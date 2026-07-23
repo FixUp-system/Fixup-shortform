@@ -8,6 +8,7 @@ export default function ProjectPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [instruction, setInstruction] = useState("");
+  const [pollTimedOut, setPollTimedOut] = useState(false);
   const pollRef = useRef(null);
 
   async function load() {
@@ -16,6 +17,50 @@ export default function ProjectPage() {
     else setErr("프로젝트를 찾을 수 없어요");
   }
   useEffect(() => { load(); return () => clearInterval(pollRef.current); }, [id]);
+
+  function startPolling() {
+    clearInterval(pollRef.current);
+    setPollTimedOut(false);
+    let failures = 0;
+    const startedAt = Date.now();
+    const stop = (timedOut) => {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+      setBusy(false);
+      if (timedOut) {
+        setPollTimedOut(true);
+        setErr("생성 상태 확인이 오래 걸리고 있어요 — 새로고침하거나 다시 시도해 주세요");
+      }
+    };
+    pollRef.current = setInterval(async () => {
+      if (Date.now() - startedAt > 5 * 60 * 1000) return stop(true);
+      try {
+        const res = await fetch(`/api/projects/${id}/cuts/status`);
+        if (!res.ok) throw new Error();
+        failures = 0;
+        const st = await res.json();
+        setProject((p) => ({ ...p, status: st.status, cuts: st.cuts }));
+        const pending = (st.cuts || []).some((c) => ["pending", "generating"].includes(c.state));
+        if (st.cuts?.length && !pending) stop(false);
+      } catch {
+        failures += 1;
+        if (failures >= 5) stop(true);
+      }
+    }, 2000);
+  }
+
+  // 새로고침 복원: 생성 중인 컷이 남아 있으면 폴링 자동 재개
+  useEffect(() => {
+    if (
+      project?.status === "cuts" &&
+      !pollRef.current &&
+      !pollTimedOut &&
+      (project.cuts || []).some((c) => ["pending", "generating"].includes(c.state))
+    ) {
+      setBusy(true);
+      startPolling();
+    }
+  }, [project?.status]);
 
   // 대본이 아직 없으면 자동 생성 시작
   useEffect(() => {
@@ -38,13 +83,7 @@ export default function ProjectPage() {
     setBusy(true); setErr("");
     const res = await fetch(`/api/projects/${id}/cuts`, { method: "POST" });
     if (!res.ok) { setErr((await res.json()).error || "시작 실패"); setBusy(false); return; }
-    // 폴링 시작
-    pollRef.current = setInterval(async () => {
-      const st = await (await fetch(`/api/projects/${id}/cuts/status`)).json();
-      setProject((p) => ({ ...p, status: st.status, cuts: st.cuts }));
-      const pending = (st.cuts || []).some((c) => ["pending", "generating"].includes(c.state));
-      if (st.cuts?.length && !pending) { clearInterval(pollRef.current); setBusy(false); }
-    }, 2000);
+    startPolling();
   }
 
   async function regen(idx) {
@@ -57,7 +96,8 @@ export default function ProjectPage() {
 
   if (!project) return <p className="pgsub">{err || "불러오는 중…"}</p>;
 
-  const step = project.status === "cuts" ? 3 : project.status === "script" ? 2 : 1;
+  // draft도 step 2 — 자동 대본 생성 동안 "대본을 쓰는 중…" 표시 (빈 화면 방지)
+  const step = project.status === "cuts" ? 3 : 2;
   const generating = busy && step >= 2 && (project.cuts || []).some?.((c) => ["pending", "generating"].includes(c.state));
 
   return (
@@ -153,7 +193,7 @@ export default function ProjectPage() {
                 <div className="ops" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {c.source === "ai" && (
                     <>
-                      <button className="mini" disabled={c.state === "generating" || c.regen_count >= 3} onClick={() => regen(c.idx)}>
+                      <button className="mini" disabled={(!pollTimedOut && c.state === "generating") || c.regen_count >= 3} onClick={() => regen(c.idx)}>
                         {c.regen_count >= 3 ? "상한 도달" : "다시 생성"}
                       </button>
                       <span className="regen-note mono">재생성 {c.regen_count}/3</span>
