@@ -13,10 +13,9 @@ export default function Sidebar() {
       <Link href="/" className={`side-item${pathname === "/" ? " on" : ""}`}>
         <span className="ic">🏠</span>홈 — 빠른 생성
       </Link>
-      <button className="side-item soon" disabled>
+      <Link href="/create" className={`side-item${pathname.startsWith("/create") ? " on" : ""}`}>
         <span className="ic">✨</span>영상 만들기 (단계별)
-        <span className="soon-tag">준비 중</span>
-      </button>
+      </Link>
       <button className="side-item soon" disabled>
         <span className="ic">📁</span>보관함
         <span className="soon-tag">준비 중</span>
