@@ -1,6 +1,6 @@
 # shotform-saas
 
-숏폼 자동 생성 SaaS. 현재는 **홈 — 빠른 생성(대화형 text-to-video) 실험 버전**만 구현돼 있습니다.
+숏폼 자동 생성 SaaS. **홈 — 빠른 생성(대화형 text-to-video)** 과 **단계별 워크플로우(제품 사진 → 대본 승인 → 컷 이미지 생성/재생성)** 가 구현돼 있습니다.
 
 ## 실행
 
@@ -14,15 +14,48 @@ npm run dev
 - `OPENAI_API_KEY` — 대화 수집 (gpt-4o)
 - `FAL_KEY` — 영상 생성 (fal.ai)
 - `FAL_VIDEO_ENDPOINT` — 사용할 비디오 모델 (기본: Kling 2.1 standard t2v). 모델 교체는 이 값만 바꾸면 됨
+- `FAL_IMAGE_ENDPOINT` — 단계별 워크플로우의 컷 이미지 모델 (기본: fal-ai/nano-banana, $0.04/장)
 
 ## 구조
 
+빠른 생성 (대화형 text-to-video):
+
 ```
 app/page.js                    홈 챗 UI (메시지·퀵리플라이·결과 재생)
-components/Sidebar.jsx         사이드바 (홈 외 메뉴는 준비 중)
+components/Sidebar.jsx         사이드바
 app/api/chat/route.js          gpt-4o 대화 수집 → ask | generate JSON
 app/api/video/route.js         fal.ai 큐 제출
 app/api/video/status/route.js  fal.ai 큐 폴링 → video_url
+```
+
+단계별 워크플로우 (프로젝트 기반, M1):
+
+```
+app/create/page.js                              새 프로젝트 시작 (업로드·정보 입력)
+app/create/[id]/page.js                         프로젝트 진행 화면 (대본 승인 → 컷 이미지)
+app/api/uploads/route.js                        제품 사진 업로드
+app/api/uploads/[name]/route.js                 업로드 파일 서빙
+app/api/projects/route.js                       프로젝트 생성·목록
+app/api/projects/[id]/route.js                  프로젝트 조회
+app/api/projects/[id]/script/route.js           대본 생성·승인
+app/api/projects/[id]/cuts/route.js             컷 이미지 생성 시작
+app/api/projects/[id]/cuts/status/route.js      컷 생성 진행 폴링
+app/api/projects/[id]/cuts/[idx]/regen/route.js 개별 컷 재생성
+lib/projects.js                                 프로젝트 저장소 (파일 기반)
+lib/llm.js                                      LLM 호출 공통
+lib/validate.js                                 입력 검증
+lib/script.js                                   대본 생성
+lib/cuts.js                                     컷 분해
+lib/imagegen.js                                 fal.ai 이미지 생성 ($0.04/장 고정 기록)
+lib/vlm.js                                      이미지 검수 (VLM)
+lib/pipeline.js                                 컷 생성 파이프라인 오케스트레이션
+```
+
+공통:
+
+```
+lib/costs.js                   비용 기록 저장소 (data/costs.json)
+app/api/costs/route.js         비용 조회
 docs/superpowers/specs/        설계 문서
 ```
 
