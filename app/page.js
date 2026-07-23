@@ -108,9 +108,10 @@ export default function Home() {
         setGenParams(params);
         push({
           role: "ai",
-          text: `정리했어요 — ${data.summary || "요청하신 내용"}\n(${data.duration}초 · ${data.aspect_ratio})\n비디오 모델에 전달할게요.`,
+          text: `정리했어요 — ${data.summary || "요청하신 내용"}\n(${data.duration}초 · ${data.aspect_ratio})\n아래 버튼을 누르면 영상 생성을 시작해요. 바꾸고 싶은 게 있으면 그냥 이어서 말씀해 주세요.`,
+          confirm: true,
+          params,
         });
-        await generateVideo(params, history);
       } else {
         throw new Error("알 수 없는 응답");
       }
@@ -119,6 +120,19 @@ export default function Home() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function confirmGenerate(idx) {
+    if (busy) return;
+    const msg = messages[idx];
+    if (!msg?.params) return;
+    setBusy(true);
+    // 이 제안의 확인 버튼 제거 (중복 클릭 방지)
+    setMessages((prev) =>
+      prev.map((m, i) => (i === idx ? { ...m, confirm: false } : m))
+    );
+    await generateVideo(msg.params, messages);
+    setBusy(false);
   }
 
   async function regenerate() {
@@ -178,6 +192,41 @@ export default function Home() {
                           </a>
                         </div>
                       </>
+                    )}
+                    {m.params && (
+                      <details open={!!m.confirm}>
+                        <summary>모델에 전달할 프롬프트 {m.confirm ? "(수정 가능)" : "보기"}</summary>
+                        {m.confirm ? (
+                          <textarea
+                            className="prompt-edit"
+                            defaultValue={m.params.prompt}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setMessages((prev) =>
+                                prev.map((mm, ii) =>
+                                  ii === i
+                                    ? { ...mm, params: { ...mm.params, prompt: v } }
+                                    : mm
+                                )
+                              );
+                              setGenParams((p) => (p ? { ...p, prompt: v } : p));
+                            }}
+                          />
+                        ) : (
+                          <div className="prompt-full">{m.params.prompt}</div>
+                        )}
+                      </details>
+                    )}
+                    {m.confirm && (
+                      <div className="res-ops">
+                        <button
+                          className="mini confirm-btn"
+                          onClick={() => confirmGenerate(i)}
+                          disabled={busy}
+                        >
+                          🎬 영상 만들기
+                        </button>
+                      </div>
                     )}
                     {m.retry && (
                       <div className="res-ops">

@@ -3,7 +3,9 @@
 // 참고: fal 큐의 상태 조회는 모델의 상위 앱 id 기준
 //   (예: fal-ai/kling-video/v2.1/standard/text-to-video → fal-ai/kling-video)
 
-const DEFAULT_ENDPOINT = "fal-ai/kling-video/v2.1/standard/text-to-video";
+import { updateRecord } from "../../../../lib/costs";
+
+const DEFAULT_ENDPOINT = "fal-ai/kling-video/v3/standard/text-to-video";
 
 function appBase(endpoint) {
   const parts = endpoint.split("/");
@@ -55,8 +57,10 @@ export async function GET(req) {
     const videoUrl = result?.video?.url || result?.output?.video?.url || null;
     if (!videoUrl) {
       console.error("fal result: no video url", JSON.stringify(result).slice(0, 500));
+      await updateRecord(id, { status: "error" }).catch(() => {});
       return Response.json({ status: "error", error: "결과에 영상이 없어요" });
     }
+    await updateRecord(id, { status: "done", video_url: videoUrl }).catch(() => {});
     return Response.json({ status: "done", video_url: videoUrl });
   }
 
