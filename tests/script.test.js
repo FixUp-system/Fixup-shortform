@@ -108,6 +108,11 @@ describe("buildScriptEditMessages", () => {
     expect(system).toContain("더하지 않는다");     // 새 사실 금지
     expect(system).toContain("paragraphs");        // 초안과 같은 출력 스키마
   });
+  it("인과 전개를 뭉개지 말라고 지시한다", () => {
+    const { system } = buildScriptEditMessages(draft);
+    expect(system).toContain("뭉개지 않는다");
+    expect(system).toContain("줄이지 않는다");
+  });
 });
 
 describe("estimateSeconds", () => {
@@ -149,6 +154,28 @@ describe("editKeptContent", () => {
   });
   it("교정이 없으면(null) 거부한다", () => {
     expect(editKeptContent(draft, null)).toBe(false);
+  });
+  it("글자 수가 초안의 80% 미만으로 줄면 거부한다(전개 뭉갬)", () => {
+    const longDraft = {
+      paragraphs: [{ tag: "여는말", text: "가".repeat(50) }, { tag: "본문", text: "나".repeat(50) }],
+      coverage: ["포인트1", "포인트2"],
+    };
+    const gutted = { // 문단·coverage는 지켰지만 글자 수 20 → 100의 20%
+      paragraphs: [{ tag: "여는말", text: "가".repeat(10) }, { tag: "본문", text: "나".repeat(10) }],
+      coverage: ["포인트1", "포인트2"],
+    };
+    expect(editKeptContent(longDraft, gutted)).toBe(false);
+  });
+  it("클리셰 제거 수준(80% 이상 유지)은 통과시킨다", () => {
+    const longDraft = {
+      paragraphs: [{ tag: "여는말", text: "가".repeat(50) }, { tag: "본문", text: "나".repeat(50) }],
+      coverage: ["포인트1"],
+    };
+    const trimmed = {
+      paragraphs: [{ tag: "여는말", text: "가".repeat(45) }, { tag: "본문", text: "나".repeat(45) }],
+      coverage: ["포인트1"],
+    };
+    expect(editKeptContent(longDraft, trimmed)).toBe(true);
   });
 });
 
