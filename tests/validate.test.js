@@ -17,23 +17,28 @@ describe("validateScript", () => {
 
 describe("validateCuts", () => {
   const photoIds = ["p1", "p2"];
-  it("정상 컷 배열을 통과시키고 idx를 재부여한다", () => {
+  it("모든 컷을 ai로 만들고 idx를 재부여한다", () => {
     const cuts = validateCuts(
       { cuts: [
-        { sentence: "문장1", seconds: 6, source: "ai", ref_photo_id: "p1" },
-        { sentence: "문장2", seconds: 8, source: "photo", photo_id: "p2" },
+        { sentence: "문장1", seconds: 6, ref_photo_id: "p1" },
+        { sentence: "문장2", seconds: 8 },
       ]},
       photoIds
     );
     expect(cuts).toHaveLength(2);
     expect(cuts[0].idx).toBe(0);
-    expect(cuts[1].photo_id).toBe("p2");
+    expect(cuts.every((c) => c.source === "ai")).toBe(true);
+    expect(cuts[0].ref_photo_id).toBe("p1");
+    expect(cuts[1].ref_photo_id).toBeUndefined();
   });
-  it("photo 소스인데 photo_id가 목록에 없으면 null", () => {
-    expect(validateCuts({ cuts: [{ sentence: "s", seconds: 5, source: "photo", photo_id: "없음" }] }, photoIds)).toBeNull();
+  it("photo 소스로 와도 ai로 바꾸고 그 사진을 레퍼런스로 승격한다", () => {
+    const cuts = validateCuts({ cuts: [{ sentence: "s", seconds: 5, source: "photo", photo_id: "p2" }] }, photoIds);
+    expect(cuts[0].source).toBe("ai");
+    expect(cuts[0].ref_photo_id).toBe("p2");
+    expect(cuts[0].photo_id).toBeUndefined();
   });
-  it("존재하지 않는 ref_photo_id는 제거하고 통과시킨다", () => {
-    const cuts = validateCuts({ cuts: [{ sentence: "s", seconds: 5, source: "ai", ref_photo_id: "없음" }] }, photoIds);
+  it("존재하지 않는 레퍼런스는 제거하고 통과시킨다", () => {
+    const cuts = validateCuts({ cuts: [{ sentence: "s", seconds: 5, ref_photo_id: "없음" }] }, photoIds);
     expect(cuts[0].ref_photo_id).toBeUndefined();
   });
 });
