@@ -13,7 +13,9 @@ export default function ImagesStepPage() {
   const [pollTimedOut, setPollTimedOut] = useState(false);
   const pollRef = useRef(null);
 
-  useEffect(() => () => clearInterval(pollRef.current), []);
+  // 언마운트 정리 — ref까지 비운다. 비우지 않으면 (dev StrictMode의 재마운트처럼) 다시 마운트됐을 때
+  // "이미 돌고 있음"으로 오인해 폴링이 되살아나지 않는다.
+  useEffect(() => () => { clearInterval(pollRef.current); pollRef.current = null; }, []);
 
   function startPolling() {
     clearInterval(pollRef.current);
@@ -36,7 +38,8 @@ export default function ImagesStepPage() {
         if (!res.ok) throw new Error();
         failures = 0;
         const st = await res.json();
-        setProject((p) => ({ ...p, status: st.status, cuts: st.cuts }));
+        setProject((p) => ({ ...p, status: st.status, cuts: st.cuts, cuts_error: st.cuts_error }));
+        if (st.cuts_error) { stop(false); setErr(st.cuts_error); return; }
         const pending = (st.cuts || []).some((c) => ["pending", "generating"].includes(c.state));
         if (st.cuts?.length && !pending) stop(false);
       } catch {
@@ -46,18 +49,28 @@ export default function ImagesStepPage() {
     }, 2000);
   }
 
-  // 진입·새로고침 복원: 생성 중인 컷이 남아 있으면 폴링 재개
+  // 진입·새로고침 복원: 컷 분할 대기(컷이 아직 없음)거나 생성 중인 컷이 남아 있으면 폴링 재개
   useEffect(() => {
-    if (
-      project?.status === "cuts" &&
-      !pollRef.current &&
-      !pollTimedOut &&
-      (project.cuts || []).some((c) => ["pending", "generating"].includes(c.state))
-    ) {
+    const cuts = project?.cuts || [];
+    const waiting = cuts.length === 0 || cuts.some((c) => ["pending", "generating"].includes(c.state));
+    if (project?.status === "cuts" && !project.cuts_error && !pollRef.current && !pollTimedOut && waiting) {
       setBusy(true);
       startPolling();
     }
-  }, [project?.status, project?.cuts]);
+  }, [project?.status, project?.cuts, project?.cuts_error]);
+
+  // 컷 분할이 실패한 뒤의 다시 시도 — 사용자가 누를 때만 파이프라인을 다시 띄운다
+  async function retry() {
+    setErr(""); setPollTimedOut(false); setBusy(true);
+    const res = await fetch(`/api/projects/${id}/cuts`, { method: "POST" });
+    if (!res.ok) {
+      setErr((await res.json().catch(() => ({}))).error || "다시 시도하지 못했어요");
+      setBusy(false);
+      return;
+    }
+    await load(id).catch(() => {});
+    startPolling();
+  }
 
   async function regen(idx) {
     setProject((p) => ({ ...p, cuts: p.cuts.map((c) => c.idx === idx ? { ...c, state: "generating" } : c) }));
@@ -75,12 +88,25 @@ export default function ImagesStepPage() {
     await load(id).catch(() => {});
   }
 
-  const generating = (project.cuts || []).some((c) => ["pending", "generating"].includes(c.state));
+  const cuts = project.cuts || [];
+  const generating = cuts.some((c) => ["pending", "generating"].includes(c.state));
+  // 새로고침·재진입으로 들어오면 실패는 화면 상태가 아니라 프로젝트에 남아 있다 — 둘 다 본다
+  const shownErr = err || project.cuts_error || "";
+  // 컷 분할이 끝나기 전 — 대본 승인 직후 이 화면에 도착하면 여기부터 보인다
+  const splitting = project.status === "cuts" && cuts.length === 0 && !shownErr;
 
   return (
     <section className="panel" style={{ maxWidth: 760 }}>
-      <h2>{generating ? "컷별 이미지를 만들고 있어요" : <>컷별 이미지를 확인해 주세요 <span className="badge vlm">승인 게이트 2</span></>}</h2>
-      {err && <p className="pgsub" style={{ color: "var(--warn)" }}>{err}</p>}
+      <h2>{splitting ? "대본을 컷으로 나누는 중이에요"
+        : cuts.length === 0 ? "컷을 나누지 못했어요"
+        : generating ? "컷별 이미지를 만들고 있어요"
+        : <>컷별 이미지를 확인해 주세요 <span className="badge vlm">승인 게이트 2</span></>}</h2>
+      {splitting && <p className="pgsub">잠시만요 — 나뉜 컷부터 차례로 이미지가 만들어집니다</p>}
+      {shownErr && (
+        <p className="pgsub" style={{ color: "var(--warn)" }}>
+          {shownErr}{cuts.length === 0 && <> <button className="mini" onClick={retry} disabled={busy}>다시 시도</button></>}
+        </p>
+      )}
       {(project.cuts || []).map((c) => {
         const photo = project.material.photos.find((p) => p.id === c.photo_id);
         const img = c.source === "photo" ? photo?.url : c.image?.url;
@@ -119,7 +145,7 @@ export default function ImagesStepPage() {
           </div>
         );
       })}
-      {!generating && !busy && (
+      {!generating && !busy && cuts.length > 0 && (
         <>
           <button className="cta" disabled>영상화 — 준비 중 (⑤)</button>
           <div className="credit-note">여기까지가 지금 되는 데까지예요 — 이미지가 곧 각 컷의 시작 프레임이 됩니다</div>

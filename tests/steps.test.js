@@ -64,6 +64,13 @@ describe("isReachable", () => {
     expect(isReachable("voice", p)).toBe(false);
     expect(isReachable("images", p)).toBe(false);
   });
+  it("대본 승인 직후 status가 cuts로 서야 ④이미지가 열린다", () => {
+    // 라우트가 파이프라인보다 먼저 status:cuts를 세우는 이유 — script인 채로 오면 가드가 되돌린다
+    const before = { status: "script", briefing: { confirmed: true } };
+    const after = { status: "cuts", briefing: { confirmed: true }, cuts: [] };
+    expect(isReachable("images", before)).toBe(false);
+    expect(isReachable("images", after)).toBe(true); // 컷이 아직 비어 있어도 열린다
+  });
   it("지난 단계는 다시 열 수 있다", () => {
     const p = { status: "cuts", briefing: { confirmed: true } };
     expect(isReachable("script", p)).toBe(true);
