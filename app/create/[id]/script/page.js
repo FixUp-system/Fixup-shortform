@@ -51,12 +51,33 @@ export default function ScriptStepPage() {
     await load(id).catch(() => {});
   }
 
-  if (!project.script) return <p className="pgsub">대본을 쓰는 중…</p>;
+  // 대본이 아직 없을 때 — 실패했다면 이유와 다시 쓰기 버튼을 보여준다(자동 재시도는 하지 않는다)
+  if (!project.script) {
+    if (err) {
+      return (
+        <p className="pgsub" style={{ color: "var(--warn)" }}>
+          {err} <button className="mini" disabled={busy} onClick={() => genScript()}>다시 쓰기</button>
+        </p>
+      );
+    }
+    return <p className="pgsub">대본을 쓰는 중…</p>;
+  }
+
+  // 브리핑을 고쳐 다시 확정하면 버전이 올라간다 — 지금 대본이 그 이전 것인지 알려주기만 한다
+  const staleScript =
+    project.briefing?.version && project.script.briefing_version &&
+    project.script.briefing_version !== project.briefing.version;
 
   return (
     <section className="panel" style={{ maxWidth: 760 }}>
       <h2>대본을 확인해 주세요 <span className="badge vlm">승인 게이트 1</span></h2>
       {err && <p className="pgsub" style={{ color: "var(--warn)" }}>{err}</p>}
+      {staleScript && (
+        <p className="pgsub" style={{ color: "var(--warn)" }}>
+          브리핑이 바뀌었어요 — 지금 대본은 바뀌기 전 내용이에요{" "}
+          <button className="mini" disabled={busy} onClick={() => genScript()}>대본 다시 쓰기</button>
+        </p>
+      )}
       <div className="script-box">
         {project.script.paragraphs.map((p, i) => (
           <p key={i}>

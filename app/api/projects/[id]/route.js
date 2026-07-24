@@ -15,7 +15,11 @@ export async function PATCH(req, { params }) {
       const next = { ...proj };
       if (body.material) next.material = { ...proj.material, ...body.material };
       if (body.settings) next.settings = { ...proj.settings, ...body.settings };
-      if (body.briefing) next.briefing = { ...proj.briefing, ...body.briefing };
+      if (body.briefing) {
+        next.briefing = { ...proj.briefing, ...body.briefing };
+        // 확정할 때마다 버전을 올린다 — 대본이 어느 브리핑에서 나왔는지 대본 화면이 비교할 수 있게
+        if (body.briefing.confirmed === true) next.briefing.version = (proj.briefing?.version || 1) + 1;
+      }
       if (body.cut && Number.isInteger(body.cut.idx) && typeof body.cut.sentence === "string") {
         next.cuts = proj.cuts.map((c) =>
           c.idx === body.cut.idx ? { ...c, sentence: body.cut.sentence } : c

@@ -27,7 +27,12 @@ export async function POST(req, { params }) {
   const updated = await updateProject(id, (proj) => ({
     ...proj,
     status: "script",
-    script: { ...script, version: (proj.script?.version || 0) + 1 },
+    // 어느 브리핑에서 나온 대본인지 찍어둔다 — 브리핑이 다시 확정되면 화면이 차이를 알 수 있다
+    script: {
+      ...script,
+      version: (proj.script?.version || 0) + 1,
+      briefing_version: proj.briefing?.version || 1,
+    },
   }));
   return Response.json({ script: updated.script });
 }
