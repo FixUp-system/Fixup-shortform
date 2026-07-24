@@ -16,8 +16,8 @@ export default function ScriptStepPage() {
 
   // 대본이 아직 없으면 자동 생성 시작
   useEffect(() => {
-    if (project?.status === "draft" && !busy) genScript();
-  }, [project?.status]);
+    if (project && !project.script && project.briefing?.confirmed && !busy) genScript();
+  }, [project?.status, project?.briefing?.confirmed]);
 
   async function genScript(instr) {
     setBusy(true); setErr("");
