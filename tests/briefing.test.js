@@ -41,6 +41,19 @@ describe("buildBriefingMessages", () => {
     expect(system).not.toContain("홍보");
   });
 
+  it("자료가 얕으면 전개용 질문으로 채우라고 지시한다", () => {
+    const { system } = buildBriefingMessages(project);
+    expect(system).toContain("전개용");
+    expect(system).toMatch(/왜 시작|반응|한 장면|남과 다른/);
+  });
+  it("전개용 소재는 취향과 다르다고 구분한다 — 여전히 훅·홍보는 없다", () => {
+    const { system } = buildBriefingMessages(project);
+    expect(system).toContain("소재");
+    expect(system).not.toContain("훅");
+    expect(system).not.toContain("홍보");
+    expect(system).toContain("빈 배열이 정답"); // 풍부하면 여전히 빈 배열
+  });
+
   it("이미 되물은 이력이 있으면 다시 묻지 말라고 지시한다", () => {
     const withAsked = {
       ...project,
