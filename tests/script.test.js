@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildScriptMessages, estimateSeconds } from "../lib/script.js";
+import { buildScriptMessages, buildScriptEditMessages, estimateSeconds } from "../lib/script.js";
 
 const project = {
   settings: { aspect_ratio: "9:16" },
@@ -71,6 +71,25 @@ describe("buildScriptMessages", () => {
     const { system } = buildScriptMessages(project);
     expect(system).toContain("성격");   // 성격은 자료가 정한다
     expect(system).not.toContain("반드시");
+  });
+});
+
+describe("buildScriptEditMessages", () => {
+  const draft = {
+    paragraphs: [{ tag: "여는말", text: "특별한 딸기라떼를 만나보세요" }],
+    coverage: ["시럽 안 씀"],
+  };
+  it("다듬을 초안 문장과 반영 포인트가 프롬프트에 들어간다", () => {
+    const user = buildScriptEditMessages(draft).messages[0].content;
+    expect(user).toContain("특별한 딸기라떼를 만나보세요");
+    expect(user).toContain("시럽 안 씀");
+  });
+  it("사실 유지·상투어 제거·새 사실 추가 금지를 지시한다", () => {
+    const { system } = buildScriptEditMessages(draft);
+    expect(system).toContain("빠뜨리지 않는다");
+    expect(system).toContain("만나보세요");       // 없앨 표현 목록
+    expect(system).toContain("더하지 않는다");     // 새 사실 금지
+    expect(system).toContain("paragraphs");        // 초안과 같은 출력 스키마
   });
 });
 
