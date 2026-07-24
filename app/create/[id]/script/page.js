@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
+import BackButton from "../../../../components/BackButton";
 import { estimateSeconds } from "../../../../lib/script";
 import { currentStepKey } from "../../../../lib/steps";
 
@@ -87,6 +88,7 @@ export default function ScriptStepPage() {
 
   return (
     <section className="panel" style={{ maxWidth: 760 }}>
+      <BackButton stepKey="script" />
       <h2>대본을 확인해 주세요 <span className="badge vlm">승인 게이트 1</span></h2>
       {err && <p className="pgsub" style={{ color: "var(--warn)" }}>{err}</p>}
       {staleScript && (
@@ -115,10 +117,12 @@ export default function ScriptStepPage() {
       {project.script.coverage?.length > 0 && (
         <div className="script-src">자료 반영 — {project.script.coverage.map((c, i) => <b key={i}>✓ {c} </b>)}</div>
       )}
-      <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-        <input className="sent-input" style={{ flex: 1 }} placeholder='수정 지시 (예: "더 짧게", "더 캐주얼하게")'
+      <div style={{ display: "flex", gap: 8, marginTop: 14, alignItems: "flex-end" }}>
+        <textarea className="sent-input" style={{ flex: 1, minHeight: 96, padding: "13px 15px", fontSize: 14, resize: "vertical", fontFamily: "inherit", lineHeight: 1.55 }}
+          placeholder='수정 지시 (예: "더 짧게", "더 캐주얼하게", "가격을 강조해줘")'
           value={instruction} onChange={(e) => setInstruction(e.target.value)} />
-        <button className="mini" disabled={busy} onClick={() => genScript(instruction || "전체를 다시 써줘")}>
+        <button className="mini" style={{ padding: "13px 18px", fontSize: 13.5, whiteSpace: "nowrap" }}
+          disabled={busy} onClick={() => genScript(instruction || "전체를 다시 써줘")}>
           {instruction ? "지시 반영" : "전체 다시 쓰기"}
         </button>
       </div>
@@ -134,10 +138,12 @@ export default function ScriptStepPage() {
           </div>
         </>
       )}
-      <button className="cta" disabled={busy} onClick={approve}>
-        {hasCuts ? "④ 이미지 확인하러 가기" : "대본 승인 — 컷 나누고 이미지 만들기"}
-      </button>
-      <div className="credit-note">
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button className="cta" disabled={busy} onClick={approve}>
+          {hasCuts ? "④ 이미지 확인하러 가기" : "대본 승인 — 컷 나누고 이미지 만들기"}
+        </button>
+      </div>
+      <div className="credit-note" style={{ textAlign: "right" }}>
         {hasCuts
           ? "이미 만든 컷이 있어요 — 다시 만들지 않고 그대로 보여드려요"
           : "컷당 이미지 후보 2장 생성 + AI 검수 (약 $0.08/컷) · 목소리(③)는 준비 중이라 건너뜁니다"}

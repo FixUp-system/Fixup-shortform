@@ -168,6 +168,9 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
 .side-step.on { background: var(--accent-soft); color: var(--ink); font-weight: 700; }
 .side-step.locked { opacity: 0.5; cursor: default; }
 
+.back-link { display: inline-block; color: var(--ink-soft); font-size: 13px; text-decoration: none; margin-bottom: 14px; }
+.back-link:hover { color: var(--ink); }
+
 .side-new {
   display: block;
   margin: 4px 0 4px 17px;
