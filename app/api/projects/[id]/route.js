@@ -15,6 +15,7 @@ export async function PATCH(req, { params }) {
       const next = { ...proj };
       if (body.material) next.material = { ...proj.material, ...body.material };
       if (body.settings) next.settings = { ...proj.settings, ...body.settings };
+      if (body.briefing) next.briefing = { ...proj.briefing, ...body.briefing };
       if (body.cut && Number.isInteger(body.cut.idx) && typeof body.cut.sentence === "string") {
         next.cuts = proj.cuts.map((c) =>
           c.idx === body.cut.idx ? { ...c, sentence: body.cut.sentence } : c
