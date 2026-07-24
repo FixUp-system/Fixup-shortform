@@ -54,6 +54,24 @@ describe("buildScriptMessages", () => {
     expect(system).not.toContain("반드시");
     expect(system).toContain("성격");
   });
+
+  it("담담한 목소리를 지시하고 상투어를 금지한다", () => {
+    const { system } = buildScriptMessages(project);
+    expect(system).toMatch(/담담|평서문/);
+    expect(system).toContain("특별한");     // 금지 목록에 이름을 올려 못 쓰게 한다
+    expect(system).toContain("만나보세요");
+    expect(system).toContain("쓰지 않는다"); // 금지 지시문
+  });
+  it("대조 예시를 톤 참고용으로만 제시한다", () => {
+    const { system } = buildScriptMessages(project);
+    expect(system).toContain("베끼지 말 것");
+    expect(system).toContain("시럽을 쓰지 않습니다"); // 담담한 예
+  });
+  it("성격 중립·훅 비강제는 그대로 유지한다", () => {
+    const { system } = buildScriptMessages(project);
+    expect(system).toContain("성격");   // 성격은 자료가 정한다
+    expect(system).not.toContain("반드시");
+  });
 });
 
 describe("estimateSeconds", () => {
