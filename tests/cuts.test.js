@@ -27,4 +27,15 @@ describe("buildImagePrompt", () => {
     expect(prompt).toMatch(/vertical|9:16/);
     expect(prompt).toContain("reference");
   });
+  it("브리핑 주제가 있으면 전 컷에 주제 앵커가 들어간다", () => {
+    const withTopic = { ...project, briefing: { topic: "생딸기라떼 신메뉴" } };
+    const cut = { sentence: "한 잔 6,500원", source: "ai" }; // 제품이 문장에 없는 컷
+    expect(buildImagePrompt(cut, withTopic)).toContain("생딸기라떼 신메뉴");
+  });
+  it("edit_instruction이 있으면 사용자 수정으로 강하게 반영된다", () => {
+    const cut = { sentence: "한 잔 6,500원", source: "ai", edit_instruction: "딸기라떼가 보이게, 컵을 더 작게" };
+    const prompt = buildImagePrompt(cut, project);
+    expect(prompt).toContain("딸기라떼가 보이게, 컵을 더 작게");
+    expect(prompt).toMatch(/correction/i);
+  });
 });

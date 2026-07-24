@@ -58,4 +58,15 @@ describe("runCutsPipeline", () => {
     await pipeline.regenCut(p.id, 0, deps());
     await expect(pipeline.regenCut(p.id, 0, deps())).rejects.toThrow(/3회/);
   });
+
+  it("regenCut instruction이 컷에 저장되고 이후 프롬프트에 실린다", async () => {
+    const p = await makeProject();
+    await pipeline.runCutsPipeline(p.id, deps());
+    const prompts = [];
+    const capturing = { ...deps(), genImage: async ({ prompt }) => { prompts.push(prompt); return { url: "http://img/x" }; } };
+    await pipeline.regenCut(p.id, 0, capturing, "딸기라떼가 보이게");
+    const cut = (await projects.getProject(p.id)).cuts.find((c) => c.idx === 0);
+    expect(cut.edit_instruction).toBe("딸기라떼가 보이게");
+    expect(prompts.some((pr) => pr.includes("딸기라떼가 보이게"))).toBe(true);
+  });
 });

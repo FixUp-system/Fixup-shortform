@@ -12,6 +12,7 @@ export default function ImagesStepPage() {
   const [err, setErr] = useState("");
   const [pollTimedOut, setPollTimedOut] = useState(false);
   const [dismissed, setDismissed] = useState(false); // 컷이 남은 채 난 실패를 화면에서 접었는가
+  const [selectedIdx, setSelectedIdx] = useState(null); // 우측 큰 미리보기로 볼 컷
   const pollRef = useRef(null);
 
   // 언마운트 정리 — ref까지 비운다. 비우지 않으면 (dev StrictMode의 재마운트처럼) 다시 마운트됐을 때
@@ -81,9 +82,12 @@ export default function ImagesStepPage() {
     await load(id).catch(() => {});
   }
 
-  async function regen(idx) {
+  async function regen(idx, instruction) {
     setProject((p) => ({ ...p, cuts: p.cuts.map((c) => c.idx === idx ? { ...c, state: "generating" } : c) }));
-    const res = await fetch(`/api/projects/${id}/cuts/${idx}/regen`, { method: "POST" });
+    const res = await fetch(`/api/projects/${id}/cuts/${idx}/regen`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(instruction ? { instruction } : {}),
+    });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) setErr(data.error);
     await load(id).catch(() => {});
@@ -98,6 +102,12 @@ export default function ImagesStepPage() {
   }
 
   const cuts = project.cuts || [];
+  const imgUrl = (c) =>
+    c.source === "photo" ? project.material.photos.find((p) => p.id === c.photo_id)?.url : c.image?.url;
+  // 우측 미리보기 대상 — 사용자가 고른 컷, 없으면 이미지가 준비된 첫 컷
+  const readyCuts = cuts.filter((c) => imgUrl(c));
+  const activeIdx = cuts.some((c) => c.idx === selectedIdx) ? selectedIdx : readyCuts[0]?.idx ?? null;
+  const activeCut = cuts.find((c) => c.idx === activeIdx) || null;
   const generating = cuts.some((c) => ["pending", "generating"].includes(c.state));
   // 새로고침·재진입으로 들어오면 실패는 화면 상태가 아니라 프로젝트에 남아 있다 — 둘 다 본다.
   // 접기(dismiss)는 프로젝트에 남은 실패에만 적용한다 — 그 뒤에 새로 난 실패는 그대로 보여야 한다.
@@ -108,64 +118,121 @@ export default function ImagesStepPage() {
   const splitting = project.status === "cuts" && cuts.length === 0 && !shownErr;
 
   return (
-    <section className="panel" style={{ maxWidth: 760 }}>
-      <h2>{splitting ? "대본을 컷으로 나누는 중이에요"
-        : cuts.length === 0 ? "컷을 나누지 못했어요"
-        : generating ? "컷별 이미지를 만들고 있어요"
-        : <>컷별 이미지를 확인해 주세요 <span className="badge vlm">승인 게이트 2</span></>}</h2>
-      {splitting && <p className="pgsub">잠시만요 — 나뉜 컷부터 차례로 이미지가 만들어집니다</p>}
-      {shownErr && (
-        <p className="pgsub" style={{ color: "var(--warn)" }}>
-          {shownErr}{" "}
-          {cuts.length === 0
-            ? <button className="mini" onClick={retry} disabled={busy}>다시 시도</button>
-            : <button className="mini" onClick={dismiss} disabled={busy}>닫고 컷별로 다시 만들기</button>}
-        </p>
-      )}
-      {(project.cuts || []).map((c) => {
-        const photo = project.material.photos.find((p) => p.id === c.photo_id);
-        const img = c.source === "photo" ? photo?.url : c.image?.url;
-        return (
-          <div className="scene" key={c.idx}>
-            <div className={`thumb${c.source === "photo" ? " photo-mark" : ""}`}>
-              <span className="num">{c.idx + 1}</span>
-              {img ? <img src={img} alt="" /> :
-                <span className="ph">{c.state === "needs_attention" ? "품질 확인 필요" : "생성 중…"}</span>}
-            </div>
-            <div className="txt">
-              “<span contentEditable suppressContentEditableWarning style={{ outline: "none" }}
-                onBlur={(e) => {
-                  const sentence = e.currentTarget.textContent.trim();
-                  if (sentence && sentence !== c.sentence) editSentence(c.idx, sentence);
-                }}>{c.sentence}</span>”
-              <div className="badges">
-                <span className={`badge ${c.source === "photo" ? "photo" : "ai"}`}>
-                  {c.source === "photo" ? `내 사진 · ${photo?.filename || ""}` : "AI 생성"}
-                </span>
-                {c.ref_photo_id && <span className="badge vlm">레퍼런스 적용</span>}
-                {c.vlm?.note && <span className="badge ai">{c.vlm.note.slice(0, 30)}</span>}
-                <span className="badge ai">{c.seconds}초</span>
+    <div className="images-layout">
+      <section className="panel images-col">
+        <h2>{splitting ? "대본을 컷으로 나누는 중이에요"
+          : cuts.length === 0 ? "컷을 나누지 못했어요"
+          : generating ? "컷별 이미지를 만들고 있어요"
+          : <>컷별 이미지를 확인해 주세요 <span className="badge vlm">승인 게이트 2</span></>}</h2>
+        {splitting && <p className="pgsub">잠시만요 — 나뉜 컷부터 차례로 이미지가 만들어집니다</p>}
+        {!splitting && cuts.length > 0 && <p className="pgsub">이미지를 클릭하면 오른쪽에서 크게 보고 고칠 수 있어요</p>}
+        {shownErr && (
+          <p className="pgsub" style={{ color: "var(--warn)" }}>
+            {shownErr}{" "}
+            {cuts.length === 0
+              ? <button className="mini" onClick={retry} disabled={busy}>다시 시도</button>
+              : <button className="mini" onClick={dismiss} disabled={busy}>닫고 컷별로 다시 만들기</button>}
+          </p>
+        )}
+        {cuts.map((c) => {
+          const photo = project.material.photos.find((p) => p.id === c.photo_id);
+          const img = imgUrl(c);
+          return (
+            <div className="scene" key={c.idx}>
+              <div
+                className={`thumb${c.source === "photo" ? " photo-mark" : ""}${c.idx === activeIdx ? " selected" : ""}`}
+                onClick={() => setSelectedIdx(c.idx)}
+              >
+                <span className="num">{c.idx + 1}</span>
+                {img ? <img src={img} alt="" /> :
+                  <span className="ph">{c.state === "needs_attention" ? "품질 확인 필요" : "생성 중…"}</span>}
+              </div>
+              <div className="txt">
+                “<span contentEditable suppressContentEditableWarning style={{ outline: "none" }}
+                  onBlur={(e) => {
+                    const sentence = e.currentTarget.textContent.trim();
+                    if (sentence && sentence !== c.sentence) editSentence(c.idx, sentence);
+                  }}>{c.sentence}</span>”
+                <div className="badges">
+                  <span className={`badge ${c.source === "photo" ? "photo" : "ai"}`}>
+                    {c.source === "photo" ? `내 사진 · ${photo?.filename || ""}` : "AI 생성"}
+                  </span>
+                  {c.ref_photo_id && <span className="badge vlm">레퍼런스 적용</span>}
+                  {c.vlm?.note && <span className="badge ai">{c.vlm.note.slice(0, 30)}</span>}
+                  <span className="badge ai">{c.seconds}초</span>
+                </div>
               </div>
             </div>
-            <div className="ops" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {c.source === "ai" && (
-                <>
-                  <button className="mini" disabled={(!stalled && c.state === "generating") || c.regen_count >= 3} onClick={() => regen(c.idx)}>
-                    {c.regen_count >= 3 ? "상한 도달" : "다시 생성"}
-                  </button>
-                  <span className="regen-note mono">재생성 {c.regen_count}/3</span>
-                </>
-              )}
-            </div>
-          </div>
-        );
-      })}
-      {!generating && !busy && cuts.length > 0 && (
-        <>
-          <button className="cta" disabled>영상화 — 준비 중 (⑤)</button>
-          <div className="credit-note">여기까지가 지금 되는 데까지예요 — 이미지가 곧 각 컷의 시작 프레임이 됩니다</div>
-        </>
+          );
+        })}
+        {!generating && !busy && cuts.length > 0 && (
+          <>
+            <button className="cta" disabled>영상화 — 준비 중 (⑤)</button>
+            <div className="credit-note">여기까지가 지금 되는 데까지예요 — 이미지가 곧 각 컷의 시작 프레임이 됩니다</div>
+          </>
+        )}
+      </section>
+
+      {activeCut && (
+        <PreviewPane
+          key={activeCut.idx}
+          cut={activeCut}
+          url={imgUrl(activeCut)}
+          photoName={project.material.photos.find((p) => p.id === activeCut.photo_id)?.filename}
+          stalled={stalled}
+          onRegen={regen}
+        />
       )}
-    </section>
+    </div>
+  );
+}
+
+// 우측 큰 미리보기 + 컷별 수정. instruction 입력은 컷마다 초기화돼야 하므로
+// 부모가 key={cut.idx}로 이 컴포넌트를 갈아끼운다(로컬 state가 자연히 리셋됨).
+function PreviewPane({ cut, url, photoName, stalled, onRegen }) {
+  const [instr, setInstr] = useState("");
+  const isPhoto = cut.source === "photo";
+  const busyCut = !stalled && cut.state === "generating";
+  const atLimit = cut.regen_count >= 3;
+
+  return (
+    <aside className="panel preview-pane">
+      <div className="preview-frame">
+        {url ? <img src={url} alt="" /> : <span className="ph">{cut.state === "needs_attention" ? "품질 확인 필요" : "생성 중…"}</span>}
+      </div>
+      <div className="badges" style={{ marginTop: 12 }}>
+        <span className={`badge ${isPhoto ? "photo" : "ai"}`}>{isPhoto ? `내 사진 · ${photoName || ""}` : "AI 생성"}</span>
+        {cut.ref_photo_id && <span className="badge vlm">레퍼런스 적용</span>}
+        <span className="badge ai">{cut.seconds}초</span>
+      </div>
+      <p className="preview-sentence">“{cut.sentence}”</p>
+
+      {isPhoto ? (
+        <p className="preview-note">내가 올린 사진이라 그대로 쓰여요.</p>
+      ) : (
+        <div className="preview-edit">
+          {cut.edit_instruction && <p className="preview-note">지난 수정 지시: {cut.edit_instruction}</p>}
+          <textarea
+            className="ref"
+            placeholder="이 이미지에서 고치고 싶은 점을 적어주세요 — 예: 딸기라떼가 보이게, 컵을 더 작게, 손 빼기"
+            value={instr}
+            onChange={(e) => setInstr(e.target.value)}
+          />
+          <div className="preview-actions">
+            <button
+              className="cta"
+              disabled={atLimit || busyCut || !instr.trim()}
+              onClick={() => onRegen(cut.idx, instr.trim())}
+            >
+              이 지시로 다시 만들기
+            </button>
+            <button className="mini" disabled={atLimit || busyCut} onClick={() => onRegen(cut.idx)}>
+              그냥 다시
+            </button>
+          </div>
+          <span className="regen-note mono">{atLimit ? "재생성 상한 도달 (3/3)" : `재생성 ${cut.regen_count}/3`}</span>
+        </div>
+      )}
+    </aside>
   );
 }
