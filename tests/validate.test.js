@@ -86,11 +86,4 @@ describe("validateBriefing", () => {
     expect(b.asked[0].question).toBe("정상?");
     expect(b.asked[0].options).toEqual([]);
   });
-
-  it("이미 답한 이력이 있으면 새 질문을 쓰지 않는다 (라우트 규칙과 같은 판정)", () => {
-    const kept = [{ question: "가격대는요?", options: [], answer: "5천원대", done: true }];
-    const fresh = validateBriefing({ topic: "주제", key_points: ["가"], questions: [{ question: "새 질문" }] });
-    const asked = kept.length > 0 ? kept : fresh.asked;
-    expect(asked).toEqual(kept);
-  });
 });

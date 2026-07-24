@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildBriefingMessages } from "../lib/briefing.js";
+import { buildBriefingMessages, mergeAsked } from "../lib/briefing.js";
 
 const project = {
   material: {
@@ -44,5 +44,49 @@ describe("buildBriefingMessages", () => {
     expect(user).toContain("가격대는요?");
     expect(user).toContain("5천원대");
     expect(user).toContain("추가 질문 없이");
+  });
+});
+
+describe("mergeAsked", () => {
+  const fresh = [
+    { question: "새 질문1", options: ["가"], answer: null, done: false },
+    { question: "새 질문2", options: [], answer: null, done: false },
+  ];
+
+  it("이전 목록이 없으면 새 목록을 쓴다", () => {
+    expect(mergeAsked(undefined, fresh)).toEqual(fresh);
+    expect(mergeAsked(null, fresh)).toEqual(fresh);
+    expect(mergeAsked([], fresh)).toEqual(fresh);
+  });
+
+  it("이전 목록이 전부 미답이면 새 목록을 쓴다", () => {
+    const prev = [{ question: "옛 질문", options: [], answer: null, done: false }];
+    expect(mergeAsked(prev, fresh)).toEqual(fresh);
+  });
+
+  it("이전 목록에 답한 항목이 있으면 이전 목록을 그대로 쓴다", () => {
+    const prev = [
+      { question: "가격대는요?", options: [], answer: "5천원대", done: true },
+      { question: "안 답한 것", options: [], answer: null, done: false },
+    ];
+    expect(mergeAsked(prev, fresh)).toEqual(prev);
+  });
+
+  it("done 없이 answer만 있는 항목도 답한 것으로 본다", () => {
+    const prev = [{ question: "가격대는요?", options: [], answer: "5천원대" }];
+    expect(mergeAsked(prev, fresh)).toEqual(prev);
+  });
+
+  it("건너뛴 항목(answer 없이 done)도 답한 것으로 본다", () => {
+    const prev = [{ question: "가격대는요?", options: [], answer: null, done: true }];
+    expect(mergeAsked(prev, fresh)).toEqual(prev);
+  });
+
+  it("빈 문자열·공백뿐인 answer는 답한 것으로 보지 않는다", () => {
+    const prev = [
+      { question: "가격대는요?", options: [], answer: "   ", done: false },
+      { question: "또?", options: [], answer: "", done: false },
+    ];
+    expect(mergeAsked(prev, fresh)).toEqual(fresh);
   });
 });

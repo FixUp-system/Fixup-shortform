@@ -1,7 +1,7 @@
 import { getProject, updateProject } from "../../../../../lib/projects";
 import { callJson } from "../../../../../lib/llm";
 import { validateBriefing } from "../../../../../lib/validate";
-import { buildBriefingMessages } from "../../../../../lib/briefing";
+import { buildBriefingMessages, mergeAsked } from "../../../../../lib/briefing";
 
 export async function POST(req, { params }) {
   const { id } = await params;
@@ -28,8 +28,7 @@ export async function POST(req, { params }) {
   // 이미 답한 이력은 보존하고, 질문 라운드는 1회로 코드가 강제한다.
   // (프롬프트로도 지시하지만 LLM이 어길 수 있으므로 여기서 잘라낸다)
   const updated = await updateProject(id, (proj) => {
-    const kept = (proj.briefing?.asked || []).filter((a) => a.done);
-    const asked = kept.length > 0 ? kept : briefing.asked;
+    const asked = mergeAsked(proj.briefing?.asked, briefing.asked);
     return {
       ...proj,
       status: "briefing",
