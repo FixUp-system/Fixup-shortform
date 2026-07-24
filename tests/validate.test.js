@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateScript, validateCuts, validateBriefing } from "../lib/validate.js";
+import { validateScript, validateCuts, validateBriefing, validatePlan } from "../lib/validate.js";
 
 describe("validateScript", () => {
   it("정상 스키마를 통과시킨다", () => {
@@ -90,5 +90,37 @@ describe("validateBriefing", () => {
     expect(b.asked).toHaveLength(1);
     expect(b.asked[0].question).toBe("정상?");
     expect(b.asked[0].options).toEqual([]);
+  });
+});
+
+describe("validatePlan", () => {
+  const ok = {
+    angle: "시럽을 쓰지 않는다",
+    beats: [
+      { role: "여는말", facts: ["시럽 안 씀"], point: "그래서 그날 단맛이 다르다" },
+      { role: "희소성", facts: ["하루 40잔"], point: "적게 만들어 금방 떨어진다" },
+    ],
+  };
+  it("정상 스키마를 통과시키고 다듬는다", () => {
+    const r = validatePlan(ok);
+    expect(r.angle).toBe("시럽을 쓰지 않는다");
+    expect(r.beats).toHaveLength(2);
+    expect(r.beats[0]).toEqual({ role: "여는말", facts: ["시럽 안 씀"], point: "그래서 그날 단맛이 다르다" });
+  });
+  it("angle이 비면 null", () => {
+    expect(validatePlan({ ...ok, angle: "" })).toBeNull();
+    expect(validatePlan({ ...ok, angle: undefined })).toBeNull();
+  });
+  it("beats가 비었거나 배열이 아니면 null", () => {
+    expect(validatePlan({ ...ok, beats: [] })).toBeNull();
+    expect(validatePlan({ ...ok, beats: "x" })).toBeNull();
+  });
+  it("beat에 role이나 point가 없으면 null", () => {
+    expect(validatePlan({ angle: "a", beats: [{ role: "여는말", point: "" }] })).toBeNull();
+    expect(validatePlan({ angle: "a", beats: [{ point: "전개" }] })).toBeNull();
+  });
+  it("facts가 없거나 배열이 아니면 빈 배열로 채운다", () => {
+    const r = validatePlan({ angle: "a", beats: [{ role: "본문", point: "전개" }] });
+    expect(r.beats[0].facts).toEqual([]);
   });
 });
