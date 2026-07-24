@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { STEPS, stepHref } from "../lib/steps";
 
-export default function BackButton({ stepKey }) {
+export default function BackButton({ stepKey, className = "" }) {
   const { id } = useParams();
   const i = STEPS.findIndex((s) => s.key === stepKey);
   if (i <= 0) return null; // 첫 단계(자료)는 이전이 없다
@@ -14,6 +14,6 @@ export default function BackButton({ stepKey }) {
   const href = stepHref(prev, id);
   if (!href) return null;
   return (
-    <Link href={href} className="back-link">← {prev.label}</Link>
+    <Link href={href} className={`back-link ${className}`.trim()}>← {prev.label}</Link>
   );
 }

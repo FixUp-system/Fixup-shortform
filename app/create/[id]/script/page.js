@@ -88,7 +88,6 @@ export default function ScriptStepPage() {
 
   return (
     <section className="panel" style={{ maxWidth: 760 }}>
-      <BackButton stepKey="script" />
       <h2>대본을 확인해 주세요 <span className="badge vlm">승인 게이트 1</span></h2>
       {err && <p className="pgsub" style={{ color: "var(--warn)" }}>{err}</p>}
       {staleScript && (
@@ -138,8 +137,9 @@ export default function ScriptStepPage() {
           </div>
         </>
       )}
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <button className="cta" disabled={busy} onClick={approve}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 20 }}>
+        <BackButton stepKey="script" className="no-mb" />
+        <button className="cta" style={{ marginTop: 0 }} disabled={busy} onClick={approve}>
           {hasCuts ? "④ 이미지 확인하러 가기" : "대본 승인 — 컷 나누고 이미지 만들기"}
         </button>
       </div>

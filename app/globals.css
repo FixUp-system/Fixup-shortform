@@ -183,6 +183,7 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
   margin-bottom: 16px;
 }
 .back-link:hover { border-color: var(--accent); color: #B9A0FF; background: var(--accent-soft); }
+.back-link.no-mb { margin-bottom: 0; }
 
 .side-new {
   display: block;
