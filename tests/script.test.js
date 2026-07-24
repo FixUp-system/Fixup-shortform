@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildScriptMessages, buildScriptEditMessages, editKeptContent, estimateSeconds } from "../lib/script.js";
+import { buildScriptMessages, buildScriptEditMessages, buildPlanMessages, editKeptContent, estimateSeconds } from "../lib/script.js";
 
 const project = {
   settings: { aspect_ratio: "9:16" },
@@ -132,5 +132,23 @@ describe("editKeptContent", () => {
   });
   it("교정이 없으면(null) 거부한다", () => {
     expect(editKeptContent(draft, null)).toBe(false);
+  });
+});
+
+describe("buildPlanMessages", () => {
+  it("브리핑과 원문·사진을 담아 기획을 요청한다", () => {
+    const { system, messages } = buildPlanMessages(project);
+    expect(system).toContain("기획");
+    expect(system).toContain("angle");
+    expect(system).toContain("beats");
+    const user = messages[0].content;
+    expect(user).toContain("생딸기라떼 신메뉴");                 // 브리핑 주제
+    expect(user).toContain("생딸기라떼. 매일 아침 직접 갈아서."); // 원문
+    expect(user).toContain("라떼.jpg");
+  });
+  it("문장이 아니라 설계도를 요구한다 — 새 사실 금지를 지시한다", () => {
+    const { system } = buildPlanMessages(project);
+    expect(system).toContain("문장을 쓰지 않는다");
+    expect(system).toContain("지어내지 않는다");
   });
 });
