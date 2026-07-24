@@ -199,4 +199,15 @@ describe("POST /api/projects/[id]/script (2단 생성)", () => {
     const saved = (await getProject(p.id)).script;
     expect(saved.paragraphs[0].text).toBe("특별한 라떼를 만나보세요");
   });
+
+  it("교정본이 문단을 흘리면(스키마는 맞아도) 초안으로 폴백한다", async () => {
+    const p = await projectWithScript();
+    const draft2 = { paragraphs: [{ tag: "여는말", text: "특별한 라떼" }, { tag: "가격", text: "6500원입니다" }], coverage: ["가격", "위치"] };
+    const shortEdit = { paragraphs: [{ tag: "여는말", text: "라떼입니다" }], coverage: ["가격"] }; // 유효하나 문단·coverage 줄어듦
+    llmMock.callJson.mockResolvedValueOnce(draft2).mockResolvedValueOnce(shortEdit);
+    await scriptPOST(patchReq({}), ctx(p.id));
+    const saved = (await getProject(p.id)).script;
+    expect(saved.paragraphs).toHaveLength(2);               // 초안 유지
+    expect(saved.paragraphs[1].text).toBe("6500원입니다");   // 흘린 사실이 살아 있다
+  });
 });

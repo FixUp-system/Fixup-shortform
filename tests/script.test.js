@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildScriptMessages, buildScriptEditMessages, estimateSeconds } from "../lib/script.js";
+import { buildScriptMessages, buildScriptEditMessages, editKeptContent, estimateSeconds } from "../lib/script.js";
 
 const project = {
   settings: { aspect_ratio: "9:16" },
@@ -110,5 +110,27 @@ describe("estimateSeconds", () => {
     expect(estimateSeconds(null)).toBe(0);
     expect(estimateSeconds({ paragraphs: [] })).toBe(0);
     expect(estimateSeconds({ paragraphs: [{ text: "   " }] })).toBe(0);
+  });
+});
+
+describe("editKeptContent", () => {
+  const draft = {
+    paragraphs: [{ tag: "여는말", text: "문장1" }, { tag: "본문", text: "문장2" }],
+    coverage: ["포인트1", "포인트2"],
+  };
+  it("문단·coverage를 다 지키면 채택한다", () => {
+    const edited = { paragraphs: [{ tag: "여는말", text: "고친1" }, { tag: "본문", text: "고친2" }], coverage: ["포인트1", "포인트2"] };
+    expect(editKeptContent(draft, edited)).toBe(true);
+  });
+  it("문단이 줄면 거부한다(사실 유실)", () => {
+    const edited = { paragraphs: [{ tag: "여는말", text: "고친1" }], coverage: ["포인트1", "포인트2"] };
+    expect(editKeptContent(draft, edited)).toBe(false);
+  });
+  it("coverage가 줄면 거부한다", () => {
+    const edited = { paragraphs: [{ tag: "여는말", text: "고친1" }, { tag: "본문", text: "고친2" }], coverage: ["포인트1"] };
+    expect(editKeptContent(draft, edited)).toBe(false);
+  });
+  it("교정이 없으면(null) 거부한다", () => {
+    expect(editKeptContent(draft, null)).toBe(false);
   });
 });

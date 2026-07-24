@@ -1,7 +1,7 @@
 import { getProject, updateProject } from "../../../../../lib/projects";
 import { callJson } from "../../../../../lib/llm";
 import { validateScript } from "../../../../../lib/validate";
-import { buildScriptMessages, buildScriptEditMessages } from "../../../../../lib/script";
+import { buildScriptMessages, buildScriptEditMessages, editKeptContent } from "../../../../../lib/script";
 
 export async function POST(req, { params }) {
   const { id } = await params;
@@ -25,7 +25,7 @@ export async function POST(req, { params }) {
   }
   if (!draft) return Response.json({ error: "대본 생성에 실패했어요. 다시 시도해 주세요." }, { status: 502 });
 
-  // 2단 자기 교정 — 광고 티·상투어 제거. 실패하면 초안으로 폴백(작업을 잃지 않는다).
+  // 2단 자기 교정 — 광고 티·상투어 제거. 실패하거나 사실을 흘리면 초안으로 폴백(작업을 잃지 않는다).
   let edited = null;
   const edit = buildScriptEditMessages(draft);
   for (let attempt = 0; attempt < 2 && !edited; attempt++) {
@@ -35,7 +35,8 @@ export async function POST(req, { params }) {
       break;
     }
   }
-  const script = edited || draft;
+  // 교정본이 문단·coverage를 지켰을 때만 채택한다 — 스키마는 맞지만 사실을 흘린 교정은 버린다
+  const script = editKeptContent(draft, edited) ? edited : draft;
 
   const updated = await updateProject(id, (proj) => ({
     ...proj,
