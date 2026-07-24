@@ -539,8 +539,10 @@ label.up.add:hover { border-color: var(--accent); color: #B9A0FF; }
 .images-layout { display: flex; gap: 22px; align-items: flex-start; }
 .images-col { flex: 1 1 0; min-width: 0; max-width: 480px; }
 .preview-pane { width: 480px; flex: none; position: sticky; top: 24px; align-self: flex-start; }
-.preview-frame { width: 100%; border-radius: 12px; overflow: hidden; background: var(--surface2); border: 1px solid var(--line); position: relative; min-height: 240px; display: flex; align-items: center; justify-content: center; }
-.preview-frame img { width: 100%; max-height: calc(100vh - 210px); object-fit: contain; display: block; }
+/* 프레임을 9:16(출력 비율)로 고정 — 원본 이미지 비율이 달라도 모든 컷의 미리보기 컴포넌트 크기가 같다.
+   폭을 뷰포트 높이로 제한해, 화면이 짧아도 9:16을 정확히 유지하며 프레임 전체가 함께 줄어든다(세로 잘림 없음). */
+.preview-frame { width: 100%; max-width: calc((100vh - 210px) * 9 / 16); aspect-ratio: 9 / 16; margin: 0 auto; border-radius: 12px; overflow: hidden; background: var(--surface2); border: 1px solid var(--line); position: relative; }
+.preview-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .preview-frame .ph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--ink-soft); font-size: 12px; }
 .preview-sentence { font-size: 14px; line-height: 1.65; margin: 12px 0; }
 .preview-note { font-size: 11.5px; color: var(--ink-soft); margin: 0 0 8px; }
