@@ -1,7 +1,7 @@
 "use client";
 
 // ② 대본 — 승인 게이트 1 (무료)
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 import { estimateSeconds } from "../../../../lib/script";
@@ -14,11 +14,17 @@ export default function ScriptStepPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [instruction, setInstruction] = useState("");
+  // 자동 생성이 한 번만 돌게 막는다 — busy는 비동기라 effect가 두 번 불리면(StrictMode 등)
+  // 대본이 두 번 생성돼 과금이 두 배가 된다. 프로젝트가 바뀌면 다시 허용.
+  const autoGenFor = useRef(null);
 
   // 대본이 아직 없으면 자동 생성 시작
   useEffect(() => {
-    if (project && !project.script && project.briefing?.confirmed && !busy) genScript();
-  }, [project?.status, project?.briefing?.confirmed]);
+    if (project && !project.script && project.briefing?.confirmed && autoGenFor.current !== id) {
+      autoGenFor.current = id;
+      genScript();
+    }
+  }, [project?.status, project?.briefing?.confirmed, id]);
 
   async function genScript(instr) {
     setBusy(true); setErr("");

@@ -5,6 +5,14 @@ import { usePathname } from "next/navigation";
 import { useProject } from "./ProjectContext";
 import { STEPS, currentStepKey, isReachable, stepHref } from "../lib/steps";
 
+// 진행 중인 프로젝트의 현재 단계 주소 — 없으면 새 프로젝트 화면.
+// 사이드바 '영상 만들기' 링크가 이걸 써서, 작업 중에 눌러도 프로젝트를 잃지 않는다.
+function makeHref(project) {
+  if (!project?.id) return "/create";
+  const step = STEPS.find((s) => s.key === currentStepKey(project));
+  return stepHref(step, project.id);
+}
+
 function StepList({ pathname }) {
   const { project } = useProject();
   const id = project?.id;
@@ -40,6 +48,10 @@ function StepList({ pathname }) {
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { project } = useProject();
+  const inCreate = pathname.startsWith("/create");
+  // 진행 중인 프로젝트가 있으면 그 프로젝트로, 없으면 새로 시작 화면으로.
+  const makeVideoHref = makeHref(project);
   return (
     <aside className="side">
       <div className="logo">
@@ -48,10 +60,13 @@ export default function Sidebar() {
       <Link href="/" className={`side-item${pathname === "/" ? " on" : ""}`}>
         <span className="ic">🏠</span>홈 — 빠른 생성
       </Link>
-      <Link href="/create" className={`side-item${pathname.startsWith("/create") ? " on" : ""}`}>
+      <Link href={makeVideoHref} className={`side-item${inCreate ? " on" : ""}`}>
         <span className="ic">✨</span>영상 만들기 (단계별)
       </Link>
-      {pathname.startsWith("/create") && <StepList pathname={pathname} />}
+      {inCreate && <StepList pathname={pathname} />}
+      {inCreate && project?.id && (
+        <Link href="/create" className="side-new">+ 새로 만들기</Link>
+      )}
       <button className="side-item soon" disabled>
         <span className="ic">📁</span>보관함
         <span className="soon-tag">준비 중</span>
