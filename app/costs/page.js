@@ -67,6 +67,8 @@ export default function CostsPage() {
             <thead>
               <tr>
                 <th>시각</th>
+                <th>단계</th>
+                <th>사용자</th>
                 <th>모델</th>
                 <th>사양</th>
                 <th>상태</th>
@@ -78,6 +80,8 @@ export default function CostsPage() {
               {records.map((r) => (
                 <tr key={r.request_id}>
                   <td className="mono">{fmtTime(r.ts)}</td>
+                  <td>{r.stage || "–"}</td>
+                  <td className="mono">{r.user || "–"}</td>
                   <td>{modelName(r.endpoint)}</td>
                   <td className="mono">
                     {r.duration}s · {r.aspect_ratio}

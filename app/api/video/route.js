@@ -2,7 +2,7 @@
 // 입력: {prompt, duration:"5"|"10", aspect_ratio:"9:16"|"1:1"|"16:9"}
 // 응답: {request_id, endpoint}
 
-import { addRecord, estimateCost } from "../../../lib/costs";
+import { addRecord, estimateCost, costActor } from "../../../lib/costs";
 
 const DEFAULT_ENDPOINT = "fal-ai/kling-video/v3/standard/text-to-video";
 
@@ -84,6 +84,10 @@ export async function POST(req) {
       request_id: data.request_id,
       ts: Date.now(),
       endpoint,
+      // 지금 이 라우트의 유일한 호출처는 홈 빠른 생성. 단계별 영상화(M2)가 붙으면
+      // body.stage로 "영상"을 넘겨받게 열어둔다.
+      stage: typeof body?.stage === "string" ? body.stage : "빠른 생성",
+      user: costActor(),
       prompt,
       duration: String(seconds),
       aspect_ratio: input.aspect_ratio,
