@@ -1,13 +1,18 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useProject } from "../../components/ProjectContext";
 
 export default function CreatePage() {
   const router = useRouter();
+  const { setProject } = useProject();
   const [text, setText] = useState("");
   const [photos, setPhotos] = useState([]); // {id, filename, url}
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+
+  // 새 프로젝트를 시작하는 자리 — 이전 프로젝트의 단계가 사이드바에 남지 않게 비운다
+  useEffect(() => { setProject(null); }, [setProject]);
 
   async function onFiles(e) {
     for (const file of e.target.files) {
@@ -29,14 +34,14 @@ export default function CreatePage() {
       body: JSON.stringify({ material: { text, photos } }),
     });
     const data = await res.json();
-    if (res.ok) router.push(`/create/${data.id}`);
+    if (res.ok) router.push(`/create/${data.id}/script`);
     else { setErr(data.error || "생성 실패"); setBusy(false); }
   }
 
   return (
     <>
       <h1 className="pgtitle">영상 만들기 (단계별)</h1>
-      <p className="pgsub">자료를 주시면 기계가 만들고, 단계마다 확인만 해 주세요 — 대본 → 이미지 → (영상화는 준비 중)</p>
+      <p className="pgsub">자료를 주시면 기계가 만들고, 단계마다 확인만 해 주세요 — 대본 → 목소리 → 이미지 → 영상 → 완성</p>
       <section className="panel" style={{ maxWidth: 760 }}>
         <div className="eyebrow">레퍼런스 자료 — 텍스트 <small>제품 설명·홍보 포인트·이야기 등 자유롭게</small></div>
         <textarea className="ref" value={text} maxLength={2000}

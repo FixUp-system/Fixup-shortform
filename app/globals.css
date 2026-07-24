@@ -132,6 +132,42 @@ aside.side {
   border-radius: 4px;
   padding: 0 5px;
 }
+/* ── 사이드바 세로 스테퍼 (영상 만들기 하위 단계) */
+.side-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 2px 0 6px 17px;
+  padding-left: 11px;
+  border-left: 1px solid var(--line);
+}
+.side-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 7px;
+  padding: 6px 8px;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  text-decoration: none;
+}
+a.side-step:hover { background: var(--surface2); color: var(--ink); }
+.side-step i { font-style: normal; opacity: 0.8; flex: none; }
+.side-step em {
+  margin-left: auto;
+  font-style: normal;
+  font-size: 9px;
+  color: var(--ink-soft);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0 5px;
+}
+.side-step em.ok { color: var(--good); border-color: transparent; font-size: 11px; }
+.side-step em.now { color: #B9A0FF; border-color: rgba(102, 51, 255, 0.45); }
+.side-step.passed { color: var(--ink); }
+.side-step.on { background: var(--accent-soft); color: var(--ink); font-weight: 700; }
+.side-step.locked { opacity: 0.5; cursor: default; }
+
 .side-grow { flex: 1; }
 .credit-box {
   background: var(--accent-soft);

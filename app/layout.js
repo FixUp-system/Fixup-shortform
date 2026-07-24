@@ -1,5 +1,6 @@
 import "./globals.css";
 import Sidebar from "../components/Sidebar";
+import { ProjectProvider } from "../components/ProjectContext";
 
 export const metadata = {
   title: "shotform — 숏폼 자동 생성",
@@ -13,10 +14,12 @@ export default function RootLayout({ children }) {
         <div className="belt">
           <b>BETA</b> 빠른 생성 실험 버전 — 대화로 정보를 모아 최신 비디오 모델에 전달합니다
         </div>
-        <div className="shell">
-          <Sidebar />
-          <main className="work">{children}</main>
-        </div>
+        <ProjectProvider>
+          <div className="shell">
+            <Sidebar />
+            <main className="work">{children}</main>
+          </div>
+        </ProjectProvider>
       </body>
     </html>
   );
