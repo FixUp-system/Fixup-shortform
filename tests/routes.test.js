@@ -57,6 +57,30 @@ describe("POST /api/projects/[id]/cuts", () => {
     expect((await getProject(p.id)).cuts_error).toBe("컷 분할 실패");
   });
 
+  it("이미 컷이 있으면 409로 막고 만든 컷을 지우지 않는다(재승인이 유료 컷을 날리지 않게)", async () => {
+    const p = await projectWithScript();
+    const cuts = [
+      { idx: 0, sentence: "컷1", state: "done", image: { url: "/a.png" } },
+      { idx: 1, sentence: "컷2", state: "generating" },
+    ];
+    await updateProject(p.id, (proj) => ({ ...proj, status: "cuts", cuts, cuts_error: null }));
+
+    const res = await cutsPOST({}, ctx(p.id));
+    expect(res.status).toBe(409);
+    const after = await getProject(p.id);
+    expect(after.cuts).toEqual(cuts); // 그대로
+    expect(pipelineMock.run).not.toHaveBeenCalled();
+  });
+
+  it("컷이 비어 있으면(분할 실패 뒤 다시 시도) 다시 띄운다", async () => {
+    const p = await projectWithScript();
+    await updateProject(p.id, (proj) => ({ ...proj, status: "cuts", cuts: [], cuts_error: "컷 분할 실패" }));
+    const res = await cutsPOST({}, ctx(p.id));
+    expect(res.status).toBe(200);
+    expect(pipelineMock.run).toHaveBeenCalledTimes(1);
+    expect((await getProject(p.id)).cuts_error).toBeNull();
+  });
+
   it("대본이 없으면 상태를 건드리지 않고 400", async () => {
     const p = await createProject({ settings: {}, material: { text: "", photos: [] } });
     const res = await cutsPOST({}, ctx(p.id));
@@ -66,20 +90,33 @@ describe("POST /api/projects/[id]/cuts", () => {
   });
 });
 
-describe("PATCH /api/projects/[id] — 브리핑 확정 버전", () => {
-  it("확정할 때마다 briefing.version이 오른다", async () => {
+describe("PATCH /api/projects/[id] — 브리핑 버전은 내용 변경에 묶인다", () => {
+  it("확정만 다시 눌러도 버전은 그대로다(거짓 stale 안내 방지)", async () => {
     const p = await projectWithScript();
     const r1 = await (await PATCH(patchReq({ briefing: { confirmed: true } }), ctx(p.id))).json();
-    expect(r1.briefing.version).toBe(3);
+    expect(r1.briefing.version).toBe(2);
     const r2 = await (await PATCH(patchReq({ briefing: { confirmed: true } }), ctx(p.id))).json();
-    expect(r2.briefing.version).toBe(4);
+    expect(r2.briefing.version).toBe(2);
   });
 
-  it("확정이 아닌 편집 저장은 버전을 올리지 않는다", async () => {
+  it("내용을 고쳐 저장하면 버전이 오른다", async () => {
     const p = await projectWithScript();
     const r = await (await PATCH(patchReq({ briefing: { topic: "바뀐 주제" } }), ctx(p.id))).json();
-    expect(r.briefing.version).toBe(2);
+    expect(r.briefing.version).toBe(3);
     expect(r.briefing.topic).toBe("바뀐 주제");
+  });
+
+  it("같은 값으로 다시 저장하면 버전은 그대로다", async () => {
+    const p = await projectWithScript();
+    const r = await (await PATCH(patchReq({ briefing: { topic: "주제", key_points: ["ㄱ"] } }), ctx(p.id))).json();
+    expect(r.briefing.version).toBe(2);
+  });
+
+  it("질문에 답하면 내용이 바뀐 것으로 본다(답변은 대본 프롬프트에 들어간다)", async () => {
+    const p = await projectWithScript();
+    const asked = [{ question: "언제?", options: [], answer: "어제", done: true }];
+    const r = await (await PATCH(patchReq({ briefing: { asked } }), ctx(p.id))).json();
+    expect(r.briefing.version).toBe(3);
   });
 });
 
@@ -95,7 +132,26 @@ describe("POST /api/projects/[id]/briefing — 재추출", () => {
     expect(after.status).toBe("cuts"); // 되감기면 만든 이미지가 잠긴다
     expect(after.briefing.confirmed).toBe(true);
     expect(after.briefing.topic).toBe("새 주제");
-    expect(after.briefing.version).toBe(2); // 버전은 확정할 때만 오른다
+    expect(after.briefing.version).toBe(3); // 내용이 바뀌었으므로 오른다 — 대본 화면이 stale을 알아채게
+  });
+
+  it("내용이 그대로면 재추출해도 버전은 오르지 않는다", async () => {
+    const p = await projectWithScript();
+    llmMock.callJson.mockResolvedValue({ topic: "주제", key_points: ["ㄱ"], questions: [] });
+    await briefingPOST({}, ctx(p.id));
+    expect((await getProject(p.id)).briefing.version).toBe(2);
+  });
+
+  it("답 없는 질문만 갈려도 버전은 오르지 않는다", async () => {
+    const p = await projectWithScript();
+    llmMock.callJson.mockResolvedValue({
+      topic: "주제", key_points: ["ㄱ"],
+      questions: [{ question: "언제 찍었나요?", options: ["어제"] }],
+    });
+    await briefingPOST({}, ctx(p.id));
+    const after = await getProject(p.id);
+    expect(after.briefing.asked.length).toBe(1);
+    expect(after.briefing.version).toBe(2);
   });
 
   it("아직 draft면 briefing 단계로 올린다", async () => {

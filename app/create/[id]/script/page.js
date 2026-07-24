@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 import { estimateSeconds } from "../../../../lib/script";
+import { currentStepKey } from "../../../../lib/steps";
 
 export default function ScriptStepPage() {
   const { id } = useParams();
@@ -31,7 +32,12 @@ export default function ScriptStepPage() {
     setBusy(false); setInstruction("");
   }
 
+  // 이미 만든 컷이 있는가 — 단계 판정은 lib/steps 하나만 본다
+  const hasCuts = currentStepKey(project) === "images" && (project.cuts || []).length > 0;
+
   async function approve() {
+    // 이미 컷이 있으면 다시 만들지 않고 보러만 간다(서버도 409로 막는다 — 돈 나간 컷을 지우지 않게)
+    if (hasCuts) { router.push(`/create/${id}/images`); return; }
     setBusy(true); setErr("");
     const res = await fetch(`/api/projects/${id}/cuts`, { method: "POST" });
     if (!res.ok) {
@@ -106,9 +112,13 @@ export default function ScriptStepPage() {
         </button>
       </div>
       <button className="cta" disabled={busy} onClick={approve}>
-        대본 승인 — 컷 나누고 이미지 만들기
+        {hasCuts ? "④ 이미지 확인하러 가기" : "대본 승인 — 컷 나누고 이미지 만들기"}
       </button>
-      <div className="credit-note">컷당 이미지 후보 2장 생성 + AI 검수 (약 $0.08/컷) · 목소리(③)는 준비 중이라 건너뜁니다</div>
+      <div className="credit-note">
+        {hasCuts
+          ? "이미 만든 컷이 있어요 — 다시 만들지 않고 그대로 보여드려요"
+          : "컷당 이미지 후보 2장 생성 + AI 검수 (약 $0.08/컷) · 목소리(③)는 준비 중이라 건너뜁니다"}
+      </div>
     </section>
   );
 }

@@ -1,4 +1,5 @@
 import { getProject, updateProject } from "../../../../lib/projects";
+import { briefingContentChanged } from "../../../../lib/briefing";
 
 export async function GET(req, { params }) {
   const { id } = await params;
@@ -17,8 +18,11 @@ export async function PATCH(req, { params }) {
       if (body.settings) next.settings = { ...proj.settings, ...body.settings };
       if (body.briefing) {
         next.briefing = { ...proj.briefing, ...body.briefing };
-        // 확정할 때마다 버전을 올린다 — 대본이 어느 브리핑에서 나왔는지 대본 화면이 비교할 수 있게
-        if (body.briefing.confirmed === true) next.briefing.version = (proj.briefing?.version || 1) + 1;
+        // 버전은 "확정했다"가 아니라 "내용이 바뀌었다"에 묶는다 — 확정만 다시 눌러도 버전이 오르면
+        // 대본 화면에 거짓 안내가 뜨고, 그 안내의 [대본 다시 쓰기]는 유료 호출이다.
+        // 브리핑이 처음 생기는 저장은 "바뀐" 것이 아니다(직접 채우기 폴백) — 1에서 시작한다.
+        const changed = proj.briefing ? briefingContentChanged(proj.briefing, next.briefing) : false;
+        next.briefing.version = (proj.briefing?.version || 1) + (changed ? 1 : 0);
       }
       if (body.cut && Number.isInteger(body.cut.idx) && typeof body.cut.sentence === "string") {
         next.cuts = proj.cuts.map((c) =>

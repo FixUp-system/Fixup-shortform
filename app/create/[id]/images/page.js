@@ -11,6 +11,7 @@ export default function ImagesStepPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [pollTimedOut, setPollTimedOut] = useState(false);
+  const [dismissed, setDismissed] = useState(false); // 컷이 남은 채 난 실패를 화면에서 접었는가
   const pollRef = useRef(null);
 
   // 언마운트 정리 — ref까지 비운다. 비우지 않으면 (dev StrictMode의 재마운트처럼) 다시 마운트됐을 때
@@ -72,6 +73,14 @@ export default function ImagesStepPage() {
     startPolling();
   }
 
+  // 컷이 남은 채 실패한 경우의 빠져나갈 길. 여기서 POST /cuts는 409로 막히고(만든 컷을 지우지 않으려고),
+  // cuts_error를 지우는 서버 경로도 없다 — load만으로는 같은 실패가 그대로 돌아온다.
+  // 그래서 화면에서 접고, 최신 상태를 한 번 받아온 뒤 컷별 [다시 생성]으로 이어가게 한다.
+  async function dismiss() {
+    setErr(""); setDismissed(true);
+    await load(id).catch(() => {});
+  }
+
   async function regen(idx) {
     setProject((p) => ({ ...p, cuts: p.cuts.map((c) => c.idx === idx ? { ...c, state: "generating" } : c) }));
     const res = await fetch(`/api/projects/${id}/cuts/${idx}/regen`, { method: "POST" });
@@ -90,8 +99,11 @@ export default function ImagesStepPage() {
 
   const cuts = project.cuts || [];
   const generating = cuts.some((c) => ["pending", "generating"].includes(c.state));
-  // 새로고침·재진입으로 들어오면 실패는 화면 상태가 아니라 프로젝트에 남아 있다 — 둘 다 본다
-  const shownErr = err || project.cuts_error || "";
+  // 새로고침·재진입으로 들어오면 실패는 화면 상태가 아니라 프로젝트에 남아 있다 — 둘 다 본다.
+  // 접기(dismiss)는 프로젝트에 남은 실패에만 적용한다 — 그 뒤에 새로 난 실패는 그대로 보여야 한다.
+  const shownErr = err || (dismissed ? "" : project.cuts_error || "");
+  // 실패가 남아 있으면 파이프라인은 이미 죽었다 — 폴링을 기다릴 게 없으니 컷별 [다시 생성]을 열어준다
+  const stalled = pollTimedOut || !!project.cuts_error;
   // 컷 분할이 끝나기 전 — 대본 승인 직후 이 화면에 도착하면 여기부터 보인다
   const splitting = project.status === "cuts" && cuts.length === 0 && !shownErr;
 
@@ -104,7 +116,10 @@ export default function ImagesStepPage() {
       {splitting && <p className="pgsub">잠시만요 — 나뉜 컷부터 차례로 이미지가 만들어집니다</p>}
       {shownErr && (
         <p className="pgsub" style={{ color: "var(--warn)" }}>
-          {shownErr}{cuts.length === 0 && <> <button className="mini" onClick={retry} disabled={busy}>다시 시도</button></>}
+          {shownErr}{" "}
+          {cuts.length === 0
+            ? <button className="mini" onClick={retry} disabled={busy}>다시 시도</button>
+            : <button className="mini" onClick={dismiss} disabled={busy}>닫고 컷별로 다시 만들기</button>}
         </p>
       )}
       {(project.cuts || []).map((c) => {
@@ -135,7 +150,7 @@ export default function ImagesStepPage() {
             <div className="ops" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {c.source === "ai" && (
                 <>
-                  <button className="mini" disabled={(!pollTimedOut && c.state === "generating") || c.regen_count >= 3} onClick={() => regen(c.idx)}>
+                  <button className="mini" disabled={(!stalled && c.state === "generating") || c.regen_count >= 3} onClick={() => regen(c.idx)}>
                     {c.regen_count >= 3 ? "상한 도달" : "다시 생성"}
                   </button>
                   <span className="regen-note mono">재생성 {c.regen_count}/3</span>
