@@ -7,6 +7,9 @@ export async function POST(req, { params }) {
   const { id } = await params;
   const project = await getProject(id);
   if (!project) return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
+  if (!project.briefing?.confirmed) {
+    return Response.json({ error: "브리핑을 먼저 확정해 주세요" }, { status: 400 });
+  }
 
   const { instruction } = await req.json().catch(() => ({}));
   const { system, messages } = buildScriptMessages(project, instruction);
