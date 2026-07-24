@@ -537,10 +537,10 @@ label.up.add:hover { border-color: var(--accent); color: #B9A0FF; }
 
 /* ── 이미지 확인 2칼럼 레이아웃 + 우측 큰 미리보기 */
 .images-layout { display: flex; gap: 22px; align-items: flex-start; }
-.images-col { flex: 1 1 0; min-width: 0; max-width: 560px; }
-.preview-pane { width: 380px; flex: none; position: sticky; top: 24px; align-self: flex-start; }
-.preview-frame { width: 100%; border-radius: 12px; overflow: hidden; background: var(--surface2); border: 1px solid var(--line); position: relative; min-height: 200px; }
-.preview-frame img { width: 100%; display: block; }
+.images-col { flex: 1 1 0; min-width: 0; max-width: 480px; }
+.preview-pane { width: 480px; flex: none; position: sticky; top: 24px; align-self: flex-start; }
+.preview-frame { width: 100%; border-radius: 12px; overflow: hidden; background: var(--surface2); border: 1px solid var(--line); position: relative; min-height: 240px; display: flex; align-items: center; justify-content: center; }
+.preview-frame img { width: 100%; max-height: calc(100vh - 210px); object-fit: contain; display: block; }
 .preview-frame .ph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--ink-soft); font-size: 12px; }
 .preview-sentence { font-size: 14px; line-height: 1.65; margin: 12px 0; }
 .preview-note { font-size: 11.5px; color: var(--ink-soft); margin: 0 0 8px; }
@@ -548,10 +548,10 @@ label.up.add:hover { border-color: var(--accent); color: #B9A0FF; }
 .preview-actions { display: flex; gap: 8px; align-items: stretch; margin: 10px 0 6px; }
 .preview-actions .cta { flex: 1; margin-top: 0; justify-content: center; padding: 10px 14px; font-size: 13.5px; border-radius: 10px; }
 .preview-actions .mini { padding: 10px 14px; font-size: 13.5px; border-radius: 10px; }
-@media (max-width: 920px) {
+@media (max-width: 1080px) {
   .images-layout { flex-direction: column; }
   .images-col { max-width: none; }
-  .preview-pane { width: 100%; position: static; }
+  .preview-pane { width: 100%; position: static; max-width: 480px; }
 }
 .thumb img { width: 100%; height: 100%; object-fit: cover; }
 .thumb .num { position: absolute; top: 6px; left: 7px; font-size: 11px; color: #fff; background: rgba(0,0,0,.55); border-radius: 5px; padding: 1px 7px; }
