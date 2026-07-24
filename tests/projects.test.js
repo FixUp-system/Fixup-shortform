@@ -20,6 +20,7 @@ describe("projects store", () => {
     expect(p.id).toMatch(/^[a-z0-9-]+$/);
     expect(p.status).toBe("draft");
     expect(p.settings.aspect_ratio).toBe("9:16");
+    expect(p.briefing).toBeNull();
   });
 
   it("getProject는 저장된 프로젝트를 돌려주고, 없으면 null", async () => {
