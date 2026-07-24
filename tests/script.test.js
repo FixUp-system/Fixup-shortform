@@ -4,13 +4,21 @@ import { buildScriptMessages, estimateSeconds } from "../lib/script.js";
 const project = {
   settings: { aspect_ratio: "9:16" },
   material: { text: "생딸기라떼. 매일 아침 직접 갈아서.", photos: [{ id: "p1", filename: "라떼.jpg" }] },
+  briefing: {
+    topic: "생딸기라떼 신메뉴",
+    key_points: ["매일 아침 직접 갈아"],
+    audience: "동네 주민",
+    takeaway: "매장에 와보고 싶어지기",
+    asked: [],
+    confirmed: true,
+  },
   script: null,
 };
 
 describe("buildScriptMessages", () => {
   it("자료가 프롬프트에 포함된다", () => {
     const { system, messages } = buildScriptMessages(project);
-    expect(system).toContain("숏폼");
+    expect(system).toContain("대본");
     const user = messages[0].content;
     expect(user).toContain("생딸기라떼");
     expect(user).toContain("라떼.jpg");
@@ -26,6 +34,25 @@ describe("buildScriptMessages", () => {
     const { messages } = buildScriptMessages(withScript, "더 짧게");
     expect(messages[0].content).toContain("기존문장");
     expect(messages[0].content).toContain("더 짧게");
+  });
+  it("브리핑과 원문 자료를 모두 담는다", () => {
+    const user = buildScriptMessages(project).messages[0].content;
+    expect(user).toContain("생딸기라떼 신메뉴");   // 브리핑 주제
+    expect(user).toContain("매일 아침 직접 갈아"); // 핵심내용
+    expect(user).toContain("동네 주민");           // 대상
+    expect(user).toContain("매장에 와보고 싶어지기"); // 보고 나면
+    expect(user).toContain("생딸기라떼. 매일 아침 직접 갈아서."); // 원문
+  });
+
+  it("브리핑이 없어도 원문만으로 조립된다", () => {
+    const user = buildScriptMessages({ ...project, briefing: null }).messages[0].content;
+    expect(user).toContain("생딸기라떼. 매일 아침 직접 갈아서.");
+  });
+
+  it("영상 성격을 단정하지 않는다 — 훅을 강제하지 않는다", () => {
+    const { system } = buildScriptMessages(project);
+    expect(system).not.toContain("반드시");
+    expect(system).toContain("성격");
   });
 });
 
