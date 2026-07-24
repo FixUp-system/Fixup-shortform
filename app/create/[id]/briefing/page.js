@@ -201,10 +201,12 @@ export default function BriefingStepPage() {
       )}
 
       <div className="script-src">칸을 클릭하면 바로 고칠 수 있어요</div>
-      <button className="cta" disabled={busy} aria-disabled={!canConfirm} onClick={confirm}>
-        이대로 대본 만들기
-      </button>
-      <div className="credit-note">대본은 무료예요 — 마음에 들 때까지 다시 쓸 수 있습니다</div>
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button className="cta" disabled={busy} aria-disabled={!canConfirm} onClick={confirm}>
+          이대로 대본 만들기
+        </button>
+      </div>
+      <div className="credit-note" style={{ textAlign: "right" }}>대본은 무료예요 — 마음에 들 때까지 다시 쓸 수 있습니다</div>
     </section>
   );
 }
