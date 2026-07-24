@@ -166,10 +166,12 @@ export default function ImagesStepPage() {
           );
         })}
         {!generating && !busy && cuts.length > 0 && (
-          <>
-            <button className="cta" disabled>영상화 — 준비 중 (⑤)</button>
-            <div className="credit-note">여기까지가 지금 되는 데까지예요 — 이미지가 곧 각 컷의 시작 프레임이 됩니다</div>
-          </>
+          <div className="step-actions">
+            <div className="fwd">
+              <span className="hint">여기까지가 지금 되는 데까지예요 — 이미지가 곧 각 컷의 시작 프레임이 됩니다</span>
+              <button className="cta" disabled>영상화 — 준비 중 (⑤)</button>
+            </div>
+          </div>
         )}
       </section>
 
