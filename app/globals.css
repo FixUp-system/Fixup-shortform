@@ -168,22 +168,36 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
 .side-step.on { background: var(--accent-soft); color: var(--ink); font-weight: 700; }
 .side-step.locked { opacity: 0.5; cursor: default; }
 
+/* 뒤로 가기 — 조용한 테두리 칩. 시선 앵커는 앞으로 가는 주 버튼 하나에만 둔다. */
 .back-link {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--ink);
+  color: var(--ink-soft);
   font-size: 13px;
   font-weight: 600;
   text-decoration: none;
-  background: var(--surface2);
+  background: transparent;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 7px 13px;
-  margin-bottom: 16px;
+  border-radius: 9px;
+  padding: 9px 15px;
+  transition: color .12s, border-color .12s;
 }
-.back-link:hover { border-color: var(--accent); color: #B9A0FF; background: var(--accent-soft); }
-.back-link.no-mb { margin-bottom: 0; }
+.back-link:hover { color: var(--ink); border-color: var(--ink-soft); }
+
+/* 단계 액션 바 — 왼쪽=뒤로 / 오른쪽=앞으로. 가로축이 흐름 방향을 그대로 뜻한다.
+   콘텐츠와 헤어라인으로 가르고, 페이지마다 제각각이던 버튼 배치를 하나로 통일한다. */
+.step-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.step-actions .fwd { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+.step-actions .hint { color: var(--ink-soft); font-size: 12px; line-height: 1.45; text-align: right; max-width: 360px; }
+.step-actions .cta { margin-top: 0; }
 
 .side-new {
   display: block;

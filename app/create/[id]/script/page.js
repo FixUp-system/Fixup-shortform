@@ -137,16 +137,18 @@ export default function ScriptStepPage() {
           </div>
         </>
       )}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 20 }}>
-        <BackButton stepKey="script" className="no-mb" />
-        <button className="cta" style={{ marginTop: 0 }} disabled={busy} onClick={approve}>
-          {hasCuts ? "④ 이미지 확인하러 가기" : "대본 승인 — 컷 나누고 이미지 만들기"}
-        </button>
-      </div>
-      <div className="credit-note" style={{ textAlign: "right" }}>
-        {hasCuts
-          ? "이미 만든 컷이 있어요 — 다시 만들지 않고 그대로 보여드려요"
-          : "컷당 이미지 후보 2장 생성 + AI 검수 (약 $0.08/컷) · 목소리(③)는 준비 중이라 건너뜁니다"}
+      <div className="step-actions">
+        <BackButton stepKey="script" />
+        <div className="fwd">
+          <span className="hint">
+            {hasCuts
+              ? "이미 만든 컷이 있어요 — 다시 만들지 않고 그대로 보여드려요"
+              : "컷당 이미지 후보 2장 + AI 검수 · 목소리(③)는 준비 중이라 건너뜁니다"}
+          </span>
+          <button className="cta" disabled={busy} onClick={approve}>
+            {hasCuts ? "④ 이미지 확인하러 가기" : "대본 승인 →"}
+          </button>
+        </div>
       </div>
     </section>
   );

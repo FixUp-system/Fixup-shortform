@@ -63,10 +63,12 @@ export default function CreatePage() {
         </div>
 
         {err && <p className="pgsub" style={{ color: "var(--warn)" }}>{err}</p>}
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <button className="cta" onClick={submit} disabled={busy || !text.trim()}>
-            {busy ? "여는 중…" : "정리하기 →"} <span className="cr">무료</span>
-          </button>
+        <div className="step-actions">
+          <div className="fwd">
+            <button className="cta" onClick={submit} disabled={busy || !text.trim()}>
+              {busy ? "여는 중…" : "정리하기 →"} <span className="cr">무료</span>
+            </button>
+          </div>
         </div>
       </section>
     </>
