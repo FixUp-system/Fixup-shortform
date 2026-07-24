@@ -15,6 +15,7 @@ vi.mock("../lib/llm.js", () => ({ callJson: (...a) => llmMock.callJson(...a) }))
 const { POST: cutsPOST } = await import("../app/api/projects/[id]/cuts/route.js");
 const { PATCH } = await import("../app/api/projects/[id]/route.js");
 const { POST: briefingPOST } = await import("../app/api/projects/[id]/briefing/route.js");
+const { POST: scriptPOST } = await import("../app/api/projects/[id]/script/route.js");
 
 const ctx = (id) => ({ params: Promise.resolve({ id }) });
 const patchReq = (body) => ({ json: async () => body });
@@ -176,5 +177,26 @@ describe("POST /api/projects/[id]/briefing — 재추출", () => {
     expect(after.status).toBe("briefing");
     expect(after.briefing.confirmed).toBe(false);
     expect(after.briefing.version).toBe(1);
+  });
+});
+
+describe("POST /api/projects/[id]/script (2단 생성)", () => {
+  const cliche = { paragraphs: [{ tag: "여는말", text: "특별한 라떼를 만나보세요" }], coverage: ["시럽 안 씀"] };
+  const plain = { paragraphs: [{ tag: "여는말", text: "시럽을 쓰지 않습니다" }], coverage: ["시럽 안 씀"] };
+
+  it("초안을 교정본으로 다듬어 저장한다", async () => {
+    const p = await projectWithScript();
+    llmMock.callJson.mockResolvedValueOnce(cliche).mockResolvedValueOnce(plain);
+    await scriptPOST(patchReq({}), ctx(p.id));
+    const saved = (await getProject(p.id)).script;
+    expect(saved.paragraphs[0].text).toBe("시럽을 쓰지 않습니다");
+  });
+
+  it("교정이 실패하면 초안으로 폴백한다", async () => {
+    const p = await projectWithScript();
+    llmMock.callJson.mockResolvedValueOnce(cliche).mockResolvedValue({}); // 교정 응답이 스키마 불일치
+    await scriptPOST(patchReq({}), ctx(p.id));
+    const saved = (await getProject(p.id)).script;
+    expect(saved.paragraphs[0].text).toBe("특별한 라떼를 만나보세요");
   });
 });

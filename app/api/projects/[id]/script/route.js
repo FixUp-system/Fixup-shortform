@@ -1,7 +1,7 @@
 import { getProject, updateProject } from "../../../../../lib/projects";
 import { callJson } from "../../../../../lib/llm";
 import { validateScript } from "../../../../../lib/validate";
-import { buildScriptMessages } from "../../../../../lib/script";
+import { buildScriptMessages, buildScriptEditMessages } from "../../../../../lib/script";
 
 export async function POST(req, { params }) {
   const { id } = await params;
@@ -14,15 +14,28 @@ export async function POST(req, { params }) {
   const { instruction } = await req.json().catch(() => ({}));
   const { system, messages } = buildScriptMessages(project, instruction);
 
-  let script = null;
-  for (let attempt = 0; attempt < 2 && !script; attempt++) {
+  // 1단 초안
+  let draft = null;
+  for (let attempt = 0; attempt < 2 && !draft; attempt++) {
     try {
-      script = validateScript(await callJson({ system, messages }));
+      draft = validateScript(await callJson({ system, messages }));
     } catch (e) {
       return Response.json({ error: e.message }, { status: 502 });
     }
   }
-  if (!script) return Response.json({ error: "대본 생성에 실패했어요. 다시 시도해 주세요." }, { status: 502 });
+  if (!draft) return Response.json({ error: "대본 생성에 실패했어요. 다시 시도해 주세요." }, { status: 502 });
+
+  // 2단 자기 교정 — 광고 티·상투어 제거. 실패하면 초안으로 폴백(작업을 잃지 않는다).
+  let edited = null;
+  const edit = buildScriptEditMessages(draft);
+  for (let attempt = 0; attempt < 2 && !edited; attempt++) {
+    try {
+      edited = validateScript(await callJson({ system: edit.system, messages: edit.messages }));
+    } catch {
+      break;
+    }
+  }
+  const script = edited || draft;
 
   const updated = await updateProject(id, (proj) => ({
     ...proj,
