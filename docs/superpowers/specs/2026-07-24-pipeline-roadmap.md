@@ -70,7 +70,7 @@ DB는 Supabase(Postgres + Storage)를 쓴다. 이건 품질 개선이 아니라 
 
 **P0 — 자료를 제대로 받고, 순서 바로잡기**
 - 자료 수집·브리핑 확정 (`2026-07-24-briefing-intake-design.md`) — 07-23 실험 결론("정보량이 본질")에 직접 답하는 유일한 항목이라 P0 맨 앞
-- 컷 스키마 보강: `role`(hook/body/cta), `visual_description`, `mood` 추가. 이미지 프롬프트의 원천을 문장이 아니라 `visual_description`으로
+- 컷 스키마 보강: `role`(opening/body/closing — 훅·CTA는 그 안의 한 방식일 뿐, 홍보를 전제하지 않는다), `visual_description`, `mood` 추가. 이미지 프롬프트의 원천을 문장이 아니라 `visual_description`으로
 - TTS 어댑터 + 컷별 오디오·character 타임스탬프 저장, `actual_audio_duration`을 컷에 기록
 - 컷 분할과 이미지 생성 분리(현재 `runCutsPipeline`이 한 덩어리) — 사이에 ④가 들어가야 한다
 - **Supabase 이행** (3.5절): 파일 저장 → Postgres + Storage. 배포의 전제이고, 생성물 보관(fal URL 만료 부채)이 여기서 함께 해소된다
