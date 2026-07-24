@@ -180,13 +180,26 @@ describe("POST /api/projects/[id]/briefing — 재추출", () => {
   });
 });
 
-describe("POST /api/projects/[id]/script (2단 생성)", () => {
+describe("POST /api/projects/[id]/script (기획→초안→교정)", () => {
+  const plan = { angle: "시럽 안 씀", beats: [{ role: "여는말", facts: ["시럽 안 씀"], point: "그래서 단맛이 다름" }] };
   const cliche = { paragraphs: [{ tag: "여는말", text: "특별한 라떼를 만나보세요" }], coverage: ["시럽 안 씀"] };
   const plain = { paragraphs: [{ tag: "여는말", text: "시럽을 쓰지 않습니다" }], coverage: ["시럽 안 씀"] };
 
-  it("초안을 교정본으로 다듬어 저장한다", async () => {
+  it("기획→초안→교정을 거쳐 교정본을 저장한다", async () => {
     const p = await projectWithScript();
-    llmMock.callJson.mockResolvedValueOnce(cliche).mockResolvedValueOnce(plain);
+    llmMock.callJson.mockResolvedValueOnce(plan).mockResolvedValueOnce(cliche).mockResolvedValueOnce(plain);
+    await scriptPOST(patchReq({}), ctx(p.id));
+    const saved = (await getProject(p.id)).script;
+    expect(saved.paragraphs[0].text).toBe("시럽을 쓰지 않습니다");
+  });
+
+  it("기획이 실패해도(plan=null) 초안·교정으로 대본을 낸다", async () => {
+    const p = await projectWithScript();
+    // 기획 콜이 던지면 plan=null로 흡수되고, 다음 콜부터 초안·교정이 이어진다
+    llmMock.callJson
+      .mockRejectedValueOnce(new Error("기획 실패"))
+      .mockResolvedValueOnce(cliche)
+      .mockResolvedValueOnce(plain);
     await scriptPOST(patchReq({}), ctx(p.id));
     const saved = (await getProject(p.id)).script;
     expect(saved.paragraphs[0].text).toBe("시럽을 쓰지 않습니다");
@@ -194,7 +207,7 @@ describe("POST /api/projects/[id]/script (2단 생성)", () => {
 
   it("교정이 실패하면 초안으로 폴백한다", async () => {
     const p = await projectWithScript();
-    llmMock.callJson.mockResolvedValueOnce(cliche).mockResolvedValue({}); // 교정 응답이 스키마 불일치
+    llmMock.callJson.mockResolvedValueOnce(plan).mockResolvedValueOnce(cliche).mockResolvedValue({}); // 교정 스키마 불일치
     await scriptPOST(patchReq({}), ctx(p.id));
     const saved = (await getProject(p.id)).script;
     expect(saved.paragraphs[0].text).toBe("특별한 라떼를 만나보세요");
@@ -203,11 +216,11 @@ describe("POST /api/projects/[id]/script (2단 생성)", () => {
   it("교정본이 문단을 흘리면(스키마는 맞아도) 초안으로 폴백한다", async () => {
     const p = await projectWithScript();
     const draft2 = { paragraphs: [{ tag: "여는말", text: "특별한 라떼" }, { tag: "가격", text: "6500원입니다" }], coverage: ["가격", "위치"] };
-    const shortEdit = { paragraphs: [{ tag: "여는말", text: "라떼입니다" }], coverage: ["가격"] }; // 유효하나 문단·coverage 줄어듦
-    llmMock.callJson.mockResolvedValueOnce(draft2).mockResolvedValueOnce(shortEdit);
+    const shortEdit = { paragraphs: [{ tag: "여는말", text: "라떼입니다" }], coverage: ["가격"] };
+    llmMock.callJson.mockResolvedValueOnce(plan).mockResolvedValueOnce(draft2).mockResolvedValueOnce(shortEdit);
     await scriptPOST(patchReq({}), ctx(p.id));
     const saved = (await getProject(p.id)).script;
-    expect(saved.paragraphs).toHaveLength(2);               // 초안 유지
-    expect(saved.paragraphs[1].text).toBe("6500원입니다");   // 흘린 사실이 살아 있다
+    expect(saved.paragraphs).toHaveLength(2);
+    expect(saved.paragraphs[1].text).toBe("6500원입니다");
   });
 });
