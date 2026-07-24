@@ -537,7 +537,7 @@ label.up.add:hover { border-color: var(--accent); color: #B9A0FF; }
 
 /* ── 이미지 확인 2칼럼 레이아웃 + 우측 큰 미리보기 */
 .images-layout { display: flex; gap: 22px; align-items: flex-start; }
-.images-col { flex: 1 1 0; min-width: 0; max-width: 480px; }
+.images-col { flex: 1 1 0; min-width: 0; max-width: 560px; }
 .preview-pane { width: 480px; flex: none; position: sticky; top: 24px; align-self: flex-start; }
 /* 프레임을 9:16(출력 비율)로 고정 — 원본 이미지 비율이 달라도 모든 컷의 미리보기 컴포넌트 크기가 같다.
    폭을 뷰포트 높이로 제한해, 화면이 짧아도 9:16을 정확히 유지하며 프레임 전체가 함께 줄어든다(세로 잘림 없음). */
