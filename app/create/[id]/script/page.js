@@ -14,6 +14,8 @@ export default function ScriptStepPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [instruction, setInstruction] = useState("");
+  // 영상(=이미지) 비율 — 이미지 생성 직전에 정한다. 저장된 값이 있으면 그걸 잇는다.
+  const [aspect, setAspect] = useState(project.settings?.aspect_ratio || "9:16");
   // 자동 생성이 한 번만 돌게 막는다 — busy는 비동기라 effect가 두 번 불리면(StrictMode 등)
   // 대본이 두 번 생성돼 과금이 두 배가 된다. 프로젝트가 바뀌면 다시 허용.
   const autoGenFor = useRef(null);
@@ -45,7 +47,10 @@ export default function ScriptStepPage() {
     // 이미 컷이 있으면 다시 만들지 않고 보러만 간다(서버도 409로 막는다 — 돈 나간 컷을 지우지 않게)
     if (hasCuts) { router.push(`/create/${id}/images`); return; }
     setBusy(true); setErr("");
-    const res = await fetch(`/api/projects/${id}/cuts`, { method: "POST" });
+    const res = await fetch(`/api/projects/${id}/cuts`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ aspect_ratio: aspect }),
+    });
     if (!res.ok) {
       setErr((await res.json().catch(() => ({}))).error || "시작 실패");
       setBusy(false);
@@ -117,6 +122,18 @@ export default function ScriptStepPage() {
           {instruction ? "지시 반영" : "전체 다시 쓰기"}
         </button>
       </div>
+      {!hasCuts && (
+        <>
+          <div className="eyebrow" style={{ marginTop: 18 }}>화면 비율 <small>이 비율로 이미지가 만들어져요</small></div>
+          <div className="chips">
+            {[["9:16", "세로 (숏폼)"], ["1:1", "정사각"], ["16:9", "가로"]].map(([r, label]) => (
+              <button key={r} className={`chip${aspect === r ? " on" : ""}`} onClick={() => setAspect(r)}>
+                {r} · {label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
       <button className="cta" disabled={busy} onClick={approve}>
         {hasCuts ? "④ 이미지 확인하러 가기" : "대본 승인 — 컷 나누고 이미지 만들기"}
       </button>

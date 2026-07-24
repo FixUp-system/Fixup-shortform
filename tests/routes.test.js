@@ -40,7 +40,7 @@ describe("POST /api/projects/[id]/cuts", () => {
     const p = await projectWithScript();
     let started = false;
     pipelineMock.run.mockImplementation(() => { started = true; return new Promise(() => {}); }); // 안 끝나는 파이프라인
-    const res = await cutsPOST({}, ctx(p.id));
+    const res = await cutsPOST(patchReq({}), ctx(p.id));
     expect(res.status).toBe(200);
     const after = await getProject(p.id);
     expect(after.status).toBe("cuts");
@@ -52,7 +52,7 @@ describe("POST /api/projects/[id]/cuts", () => {
   it("컷 분할이 실패하면 cuts_error를 남긴다(화면이 5분을 기다리지 않게)", async () => {
     const p = await projectWithScript();
     pipelineMock.run.mockRejectedValue(new Error("컷 분할 실패"));
-    await cutsPOST({}, ctx(p.id));
+    await cutsPOST(patchReq({}), ctx(p.id));
     await new Promise((r) => setTimeout(r, 20));
     expect((await getProject(p.id)).cuts_error).toBe("컷 분할 실패");
   });
@@ -65,7 +65,7 @@ describe("POST /api/projects/[id]/cuts", () => {
     ];
     await updateProject(p.id, (proj) => ({ ...proj, status: "cuts", cuts, cuts_error: null }));
 
-    const res = await cutsPOST({}, ctx(p.id));
+    const res = await cutsPOST(patchReq({}), ctx(p.id));
     expect(res.status).toBe(409);
     const after = await getProject(p.id);
     expect(after.cuts).toEqual(cuts); // 그대로
@@ -75,15 +75,29 @@ describe("POST /api/projects/[id]/cuts", () => {
   it("컷이 비어 있으면(분할 실패 뒤 다시 시도) 다시 띄운다", async () => {
     const p = await projectWithScript();
     await updateProject(p.id, (proj) => ({ ...proj, status: "cuts", cuts: [], cuts_error: "컷 분할 실패" }));
-    const res = await cutsPOST({}, ctx(p.id));
+    const res = await cutsPOST(patchReq({}), ctx(p.id));
     expect(res.status).toBe(200);
     expect(pipelineMock.run).toHaveBeenCalledTimes(1);
     expect((await getProject(p.id)).cuts_error).toBeNull();
   });
 
+  it("보낸 화면 비율을 settings에 저장한다", async () => {
+    const p = await projectWithScript();
+    pipelineMock.run.mockImplementation(() => new Promise(() => {}));
+    await cutsPOST(patchReq({ aspect_ratio: "1:1" }), ctx(p.id));
+    expect((await getProject(p.id)).settings.aspect_ratio).toBe("1:1");
+  });
+
+  it("잘못된 비율은 무시하고 기본 9:16으로 저장한다", async () => {
+    const p = await projectWithScript();
+    pipelineMock.run.mockImplementation(() => new Promise(() => {}));
+    await cutsPOST(patchReq({ aspect_ratio: "999" }), ctx(p.id));
+    expect((await getProject(p.id)).settings.aspect_ratio).toBe("9:16");
+  });
+
   it("대본이 없으면 상태를 건드리지 않고 400", async () => {
     const p = await createProject({ settings: {}, material: { text: "", photos: [] } });
-    const res = await cutsPOST({}, ctx(p.id));
+    const res = await cutsPOST(patchReq({}), ctx(p.id));
     expect(res.status).toBe(400);
     expect((await getProject(p.id)).status).toBe("draft");
     expect(pipelineMock.run).not.toHaveBeenCalled();

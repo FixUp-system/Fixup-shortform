@@ -179,6 +179,7 @@ export default function ImagesStepPage() {
           cut={activeCut}
           url={imgUrl(activeCut)}
           photoName={project.material.photos.find((p) => p.id === activeCut.photo_id)?.filename}
+          aspect={project.settings?.aspect_ratio || "9:16"}
           stalled={stalled}
           onRegen={regen}
         />
@@ -187,9 +188,21 @@ export default function ImagesStepPage() {
   );
 }
 
+// 비율별 프레임 스타일 — 미리보기가 실제 출력 비율을 그대로 보여준다.
+// 폭을 뷰포트 높이로 제한해 세로가 길어도 화면을 넘지 않고 비율이 유지된다.
+const ASPECT = {
+  "9:16": { css: "9 / 16", r: 9 / 16 },
+  "1:1": { css: "1 / 1", r: 1 },
+  "16:9": { css: "16 / 9", r: 16 / 9 },
+};
+function frameStyle(aspect) {
+  const a = ASPECT[aspect] || ASPECT["9:16"];
+  return { aspectRatio: a.css, maxWidth: `calc((100vh - 210px) * ${a.r})` };
+}
+
 // 우측 큰 미리보기 + 컷별 수정. instruction 입력은 컷마다 초기화돼야 하므로
 // 부모가 key={cut.idx}로 이 컴포넌트를 갈아끼운다(로컬 state가 자연히 리셋됨).
-function PreviewPane({ cut, url, photoName, stalled, onRegen }) {
+function PreviewPane({ cut, url, photoName, aspect, stalled, onRegen }) {
   const [instr, setInstr] = useState("");
   const isPhoto = cut.source === "photo";
   const busyCut = !stalled && cut.state === "generating";
@@ -197,7 +210,7 @@ function PreviewPane({ cut, url, photoName, stalled, onRegen }) {
 
   return (
     <aside className="panel preview-pane">
-      <div className="preview-frame">
+      <div className="preview-frame" style={frameStyle(aspect)}>
         {url ? <img src={url} alt="" /> : <span className="ph">{cut.state === "needs_attention" ? "품질 확인 필요" : "생성 중…"}</span>}
       </div>
       <div className="badges" style={{ marginTop: 12 }}>
