@@ -34,14 +34,14 @@ export default function CreatePage() {
       body: JSON.stringify({ material: { text, photos } }),
     });
     const data = await res.json();
-    if (res.ok) router.push(`/create/${data.id}/script`);
+    if (res.ok) router.push(`/create/${data.id}/briefing`);
     else { setErr(data.error || "생성 실패"); setBusy(false); }
   }
 
   return (
     <>
       <h1 className="pgtitle">영상 만들기 (단계별)</h1>
-      <p className="pgsub">자료를 주시면 기계가 만들고, 단계마다 확인만 해 주세요 — 대본 → 목소리 → 이미지 → 영상 → 완성</p>
+      <p className="pgsub">자료를 주시면 기계가 정리해 보여드려요 — 확인 → 대본 → 목소리 → 이미지 → 영상 → 완성</p>
       <section className="panel" style={{ maxWidth: 760 }}>
         <div className="eyebrow">레퍼런스 자료 — 텍스트 <small>제품 설명·홍보 포인트·이야기 등 자유롭게</small></div>
         <textarea className="ref" value={text} maxLength={2000}
@@ -64,7 +64,7 @@ export default function CreatePage() {
 
         {err && <p className="pgsub" style={{ color: "var(--warn)" }}>{err}</p>}
         <button className="cta" onClick={submit} disabled={busy || !text.trim()}>
-          {busy ? "만드는 중…" : "대본 만들기 →"} <span className="cr">무료</span>
+          {busy ? "여는 중…" : "정리하기 →"} <span className="cr">무료</span>
         </button>
       </section>
     </>
