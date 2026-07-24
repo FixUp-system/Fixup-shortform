@@ -168,8 +168,21 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
 .side-step.on { background: var(--accent-soft); color: var(--ink); font-weight: 700; }
 .side-step.locked { opacity: 0.5; cursor: default; }
 
-.back-link { display: inline-block; color: var(--ink-soft); font-size: 13px; text-decoration: none; margin-bottom: 14px; }
-.back-link:hover { color: var(--ink); }
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 13px;
+  margin-bottom: 16px;
+}
+.back-link:hover { border-color: var(--accent); color: #B9A0FF; background: var(--accent-soft); }
 
 .side-new {
   display: block;
