@@ -29,10 +29,17 @@ export async function POST(req, { params }) {
   // (프롬프트로도 지시하지만 LLM이 어길 수 있으므로 여기서 잘라낸다)
   const updated = await updateProject(id, (proj) => {
     const asked = mergeAsked(proj.briefing?.asked, briefing.asked);
+    // 재추출은 브리핑 내용을 갱신하는 것이지 진행을 취소하는 게 아니다 —
+    // 이미 나아간 status와 확정 여부는 되감지 않는다(되감으면 만든 이미지가 잠긴다).
     return {
       ...proj,
-      status: "briefing",
-      briefing: { ...briefing, asked, confirmed: false, version: 1 },
+      status: proj.status === "draft" ? "briefing" : proj.status,
+      briefing: {
+        ...briefing,
+        asked,
+        confirmed: proj.briefing?.confirmed || false,
+        version: proj.briefing?.version || 1,
+      },
     };
   });
   return Response.json({ briefing: updated.briefing });

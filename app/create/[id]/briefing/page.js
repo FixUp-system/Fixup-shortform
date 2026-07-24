@@ -30,7 +30,8 @@ export default function BriefingStepPage() {
   const router = useRouter();
   const { project, load } = useProject();
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
+  const [err, setErr] = useState(""); // 정리 실패 — 옆에 "다시 정리하기"가 붙는다(LLM 재호출)
+  const [hint, setHint] = useState(""); // 저장·확정 안내 — 재호출 버튼이 따라붙으면 안 되는 자리
   const [draft, setDraft] = useState(null); // 직접 채우기 폴백용
   const started = useRef(false);
   // 저장 왕복(fetch+load) 동안에는 재렌더가 없어 핸들러가 낡은 brief를 붙든다 —
@@ -48,7 +49,7 @@ export default function BriefingStepPage() {
   }, [project?.id, project?.briefing]);
 
   async function extract() {
-    setBusy(true); setErr("");
+    setBusy(true); setErr(""); setHint("");
     const res = await fetch(`/api/projects/${id}/briefing`, { method: "POST" });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -61,12 +62,18 @@ export default function BriefingStepPage() {
     setBusy(false);
   }
 
+  // 저장이 실패하면 직후 load가 옛 값을 되돌려놔 편집이 사라진다 — 왜 사라졌는지 알려준다.
   async function patch(briefing) {
-    await fetch(`/api/projects/${id}`, {
+    const res = await fetch(`/api/projects/${id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ briefing }),
-    });
+    }).catch(() => null);
+    if (!res || !res.ok) {
+      const data = res ? await res.json().catch(() => ({})) : {};
+      setHint(data.error || "저장하지 못했어요 — 방금 고친 내용이 되돌아갔어요. 다시 고쳐 주세요");
+    }
     await load(id).catch(() => {});
+    return !!res && res.ok;
   }
 
   // 저장은 하나씩 순서대로 — 앞 저장의 왕복 중에 뒤 저장이 끼어들어 서로 덮어쓰지 않게.
@@ -90,16 +97,29 @@ export default function BriefingStepPage() {
   }
 
   async function confirm() {
-    // 마지막 칸을 채우고 바로 누르는 경우가 있다 — 눌러도 아무 일도 안 나는 대신 무엇이 빈지 알려준다.
+    // 마지막 칸을 채우고 바로 누르는 경우가 있다 — 판정은 렌더 클로저가 아니라 ref(최신 값) 기준.
     // (버튼을 disabled로 막으면 mousedown이 먹혀 편집 칸의 blur=저장이 아예 안 일어난다)
-    if (!canConfirm) { setErr("주제와 핵심 내용을 채워 주세요"); return; }
-    setBusy(true); setErr("");
+    const cur0 = briefRef.current;
+    if (!(cur0?.topic.trim() && cur0.key_points.some((k) => k.trim()))) {
+      setHint("주제와 핵심 내용을 채워 주세요");
+      return;
+    }
+    setBusy(true); setHint("");
     // 방금 칸을 고치고 바로 누른 경우가 있다 — 앞선 저장 뒤에 줄을 서서 최신 값 위에 확정한다.
-    await enqueue(async () => {
-      const cur = briefRef.current;
-      if (draft) await patch({ ...cur, key_points: cur.key_points.filter((k) => k.trim()) });
-      await patch({ confirmed: true });
-    });
+    let ok = false;
+    try {
+      ok = await enqueue(async () => {
+        const cur = briefRef.current;
+        if (draft && !(await patch({ ...cur, key_points: cur.key_points.filter((k) => k.trim()) }))) return false;
+        return await patch({ confirmed: true });
+      });
+    } catch { ok = false; }
+    if (!ok) {
+      // 확정은 이 화면의 유일한 문이다 — 실패해도 CTA가 잠기지 않게 반드시 busy를 푼다
+      setBusy(false);
+      setHint((h) => h || "확정하지 못했어요 — 다시 눌러 주세요");
+      return;
+    }
     router.push(`/create/${id}/script`);
   }
 
@@ -120,6 +140,7 @@ export default function BriefingStepPage() {
           {err} <button className="mini" onClick={extract} disabled={busy}>다시 정리하기</button>
         </p>
       )}
+      {hint && <p className="pgsub" style={{ color: "var(--warn)" }}>{hint}</p>}
 
       <div className="brief">
         <div className="brief-row">
