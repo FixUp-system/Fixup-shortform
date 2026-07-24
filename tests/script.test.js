@@ -72,6 +72,23 @@ describe("buildScriptMessages", () => {
     expect(system).toContain("성격");   // 성격은 자료가 정한다
     expect(system).not.toContain("반드시");
   });
+  it("기획(plan)이 주어지면 앵글과 beats를 프롬프트에 싣는다", () => {
+    const plan = { angle: "시럽을 안 쓴다", beats: [{ role: "여는말", facts: ["시럽 안 씀"], point: "그래서 단맛이 다르다" }] };
+    const user = buildScriptMessages(project, undefined, plan).messages[0].content;
+    expect(user).toContain("시럽을 안 쓴다");        // 앵글
+    expect(user).toContain("그래서 단맛이 다르다");   // beat.point
+  });
+  it("기획이 없으면 오늘 형태 그대로 조립된다", () => {
+    const user = buildScriptMessages(project).messages[0].content;
+    expect(user).not.toContain("[기획");
+    expect(user).toContain("생딸기라떼. 매일 아침 직접 갈아서.");
+  });
+  it("사실을 나열하지 말고 전개하라고 지시한다", () => {
+    const { system } = buildScriptMessages(project);
+    expect(system).toContain("나열");
+    expect(system).toContain("전개");
+    expect(system).toContain("그래서 단맛이 다릅니다"); // 전개 예시(인과)
+  });
 });
 
 describe("buildScriptEditMessages", () => {
