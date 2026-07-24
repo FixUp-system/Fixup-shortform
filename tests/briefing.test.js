@@ -28,6 +28,13 @@ describe("buildBriefingMessages", () => {
     expect(system).toContain("정보가 있어야만");
   });
 
+  it("자료에 이미 있는 것은 되묻지 말라고 지시한다", () => {
+    const { system } = buildBriefingMessages(project);
+    expect(system).toContain("key_points");
+    expect(system).toContain("버린다");
+    expect(system).toContain("빈 배열이 정답");
+  });
+
   it("영상 성격을 단정하지 않는다 — 훅·홍보를 전제하는 표현이 없다", () => {
     const { system } = buildBriefingMessages(project);
     expect(system).not.toContain("훅");
