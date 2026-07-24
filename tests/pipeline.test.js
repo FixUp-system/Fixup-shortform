@@ -25,7 +25,7 @@ beforeEach(async () => {
 
 async function makeProject() {
   return projects.createProject({
-    settings: { purpose: "홍보", duration_s: 45, aspect_ratio: "9:16" },
+    settings: { aspect_ratio: "9:16" },
     material: { text: "자료", photos: [{ id: "p1", filename: "a.jpg", url: "/api/uploads/a.jpg" }] },
   });
 }

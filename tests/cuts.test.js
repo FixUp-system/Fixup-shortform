@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { buildCutsMessages, buildImagePrompt } from "../lib/cuts.js";
 
 const project = {
-  settings: { purpose: "홍보·판매", duration_s: 45, aspect_ratio: "9:16" },
+  settings: { aspect_ratio: "9:16" },
   material: { text: "자료", photos: [{ id: "p1", filename: "라떼.jpg" }] },
   script: { paragraphs: [{ tag: "훅", text: "요즘 이거 모르면 손해" }], coverage: [] },
 };
@@ -12,7 +12,11 @@ describe("buildCutsMessages", () => {
     const { messages } = buildCutsMessages(project);
     expect(messages[0].content).toContain("요즘 이거 모르면 손해");
     expect(messages[0].content).toContain("p1");
-    expect(messages[0].content).toContain("45"); // 총 길이 제약
+  });
+  it("목표 길이 제약은 더 이상 주입하지 않는다", () => {
+    const { system, messages } = buildCutsMessages(project);
+    expect(messages[0].content).not.toContain("목표 길이");
+    expect(system).not.toContain("±20%");
   });
 });
 

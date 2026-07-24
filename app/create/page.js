@@ -2,15 +2,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-const PURPOSES = ["홍보·판매", "정보·안내", "기록·스토리", "축하·이벤트"];
-
 export default function CreatePage() {
   const router = useRouter();
   const [text, setText] = useState("");
   const [photos, setPhotos] = useState([]); // {id, filename, url}
-  const [purpose, setPurpose] = useState(PURPOSES[0]);
-  const [dur, setDur] = useState(45);
-  const [ratio, setRatio] = useState("9:16");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
@@ -31,10 +26,7 @@ export default function CreatePage() {
     const res = await fetch("/api/projects", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        settings: { purpose, duration_s: dur, aspect_ratio: ratio },
-        material: { text, photos },
-      }),
+      body: JSON.stringify({ material: { text, photos } }),
     });
     const data = await res.json();
     if (res.ok) router.push(`/create/${data.id}`);
@@ -63,19 +55,6 @@ export default function CreatePage() {
           {photos.length < 10 && (
             <label className="up add">+<input type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={onFiles} /></label>
           )}
-        </div>
-
-        <div className="eyebrow">영상의 목적</div>
-        <div className="chips">{PURPOSES.map((p) => (
-          <button key={p} className={`chip${purpose === p ? " on" : ""}`} onClick={() => setPurpose(p)}>{p}</button>))}
-        </div>
-        <div className="eyebrow">길이</div>
-        <div className="chips">{[15, 30, 45, 60].map((d) => (
-          <button key={d} className={`chip${dur === d ? " on" : ""}`} onClick={() => setDur(d)}>{d}초</button>))}
-        </div>
-        <div className="eyebrow">화면 비율</div>
-        <div className="chips">{["9:16", "1:1", "16:9"].map((r) => (
-          <button key={r} className={`chip${ratio === r ? " on" : ""}`} onClick={() => setRatio(r)}>{r}</button>))}
         </div>
 
         {err && <p className="pgsub" style={{ color: "var(--warn)" }}>{err}</p>}

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
+import { estimateSeconds } from "../../../lib/script";
 
 export default function ProjectPage() {
   const { id } = useParams();
@@ -136,7 +137,7 @@ export default function ProjectPage() {
               </p>
             ))}
           </div>
-          <div className="script-src">문장을 클릭하면 바로 고칠 수 있어요</div>
+          <div className="script-src">이대로 읽으면 약 {estimateSeconds(project.script)}초 · 문장을 클릭하면 바로 고칠 수 있어요</div>
           {project.script.coverage?.length > 0 && (
             <div className="script-src">자료 반영 — {project.script.coverage.map((c, i) => <b key={i}>✓ {c} </b>)}</div>
           )}

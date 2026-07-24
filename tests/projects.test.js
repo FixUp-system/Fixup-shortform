@@ -14,12 +14,12 @@ describe("projects store", () => {
 
   it("createProject는 id·status·created_ts를 부여한다", async () => {
     const p = await projects.createProject({
-      settings: { purpose: "홍보·판매", duration_s: 45, aspect_ratio: "9:16" },
+      settings: { aspect_ratio: "9:16" },
       material: { text: "딸기라떼", photos: [] },
     });
     expect(p.id).toMatch(/^[a-z0-9-]+$/);
     expect(p.status).toBe("draft");
-    expect(p.settings.duration_s).toBe(45);
+    expect(p.settings.aspect_ratio).toBe("9:16");
   });
 
   it("getProject는 저장된 프로젝트를 돌려주고, 없으면 null", async () => {
