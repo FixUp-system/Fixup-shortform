@@ -33,6 +33,11 @@ export default function BriefingStepPage() {
   const [err, setErr] = useState("");
   const [draft, setDraft] = useState(null); // 직접 채우기 폴백용
   const started = useRef(false);
+  // 저장 왕복(fetch+load) 동안에는 재렌더가 없어 핸들러가 낡은 brief를 붙든다 —
+  // 페이로드는 항상 이 ref(최신 브리핑)에서 계산하고, 저장은 큐로 한 줄로 세운다.
+  const briefRef = useRef(null);
+  const inFlight = useRef(0);
+  const saveQueue = useRef(Promise.resolve());
 
   // 브리핑이 없으면 자동으로 정리 시작 (새로고침으로 들어와도 이어진다)
   useEffect(() => {
@@ -48,7 +53,7 @@ export default function BriefingStepPage() {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       setErr(data.error || "정리하지 못했어요");
-      setDraft(EMPTY); // 백지 폼으로 폴백 — 직접 채울 수 있게
+      setDraft((d) => d || EMPTY); // 백지 폼으로 폴백 — 이미 직접 입력한 게 있으면 지우지 않는다
     } else {
       setDraft(null); // 다시 정리하기가 성공하면 백지 폼은 버린다
     }
@@ -64,14 +69,24 @@ export default function BriefingStepPage() {
     await load(id).catch(() => {});
   }
 
+  // 저장은 하나씩 순서대로 — 앞 저장의 왕복 중에 뒤 저장이 끼어들어 서로 덮어쓰지 않게.
+  function enqueue(fn) {
+    inFlight.current += 1;
+    const run = saveQueue.current.then(fn, fn);
+    saveQueue.current = run.catch(() => {}).then(() => { inFlight.current -= 1; });
+    return run;
+  }
+
   // 백지 폼(폴백)에서는 아직 서버에 브리핑이 없으므로 draft에만 담고, 확정할 때 한 번에 저장한다.
   function save(patchObj) {
-    return draft ? setDraft({ ...draft, ...patchObj }) : patch(patchObj);
+    const next = { ...briefRef.current, ...patchObj };
+    briefRef.current = next; // 낙관적 갱신 — 연달아 고쳐도 다음 페이로드가 최신 위에서 계산된다
+    return draft ? setDraft(next) : enqueue(() => patch(patchObj));
   }
 
   async function answer(idx, value) {
-    const asked = brief.asked.map((a, i) => (i === idx ? { ...a, answer: value, done: true } : a));
-    await patch({ asked });
+    const asked = briefRef.current.asked.map((a, i) => (i === idx ? { ...a, answer: value, done: true } : a));
+    await save({ asked });
   }
 
   async function confirm() {
@@ -79,12 +94,18 @@ export default function BriefingStepPage() {
     // (버튼을 disabled로 막으면 mousedown이 먹혀 편집 칸의 blur=저장이 아예 안 일어난다)
     if (!canConfirm) { setErr("주제와 핵심 내용을 채워 주세요"); return; }
     setBusy(true); setErr("");
-    if (draft) await patch({ ...draft, key_points: draft.key_points.filter((k) => k.trim()) });
-    await patch({ confirmed: true });
+    // 방금 칸을 고치고 바로 누른 경우가 있다 — 앞선 저장 뒤에 줄을 서서 최신 값 위에 확정한다.
+    await enqueue(async () => {
+      const cur = briefRef.current;
+      if (draft) await patch({ ...cur, key_points: cur.key_points.filter((k) => k.trim()) });
+      await patch({ confirmed: true });
+    });
     router.push(`/create/${id}/script`);
   }
 
   const brief = project.briefing || draft;
+  // 저장이 도는 중에는 서버 값이 낡았을 수 있으니 ref를 덮지 않는다(낙관적 값 유지).
+  if (inFlight.current === 0) briefRef.current = brief;
 
   if (!brief) return <p className="pgsub">{busy ? "자료를 정리하는 중…" : err || "준비 중…"}</p>;
 
@@ -113,12 +134,13 @@ export default function BriefingStepPage() {
               <div className="brief-point" key={i}>
                 <EditableText value={k} placeholder="" style={{ outline: "none", flex: 1 }}
                   onCommit={(text) => save({
-                    key_points: brief.key_points.map((v, j) => (j === i ? text : v)).filter((v) => v),
+                    // 렌더 클로저의 brief 는 앞선 저장 중이면 낡았다 — 목록은 항상 ref(최신)에서 만든다
+                    key_points: briefRef.current.key_points.map((v, j) => (j === i ? text : v)).filter((v) => v),
                   })} />
               </div>
             ))}
             <button className="mini" style={{ marginTop: 6 }}
-              onClick={() => save({ key_points: [...brief.key_points, "새 내용"] })}>+ 내용 추가</button>
+              onClick={() => save({ key_points: [...briefRef.current.key_points, "새 내용"] })}>+ 내용 추가</button>
           </div>
         </div>
         <div className="brief-row">
