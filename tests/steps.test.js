@@ -6,9 +6,10 @@ describe("단계 정의", () => {
     expect(STEPS.map((s) => s.key)).toEqual(["material", "script", "voice", "images", "video", "done"]);
   });
 
-  it("stepHref는 1단계만 프로젝트 없이 열린다", () => {
+  it("stepHref는 ①자료를 프로젝트 유무로 가른다", () => {
     const [material, script] = STEPS;
     expect(stepHref(material, null)).toBe("/create");
+    expect(stepHref(material, "abc")).toBe("/create/abc/briefing");
     expect(stepHref(script, null)).toBeNull();
     expect(stepHref(script, "abc")).toBe("/create/abc/script");
   });
@@ -24,6 +25,9 @@ describe("stepFromPathname", () => {
     // seg 없이 STEPS를 찾으면 seg:null인 자료가 매칭돼 가드가 통째로 무력화됐던 자리
     expect(stepFromPathname("/create/abc")).toBeUndefined();
   });
+  it("브리핑 경로를 ①자료로 읽는다", () => {
+    expect(stepFromPathname("/create/abc/briefing").key).toBe("material");
+  });
   it("모르는 경로는 undefined", () => {
     expect(stepFromPathname("/costs")).toBeUndefined();
     expect(stepFromPathname("/create/abc/없는단계")).toBeUndefined();
@@ -32,15 +36,21 @@ describe("stepFromPathname", () => {
 });
 
 describe("currentStepKey", () => {
+  const confirmed = { confirmed: true };
+
   it("프로젝트가 없으면 자료 단계", () => {
     expect(currentStepKey(null)).toBe("material");
   });
-  it("대본 생성 전·후 모두 대본 단계", () => {
-    expect(currentStepKey({ status: "draft" })).toBe("script");
-    expect(currentStepKey({ status: "script" })).toBe("script");
+  it("브리핑 확정 전에는 상태와 무관하게 자료 단계", () => {
+    expect(currentStepKey({ status: "draft", briefing: null })).toBe("material");
+    expect(currentStepKey({ status: "briefing", briefing: { confirmed: false } })).toBe("material");
+  });
+  it("확정하면 대본 단계", () => {
+    expect(currentStepKey({ status: "briefing", briefing: confirmed })).toBe("script");
+    expect(currentStepKey({ status: "script", briefing: confirmed })).toBe("script");
   });
   it("컷이 시작되면 이미지 단계", () => {
-    expect(currentStepKey({ status: "cuts" })).toBe("images");
+    expect(currentStepKey({ status: "cuts", briefing: confirmed })).toBe("images");
   });
 });
 
@@ -49,13 +59,13 @@ describe("isReachable", () => {
     expect(isReachable("material", null)).toBe(true);
   });
   it("현재 단계까지만 열린다", () => {
-    const p = { status: "script" };
+    const p = { status: "script", briefing: { confirmed: true } };
     expect(isReachable("script", p)).toBe(true);
     expect(isReachable("voice", p)).toBe(false);
     expect(isReachable("images", p)).toBe(false);
   });
   it("지난 단계는 다시 열 수 있다", () => {
-    const p = { status: "cuts" };
+    const p = { status: "cuts", briefing: { confirmed: true } };
     expect(isReachable("script", p)).toBe(true);
     expect(isReachable("images", p)).toBe(true);
     expect(isReachable("video", p)).toBe(false);
