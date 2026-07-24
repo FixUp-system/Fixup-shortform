@@ -436,6 +436,8 @@ textarea.ref {
   line-height: 1.55;
   resize: vertical;
 }
+/* 자료 입력 화면의 큰 텍스트영역 — 자료를 넉넉히 쓰게 */
+textarea.ref-lg { min-height: 260px; font-size: 14.5px; padding: 16px 18px; }
 textarea.ref::placeholder { color: var(--ink-soft); }
 textarea.ref:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
 .char-count { text-align: right; font-size: 11.5px; color: var(--ink-soft); margin-top: 4px; }

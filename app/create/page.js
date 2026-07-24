@@ -42,9 +42,9 @@ export default function CreatePage() {
     <>
       <h1 className="pgtitle">영상 만들기 (단계별)</h1>
       <p className="pgsub">자료를 주시면 기계가 정리해 보여드려요 — 확인 → 대본 → 목소리 → 이미지 → 영상 → 완성</p>
-      <section className="panel" style={{ maxWidth: 760 }}>
+      <section className="panel" style={{ maxWidth: 880 }}>
         <div className="eyebrow">레퍼런스 자료 — 텍스트 <small>제품 설명·홍보 포인트·이야기 등 자유롭게</small></div>
-        <textarea className="ref" value={text} maxLength={2000}
+        <textarea className="ref ref-lg" value={text} maxLength={2000}
           onChange={(e) => setText(e.target.value)}
           placeholder="예: 이번 주 신메뉴 생딸기라떼. 매일 아침 생딸기를 직접 갈아서 만듦…" />
         <div className="char-count">{text.length}자 / 2,000자</div>
