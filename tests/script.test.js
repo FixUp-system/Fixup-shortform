@@ -55,9 +55,9 @@ describe("buildScriptMessages", () => {
     expect(system).toContain("성격");
   });
 
-  it("담담한 목소리를 지시하고 상투어를 금지한다", () => {
+  it("숏폼 어조(짧고 힘있게·훅)를 지시하고 상투어를 금지한다", () => {
     const { system } = buildScriptMessages(project);
-    expect(system).toMatch(/담담|평서문/);
+    expect(system).toMatch(/짧고 힘있게|훅|리듬/);
     expect(system).toContain("특별한");     // 금지 목록에 이름을 올려 못 쓰게 한다
     expect(system).toContain("만나보세요");
     expect(system).toContain("쓰지 않는다"); // 금지 지시문
@@ -65,7 +65,17 @@ describe("buildScriptMessages", () => {
   it("대조 예시를 톤 참고용으로만 제시한다", () => {
     const { system } = buildScriptMessages(project);
     expect(system).toContain("베끼지 말 것");
-    expect(system).toContain("시럽을 쓰지 않습니다"); // 담담한 예
+    expect(system).toContain("지나면 없습니다"); // 짧고 센 예
+  });
+  it("기획 point를 전사 말고 실현하라고 지시한다", () => {
+    const { system } = buildScriptMessages(project);
+    expect(system).toContain("실현");
+    expect(system).toContain("강조");  // '강조·유도…' 연출 단어를 나레이션에 넣지 말라
+    expect(system).toContain("옮기지 마"); // point 표현을 문장에 옮기지 마라
+  });
+  it("첫 문단을 스크롤 멈출 한 방으로 열라고 지시한다", () => {
+    const { system } = buildScriptMessages(project);
+    expect(system).toContain("스크롤");
   });
   it("성격 중립·훅 비강제는 그대로 유지한다", () => {
     const { system } = buildScriptMessages(project);
