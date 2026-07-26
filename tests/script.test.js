@@ -162,9 +162,9 @@ describe("editKeptContent", () => {
     const edited = { paragraphs: [{ tag: "여는말", text: "고친1" }], coverage: ["포인트1", "포인트2"] };
     expect(editKeptContent(draft, edited)).toBe(false);
   });
-  it("coverage가 줄면 거부한다", () => {
+  it("coverage가 줄어도 문단·글자바닥을 지키면 채택한다", () => {
     const edited = { paragraphs: [{ tag: "여는말", text: "고친1" }, { tag: "본문", text: "고친2" }], coverage: ["포인트1"] };
-    expect(editKeptContent(draft, edited)).toBe(false);
+    expect(editKeptContent(draft, edited)).toBe(true);
   });
   it("교정이 없으면(null) 거부한다", () => {
     expect(editKeptContent(draft, null)).toBe(false);
