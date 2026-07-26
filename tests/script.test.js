@@ -123,6 +123,10 @@ describe("buildScriptEditMessages", () => {
     expect(system).toContain("뭉개지 않는다");
     expect(system).toContain("줄이지 않는다");
   });
+  it("평탄화 말고 날카롭게·임팩트 보존을 지시한다", () => {
+    const { system } = buildScriptEditMessages(draft);
+    expect(system).toMatch(/날카롭|임팩트|평탄/);
+  });
 });
 
 describe("estimateSeconds", () => {
