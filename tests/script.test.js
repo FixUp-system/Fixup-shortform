@@ -195,4 +195,10 @@ describe("buildPlanMessages", () => {
     expect(system).toContain("문장을 쓰지 않는다");
     expect(system).toContain("지어내지 않는다");
   });
+  it("point를 연출 의도로 지시하고 기법 서술을 금지한다", () => {
+    const { system } = buildPlanMessages(project);
+    expect(system).toContain("연출 의도");
+    expect(system).toContain("강조한다");   // 금지 예로 이름을 올려 못 쓰게 한다
+    expect(system).toContain("스크롤");     // 여는말 = 스크롤 멈출 한 방
+  });
 });
