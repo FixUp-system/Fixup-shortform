@@ -50,6 +50,22 @@ describe("runCutsPipeline", () => {
     expect(after.cuts[1].state).toBe("done");
   });
 
+  it("검수에 그 컷이 속한 장면을 함께 넘긴다(그림과 심사가 같은 기준을 보게)", async () => {
+    const p = await makeProject();
+    await projects.updateProject(p.id, (proj) => ({
+      ...proj,
+      synopsis: { angle: "앵글", scenes: [{ role: "여는말", shows: "딸기라떼 클로즈업", says: "요지", seconds: 5, facts: [] }] },
+    }));
+    const seen = [];
+    const capturing = {
+      ...deps(),
+      splitCuts: async () => [{ idx: 0, scene_idx: 0, sentence: "AI컷", seconds: 6, source: "ai", regen_count: 0 }],
+      select: async ({ scene }) => { seen.push(scene); return { selectedIndex: 0, passed: true, note: "ok" }; },
+    };
+    await pipeline.runCutsPipeline(p.id, capturing);
+    expect(seen[0]?.shows).toBe("딸기라떼 클로즈업");
+  });
+
   it("regenCut은 3회 제한", async () => {
     const p = await makeProject();
     await pipeline.runCutsPipeline(p.id, deps());
