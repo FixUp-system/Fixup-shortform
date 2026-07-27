@@ -115,6 +115,23 @@ describe("validateSynopsis", () => {
     expect(validateSynopsis({ scenes: [scene()] }, [])).toBeNull();
   });
 
+  it("role이 없거나 공백이면 null", () => {
+    const 누락 = ok();
+    delete 누락.scenes[1].role;
+    expect(validateSynopsis(누락, [])).toBeNull();
+    const 공백 = ok();
+    공백.scenes[1].role = "   ";
+    expect(validateSynopsis(공백, [])).toBeNull();
+  });
+
+  it("scenes가 배열이 아니면 null", () => {
+    expect(validateSynopsis(ok({ scenes: "여는말" }), [])).toBeNull();
+  });
+
+  it("obj가 null이면 null", () => {
+    expect(validateSynopsis(null, [])).toBeNull();
+  });
+
   it("shows가 없으면 null — 화면 근거가 이 필드 하나뿐이다", () => {
     const bad = ok();
     delete bad.scenes[1].shows;
