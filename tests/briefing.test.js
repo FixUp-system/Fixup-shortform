@@ -54,6 +54,13 @@ describe("buildBriefingMessages", () => {
     expect(system).toContain("빈 배열이 정답"); // 풍부하면 여전히 빈 배열
   });
 
+  // 라이브에서 "유약 색상은?"에 보기 3개가 전부 창작으로 붙었다. 무심코 첫 보기를 고르면
+  // 없는 사실이 facts를 타고 화면까지 간다 — 확인해야 할 사실에는 보기를 주면 안 된다.
+  it("사실 확인 질문에는 보기를 지어내지 않는다", () => {
+    const { system } = buildBriefingMessages(project);
+    expect(system).toContain("보기를 지어내지 않는다");
+  });
+
   it("이미 되물은 이력이 있으면 다시 묻지 말라고 지시한다", () => {
     const withAsked = {
       ...project,
