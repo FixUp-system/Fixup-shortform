@@ -714,3 +714,11 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
 .mt-sm { margin-top: 6px; }
 .mt-md { margin-top: 12px; }
 .mt-lg { margin-top: 18px; }
+
+/* ── 목소리 단계 — 컷마다 붙는 미리듣기 */
+.audio-row {
+  width: 100%;
+  max-width: 360px;
+  margin-top: 6px;
+  height: 36px;
+}

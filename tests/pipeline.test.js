@@ -155,3 +155,66 @@ describe("runCutsPipeline", () => {
     expect(prompts.some((pr) => pr.includes("딸기라떼가 보이게"))).toBe(true);
   });
 });
+
+describe("runVoicePipeline — 컷마다 따로 읽힌다", () => {
+  async function withCuts(cuts) {
+    const p = await makeProject();
+    await projects.updateProject(p.id, (proj) => ({ ...proj, status: "cuts", cuts, voice_id: "v1" }));
+    return p;
+  }
+
+  it("컷마다 audio를 채우고 seconds를 실측으로 덮어쓴다", async () => {
+    const p = await withCuts([
+      { idx: 0, sentence: "첫 문장", seconds: 3, state: "done", image: { url: "i0" } },
+      { idx: 1, sentence: "둘째 문장", seconds: 9, state: "done", image: { url: "i1" } },
+    ]);
+
+    await pipeline.runVoicePipeline(p.id, {
+      speak: async ({ text }) => ({ url: "a/" + text, seconds: 4.3 }),
+    });
+
+    const saved = await projects.getProject(p.id);
+    expect(saved.status).toBe("voice");
+    expect(saved.cuts[0].audio).toEqual({ url: "a/첫 문장", seconds: 4.3 });
+    // 추정치 3초·9초가 실측 4.3초로 덮인다 — 소리와 그림이 어긋나지 않게
+    expect(saved.cuts[0].seconds).toBe(4.3);
+    expect(saved.cuts[1].seconds).toBe(4.3);
+  });
+
+  it("고른 목소리를 그대로 넘긴다", async () => {
+    const p = await withCuts([{ idx: 0, sentence: "문장", seconds: 3 }]);
+    let got;
+    await pipeline.runVoicePipeline(p.id, {
+      speak: async (args) => { got = args; return { url: "a", seconds: 1 }; },
+    });
+    expect(got.voiceId).toBe("v1");
+  });
+
+  it("한 컷이 실패해도 나머지는 살아남는다", async () => {
+    const p = await withCuts([
+      { idx: 0, sentence: "실패", seconds: 3 },
+      { idx: 1, sentence: "성공", seconds: 3 },
+    ]);
+
+    await pipeline.runVoicePipeline(p.id, {
+      speak: async ({ text }) => {
+        if (text === "실패") throw new Error("고장");
+        return { url: "a", seconds: 2 };
+      },
+    });
+
+    const saved = await projects.getProject(p.id);
+    expect(saved.cuts[0].voice_error).toMatch(/고장/);
+    expect(saved.cuts[0].audio).toBeUndefined();
+    expect(saved.cuts[1].audio.url).toBe("a");
+    // 일부가 실패해도 단계는 넘어간다 — 사장님이 그 컷만 다시 만들 수 있어야 한다
+    expect(saved.status).toBe("voice");
+  });
+
+  it("다시 만들면 앞선 실패 표시가 지워진다", async () => {
+    const p = await withCuts([{ idx: 0, sentence: "문장", seconds: 3, voice_error: "지난번 실패" }]);
+    await pipeline.runVoicePipeline(p.id, { speak: async () => ({ url: "a", seconds: 2 }) });
+    const saved = await projects.getProject(p.id);
+    expect(saved.cuts[0].voice_error).toBe(null);
+  });
+});
