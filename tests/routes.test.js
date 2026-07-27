@@ -121,6 +121,15 @@ describe("POST /api/projects/[id]/cuts", () => {
     expect((await getProject(p.id)).settings.aspect_ratio).toBe("9:16");
   });
 
+  it("대본 문단 수와 장면 수가 다르면 상태를 건드리지 않고 400", async () => {
+    const p = await projectWith2Scenes(); // 장면 2 · 대본 문단 1
+    const res = await cutsPOST(patchReq({}), ctx(p.id));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain("대본을 다시 써");
+    expect((await getProject(p.id)).status).toBe("script");
+    expect(pipelineMock.run).not.toHaveBeenCalled();
+  });
+
   it("대본이 없으면 상태를 건드리지 않고 400", async () => {
     const p = await createProject({ settings: {}, material: { text: "", photos: [] } });
     const res = await cutsPOST(patchReq({}), ctx(p.id));

@@ -81,10 +81,10 @@ export default function ScriptStepPage() {
     return <p className="pgsub">대본을 쓰는 중…</p>;
   }
 
-  // 구성을 다시 만들면 버전이 오른다 — 지금 대본이 그 이전 것인지 알려주기만 한다
+  // 구성을 다시 만들면 버전이 오른다 — 지금 대본이 그 이전 것인지 알려주기만 한다.
+  // 구성 도입 전에 쓰인 대본은 버전 자체가 없다 — 그것도 "이전 것"이므로 함께 알린다.
   const staleScript =
-    project.synopsis?.version && project.script.synopsis_version &&
-    project.script.synopsis_version !== project.synopsis.version;
+    !!project.synopsis?.version && project.script.synopsis_version !== project.synopsis.version;
   // 이미 만들어 둔 이미지가 있는가 — 대본을 다시 쓰면 컷을 처음부터 다시 만들게 돼 그 이미지가 지워진다
   const madeCuts = (project.cuts || []).length > 0;
 
