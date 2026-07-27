@@ -111,6 +111,15 @@ describe("buildScriptMessages — 구성 종속", () => {
     expect(system).toContain("나레이션으로 옮기지 않는다");
   });
 
+  it("촬영·조명 용어를 낭독 문장에 넣지 말라고 지시한다 — shows에 적힌 기법이 전사되면 안 된다", () => {
+    const { system } = buildScriptMessages(project);
+    expect(system).toContain("샷 크기·앵글·조명 용어");
+    expect(system).toContain("클로즈업");
+    expect(system).toContain("골든아워");
+    expect(system).toContain("낭독 문장에 한 낱말도 넣지 않는다");
+    expect(system).toContain("나쁜 예(촬영 용어 전사)"); // 대조 예시로 못박는다
+  });
+
   it("장면과 같은 개수·순서를 요구한다", () => {
     expect(buildScriptMessages(project).system).toContain("같은 개수·같은 순서");
   });
@@ -142,6 +151,15 @@ describe("buildScriptEditMessages", () => {
     expect(system).toContain("뭉개지 않는다");
     expect(system).toContain("줄이지 않는다");
   });
+  it("촬영·조명 용어도 기법 서술과 같이 걷어내라고 지시한다 — 교정이 두 번째 그물이다", () => {
+    const { system } = buildScriptEditMessages(draft);
+    expect(system).toContain("샷 크기·앵글·조명 용어");
+    expect(system).toContain("클로즈업");
+    expect(system).toContain("골든아워");
+    expect(system).toContain("기법 서술과 똑같이 걷어낸다");
+    expect(system).toContain("강조·유도·차별화"); // 기존 기법 서술 규칙은 그대로 남는다
+  });
+
   it("평탄화 말고 날카롭게·임팩트 보존을 지시한다", () => {
     const { system } = buildScriptEditMessages(draft);
     expect(system).toMatch(/날카롭|임팩트|평탄/);

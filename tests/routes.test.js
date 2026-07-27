@@ -181,6 +181,32 @@ describe("PATCH synopsis_scene", () => {
     await PATCH(patchReq({ synopsis_scene: { idx: 9, shows: "엉뚱" } }), ctx(p.id));
     expect((await getProject(p.id)).synopsis.scenes[0].shows).toBe("화면");
   });
+
+  it("빈 문자열 shows는 무시한다 — 비어있지 않은 문자열 불변식을 깨지 않는다", async () => {
+    const p = await projectWithScript();
+    await PATCH(patchReq({ synopsis_scene: { idx: 0, shows: "" } }), ctx(p.id));
+    expect((await getProject(p.id)).synopsis.scenes[0].shows).toBe("화면");
+  });
+
+  it("공백뿐인 says는 무시한다", async () => {
+    const p = await projectWithScript();
+    await PATCH(patchReq({ synopsis_scene: { idx: 0, says: "   " } }), ctx(p.id));
+    expect((await getProject(p.id)).synopsis.scenes[0].says).toBe("요지");
+  });
+
+  it("비문자열 shows는 무시한다", async () => {
+    const p = await projectWithScript();
+    await PATCH(patchReq({ synopsis_scene: { idx: 0, shows: 123 } }), ctx(p.id));
+    expect((await getProject(p.id)).synopsis.scenes[0].shows).toBe("화면");
+  });
+
+  it("says만 보내면 shows는 그대로다", async () => {
+    const p = await projectWithScript();
+    await PATCH(patchReq({ synopsis_scene: { idx: 0, says: "고친요지" } }), ctx(p.id));
+    const s = (await getProject(p.id)).synopsis.scenes[0];
+    expect(s.shows).toBe("화면");
+    expect(s.says).toBe("고친요지");
+  });
 });
 
 describe("POST /api/projects/[id]/briefing — 재추출", () => {
