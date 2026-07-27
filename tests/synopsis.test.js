@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildSynopsisMessages } from "../lib/synopsis.js";
+import { buildSynopsisMessages, factCount, sceneBudget } from "../lib/synopsis.js";
 
 const project = {
   material: { text: "생딸기라떼. 매일 아침 직접 갈아서.", photos: [{ id: "p1", filename: "라떼.jpg" }] },
@@ -12,6 +12,33 @@ const project = {
     confirmed: true,
   },
 };
+
+describe("factCount · sceneBudget", () => {
+  const withBrief = (briefing) => ({ ...project, briefing });
+
+  it("핵심 내용과 답을 받은 질문을 사실로 센다", () => {
+    const p = withBrief({
+      key_points: ["ㄱ", "ㄴ", "  "],
+      asked: [
+        { question: "가격은?", answer: "5천원" },
+        { question: "언제부터?", answer: "" },   // 안 답한 것은 사실이 아니다
+        { question: "왜?", answer: "   " },
+      ],
+    });
+    expect(factCount(p)).toBe(3);
+    expect(sceneBudget(p)).toBe(3);
+  });
+
+  it("두 줄짜리 자료도 최소 2장면은 준다 — 여는말과 마감이 한 장면에 겹치지 않게", () => {
+    expect(sceneBudget(withBrief({ key_points: ["하나뿐"], asked: [] }))).toBe(2);
+    expect(sceneBudget(withBrief(null))).toBe(2);
+  });
+
+  it("사실이 아무리 많아도 8장면을 넘지 않는다", () => {
+    const many = Array.from({ length: 20 }, (_, i) => `사실${i}`);
+    expect(sceneBudget(withBrief({ key_points: many, asked: [] }))).toBe(8);
+  });
+});
 
 describe("buildSynopsisMessages", () => {
   it("자료와 브리핑이 지문에 들어간다", () => {
@@ -88,6 +115,58 @@ describe("buildSynopsisMessages", () => {
     const { system } = buildSynopsisMessages(project);
     expect(system).toContain("희소성을 강조한다");
     expect(system).toContain("특별한");
+  });
+
+  // 아래 일곱은 "정보는 다 있는데 구성이 없다"를 막는 규칙이다. 라이브 3건(딸기·공방·세탁소)에서
+  // 앵글이 소개문으로, 순서가 자료 순서로, 여는말이 거리 전경으로, 초가 균등 배분으로 나왔다.
+  it("앵글을 소개문이 아니라 주장으로 잡게 한다", () => {
+    const { system } = buildSynopsisMessages(project);
+    expect(system).toContain("주장");
+    expect(system).toContain("소개문");
+  });
+
+  // 두 줄짜리 자료(세탁소)에서 "주장을 세우라"는 압력이 환각으로 샜다 —
+  // 자료에 없는 "더 빠르다"·"전문 장비"가 앵글과 장면에 들어왔다.
+  it("세울 주장이 없으면 지어내지 말라는 안전판을 둔다", () => {
+    const { system } = buildSynopsisMessages(project);
+    expect(system).toContain("세울 것이 없으면");
+  });
+
+  it("장면 순서에 인과를 요구한다 — 섞어도 말이 되면 목록이지 구성이 아니다", () => {
+    const { system } = buildSynopsisMessages(project);
+    expect(system).toContain("근데");
+    expect(system).toContain("그래서");
+    expect(system).toContain("순서를 바꿔도");
+  });
+
+  it("첫 장면은 스크롤을 멈추는 한 방이다 — 거리 전경·간판으로 열지 않는다", () => {
+    const { system } = buildSynopsisMessages(project);
+    expect(system).toContain("첫 장면");
+    expect(system).toContain("간판");
+  });
+
+  it("화면이 할 말을 그대로 그리지 않게 한다 — 삽화가 되면 그 초의 정보량이 절반이다", () => {
+    expect(buildSynopsisMessages(project).system).toContain("삽화");
+  });
+
+  it("seconds를 균등하게 배분하지 말라고 지시한다", () => {
+    expect(buildSynopsisMessages(project).system).toContain("균등");
+  });
+
+  it("role 라벨이 장면 내용과 어긋나지 않게 한다", () => {
+    expect(buildSynopsisMessages(project).system).toContain("'희소성'이라 적고");
+  });
+
+  it("자료가 얇으면 장면 수를 줄이라고 지시한다 — 3은 하한이지 목표가 아니다", () => {
+    expect(buildSynopsisMessages(project).system).toContain("목표가 아니다");
+  });
+
+  it("지문에 장면 예산을 적는다 — 자료가 얇으면 장면도 적다", () => {
+    const { messages } = buildSynopsisMessages(project); // 핵심 내용 1개, 답한 질문 0개
+    const user = messages[0].content;
+    expect(user).toContain("[분량]");
+    expect(user).toContain("장면은 2개를 넘지 않는다");
+    expect(user).toContain("지어내 길이를 늘리지 않는다");
   });
 
   it("수정 지시가 있으면 기존 구성과 함께 지문에 붙는다", () => {

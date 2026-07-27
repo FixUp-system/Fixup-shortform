@@ -1,7 +1,7 @@
 import { getProject, updateProject } from "../../../../../lib/projects";
 import { callJson } from "../../../../../lib/llm";
 import { validateSynopsis } from "../../../../../lib/validate";
-import { buildSynopsisMessages } from "../../../../../lib/synopsis";
+import { buildSynopsisMessages, sceneBudget } from "../../../../../lib/synopsis";
 
 export async function POST(req, { params }) {
   const { id } = await params;
@@ -15,16 +15,29 @@ export async function POST(req, { params }) {
   const photoIds = (project.material?.photos || []).map((p) => p.id);
   const { system, messages } = buildSynopsisMessages(project, instruction);
 
+  // 자료가 가진 사실보다 장면이 많으면 그 차이는 지어낸 것이다 — 한 번은 줄여 오라고 되돌린다.
+  // 두 번째도 넘치면 그대로 안고 간다(구성을 아예 못 주는 것보다 낫다).
+  const budget = sceneBudget(project);
   let synopsis = null;
+  let overBudget = null;
   for (let attempt = 0; attempt < 2 && !synopsis; attempt++) {
+    const msgs = overBudget
+      ? [{
+          role: "user",
+          content: `${messages[0].content}\n\n[다시] 방금 장면을 ${overBudget.scenes.length}개 냈다. 이 자료의 사실은 ${budget}가지뿐이니 ${budget}개 이하로 줄여 다시 짜라. 사실 하나를 여러 장면으로 늘리지 마라.`,
+        }]
+      : messages;
     try {
-      synopsis = validateSynopsis(await callJson({ system, messages }), photoIds);
+      const got = validateSynopsis(await callJson({ system, messages: msgs }), photoIds);
+      if (got && got.scenes.length > budget && attempt === 0) overBudget = got;
+      else synopsis = got;
     } catch (e) {
       // 일시적 호출 실패는 삼키고 다음 시도로 — 루프 조건이 상한을 쥔다.
       // 다만 왜 실패했는지는 남긴다(키 미설정·크레딧 소진·형식 거절이 전부 같은 502로 보이지 않게).
       console.error("구성 생성 실패:", e);
     }
   }
+  if (!synopsis) synopsis = overBudget;
   if (!synopsis) {
     return Response.json({ error: "구성 만들기에 실패했어요. 다시 시도해 주세요." }, { status: 502 });
   }
