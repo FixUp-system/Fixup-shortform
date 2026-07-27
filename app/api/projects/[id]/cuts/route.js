@@ -7,6 +7,8 @@ export async function POST(req, { params }) {
   const project = await getProject(id);
   if (!project) return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
   if (!project.script) return Response.json({ error: "대본을 먼저 만들어 주세요" }, { status: 400 });
+  // 컷은 장면에서 갈라져 나온다 — 구성이 없으면 나눌 것도, 그릴 근거도 없다
+  if (!project.synopsis) return Response.json({ error: "구성을 먼저 만들어 주세요" }, { status: 400 });
 
   // 화면 비율 — 이미지 생성이 이 값을 쓴다. 보내지 않으면 기존 설정(기본 9:16)을 유지한다.
   const body = await req.json().catch(() => ({}));

@@ -41,30 +41,58 @@ describe("validateScript", () => {
 });
 
 describe("validateCuts", () => {
-  const photoIds = ["p1", "p2"];
+  const scenes = [
+    { role: "여는말", shows: "클로즈업", says: "가", seconds: 3, facts: [], ref_photo_id: "p1" },
+    { role: "마감", shows: "시점 샷", says: "나", seconds: 4, facts: [] },
+  ];
   it("모든 컷을 ai로 만들고 idx를 재부여한다", () => {
     const cuts = validateCuts(
       { cuts: [
-        { sentence: "문장1", seconds: 6, ref_photo_id: "p1" },
-        { sentence: "문장2", seconds: 8 },
+        { sentence: "문장1", seconds: 6, scene_idx: 0 },
+        { sentence: "문장2", seconds: 8, scene_idx: 1 },
       ]},
-      photoIds
+      scenes
     );
     expect(cuts).toHaveLength(2);
     expect(cuts[0].idx).toBe(0);
     expect(cuts.every((c) => c.source === "ai")).toBe(true);
-    expect(cuts[0].ref_photo_id).toBe("p1");
-    expect(cuts[1].ref_photo_id).toBeUndefined();
   });
-  it("photo 소스로 와도 ai로 바꾸고 그 사진을 레퍼런스로 승격한다", () => {
-    const cuts = validateCuts({ cuts: [{ sentence: "s", seconds: 5, source: "photo", photo_id: "p2" }] }, photoIds);
+  it("photo 소스로 와도 ai로 바꾸고 photo_id는 남기지 않는다", () => {
+    const cuts = validateCuts({ cuts: [{ sentence: "s", seconds: 5, source: "photo", photo_id: "p2", scene_idx: 1 }] }, scenes);
     expect(cuts[0].source).toBe("ai");
-    expect(cuts[0].ref_photo_id).toBe("p2");
     expect(cuts[0].photo_id).toBeUndefined();
   });
-  it("존재하지 않는 레퍼런스는 제거하고 통과시킨다", () => {
-    const cuts = validateCuts({ cuts: [{ sentence: "s", seconds: 5, ref_photo_id: "없음" }] }, photoIds);
+  it("장면에 ref_photo_id가 있으면 그 장면의 모든 컷이 물려받는다", () => {
+    const cuts = validateCuts(
+      { cuts: [
+        { sentence: "s1", seconds: 5, scene_idx: 0 },
+        { sentence: "s2", seconds: 5, scene_idx: 0 },
+      ]},
+      scenes
+    );
+    expect(cuts[0].ref_photo_id).toBe("p1");
+    expect(cuts[1].ref_photo_id).toBe("p1");
+  });
+  it("장면에 ref_photo_id가 없으면 컷에도 없다 — LLM이 고른 값은 무시한다", () => {
+    const cuts = validateCuts({ cuts: [{ sentence: "s", seconds: 5, scene_idx: 1, ref_photo_id: "p1" }] }, scenes);
     expect(cuts[0].ref_photo_id).toBeUndefined();
+  });
+  it("scene_idx가 범위 밖이면 null", () => {
+    const obj = { cuts: [{ sentence: "가", seconds: 3, scene_idx: 5 }] };
+    expect(validateCuts(obj, scenes)).toBeNull();
+  });
+  it("scene_idx가 없으면 null — 컷은 반드시 어느 장면의 것인지 밝힌다", () => {
+    const obj = { cuts: [{ sentence: "가", seconds: 3 }] };
+    expect(validateCuts(obj, scenes)).toBeNull();
+  });
+  it("scene_idx를 컷에 남긴다", () => {
+    const obj = { cuts: [{ sentence: "가", seconds: 3, scene_idx: 1 }] };
+    expect(validateCuts(obj, scenes)[0].scene_idx).toBe(1);
+  });
+  it("장면이 없으면 null — 컷은 구성 없이는 만들 수 없다", () => {
+    const obj = { cuts: [{ sentence: "가", seconds: 3, scene_idx: 0 }] };
+    expect(validateCuts(obj, [])).toBeNull();
+    expect(validateCuts(obj, undefined)).toBeNull();
   });
 });
 
