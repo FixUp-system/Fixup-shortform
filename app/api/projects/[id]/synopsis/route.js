@@ -20,7 +20,7 @@ export async function POST(req, { params }) {
     try {
       synopsis = validateSynopsis(await callJson({ system, messages }), photoIds);
     } catch {
-      break;
+      // 일시적 호출 실패는 삼키고 다음 시도로 — 루프 조건이 상한을 쥔다
     }
   }
   if (!synopsis) {

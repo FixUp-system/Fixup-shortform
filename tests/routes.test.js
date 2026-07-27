@@ -243,8 +243,8 @@ describe("POST /api/projects/[id]/script (초안→교정)", () => {
     expect(res.status).toBe(502);
     // lib/llm.js가 응답 본문을 메시지에 담으므로 e.message를 그대로 돌려주면 내부 정보가 샌다
     expect((await res.json()).error).toBe("대본 생성에 실패했어요. 다시 시도해 주세요.");
-    // 교정·구성 루프와 같은 catch{break} — 예외는 재시도하지 않고 루프를 빠져나온다
-    expect(llmMock.callJson).toHaveBeenCalledTimes(1);
+    // 일시적 네트워크 오류 하나가 요청 전체를 날리지 않게 — 예외도 재시도한다(상한 2회)
+    expect(llmMock.callJson).toHaveBeenCalledTimes(2);
     expect((await getProject(p.id)).script.version).toBe(1); // 기존 대본을 덮지 않는다
   });
 
@@ -254,6 +254,8 @@ describe("POST /api/projects/[id]/script (초안→교정)", () => {
     const res = await scriptPOST(patchReq({}), ctx(p.id));
     expect(res.status).toBe(200);
     expect((await getProject(p.id)).script.paragraphs[0].text).toBe("특별한 라떼를 만나보세요");
+    // 초안 1회 + 교정 2회 — 교정 루프도 예외에 재시도한다(그래도 502가 아니라 초안 폴백)
+    expect(llmMock.callJson).toHaveBeenCalledTimes(3);
   });
 });
 
@@ -296,6 +298,16 @@ describe("POST /api/projects/[id]/synopsis", () => {
     llmMock.callJson.mockResolvedValue({ angle: "", scenes: [] });
     const res = await synopsisPOST(patchReq({}), ctx(p.id));
     expect(res.status).toBe(502);
+    expect(llmMock.callJson).toHaveBeenCalledTimes(2);
+  });
+
+  it("호출이 예외로 죽어도 재시도하고, 계속 죽으면 한국어 502를 준다", async () => {
+    const p = await projectWithBriefing();
+    llmMock.callJson.mockRejectedValue(new Error("네트워크"));
+    const res = await synopsisPOST(patchReq({}), ctx(p.id));
+    expect(res.status).toBe(502);
+    expect((await res.json()).error).toBe("구성 만들기에 실패했어요. 다시 시도해 주세요.");
+    // 일시적 네트워크 오류 하나가 요청 전체를 날리지 않게 — 예외도 재시도한다(상한 2회)
     expect(llmMock.callJson).toHaveBeenCalledTimes(2);
   });
 });

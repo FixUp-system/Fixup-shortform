@@ -25,7 +25,7 @@ export async function POST(req, { params }) {
     try {
       draft = validateScript(await callJson({ system, messages }), sceneCount);
     } catch {
-      break;
+      // 일시적 호출 실패는 삼키고 다음 시도로 — 루프 조건이 상한을 쥔다
     }
   }
   if (!draft) return Response.json({ error: "대본 생성에 실패했어요. 다시 시도해 주세요." }, { status: 502 });
@@ -37,7 +37,7 @@ export async function POST(req, { params }) {
     try {
       edited = validateScript(await callJson({ system: edit.system, messages: edit.messages }), sceneCount);
     } catch {
-      break;
+      // 일시적 호출 실패는 삼키고 다음 시도로 — 끝내 못 얻으면 아래에서 초안으로 폴백한다
     }
   }
   const script = editKeptContent(draft, edited) ? edited : draft;
