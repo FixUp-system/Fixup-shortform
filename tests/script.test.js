@@ -1,5 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { buildScriptMessages, buildScriptEditMessages, editKeptContent, estimateSeconds } from "../lib/script.js";
+import {
+  buildScriptMessages,
+  buildScriptEditMessages,
+  buildScriptRewriteMessages,
+  editKeptContent,
+  estimateSeconds,
+  copyRatio,
+  repeatsWithin,
+  paragraphsToRewrite,
+  secondsForText,
+  syncSceneSeconds,
+} from "../lib/script.js";
 
 const synopsis = {
   angle: "매일 맛이 다른 라떼",
@@ -137,6 +148,42 @@ describe("buildScriptMessages — 구성 종속", () => {
   });
 });
 
+describe("buildScriptMessages — 밀도와 카피톤", () => {
+  // 라이브 3건에서 낭독 길이가 구성 배분의 60·74·64%에 그쳤고, 모자란 자리를
+  // "그날의 손맛 그대로"·"집중과 몰입의 시간" 같은 명사형 카피가 채웠다.
+  it("장면에 배분된 초를 문장 분량으로 채우라고 지시한다", () => {
+    const { system } = buildScriptMessages(project);
+    expect(system).toContain("초당 5.5자");
+    expect(system).toContain("분량");
+  });
+
+  // 카피톤을 막았더니 모델이 '할 말'을 조사만 바꿔 그대로 옮기는 쪽으로 도망갔다.
+  it("'할 말'을 조사만 바꿔 전사하지 말라고 대조 예시로 못박는다", () => {
+    const { system } = buildScriptMessages(project);
+    expect(system).toContain("나쁜 예(할 말 전사)");
+  });
+
+  it("낭독 어체를 '~합니다'로 못박는다 — 초안·교정 둘 다", () => {
+    for (const { system } of [
+      buildScriptMessages(project),
+      buildScriptEditMessages({ paragraphs: [{ text: "문장" }] }),
+    ]) {
+      expect(system).toContain("합니다");
+      expect(system).toContain("어체");
+    }
+  });
+
+  it("명사형 카피로 끝맺지 말라고 지시한다 — 초안·교정 둘 다", () => {
+    for (const { system } of [
+      buildScriptMessages(project),
+      buildScriptEditMessages({ paragraphs: [{ text: "문장" }] }),
+    ]) {
+      expect(system).toContain("명사");
+      expect(system).toContain("당신의 손에");
+    }
+  });
+});
+
 describe("buildScriptEditMessages", () => {
   const draft = {
     paragraphs: [{ text: "특별한 딸기라떼를 만나보세요" }],
@@ -169,6 +216,150 @@ describe("buildScriptEditMessages", () => {
   it("평탄화 말고 날카롭게·임팩트 보존을 지시한다", () => {
     const { system } = buildScriptEditMessages(draft);
     expect(system).toMatch(/날카롭|임팩트|평탄/);
+  });
+});
+
+describe("copyRatio", () => {
+  it("조사만 바꾼 복사는 1에 가깝다", () => {
+    // 라이브에서 실제로 나온 쌍 — 대본 단계가 아무 일도 하지 않았다
+    expect(copyRatio("이곳은 동네 작은 세탁소다", "이곳은 평범한 동네에 자리한 작은 세탁소입니다.")).toBeGreaterThan(0.8);
+  });
+
+  it("사실을 한 걸음 전개한 문장은 임계 아래다", () => {
+    expect(copyRatio("물레 없이 손으로만 빚는다", "물레는 가르치지 않습니다. 손으로 빚어야 그날 만든 것을 가져갑니다.")).toBeLessThan(0.8);
+  });
+
+  it("한쪽이 비면 0 — 판정하지 않는다", () => {
+    expect(copyRatio("", "아무 문장")).toBe(0);
+    expect(copyRatio(null, "아무 문장")).toBe(0);
+    expect(copyRatio("할 말", "")).toBe(0);
+  });
+});
+
+describe("repeatsWithin", () => {
+  it("같은 말을 두 번 하면 잡는다", () => {
+    // 라이브에서 분량을 채우라니까 나온 문단
+    expect(repeatsWithin("손님들이 운동화를 맡기기 위해 세탁소를 방문합니다. 최근 들어 많은 손님들이 운동화를 맡기고 있습니다.")).toBe(true);
+  });
+
+  it("서로 다른 사실을 말하면 잡지 않는다", () => {
+    expect(repeatsWithin("물레는 가르치지 않습니다. 수요일은 가마를 굽느라 쉽니다.")).toBe(false);
+  });
+
+  it("문장이 하나뿐이면 잡지 않는다", () => {
+    expect(repeatsWithin("운동화가 하루에 열 켤레씩 들어옵니다.")).toBe(false);
+  });
+
+  it("아주 짧은 문장은 세지 않는다 — 맞장구가 겹쳐 보인다", () => {
+    expect(repeatsWithin("네. 네.")).toBe(false);
+  });
+});
+
+describe("paragraphsToRewrite", () => {
+  const syn = {
+    scenes: [
+      { says: "이곳은 동네 작은 세탁소다", shows: "세탁소 외관 풀 샷" },
+      { says: "운동화를 많이 맡긴다", shows: "세제를 넣는 손 클로즈업, 조작 패널을 누르는 모습" },
+    ],
+  };
+
+  it("할 말 전사를 이유와 함께 지목한다", () => {
+    const script = {
+      paragraphs: [
+        { text: "이곳은 평범한 동네에 자리한 작은 세탁소입니다." },
+        { text: "요즘은 흰 운동화가 하루에 열 켤레씩 들어옵니다." },
+      ],
+    };
+    expect(paragraphsToRewrite(syn, script)).toEqual([{ idx: 0, reason: "할 말 전사" }]);
+  });
+
+  it("보여줌을 읊은 문단도 지목한다 — 할 말만 보면 이 경로가 열린다", () => {
+    const script = {
+      paragraphs: [
+        { text: "흰 운동화가 하루에 열 켤레씩 들어옵니다." },
+        { text: "세제를 넣고 조작 패널을 누릅니다." },
+      ],
+    };
+    expect(paragraphsToRewrite(syn, script)).toEqual([{ idx: 1, reason: "화면 설명 전사" }]);
+  });
+
+  it("같은 말을 되풀이한 문단도 지목한다", () => {
+    const script = {
+      paragraphs: [
+        { text: "흰 운동화가 하루에 열 켤레씩 들어옵니다." },
+        { text: "손님들이 운동화를 맡기러 자주 오십니다. 요즘 손님들이 운동화를 맡기러 자주 옵니다." },
+      ],
+    };
+    expect(paragraphsToRewrite(syn, script)).toEqual([{ idx: 1, reason: "같은 말 되풀이" }]);
+  });
+
+  it("멀쩡하면 빈 배열", () => {
+    const script = {
+      paragraphs: [
+        { text: "흰 운동화가 하루에 열 켤레씩 들어옵니다." },
+        { text: "하루면 다 마릅니다." },
+      ],
+    };
+    expect(paragraphsToRewrite(syn, script)).toEqual([]);
+  });
+
+  it("구성이나 대본이 없으면 빈 배열 — 옛 프로젝트를 건드리지 않는다", () => {
+    expect(paragraphsToRewrite(null, { paragraphs: [{ text: "문장" }] })).toEqual([]);
+    expect(paragraphsToRewrite(syn, null)).toEqual([]);
+  });
+});
+
+describe("secondsForText · syncSceneSeconds", () => {
+  it("문장 길이를 초로 환산하고 2~15초로 묶는다", () => {
+    expect(secondsForText("가".repeat(55))).toBe(10);
+    expect(secondsForText("가")).toBe(2);        // 하한
+    expect(secondsForText("가".repeat(200))).toBe(15); // 상한
+  });
+
+  it("장면의 초를 그 장면 문장 길이로 맞춘다", () => {
+    const syn = { angle: "앵글", version: 3, scenes: [{ says: "ㄱ", seconds: 8 }, { says: "ㄴ", seconds: 8 }] };
+    const script = { paragraphs: [{ text: "가".repeat(55) }, { text: "나".repeat(11) }] };
+    const next = syncSceneSeconds(syn, script);
+    expect(next.scenes.map((s) => s.seconds)).toEqual([10, 2]);
+    // 사장님이 승인한 구성이 바뀐 게 아니다 — 버전을 올리면 대본 화면에 거짓 경고가 뜬다
+    expect(next.version).toBe(3);
+    expect(next.angle).toBe("앵글");
+  });
+
+  it("문단이 없는 장면의 초는 건드리지 않는다", () => {
+    const syn = { scenes: [{ says: "ㄱ", seconds: 8 }, { says: "ㄴ", seconds: 7 }] };
+    const next = syncSceneSeconds(syn, { paragraphs: [{ text: "가".repeat(55) }] });
+    expect(next.scenes.map((s) => s.seconds)).toEqual([10, 7]);
+  });
+});
+
+describe("buildScriptRewriteMessages", () => {
+  const draft = { paragraphs: [{ text: "베낀 문장" }, { text: "괜찮은 문장" }] };
+
+  const targets = [{ idx: 0, reason: "할 말 전사" }];
+
+  it("지목한 문단 번호·이유와 그 장면의 할 말·보여줌을 지문에 담는다", () => {
+    const { system, messages } = buildScriptRewriteMessages(project, draft, targets);
+    const user = messages[0].content;
+    expect(user).toContain("1번");                 // 사람이 세는 번호
+    expect(user).toContain("할 말 전사");           // 무엇이 잘못됐는지 알려야 같은 자리로 안 돌아온다
+    expect(user).toContain("베낀 문장");
+    expect(user).toContain("오늘 한 잔은 어제와 다르다");           // 1번 장면의 할 말
+    expect(user).toContain("딸기 과육이 우유에 섞이는 클로즈업");   // 1번 장면의 보여줌
+    expect(system).toContain("전사");
+  });
+
+  it("지목하지 않은 문단은 그대로 두라고 지시한다", () => {
+    const user = buildScriptRewriteMessages(project, draft, targets).messages[0].content;
+    expect(user).toContain("괜찮은 문장");
+    expect(user).toContain("그대로");
+  });
+
+  it("이유마다 다른 처방을 준다 — 되풀이는 지우고 화면 설명은 말하지 않는다", () => {
+    const { system } = buildScriptRewriteMessages(project, draft, targets);
+    expect(system).toContain("화면 설명 전사");
+    expect(system).toContain("같은 말 되풀이");
+    expect(system).toContain("짧아지는 편이 낫다");
   });
 });
 

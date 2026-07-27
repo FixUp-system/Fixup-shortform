@@ -279,6 +279,38 @@ describe("POST /api/projects/[id]/briefing — 재추출", () => {
   });
 });
 
+describe("POST /api/projects/[id]/synopsis — 장면 예산", () => {
+  const scene = (says) => ({ role: "여는말", shows: "화면", says, seconds: 3, facts: [] });
+
+  it("자료가 가진 사실보다 장면이 많으면 한 번 줄여 오라고 되돌린다", async () => {
+    const p = await projectWithBriefing(); // 핵심 내용 1개 → 예산 2장면
+    const 넘침 = { angle: "앵글", scenes: [scene("ㄱ"), scene("ㄴ"), scene("ㄷ"), scene("ㄹ")] };
+    const 맞음 = { angle: "앵글", scenes: [scene("ㄱ"), scene("ㄴ")] };
+    llmMock.callJson.mockResolvedValueOnce(넘침).mockResolvedValueOnce(맞음);
+    await synopsisPOST(patchReq({}), ctx(p.id));
+    expect(llmMock.callJson).toHaveBeenCalledTimes(2);
+    // 되돌릴 때는 몇 개를 냈고 몇 개까지인지 알려줘야 같은 개수로 돌아오지 않는다
+    expect(llmMock.callJson.mock.calls[1][0].messages[0].content).toContain("2개 이하로 줄여");
+    expect((await getProject(p.id)).synopsis.scenes).toHaveLength(2);
+  });
+
+  it("두 번째도 넘치면 그대로 안고 간다 — 구성을 아예 못 주는 것보다 낫다", async () => {
+    const p = await projectWithBriefing();
+    const 넘침 = { angle: "앵글", scenes: [scene("ㄱ"), scene("ㄴ"), scene("ㄷ")] };
+    llmMock.callJson.mockResolvedValue(넘침);
+    const res = await synopsisPOST(patchReq({}), ctx(p.id));
+    expect(res.status).toBe(200);
+    expect((await getProject(p.id)).synopsis.scenes).toHaveLength(3);
+  });
+
+  it("예산 안에 들면 되돌리지 않는다", async () => {
+    const p = await projectWithBriefing();
+    llmMock.callJson.mockResolvedValue({ angle: "앵글", scenes: [scene("ㄱ"), scene("ㄴ")] });
+    await synopsisPOST(patchReq({}), ctx(p.id));
+    expect(llmMock.callJson).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("POST /api/projects/[id]/script (초안→교정)", () => {
   const cliche = { paragraphs: [{ text: "특별한 라떼를 만나보세요" }] };
   const plain = { paragraphs: [{ text: "시럽을 쓰지 않습니다" }] };
@@ -308,6 +340,58 @@ describe("POST /api/projects/[id]/script (초안→교정)", () => {
     const saved = (await getProject(p.id)).script;
     expect(saved.paragraphs).toHaveLength(2);
     expect(saved.paragraphs[1].text).toBe("6500원입니다");
+  });
+
+  // 판정은 여덟 자 이상인 '할 말'에만 걸린다(짧은 원본은 우연히 겹친다) — 실제 길이의 장면으로 세운다
+  async function projectWithLongSays() {
+    const p = await projectWithScript();
+    return updateProject(p.id, (proj) => ({
+      ...proj,
+      synopsis: { ...SYN, scenes: [{ ...SYN.scenes[0], says: "시럽을 쓰지 않고 매일 아침 직접 간다" }] },
+    }));
+  }
+  const 전사 = { paragraphs: [{ text: "시럽을 쓰지 않고 매일 아침 직접 갑니다." }] }; // 조사만 바꾼 복사
+  const 다시쓴 = { paragraphs: [{ text: "아침마다 딸기를 갈아 그날 치만 만듭니다." }] };
+
+  it("초안이 장면의 할 말을 전사하면 그 문단만 다시 쓰게 한 번 더 부른다", async () => {
+    const p = await projectWithLongSays();
+    llmMock.callJson
+      .mockResolvedValueOnce(전사)      // 초안
+      .mockResolvedValueOnce(다시쓴)    // 되돌리기
+      .mockResolvedValueOnce(다시쓴);   // 교정
+    await scriptPOST(patchReq({}), ctx(p.id));
+    expect(llmMock.callJson).toHaveBeenCalledTimes(3); // 초안·되돌리기·교정
+    expect((await getProject(p.id)).script.paragraphs[0].text).toBe("아침마다 딸기를 갈아 그날 치만 만듭니다.");
+  });
+
+  it("전사가 아니면 되돌리기를 부르지 않는다 — 멀쩡한 초안에 돈을 더 쓰지 않는다", async () => {
+    const p = await projectWithLongSays();
+    llmMock.callJson.mockResolvedValue(다시쓴);
+    await scriptPOST(patchReq({}), ctx(p.id));
+    expect(llmMock.callJson).toHaveBeenCalledTimes(2); // 초안·교정뿐
+  });
+
+  it("되돌리기가 실패해도 초안을 안고 간다", async () => {
+    const p = await projectWithLongSays();
+    llmMock.callJson
+      .mockResolvedValueOnce(전사)
+      .mockRejectedValueOnce(new Error("네트워크")) // 되돌리기 실패
+      .mockResolvedValueOnce(전사);                 // 교정
+    const res = await scriptPOST(patchReq({}), ctx(p.id));
+    expect(res.status).toBe(200);
+    expect((await getProject(p.id)).script.paragraphs[0].text).toBe("시럽을 쓰지 않고 매일 아침 직접 갑니다.");
+  });
+
+  it("대본을 저장하면 장면의 초를 문장 길이에 맞추되 구성 버전은 올리지 않는다", async () => {
+    const p = await projectWithScript(); // 장면 seconds 3, 구성 version 1
+    const 긴문장 = { paragraphs: [{ text: "가".repeat(55) }] }; // 55자 → 10초
+    llmMock.callJson.mockResolvedValue(긴문장);
+    await scriptPOST(patchReq({}), ctx(p.id));
+    const after = await getProject(p.id);
+    expect(after.synopsis.scenes[0].seconds).toBe(10);
+    // 버전이 오르면 대본 화면에 "구성이 바뀌었어요" 거짓 경고와 유료 재생성 버튼이 뜬다
+    expect(after.synopsis.version).toBe(1);
+    expect(after.script.synopsis_version).toBe(1);
   });
 
   it("초안 호출이 예외로 죽어도 원시 에러를 흘리지 않고 한국어 502를 준다", async () => {
