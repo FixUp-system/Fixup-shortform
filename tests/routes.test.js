@@ -182,7 +182,9 @@ describe("PATCH synopsis_scene", () => {
   it("직접 편집은 version을 올리지 않는다 — 사장님이 고친 것이 stale 경고를 띄우면 안 된다", async () => {
     const p = await projectWithScript();
     await PATCH(patchReq({ synopsis_scene: { idx: 0, shows: "고친화면" } }), ctx(p.id));
-    expect((await getProject(p.id)).synopsis.version).toBe(1);
+    const after = (await getProject(p.id)).synopsis;
+    expect(after.scenes[0].shows).toBe("고친화면"); // 편집이 실제로 먹었는지 — 기능이 없어도 version은 1이다
+    expect(after.version).toBe(1);
   });
 
   it("범위 밖 idx는 아무것도 바꾸지 않는다", async () => {
@@ -345,6 +347,12 @@ describe("POST /api/projects/[id]/synopsis", () => {
     expect(res.status).toBe(400);
   });
 
+  it("없는 프로젝트면 404", async () => {
+    const res = await synopsisPOST(patchReq({}), ctx("없는id"));
+    expect(res.status).toBe(404);
+    expect(llmMock.callJson).not.toHaveBeenCalled();
+  });
+
   it("구성을 저장하고 version을 올린다", async () => {
     const p = await projectWithBriefing();
     llmMock.callJson.mockResolvedValueOnce(synOut(3));
@@ -385,6 +393,12 @@ describe("POST /api/projects/[id]/synopsis", () => {
 });
 
 describe("POST /api/projects/[id]/script — 구성 종속", () => {
+  it("없는 프로젝트면 404", async () => {
+    const res = await scriptPOST(patchReq({}), ctx("없는id"));
+    expect(res.status).toBe(404);
+    expect(llmMock.callJson).not.toHaveBeenCalled();
+  });
+
   it("구성이 없으면 400", async () => {
     const p = await projectWithBriefing();
     const res = await scriptPOST(patchReq({}), ctx(p.id));

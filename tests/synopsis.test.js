@@ -20,6 +20,8 @@ describe("buildSynopsisMessages", () => {
     expect(user).toContain("생딸기라떼");
     expect(user).toContain("매일 아침 직접 갈아");
     expect(user).toContain("라떼.jpg");
+    // 사진 id를 함께 적어야 장면이 ref_photo_id를 고를 수 있다 — 표기가 배선이다
+    expect(user).toContain("id:p1");
   });
 
   it("shows와 says를 갈라서 요구한다", () => {
@@ -65,9 +67,19 @@ describe("buildSynopsisMessages", () => {
 
   it("카메라 움직임 용어는 넣지 않는다 — shows는 정지 키프레임이다", () => {
     const { system } = buildSynopsisMessages(project);
-    // '팬'은 뒤 공백 없이 잠근다 — 이 저장소 프롬프트는 '팬·돌리'처럼 가운뎃점으로 나열한다.
+    // 다른 낱말에 파묻히지 않는 용어는 그대로 잠근다.
     // ('달리'는 '달리다'와 겹쳐 오탐이 나므로 넣지 않는다.)
-    for (const term of ["팬", "돌리", "트럭", "크레인", "줌", "휩팬", "틸트", "트래킹", "핸드헬드", "슬로우모션"]) {
+    for (const term of ["돌리", "크레인", "휩팬", "틸트", "트래킹", "핸드헬드", "슬로우모션"]) {
+      expect(system).not.toContain(term);
+    }
+    // '팬·줌·트럭'을 맨 부분문자열로 잠그면 '프라이팬'·'보여줌'·'푸드트럭' 하나만 들어와도
+    // 거짓 실패가 난다. 낱말 경계를 두고 본다 — 이 저장소 프롬프트의 '팬·돌리' 같은
+    // 가운뎃점 나열도 경계다.
+    for (const term of ["팬", "줌", "트럭"]) {
+      expect(system).not.toMatch(new RegExp(`(^|[^가-힣A-Za-z])${term}([^가-힣A-Za-z]|$)`));
+    }
+    // 경계 없이 붙여 쓰는 합성어는 따로 잠근다
+    for (const term of ["팬인", "팬아웃", "줌인", "줌아웃", "트럭샷"]) {
       expect(system).not.toContain(term);
     }
   });

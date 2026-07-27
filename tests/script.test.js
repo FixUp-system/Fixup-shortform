@@ -58,8 +58,12 @@ describe("buildScriptMessages", () => {
     expect(user).toContain("생딸기라떼. 매일 아침 직접 갈아서.");
   });
 
-  it("영상 성격을 단정하지 않는다 — 훅을 강제하지 않는다", () => {
+  it("여는말은 센 사실로 열게 하되 정해진 틀을 강요하지 않는다", () => {
     const { system } = buildScriptMessages(project);
+    // 여는 방식을 지시하긴 한다 — 다만 문구 틀이 아니라 '가장 센 사실'로 열라는 지시다
+    expect(system).toContain("가장 센 한 방");
+    expect(system).toContain("가장 구체적이고 센 사실로");
+    // 틀을 못박는 명령("반드시 …로 시작하라")은 두지 않는다
     expect(system).not.toContain("반드시");
   });
 
@@ -124,10 +128,12 @@ describe("buildScriptMessages — 구성 종속", () => {
     expect(buildScriptMessages(project).system).toContain("같은 개수·같은 순서");
   });
 
-  it("출력 스키마에 tag와 coverage가 없다", () => {
-    const { system } = buildScriptMessages(project);
-    expect(system).not.toContain('"tag"');
-    expect(system).not.toContain("coverage");
+  it("출력 스키마에 tag와 coverage가 없다 — 초안·교정 프롬프트 둘 다", () => {
+    // 교정 프롬프트도 같은 스키마를 요구한다. 한쪽만 보면 coverage가 되살아나도 못 잡는다.
+    for (const { system } of [buildScriptMessages(project), buildScriptEditMessages({ paragraphs: [{ text: "문장" }] })]) {
+      expect(system).not.toContain('"tag"');
+      expect(system).not.toContain("coverage");
+    }
   });
 });
 
