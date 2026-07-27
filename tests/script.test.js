@@ -28,13 +28,39 @@ const project = {
 };
 
 describe("buildScriptMessages — 하나로 흐르는 원고", () => {
-  it("자료와 브리핑이 지문에 들어간다", () => {
+  it("자료 원문과 사진이 지문에 들어간다", () => {
     const { system, messages } = buildScriptMessages(project);
     expect(system).toContain("대본");
     const user = messages[0].content;
-    expect(user).toContain("생딸기라떼");
+    expect(user).toContain("생딸기라떼. 매일 아침 직접 갈아서."); // 원문 그대로
     expect(user).toContain("라떼.jpg");
-    expect(user).toContain("동네 주민");
+  });
+
+  // A/B 측정: 요약을 함께 주면 모델이 원문 대신 요약을 문장화해 두 번 증류됐다.
+  // 사장님이 한 말과 구체 수치가 사라지고, 얕은 자료에서는 금지어·환각까지 나왔다.
+  it("브리핑 요약은 지문에 넣지 않는다 — 원문이 직접 닿아야 한다", () => {
+    const user = buildScriptMessages(project).messages[0].content;
+    expect(user).not.toContain("[정리된 브리핑]");
+    expect(user).not.toContain("생딸기라떼 신메뉴"); // topic
+    expect(user).not.toContain("동네 주민");         // audience
+    expect(user).not.toContain("매장에 와보고 싶어지기"); // takeaway
+  });
+
+  it("되물어 받은 답은 넣는다 — 원문에 없는 사실이다", () => {
+    const asked = {
+      ...project,
+      briefing: {
+        ...project.briefing,
+        asked: [
+          { question: "가격은?", answer: "6,500원", done: true },
+          { question: "언제부터?", answer: "  ", done: true }, // 답 없는 것은 빼고
+        ],
+      },
+    };
+    const user = buildScriptMessages(asked).messages[0].content;
+    expect(user).toContain("추가로 확인한 것");
+    expect(user).toContain("가격은? → 6,500원");
+    expect(user).not.toContain("언제부터?");
   });
 
   it("출력이 문단 배열이 아니라 원고 한 덩어리다", () => {
