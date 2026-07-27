@@ -1,45 +1,25 @@
 "use client";
 
-// ① 자료 — 정리 결과 확인·보강·확정 (개입 지점 1)
+// ① 자료 — 되물을 것이 있을 때만 멈춘다.
+//
+// 정리된 요약("이렇게 이해했어요" 카드)은 보여주지 않는다. 대본 지문에서 브리핑 요약을 뺀 뒤로
+// key_points가 원고에 직접 닿지 않기 때문이다 — 사장님이 고칠 실익이 없는 것을 확인시키면
+// 게이트만 하나 늘어난다. topic(이미지 주제 앵커)과 사실 개수(자동 길이)는 그대로 쓰인다.
+//
+// 그래서 이 화면은 셋 중 하나다: 정리하는 중 / 되물을 것 / (둘 다 아니면) 대본으로 바로 통과.
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 import { capacitySeconds } from "../../../../lib/script";
-
-const EMPTY = { topic: "", key_points: [""], audience: "", takeaway: "", asked: [], confirmed: false };
-const BLANK = "(비어 있음)";
-
-// 클릭하면 바로 고쳐지는 한 줄. 브리핑 카드의 네 칸이 모두 이걸 쓴다.
-function EditableText({ value, placeholder, className, style, onCommit }) {
-  return (
-    <span
-      className={className}
-      style={style}
-      contentEditable
-      suppressContentEditableWarning
-      onBlur={(e) => {
-        const raw = e.currentTarget.textContent.trim();
-        const text = raw === placeholder ? "" : raw; // 안내 문구를 값으로 저장하지 않는다
-        if (text !== value) onCommit(text);
-      }}
-    >{value || placeholder}</span>
-  );
-}
 
 export default function BriefingStepPage() {
   const { id } = useParams();
   const router = useRouter();
   const { project, load } = useProject();
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState(""); // 정리 실패 — 옆에 "다시 정리하기"가 붙는다(LLM 재호출)
-  const [hint, setHint] = useState(""); // 저장·확정 안내 — 재호출 버튼이 따라붙으면 안 되는 자리
-  const [draft, setDraft] = useState(null); // 직접 채우기 폴백용
+  const [err, setErr] = useState("");
   const started = useRef(false);
-  // 저장 왕복(fetch+load) 동안에는 재렌더가 없어 핸들러가 낡은 brief를 붙든다 —
-  // 페이로드는 항상 이 ref(최신 브리핑)에서 계산하고, 저장은 큐로 한 줄로 세운다.
-  const briefRef = useRef(null);
-  const inFlight = useRef(0);
-  const saveQueue = useRef(Promise.resolve());
+  const passed = useRef(null); // 자동 통과는 프로젝트당 한 번만 — 뒤로 돌아왔을 때 다시 튕기지 않게
 
   // 브리핑이 없으면 자동으로 정리 시작 (새로고침으로 들어와도 이어진다)
   useEffect(() => {
@@ -49,180 +29,142 @@ export default function BriefingStepPage() {
     }
   }, [project?.id, project?.briefing]);
 
+  const brief = project?.briefing;
+  const pending = (brief?.asked || []).filter((a) => !a.done);
+
+  // 되물을 것이 없으면 멈추지 않는다 — 확정하고 대본으로 넘긴다
+  useEffect(() => {
+    if (!brief || brief.confirmed || pending.length > 0 || passed.current === id) return;
+    passed.current = id;
+    confirmAndGo();
+  }, [brief, pending.length, id]);
+
   async function extract() {
-    setBusy(true); setErr(""); setHint("");
+    setBusy(true); setErr("");
     const res = await fetch(`/api/projects/${id}/briefing`, { method: "POST" });
-    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      setErr(data.error || "정리하지 못했어요");
-      setDraft((d) => d || EMPTY); // 백지 폼으로 폴백 — 이미 직접 입력한 게 있으면 지우지 않는다
-    } else {
-      setDraft(null); // 다시 정리하기가 성공하면 백지 폼은 버린다
+      const data = await res.json().catch(() => ({}));
+      setErr(data.error || "자료를 정리하지 못했어요");
     }
     await load(id).catch(() => {});
     setBusy(false);
   }
 
-  // 저장이 실패하면 직후 load가 옛 값을 되돌려놔 편집이 사라진다 — 왜 사라졌는지 알려준다.
-  async function patch(briefing) {
+  async function patchBriefing(patch) {
     const res = await fetch(`/api/projects/${id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ briefing }),
+      body: JSON.stringify({ briefing: patch }),
     }).catch(() => null);
-    if (!res || !res.ok) {
-      const data = res ? await res.json().catch(() => ({})) : {};
-      setHint(data.error || "저장하지 못했어요 — 방금 고친 내용이 되돌아갔어요. 다시 고쳐 주세요");
-    }
+    if (!res || !res.ok) setErr("저장하지 못했어요 — 다시 시도해 주세요");
     await load(id).catch(() => {});
     return !!res && res.ok;
   }
 
-  // 저장은 하나씩 순서대로 — 앞 저장의 왕복 중에 뒤 저장이 끼어들어 서로 덮어쓰지 않게.
-  function enqueue(fn) {
-    inFlight.current += 1;
-    const run = saveQueue.current.then(fn, fn);
-    saveQueue.current = run.catch(() => {}).then(() => { inFlight.current -= 1; });
-    return run;
-  }
-
-  // 백지 폼(폴백)에서는 아직 서버에 브리핑이 없으므로 draft에만 담고, 확정할 때 한 번에 저장한다.
-  function save(patchObj) {
-    const next = { ...briefRef.current, ...patchObj };
-    briefRef.current = next; // 낙관적 갱신 — 연달아 고쳐도 다음 페이로드가 최신 위에서 계산된다
-    return draft ? setDraft(next) : enqueue(() => patch(patchObj));
-  }
-
   async function answer(idx, value) {
-    const asked = briefRef.current.asked.map((a, i) => (i === idx ? { ...a, answer: value, done: true } : a));
-    await save({ asked });
+    const asked = (brief.asked || []).map((a, i) => (i === idx ? { ...a, answer: value, done: true } : a));
+    await patchBriefing({ asked });
   }
 
-  async function confirm() {
-    // 마지막 칸을 채우고 바로 누르는 경우가 있다 — 판정은 렌더 클로저가 아니라 ref(최신 값) 기준.
-    // (버튼을 disabled로 막으면 mousedown이 먹혀 편집 칸의 blur=저장이 아예 안 일어난다)
-    const cur0 = briefRef.current;
-    if (!(cur0?.topic.trim() && cur0.key_points.some((k) => k.trim()))) {
-      setHint("주제와 핵심 내용을 채워 주세요");
-      return;
-    }
-    setBusy(true); setHint("");
-    // 방금 칸을 고치고 바로 누른 경우가 있다 — 앞선 저장 뒤에 줄을 서서 최신 값 위에 확정한다.
-    let ok = false;
-    try {
-      ok = await enqueue(async () => {
-        const cur = briefRef.current;
-        if (draft && !(await patch({ ...cur, key_points: cur.key_points.filter((k) => k.trim()) }))) return false;
-        return await patch({ confirmed: true });
-      });
-    } catch { ok = false; }
-    if (!ok) {
-      // 확정은 이 화면의 유일한 문이다 — 실패해도 CTA가 잠기지 않게 반드시 busy를 푼다
+  async function confirmAndGo() {
+    setBusy(true);
+    const ok = await patchBriefing({ confirmed: true });
+    setBusy(false);
+    if (ok) router.replace(`/create/${id}/script`);
+  }
+
+  // 이야기를 더 들려준 뒤에는 원고를 다시 써야 반영된다 — 그 자리를 명시적으로 만든다
+  async function rewriteScript() {
+    setBusy(true); setErr("");
+    const res = await fetch(`/api/projects/${id}/script`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+    });
+    if (!res.ok) {
+      setErr((await res.json().catch(() => ({}))).error || "대본을 다시 쓰지 못했어요");
       setBusy(false);
-      setHint((h) => h || "확정하지 못했어요 — 다시 눌러 주세요");
       return;
     }
+    await load(id).catch(() => {});
     router.push(`/create/${id}/script`);
   }
 
-  const brief = project.briefing || draft;
-  // 저장이 도는 중에는 서버 값이 낡았을 수 있으니 ref를 덮지 않는다(낙관적 값 유지).
-  if (inFlight.current === 0) briefRef.current = brief;
+  if (!project) return <p className="pgsub">준비 중…</p>;
 
-  if (!brief) return <p className="pgsub">{busy ? "자료를 정리하는 중…" : err || "준비 중…"}</p>;
+  if (!brief) {
+    return err ? (
+      <p className="pgsub warn">
+        {err} <button className="mini" onClick={extract} disabled={busy}>다시 정리하기</button>
+      </p>
+    ) : (
+      <p className="pgsub">자료를 정리하는 중…</p>
+    );
+  }
 
-  const pending = (brief.asked || []).filter((a) => !a.done);
-  // 고른 길이 vs 자료가 감당하는 길이 — 둘이 어긋나면 미리 알린다
-  const chosen = project?.settings?.target_seconds || null;
+  // 되물을 것이 없는데 여기 있다면 되돌아온 것이다(자동 통과는 위에서 한 번만 돈다)
+  if (pending.length === 0) {
+    return (
+      <section className="panel panel--narrow">
+        <h2>자료는 준비됐어요</h2>
+        <p className="pgsub">{project.material?.text?.slice(0, 120)}…</p>
+        <div className="step-actions">
+          <div className="fwd">
+            <button className="cta" disabled={busy} onClick={() => router.push(`/create/${id}/script`)}>
+              대본 보러 가기 →
+            </button>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  const hasScript = !!project.script?.text;
   const capacity = capacitySeconds({ briefing: brief });
-  const short = chosen ? capacity < chosen : false;
-  const canConfirm = brief.topic.trim() && brief.key_points.some((k) => k.trim());
 
   return (
     <section className="panel panel--narrow">
-      <h2>이렇게 이해했어요 <span className="badge vlm">확인 1</span></h2>
-      {err && (
-        <p className="pgsub warn">
-          {err} <button className="mini" onClick={extract} disabled={busy}>다시 정리하기</button>
-        </p>
-      )}
-      {hint && <p className="pgsub warn">{hint}</p>}
+      <h2>{pending.length}가지만 여쭤요 <span className="badge vlm">대본이 구체적이 됩니다</span></h2>
+      {err && <p className="pgsub warn">{err}</p>}
 
-      <div className="brief">
-        <div className="brief-row">
-          <b>주제</b>
-          <EditableText className="val" value={brief.topic} placeholder=""
-            onCommit={(topic) => save({ topic })} />
-        </div>
-        <div className="brief-row">
-          <b>핵심 내용</b>
-          <div className="val">
-            {brief.key_points.map((k, i) => (
-              <div className="brief-point" key={i}>
-                <EditableText value={k} placeholder="" className="editable" style={{ flex: 1 }}
-                  onCommit={(text) => save({
-                    // 렌더 클로저의 brief 는 앞선 저장 중이면 낡았다 — 목록은 항상 ref(최신)에서 만든다
-                    key_points: briefRef.current.key_points.map((v, j) => (j === i ? text : v)).filter((v) => v),
-                  })} />
-              </div>
-            ))}
-            <button className="mini mt-sm"
-              onClick={() => save({ key_points: [...briefRef.current.key_points, "새 내용"] })}>+ 내용 추가</button>
+      <div className="ask">
+        {(brief.asked || []).map((a, i) => a.done ? null : (
+          <div className="ask-q" key={i}>
+            <p>{a.question}</p>
+            <div className="row">
+              {(a.options || []).map((o) => (
+                <button className="mini" key={o} onClick={() => answer(i, o)}>{o}</button>
+              ))}
+              <input className="sent-input" placeholder="직접 입력"
+                onKeyDown={(e) => { if (e.key === "Enter" && e.currentTarget.value.trim()) answer(i, e.currentTarget.value.trim()); }} />
+              <button className="mini" onClick={() => answer(i, null)}>건너뛰기</button>
+            </div>
           </div>
-        </div>
-        <div className="brief-row">
-          <b>보는 사람</b>
-          <EditableText className={`val${brief.audience ? "" : " blank"}`} value={brief.audience} placeholder={BLANK}
-            onCommit={(audience) => save({ audience })} />
-        </div>
-        <div className="brief-row">
-          <b>보고 나면</b>
-          <EditableText className={`val${brief.takeaway ? "" : " blank"}`} value={brief.takeaway} placeholder={BLANK}
-            onCommit={(takeaway) => save({ takeaway })} />
-        </div>
+        ))}
       </div>
 
-      {pending.length > 0 && (
-        <div className="ask">
-          <h3>{pending.length}가지만 더 여쭤요 — 대본이 구체적이 됩니다</h3>
-          {brief.asked.map((a, i) => a.done ? null : (
-            <div className="ask-q" key={i}>
-              <p>{a.question}</p>
-              <div className="row">
-                {a.options.map((o) => (
-                  <button className="mini" key={o} onClick={() => answer(i, o)}>{o}</button>
-                ))}
-                <input className="sent-input" placeholder="직접 입력"
-                  onKeyDown={(e) => { if (e.key === "Enter" && e.currentTarget.value.trim()) answer(i, e.currentTarget.value.trim()); }} />
-                <button className="mini" onClick={() => answer(i, null)}>건너뛰기</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
       {brief.asked?.some((a) => a.done && a.answer) && (
         <div className="script-src">
           답해주신 것 — {brief.asked.filter((a) => a.done && a.answer).map((a, i) => <b key={i}>✓ {a.answer} </b>)}
         </div>
       )}
-
-      <div className="script-src">칸을 클릭하면 바로 고칠 수 있어요</div>
-      {/* 고른 길이와 자료가 감당하는 길이를 나란히 둔다 — 대본을 받아 보고 나서
-          "왜 짧지"를 알면 늦다. 모자라면 무엇을 하면 되는지까지 여기서 말한다. */}
-      <div className={`script-src${short ? " warn" : ""}`}>
-        {chosen
-          ? short
-            ? `고르신 ${chosen}초에는 자료가 조금 모자라요 — 지금 자료로는 약 ${capacity}초예요.`
-            : `고르신 ${chosen}초로 만들어요 — 지금 자료면 충분해요.`
-          : `지금 자료로 약 ${capacity}초짜리 영상을 만들 수 있어요.`}
-        {pending.length > 0 && " 위 질문에 답하시면 더 길어져요."}
-        {short && pending.length === 0 && " 자료를 더 적어 주시면 길어져요."}
+      <div className="script-src">
+        답하시면 그만큼 대본에 담을 이야기가 늘어요 — 지금 자료로는 약 {capacity}초예요.
       </div>
+
       <div className="step-actions">
         <div className="fwd">
-          <span className="hint">자료를 바탕으로 대본을 써요 — 마음에 들 때까지 다시 쓸 수 있어요</span>
-          <button className="cta" disabled={busy} aria-disabled={!canConfirm} onClick={confirm}>
-            이대로 대본 쓰기
-          </button>
+          <span className="hint">
+            {hasScript
+              ? "답한 이야기를 담으려면 대본을 다시 써야 해요"
+              : "답을 마치면 바로 대본을 씁니다 — 건너뛰셔도 됩니다"}
+          </span>
+          {hasScript ? (
+            <button className="cta" disabled={busy} onClick={rewriteScript}>
+              이 이야기로 대본 다시 쓰기
+            </button>
+          ) : (
+            <button className="cta" disabled={busy} onClick={confirmAndGo}>
+              이대로 대본 쓰기
+            </button>
+          )}
         </div>
       </div>
     </section>
