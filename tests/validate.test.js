@@ -85,6 +85,16 @@ describe("validateCuts", () => {
     const obj = { cuts: [{ sentence: "가", seconds: 3 }] };
     expect(validateCuts(obj, scenes)).toBeNull();
   });
+  it("scene_idx가 숫자가 아니면 null — 강제변환으로 장면 0에 붙지 않는다", () => {
+    for (const bad of [null, "", [], true, "1"]) {
+      const obj = { cuts: [{ sentence: "가", seconds: 3, scene_idx: bad }] };
+      expect(validateCuts(obj, scenes)).toBeNull();
+    }
+  });
+  it("scene_idx가 정수가 아닌 숫자여도 null", () => {
+    const obj = { cuts: [{ sentence: "가", seconds: 3, scene_idx: 1.5 }] };
+    expect(validateCuts(obj, scenes)).toBeNull();
+  });
   it("scene_idx를 컷에 남긴다", () => {
     const obj = { cuts: [{ sentence: "가", seconds: 3, scene_idx: 1 }] };
     expect(validateCuts(obj, scenes)[0].scene_idx).toBe(1);

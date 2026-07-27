@@ -68,6 +68,12 @@ describe("buildImagePrompt — 화면 근거", () => {
     expect(prompt).toContain("reference");
   });
 
+  it("사진 목록에 없는 ref는 레퍼런스 문장을 붙이지 않는다", () => {
+    const cut = { idx: 0, scene_idx: 0, sentence: "첫 모금에 과육이 씹히는", source: "ai", ref_photo_id: "지워진사진" };
+    const prompt = buildImagePrompt(cut, project);
+    expect(prompt).not.toContain("reference");
+  });
+
   it("브리핑 주제가 있으면 전 컷에 주제 앵커가 들어간다", () => {
     const withTopic = { ...project, briefing: { topic: "생딸기라떼 신메뉴" } };
     const cut = { idx: 0, scene_idx: 1, sentence: "한 잔 6,500원", source: "ai" }; // 제품이 문장에 없는 컷
