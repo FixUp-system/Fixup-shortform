@@ -275,7 +275,8 @@ describe("POST /api/projects/[id]/script — 원고", () => {
   it("되풀이가 있으면 한 번 다시 쓰게 부르고, 나아지면 받는다", async () => {
     const p = await projectWithBriefing();
     const 되풀이 = { script: "손님들이 운동화를 맡기기 위해 세탁소를 방문합니다. 최근 들어 많은 손님들이 운동화를 맡기고 있습니다." };
-    const 고침 = { script: "손님들이 운동화를 맡기러 옵니다. 하루면 다 마릅니다." };
+    // 고쳐 온 원고는 목표 분량(60자) 안에 들어와야 한다 — 짧으면 '분량 미달'로 또 돌아간다
+    const 고침 = { script: "손님들이 운동화를 맡기러 옵니다. 흰 운동화는 하루면 다 마릅니다. 굽이 닳은 신발은 이틀 걸립니다. 밑창은 직접 손으로 솔질합니다." };
     llmMock.callJson
       .mockResolvedValueOnce(되풀이)   // 초안
       .mockResolvedValueOnce(고침)     // 되돌리기

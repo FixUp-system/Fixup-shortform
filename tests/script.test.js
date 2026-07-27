@@ -11,6 +11,8 @@ import {
   overTarget,
   underTarget,
   unusedFacts,
+  weakOpening,
+  scriptScore,
   secondsForText,
   targetChars,
   capacitySeconds,
@@ -95,6 +97,16 @@ describe("buildScriptMessages — 하나로 흐르는 원고", () => {
     const { system } = buildScriptMessages(project);
     expect(system).toContain("사람이 한 말");
     expect(system).toContain("버리는 것이 대본이다");
+  });
+
+  // 금지 12종이 행동 요청까지 막는 것으로 읽혔다 — 판매·알림 영상의 목적 자체를 지운다
+  it("행동 요청 자체는 막지 않는다 — 관용구 대신 사실로 청하게 한다", () => {
+    const { system } = buildScriptMessages(project);
+    expect(system).toContain("행동을 청하는 것 자체는 금지가 아니다");
+    expect(system).toContain("11월부터 예약 받습니다");
+    // 교정 패스도 같은 오해를 하지 않아야 한다
+    const edit = buildScriptEditMessages({ text: "원고" }).system;
+    expect(edit).toContain("행동 정보 자체를 지우라는 뜻이 아니다");
   });
 
   it("화면 묘사·기법어·명사형 카피·어체를 규정한다", () => {
@@ -281,6 +293,20 @@ describe("scriptFaults — 원고가 스스로 판정되는 셋", () => {
     expect(underTarget(project, near)).toBe(false);
   });
 
+  // "성수동에서 12년째 옷 수선집을 운영합니다" — 프롬프트로 두 번 금지했는데 두 번 다 나왔다
+  it("연차나 소개로 여는 첫 문장을 잡는다", () => {
+    expect(weakOpening("성수동에서 12년째 옷 수선집을 운영합니다. 손님이 울었습니다.")).toBe(true);
+    expect(weakOpening("망원동에서 반찬가게를 운영합니다. 남은 건 팔지 않습니다.")).toBe(true);
+    expect(scriptFaults(project, { text: "성수동에서 12년째 옷 수선집을 운영합니다. 매일 아침 직접 갈아 만듭니다. 하루 40잔이면 끝납니다." }))
+      .toContain("약한 오프닝");
+  });
+
+  it("사실로 여는 첫 문장은 잡지 않는다", () => {
+    expect(weakOpening("물레는 가르치지 않습니다. 손으로 빚어야 그날 가져가시니까요.")).toBe(false);
+    expect(weakOpening("작년 김장 김치 200포기가 이틀 만에 나갔습니다.")).toBe(false);
+    expect(weakOpening("손님이 받아 가시면서 우셨습니다.")).toBe(false);
+  });
+
   it("멀쩡하면 빈 배열", () => {
     // 목표(사실 2개 → 60자) 안에 드는 길이여야 한다 — 짧으면 이제 '분량 미달'로 잡힌다
     const ok = "매일 아침 딸기를 직접 갈아서 그날 쓸 만큼만 만듭니다. 그래서 하루 40잔이면 그날 치는 끝납니다. 오후 세 시쯤이면 대개 떨어집니다.";
@@ -290,6 +316,22 @@ describe("scriptFaults — 원고가 스스로 판정되는 셋", () => {
   it("원고가 없으면 판정하지 않는다", () => {
     expect(scriptFaults(project, null)).toEqual([]);
     expect(scriptFaults(project, { text: "  " })).toEqual([]);
+  });
+});
+
+describe("scriptScore — 되돌리기를 받을지 가르는 자", () => {
+  const target = targetChars(project); // 60자
+
+  it("결함 개수를 먼저 본다", () => {
+    const clean = { text: "가".repeat(target) };
+    const broken = { text: "가".repeat(target * 2) }; // 분량 초과
+    expect(scriptScore(project, clean)).toBeLessThan(scriptScore(project, broken));
+  });
+
+  it("결함 개수가 같으면 목표에 가까운 쪽이 낫다 — 절반 고쳐 온 것을 버리지 않게", () => {
+    const far = { text: "가".repeat(target * 3) };   // 초과 1개
+    const near = { text: "가".repeat(target * 2) };  // 초과 1개, 목표에 더 가깝다
+    expect(scriptScore(project, near)).toBeLessThan(scriptScore(project, far));
   });
 });
 
