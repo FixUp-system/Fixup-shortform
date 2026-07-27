@@ -32,3 +32,22 @@ describe("estimateCost", () => {
     expect(estimateCost("fal-ai/kling-video/v3", 7)).toBe(0.88); // 0.882 → 0.88
   });
 });
+
+describe("단위", () => {
+  it("글자당 단가는 1000자 기준으로 계산한다", () => {
+    expect(estimateCost("fal-ai/elevenlabs/tts/turbo-v2.5", 165)).toBe(0.01); // 0.00825 → 0.01
+    expect(estimateCost("fal-ai/elevenlabs/tts/turbo-v2.5", 2000)).toBe(0.1);
+  });
+
+  it("minimax 는 영상(초당)과 음성(글자당)이 갈린다", () => {
+    // "fal-ai/minimax" 가 speech 도 삼킨다 — speech 항목이 위에 있어야 한다
+    expect(estimateCost("fal-ai/minimax/speech-02-hd", 1000)).toBe(0.1);
+    expect(estimateCost("fal-ai/minimax/video-01", 10)).toBe(0.5);
+  });
+
+  it("i2v와 ffmpeg 단가가 표에 있다", () => {
+    expect(estimateCost("fal-ai/ltx-2.3/image-to-video/fast", 10)).toBe(0.4);
+    expect(estimateCost("fal-ai/ffmpeg-api/merge-videos", 30)).toBe(0);
+    expect(estimateCost("fal-ai/ffmpeg-api/merge-audio-video", 30)).toBe(0.01); // 0.006 → 0.01
+  });
+});
