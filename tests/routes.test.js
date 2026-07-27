@@ -160,6 +160,29 @@ describe("PATCH /api/projects/[id] — 브리핑 버전은 내용 변경에 묶�
   });
 });
 
+describe("PATCH synopsis_scene", () => {
+  it("장면의 shows·says를 고친다", async () => {
+    const p = await projectWithScript();
+    await PATCH(patchReq({ synopsis_scene: { idx: 0, shows: "고친화면", says: "고친요지" } }), ctx(p.id));
+    const s = (await getProject(p.id)).synopsis.scenes[0];
+    expect(s.shows).toBe("고친화면");
+    expect(s.says).toBe("고친요지");
+    expect(s.role).toBe("여는말"); // 나머지 필드는 건드리지 않는다
+  });
+
+  it("직접 편집은 version을 올리지 않는다 — 사장님이 고친 것이 stale 경고를 띄우면 안 된다", async () => {
+    const p = await projectWithScript();
+    await PATCH(patchReq({ synopsis_scene: { idx: 0, shows: "고친화면" } }), ctx(p.id));
+    expect((await getProject(p.id)).synopsis.version).toBe(1);
+  });
+
+  it("범위 밖 idx는 아무것도 바꾸지 않는다", async () => {
+    const p = await projectWithScript();
+    await PATCH(patchReq({ synopsis_scene: { idx: 9, shows: "엉뚱" } }), ctx(p.id));
+    expect((await getProject(p.id)).synopsis.scenes[0].shows).toBe("화면");
+  });
+});
+
 describe("POST /api/projects/[id]/briefing — 재추출", () => {
   it("이미 진행된 프로젝트의 status·confirmed를 되감지 않는다", async () => {
     const p = await projectWithScript();

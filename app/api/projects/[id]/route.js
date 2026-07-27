@@ -38,6 +38,21 @@ export async function PATCH(req, { params }) {
           ),
         };
       }
+      // 장면 직접 편집. version을 올리지 않는다 — 사장님이 손으로 고친 것을
+      // "구성이 바뀌었다"로 알리면 대본 화면에 거짓 경고가 뜨고, 그 버튼은 유료 호출이다.
+      if (body.synopsis_scene && proj.synopsis && Number.isInteger(body.synopsis_scene.idx)) {
+        const { idx, shows, says } = body.synopsis_scene;
+        next.synopsis = {
+          ...proj.synopsis,
+          scenes: proj.synopsis.scenes.map((s, i) =>
+            i !== idx ? s : {
+              ...s,
+              ...(typeof shows === "string" && shows.trim() ? { shows: shows.trim() } : {}),
+              ...(typeof says === "string" && says.trim() ? { says: says.trim() } : {}),
+            }
+          ),
+        };
+      }
       return next;
     });
     return Response.json(project);
