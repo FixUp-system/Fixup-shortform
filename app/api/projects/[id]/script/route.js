@@ -24,8 +24,8 @@ export async function POST(req, { params }) {
   for (let attempt = 0; attempt < 2 && !draft; attempt++) {
     try {
       draft = validateScript(await callJson({ system, messages }), sceneCount);
-    } catch (e) {
-      return Response.json({ error: e.message }, { status: 502 });
+    } catch {
+      break;
     }
   }
   if (!draft) return Response.json({ error: "대본 생성에 실패했어요. 다시 시도해 주세요." }, { status: 502 });

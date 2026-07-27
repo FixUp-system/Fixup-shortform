@@ -235,6 +235,26 @@ describe("POST /api/projects/[id]/script (초안→교정)", () => {
     expect(saved.paragraphs).toHaveLength(2);
     expect(saved.paragraphs[1].text).toBe("6500원입니다");
   });
+
+  it("초안 호출이 예외로 죽어도 원시 에러를 흘리지 않고 한국어 502를 준다", async () => {
+    const p = await projectWithScript();
+    llmMock.callJson.mockRejectedValue(new Error("네트워크"));
+    const res = await scriptPOST(patchReq({}), ctx(p.id));
+    expect(res.status).toBe(502);
+    // lib/llm.js가 응답 본문을 메시지에 담으므로 e.message를 그대로 돌려주면 내부 정보가 샌다
+    expect((await res.json()).error).toBe("대본 생성에 실패했어요. 다시 시도해 주세요.");
+    // 교정·구성 루프와 같은 catch{break} — 예외는 재시도하지 않고 루프를 빠져나온다
+    expect(llmMock.callJson).toHaveBeenCalledTimes(1);
+    expect((await getProject(p.id)).script.version).toBe(1); // 기존 대본을 덮지 않는다
+  });
+
+  it("교정 호출이 예외로 죽으면 초안이 그대로 저장된다", async () => {
+    const p = await projectWithScript();
+    llmMock.callJson.mockResolvedValueOnce(cliche).mockRejectedValue(new Error("네트워크"));
+    const res = await scriptPOST(patchReq({}), ctx(p.id));
+    expect(res.status).toBe(200);
+    expect((await getProject(p.id)).script.paragraphs[0].text).toBe("특별한 라떼를 만나보세요");
+  });
 });
 
 const synOut = (n = 1) => ({
@@ -260,6 +280,7 @@ describe("POST /api/projects/[id]/synopsis", () => {
     expect(saved.scenes).toHaveLength(3);
     expect(saved.version).toBe(1);
     expect(saved.briefing_version).toBe(2);
+    expect((await getProject(p.id)).status).toBe("synopsis"); // 뒤 단계 문턱이 이 값에 걸린다
   });
 
   it("다시 만들면 version이 오른다", async () => {
@@ -299,6 +320,7 @@ describe("POST /api/projects/[id]/script — 구성 종속", () => {
     llmMock.callJson.mockResolvedValue({ paragraphs: [{ text: "가" }, { text: "나" }] });
     const res = await scriptPOST(patchReq({}), ctx(p.id));
     expect(res.status).toBe(502);
+    expect(llmMock.callJson).toHaveBeenCalledTimes(2); // 이름의 "재시도"가 실제로 일어났는지
   });
 
   it("synopsis_version을 붙여 저장한다", async () => {
