@@ -174,7 +174,7 @@ export default function SynopsisStepPage() {
         <BackButton stepKey="synopsis" />
         <div className="fwd">
           <button className="mini" disabled={busy} onClick={() => gen()}>처음부터 다시</button>
-          <button disabled={busy} onClick={() => router.push(`/create/${id}/script`)}>
+          <button className="cta" disabled={busy} onClick={() => router.push(`/create/${id}/script`)}>
             이 구성으로 대본 쓰기 →
           </button>
         </div>
