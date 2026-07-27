@@ -1,7 +1,7 @@
 import { getProject, updateProject } from "../../../../../lib/projects";
 import { callJson } from "../../../../../lib/llm";
-import { validateScript, validatePlan } from "../../../../../lib/validate";
-import { buildScriptMessages, buildScriptEditMessages, buildPlanMessages, editKeptContent } from "../../../../../lib/script";
+import { validateScript } from "../../../../../lib/validate";
+import { buildScriptMessages, buildScriptEditMessages, editKeptContent } from "../../../../../lib/script";
 
 export async function POST(req, { params }) {
   const { id } = await params;
@@ -10,38 +10,32 @@ export async function POST(req, { params }) {
   if (!project.briefing?.confirmed) {
     return Response.json({ error: "브리핑을 먼저 확정해 주세요" }, { status: 400 });
   }
-
-  const { instruction } = await req.json().catch(() => ({}));
-
-  // 0단 기획 — 앵글·비트시트(내부 밑그림). 실패해도 던지지 않는다. plan=null이면 초안이 폴백 경로를 탄다.
-  let plan = null;
-  const planMsg = buildPlanMessages(project);
-  for (let attempt = 0; attempt < 2 && !plan; attempt++) {
-    try {
-      plan = validatePlan(await callJson({ system: planMsg.system, messages: planMsg.messages }));
-    } catch {
-      break;
-    }
+  // 구성이 곧 설계도다. 없으면 대본이 따를 장면이 없다.
+  if (!project.synopsis) {
+    return Response.json({ error: "구성을 먼저 만들어 주세요" }, { status: 400 });
   }
 
-  // 1단 초안 — 기획이 있으면 그 설계대로 전개한다
-  const { system, messages } = buildScriptMessages(project, instruction, plan);
+  const { instruction } = await req.json().catch(() => ({}));
+  const sceneCount = project.synopsis.scenes.length;
+
+  // 1단 초안 — 구성의 장면 수·순서를 그대로 따른다
+  const { system, messages } = buildScriptMessages(project, instruction);
   let draft = null;
   for (let attempt = 0; attempt < 2 && !draft; attempt++) {
     try {
-      draft = validateScript(await callJson({ system, messages }));
+      draft = validateScript(await callJson({ system, messages }), sceneCount);
     } catch (e) {
       return Response.json({ error: e.message }, { status: 502 });
     }
   }
   if (!draft) return Response.json({ error: "대본 생성에 실패했어요. 다시 시도해 주세요." }, { status: 502 });
 
-  // 2단 자기 교정 — 광고 티·상투어 제거. 실패하거나 사실·분량을 흘리면 초안으로 폴백(작업을 잃지 않는다).
+  // 2단 자기 교정 — 광고 티·상투어 제거. 실패하거나 분량을 흘리면 초안으로 폴백(작업을 잃지 않는다).
   let edited = null;
   const edit = buildScriptEditMessages(draft);
   for (let attempt = 0; attempt < 2 && !edited; attempt++) {
     try {
-      edited = validateScript(await callJson({ system: edit.system, messages: edit.messages }));
+      edited = validateScript(await callJson({ system: edit.system, messages: edit.messages }), sceneCount);
     } catch {
       break;
     }
@@ -54,7 +48,7 @@ export async function POST(req, { params }) {
     script: {
       ...script,
       version: (proj.script?.version || 0) + 1,
-      briefing_version: proj.briefing?.version || 1,
+      synopsis_version: proj.synopsis?.version || 1,
     },
   }));
   return Response.json({ script: updated.script });

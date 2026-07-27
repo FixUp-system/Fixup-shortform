@@ -16,6 +16,7 @@ const { POST: cutsPOST } = await import("../app/api/projects/[id]/cuts/route.js"
 const { PATCH } = await import("../app/api/projects/[id]/route.js");
 const { POST: briefingPOST } = await import("../app/api/projects/[id]/briefing/route.js");
 const { POST: scriptPOST } = await import("../app/api/projects/[id]/script/route.js");
+const { POST: synopsisPOST } = await import("../app/api/projects/[id]/synopsis/route.js");
 
 const ctx = (id) => ({ params: Promise.resolve({ id }) });
 const patchReq = (body) => ({ json: async () => body });
@@ -26,13 +27,37 @@ beforeEach(async () => {
   llmMock.callJson.mockReset();
 });
 
+const SYN = {
+  angle: "앵글",
+  scenes: [{ role: "여는말", shows: "화면", says: "요지", seconds: 3, facts: [] }],
+  version: 1,
+  briefing_version: 2,
+};
+
 async function projectWithScript() {
   const p = await createProject({ settings: {}, material: { text: "자료", photos: [] } });
   return updateProject(p.id, (proj) => ({
     ...proj,
     status: "script",
     briefing: { topic: "주제", key_points: ["ㄱ"], asked: [], confirmed: true, version: 2 },
-    script: { paragraphs: [{ tag: "훅", text: "안녕" }], coverage: [], version: 1, briefing_version: 2 },
+    synopsis: SYN,
+    script: { paragraphs: [{ text: "안녕" }], version: 1, synopsis_version: 1 },
+  }));
+}
+
+async function projectWithBriefing() {
+  const p = await createProject({ settings: {}, material: { text: "자료", photos: [] } });
+  return updateProject(p.id, (proj) => ({
+    ...proj,
+    briefing: { topic: "주제", key_points: ["ㄱ"], asked: [], confirmed: true, version: 2 },
+  }));
+}
+
+async function projectWith2Scenes() {
+  const p = await projectWithScript();
+  return updateProject(p.id, (proj) => ({
+    ...proj,
+    synopsis: { ...SYN, scenes: [SYN.scenes[0], { role: "가격", shows: "가격표", says: "6500원", seconds: 3, facts: [] }] },
   }));
 }
 
@@ -180,26 +205,13 @@ describe("POST /api/projects/[id]/briefing — 재추출", () => {
   });
 });
 
-describe("POST /api/projects/[id]/script (기획→초안→교정)", () => {
-  const plan = { angle: "시럽 안 씀", beats: [{ role: "여는말", facts: ["시럽 안 씀"], point: "그래서 단맛이 다름" }] };
-  const cliche = { paragraphs: [{ tag: "여는말", text: "특별한 라떼를 만나보세요" }], coverage: ["시럽 안 씀"] };
-  const plain = { paragraphs: [{ tag: "여는말", text: "시럽을 쓰지 않습니다" }], coverage: ["시럽 안 씀"] };
+describe("POST /api/projects/[id]/script (초안→교정)", () => {
+  const cliche = { paragraphs: [{ text: "특별한 라떼를 만나보세요" }] };
+  const plain = { paragraphs: [{ text: "시럽을 쓰지 않습니다" }] };
 
-  it("기획→초안→교정을 거쳐 교정본을 저장한다", async () => {
+  it("초안→교정을 거쳐 교정본을 저장한다", async () => {
     const p = await projectWithScript();
-    llmMock.callJson.mockResolvedValueOnce(plan).mockResolvedValueOnce(cliche).mockResolvedValueOnce(plain);
-    await scriptPOST(patchReq({}), ctx(p.id));
-    const saved = (await getProject(p.id)).script;
-    expect(saved.paragraphs[0].text).toBe("시럽을 쓰지 않습니다");
-  });
-
-  it("기획이 실패해도(plan=null) 초안·교정으로 대본을 낸다", async () => {
-    const p = await projectWithScript();
-    // 기획 콜이 던지면 plan=null로 흡수되고, 다음 콜부터 초안·교정이 이어진다
-    llmMock.callJson
-      .mockRejectedValueOnce(new Error("기획 실패"))
-      .mockResolvedValueOnce(cliche)
-      .mockResolvedValueOnce(plain);
+    llmMock.callJson.mockResolvedValueOnce(cliche).mockResolvedValueOnce(plain);
     await scriptPOST(patchReq({}), ctx(p.id));
     const saved = (await getProject(p.id)).script;
     expect(saved.paragraphs[0].text).toBe("시럽을 쓰지 않습니다");
@@ -207,20 +219,94 @@ describe("POST /api/projects/[id]/script (기획→초안→교정)", () => {
 
   it("교정이 실패하면 초안으로 폴백한다", async () => {
     const p = await projectWithScript();
-    llmMock.callJson.mockResolvedValueOnce(plan).mockResolvedValueOnce(cliche).mockResolvedValue({}); // 교정 스키마 불일치
+    llmMock.callJson.mockResolvedValueOnce(cliche).mockResolvedValue({}); // 교정 스키마 불일치
     await scriptPOST(patchReq({}), ctx(p.id));
     const saved = (await getProject(p.id)).script;
     expect(saved.paragraphs[0].text).toBe("특별한 라떼를 만나보세요");
   });
 
   it("교정본이 문단을 흘리면(스키마는 맞아도) 초안으로 폴백한다", async () => {
-    const p = await projectWithScript();
-    const draft2 = { paragraphs: [{ tag: "여는말", text: "특별한 라떼" }, { tag: "가격", text: "6500원입니다" }], coverage: ["가격", "위치"] };
-    const shortEdit = { paragraphs: [{ tag: "여는말", text: "라떼입니다" }], coverage: ["가격"] };
-    llmMock.callJson.mockResolvedValueOnce(plan).mockResolvedValueOnce(draft2).mockResolvedValueOnce(shortEdit);
+    const p = await projectWith2Scenes(); // 장면 2개 — 초안도 문단 2개다
+    const draft2 = { paragraphs: [{ text: "특별한 라떼" }, { text: "6500원입니다" }] };
+    const shortEdit = { paragraphs: [{ text: "라떼입니다" }] };
+    llmMock.callJson.mockResolvedValueOnce(draft2).mockResolvedValueOnce(shortEdit).mockResolvedValue({});
     await scriptPOST(patchReq({}), ctx(p.id));
     const saved = (await getProject(p.id)).script;
     expect(saved.paragraphs).toHaveLength(2);
     expect(saved.paragraphs[1].text).toBe("6500원입니다");
+  });
+});
+
+const synOut = (n = 1) => ({
+  angle: "매일 맛이 다른 라떼",
+  scenes: Array.from({ length: n }, (_, i) => ({
+    role: `역할${i}`, shows: `화면${i}`, says: `요지${i}`, seconds: 3, facts: [],
+  })),
+});
+
+describe("POST /api/projects/[id]/synopsis", () => {
+  it("브리핑이 확정되지 않았으면 400", async () => {
+    const p = await createProject({ settings: {}, material: { text: "자료", photos: [] } });
+    const res = await synopsisPOST(patchReq({}), ctx(p.id));
+    expect(res.status).toBe(400);
+  });
+
+  it("구성을 저장하고 version을 올린다", async () => {
+    const p = await projectWithBriefing();
+    llmMock.callJson.mockResolvedValueOnce(synOut(3));
+    const res = await synopsisPOST(patchReq({}), ctx(p.id));
+    expect(res.status).toBe(200);
+    const saved = (await getProject(p.id)).synopsis;
+    expect(saved.scenes).toHaveLength(3);
+    expect(saved.version).toBe(1);
+    expect(saved.briefing_version).toBe(2);
+  });
+
+  it("다시 만들면 version이 오른다", async () => {
+    const p = await projectWithBriefing();
+    llmMock.callJson.mockResolvedValue(synOut(3));
+    await synopsisPOST(patchReq({}), ctx(p.id));
+    await synopsisPOST(patchReq({ instruction: "더 짧게" }), ctx(p.id));
+    expect((await getProject(p.id)).synopsis.version).toBe(2);
+  });
+
+  it("두 번 다 스키마가 깨지면 502", async () => {
+    const p = await projectWithBriefing();
+    llmMock.callJson.mockResolvedValue({ angle: "", scenes: [] });
+    const res = await synopsisPOST(patchReq({}), ctx(p.id));
+    expect(res.status).toBe(502);
+    expect(llmMock.callJson).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("POST /api/projects/[id]/script — 구성 종속", () => {
+  it("구성이 없으면 400", async () => {
+    const p = await projectWithBriefing();
+    const res = await scriptPOST(patchReq({}), ctx(p.id));
+    expect(res.status).toBe(400);
+    expect(llmMock.callJson).not.toHaveBeenCalled();
+  });
+
+  it("기획을 새로 짜지 않는다 — 초안·교정 두 번만 부른다", async () => {
+    const p = await projectWithScript();
+    llmMock.callJson.mockResolvedValue({ paragraphs: [{ text: "문장" }] });
+    await scriptPOST(patchReq({ instruction: "더 짧게" }), ctx(p.id));
+    expect(llmMock.callJson).toHaveBeenCalledTimes(2);
+  });
+
+  it("문단 수가 장면 수와 다르면 재시도하고, 계속 다르면 502", async () => {
+    const p = await projectWithScript(); // 장면 1개
+    llmMock.callJson.mockResolvedValue({ paragraphs: [{ text: "가" }, { text: "나" }] });
+    const res = await scriptPOST(patchReq({}), ctx(p.id));
+    expect(res.status).toBe(502);
+  });
+
+  it("synopsis_version을 붙여 저장한다", async () => {
+    const p = await projectWithScript();
+    llmMock.callJson.mockResolvedValue({ paragraphs: [{ text: "문장" }] });
+    await scriptPOST(patchReq({}), ctx(p.id));
+    const saved = (await getProject(p.id)).script;
+    expect(saved.synopsis_version).toBe(1);
+    expect(saved.version).toBe(2);
   });
 });
