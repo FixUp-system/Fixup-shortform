@@ -58,15 +58,21 @@ describe("currentStepKey", () => {
   it("컷이 시작되면 이미지 단계", () => {
     expect(currentStepKey({ status: "cuts", briefing: confirmed, synopsis })).toBe("images");
   });
-  it("구성을 다시 만들어 status가 내려가도 컷이 남아 있으면 이미지 단계다", () => {
-    // 구성 라우트가 status를 "synopsis"로 되돌린다 — 상태만 보면 돈 주고 만든 컷이 있는데도 ⑤가 닫힌다
-    const p = { status: "synopsis", briefing: confirmed, synopsis, cuts: [{ id: "c1" }] };
-    expect(currentStepKey(p)).toBe("images");
-    // 대본을 다시 뽑아 status가 "script"로 내려간 경우도 같다
-    expect(currentStepKey({ ...p, status: "script" })).toBe("images");
+  it("구성이 없어도 status가 cuts면 이미지 단계 — 구성 도입 전 프로젝트를 쫓아내지 않는다", () => {
+    // synopsis 없이 "synopsis"를 돌려주면 레이아웃이 아직 없는 화면으로 replace 해 404에 갇힌다
+    const old = { status: "cuts", briefing: confirmed, cuts: [{ id: "c1" }] };
+    expect(currentStepKey(old)).toBe("images");
   });
-  it("컷이 비어 있으면 상태를 따른다 — 분할 실패는 되돌아갈 수 있어야 한다", () => {
-    expect(currentStepKey({ status: "script", briefing: confirmed, synopsis, cuts: [] })).toBe("script");
+  it("대본을 고쳐 status가 script로 내려가면 컷이 남아 있어도 대본 단계 — 컷을 다시 뽑을 수 있다", () => {
+    const p = { status: "script", briefing: confirmed, synopsis, cuts: [{ id: "c1" }] };
+    expect(currentStepKey(p)).toBe("script");
+  });
+  it("구성을 고치면 남은 컷은 낡은 것으로 본다", () => {
+    const p = { status: "synopsis", briefing: confirmed, synopsis, cuts: [{ id: "c1" }] };
+    expect(currentStepKey(p)).toBe("script");
+  });
+  it("구성도 컷도 없으면 구성 단계", () => {
+    expect(currentStepKey({ status: "briefing", briefing: confirmed })).toBe("synopsis");
   });
 });
 

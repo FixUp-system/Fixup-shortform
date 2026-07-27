@@ -1,6 +1,6 @@
 "use client";
 
-// ⑥ 완성 — 자막·병합·믹싱·인코딩을 거친 최종본 (P1)
+// ⑦ 완성 — 자막·병합·믹싱·인코딩을 거친 최종본 (P1)
 import SoonStep from "../../../../components/SoonStep";
 
 export default function DoneStepPage() {

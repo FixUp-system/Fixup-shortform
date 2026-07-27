@@ -1,6 +1,6 @@
 "use client";
 
-// ④ 이미지 — 승인 게이트 2 (컷별 이미지 확인·재생성)
+// ⑤ 이미지 — 승인 게이트 2 (컷별 이미지 확인·재생성)
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
@@ -169,7 +169,7 @@ export default function ImagesStepPage() {
           <div className="step-actions">
             <div className="fwd">
               <span className="hint">여기까지가 지금 되는 데까지예요 — 이미지가 곧 각 컷의 시작 프레임이 됩니다</span>
-              <button className="cta" disabled>영상화 — 준비 중 (⑤)</button>
+              <button className="cta" disabled>영상화 — 준비 중 (⑥)</button>
             </div>
           </div>
         )}

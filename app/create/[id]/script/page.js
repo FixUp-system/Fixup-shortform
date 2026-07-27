@@ -1,6 +1,6 @@
 "use client";
 
-// ② 대본 — 승인 게이트 1 (무료)
+// ③ 대본 — 승인 게이트 1 (무료)
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
@@ -143,10 +143,10 @@ export default function ScriptStepPage() {
           <span className="hint">
             {hasCuts
               ? "이미 만든 컷이 있어요 — 다시 만들지 않고 그대로 보여드려요"
-              : "컷당 이미지 후보 2장 + AI 검수 · 목소리(③)는 준비 중이라 건너뜁니다"}
+              : "컷당 이미지 후보 2장 + AI 검수 · 목소리(④)는 준비 중이라 건너뜁니다"}
           </span>
           <button className="cta" disabled={busy} onClick={approve}>
-            {hasCuts ? "④ 이미지 확인하러 가기" : "대본 승인 →"}
+            {hasCuts ? "⑤ 이미지 확인하러 가기" : "대본 승인 →"}
           </button>
         </div>
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-// ③ 목소리 — 대본을 읽어 컷별 실제 길이를 확정하는 단계 (P0)
+// ④ 목소리 — 대본을 읽어 컷별 실제 길이를 확정하는 단계 (P0)
 import SoonStep from "../../../../components/SoonStep";
 
 export default function VoiceStepPage() {
