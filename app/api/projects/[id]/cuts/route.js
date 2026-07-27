@@ -18,12 +18,12 @@ export async function POST(req, { params }) {
     ? body.aspect_ratio
     : project.settings?.aspect_ratio || "9:16";
 
-  // 멱등 가드 — 이미 ⑤에 컷이 하나라도 있으면(만드는 중이든 다 됐든) 다시 띄우지 않는다.
+  // 멱등 가드 — 이미 ③에 컷이 하나라도 있으면(만드는 중이든 다 됐든) 다시 띄우지 않는다.
   // 아래에서 cuts:[]를 선저장하므로, 막지 않으면 돈 주고 만든 컷·이미지가 그 자리에서 지워지고
   // 파이프라인이 한 벌 더 돈다(컷당 ≈$0.08). 컷이 비어 있는 경우(=분할 실패)는 다시 시도를 허용한다.
   if (currentStepKey(project) === "images" && (project.cuts || []).length > 0) {
     return Response.json(
-      { error: "이미 만든 컷이 있어요 — ⑤ 이미지에서 확인해 주세요" },
+      { error: "이미 만든 컷이 있어요 — ③ 이미지에서 확인해 주세요" },
       { status: 409 }
     );
   }

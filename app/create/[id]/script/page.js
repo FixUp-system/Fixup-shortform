@@ -186,10 +186,10 @@ export default function ScriptStepPage() {
               ? "이미 만든 컷이 있어요 — 다시 만들지 않고 그대로 보여드려요"
               : madeCuts
               ? "지금 승인하면 컷을 처음부터 다시 만들어요 — 먼저 만든 이미지는 지워집니다"
-              : "원고를 컷으로 나누고, 컷마다 화면을 설계해서 그려요 · 목소리(③)는 준비 중이라 건너뜁니다"}
+              : "원고를 컷으로 나누고, 컷마다 화면을 설계해서 그려요 · 목소리는 이미지를 만든 뒤에 입힙니다"}
           </span>
           <button className="cta" disabled={busy} onClick={approve}>
-            {hasCuts ? "④ 이미지 확인하러 가기" : "대본 승인 →"}
+            {hasCuts ? "③ 이미지 확인하러 가기" : "대본 승인 →"}
           </button>
         </div>
       </div>

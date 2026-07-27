@@ -1,6 +1,6 @@
 "use client";
 
-// ⑥ 영상 — 승인된 이미지를 각 컷의 시작 프레임으로 삼아 클립 생성 (P1)
+// ⑤ 영상 — 승인된 이미지를 각 컷의 시작 프레임으로 삼아 클립 생성 (P1)
 import SoonStep from "../../../../components/SoonStep";
 
 export default function VideoStepPage() {

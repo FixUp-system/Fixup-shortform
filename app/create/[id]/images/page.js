@@ -1,6 +1,6 @@
 "use client";
 
-// ⑤ 이미지 — 승인 게이트 3 (컷별 이미지 확인·재생성)
+// ③ 이미지 — 승인 게이트 3 (컷별 이미지 확인·재생성)
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
