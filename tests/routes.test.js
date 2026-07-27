@@ -263,6 +263,15 @@ describe("POST /api/projects/[id]/script — 원고", () => {
     expect((await getProject(p.id)).script.text).toBe(cliche.script);
   });
 
+  it("교정본이 분량을 불려 놓으면 초안을 지킨다", async () => {
+    const p = await projectWithBriefing();                    // 목표 60자
+    const fit = { script: "가".repeat(70) };                  // 목표 안
+    const bloated = { script: "나".repeat(140) };             // 교정이 두 배로 불림
+    llmMock.callJson.mockResolvedValueOnce(fit).mockResolvedValue(bloated);
+    await scriptPOST(patchReq({}), ctx(p.id));
+    expect((await getProject(p.id)).script.text).toBe(fit.script);
+  });
+
   it("교정본이 분량을 흘리면 초안으로 폴백한다", async () => {
     const p = await projectWithBriefing();
     const long = { script: "가".repeat(70) };   // 목표 분량 안 — 되돌리기가 끼어들지 않는다

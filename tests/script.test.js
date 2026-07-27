@@ -116,7 +116,7 @@ describe("buildScriptMessages — 하나로 흐르는 원고", () => {
     expect(system).toContain("행동을 청하는 것 자체는 금지가 아니다");
     expect(system).toContain("11월부터 예약 받습니다");
     // 교정 패스도 같은 오해를 하지 않아야 한다
-    const edit = buildScriptEditMessages({ text: "원고" }).system;
+    const edit = buildScriptEditMessages(project, { text: "원고" }).system;
     expect(edit).toContain("행동 정보 자체를 지우라는 뜻이 아니다");
   });
 
@@ -202,12 +202,12 @@ describe("buildScriptEditMessages", () => {
   const draft = { text: "특별한 딸기라떼를 만나보세요. 지금 바로 오세요." };
 
   it("다듬을 원고가 통으로 들어간다", () => {
-    const user = buildScriptEditMessages(draft).messages[0].content;
+    const user = buildScriptEditMessages(project, draft).messages[0].content;
     expect(user).toContain("특별한 딸기라떼를 만나보세요");
   });
 
   it("사실 유지·상투어 제거·새 사실 금지를 지시하고 같은 스키마를 요구한다", () => {
-    const { system } = buildScriptEditMessages(draft);
+    const { system } = buildScriptEditMessages(project, draft);
     expect(system).toContain("빠뜨리지 않는다");
     expect(system).toContain("만나보세요");
     expect(system).toContain("더하지 않는다");
@@ -215,12 +215,20 @@ describe("buildScriptEditMessages", () => {
     expect(system).not.toContain('"paragraphs"');
   });
 
+  // 교정이 174자를 206자로 불려 놓고도 통과했다 — editKeptContent는 줄어드는 것만 막는다
+  it("목표 분량을 지문에 적고 늘리지 말라고 지시한다", () => {
+    const { system, messages } = buildScriptEditMessages(project, draft);
+    expect(messages[0].content).toContain("[분량]");
+    expect(messages[0].content).toContain(`목표 ${targetChars(project)}자`);
+    expect(system).toContain("줄이지도 늘리지도 않는다");
+  });
+
   it("쪼개지 말고 하나로 이어진 글을 유지하라고 지시한다", () => {
-    expect(buildScriptEditMessages(draft).system).toContain("장면·번호·소제목으로 쪼개지 않는다");
+    expect(buildScriptEditMessages(project, draft).system).toContain("장면·번호·소제목으로 쪼개지 않는다");
   });
 
   it("촬영 용어·명사형 카피도 걷어내라고 지시한다 — 교정이 두 번째 그물이다", () => {
-    const { system } = buildScriptEditMessages(draft);
+    const { system } = buildScriptEditMessages(project, draft);
     expect(system).toContain("샷 크기·앵글·조명 용어");
     expect(system).toContain("당신의 손에");
   });
