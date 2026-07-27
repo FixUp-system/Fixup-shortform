@@ -51,3 +51,25 @@ describe("단위", () => {
     expect(estimateCost("fal-ai/ffmpeg-api/merge-audio-video", 30)).toBe(0.01); // 0.006 → 0.01
   });
 });
+
+describe("데이터 경로", () => {
+  it("SHOTFORM_DATA_DIR 을 호출 시점에 읽는다", async () => {
+    // 모듈 로드 때 경로를 고정하면 이 값을 무시하고 저장소의 data/ 에 쓴다.
+    // 실제로 테스트가 data/costs.json 을 오염시킨 적이 있다.
+    const { mkdtempSync, existsSync } = await import("fs");
+    const { tmpdir } = await import("os");
+    const path = (await import("path")).default;
+    const { addRecord } = await import("../lib/costs.js");
+
+    const dir = mkdtempSync(path.join(tmpdir(), "shotform-costs-"));
+    const before = process.env.SHOTFORM_DATA_DIR;
+    process.env.SHOTFORM_DATA_DIR = dir;
+    try {
+      await addRecord({ request_id: "t1", ts: Date.now(), endpoint: "x", est_cost_usd: 0 });
+      expect(existsSync(path.join(dir, "costs.json"))).toBe(true);
+    } finally {
+      if (before === undefined) delete process.env.SHOTFORM_DATA_DIR;
+      else process.env.SHOTFORM_DATA_DIR = before;
+    }
+  });
+});

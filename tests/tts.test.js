@@ -1,6 +1,14 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { generateSpeech, VOICES } from "../lib/tts";
 
+import { mkdtempSync } from "fs";
+import { tmpdir } from "os";
+import path from "path";
+
+// 비용 기록이 저장소의 data/ 를 오염시키지 않게 임시 디렉터리로 돌린다 —
+// 이 테스트들은 addRecord 가 실제로 도는 경로를 지난다.
+process.env.SHOTFORM_DATA_DIR = mkdtempSync(path.join(tmpdir(), "shotform-t-"));
+
 afterEach(() => { delete process.env.SHOTFORM_FAKE; });
 
 describe("VOICES", () => {
