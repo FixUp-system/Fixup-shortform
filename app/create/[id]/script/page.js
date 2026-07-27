@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 import BackButton from "../../../../components/BackButton";
 import { estimateSeconds } from "../../../../lib/script";
-import { currentStepKey } from "../../../../lib/steps";
+import { currentStepKey, isScriptStale } from "../../../../lib/steps";
 
 export default function ScriptStepPage() {
   const { id } = useParams();
@@ -82,9 +82,8 @@ export default function ScriptStepPage() {
   }
 
   // 구성을 다시 만들면 버전이 오른다 — 지금 대본이 그 이전 것인지 알려주기만 한다.
-  // 구성 도입 전에 쓰인 대본은 버전 자체가 없다 — 그것도 "이전 것"이므로 함께 알린다.
-  const staleScript =
-    !!project.synopsis?.version && project.script.synopsis_version !== project.synopsis.version;
+  // 판정은 lib/steps가 쥔다(단계·상태 판정의 단일 소스).
+  const staleScript = isScriptStale(project);
   // 이미 만들어 둔 이미지가 있는가 — 대본을 다시 쓰면 컷을 처음부터 다시 만들게 돼 그 이미지가 지워진다
   const madeCuts = (project.cuts || []).length > 0;
 

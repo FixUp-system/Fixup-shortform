@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { STEPS, currentStepKey, isReachable, stepFromPathname, stepHref } from "../lib/steps.js";
+import { STEPS, currentStepKey, isReachable, isScriptStale, stepFromPathname, stepHref } from "../lib/steps.js";
 
 describe("단계 정의", () => {
   it("로드맵 확정 순서를 따른다", () => {
@@ -100,6 +100,39 @@ describe("구성 단계", () => {
 
   it("경로에서 구성 단계를 찾는다", () => {
     expect(stepFromPathname("/create/abc/synopsis")?.key).toBe("synopsis");
+  });
+});
+
+describe("isScriptStale", () => {
+  const syn = (version) => ({ angle: "각도", scenes: [{ role: "여는말" }], version });
+
+  it("두 버전이 같으면 낡지 않았다", () => {
+    expect(isScriptStale({ synopsis: syn(1), script: { synopsis_version: 1 } })).toBe(false);
+  });
+
+  it("구성을 다시 만들면(1 vs 2) 낡은 것으로 본다", () => {
+    expect(isScriptStale({ synopsis: syn(2), script: { synopsis_version: 1 } })).toBe(true);
+  });
+
+  it("구성을 손편집해도 낡지 않았다 — version이 그대로면 거짓 경고를 띄우지 않는다", () => {
+    // PATCH synopsis_scene은 version을 올리지 않는다. 사장님이 직접 고친 것에
+    // "대본 다시 쓰기"(유료 호출)를 권하면 안 된다.
+    const edited = { ...syn(1), scenes: [{ role: "여는말", shows: "고친화면" }] };
+    expect(isScriptStale({ synopsis: edited, script: { synopsis_version: 1 } })).toBe(false);
+  });
+
+  it("구성 도입 전에 쓰인 옛 대본은 낡은 것으로 본다", () => {
+    expect(isScriptStale({ synopsis: syn(1), script: { paragraphs: [] } })).toBe(true);
+  });
+
+  it("구성이 없으면 낡음을 판정하지 않는다", () => {
+    expect(isScriptStale({ script: { synopsis_version: 1 } })).toBe(false);
+    expect(isScriptStale({ synopsis: { scenes: [] }, script: { synopsis_version: 1 } })).toBe(false);
+  });
+
+  it("대본이 아직 없거나 프로젝트가 없으면 낡음이 아니다", () => {
+    expect(isScriptStale({ synopsis: syn(2) })).toBe(false);
+    expect(isScriptStale(null)).toBe(false);
   });
 });
 

@@ -1,7 +1,10 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mkdtempSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
+
+const llmMock = vi.hoisted(() => ({ callJson: vi.fn() }));
+vi.mock("../lib/llm.js", () => ({ callJson: (...a) => llmMock.callJson(...a) }));
 
 let projects, pipeline;
 
@@ -21,6 +24,7 @@ beforeEach(async () => {
   process.env.SHOTFORM_DATA_DIR = mkdtempSync(path.join(tmpdir(), "shotform-"));
   projects = await import("../lib/projects.js?t=" + Date.now());
   pipeline = await import("../lib/pipeline.js?t=" + Date.now());
+  llmMock.callJson.mockReset();
 });
 
 async function makeProject() {
@@ -29,6 +33,47 @@ async function makeProject() {
     material: { text: "자료", photos: [{ id: "p1", filename: "a.jpg", url: "/api/uploads/a.jpg" }] },
   });
 }
+
+// 주입 deps가 전부 우회하는 자리 — buildCutsMessages와 validateCuts(obj, scenes)가
+// 실제로 맞물리는 유일한 지점이라 여기만 직접 부른다.
+describe("defaultDeps.splitCuts", () => {
+  const project = {
+    settings: { aspect_ratio: "9:16" },
+    material: { text: "자료", photos: [{ id: "p1", filename: "a.jpg" }] },
+    synopsis: {
+      angle: "앵글",
+      scenes: [
+        { role: "여는말", shows: "딸기라떼 클로즈업", says: "요지", seconds: 5, facts: [], ref_photo_id: "p1" },
+        { role: "마감", shows: "매장 외관", says: "위치", seconds: 4, facts: [] },
+      ],
+    },
+    script: { paragraphs: [{ text: "문장1" }, { text: "문장2" }] },
+  };
+
+  it("정상 응답이면 scene_idx가 붙은 컷 배열을 돌려준다", async () => {
+    llmMock.callJson.mockResolvedValue({
+      cuts: [
+        { scene_idx: 0, sentence: "컷1", seconds: 5 },
+        { scene_idx: 1, sentence: "컷2", seconds: 4 },
+      ],
+    });
+    const cuts = await pipeline.defaultDeps.splitCuts(project);
+    expect(cuts).toHaveLength(2);
+    expect(cuts.map((c) => c.scene_idx)).toEqual([0, 1]);
+    expect(cuts[0].idx).toBe(0);
+    expect(cuts[0].source).toBe("ai");
+    expect(cuts[0].ref_photo_id).toBe("p1"); // 장면이 정한 참조 사진을 물려받는다
+    expect(cuts[1].ref_photo_id).toBeUndefined();
+    // 장면 지문이 실제로 프롬프트에 실렸는지 — buildCutsMessages와의 맞물림
+    expect(llmMock.callJson.mock.calls[0][0].messages[0].content).toContain("딸기라떼 클로즈업");
+  });
+
+  it("스키마가 깨지면 2회 재시도 후 컷 분할 실패를 던진다", async () => {
+    llmMock.callJson.mockResolvedValue({ cuts: [{ sentence: "장면을 안 밝힌 컷", seconds: 5 }] });
+    await expect(pipeline.defaultDeps.splitCuts(project)).rejects.toThrow("컷 분할 실패");
+    expect(llmMock.callJson).toHaveBeenCalledTimes(2);
+  });
+});
 
 describe("runCutsPipeline", () => {
   it("정상 흐름: ai 컷은 이미지·검수, photo 컷은 즉시 done", async () => {
