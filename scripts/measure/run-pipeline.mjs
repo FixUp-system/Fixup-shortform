@@ -6,7 +6,7 @@
 //
 // 서버가 localhost:3000에 떠 있어야 한다. 이미지 비용을 안 쓰려면 SHOTFORM_FAKE_IMAGES=1로 띄운다.
 // 컷까지 보려면 --cuts를 붙인다(이미지 생성이 돌므로 가짜 이미지 모드 권장).
-const BASE = "http://localhost:3000";
+const BASE = process.env.MEASURE_BASE || "http://localhost:3000";
 
 const MATERIALS = {
   thin: `동네에서 작은 세탁소를 합니다. 요즘은 운동화 세탁을 많이 맡기세요.`,

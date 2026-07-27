@@ -120,6 +120,21 @@ describe("buildScriptMessages — 하나로 흐르는 원고", () => {
     expect(edit).toContain("행동 정보 자체를 지우라는 뜻이 아니다");
   });
 
+  it("핵심 개수에 상한을 둔다 — 분량을 채우려 자료를 긁어오는 걸 막는다", () => {
+    // 개수 제한이 없으면 "N자를 채워라"가 "자료를 다 담아라"로 읽힌다.
+    // 넷을 넘으면 각각이 얕아진다(실측: 코트 이야기가 4.7초, 우는 대목이 2.2초였다).
+    const { system } = buildScriptMessages(project);
+    expect(system).toContain("핵심은 셋을 넘기지 않는다");
+    expect(system).toContain("넷을 넘기면");
+  });
+
+  it("첫 문장을 배경 설명으로 열지 말라고 못박는다", () => {
+    // weakOpening() 은 연차·소개문만 잡는다. 배경 설명형("백화점에서는 …")은
+    // 코드가 못 잡으므로 프롬프트가 예시로 막는다.
+    const { system } = buildScriptMessages(project);
+    expect(system).toContain("배경 설명으로도 열지 않는다");
+  });
+
   it("화면 묘사·기법어·명사형 카피·어체를 규정한다", () => {
     const { system } = buildScriptMessages(project);
     expect(system).toContain("샷 크기·앵글·조명");
@@ -135,7 +150,15 @@ describe("buildScriptMessages — 하나로 흐르는 원고", () => {
     expect(user).toContain("[분량]");
     expect(user).toContain(`${targetChars(project)}자`);
     expect(user).toContain("아래로 내려가지 않는다");
-    expect(user).toContain("지어내지 않는다");
+    expect(user).toMatch(/지어내지도? 않는다/);
+  });
+
+  it("채우는 방향을 넓이가 아니라 깊이로 지시한다", () => {
+    // 하한만 주면 자료의 사실을 더 끌어와 채운다 — 그러면 원문을 옮겨 적은 글이 된다.
+    // 실측: 수선집 자료로 10문장 중 6개가 자료와 70% 이상 겹쳤다(2026-07-27).
+    const user = buildScriptMessages(project).messages[0].content;
+    expect(user).toContain("깊이");
+    expect(user).toContain("더 끌어와 채우지 않는다");
   });
 
   it("수정 지시가 있으면 기존 원고와 함께 붙는다", () => {
@@ -408,5 +431,33 @@ describe("secondsForText · estimateSeconds", () => {
 
   it("구성 시절 프로젝트의 paragraphs도 읽는다", () => {
     expect(estimateSeconds({ paragraphs: [{ text: "가".repeat(55) }, { text: "나".repeat(55) }] })).toBe(20);
+  });
+});
+
+describe("지어내기의 선 — 감상은 되고 실적은 안 된다", () => {
+  const project = {
+    settings: { aspect_ratio: "9:16" },
+    material: { text: "생딸기라떼. 매일 아침 직접 갈아서.", photos: [] },
+    briefing: { topic: "생딸기라떼", key_points: ["매일 아침 직접 간다"] },
+  };
+
+  it("감상·이유·의미는 허용한다고 명시한다", () => {
+    // 사장님은 자료를 길게 주지 않는다. 짧은 자료를 영상으로 만들려면 이야기가 필요하다.
+    const { system } = buildScriptMessages(project);
+    expect(system).toContain("감상·이유·의미");
+  });
+
+  it("숫자·순위·실적은 자료에 있는 것만 쓰라고 못박는다", () => {
+    // 확인할 수 있는데 확인하면 틀린 말은 사장님이 책임진다
+    const { system } = buildScriptMessages(project);
+    expect(system).toContain("숫자·순위·실적");
+    expect(system).toContain("판매 1위");
+    expect(system).toContain("후기 1,000건");
+  });
+
+  it("교정 패스도 수치를 새로 붙이지 못하게 막는다", () => {
+    // 다듬는 과정에서 새로 들어오면 초안 규칙만으로는 못 잡는다
+    const { system } = buildScriptEditMessages(project, { text: "원고" });
+    expect(system).toContain("숫자·순위·실적을 새로 붙이지 않는다");
   });
 });
