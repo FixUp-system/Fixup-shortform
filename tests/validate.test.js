@@ -2,16 +2,41 @@ import { describe, it, expect } from "vitest";
 import { validateScript, validateCuts, validateBriefing, validateSynopsis } from "../lib/validate.js";
 
 describe("validateScript", () => {
-  it("정상 스키마를 통과시킨다", () => {
-    const ok = validateScript({
-      paragraphs: [{ tag: "훅", text: "요즘 이거 모르면 손해" }],
-      coverage: ["생딸기 직접 갈기"],
-    });
-    expect(ok.paragraphs).toHaveLength(1);
+  const ok = { paragraphs: [{ text: "첫 문장" }, { text: "둘째 문장" }] };
+
+  it("장면 수와 문단 수가 같으면 통과한다", () => {
+    const s = validateScript(ok, 2);
+    expect(s.paragraphs).toHaveLength(2);
+    expect(s.paragraphs[0]).toEqual({ text: "첫 문장" });
   });
+
+  it("tag를 요구하지 않고, 있어도 버린다 — 역할은 장면이 갖는다", () => {
+    const s = validateScript({ paragraphs: [{ tag: "훅", text: "문장" }] }, 1);
+    expect(s.paragraphs[0]).toEqual({ text: "문장" });
+  });
+
+  it("coverage를 반환하지 않는다 — 사실 추적은 scene.facts가 한다", () => {
+    const s = validateScript({ paragraphs: [{ text: "문장" }], coverage: ["ㄱ"] }, 1);
+    expect(s.coverage).toBeUndefined();
+  });
+
+  it("문단 수가 장면 수와 다르면 null — 1:1 종속을 지키는 유일한 장치다", () => {
+    expect(validateScript(ok, 3)).toBeNull();
+    expect(validateScript(ok, 1)).toBeNull();
+  });
+
+  it("sceneCount를 안 주면 null — 조용히 검사를 건너뛰지 않는다", () => {
+    expect(validateScript(ok)).toBeNull();
+    expect(validateScript(ok, 0)).toBeNull();
+  });
+
+  it("빈 문장이 있으면 null", () => {
+    expect(validateScript({ paragraphs: [{ text: "  " }] }, 1)).toBeNull();
+  });
+
   it("paragraphs가 없으면 null", () => {
-    expect(validateScript({ coverage: [] })).toBeNull();
-    expect(validateScript({ paragraphs: [{ tag: "훅" }] })).toBeNull(); // text 누락
+    expect(validateScript({}, 1)).toBeNull();
+    expect(validateScript(null, 1)).toBeNull();
   });
 });
 
