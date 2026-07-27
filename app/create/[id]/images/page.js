@@ -1,6 +1,6 @@
 "use client";
 
-// ⑤ 이미지 — 승인 게이트 2 (컷별 이미지 확인·재생성)
+// ⑤ 이미지 — 승인 게이트 3 (컷별 이미지 확인·재생성)
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
@@ -123,9 +123,14 @@ export default function ImagesStepPage() {
         <h2>{splitting ? "대본을 컷으로 나누는 중이에요"
           : cuts.length === 0 ? "컷을 나누지 못했어요"
           : generating ? "컷별 이미지를 만들고 있어요"
-          : <>컷별 이미지를 확인해 주세요 <span className="badge vlm">승인 게이트 2</span></>}</h2>
+          : <>컷별 이미지를 확인해 주세요 <span className="badge vlm">승인 게이트 3</span></>}</h2>
         {splitting && <p className="pgsub">잠시만요 — 나뉜 컷부터 차례로 이미지가 만들어집니다</p>}
-        {!splitting && cuts.length > 0 && <p className="pgsub">이미지를 클릭하면 오른쪽에서 크게 보고 고칠 수 있어요</p>}
+        {!splitting && cuts.length > 0 && (
+          <p className="pgsub">
+            이미지를 클릭하면 오른쪽에서 크게 보고 고칠 수 있어요 · 아래 문장은 읽어 줄 말과 자막이에요 —
+            고쳐도 그림은 바뀌지 않아요
+          </p>
+        )}
         {shownErr && (
           <p className="pgsub" style={{ color: "var(--warn)" }}>
             {shownErr}{" "}
@@ -226,6 +231,7 @@ function PreviewPane({ cut, url, photoName, aspect, stalled, onRegen }) {
         <p className="preview-note">내가 올린 사진이라 그대로 쓰여요.</p>
       ) : (
         <div className="preview-edit">
+          <p className="preview-note">그림을 바꾸려면 여기에 적어주세요 — 위 문장을 고치는 건 읽어 줄 말과 자막에만 반영돼요.</p>
           {cut.edit_instruction && <p className="preview-note">지난 수정 지시: {cut.edit_instruction}</p>}
           <textarea
             className="ref"

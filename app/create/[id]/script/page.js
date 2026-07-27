@@ -1,6 +1,6 @@
 "use client";
 
-// ③ 대본 — 승인 게이트 1 (무료)
+// ③ 대본 — 승인 게이트 2 (무료)
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
@@ -81,25 +81,27 @@ export default function ScriptStepPage() {
     return <p className="pgsub">대본을 쓰는 중…</p>;
   }
 
-  // 브리핑을 고쳐 다시 확정하면 버전이 올라간다 — 지금 대본이 그 이전 것인지 알려주기만 한다
+  // 구성을 다시 만들면 버전이 오른다 — 지금 대본이 그 이전 것인지 알려주기만 한다
   const staleScript =
-    project.briefing?.version && project.script.briefing_version &&
-    project.script.briefing_version !== project.briefing.version;
+    project.synopsis?.version && project.script.synopsis_version &&
+    project.script.synopsis_version !== project.synopsis.version;
+  // 이미 만들어 둔 이미지가 있는가 — 대본을 다시 쓰면 컷을 처음부터 다시 만들게 돼 그 이미지가 지워진다
+  const madeCuts = (project.cuts || []).length > 0;
 
   return (
     <section className="panel" style={{ maxWidth: 760 }}>
-      <h2>대본을 확인해 주세요 <span className="badge vlm">승인 게이트 1</span></h2>
+      <h2>대본을 확인해 주세요 <span className="badge vlm">승인 게이트 2</span></h2>
       {err && <p className="pgsub" style={{ color: "var(--warn)" }}>{err}</p>}
       {staleScript && (
         <p className="pgsub" style={{ color: "var(--warn)" }}>
-          브리핑이 바뀌었어요 — 지금 대본은 바뀌기 전 내용이에요{" "}
+          구성이 바뀌었어요 — 지금 대본은 바뀌기 전 내용이에요{" "}
           <button className="mini" disabled={busy} onClick={() => genScript()}>대본 다시 쓰기</button>
         </p>
       )}
       <div className="script-box">
         {project.script.paragraphs.map((p, i) => (
           <p key={i}>
-            <span className="tag">{p.tag}</span>
+            <span className="tag">{project.synopsis?.scenes?.[i]?.role || `${i + 1}`}</span>
             <span
               contentEditable
               suppressContentEditableWarning
@@ -113,8 +115,10 @@ export default function ScriptStepPage() {
         ))}
       </div>
       <div className="script-src">이대로 읽으면 약 {estimateSeconds(project.script)}초 · 문장을 클릭하면 바로 고칠 수 있어요</div>
-      {project.script.coverage?.length > 0 && (
-        <div className="script-src">자료 반영 — {project.script.coverage.map((c, i) => <b key={i}>✓ {c} </b>)}</div>
+      {madeCuts && (
+        <div className="script-src" style={{ color: "var(--warn)" }}>
+          이미 만들어 둔 이미지가 있어요 — 대본을 다시 쓰면 컷을 처음부터 다시 만들게 되고, 그 이미지는 지워져요
+        </div>
       )}
       <div style={{ display: "flex", gap: 8, marginTop: 14, alignItems: "flex-end" }}>
         <textarea className="sent-input" style={{ flex: 1, minHeight: 96, padding: "13px 15px", fontSize: 14, resize: "vertical", fontFamily: "inherit", lineHeight: 1.55 }}
@@ -143,6 +147,8 @@ export default function ScriptStepPage() {
           <span className="hint">
             {hasCuts
               ? "이미 만든 컷이 있어요 — 다시 만들지 않고 그대로 보여드려요"
+              : madeCuts
+              ? "지금 승인하면 컷을 처음부터 다시 만들어요 — 먼저 만든 이미지는 지워집니다"
               : "컷당 이미지 후보 2장 + AI 검수 · 목소리(④)는 준비 중이라 건너뜁니다"}
           </span>
           <button className="cta" disabled={busy} onClick={approve}>
