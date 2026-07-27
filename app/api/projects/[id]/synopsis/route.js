@@ -19,8 +19,10 @@ export async function POST(req, { params }) {
   for (let attempt = 0; attempt < 2 && !synopsis; attempt++) {
     try {
       synopsis = validateSynopsis(await callJson({ system, messages }), photoIds);
-    } catch {
-      // 일시적 호출 실패는 삼키고 다음 시도로 — 루프 조건이 상한을 쥔다
+    } catch (e) {
+      // 일시적 호출 실패는 삼키고 다음 시도로 — 루프 조건이 상한을 쥔다.
+      // 다만 왜 실패했는지는 남긴다(키 미설정·크레딧 소진·형식 거절이 전부 같은 502로 보이지 않게).
+      console.error("구성 생성 실패:", e);
     }
   }
   if (!synopsis) {

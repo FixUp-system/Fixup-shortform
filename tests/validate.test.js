@@ -179,12 +179,12 @@ describe("validateSynopsis", () => {
   });
 
   it("role이 없거나 공백이면 null", () => {
-    const 누락 = ok();
-    delete 누락.scenes[1].role;
-    expect(validateSynopsis(누락, [])).toBeNull();
-    const 공백 = ok();
-    공백.scenes[1].role = "   ";
-    expect(validateSynopsis(공백, [])).toBeNull();
+    const missing = ok();
+    delete missing.scenes[1].role;
+    expect(validateSynopsis(missing, [])).toBeNull();
+    const blank = ok();
+    blank.scenes[1].role = "   ";
+    expect(validateSynopsis(blank, [])).toBeNull();
   });
 
   it("scenes가 배열이 아니면 null", () => {

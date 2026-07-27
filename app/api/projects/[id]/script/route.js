@@ -24,8 +24,10 @@ export async function POST(req, { params }) {
   for (let attempt = 0; attempt < 2 && !draft; attempt++) {
     try {
       draft = validateScript(await callJson({ system, messages }), sceneCount);
-    } catch {
-      // 일시적 호출 실패는 삼키고 다음 시도로 — 루프 조건이 상한을 쥔다
+    } catch (e) {
+      // 일시적 호출 실패는 삼키고 다음 시도로 — 루프 조건이 상한을 쥔다.
+      // 다만 왜 실패했는지는 남긴다(키 미설정·크레딧 소진·형식 거절이 전부 같은 502로 보이지 않게).
+      console.error("대본 초안 생성 실패:", e);
     }
   }
   if (!draft) return Response.json({ error: "대본 생성에 실패했어요. 다시 시도해 주세요." }, { status: 502 });
@@ -36,8 +38,9 @@ export async function POST(req, { params }) {
   for (let attempt = 0; attempt < 2 && !edited; attempt++) {
     try {
       edited = validateScript(await callJson({ system: edit.system, messages: edit.messages }), sceneCount);
-    } catch {
+    } catch (e) {
       // 일시적 호출 실패는 삼키고 다음 시도로 — 끝내 못 얻으면 아래에서 초안으로 폴백한다
+      console.error("대본 교정 실패:", e);
     }
   }
   const script = editKeptContent(draft, edited) ? edited : draft;
