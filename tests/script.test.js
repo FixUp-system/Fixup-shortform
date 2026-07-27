@@ -99,6 +99,17 @@ describe("buildScriptMessages — 하나로 흐르는 원고", () => {
     expect(system).toContain("버리는 것이 대본이다");
   });
 
+  // 줄이는 과정에서 "그래서 가게를 냈습니다"가 잘려 계기가 붕 떴다
+  it("버릴 때는 이야기 단위로 버리라고 지시한다 — 결론이 잘리면 안 된다", () => {
+    for (const { system } of [
+      buildScriptMessages(project),
+      buildScriptRewriteMessages(project, { text: "원고" }, ["분량 초과"]),
+    ]) {
+      expect(system).toContain("이야기 단위로");
+      expect(system).toContain("통째로");
+    }
+  });
+
   // 금지 12종이 행동 요청까지 막는 것으로 읽혔다 — 판매·알림 영상의 목적 자체를 지운다
   it("행동 요청 자체는 막지 않는다 — 관용구 대신 사실로 청하게 한다", () => {
     const { system } = buildScriptMessages(project);
