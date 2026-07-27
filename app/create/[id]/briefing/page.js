@@ -133,14 +133,14 @@ export default function BriefingStepPage() {
   const canConfirm = brief.topic.trim() && brief.key_points.some((k) => k.trim());
 
   return (
-    <section className="panel" style={{ maxWidth: 760 }}>
+    <section className="panel panel--narrow">
       <h2>이렇게 이해했어요 <span className="badge vlm">확인 1</span></h2>
       {err && (
-        <p className="pgsub" style={{ color: "var(--warn)" }}>
+        <p className="pgsub warn">
           {err} <button className="mini" onClick={extract} disabled={busy}>다시 정리하기</button>
         </p>
       )}
-      {hint && <p className="pgsub" style={{ color: "var(--warn)" }}>{hint}</p>}
+      {hint && <p className="pgsub warn">{hint}</p>}
 
       <div className="brief">
         <div className="brief-row">
@@ -153,14 +153,14 @@ export default function BriefingStepPage() {
           <div className="val">
             {brief.key_points.map((k, i) => (
               <div className="brief-point" key={i}>
-                <EditableText value={k} placeholder="" style={{ outline: "none", flex: 1 }}
+                <EditableText value={k} placeholder="" className="editable" style={{ flex: 1 }}
                   onCommit={(text) => save({
                     // 렌더 클로저의 brief 는 앞선 저장 중이면 낡았다 — 목록은 항상 ref(최신)에서 만든다
                     key_points: briefRef.current.key_points.map((v, j) => (j === i ? text : v)).filter((v) => v),
                   })} />
               </div>
             ))}
-            <button className="mini" style={{ marginTop: 6 }}
+            <button className="mini mt-sm"
               onClick={() => save({ key_points: [...briefRef.current.key_points, "새 내용"] })}>+ 내용 추가</button>
           </div>
         </div>

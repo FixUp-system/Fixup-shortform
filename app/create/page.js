@@ -42,7 +42,7 @@ export default function CreatePage() {
     <>
       <h1 className="pgtitle">영상 만들기 (단계별)</h1>
       <p className="pgsub">자료를 주시면 기계가 정리해 보여드려요 — 확인 → 대본 → 목소리 → 이미지 → 영상 → 완성</p>
-      <section className="panel" style={{ maxWidth: 880 }}>
+      <section className="panel panel--wide">
         <div className="eyebrow">레퍼런스 자료 — 텍스트 <small>제품 설명·홍보 포인트·이야기 등 자유롭게</small></div>
         <textarea className="ref ref-lg" value={text} maxLength={2000}
           onChange={(e) => setText(e.target.value)}
@@ -52,7 +52,7 @@ export default function CreatePage() {
         <div className="eyebrow">사진 <small>장면 소스 + AI 컷의 기준 이미지 (선택, ≤10장)</small></div>
         <div className="uploads">
           {photos.map((p) => (
-            <div key={p.id} className="up photo-mark" style={{ background: "#333" }}>
+            <div key={p.id} className="up photo-mark">
               <img src={p.url} alt={p.filename} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               <button className="tag" onClick={() => setPhotos((ps) => ps.filter((x) => x.id !== p.id))}>✕ {p.filename.slice(0, 8)}</button>
             </div>
@@ -62,7 +62,7 @@ export default function CreatePage() {
           )}
         </div>
 
-        {err && <p className="pgsub" style={{ color: "var(--warn)" }}>{err}</p>}
+        {err && <p className="pgsub warn">{err}</p>}
         <div className="step-actions">
           <div className="fwd">
             <button className="cta" onClick={submit} disabled={busy || !text.trim()}>

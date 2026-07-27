@@ -6,9 +6,9 @@ import BackButton from "./BackButton";
 
 export default function SoonStep({ title, what, when, backKey }) {
   return (
-    <section className="panel" style={{ maxWidth: 760 }}>
+    <section className="panel panel--narrow">
       <h2>{title} <span className="badge ai">준비 중</span></h2>
-      <p className="pgsub" style={{ marginTop: 6 }}>{what}</p>
+      <p className="pgsub mt-sm">{what}</p>
       <div className="script-src">계획: {when}</div>
       {backKey && (
         <div className="step-actions">

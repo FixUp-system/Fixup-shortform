@@ -136,7 +136,7 @@ export default function ImagesStepPage() {
           </p>
         )}
         {shownErr && (
-          <p className="pgsub" style={{ color: "var(--warn)" }}>
+          <p className="pgsub warn">
             {shownErr}{" "}
             {cuts.length === 0
               ? <button className="mini" onClick={retry} disabled={busy}>다시 시도</button>
@@ -157,7 +157,7 @@ export default function ImagesStepPage() {
                   <span className="ph">{c.state === "needs_attention" ? "품질 확인 필요" : "생성 중…"}</span>}
               </div>
               <div className="txt">
-                “<span contentEditable suppressContentEditableWarning style={{ outline: "none" }}
+                “<span contentEditable suppressContentEditableWarning className="editable"
                   onBlur={(e) => {
                     const sentence = e.currentTarget.textContent.trim();
                     if (sentence && sentence !== c.sentence) editSentence(c.idx, sentence);
@@ -225,7 +225,7 @@ function PreviewPane({ cut, url, photoName, aspect, hasSynopsis, stalled, onRege
       <div className="preview-frame" style={frameStyle(aspect)}>
         {url ? <img src={url} alt="" /> : <span className="ph">{cut.state === "needs_attention" ? "품질 확인 필요" : "생성 중…"}</span>}
       </div>
-      <div className="badges" style={{ marginTop: 12 }}>
+      <div className="badges mt-md">
         <span className={`badge ${isPhoto ? "photo" : "ai"}`}>{isPhoto ? `내 사진 · ${photoName || ""}` : "AI 생성"}</span>
         {cut.ref_photo_id && <span className="badge vlm">레퍼런스 적용</span>}
         <span className="badge ai">{cut.seconds}초</span>

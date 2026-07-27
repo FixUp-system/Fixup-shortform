@@ -62,7 +62,7 @@ export default function SynopsisStepPage() {
   if (!project.synopsis) {
     if (err) {
       return (
-        <p className="pgsub" style={{ color: "var(--warn)" }}>
+        <p className="pgsub warn">
           {err} <button className="mini" disabled={busy} onClick={() => gen()}>다시 만들기</button>
         </p>
       );
@@ -71,18 +71,18 @@ export default function SynopsisStepPage() {
     // 지금 무엇을 할 수 있고 무엇을 잃게 되는지 알린 다음 사장님이 직접 시작하게 한다.
     if (madeWithoutSynopsis) {
       return (
-        <section className="panel" style={{ maxWidth: 760 }}>
+        <section className="panel panel--narrow">
           <h2>이 영상은 구성 없이 만들어졌어요</h2>
           <p className="pgsub">
             구성을 짜는 단계가 생기기 전에 시작한 영상이라, 구성 없이 대본{madeCuts ? "과 이미지가" : "이"} 이미 나와 있어요.
           </p>
           {project.script && (
-            <div className="script-src" style={{ color: "var(--warn)" }}>
+            <div className="script-src warn">
               구성을 새로 짜면 지금 대본과 어긋날 수 있어요 — 그때는 대본도 다시 써야 해요
             </div>
           )}
           {madeCuts && (
-            <div className="script-src" style={{ color: "var(--warn)" }}>
+            <div className="script-src warn">
               이미 만들어 둔 이미지가 {project.cuts.length}장 있어요 — 지금 구성을 새로 짜면
               대본부터 다시 가게 되고, 그 이미지는 지워져요
             </div>
@@ -112,11 +112,11 @@ export default function SynopsisStepPage() {
     project.synopsis.briefing_version !== project.briefing.version;
 
   return (
-    <section className="panel" style={{ maxWidth: 760 }}>
+    <section className="panel panel--narrow">
       <h2>구성을 확인해 주세요 <span className="badge vlm">승인 게이트 1</span></h2>
-      {err && <p className="pgsub" style={{ color: "var(--warn)" }}>{err}</p>}
+      {err && <p className="pgsub warn">{err}</p>}
       {stale && (
-        <p className="pgsub" style={{ color: "var(--warn)" }}>
+        <p className="pgsub warn">
           브리핑이 바뀌었어요 — 지금 구성은 바뀌기 전 내용이에요{" "}
           <button className="mini" disabled={busy} onClick={() => gen()}>구성 다시 만들기</button>
         </p>
@@ -128,7 +128,7 @@ export default function SynopsisStepPage() {
             <span className="tag">{i + 1}. {s.role} · 약 {s.seconds}초</span><br />
             <b>보여줌</b>{" "}
             <span
-              contentEditable suppressContentEditableWarning style={{ outline: "none" }}
+              contentEditable suppressContentEditableWarning className="editable"
               onBlur={(e) => {
                 const v = e.currentTarget.textContent.trim();
                 if (v && v !== s.shows) editScene(i, "shows", v);
@@ -136,7 +136,7 @@ export default function SynopsisStepPage() {
             >{s.shows}</span><br />
             <b>할 말</b>{" "}
             <span
-              contentEditable suppressContentEditableWarning style={{ outline: "none" }}
+              contentEditable suppressContentEditableWarning className="editable"
               onBlur={(e) => {
                 const v = e.currentTarget.textContent.trim();
                 if (v && v !== s.says) editScene(i, "says", v);
@@ -154,14 +154,13 @@ export default function SynopsisStepPage() {
         고친 글은 바로 저장돼요 — 이미 써 둔 대본에 담으려면 다음 단계에서 대본을 다시 쓰면 반영돼요
       </div>
       {madeCuts && (
-        <div className="script-src" style={{ color: "var(--warn)" }}>
+        <div className="script-src warn">
           이미 만들어 둔 이미지가 있어요 — 구성을 새로 짜면 대본부터 다시 가게 되고, 그 이미지는 지워져요
         </div>
       )}
-      <div style={{ display: "flex", gap: 8, marginTop: 14, alignItems: "flex-end" }}>
+      <div className="fix-row">
         <textarea
-          className="sent-input"
-          style={{ flex: 1, minHeight: 96, padding: "13px 15px", fontSize: 14, resize: "vertical", fontFamily: "inherit", lineHeight: 1.55 }}
+          className="sent-input fix-input"
           placeholder="고치고 싶은 곳을 적어주세요 — 예: 가격 장면을 앞으로"
           value={instruction}
           onChange={(e) => setInstruction(e.target.value)}
