@@ -43,6 +43,14 @@ describe("buildSplitMessages", () => {
   it("빈틈도 겹침도 없어야 한다고 지시한다", () => {
     expect(buildSplitMessages(sentences).system).toContain("빈틈도 겹침도 없다");
   });
+
+  // 상한(15초)만 주자 두 문장씩 묶어 12~15초 컷이 나왔다. 이미지 한 장이 버티기엔 길다.
+  it("컷 목표 길이를 준다 — 상한만으로는 넉넉하게 묶는다", () => {
+    const { system } = buildSplitMessages(sentences);
+    expect(system).toContain("3~8초");
+    // 컷은 문장보다 잘게 쪼개질 수 없다 — 긴 문장은 그대로 두라는 예외가 함께 있어야 한다
+    expect(system).toContain("문장을 쪼개지 않는다");
+  });
 });
 
 describe("buildShowsMessages", () => {

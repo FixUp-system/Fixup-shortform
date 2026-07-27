@@ -9,6 +9,8 @@ import {
   repeatsWithin,
   scriptFaults,
   overTarget,
+  underTarget,
+  unusedFacts,
   secondsForText,
   targetChars,
   capacitySeconds,
@@ -105,10 +107,12 @@ describe("buildScriptMessages — 하나로 흐르는 원고", () => {
     expect(system).not.toContain("반드시"); // 틀을 못박는 명령은 두지 않는다
   });
 
-  it("목표 분량을 지문에 적는다", () => {
+  it("목표 분량을 하한과 함께 적는다 — 상한만 주면 짧은 쪽으로 도망간다", () => {
     const user = buildScriptMessages(project).messages[0].content;
     expect(user).toContain("[분량]");
-    expect(user).toContain(`${targetChars(project)}자 안팎`);
+    expect(user).toContain(`${targetChars(project)}자`);
+    expect(user).toContain("아래로 내려가지 않는다");
+    expect(user).toContain("지어내지 않는다");
   });
 
   it("수정 지시가 있으면 기존 원고와 함께 붙는다", () => {
@@ -213,7 +217,7 @@ describe("copyRatio · repeatsWithin", () => {
   });
 });
 
-describe("scriptFaults — 원고가 스스로 판정되는 둘", () => {
+describe("scriptFaults — 원고가 스스로 판정되는 셋", () => {
   // '할 말 전사'·'화면 설명 전사'는 사라졌다 — 옮겨 적을 원본이 없어졌다
   it("되풀이를 잡는다", () => {
     const script = { text: "손님들이 운동화를 맡기기 위해 세탁소를 방문합니다. 최근 들어 많은 손님들이 운동화를 맡기고 있습니다." };
@@ -230,8 +234,36 @@ describe("scriptFaults — 원고가 스스로 판정되는 둘", () => {
     expect(overTarget(project, "가".repeat(targetChars(project) + 5))).toBe(false);
   });
 
+  // 10초를 고른 사장님에게 5초를 주면 자료 부족이 아니라 그냥 실패다
+  it("채울 재료가 남아 있는데 짧으면 잡는다", () => {
+    const half = "가".repeat(Math.round(targetChars(project) * 0.5)); // 자료의 사실을 하나도 안 씀
+    expect(underTarget(project, half)).toBe(true);
+    expect(scriptFaults(project, { text: half })).toContain("분량 미달");
+  });
+
+  // 두 줄짜리 자료에서 하한만 요구했더니 "직접 삶아 세탁"·"고객 만족도" 같은
+  // 자료에 없는 말을 지어내 채웠다. 더 쓸 게 없으면 짧은 것이 정답이다.
+  it("자료의 사실을 이미 다 썼으면 짧아도 잡지 않는다 — 지어내게 만들면 안 된다", () => {
+    const usedAll = "매일 아침 직접 갈아 만듭니다. 하루 40잔이면 끝납니다.";
+    expect(unusedFacts(project, usedAll)).toEqual([]);
+    expect(underTarget(project, usedAll)).toBe(false);
+    expect(scriptFaults(project, { text: usedAll })).toEqual([]);
+  });
+
+  it("안 쓴 사실만 골라낸다", () => {
+    const partial = "매일 아침 직접 갈아 만듭니다.";
+    expect(unusedFacts(project, partial)).toEqual(["하루 40잔"]);
+  });
+
+  it("조금 모자란 것은 잡지 않는다 — 10초 요청에 8~9초는 정상 응답이다", () => {
+    const near = "가".repeat(Math.round(targetChars(project) * 0.9));
+    expect(underTarget(project, near)).toBe(false);
+  });
+
   it("멀쩡하면 빈 배열", () => {
-    expect(scriptFaults(project, { text: "매일 아침 딸기를 갈아 씁니다. 하루 40잔이면 끝입니다." })).toEqual([]);
+    // 목표(사실 2개 → 60자) 안에 드는 길이여야 한다 — 짧으면 이제 '분량 미달'로 잡힌다
+    const ok = "매일 아침 딸기를 직접 갈아서 그날 쓸 만큼만 만듭니다. 그래서 하루 40잔이면 그날 치는 끝납니다. 오후 세 시쯤이면 대개 떨어집니다.";
+    expect(scriptFaults(project, { text: ok })).toEqual([]);
   });
 
   it("원고가 없으면 판정하지 않는다", () => {
@@ -258,6 +290,24 @@ describe("buildScriptRewriteMessages", () => {
     expect(system).toContain("분량 초과");
     expect(system).toContain("가격·위치·영업시간부터 버린다");
     expect(system).toContain("지적되지 않은 자리는 그대로 둔다");
+  });
+
+  it("분량 미달에는 채우는 방법까지 지정한다 — 지어내기·되풀이로 채우면 안 된다", () => {
+    const { system } = buildScriptRewriteMessages(project, draft, ["분량 미달"]);
+    expect(system).toContain("분량 미달");
+    expect(system).toContain("한 걸음 더");
+    expect(system).toContain("짧은 채로 둔다");
+  });
+
+  it("분량 미달이면 아직 안 쓴 사실을 지문에 함께 준다 — 채우라고만 하면 지어낸다", () => {
+    const user = buildScriptRewriteMessages(project, draft, ["분량 미달"]).messages[0].content;
+    expect(user).toContain("[아직 안 쓴 사실]");
+    expect(user).toContain("하루 40잔");
+  });
+
+  it("다른 이유일 때는 사실 목록을 붙이지 않는다", () => {
+    const user = buildScriptRewriteMessages(project, draft, ["분량 초과"]).messages[0].content;
+    expect(user).not.toContain("[아직 안 쓴 사실]");
   });
 });
 

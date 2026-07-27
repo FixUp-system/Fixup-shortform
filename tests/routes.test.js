@@ -206,8 +206,10 @@ describe("POST /api/projects/[id]/briefing — 재추출", () => {
 });
 
 describe("POST /api/projects/[id]/script — 원고", () => {
-  const cliche = { script: "특별한 라떼를 만나보세요. 지금 바로 오세요." };
-  const plain = { script: "시럽을 쓰지 않습니다. 매일 아침 직접 갈아 씁니다." };
+  // 목표 분량(사실 1개 → 60자) 안에 드는 길이로 둔다 — 짧으면 '분량 미달' 되돌리기가 끼어들어
+  // 호출 순서가 밀린다(그 동작 자체는 아래 되돌리기 테스트에서 따로 본다)
+  const cliche = { script: "특별한 라떼를 만나보세요. 지금 바로 오시면 매일 아침 직접 갈아 만든 생딸기를 경험해보세요. 오늘도 신선하게 준비했습니다." };
+  const plain = { script: "시럽을 쓰지 않습니다. 매일 아침 딸기를 직접 갈아서 그날 쓸 만큼만 만듭니다. 하루 40잔이면 끝납니다. 오후 세 시면 대개 떨어집니다." };
 
   it("없는 프로젝트면 404", async () => {
     const res = await scriptPOST(patchReq({}), ctx("없는id"));
