@@ -85,7 +85,7 @@ export default function ScriptStepPage() {
   if (!text) {
     if (err) {
       return (
-        <p className="pgsub" style={{ color: "var(--warn)" }}>
+        <p className="pgsub warn">
           {err} <button className="mini" disabled={busy} onClick={() => genScript()}>다시 쓰기</button>
         </p>
       );
@@ -98,18 +98,17 @@ export default function ScriptStepPage() {
   const madeCuts = (project.cuts || []).length > 0;
 
   return (
-    <section className="panel" style={{ maxWidth: 760 }}>
+    <section className="panel panel--narrow">
       <h2>대본을 확인해 주세요 <span className="badge vlm">승인 게이트</span></h2>
-      {err && <p className="pgsub" style={{ color: "var(--warn)" }}>{err}</p>}
+      {err && <p className="pgsub warn">{err}</p>}
       {staleCuts && (
-        <p className="pgsub" style={{ color: "var(--warn)" }}>
+        <p className="pgsub warn">
           원고가 바뀌었어요 — 지금 이미지는 바뀌기 전 원고로 만든 것이에요
         </p>
       )}
 
       <textarea
-        className="ref ref-lg"
-        style={{ minHeight: 260, lineHeight: 1.9, fontSize: 15 }}
+        className="ref ref-lg script-draft"
         value={shown}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => { if (draft !== null && draft.trim() && draft !== text) saveText(draft.trim()); }}
@@ -122,16 +121,15 @@ export default function ScriptStepPage() {
         컷은 이 원고를 잘라서 만들어요 — 여기서 승인한 문장이 그대로 화면에 실립니다
       </div>
       {madeCuts && (
-        <div className="script-src" style={{ color: "var(--warn)" }}>
+        <div className="script-src warn">
           이미 만들어 둔 이미지가 있어요 — 대본을 다시 쓰면 컷을 처음부터 다시 만들게 되고, 그 이미지는 지워져요
         </div>
       )}
-
-      <div style={{ display: "flex", gap: 8, marginTop: 14, alignItems: "flex-end" }}>
-        <textarea className="sent-input" style={{ flex: 1, minHeight: 96, padding: "13px 15px", fontSize: 14, resize: "vertical", fontFamily: "inherit", lineHeight: 1.55 }}
+      <div className="fix-row">
+        <textarea className="sent-input fix-input"
           placeholder='수정 지시 (예: "더 짧게", "가게 이름을 빼줘", "손님 이야기를 앞으로")'
           value={instruction} onChange={(e) => setInstruction(e.target.value)} />
-        <button className="mini" style={{ padding: "13px 18px", fontSize: 13.5, whiteSpace: "nowrap" }}
+        <button className="mini"
           disabled={busy} onClick={() => genScript(instruction || "전체를 다시 써줘")}>
           {instruction ? "지시 반영" : "전체 다시 쓰기"}
         </button>
@@ -139,7 +137,7 @@ export default function ScriptStepPage() {
 
       {!hasCuts && (
         <>
-          <div className="eyebrow" style={{ marginTop: 18 }}>화면 비율 <small>이 비율로 이미지가 만들어져요</small></div>
+          <div className="eyebrow mt-lg">화면 비율 <small>이 비율로 이미지가 만들어져요</small></div>
           <div className="chips">
             {[["9:16", "세로 (숏폼)"], ["1:1", "정사각"], ["16:9", "가로"]].map(([r, label]) => (
               <button key={r} className={`chip${aspect === r ? " on" : ""}`} onClick={() => setAspect(r)}>
