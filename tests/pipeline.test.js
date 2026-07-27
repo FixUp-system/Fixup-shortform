@@ -218,3 +218,76 @@ describe("runVoicePipeline — 컷마다 따로 읽힌다", () => {
     expect(saved.cuts[0].voice_error).toBe(null);
   });
 });
+
+describe("runVideoPipeline — 이미지를 클립으로", () => {
+  async function withCuts(cuts) {
+    const p = await makeProject();
+    await projects.updateProject(p.id, (proj) => ({ ...proj, status: "voice", cuts }));
+    return p;
+  }
+
+  it("컷마다 클립을 만들고 잘린 컷을 표시한다", async () => {
+    const p = await withCuts([
+      { idx: 0, sentence: "짧은", seconds: 4, image: { url: "i0" }, audio: { url: "a0", seconds: 4 } },
+      { idx: 1, sentence: "긴", seconds: 13, image: { url: "i1" }, audio: { url: "a1", seconds: 13 } },
+    ]);
+
+    await pipeline.runVideoPipeline(p.id, {
+      clip: async ({ seconds }) => ({
+        url: "v" + seconds, seconds: Math.min(seconds, 10), truncated: seconds > 10,
+      }),
+    });
+
+    const saved = await projects.getProject(p.id);
+    expect(saved.status).toBe("video");
+    expect(saved.cuts[0].video).toEqual({ url: "v4", seconds: 4, truncated: false });
+    expect(saved.cuts[1].video.truncated).toBe(true);
+    // 소리 길이(13초)는 그대로 둔다 — 합성이 정지로 늘려 맞춘다
+    expect(saved.cuts[1].seconds).toBe(13);
+  });
+
+  it("이미지와 비율을 그대로 넘긴다", async () => {
+    const p = await withCuts([
+      { idx: 0, sentence: "문장", seconds: 3, image: { url: "https://img/a.png" }, audio: { url: "a", seconds: 3 } },
+    ]);
+    let got;
+    await pipeline.runVideoPipeline(p.id, {
+      clip: async (args) => { got = args; return { url: "v", seconds: 3, truncated: false }; },
+    });
+    expect(got.imageUrl).toBe("https://img/a.png");
+    expect(got.aspect_ratio).toBe("9:16");
+  });
+
+  it("한 컷이 실패해도 나머지는 살아남는다", async () => {
+    const p = await withCuts([
+      { idx: 0, sentence: "실패", seconds: 3, image: { url: "i0" }, audio: { url: "a0", seconds: 3 } },
+      { idx: 1, sentence: "성공", seconds: 3, image: { url: "i1" }, audio: { url: "a1", seconds: 3 } },
+    ]);
+
+    await pipeline.runVideoPipeline(p.id, {
+      clip: async ({ imageUrl }) => {
+        if (imageUrl === "i0") throw new Error("고장");
+        return { url: "v", seconds: 3, truncated: false };
+      },
+    });
+
+    const saved = await projects.getProject(p.id);
+    expect(saved.cuts[0].video_error).toMatch(/고장/);
+    expect(saved.cuts[1].video.url).toBe("v");
+    expect(saved.status).toBe("video");
+  });
+
+  it("이미지가 없는 컷은 건너뛴다", async () => {
+    // 이미지 단계에서 실패한 컷이 남아 있을 수 있다 — 없는 그림으로 클립을 부르면 안 된다
+    const p = await withCuts([
+      { idx: 0, sentence: "그림 없음", seconds: 3, audio: { url: "a0", seconds: 3 } },
+    ]);
+    let called = false;
+    await pipeline.runVideoPipeline(p.id, {
+      clip: async () => { called = true; return { url: "v", seconds: 3, truncated: false }; },
+    });
+    expect(called).toBe(false);
+    const saved = await projects.getProject(p.id);
+    expect(saved.cuts[0].video_error).toMatch(/이미지/);
+  });
+});
