@@ -7,7 +7,12 @@ import path from "path";
 import { createProject, getProject, updateProject } from "../lib/projects.js";
 
 const pipelineMock = vi.hoisted(() => ({ run: vi.fn(async () => {}) }));
-vi.mock("../lib/pipeline.js", () => ({ runCutsPipeline: (...a) => pipelineMock.run(...a) }));
+vi.mock("../lib/pipeline.js", () => ({
+  runCutsPipeline: (...a) => pipelineMock.run(...a),
+  runVoicePipeline: (...a) => pipelineMock.run(...a),
+  runVideoPipeline: (...a) => pipelineMock.run(...a),
+  runRenderPipeline: (...a) => pipelineMock.run(...a),
+}));
 
 const llmMock = vi.hoisted(() => ({ callJson: vi.fn() }));
 vi.mock("../lib/llm.js", () => ({ callJson: (...a) => llmMock.callJson(...a) }));
@@ -16,6 +21,8 @@ const { POST: cutsPOST } = await import("../app/api/projects/[id]/cuts/route.js"
 const { PATCH } = await import("../app/api/projects/[id]/route.js");
 const { POST: briefingPOST } = await import("../app/api/projects/[id]/briefing/route.js");
 const { POST: scriptPOST } = await import("../app/api/projects/[id]/script/route.js");
+const { POST: renderPOST } = await import("../app/api/projects/[id]/render/route.js");
+const { GET: renderFileGET } = await import("../app/api/renders/[name]/route.js");
 
 const ctx = (id) => ({ params: Promise.resolve({ id }) });
 const patchReq = (body) => ({ json: async () => body });
@@ -342,5 +349,45 @@ describe("POST /api/projects/[id]/script — 원고", () => {
     const user = llmMock.callJson.mock.calls[0][0].messages[0].content;
     expect(user).toContain(SCRIPT_TEXT);
     expect(user).toContain("더 짧게");
+  });
+});
+
+describe("완성 라우트", () => {
+  it("클립이 없으면 합성을 시작하지 않는다", async () => {
+    const p = await createProject({ settings: {}, material: { text: "x" } });
+    await updateProject(p.id, (proj) => ({
+      ...proj, status: "voice", cuts: [{ idx: 0, sentence: "문장", audio: { url: "a" } }],
+    }));
+    const res = await renderPOST(new Request("http://x", { method: "POST" }), ctx(p.id));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/영상/);
+  });
+
+  it("클립이 있으면 시작한다", async () => {
+    const p = await createProject({ settings: {}, material: { text: "x" } });
+    await updateProject(p.id, (proj) => ({
+      ...proj, status: "video",
+      cuts: [{ idx: 0, sentence: "문장", video: { url: "v" }, audio: { url: "a" } }],
+    }));
+    const res = await renderPOST(new Request("http://x", { method: "POST" }), ctx(p.id));
+    expect(res.status).toBe(200);
+    expect((await res.json()).started).toBe(true);
+  });
+});
+
+describe("완성본 내려받기", () => {
+  const nameCtx = (name) => ({ params: Promise.resolve({ name }) });
+
+  it("경로 탈출을 막는다", async () => {
+    // 파일명 정규식을 통과한 이름만 경로에 붙인다
+    for (const bad of ["../../secret.json", "..%2Fx.mp4", "a/b.mp4", "x.json"]) {
+      const res = await renderFileGET(new Request("http://x"), nameCtx(bad));
+      expect(res.status, bad).toBe(400);
+    }
+  });
+
+  it("없는 파일은 404", async () => {
+    const res = await renderFileGET(new Request("http://x"), nameCtx("nothing-here.mp4"));
+    expect(res.status).toBe(404);
   });
 });

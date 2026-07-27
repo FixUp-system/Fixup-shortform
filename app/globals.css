@@ -730,3 +730,6 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
   object-fit: cover;
   display: block;
 }
+
+/* 완성 화면 — 미리보기를 가운데로 */
+.done-preview { width: 100%; max-width: 360px; margin: 14px auto 0; position: static; }

@@ -291,3 +291,54 @@ describe("runVideoPipeline — 이미지를 클립으로", () => {
     expect(saved.cuts[0].video_error).toMatch(/이미지/);
   });
 });
+
+describe("runRenderPipeline — 하나로 합친다", () => {
+  it("합성 결과를 render 에 담고 done 으로 넘긴다", async () => {
+    const p = await makeProject();
+    await projects.updateProject(p.id, (proj) => ({
+      ...proj, status: "video",
+      cuts: [{ idx: 0, sentence: "문장", seconds: 4, video: { url: "v0" }, audio: { url: "a0", seconds: 4 } }],
+    }));
+
+    await pipeline.runRenderPipeline(p.id, {
+      compose: async () => ({ url: "/api/renders/x.mp4", seconds: 4 }),
+    });
+
+    const saved = await projects.getProject(p.id);
+    expect(saved.status).toBe("done");
+    expect(saved.render.url).toBe("/api/renders/x.mp4");
+    expect(saved.render.ts).toBeGreaterThan(0);
+  });
+
+  it("가짜 모드 표시를 그대로 옮긴다", async () => {
+    // 화면이 "파일은 만들어지지 않았어요"를 띄우려면 이 값이 살아 있어야 한다
+    const p = await makeProject();
+    await projects.updateProject(p.id, (proj) => ({
+      ...proj, status: "video",
+      cuts: [{ idx: 0, sentence: "문장", seconds: 4, video: { url: "v0" }, audio: { url: "a0", seconds: 4 } }],
+    }));
+
+    await pipeline.runRenderPipeline(p.id, {
+      compose: async () => ({ url: null, seconds: 4, fake: true }),
+    });
+
+    const saved = await projects.getProject(p.id);
+    expect(saved.render.fake).toBe(true);
+    expect(saved.render.url).toBe(null);
+  });
+
+  it("고른 비율과 컷을 그대로 넘긴다", async () => {
+    const p = await makeProject();
+    await projects.updateProject(p.id, (proj) => ({
+      ...proj, status: "video", settings: { aspect_ratio: "1:1" },
+      cuts: [{ idx: 0, sentence: "문장", seconds: 4, video: { url: "v0" }, audio: { url: "a0", seconds: 4 } }],
+    }));
+
+    let got;
+    await pipeline.runRenderPipeline(p.id, {
+      compose: async (args) => { got = args; return { url: "u", seconds: 4 }; },
+    });
+    expect(got.aspect_ratio).toBe("1:1");
+    expect(got.cuts).toHaveLength(1);
+  });
+});
