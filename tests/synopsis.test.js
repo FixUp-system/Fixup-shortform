@@ -161,6 +161,14 @@ describe("buildSynopsisMessages", () => {
     expect(buildSynopsisMessages(project).system).toContain("목표가 아니다");
   });
 
+  // 풍부한 자료에서 says가 완성 문장으로 나와 대본이 그대로 옮겼다(전사율 1.0).
+  // 요지와 완성 문장의 거리가 좁아지는 자리를 길이로 벌린다.
+  it("says를 완성 문장이 못 되게 짧게 묶는다", () => {
+    const { system } = buildSynopsisMessages(project);
+    expect(system).toContain("20자");
+    expect(system).toContain("옮겨 적을 뿐이다");
+  });
+
   it("지문에 장면 예산을 적는다 — 자료가 얇으면 장면도 적다", () => {
     const { messages } = buildSynopsisMessages(project); // 핵심 내용 1개, 답한 질문 0개
     const user = messages[0].content;
