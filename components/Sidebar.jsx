@@ -58,31 +58,31 @@ export default function Sidebar() {
         <i>▶</i>shotform
       </div>
       <Link href="/" className={`side-item${pathname === "/" ? " on" : ""}`}>
-        <span className="ic">🏠</span>홈 — 빠른 생성
+        <span className="ic">⌂</span>홈 — 빠른 생성
       </Link>
       <Link href={makeVideoHref} className={`side-item${inCreate ? " on" : ""}`}>
-        <span className="ic">✨</span>영상 만들기 (단계별)
+        <span className="ic">✦</span>영상 만들기 (단계별)
       </Link>
       {inCreate && <StepList pathname={pathname} />}
       {inCreate && project?.id && (
         <Link href="/create" className="side-new">+ 새로 만들기</Link>
       )}
       <button className="side-item soon" disabled>
-        <span className="ic">📁</span>보관함
+        <span className="ic">▤</span>보관함
         <span className="soon-tag">준비 중</span>
       </button>
       <button className="side-item soon" disabled>
-        <span className="ic">🎬</span>템플릿
+        <span className="ic">◫</span>템플릿
         <span className="soon-tag">준비 중</span>
       </button>
       <Link
         href="/costs"
         className={`side-item${pathname === "/costs" ? " on" : ""}`}
       >
-        <span className="ic">💰</span>비용 기록
+        <span className="ic">◷</span>비용 기록
       </Link>
       <button className="side-item soon" disabled>
-        <span className="ic">⚙️</span>설정
+        <span className="ic">⚙︎</span>설정
         <span className="soon-tag">준비 중</span>
       </button>
       <div className="side-grow" />
