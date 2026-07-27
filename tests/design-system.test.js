@@ -63,7 +63,7 @@ describe("색", () => {
       "--btn": "#F5F5F5",
       "--btn-ink": "#1A1A1A",
       "--good": "#57B383",
-      "--warn": "#DFAF54",
+      "--warn": "#E5B93C",
     };
     for (const [name, value] of Object.entries(expected)) {
       expect(css, `${name} 토큰`).toMatch(
