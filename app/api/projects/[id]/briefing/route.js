@@ -18,7 +18,9 @@ export async function POST(req, { params }) {
     try {
       briefing = validateBriefing(await callJson({ system, messages }));
     } catch (e) {
-      return Response.json({ error: e.message }, { status: 502 });
+      // 일시적 호출 실패는 삼키고 다음 시도로 — 루프 조건이 상한을 쥔다.
+      // 다만 왜 실패했는지는 남긴다(키 미설정·크레딧 소진·형식 거절이 전부 같은 502로 보이지 않게).
+      console.error("자료 정리 실패:", e);
     }
   }
   if (!briefing) {

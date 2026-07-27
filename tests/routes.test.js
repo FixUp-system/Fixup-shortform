@@ -261,6 +261,20 @@ describe("POST /api/projects/[id]/briefing — 재추출", () => {
     expect(after.briefing.confirmed).toBe(false);
     expect(after.briefing.version).toBe(1);
   });
+
+  it("호출이 예외로 죽어도 원시 에러를 흘리지 않고 한국어 502를 준다", async () => {
+    const p = await projectWithScript();
+    const raw = 'LLM 호출 실패 (429) {"error":{"message":"You exceeded your current quota"}}';
+    llmMock.callJson.mockRejectedValue(new Error(raw));
+    const res = await briefingPOST({}, ctx(p.id));
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    // lib/llm.js가 응답 본문을 메시지에 담으므로 e.message를 그대로 돌려주면 벤더 에러가 사장님 화면에 뜬다
+    expect(body.error).toBe("자료를 정리하지 못했어요. 직접 채우거나 다시 시도해 주세요.");
+    expect(JSON.stringify(body)).not.toContain(raw);
+    // 일시적 오류 하나가 요청 전체를 날리지 않게 — 예외도 재시도한다(상한 2회)
+    expect(llmMock.callJson).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("POST /api/projects/[id]/script (초안→교정)", () => {
