@@ -1,108 +1,111 @@
 import { describe, it, expect } from "vitest";
-import { validateScript, validateCuts, validateBriefing, validateSynopsis } from "../lib/validate.js";
+import { validateScript, validateCutRanges, validateShows, validateBriefing } from "../lib/validate.js";
 
-describe("validateScript", () => {
-  const ok = { paragraphs: [{ text: "첫 문장" }, { text: "둘째 문장" }] };
-
-  it("장면 수와 문단 수가 같으면 통과한다", () => {
-    const s = validateScript(ok, 2);
-    expect(s.paragraphs).toHaveLength(2);
-    expect(s.paragraphs[0]).toEqual({ text: "첫 문장" });
+describe("validateScript — 하나로 흐르는 원고", () => {
+  it("원고 문자열을 받아 다듬어 돌려준다", () => {
+    expect(validateScript({ script: "  매일 아침 딸기를 갈아 씁니다. 하루 40잔이면 끝입니다.  " })).toEqual({
+      text: "매일 아침 딸기를 갈아 씁니다. 하루 40잔이면 끝입니다.",
+    });
   });
 
-  it("tag를 요구하지 않고, 있어도 버린다 — 역할은 장면이 갖는다", () => {
-    const s = validateScript({ paragraphs: [{ tag: "훅", text: "문장" }] }, 1);
-    expect(s.paragraphs[0]).toEqual({ text: "문장" });
+  it("문단 배열은 더 이상 받지 않는다 — 원고가 원본이다", () => {
+    expect(validateScript({ paragraphs: [{ text: "문장" }] })).toBeNull();
   });
 
-  it("coverage를 반환하지 않는다 — 사실 추적은 scene.facts가 한다", () => {
-    const s = validateScript({ paragraphs: [{ text: "문장" }], coverage: ["ㄱ"] }, 1);
-    expect(s.coverage).toBeUndefined();
+  it("너무 짧으면 null — 한 마디는 대본이 아니다", () => {
+    expect(validateScript({ script: "짧다." })).toBeNull();
   });
 
-  it("문단 수가 장면 수와 다르면 null — 1:1 종속을 지키는 유일한 장치다", () => {
-    expect(validateScript(ok, 3)).toBeNull();
-    expect(validateScript(ok, 1)).toBeNull();
+  it("파이프라인이 감당 못 할 크기는 막는다", () => {
+    expect(validateScript({ script: "가".repeat(2001) })).toBeNull();
   });
 
-  it("sceneCount를 안 주면 null — 조용히 검사를 건너뛰지 않는다", () => {
-    expect(validateScript(ok)).toBeNull();
-    expect(validateScript(ok, 0)).toBeNull();
-  });
-
-  it("빈 문장이 있으면 null", () => {
-    expect(validateScript({ paragraphs: [{ text: "  " }] }, 1)).toBeNull();
-  });
-
-  it("paragraphs가 없으면 null", () => {
-    expect(validateScript({}, 1)).toBeNull();
-    expect(validateScript(null, 1)).toBeNull();
+  it("비었거나 문자열이 아니면 null", () => {
+    expect(validateScript({ script: "   " })).toBeNull();
+    expect(validateScript({ script: 123 })).toBeNull();
+    expect(validateScript(null)).toBeNull();
   });
 });
 
-describe("validateCuts", () => {
-  const scenes = [
-    { role: "여는말", shows: "클로즈업", says: "가", seconds: 3, facts: [], ref_photo_id: "p1" },
-    { role: "마감", shows: "시점 샷", says: "나", seconds: 4, facts: [] },
-  ];
-  it("모든 컷을 ai로 만들고 idx를 재부여한다", () => {
-    const cuts = validateCuts(
-      { cuts: [
-        { sentence: "문장1", seconds: 6, scene_idx: 0 },
-        { sentence: "문장2", seconds: 8, scene_idx: 1 },
-      ]},
-      scenes
-    );
+describe("validateCutRanges — 경계만 받고 텍스트는 코드가 자른다", () => {
+  const sentences = ["첫 문장입니다.", "둘째 문장입니다.", "셋째 문장입니다."];
+
+  it("경계로 원고를 잘라 컷을 만든다", () => {
+    const cuts = validateCutRanges({ cuts: [{ from: 1, to: 2 }, { from: 3, to: 3 }] }, sentences);
     expect(cuts).toHaveLength(2);
-    expect(cuts[0].idx).toBe(0);
-    expect(cuts.every((c) => c.source === "ai")).toBe(true);
+    expect(cuts[0]).toMatchObject({ idx: 0, sentence: "첫 문장입니다. 둘째 문장입니다.", source: "ai", regen_count: 0 });
+    expect(cuts[1].sentence).toBe("셋째 문장입니다.");
   });
-  it("photo 소스로 와도 ai로 바꾸고 photo_id는 남기지 않는다", () => {
-    const cuts = validateCuts({ cuts: [{ sentence: "s", seconds: 5, source: "photo", photo_id: "p2", scene_idx: 1 }] }, scenes);
-    expect(cuts[0].source).toBe("ai");
-    expect(cuts[0].photo_id).toBeUndefined();
+
+  it("초는 LLM에게 묻지 않고 자른 길이로 계산한다", () => {
+    const cuts = validateCutRanges({ cuts: [{ from: 1, to: 3 }] }, sentences);
+    expect(cuts[0].seconds).toBeGreaterThanOrEqual(2);
+    expect(cuts[0].seconds).toBeLessThanOrEqual(15);
   });
-  it("장면에 ref_photo_id가 있으면 그 장면의 모든 컷이 물려받는다", () => {
-    const cuts = validateCuts(
-      { cuts: [
-        { sentence: "s1", seconds: 5, scene_idx: 0 },
-        { sentence: "s2", seconds: 5, scene_idx: 0 },
-      ]},
-      scenes
-    );
-    expect(cuts[0].ref_photo_id).toBe("p1");
-    expect(cuts[1].ref_photo_id).toBe("p1");
+
+  it("모델이 보낸 문장은 무시한다 — 원고를 다시 쓰지 못한다", () => {
+    const cuts = validateCutRanges({ cuts: [{ from: 1, to: 1, sentence: "몰래 고친 문장" }, { from: 2, to: 3 }] }, sentences);
+    expect(cuts[0].sentence).toBe("첫 문장입니다.");
   });
-  it("장면에 ref_photo_id가 없으면 컷에도 없다 — LLM이 고른 값은 무시한다", () => {
-    const cuts = validateCuts({ cuts: [{ sentence: "s", seconds: 5, scene_idx: 1, ref_photo_id: "p1" }] }, scenes);
-    expect(cuts[0].ref_photo_id).toBeUndefined();
+
+  it("빈틈이 있으면 null — 원고 한 조각이 조용히 사라진다", () => {
+    expect(validateCutRanges({ cuts: [{ from: 1, to: 1 }, { from: 3, to: 3 }] }, sentences)).toBeNull();
   });
-  it("scene_idx가 범위 밖이면 null", () => {
-    const obj = { cuts: [{ sentence: "가", seconds: 3, scene_idx: 5 }] };
-    expect(validateCuts(obj, scenes)).toBeNull();
+
+  it("겹치면 null — 같은 문장이 두 번 읽힌다", () => {
+    expect(validateCutRanges({ cuts: [{ from: 1, to: 2 }, { from: 2, to: 3 }] }, sentences)).toBeNull();
   });
-  it("scene_idx가 없으면 null — 컷은 반드시 어느 장면의 것인지 밝힌다", () => {
-    const obj = { cuts: [{ sentence: "가", seconds: 3 }] };
-    expect(validateCuts(obj, scenes)).toBeNull();
+
+  it("끝까지 쓰지 않으면 null — 뒤를 잘라먹으면 승인한 대본이 사라진다", () => {
+    expect(validateCutRanges({ cuts: [{ from: 1, to: 2 }] }, sentences)).toBeNull();
   });
-  it("scene_idx가 숫자가 아니면 null — 강제변환으로 장면 0에 붙지 않는다", () => {
-    for (const bad of [null, "", [], true, "1"]) {
-      const obj = { cuts: [{ sentence: "가", seconds: 3, scene_idx: bad }] };
-      expect(validateCuts(obj, scenes)).toBeNull();
+
+  it("1번에서 시작하지 않으면 null", () => {
+    expect(validateCutRanges({ cuts: [{ from: 2, to: 3 }] }, sentences)).toBeNull();
+  });
+
+  it("범위 밖이면 null", () => {
+    expect(validateCutRanges({ cuts: [{ from: 1, to: 9 }] }, sentences)).toBeNull();
+  });
+
+  it("정수가 아니면 null — 강제변환으로 경계가 밀리지 않는다", () => {
+    for (const bad of [null, "", [], true, "1", 1.5]) {
+      expect(validateCutRanges({ cuts: [{ from: bad, to: 3 }] }, sentences)).toBeNull();
     }
   });
-  it("scene_idx가 정수가 아닌 숫자여도 null", () => {
-    const obj = { cuts: [{ sentence: "가", seconds: 3, scene_idx: 1.5 }] };
-    expect(validateCuts(obj, scenes)).toBeNull();
+
+  it("문장이나 컷이 비면 null", () => {
+    expect(validateCutRanges({ cuts: [] }, sentences)).toBeNull();
+    expect(validateCutRanges({ cuts: [{ from: 1, to: 1 }] }, [])).toBeNull();
+    expect(validateCutRanges(null, sentences)).toBeNull();
   });
-  it("scene_idx를 컷에 남긴다", () => {
-    const obj = { cuts: [{ sentence: "가", seconds: 3, scene_idx: 1 }] };
-    expect(validateCuts(obj, scenes)[0].scene_idx).toBe(1);
+});
+
+describe("validateShows — 화면 패스", () => {
+  it("컷 수만큼의 화면을 돌려준다", () => {
+    const shots = validateShows({ shots: [{ shows: "클로즈업 화면" }, { shows: "풀 샷 화면" }] }, 2);
+    expect(shots).toEqual([{ shows: "클로즈업 화면" }, { shows: "풀 샷 화면" }]);
   });
-  it("장면이 없으면 null — 컷은 구성 없이는 만들 수 없다", () => {
-    const obj = { cuts: [{ sentence: "가", seconds: 3, scene_idx: 0 }] };
-    expect(validateCuts(obj, [])).toBeNull();
-    expect(validateCuts(obj, undefined)).toBeNull();
+
+  it("개수가 어긋나면 null — 짝이 밀리면 엉뚱한 문장에 엉뚱한 그림이 붙는다", () => {
+    expect(validateShows({ shots: [{ shows: "하나뿐" }] }, 2)).toBeNull();
+    expect(validateShows({ shots: [{ shows: "가" }, { shows: "나" }, { shows: "다" }] }, 2)).toBeNull();
+  });
+
+  it("있는 사진만 ref로 남긴다", () => {
+    const shots = validateShows({ shots: [{ shows: "화면", ref_photo_id: "p1" }, { shows: "화면2", ref_photo_id: "없는id" }] }, 2, ["p1"]);
+    expect(shots[0].ref_photo_id).toBe("p1");
+    expect(shots[1].ref_photo_id).toBeUndefined();
+  });
+
+  it("빈 화면이 있으면 null", () => {
+    expect(validateShows({ shots: [{ shows: "  " }] }, 1)).toBeNull();
+    expect(validateShows({ shots: [{}] }, 1)).toBeNull();
+  });
+
+  it("컷 수가 없거나 응답이 망가지면 null", () => {
+    expect(validateShows({ shots: [{ shows: "가" }] }, 0)).toBeNull();
+    expect(validateShows(null, 1)).toBeNull();
   });
 });
 
@@ -153,87 +156,5 @@ describe("validateBriefing", () => {
     expect(b.asked).toHaveLength(1);
     expect(b.asked[0].question).toBe("정상?");
     expect(b.asked[0].options).toEqual([]);
-  });
-});
-
-describe("validateSynopsis", () => {
-  const scene = () => ({
-    role: "여는말",
-    shows: "유리잔 속 딸기 과육이 우유와 섞이는 클로즈업",
-    says: "오늘 이 한 잔은 어제와 맛이 다르다",
-    seconds: 3,
-    facts: ["논산 설향"],
-  });
-  const ok = (over = {}) => ({ angle: "매일 맛이 다른 라떼", scenes: [scene(), scene(), scene()], ...over });
-
-  it("정상 응답을 통과시킨다", () => {
-    const s = validateSynopsis(ok(), []);
-    expect(s.angle).toBe("매일 맛이 다른 라떼");
-    expect(s.scenes).toHaveLength(3);
-    expect(s.scenes[0].shows).toContain("클로즈업");
-    expect(s.scenes[0].seconds).toBe(3);
-  });
-
-  it("angle이 없으면 null", () => {
-    expect(validateSynopsis({ scenes: [scene()] }, [])).toBeNull();
-  });
-
-  it("role이 없거나 공백이면 null", () => {
-    const missing = ok();
-    delete missing.scenes[1].role;
-    expect(validateSynopsis(missing, [])).toBeNull();
-    const blank = ok();
-    blank.scenes[1].role = "   ";
-    expect(validateSynopsis(blank, [])).toBeNull();
-  });
-
-  it("scenes가 배열이 아니면 null", () => {
-    expect(validateSynopsis(ok({ scenes: "여는말" }), [])).toBeNull();
-  });
-
-  it("obj가 null이면 null", () => {
-    expect(validateSynopsis(null, [])).toBeNull();
-  });
-
-  it("shows가 없으면 null — 화면 근거가 이 필드 하나뿐이다", () => {
-    const bad = ok();
-    delete bad.scenes[1].shows;
-    expect(validateSynopsis(bad, [])).toBeNull();
-  });
-
-  it("says가 없으면 null", () => {
-    const bad = ok();
-    bad.scenes[1].says = "   ";
-    expect(validateSynopsis(bad, [])).toBeNull();
-  });
-
-  it("seconds가 범위 밖이면 null", () => {
-    expect(validateSynopsis(ok({ scenes: [{ ...scene(), seconds: 1 }] }), [])).toBeNull();
-    expect(validateSynopsis(ok({ scenes: [{ ...scene(), seconds: 16 }] }), [])).toBeNull();
-    expect(validateSynopsis(ok({ scenes: [{ ...scene(), seconds: "셋" }] }), [])).toBeNull();
-  });
-
-  it("장면이 없거나 8개를 넘으면 null", () => {
-    expect(validateSynopsis(ok({ scenes: [] }), [])).toBeNull();
-    expect(validateSynopsis(ok({ scenes: Array.from({ length: 9 }, scene) }), [])).toBeNull();
-  });
-
-  it("장면이 2개여도 통과한다 — 하한은 프롬프트가 지시하고 검증기는 막지 않는다", () => {
-    expect(validateSynopsis(ok({ scenes: [scene(), scene()] }), [])).not.toBeNull();
-  });
-
-  it("없는 ref_photo_id는 조용히 제거한다", () => {
-    const s = validateSynopsis(ok({ scenes: [{ ...scene(), ref_photo_id: "없는id" }] }), ["p1"]);
-    expect(s.scenes[0].ref_photo_id).toBeUndefined();
-  });
-
-  it("있는 ref_photo_id는 남긴다", () => {
-    const s = validateSynopsis(ok({ scenes: [{ ...scene(), ref_photo_id: "p1" }] }), ["p1"]);
-    expect(s.scenes[0].ref_photo_id).toBe("p1");
-  });
-
-  it("facts가 없으면 빈 배열로 채운다", () => {
-    const s = validateSynopsis(ok({ scenes: [{ ...scene(), facts: undefined }] }), []);
-    expect(s.scenes[0].facts).toEqual([]);
   });
 });

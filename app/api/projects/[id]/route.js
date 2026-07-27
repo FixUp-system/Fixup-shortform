@@ -29,29 +29,11 @@ export async function PATCH(req, { params }) {
           c.idx === body.cut.idx ? { ...c, sentence: body.cut.sentence } : c
         );
       }
-      if (body.script_paragraph && proj.script &&
-          Number.isInteger(body.script_paragraph.idx) && typeof body.script_paragraph.text === "string") {
-        next.script = {
-          ...proj.script,
-          paragraphs: proj.script.paragraphs.map((p, i) =>
-            i === body.script_paragraph.idx ? { ...p, text: body.script_paragraph.text } : p
-          ),
-        };
-      }
-      // 장면 직접 편집. version을 올리지 않는다 — 사장님이 손으로 고친 것을
-      // "구성이 바뀌었다"로 알리면 대본 화면에 거짓 경고가 뜨고, 그 버튼은 유료 호출이다.
-      if (body.synopsis_scene && proj.synopsis && Number.isInteger(body.synopsis_scene.idx)) {
-        const { idx, shows, says } = body.synopsis_scene;
-        next.synopsis = {
-          ...proj.synopsis,
-          scenes: proj.synopsis.scenes.map((s, i) =>
-            i !== idx ? s : {
-              ...s,
-              ...(typeof shows === "string" && shows.trim() ? { shows: shows.trim() } : {}),
-              ...(typeof says === "string" && says.trim() ? { says: says.trim() } : {}),
-            }
-          ),
-        };
+      // 원고 직접 편집. version을 올리지 않는다 — 사장님이 손으로 고친 것을
+      // "원고가 바뀌었다"로 알리면 이미지 화면에 거짓 경고가 뜨고, 그 버튼은 유료 호출이다.
+      // (손으로 고친 문장을 컷에 반영하려면 컷을 다시 만들어야 하는 것은 그대로다.)
+      if (typeof body.script_text === "string" && body.script_text.trim() && proj.script) {
+        next.script = { ...proj.script, text: body.script_text.trim() };
       }
       return next;
     });

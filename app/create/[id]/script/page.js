@@ -1,12 +1,13 @@
 "use client";
 
-// ③ 대본 — 승인 게이트 2 (무료)
+// ② 대본 — 승인 게이트 (무료). 장면으로 끊기지 않은 하나의 원고를 읽고 고친다.
+// 컷은 이 원고를 잘라서 만든다 — 여기서 승인한 문장이 이미지 단계까지 글자 그대로 간다.
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 import BackButton from "../../../../components/BackButton";
 import { estimateSeconds } from "../../../../lib/script";
-import { currentStepKey, isScriptStale } from "../../../../lib/steps";
+import { currentStepKey, areCutsStale } from "../../../../lib/steps";
 
 export default function ScriptStepPage() {
   const { id } = useParams();
@@ -15,19 +16,21 @@ export default function ScriptStepPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [instruction, setInstruction] = useState("");
-  // 영상(=이미지) 비율 — 이미지 생성 직전에 정한다. 저장된 값이 있으면 그걸 잇는다.
+  const [draft, setDraft] = useState(null); // 손으로 고치는 중인 원고(저장 전)
   const [aspect, setAspect] = useState(project.settings?.aspect_ratio || "9:16");
-  // 자동 생성이 한 번만 돌게 막는다 — busy는 비동기라 effect가 두 번 불리면(StrictMode 등)
-  // 대본이 두 번 생성돼 과금이 두 배가 된다. 프로젝트가 바뀌면 다시 허용.
+  // 자동 생성이 한 번만 돌게 막는다 — busy는 비동기라 effect가 두 번 불리면 과금이 두 배가 된다.
   const autoGenFor = useRef(null);
 
-  // 대본이 아직 없으면 자동 생성 시작
+  // 원고가 아직 없으면 자동 생성 시작
   useEffect(() => {
-    if (project && !project.script && project.briefing?.confirmed && autoGenFor.current !== id) {
+    if (project && !project.script?.text && project.briefing?.confirmed && autoGenFor.current !== id) {
       autoGenFor.current = id;
       genScript();
     }
   }, [project?.status, project?.briefing?.confirmed, id]);
+
+  // 서버 원고가 바뀌면 편집 중인 초안을 버린다(재생성 결과가 화면에 보이게)
+  useEffect(() => { setDraft(null); }, [project?.script?.version]);
 
   async function genScript(instr) {
     setBusy(true); setErr("");
@@ -39,6 +42,21 @@ export default function ScriptStepPage() {
     if (!res.ok) setErr(data.error || "대본 생성 실패");
     await load(id).catch(() => {});
     setBusy(false); setInstruction("");
+  }
+
+  // 손으로 고친 원고 저장 — 실패를 삼키지 않는다(고친 글이 사라진 줄 모르면 안 된다)
+  async function saveText(text) {
+    const res = await fetch(`/api/projects/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ script_text: text }),
+    }).catch(() => null);
+    if (!res || !res.ok) {
+      setErr("고친 글을 저장하지 못했어요 — 다시 저장해 주세요");
+      return;
+    }
+    setErr("");
+    setDraft(null);
+    await load(id).catch(() => {});
   }
 
   // 이미 만든 컷이 있는가 — 단계 판정은 lib/steps 하나만 본다
@@ -61,16 +79,10 @@ export default function ScriptStepPage() {
     router.push(`/create/${id}/images`);
   }
 
-  async function editParagraph(idx, text) {
-    await fetch(`/api/projects/${id}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ script_paragraph: { idx, text } }),
-    });
-    await load(id).catch(() => {});
-  }
+  const text = project.script?.text;
 
-  // 대본이 아직 없을 때 — 실패했다면 이유와 다시 쓰기 버튼을 보여준다(자동 재시도는 하지 않는다)
-  if (!project.script) {
+  // 원고가 아직 없을 때 — 실패했다면 이유와 다시 쓰기 버튼을 보여준다(자동 재시도는 하지 않는다)
+  if (!text) {
     if (err) {
       return (
         <p className="pgsub" style={{ color: "var(--warn)" }}>
@@ -81,53 +93,50 @@ export default function ScriptStepPage() {
     return <p className="pgsub">대본을 쓰는 중…</p>;
   }
 
-  // 구성을 다시 만들면 버전이 오른다 — 지금 대본이 그 이전 것인지 알려주기만 한다.
-  // 판정은 lib/steps가 쥔다(단계·상태 판정의 단일 소스).
-  const staleScript = isScriptStale(project);
-  // 이미 만들어 둔 이미지가 있는가 — 대본을 다시 쓰면 컷을 처음부터 다시 만들게 돼 그 이미지가 지워진다
+  const shown = draft ?? text;
+  const staleCuts = areCutsStale(project);
   const madeCuts = (project.cuts || []).length > 0;
 
   return (
     <section className="panel" style={{ maxWidth: 760 }}>
-      <h2>대본을 확인해 주세요 <span className="badge vlm">승인 게이트 2</span></h2>
+      <h2>대본을 확인해 주세요 <span className="badge vlm">승인 게이트</span></h2>
       {err && <p className="pgsub" style={{ color: "var(--warn)" }}>{err}</p>}
-      {staleScript && (
+      {staleCuts && (
         <p className="pgsub" style={{ color: "var(--warn)" }}>
-          구성이 바뀌었어요 — 지금 대본은 바뀌기 전 내용이에요{" "}
-          <button className="mini" disabled={busy} onClick={() => genScript()}>대본 다시 쓰기</button>
+          원고가 바뀌었어요 — 지금 이미지는 바뀌기 전 원고로 만든 것이에요
         </p>
       )}
-      <div className="script-box">
-        {project.script.paragraphs.map((p, i) => (
-          <p key={i}>
-            <span className="tag">{project.synopsis?.scenes?.[i]?.role || `${i + 1}`}</span>
-            <span
-              contentEditable
-              suppressContentEditableWarning
-              style={{ outline: "none" }}
-              onBlur={(e) => {
-                const text = e.currentTarget.textContent.trim();
-                if (text && text !== p.text) editParagraph(i, text);
-              }}
-            >{p.text}</span>
-          </p>
-        ))}
+
+      <textarea
+        className="ref ref-lg"
+        style={{ minHeight: 260, lineHeight: 1.9, fontSize: 15 }}
+        value={shown}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => { if (draft !== null && draft.trim() && draft !== text) saveText(draft.trim()); }}
+      />
+      <div className="script-src">
+        이대로 읽으면 약 {estimateSeconds({ text: shown })}초 · 글을 고치면 그대로 저장돼요
+        {draft !== null && draft !== text && " (저장하려면 글 밖을 한 번 클릭하세요)"}
       </div>
-      <div className="script-src">이대로 읽으면 약 {estimateSeconds(project.script)}초 · 문장을 클릭하면 바로 고칠 수 있어요</div>
+      <div className="script-src">
+        컷은 이 원고를 잘라서 만들어요 — 여기서 승인한 문장이 그대로 화면에 실립니다
+      </div>
       {madeCuts && (
         <div className="script-src" style={{ color: "var(--warn)" }}>
           이미 만들어 둔 이미지가 있어요 — 대본을 다시 쓰면 컷을 처음부터 다시 만들게 되고, 그 이미지는 지워져요
         </div>
       )}
+
       <div style={{ display: "flex", gap: 8, marginTop: 14, alignItems: "flex-end" }}>
         <textarea className="sent-input" style={{ flex: 1, minHeight: 96, padding: "13px 15px", fontSize: 14, resize: "vertical", fontFamily: "inherit", lineHeight: 1.55 }}
-          placeholder='수정 지시 (예: "더 짧게", "더 캐주얼하게", "가격을 강조해줘")'
+          placeholder='수정 지시 (예: "더 짧게", "가게 이름을 빼줘", "손님 이야기를 앞으로")'
           value={instruction} onChange={(e) => setInstruction(e.target.value)} />
         <button className="mini" style={{ padding: "13px 18px", fontSize: 13.5, whiteSpace: "nowrap" }}
           disabled={busy} onClick={() => genScript(instruction || "전체를 다시 써줘")}>
           {instruction ? "지시 반영" : "전체 다시 쓰기"}
         </button>
       </div>
+
       {!hasCuts && (
         <>
           <div className="eyebrow" style={{ marginTop: 18 }}>화면 비율 <small>이 비율로 이미지가 만들어져요</small></div>
@@ -148,10 +157,10 @@ export default function ScriptStepPage() {
               ? "이미 만든 컷이 있어요 — 다시 만들지 않고 그대로 보여드려요"
               : madeCuts
               ? "지금 승인하면 컷을 처음부터 다시 만들어요 — 먼저 만든 이미지는 지워집니다"
-              : "컷당 이미지 후보 2장 + AI 검수 · 목소리(④)는 준비 중이라 건너뜁니다"}
+              : "원고를 컷으로 나누고, 컷마다 화면을 설계해서 그려요 · 목소리(③)는 준비 중이라 건너뜁니다"}
           </span>
           <button className="cta" disabled={busy} onClick={approve}>
-            {hasCuts ? "⑤ 이미지 확인하러 가기" : "대본 승인 →"}
+            {hasCuts ? "④ 이미지 확인하러 가기" : "대본 승인 →"}
           </button>
         </div>
       </div>

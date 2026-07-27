@@ -6,16 +6,10 @@ export async function POST(req, { params }) {
   const { id } = await params;
   const project = await getProject(id);
   if (!project) return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
-  if (!project.script) return Response.json({ error: "대본을 먼저 만들어 주세요" }, { status: 400 });
-  // 컷은 장면에서 갈라져 나온다 — 구성이 없으면 나눌 것도, 그릴 근거도 없다
-  if (!project.synopsis) return Response.json({ error: "구성을 먼저 만들어 주세요" }, { status: 400 });
-  // 대본은 장면에 1:1로 붙는다. 개수가 어긋난 채로 나누면 뒤 장면이 조용히 빠지거나
-  // 없는 장면을 가리키는 컷이 나와 분할이 두 번 다 거절된다 — 여기서 먼저 막는다.
-  if (project.script.paragraphs.length !== project.synopsis.scenes.length) {
-    return Response.json(
-      { error: "구성이 바뀌었어요 — 대본을 다시 써 주세요" },
-      { status: 400 }
-    );
+  // 컷은 원고를 잘라서 만든다 — 원고가 없으면 자를 것도, 그릴 근거도 없다.
+  // 구성 시절 프로젝트(paragraphs만 있는)도 여기서 걸린다: 대본을 다시 쓰면 원고가 생긴다.
+  if (!project.script?.text) {
+    return Response.json({ error: "대본을 먼저 만들어 주세요" }, { status: 400 });
   }
 
   // 화면 비율 — 이미지 생성이 이 값을 쓴다. 보내지 않으면 기존 설정(기본 9:16)을 유지한다.
@@ -40,6 +34,8 @@ export async function POST(req, { params }) {
     ...proj,
     settings: { ...proj.settings, aspect_ratio },
     status: "cuts", cuts: [], cuts_error: null,
+    // 이 컷들이 어느 원고에서 나왔는지 — 원고를 다시 쓰면 컷이 낡는다(areCutsStale)
+    cuts_script_version: proj.script?.version || 1,
   }));
 
   // 비동기 시작 — 완료를 기다리지 않고 폴링으로 확인 (로컬 node 서버 전제. 배포 시 잡 큐 이관)

@@ -1,89 +1,137 @@
 import { describe, it, expect } from "vitest";
-import { buildCutsMessages, buildImagePrompt } from "../lib/cuts.js";
+import { splitSentences, buildSplitMessages, buildShowsMessages, buildImagePrompt } from "../lib/cuts.js";
 
 const project = {
   settings: { aspect_ratio: "9:16" },
   material: { text: "자료", photos: [{ id: "p1", filename: "라떼.jpg" }] },
   briefing: { topic: "생딸기라떼" },
-  synopsis: {
-    angle: "매일 맛이 다른 라떼",
-    scenes: [
-      { role: "여는말", shows: "딸기 과육이 우유에 섞이는 클로즈업", says: "오늘 한 잔은 다르다", seconds: 3, facts: [] },
-      { role: "마감", shows: "성수역 3번 출구에서 카페까지 걷는 시점 샷", says: "도보 2분", seconds: 4, facts: [] },
-    ],
-  },
-  script: { paragraphs: [{ text: "요즘 이거 모르면 손해" }, { text: "성수역 3번 출구 2분입니다" }] },
+  script: { text: "매일 아침 딸기를 갈아 씁니다. 시럽은 쓰지 않습니다.\n성수역 3번 출구에서 2분입니다." },
 };
 
-describe("buildCutsMessages — 구성 주입", () => {
-  it("장면의 보여줌이 지문에 들어간다", () => {
-    const user = buildCutsMessages(project).messages[0].content;
-    expect(user).toContain("딸기 과육이 우유에 섞이는 클로즈업");
-    expect(user).toContain("성수역 3번 출구에서 카페까지 걷는 시점 샷");
+describe("splitSentences", () => {
+  it("종결부호와 줄바꿈으로 나눈다", () => {
+    expect(splitSentences(project.script.text)).toEqual([
+      "매일 아침 딸기를 갈아 씁니다.",
+      "시럽은 쓰지 않습니다.",
+      "성수역 3번 출구에서 2분입니다.",
+    ]);
   });
 
-  it("문단이 장면 번호와 함께 붙는다", () => {
-    const user = buildCutsMessages(project).messages[0].content;
-    expect(user).toContain("장면 0");
-    expect(user).toContain("요즘 이거 모르면 손해");
+  it("빈 원고는 빈 배열", () => {
+    expect(splitSentences("")).toEqual([]);
+    expect(splitSentences(null)).toEqual([]);
+  });
+});
+
+describe("buildSplitMessages", () => {
+  const sentences = splitSentences(project.script.text);
+
+  it("번호를 매겨 문장을 준다 — 경계를 번호로 이야기하기 위해서다", () => {
+    const user = buildSplitMessages(sentences).messages[0].content;
+    expect(user).toContain("1. 매일 아침 딸기를 갈아 씁니다.");
+    expect(user).toContain("3. 성수역 3번 출구에서 2분입니다.");
+    expect(user).toContain("문장 3개");
   });
 
-  it("컷이 장면 경계를 넘지 말라고 지시하고 scene_idx를 요구한다", () => {
-    const { system } = buildCutsMessages(project);
-    expect(system).toContain("scene_idx");
-    expect(system).toContain("장면 경계를 넘지 않는다");
+  it("문장을 고쳐 쓰지 말고 경계만 고르라고 지시한다", () => {
+    const { system } = buildSplitMessages(sentences);
+    expect(system).toContain("경계만 고른다");
+    expect(system).toContain("고쳐 쓰지 않는다");
+    expect(system).toContain('{"cuts":[{"from"');
   });
 
-  it("사진 선택은 구성의 일이므로 컷 프롬프트는 사진을 다루지 않는다", () => {
-    const { system, messages } = buildCutsMessages(project);
-    expect(system).not.toContain("ref_photo_id");
-    expect(messages[0].content).not.toContain("업로드 사진");
+  it("빈틈도 겹침도 없어야 한다고 지시한다", () => {
+    expect(buildSplitMessages(sentences).system).toContain("빈틈도 겹침도 없다");
+  });
+});
+
+describe("buildShowsMessages", () => {
+  const cuts = [
+    { idx: 0, sentence: "매일 아침 딸기를 갈아 씁니다." },
+    { idx: 1, sentence: "성수역 3번 출구에서 2분입니다." },
+  ];
+
+  it("원고 전문과 컷 목록·사진을 함께 준다 — 화면은 전체 맥락에서 나온다", () => {
+    const user = buildShowsMessages(project, cuts).messages[0].content;
+    expect(user).toContain("시럽은 쓰지 않습니다");        // 원고 전문
+    expect(user).toContain("1. 매일 아침 딸기를 갈아 씁니다.");
+    expect(user).toContain("id:p1");
+    expect(user).toContain("생딸기라떼");                   // 주제
   });
 
-  it("목표 길이 제약은 더 이상 주입하지 않는다", () => {
-    const { system, messages } = buildCutsMessages(project);
-    expect(messages[0].content).not.toContain("목표 길이");
-    expect(system).not.toContain("±20%");
+  it("shows 작법을 지시한다 — 샷 크기·앵글·조명, 부정형 금지, 삽화 금지", () => {
+    const { system } = buildShowsMessages(project, cuts);
+    for (const term of ["극단적 클로즈업", "미디엄 샷", "광각", "로우 앵글", "골든아워"]) {
+      expect(system).toContain(term);
+    }
+    expect(system).toContain("없는 것으로 쓰지 않는다");
+    expect(system).toContain("삽화가 아니다");
+  });
+
+  it("첫 컷을 설정 샷으로 열지 말라고 지시한다", () => {
+    expect(buildShowsMessages(project, cuts).system).toContain("설정 샷으로 열지 않는다");
+  });
+
+  it("같은 그림을 반복하지 말라고 지시한다 — 한 편의 영상이다", () => {
+    expect(buildShowsMessages(project, cuts).system).toContain("같은 그림을 반복하지 않는다");
+  });
+
+  it("카메라 움직임은 넣지 않는다 — 만드는 것은 정지 화면이다", () => {
+    const { system } = buildShowsMessages(project, cuts);
+    for (const term in { 돌리: 1, 크레인: 1, 휩팬: 1, 틸트: 1, 트래킹: 1, 핸드헬드: 1, 슬로우모션: 1 }) {
+      expect(system).not.toContain(term);
+    }
+    for (const term of ["팬", "줌", "트럭"]) {
+      expect(system).not.toMatch(new RegExp(`(^|[^가-힣A-Za-z])${term}([^가-힣A-Za-z]|$)`));
+    }
   });
 });
 
 describe("buildImagePrompt — 화면 근거", () => {
-  it("나레이션 문장이 아니라 장면의 보여줌을 쓴다", () => {
-    const cut = { idx: 0, scene_idx: 0, sentence: "요즘 이거 모르면 손해", seconds: 3 };
+  it("컷의 보여줌을 쓴다. 나레이션 문장은 그릴 대상이 아니다", () => {
+    const cut = { idx: 0, sentence: "매일 아침 딸기를 갈아 씁니다.", shows: "딸기 과육이 우유에 섞이는 클로즈업" };
     const p = buildImagePrompt(cut, project);
     expect(p).toContain("딸기 과육이 우유에 섞이는 클로즈업");
-    expect(p).not.toContain("요즘 이거 모르면 손해");
+    expect(p).not.toContain("매일 아침 딸기를 갈아 씁니다");
   });
 
-  it("구성이 없는 옛 프로젝트는 문장으로 폴백한다", () => {
-    const cut = { idx: 0, sentence: "옛 문장", seconds: 3 };
-    const p = buildImagePrompt(cut, { ...project, synopsis: undefined });
-    expect(p).toContain("옛 문장");
+  it("화면 패스가 실패한 컷은 문장으로 폴백한다 — 그림은 나온다", () => {
+    const cut = { idx: 0, sentence: "폴백 문장입니다." };
+    expect(buildImagePrompt(cut, project)).toContain("폴백 문장입니다.");
+  });
+
+  it("구성 시절 프로젝트는 장면의 보여줌으로 폴백한다", () => {
+    const legacy = {
+      ...project,
+      synopsis: { scenes: [{ shows: "옛 장면의 화면" }] },
+    };
+    const cut = { idx: 0, scene_idx: 0, sentence: "옛 문장" };
+    const p = buildImagePrompt(cut, legacy);
+    expect(p).toContain("옛 장면의 화면");
+    expect(p).not.toContain("옛 문장");
   });
 
   it("컷 비율·레퍼런스 지시가 반영된다", () => {
-    const cut = { idx: 0, scene_idx: 0, sentence: "첫 모금에 과육이 씹히는", source: "ai", ref_photo_id: "p1" };
+    const cut = { idx: 0, sentence: "문장", shows: "화면", source: "ai", ref_photo_id: "p1" };
     const prompt = buildImagePrompt(cut, project);
     expect(prompt).toMatch(/vertical|9:16/);
     expect(prompt).toContain("reference");
   });
 
   it("사진 목록에 없는 ref는 레퍼런스 문장을 붙이지 않는다", () => {
-    const cut = { idx: 0, scene_idx: 0, sentence: "첫 모금에 과육이 씹히는", source: "ai", ref_photo_id: "지워진사진" };
-    const prompt = buildImagePrompt(cut, project);
-    expect(prompt).not.toContain("reference");
+    const cut = { idx: 0, sentence: "문장", shows: "화면", source: "ai", ref_photo_id: "지워진사진" };
+    expect(buildImagePrompt(cut, project)).not.toContain("reference");
   });
 
   it("브리핑 주제가 있으면 전 컷에 주제 앵커가 들어간다", () => {
-    const withTopic = { ...project, briefing: { topic: "생딸기라떼 신메뉴" } };
-    const cut = { idx: 0, scene_idx: 1, sentence: "한 잔 6,500원", source: "ai" }; // 제품이 문장에 없는 컷
-    expect(buildImagePrompt(cut, withTopic)).toContain("생딸기라떼 신메뉴");
+    const cut = { idx: 0, sentence: "한 잔 6,500원", shows: "가격표 클로즈업", source: "ai" };
+    expect(buildImagePrompt(cut, project)).toContain("생딸기라떼");
   });
 
   it("edit_instruction이 있으면 사용자 수정으로 강하게 반영된다", () => {
-    const cut = { idx: 0, scene_idx: 0, sentence: "한 잔 6,500원", source: "ai", edit_instruction: "딸기라떼가 보이게, 컵을 더 작게" };
+    const cut = { idx: 0, sentence: "문장", shows: "화면", source: "ai", edit_instruction: "컵을 더 작게" };
     const prompt = buildImagePrompt(cut, project);
-    expect(prompt).toContain("딸기라떼가 보이게, 컵을 더 작게");
+    expect(prompt).toContain("컵을 더 작게");
     expect(prompt).toMatch(/correction/i);
   });
 });
