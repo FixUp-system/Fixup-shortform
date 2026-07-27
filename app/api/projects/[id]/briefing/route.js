@@ -1,7 +1,8 @@
 import { getProject, updateProject } from "../../../../../lib/projects";
 import { callJson } from "../../../../../lib/llm";
-import { validateBriefing } from "../../../../../lib/validate";
-import { buildBriefingMessages, mergeAsked, briefingContentChanged } from "../../../../../lib/briefing";
+import { validateBriefing, validateDevelopQuestions } from "../../../../../lib/validate";
+import { buildBriefingMessages, buildDevelopMessages, mergeAsked, briefingContentChanged } from "../../../../../lib/briefing";
+import { estimateSeconds, targetChars, CHARS_PER_SEC } from "../../../../../lib/script";
 
 export async function POST(req, { params }) {
   const { id } = await params;
@@ -9,6 +10,31 @@ export async function POST(req, { params }) {
   if (!project) return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
   if (!project.material?.text?.trim()) {
     return Response.json({ error: "정리할 자료가 없어요" }, { status: 400 });
+  }
+
+  // 이야기 소재 청하기 — 대본을 써 보고 길이가 모자랄 때만 온다.
+  // 브리핑 전체를 다시 뽑지 않고 질문만 덧붙인다(정리된 내용과 이미 받은 답을 지우지 않게).
+  // 브리핑 라우트는 본문 없이도 불린다(첫 추출·재추출) — json()이 없는 요청도 받아넘긴다
+  const body = typeof req?.json === "function" ? await req.json().catch(() => ({})) : {};
+  if (body?.kind === "develop") {
+    const short = Math.max(1, Math.round((targetChars(project) / CHARS_PER_SEC) - estimateSeconds(project.script)));
+    const msg = buildDevelopMessages(project, short);
+    let questions = null;
+    for (let attempt = 0; attempt < 2 && !questions; attempt++) {
+      try {
+        questions = validateDevelopQuestions(await callJson({ system: msg.system, messages: msg.messages }));
+      } catch (e) {
+        console.error("소재 질문 생성 실패:", e);
+      }
+    }
+    if (!questions) {
+      return Response.json({ error: "여쭤볼 것을 찾지 못했어요. 자료를 직접 더 적어 주세요." }, { status: 502 });
+    }
+    const updated = await updateProject(id, (proj) => ({
+      ...proj,
+      briefing: { ...proj.briefing, asked: [...(proj.briefing?.asked || []), ...questions] },
+    }));
+    return Response.json({ briefing: updated.briefing });
   }
 
   const { system, messages } = buildBriefingMessages(project);

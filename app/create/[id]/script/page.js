@@ -59,6 +59,23 @@ export default function ScriptStepPage() {
     await load(id).catch(() => {});
   }
 
+  // 모자란 분량을 채울 이야기를 청한다 — 질문을 만들어 두고 답하는 화면(①자료)으로 보낸다.
+  // 답한 뒤 거기서 "이대로 대본 쓰기"를 누르면 원고가 다시 쓰인다.
+  async function askMore() {
+    setBusy(true); setErr("");
+    const res = await fetch(`/api/projects/${id}/briefing`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: "develop" }),
+    });
+    if (!res.ok) {
+      setErr((await res.json().catch(() => ({}))).error || "여쭤볼 것을 찾지 못했어요");
+      setBusy(false);
+      return;
+    }
+    await load(id).catch(() => {});
+    router.push(`/create/${id}/briefing`);
+  }
+
   // 이미 만든 컷이 있는가 — 단계 판정은 lib/steps 하나만 본다
   const hasCuts = currentStepKey(project) === "images" && (project.cuts || []).length > 0;
 
@@ -96,6 +113,12 @@ export default function ScriptStepPage() {
   const shown = draft ?? text;
   const staleCuts = areCutsStale(project);
   const madeCuts = (project.cuts || []).length > 0;
+  // 고른 길이를 못 채웠는가 — 사실 개수로 어림하지 않고 실제 원고를 재서 판단한다.
+  // 모자라면 강요하지 않고 고르게 한다: 이야기를 더 들려주거나, 이대로 가거나.
+  const chosen = project.settings?.target_seconds || null;
+  const actual = estimateSeconds({ text: shown });
+  const short = chosen ? chosen - actual : 0;
+  const needsMore = chosen ? actual < chosen * 0.85 : false;
 
   return (
     <section className="panel panel--narrow">
@@ -120,6 +143,14 @@ export default function ScriptStepPage() {
       <div className="script-src">
         컷은 이 원고를 잘라서 만들어요 — 여기서 승인한 문장이 그대로 화면에 실립니다
       </div>
+      {needsMore && (
+        <div className="script-src warn">
+          고르신 {chosen}초에 <b>약 {short}초</b>가 모자라요 — 자료에 담긴 이야기를 다 썼거든요.
+          이야기를 조금 더 들려주시면 채울 수 있어요.{" "}
+          <button className="mini" disabled={busy} onClick={askMore}>이야기 더 들려주기</button>
+          {" "}또는 이대로 승인하셔도 됩니다.
+        </div>
+      )}
       {madeCuts && (
         <div className="script-src warn">
           이미 만들어 둔 이미지가 있어요 — 대본을 다시 쓰면 컷을 처음부터 다시 만들게 되고, 그 이미지는 지워져요

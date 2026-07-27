@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateScript, validateCutRanges, validateShows, validateBriefing } from "../lib/validate.js";
+import { validateScript, validateCutRanges, validateShows, validateBriefing, validateDevelopQuestions } from "../lib/validate.js";
 
 describe("validateScript — 하나로 흐르는 원고", () => {
   it("원고 문자열을 받아 다듬어 돌려준다", () => {
@@ -106,6 +106,30 @@ describe("validateShows — 화면 패스", () => {
   it("컷 수가 없거나 응답이 망가지면 null", () => {
     expect(validateShows({ shots: [{ shows: "가" }] }, 0)).toBeNull();
     expect(validateShows(null, 1)).toBeNull();
+  });
+});
+
+describe("validateDevelopQuestions", () => {
+  it("질문만 받아 답변 자리와 함께 돌려준다", () => {
+    const qs = validateDevelopQuestions({ questions: [{ question: "왜 시작하셨어요?" }] });
+    expect(qs).toEqual([{ question: "왜 시작하셨어요?", options: [], answer: null, done: false, kind: "develop" }]);
+  });
+
+  it("보기를 보내와도 버린다 — 사장님만 아는 이야기에 보기를 만들면 없는 사실이 굳는다", () => {
+    const qs = validateDevelopQuestions({ questions: [{ question: "왜요?", options: ["가", "나"] }] });
+    expect(qs[0].options).toEqual([]);
+  });
+
+  it("3개까지만 남기고 망가진 질문은 버린다", () => {
+    const many = Array.from({ length: 5 }, (_, i) => ({ question: `질문${i}` }));
+    expect(validateDevelopQuestions({ questions: many })).toHaveLength(3);
+    expect(validateDevelopQuestions({ questions: [{ question: "  " }, { question: "정상?" }] })).toHaveLength(1);
+  });
+
+  it("쓸 질문이 하나도 없으면 null — 빈 배열로 조용히 넘기지 않는다", () => {
+    expect(validateDevelopQuestions({ questions: [] })).toBeNull();
+    expect(validateDevelopQuestions({})).toBeNull();
+    expect(validateDevelopQuestions(null)).toBeNull();
   });
 });
 

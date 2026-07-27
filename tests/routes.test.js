@@ -192,6 +192,24 @@ describe("POST /api/projects/[id]/briefing — 재추출", () => {
     expect((await getProject(p.id)).briefing.version).toBe(2);
   });
 
+  it("kind:develop이면 브리핑을 다시 뽑지 않고 질문만 덧붙인다", async () => {
+    const p = await projectWithScript();
+    await updateProject(p.id, (proj) => ({
+      ...proj,
+      settings: { ...proj.settings, target_seconds: 30 },
+      briefing: { ...proj.briefing, asked: [{ question: "가격은?", answer: "5천원", done: true }] },
+    }));
+    llmMock.callJson.mockResolvedValue({ questions: [{ question: "왜 시작하셨어요?" }] });
+
+    const res = await briefingPOST(patchReq({ kind: "develop" }), ctx(p.id));
+    expect(res.status).toBe(200);
+    const after = await getProject(p.id);
+    expect(after.briefing.topic).toBe("주제");            // 정리된 내용을 다시 뽑지 않는다
+    expect(after.briefing.asked).toHaveLength(2);          // 이미 받은 답을 지우지 않는다
+    expect(after.briefing.asked[0].answer).toBe("5천원");
+    expect(after.briefing.asked[1]).toMatchObject({ question: "왜 시작하셨어요?", kind: "develop", options: [] });
+  });
+
   it("호출이 예외로 죽어도 원시 에러를 흘리지 않고 한국어 502를 준다", async () => {
     const p = await projectWithScript();
     const raw = 'LLM 호출 실패 (429) {"error":{"message":"You exceeded your current quota"}}';

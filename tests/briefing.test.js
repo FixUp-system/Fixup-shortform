@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildBriefingMessages, mergeAsked } from "../lib/briefing.js";
+import { buildBriefingMessages, buildDevelopMessages, mergeAsked } from "../lib/briefing.js";
 
 const project = {
   material: {
@@ -41,14 +41,12 @@ describe("buildBriefingMessages", () => {
     expect(system).not.toContain("홍보");
   });
 
-  it("자료가 얕으면 전개용 질문으로 채우라고 지시한다", () => {
+  // 후보 목록을 주자 모델이 자료를 대조하는 대신 목록을 채웠다 — 자료에 답이 있는
+  // "손님 반응"·"차별점"을 그대로 물었다. 이야기 소재는 대본을 써 본 뒤에 따로 청한다.
+  it("이야기 소재는 여기서 묻지 않는다 — 자료에 없는 사실만 묻는다", () => {
     const { system } = buildBriefingMessages(project);
-    expect(system).toContain("전개용");
-    expect(system).toMatch(/왜 시작|반응|한 장면|남과 다른/);
-  });
-  it("전개용 소재는 취향과 다르다고 구분한다 — 여전히 훅·홍보는 없다", () => {
-    const { system } = buildBriefingMessages(project);
-    expect(system).toContain("소재");
+    expect(system).toContain("자료에 없는 사실'만 묻는다");
+    expect(system).toContain("길이가 모자랄 때 따로 청한다");
     expect(system).not.toContain("훅");
     expect(system).not.toContain("홍보");
     expect(system).toContain("빈 배열이 정답"); // 풍부하면 여전히 빈 배열
@@ -71,6 +69,33 @@ describe("buildBriefingMessages", () => {
     expect(user).toContain("가격대는요?");
     expect(user).toContain("5천원대");
     expect(user).toContain("추가 질문 없이");
+  });
+});
+
+describe("buildDevelopMessages — 대본을 써 보고 모자랄 때만", () => {
+  const withScript = {
+    ...project,
+    briefing: { topic: "주제", key_points: ["ㄱ"], asked: [{ question: "가격은?", answer: "5천원" }] },
+    script: { text: "지금까지 쓴 원고입니다." },
+  };
+
+  it("자료·정리된 내용·이미 물은 것·지금 대본·모자란 초를 모두 준다", () => {
+    const user = buildDevelopMessages(withScript, 12).messages[0].content;
+    expect(user).toContain("성수동 카페 미영"); // 자료 원문
+    expect(user).toContain("가격은? → 5천원");   // 이미 물어본 것(다시 묻지 않게)
+    expect(user).toContain("지금까지 쓴 원고입니다.");
+    expect(user).toContain("약 12초");
+  });
+
+  it("사실이 아니라 이야기를 청하고, 보기는 붙이지 않는다", () => {
+    const { system } = buildDevelopMessages(withScript, 5);
+    expect(system).toContain("이야기를 청하는 질문");
+    expect(system).toContain("보기는 붙이지 않는다");
+    expect(system).toContain("답이 있는 것은 묻지 않는다");
+  });
+
+  it("후보를 그대로 옮기지 말라고 지시한다 — 목록을 주면 목록을 채운다", () => {
+    expect(buildDevelopMessages(withScript, 5).system).toContain("후보를 그대로 옮기지 말고");
   });
 });
 
