@@ -120,7 +120,7 @@ export default function BriefingStepPage() {
       setHint((h) => h || "확정하지 못했어요 — 다시 눌러 주세요");
       return;
     }
-    router.push(`/create/${id}/script`);
+    router.push(`/create/${id}/synopsis`);
   }
 
   const brief = project.briefing || draft;
@@ -203,9 +203,9 @@ export default function BriefingStepPage() {
       <div className="script-src">칸을 클릭하면 바로 고칠 수 있어요</div>
       <div className="step-actions">
         <div className="fwd">
-          <span className="hint">대본은 무료예요 — 마음에 들 때까지 다시 쓸 수 있어요</span>
+          <span className="hint">영상이 어떻게 흘러갈지부터 짜요 — 마음에 들 때까지 다시 짤 수 있어요</span>
           <button className="cta" disabled={busy} aria-disabled={!canConfirm} onClick={confirm}>
-            이대로 대본 만들기
+            이대로 구성 짜기
           </button>
         </div>
       </div>

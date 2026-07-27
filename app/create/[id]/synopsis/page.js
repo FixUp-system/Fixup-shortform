@@ -17,11 +17,12 @@ export default function SynopsisStepPage() {
   // 자동 생성이 한 번만 돌게 막는다 — busy는 비동기라 effect가 두 번 불리면 과금이 두 배가 된다.
   const autoGenFor = useRef(null);
 
-  // 지금 있어야 할 단계가 ②구성일 때만 자동으로 만든다 — 단계 판정은 lib/steps 하나만 본다.
-  // 구성 도입 전에 만들어져 구성은 없지만 컷은 이미 있는 프로젝트에서는 자동 생성이 돌면 안 된다:
-  // 유료 생성이 방문만으로 나가고, 상태가 되돌아가 이미 만든 이미지에서 쫓겨난다.
+  // 지금 있어야 할 단계가 ②구성이고, 아직 대본도 없을 때만 자동으로 만든다 —
+  // 단계 판정은 lib/steps 하나만 본다.
+  // 구성 도입 전에 만들어진 프로젝트(구성은 없는데 대본이나 컷이 이미 있는)에서는 자동 생성이 돌면 안 된다:
+  // 생성이 방문만으로 나가고, 새 구성이 지금 대본과 어긋나며, 상태가 되돌아가 이미 만든 이미지에서 쫓겨난다.
   useEffect(() => {
-    if (project && currentStepKey(project) === "synopsis" && autoGenFor.current !== id) {
+    if (project && currentStepKey(project) === "synopsis" && !project.script && autoGenFor.current !== id) {
       autoGenFor.current = id;
       gen();
     }
@@ -55,6 +56,8 @@ export default function SynopsisStepPage() {
 
   // 이미 만들어 둔 이미지가 있는가 — 구성을 새로 짜면 대본부터 다시 가야 해서 그 이미지는 사라진다
   const madeCuts = (project.cuts || []).length > 0;
+  // 구성 없이 이미 대본(또는 이미지)까지 간 옛 영상인가 — 자동 생성이 돌지 않는 경우와 정확히 같다
+  const madeWithoutSynopsis = !project.synopsis && (currentStepKey(project) !== "synopsis" || !!project.script);
 
   if (!project.synopsis) {
     if (err) {
@@ -64,15 +67,20 @@ export default function SynopsisStepPage() {
         </p>
       );
     }
-    // 자동 생성이 도는 단계가 아니면(=구성 없이 이미 컷까지 간 옛 영상) 화면이 빈 채로 멎지 않게,
+    // 자동 생성이 돌지 않는 경우(=구성 없이 이미 대본이나 이미지까지 간 옛 영상) 화면이 빈 채로 멎지 않게,
     // 지금 무엇을 할 수 있고 무엇을 잃게 되는지 알린 다음 사장님이 직접 시작하게 한다.
-    if (currentStepKey(project) !== "synopsis") {
+    if (madeWithoutSynopsis) {
       return (
         <section className="panel" style={{ maxWidth: 760 }}>
           <h2>이 영상은 구성 없이 만들어졌어요</h2>
           <p className="pgsub">
-            구성을 짜는 단계가 생기기 전에 시작한 영상이라, 구성 없이 대본과 이미지가 이미 나와 있어요.
+            구성을 짜는 단계가 생기기 전에 시작한 영상이라, 구성 없이 대본{madeCuts ? "과 이미지가" : "이"} 이미 나와 있어요.
           </p>
+          {project.script && (
+            <div className="script-src" style={{ color: "var(--warn)" }}>
+              구성을 새로 짜면 지금 대본과 어긋날 수 있어요 — 그때는 대본도 다시 써야 해요
+            </div>
+          )}
           {madeCuts && (
             <div className="script-src" style={{ color: "var(--warn)" }}>
               이미 만들어 둔 이미지가 {project.cuts.length}장 있어요 — 지금 구성을 새로 짜면
@@ -80,12 +88,14 @@ export default function SynopsisStepPage() {
             </div>
           )}
           <div className="script-src">
-            지금 만든 것을 그대로 두려면 이 화면을 떠나 이미지 단계로 가시면 돼요.
+            {madeCuts
+              ? "지금 만든 것을 그대로 두려면 이 화면을 떠나 이미지 단계로 가시면 돼요."
+              : "다음 단계로 가려면 구성이 필요해요 — 아래에서 짜 주세요."}
           </div>
           <div className="step-actions">
             <BackButton stepKey="synopsis" />
             <div className="fwd">
-              <button className="mini" disabled={busy} onClick={() => gen()}>구성을 새로 짜기</button>
+              <button className="mini" disabled={busy} onClick={() => gen()}>구성 짜기</button>
             </div>
           </div>
         </section>
