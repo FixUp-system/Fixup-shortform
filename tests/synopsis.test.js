@@ -39,6 +39,37 @@ describe("buildSynopsisMessages", () => {
     expect(system).toContain("추상어");
   });
 
+  it("shows에 샷 크기와 앵글 용어를 쓰라고 지시한다", () => {
+    const { system } = buildSynopsisMessages(project);
+    for (const term of ["극단적 클로즈업", "클로즈업", "미디엄 샷", "풀 샷", "광각"]) {
+      expect(system).toContain(term);
+    }
+    for (const term of ["눈높이", "로우 앵글", "하이 앵글", "조감도", "오버더숄더", "시점 샷"]) {
+      expect(system).toContain(term);
+    }
+  });
+
+  it("shows에 조명과 시간대를 적으라고 지시한다", () => {
+    const { system } = buildSynopsisMessages(project);
+    expect(system).toContain("조명");
+    expect(system).toContain("골든아워");
+    expect(system).toContain("새벽");
+  });
+
+  it("shows를 부정형으로 쓰지 말라고 지시한다 — 이미지 모델은 '~이 없는'을 못 다룬다", () => {
+    const { system } = buildSynopsisMessages(project);
+    expect(system).toContain("없는 것으로 쓰지 않는다");
+    expect(system).toContain("손님이 없는 매장");
+    expect(system).toContain("텅 빈 새벽 매장");
+  });
+
+  it("카메라 움직임 용어는 넣지 않는다 — shows는 정지 키프레임이다", () => {
+    const { system } = buildSynopsisMessages(project);
+    for (const term of ["팬 ", "돌리", "트럭", "크레인", "줌", "휩팬", "틸트"]) {
+      expect(system).not.toContain(term);
+    }
+  });
+
   it("기법 서술과 광고 형용사를 금지한다", () => {
     const { system } = buildSynopsisMessages(project);
     expect(system).toContain("희소성을 강조한다");
