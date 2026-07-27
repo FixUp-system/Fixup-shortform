@@ -1,0 +1,34 @@
+// 단가표는 prefix 매칭이라 "순서"가 곧 로직이다.
+// 더 구체적인 prefix가 위에 있지 않으면 조용히 틀린 값이 기록된다 — 그걸 여기서 고정한다.
+import { describe, it, expect } from "vitest";
+import { estimateCost } from "../lib/costs";
+
+describe("estimateCost", () => {
+  it("영상 모델별 단가를 초에 곱한다", () => {
+    expect(estimateCost("fal-ai/kling-video/v3/standard/text-to-video", 5)).toBe(0.63);
+    expect(estimateCost("fal-ai/veo3.1", 8)).toBe(3.2);
+    expect(estimateCost("fal-ai/veo3.1/fast", 8)).toBe(1.2);
+  });
+
+  it("ltx-2.3이 ltx-2보다 먼저 매치된다", () => {
+    // "fal-ai/ltx-2"는 "fal-ai/ltx-2.3"으로도 startsWith 매치된다.
+    // 2.3 항목이 위에 있어야 일반 2.3이 0.04(2.0 가격)로 잘못 잡히지 않는다.
+    expect(estimateCost("fal-ai/ltx-2.3/image-to-video", 10)).toBe(0.6);
+    expect(estimateCost("fal-ai/ltx-2/text-to-video/fast", 10)).toBe(0.4);
+  });
+
+  it("ltx의 fast 계열은 일반보다 싸다", () => {
+    expect(estimateCost("fal-ai/ltx-2.3/text-to-video/fast", 10)).toBe(0.4);
+    expect(estimateCost("fal-ai/ltx-2.3/image-to-video/fast", 10)).toBe(0.4);
+    expect(estimateCost("fal-ai/ltx-2.3/text-to-video", 10)).toBe(0.6);
+  });
+
+  it("모르는 엔드포인트는 기본 단가로 떨어진다", () => {
+    // 새 모델을 env로만 바꾸고 표에 안 넣으면 여기로 온다 — 값이 틀려도 조용하다.
+    expect(estimateCost("fal-ai/wan/v2.5/image-to-video", 10)).toBe(1);
+  });
+
+  it("센트 단위로 반올림한다", () => {
+    expect(estimateCost("fal-ai/kling-video/v3", 7)).toBe(0.88); // 0.882 → 0.88
+  });
+});
