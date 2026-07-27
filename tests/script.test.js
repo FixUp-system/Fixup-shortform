@@ -301,6 +301,26 @@ describe("paragraphsToRewrite", () => {
     expect(paragraphsToRewrite(syn, script)).toEqual([{ idx: 1, reason: "같은 말 되풀이" }]);
   });
 
+  // 풍부한 자료에서 문장이 배분된 초를 넘겨 전체가 57초가 됐다(숏폼이 아니다).
+  it("배분된 초를 크게 넘긴 문단을 지목한다", () => {
+    const long = { scenes: [{ says: "김장 김치 200포기, 이틀", shows: "김치 클로즈업", seconds: 4 }] };
+    // 4초 배분 = 22자 안팎인데 60자를 썼다
+    const script = { paragraphs: [{ text: "작년 겨울에 담근 김치는 이틀 만에 동났고 올해는 11월부터 예약을 받으며 그때 못 사신 분들이 많아 미리 말씀드립니다." }] };
+    expect(paragraphsToRewrite(long, script)).toEqual([{ idx: 0, reason: "분량 초과" }]);
+  });
+
+  it("조금 넘긴 것은 지목하지 않는다 — 초는 눈금이지 자가 아니다", () => {
+    const s = { scenes: [{ says: "김장 김치 200포기, 이틀", shows: "김치 클로즈업", seconds: 4 }] };
+    const script = { paragraphs: [{ text: "작년 겨울 김치는 이틀 만에 다 나갔습니다." }] };
+    expect(paragraphsToRewrite(s, script)).toEqual([]);
+  });
+
+  it("장면에 초가 없으면 분량을 따지지 않는다 — 구성 이전 프로젝트", () => {
+    const s = { scenes: [{ says: "김장 김치 200포기, 이틀", shows: "김치 클로즈업" }] };
+    const script = { paragraphs: [{ text: "작년 겨울에 담근 김치는 이틀 만에 동났고 올해는 11월부터 예약을 받으며 그때 못 사신 분들이 많아 미리 말씀드립니다." }] };
+    expect(paragraphsToRewrite(s, script)).toEqual([]);
+  });
+
   it("멀쩡하면 빈 배열", () => {
     const script = {
       paragraphs: [
@@ -413,6 +433,8 @@ describe("buildScriptRewriteMessages", () => {
     expect(system).toContain("화면 설명 전사");
     expect(system).toContain("같은 말 되풀이");
     expect(system).toContain("짧아지는 편이 낫다");
+    expect(system).toContain("분량 초과");
+    expect(system).toContain("앵글을 떠받치지 않는 것부터 버린다");
   });
 });
 

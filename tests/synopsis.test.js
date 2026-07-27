@@ -153,6 +153,13 @@ describe("buildSynopsisMessages", () => {
     expect(buildSynopsisMessages(project).system).toContain("균등");
   });
 
+  // 풍부한 자료에서 다 담으려다 57초가 됐다 — 숏폼이 아니다
+  it("전체 길이에 상한을 두고 무엇을 버릴지 기준을 준다", () => {
+    const { system } = buildSynopsisMessages(project);
+    expect(system).toContain("40초를 넘지 않는다");
+    expect(system).toContain("버리는 것이 구성이다");
+  });
+
   it("role 라벨이 장면 내용과 어긋나지 않게 한다", () => {
     expect(buildSynopsisMessages(project).system).toContain("'희소성'이라 적고");
   });
