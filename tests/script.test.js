@@ -11,6 +11,7 @@ import {
   overTarget,
   secondsForText,
   targetChars,
+  capacitySeconds,
 } from "../lib/script.js";
 
 const project = {
@@ -132,6 +133,12 @@ describe("targetChars — 장면별 초 배분을 대신하는 숫자 하나", (
 
   it("자료가 얇아도 최소 분량은 준다", () => {
     expect(targetChars(withPoints(1))).toBe(60);
+  });
+
+  it("자료로 만들 수 있는 길이를 초로 돌려준다 — 사실 하나에 약 5초", () => {
+    expect(capacitySeconds(withPoints(1))).toBe(11);  // 하한 60자
+    expect(capacitySeconds(withPoints(4))).toBe(22);  // 120자
+    expect(capacitySeconds(withPoints(20))).toBe(40); // 상한 220자
   });
 
   it("답을 받은 질문도 사실로 센다", () => {

@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
+import { capacitySeconds } from "../../../../lib/script";
 
 const EMPTY = { topic: "", key_points: [""], audience: "", takeaway: "", asked: [], confirmed: false };
 const BLANK = "(비어 있음)";
@@ -120,7 +121,7 @@ export default function BriefingStepPage() {
       setHint((h) => h || "확정하지 못했어요 — 다시 눌러 주세요");
       return;
     }
-    router.push(`/create/${id}/synopsis`);
+    router.push(`/create/${id}/script`);
   }
 
   const brief = project.briefing || draft;
@@ -201,11 +202,17 @@ export default function BriefingStepPage() {
       )}
 
       <div className="script-src">칸을 클릭하면 바로 고칠 수 있어요</div>
+      {/* 지금 자료로 몇 초짜리가 나오는지 미리 알린다 — 대본을 받아 보고 나서 알면 늦다.
+          자료를 더 주거나 질문에 답하면 이 숫자가 올라간다는 것도 같이 말한다. */}
+      <div className="script-src">
+        지금 자료로 <b>약 {capacitySeconds({ briefing: brief })}초</b>짜리 영상을 만들 수 있어요
+        {pending.length > 0 && " — 위 질문에 답하시면 더 길어져요"}
+      </div>
       <div className="step-actions">
         <div className="fwd">
-          <span className="hint">영상이 어떻게 흘러갈지부터 짜요 — 마음에 들 때까지 다시 짤 수 있어요</span>
+          <span className="hint">자료를 바탕으로 대본을 써요 — 마음에 들 때까지 다시 쓸 수 있어요</span>
           <button className="cta" disabled={busy} aria-disabled={!canConfirm} onClick={confirm}>
-            이대로 구성 짜기
+            이대로 대본 쓰기
           </button>
         </div>
       </div>
