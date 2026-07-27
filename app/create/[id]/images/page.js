@@ -116,6 +116,9 @@ export default function ImagesStepPage() {
   const stalled = pollTimedOut || !!project.cuts_error;
   // 컷 분할이 끝나기 전 — 대본 승인 직후 이 화면에 도착하면 여기부터 보인다
   const splitting = project.status === "cuts" && cuts.length === 0 && !shownErr;
+  // 구성이 없는 영상에서는 컷의 문장이 곧 그림을 만드는 글이다(lib/cuts.js buildImagePrompt).
+  // 구성이 있으면 그림의 바탕은 장면 설명이지만, 그때도 문장은 어떤 그림을 고를지에 쓰인다(lib/vlm.js).
+  const hasSynopsis = !!project.synopsis;
 
   return (
     <div className="images-layout">
@@ -127,8 +130,9 @@ export default function ImagesStepPage() {
         {splitting && <p className="pgsub">잠시만요 — 나뉜 컷부터 차례로 이미지가 만들어집니다</p>}
         {!splitting && cuts.length > 0 && (
           <p className="pgsub">
-            이미지를 클릭하면 오른쪽에서 크게 보고 고칠 수 있어요 · 아래 문장은 읽어 줄 말과 자막이에요 —
-            고쳐도 그림은 바뀌지 않아요
+            {hasSynopsis
+              ? "이미지를 클릭하면 오른쪽에서 크게 보고 고칠 수 있어요 · 아래 문장은 읽어 줄 말이에요 — 그림을 만드는 바탕은 ②구성에 적어 둔 장면이라, 그림을 바꾸려면 오른쪽에 수정 지시를 적거나 ②구성의 장면 글을 고쳐 주세요"
+              : "이미지를 클릭하면 오른쪽에서 크게 보고 고칠 수 있어요 · 아래 문장은 읽어 줄 말이면서, 이 영상에서는 그림을 만드는 글이기도 해요 — 문장을 고친 뒤 다시 만들면 그림도 달라져요"}
           </p>
         )}
         {shownErr && (
@@ -187,6 +191,7 @@ export default function ImagesStepPage() {
           url={imgUrl(activeCut)}
           photoName={project.material.photos.find((p) => p.id === activeCut.photo_id)?.filename}
           aspect={project.settings?.aspect_ratio || "9:16"}
+          hasSynopsis={hasSynopsis}
           stalled={stalled}
           onRegen={regen}
         />
@@ -209,7 +214,7 @@ function frameStyle(aspect) {
 
 // 우측 큰 미리보기 + 컷별 수정. instruction 입력은 컷마다 초기화돼야 하므로
 // 부모가 key={cut.idx}로 이 컴포넌트를 갈아끼운다(로컬 state가 자연히 리셋됨).
-function PreviewPane({ cut, url, photoName, aspect, stalled, onRegen }) {
+function PreviewPane({ cut, url, photoName, aspect, hasSynopsis, stalled, onRegen }) {
   const [instr, setInstr] = useState("");
   const isPhoto = cut.source === "photo";
   const busyCut = !stalled && cut.state === "generating";
@@ -231,7 +236,11 @@ function PreviewPane({ cut, url, photoName, aspect, stalled, onRegen }) {
         <p className="preview-note">내가 올린 사진이라 그대로 쓰여요.</p>
       ) : (
         <div className="preview-edit">
-          <p className="preview-note">그림을 바꾸려면 여기에 적어주세요 — 위 문장을 고치는 건 읽어 줄 말과 자막에만 반영돼요.</p>
+          <p className="preview-note">
+            {hasSynopsis
+              ? "그림을 바꾸려면 여기에 적어주세요 — 위 문장은 읽어 줄 말이고, 그림을 만드는 바탕은 ②구성에 적어 둔 장면이에요. 문장을 고친 뒤 다시 만들면 고르는 그림이 달라질 수 있어요."
+              : "그림을 바꾸려면 여기에 적어주세요 — 위 문장은 읽어 줄 말이면서 그림을 만드는 글이기도 해서, 문장을 고친 뒤 다시 만들면 그림도 달라져요."}
+          </p>
           {cut.edit_instruction && <p className="preview-note">지난 수정 지시: {cut.edit_instruction}</p>}
           <textarea
             className="ref"

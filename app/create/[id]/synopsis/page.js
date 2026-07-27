@@ -4,6 +4,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
+import BackButton from "../../../../components/BackButton";
+import { currentStepKey } from "../../../../lib/steps";
 
 export default function SynopsisStepPage() {
   const { id } = useParams();
@@ -15,8 +17,11 @@ export default function SynopsisStepPage() {
   // 자동 생성이 한 번만 돌게 막는다 — busy는 비동기라 effect가 두 번 불리면 과금이 두 배가 된다.
   const autoGenFor = useRef(null);
 
+  // 지금 있어야 할 단계가 ②구성일 때만 자동으로 만든다 — 단계 판정은 lib/steps 하나만 본다.
+  // 구성 도입 전에 만들어져 구성은 없지만 컷은 이미 있는 프로젝트에서는 자동 생성이 돌면 안 된다:
+  // 유료 생성이 방문만으로 나가고, 상태가 되돌아가 이미 만든 이미지에서 쫓겨난다.
   useEffect(() => {
-    if (project && !project.synopsis && project.briefing?.confirmed && autoGenFor.current !== id) {
+    if (project && currentStepKey(project) === "synopsis" && autoGenFor.current !== id) {
       autoGenFor.current = id;
       gen();
     }
@@ -34,13 +39,22 @@ export default function SynopsisStepPage() {
     setBusy(false); setInstruction("");
   }
 
+  // 고친 글이 저장되지 않았는데 저장된 것처럼 보이면 안 된다 — 실패는 그대로 알린다
   async function editScene(idx, field, value) {
-    await fetch(`/api/projects/${id}`, {
+    setErr("");
+    const res = await fetch(`/api/projects/${id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ synopsis_scene: { idx, [field]: value } }),
-    });
+    }).catch(() => null);
+    if (!res || !res.ok) {
+      const data = res ? await res.json().catch(() => ({})) : {};
+      setErr(data.error || "고친 글을 저장하지 못했어요 — 다시 고쳐 주세요");
+    }
     await load(id).catch(() => {});
   }
+
+  // 이미 만들어 둔 이미지가 있는가 — 구성을 새로 짜면 대본부터 다시 가야 해서 그 이미지는 사라진다
+  const madeCuts = (project.cuts || []).length > 0;
 
   if (!project.synopsis) {
     if (err) {
@@ -48,6 +62,33 @@ export default function SynopsisStepPage() {
         <p className="pgsub" style={{ color: "var(--warn)" }}>
           {err} <button className="mini" disabled={busy} onClick={() => gen()}>다시 만들기</button>
         </p>
+      );
+    }
+    // 자동 생성이 도는 단계가 아니면(=구성 없이 이미 컷까지 간 옛 영상) 화면이 빈 채로 멎지 않게,
+    // 지금 무엇을 할 수 있고 무엇을 잃게 되는지 알린 다음 사장님이 직접 시작하게 한다.
+    if (currentStepKey(project) !== "synopsis") {
+      return (
+        <section className="panel" style={{ maxWidth: 760 }}>
+          <h2>이 영상은 구성 없이 만들어졌어요</h2>
+          <p className="pgsub">
+            구성을 짜는 단계가 생기기 전에 시작한 영상이라, 구성 없이 대본과 이미지가 이미 나와 있어요.
+          </p>
+          {madeCuts && (
+            <div className="script-src" style={{ color: "var(--warn)" }}>
+              이미 만들어 둔 이미지가 {project.cuts.length}장 있어요 — 지금 구성을 새로 짜면
+              대본부터 다시 가게 되고, 그 이미지는 지워져요
+            </div>
+          )}
+          <div className="script-src">
+            지금 만든 것을 그대로 두려면 이 화면을 떠나 이미지 단계로 가시면 돼요.
+          </div>
+          <div className="step-actions">
+            <BackButton stepKey="synopsis" />
+            <div className="fwd">
+              <button className="mini" disabled={busy} onClick={() => gen()}>구성을 새로 짜기</button>
+            </div>
+          </div>
+        </section>
       );
     }
     return <p className="pgsub">구성을 짜는 중…</p>;
@@ -59,8 +100,6 @@ export default function SynopsisStepPage() {
   const stale =
     project.briefing?.version && project.synopsis.briefing_version &&
     project.synopsis.briefing_version !== project.briefing.version;
-  // 이미 만들어 둔 이미지가 있는가 — 구성을 새로 짜면 대본부터 다시 가야 해서 그 이미지는 사라진다
-  const madeCuts = (project.cuts || []).length > 0;
 
   return (
     <section className="panel" style={{ maxWidth: 760 }}>
@@ -121,11 +160,14 @@ export default function SynopsisStepPage() {
           이대로 고치기
         </button>
       </div>
-      <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-        <button className="mini" disabled={busy} onClick={() => gen()}>처음부터 다시</button>
-        <button disabled={busy} onClick={() => router.push(`/create/${id}/script`)}>
-          이 구성으로 대본 쓰기 →
-        </button>
+      <div className="step-actions">
+        <BackButton stepKey="synopsis" />
+        <div className="fwd">
+          <button className="mini" disabled={busy} onClick={() => gen()}>처음부터 다시</button>
+          <button disabled={busy} onClick={() => router.push(`/create/${id}/script`)}>
+            이 구성으로 대본 쓰기 →
+          </button>
+        </div>
       </div>
     </section>
   );
