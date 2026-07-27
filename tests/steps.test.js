@@ -24,7 +24,8 @@ describe("stepFromPathname", () => {
     expect(stepFromPathname("/create").key).toBe("material");
   });
   it("프로젝트 인덱스는 단계 미상 — ①자료로 오인하지 않는다", () => {
-    // seg 없이 STEPS를 찾으면 seg:null인 자료가 매칭돼 가드가 통째로 무력화됐던 자리
+    // ①자료의 seg가 비어 있던 시절, seg 없이 STEPS를 찾으면 자료가 매칭돼
+    // 가드가 통째로 무력화됐던 자리다(지금 자료의 seg는 "briefing"이다)
     expect(stepFromPathname("/create/abc")).toBeUndefined();
   });
   it("브리핑 경로를 ①자료로 읽는다", () => {
