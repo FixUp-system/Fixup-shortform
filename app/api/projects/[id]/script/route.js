@@ -7,6 +7,7 @@ import {
   buildScriptRewriteMessages,
   editKeptContent,
   paragraphsToRewrite,
+  mergeRewrite,
   syncSceneSeconds,
 } from "../../../../../lib/script";
 
@@ -40,14 +41,14 @@ export async function POST(req, { params }) {
   if (!draft) return Response.json({ error: "대본 생성에 실패했어요. 다시 시도해 주세요." }, { status: 502 });
 
   // 1.5단 되돌리기 — 초안이 '할 말'이나 '보여줌'을 옮겨 적었거나 같은 말을 되풀이했으면 그 문단만 다시 쓴다.
-  // 프롬프트로는 못 막혔다(막을 때마다 옆으로 샜다). 한 번만 시도하고, 실패하거나 나아지지 않으면
-  // 초안을 그대로 안고 간다 — 대본을 못 주는 것보다 낫다.
+  // 프롬프트로는 못 막혔다(막을 때마다 옆으로 샜다). 한 번만 시도하고, 고쳐 온 문단만 갈아 끼운다 —
+  // 나머지는 초안을 그대로 안고 간다(대본을 못 주는 것보다 낫다).
   const weak = paragraphsToRewrite(project.synopsis, draft);
   if (weak.length > 0) {
     const rewrite = buildScriptRewriteMessages(project, draft, weak);
     try {
       const rewritten = validateScript(await callJson({ system: rewrite.system, messages: rewrite.messages }), sceneCount);
-      if (rewritten && paragraphsToRewrite(project.synopsis, rewritten).length < weak.length) draft = rewritten;
+      draft = mergeRewrite(project.synopsis, draft, rewritten, weak);
     } catch (e) {
       console.error("대본 되돌리기 실패:", e);
     }

@@ -371,6 +371,36 @@ describe("POST /api/projects/[id]/script (초안→교정)", () => {
     expect(llmMock.callJson).toHaveBeenCalledTimes(2); // 초안·교정뿐
   });
 
+  it("되돌리기가 일부만 고쳐 와도 그 문단은 받는다", async () => {
+    const p = await projectWithScript();
+    await updateProject(p.id, (proj) => ({
+      ...proj,
+      synopsis: {
+        ...SYN,
+        scenes: [
+          { ...SYN.scenes[0], says: "시럽을 쓰지 않고 매일 아침 직접 간다" },
+          { ...SYN.scenes[0], says: "오후 세 시면 그날 치가 끝난다" },
+        ],
+      },
+    }));
+    const 초안 = { paragraphs: [
+      { text: "시럽을 쓰지 않고 매일 아침 직접 갑니다." },  // 전사
+      { text: "오후 세 시면 그날 치가 끝납니다." },          // 전사
+    ] };
+    const 반만고침 = { paragraphs: [
+      { text: "아침마다 딸기를 갈아 그날 치만 만듭니다." },  // 고쳐짐
+      { text: "오후 세 시면 그날 치가 끝납니다." },          // 그대로
+    ] };
+    llmMock.callJson
+      .mockResolvedValueOnce(초안)
+      .mockResolvedValueOnce(반만고침)
+      .mockResolvedValueOnce(반만고침); // 교정
+    await scriptPOST(patchReq({}), ctx(p.id));
+    const saved = (await getProject(p.id)).script;
+    expect(saved.paragraphs[0].text).toBe("아침마다 딸기를 갈아 그날 치만 만듭니다.");
+    expect(saved.paragraphs[1].text).toBe("오후 세 시면 그날 치가 끝납니다.");
+  });
+
   it("되돌리기가 실패해도 초안을 안고 간다", async () => {
     const p = await projectWithLongSays();
     llmMock.callJson

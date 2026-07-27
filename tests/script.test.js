@@ -8,6 +8,7 @@ import {
   copyRatio,
   repeatsWithin,
   paragraphsToRewrite,
+  mergeRewrite,
   secondsForText,
   syncSceneSeconds,
 } from "../lib/script.js";
@@ -220,13 +221,20 @@ describe("buildScriptEditMessages", () => {
 });
 
 describe("copyRatio", () => {
-  it("조사만 바꾼 복사는 1에 가깝다", () => {
+  it("수사만 덧대고 사실을 더하지 않은 문장은 임계 위다", () => {
     // 라이브에서 실제로 나온 쌍 — 대본 단계가 아무 일도 하지 않았다
-    expect(copyRatio("이곳은 동네 작은 세탁소다", "이곳은 평범한 동네에 자리한 작은 세탁소입니다.")).toBeGreaterThan(0.8);
+    expect(copyRatio("이곳은 동네 작은 세탁소다", "이곳은 평범한 동네에 자리한 작은 세탁소입니다.")).toBeGreaterThan(0.5);
   });
 
   it("사실을 한 걸음 전개한 문장은 임계 아래다", () => {
-    expect(copyRatio("물레 없이 손으로만 빚는다", "물레는 가르치지 않습니다. 손으로 빚어야 그날 만든 것을 가져갑니다.")).toBeLessThan(0.8);
+    expect(copyRatio("물레 없이 손으로만 빚는다", "물레는 가르치지 않습니다. 손으로 빚어야 그날 만든 것을 가져갑니다.")).toBeLessThan(0.5);
+  });
+
+  it("짧은 할 말을 문장으로 실현하면서 사실을 더하면 임계 아래다", () => {
+    // 할 말을 명사구로 줄인 뒤 생긴 자리 — 낱말이 다 들어가도 문장이 제 몫을 말하면 전사가 아니다
+    expect(
+      copyRatio("남은 음식은 경로당에 기부", "남은 음식은 경로당에 기부하거나 직원들이 나눕니다. 오후 다섯 시가 넘으면 남은 음식이 없습니다.")
+    ).toBeLessThan(0.5);
   });
 
   it("한쪽이 비면 0 — 판정하지 않는다", () => {
@@ -306,6 +314,51 @@ describe("paragraphsToRewrite", () => {
   it("구성이나 대본이 없으면 빈 배열 — 옛 프로젝트를 건드리지 않는다", () => {
     expect(paragraphsToRewrite(null, { paragraphs: [{ text: "문장" }] })).toEqual([]);
     expect(paragraphsToRewrite(syn, null)).toEqual([]);
+  });
+});
+
+describe("mergeRewrite", () => {
+  // 풍부한 자료(반찬가게)에서 6문단 중 5문단이 전사로 지목됐는데, 채택 조건이 "지목 개수 감소"라
+  // 두 문단이 제대로 고쳐져 와도 통째로 버려졌다. 문단 단위로 좋아진 것만 받는다.
+  const syn = {
+    scenes: [
+      { says: "작년 김장 김치 200포기가 이틀 만에 완판", shows: "포장된 김치 클로즈업" },
+      { says: "늦게 오면 반찬이 없다", shows: "텅 빈 진열대 풀 샷" },
+    ],
+  };
+  const draft = {
+    paragraphs: [
+      { text: "작년 김장 김치는 200포기가 이틀 만에 완판되었습니다." }, // 전사
+      { text: "늦게 오시면 반찬이 없습니다." },                          // 전사
+    ],
+  };
+  const targets = [{ idx: 0, reason: "할 말 전사" }, { idx: 1, reason: "할 말 전사" }];
+
+  it("고쳐진 문단만 갈아 끼우고 여전히 전사인 문단은 초안을 지킨다", () => {
+    const rewritten = {
+      paragraphs: [
+        { text: "작년 겨울에 담근 김치는 이틀 만에 동났습니다." },   // 고쳐짐
+        { text: "늦게 오시면 반찬이 없습니다." },                     // 그대로 전사
+      ],
+    };
+    const merged = mergeRewrite(syn, draft, rewritten, targets);
+    expect(merged.paragraphs[0].text).toBe("작년 겨울에 담근 김치는 이틀 만에 동났습니다.");
+    expect(merged.paragraphs[1].text).toBe("늦게 오시면 반찬이 없습니다.");
+  });
+
+  it("지목하지 않은 문단은 모델이 건드렸어도 초안을 지킨다", () => {
+    const rewritten = { paragraphs: [{ text: "작년 겨울에 담근 김치는 이틀 만에 동났습니다." }, { text: "멋대로 바꾼 문장입니다." }] };
+    const merged = mergeRewrite(syn, draft, rewritten, [{ idx: 0, reason: "할 말 전사" }]);
+    expect(merged.paragraphs[1].text).toBe("늦게 오시면 반찬이 없습니다.");
+  });
+
+  it("문단 수가 어긋나면 통째로 버린다", () => {
+    const merged = mergeRewrite(syn, draft, { paragraphs: [{ text: "하나뿐" }] }, targets);
+    expect(merged).toEqual(draft);
+  });
+
+  it("되돌리기가 없으면 초안 그대로", () => {
+    expect(mergeRewrite(syn, draft, null, targets)).toEqual(draft);
   });
 });
 
