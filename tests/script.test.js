@@ -131,6 +131,27 @@ describe("buildScriptMessages — 하나로 흐르는 원고", () => {
 describe("targetChars — 장면별 초 배분을 대신하는 숫자 하나", () => {
   const withPoints = (n) => ({ ...project, briefing: { key_points: Array.from({ length: n }, (_, i) => `사실${i}`), asked: [] } });
 
+  it("사장님이 고른 길이가 있으면 그것이 목표다", () => {
+    const p = { ...withPoints(2), settings: { target_seconds: 30 } };
+    expect(targetChars(p)).toBe(165); // 30초 × 5.5자
+  });
+
+  it("고른 길이는 자료가 얇아도 깎지 않는다 — 10초를 고른 사람에게 5초를 주면 실패다", () => {
+    const p = { ...withPoints(1), settings: { target_seconds: 45 } };
+    expect(targetChars(p)).toBe(248);
+  });
+
+  it("목록에 없는 값은 무시하고 자동으로 돌아간다", () => {
+    for (const bad of [7, "30", null, undefined]) {
+      expect(targetChars({ ...withPoints(2), settings: { target_seconds: bad } })).toBe(60);
+    }
+  });
+
+  it("자료가 감당하는 길이는 고른 값과 무관하게 자료만 본다", () => {
+    const p = { ...withPoints(2), settings: { target_seconds: 60 } };
+    expect(capacitySeconds(p)).toBe(11); // 사실 2개 → 60자 → 11초
+  });
+
   it("사실 수에 비례하되 40초(220자)를 넘지 않는다", () => {
     expect(targetChars(withPoints(20))).toBe(220);
   });

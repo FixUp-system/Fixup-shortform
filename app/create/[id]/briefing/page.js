@@ -131,6 +131,10 @@ export default function BriefingStepPage() {
   if (!brief) return <p className="pgsub">{busy ? "자료를 정리하는 중…" : err || "준비 중…"}</p>;
 
   const pending = (brief.asked || []).filter((a) => !a.done);
+  // 고른 길이 vs 자료가 감당하는 길이 — 둘이 어긋나면 미리 알린다
+  const chosen = project?.settings?.target_seconds || null;
+  const capacity = capacitySeconds({ briefing: brief });
+  const short = chosen ? capacity < chosen : false;
   const canConfirm = brief.topic.trim() && brief.key_points.some((k) => k.trim());
 
   return (
@@ -202,11 +206,16 @@ export default function BriefingStepPage() {
       )}
 
       <div className="script-src">칸을 클릭하면 바로 고칠 수 있어요</div>
-      {/* 지금 자료로 몇 초짜리가 나오는지 미리 알린다 — 대본을 받아 보고 나서 알면 늦다.
-          자료를 더 주거나 질문에 답하면 이 숫자가 올라간다는 것도 같이 말한다. */}
-      <div className="script-src">
-        지금 자료로 <b>약 {capacitySeconds({ briefing: brief })}초</b>짜리 영상을 만들 수 있어요
-        {pending.length > 0 && " — 위 질문에 답하시면 더 길어져요"}
+      {/* 고른 길이와 자료가 감당하는 길이를 나란히 둔다 — 대본을 받아 보고 나서
+          "왜 짧지"를 알면 늦다. 모자라면 무엇을 하면 되는지까지 여기서 말한다. */}
+      <div className={`script-src${short ? " warn" : ""}`}>
+        {chosen
+          ? short
+            ? `고르신 ${chosen}초에는 자료가 조금 모자라요 — 지금 자료로는 약 ${capacity}초예요.`
+            : `고르신 ${chosen}초로 만들어요 — 지금 자료면 충분해요.`
+          : `지금 자료로 약 ${capacity}초짜리 영상을 만들 수 있어요.`}
+        {pending.length > 0 && " 위 질문에 답하시면 더 길어져요."}
+        {short && pending.length === 0 && " 자료를 더 적어 주시면 길어져요."}
       </div>
       <div className="step-actions">
         <div className="fwd">

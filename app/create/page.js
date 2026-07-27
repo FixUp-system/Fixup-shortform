@@ -2,12 +2,14 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useProject } from "../../components/ProjectContext";
+import { TARGET_CHOICES } from "../../lib/script";
 
 export default function CreatePage() {
   const router = useRouter();
   const { setProject } = useProject();
   const [text, setText] = useState("");
   const [photos, setPhotos] = useState([]); // {id, filename, url}
+  const [seconds, setSeconds] = useState(null); // null = 자동(자료가 정함)
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
@@ -31,7 +33,7 @@ export default function CreatePage() {
     const res = await fetch("/api/projects", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ material: { text, photos } }),
+      body: JSON.stringify({ material: { text, photos }, settings: { target_seconds: seconds } }),
     });
     const data = await res.json();
     if (res.ok) router.push(`/create/${data.id}/briefing`);
@@ -48,6 +50,20 @@ export default function CreatePage() {
           onChange={(e) => setText(e.target.value)}
           placeholder="예: 이번 주 신메뉴 생딸기라떼. 매일 아침 생딸기를 직접 갈아서 만듦…" />
         <div className="char-count">{text.length}자 / 2,000자</div>
+
+        {/* 원하는 길이는 여기서 고른다 — 원고를 쓰기 전에 정해져야 하는 값이다.
+            고르지 않으면 자료가 담은 사실 수만큼만 만든다(자동). */}
+        <div className="eyebrow">영상 길이 <small>자료가 모자라면 더 짧아질 수 있어요</small></div>
+        <div className="chips">
+          <button className={`chip${seconds === null ? " on" : ""}`} onClick={() => setSeconds(null)}>
+            자동 · 자료에 맞춰
+          </button>
+          {TARGET_CHOICES.map((s) => (
+            <button key={s} className={`chip${seconds === s ? " on" : ""}`} onClick={() => setSeconds(s)}>
+              {s}초
+            </button>
+          ))}
+        </div>
 
         <div className="eyebrow">사진 <small>장면 소스 + AI 컷의 기준 이미지 (선택, ≤10장)</small></div>
         <div className="uploads">
