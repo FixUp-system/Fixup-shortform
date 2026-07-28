@@ -44,39 +44,59 @@ const runBoth = async (id, d) => {
 // 주입 deps가 전부 우회하는 자리 — buildCutsMessages와 validateCuts(obj, scenes)가
 // 실제로 맞물리는 유일한 지점이라 여기만 직접 부른다.
 describe("defaultDeps.splitCuts — 두 패스", () => {
-  const project = {
-    settings: { aspect_ratio: "9:16" },
-    material: { text: "자료", photos: [{ id: "p1", filename: "a.jpg" }] },
-    briefing: { topic: "생딸기라떼" },
-    script: { text: "매일 아침 딸기를 갈아 씁니다. 시럽은 쓰지 않습니다. 성수역에서 2분입니다." },
-  };
+  const SCRIPT = "매일 아침 딸기를 갈아 씁니다. 시럽은 쓰지 않습니다. 성수역에서 2분입니다.";
+  // 실제로 저장된 프로젝트를 쓴다 — splitCuts 가 캐스팅 결과를 프로젝트에 남기기 때문이다.
+  // 껍데기 객체로는 그 저장이 갈 곳이 없다.
+  async function saved() {
+    const p = await projects.createProject({
+      settings: { aspect_ratio: "9:16" },
+      material: { text: "자료", photos: [{ id: "p1", filename: "a.jpg" }] },
+    });
+    return projects.updateProject(p.id, (proj) => ({
+      ...proj,
+      briefing: { topic: "생딸기라떼" },
+      script: { text: SCRIPT },
+    }));
+  }
   const ranges = { cuts: [{ from: 1, to: 2 }, { from: 3, to: 3 }] };
-  const shots = { shots: [{ shows: "딸기를 가는 손 클로즈업", ref_photo_id: "p1" }, { shows: "골목을 걷는 시점 샷" }] };
+  const noCast = { cast: [] };
+  const shots = { shots: [{ shows: "딸기를 가는 손 클로즈업", ref_ids: ["p1"] }, { shows: "골목을 걷는 시점 샷" }] };
 
   it("경계로 자른 컷에 화면을 붙여 돌려준다", async () => {
-    llmMock.callJson.mockResolvedValueOnce(ranges).mockResolvedValueOnce(shots);
-    const cuts = await pipeline.defaultDeps.splitCuts(project);
+    llmMock.callJson.mockResolvedValueOnce(ranges).mockResolvedValueOnce(noCast).mockResolvedValueOnce(shots);
+    const cuts = await pipeline.defaultDeps.splitCuts(await saved());
     expect(cuts).toHaveLength(2);
     // 텍스트는 코드가 원고에서 자른다 — 모델이 문장을 다시 쓰지 못한다
     expect(cuts[0].sentence).toBe("매일 아침 딸기를 갈아 씁니다. 시럽은 쓰지 않습니다.");
     expect(cuts[1].sentence).toBe("성수역에서 2분입니다.");
     expect(cuts[0].shows).toBe("딸기를 가는 손 클로즈업");
-    expect(cuts[0].ref_photo_id).toBe("p1");
-    expect(cuts[1].ref_photo_id).toBeUndefined();
+    expect(cuts[0].ref_ids).toEqual(["p1"]);
+    expect(cuts[1].ref_ids).toBeUndefined();
     expect(cuts[0].source).toBe("ai");
     expect(cuts[0].seconds).toBeGreaterThan(1);
   });
 
   it("컷을 이어붙이면 원고와 같다 — 승인한 문장이 글자 그대로 살아남는다", async () => {
-    llmMock.callJson.mockResolvedValueOnce(ranges).mockResolvedValueOnce(shots);
-    const cuts = await pipeline.defaultDeps.splitCuts(project);
+    llmMock.callJson.mockResolvedValueOnce(ranges).mockResolvedValueOnce(noCast).mockResolvedValueOnce(shots);
+    const cuts = await pipeline.defaultDeps.splitCuts(await saved());
     const joined = cuts.map((c) => c.sentence).join(" ").replace(/\s/g, "");
-    expect(joined).toBe(project.script.text.replace(/\s/g, ""));
+    expect(joined).toBe(SCRIPT.replace(/\s/g, ""));
+  });
+
+  it("원고에서 뽑은 인물이 프로젝트에 남는다 — 컷이 고를 목록이 된다", async () => {
+    const p = await saved();
+    llmMock.callJson
+      .mockResolvedValueOnce(ranges)
+      .mockResolvedValueOnce({ cast: [{ who: "10세 전후 남자아이" }] })
+      .mockResolvedValueOnce(shots);
+    await pipeline.defaultDeps.splitCuts(p);
+    const after = await projects.getProject(p.id);
+    expect(after.cast).toEqual([{ id: "c1", who: "10세 전후 남자아이" }]);
   });
 
   it("화면 패스가 실패해도 컷은 남는다 — 그림은 문장으로 폴백한다", async () => {
-    llmMock.callJson.mockResolvedValueOnce(ranges).mockResolvedValue({ shots: [] }); // 개수 불일치
-    const cuts = await pipeline.defaultDeps.splitCuts(project);
+    llmMock.callJson.mockResolvedValueOnce(ranges).mockResolvedValueOnce(noCast).mockResolvedValue({ shots: [] }); // 개수 불일치
+    const cuts = await pipeline.defaultDeps.splitCuts(await saved());
     expect(cuts).toHaveLength(2);
     expect(cuts[0].shows).toBeUndefined();
   });
@@ -84,13 +104,13 @@ describe("defaultDeps.splitCuts — 두 패스", () => {
   it("경계를 못 받으면 한 문장에 한 컷으로 떨어진다 — 대본은 살아 있다", async () => {
     // 빈틈이 있는 경계(2번 문장을 건너뜀)는 거절된다
     llmMock.callJson.mockResolvedValue({ cuts: [{ from: 1, to: 1 }, { from: 3, to: 3 }] });
-    const cuts = await pipeline.defaultDeps.splitCuts(project);
+    const cuts = await pipeline.defaultDeps.splitCuts(await saved());
     expect(cuts).toHaveLength(3);
     expect(cuts[1].sentence).toBe("시럽은 쓰지 않습니다.");
   });
 
   it("원고가 없으면 컷 분할 실패를 던진다", async () => {
-    await expect(pipeline.defaultDeps.splitCuts({ ...project, script: null })).rejects.toThrow("컷 분할 실패");
+    await expect(pipeline.defaultDeps.splitCuts({ ...(await saved()), script: null })).rejects.toThrow("컷 분할 실패");
   });
 });
 
@@ -196,6 +216,30 @@ describe("분할 → 이미지 (이어 부르면 갈라지기 전과 같다)", (
     const cut = (await projects.getProject(p.id)).cuts.find((c) => c.idx === 0);
     expect(cut.edit_instruction).toBe("딸기라떼가 보이게");
     expect(prompts.some((pr) => pr.includes("딸기라떼가 보이게"))).toBe(true);
+  });
+});
+
+describe("이미지 생성에 레퍼런스가 배열로 간다", () => {
+  it("컷이 고른 인물·사물이 refs 로 넘어간다", async () => {
+    const p = await makeProject();
+    await projects.updateProject(p.id, (proj) => ({
+      ...proj,
+      status: "voice",
+      cast: [{ id: "c1", who: "아이", ref: { from: "avatar", id: "av-child" } }],
+      cuts: [{ idx: 0, sentence: "문장입니다.", seconds: 3, state: "pending",
+               shows: "아이가 자전거를 끄는 미디엄 샷", ref_ids: ["c1"], regen_count: 0 }],
+    }));
+    const seen = [];
+    const d = {
+      splitCuts: async () => { throw new Error("부르면 안 된다"); },
+      genImage: async (args) => { seen.push(args.refs); return { url: "img" }; },
+      select: async () => ({ passed: true, selectedIndex: 0, note: "" }),
+    };
+    await pipeline.runImagesPipeline(p.id, d);
+    // 아바타 파일이 없으면 refs 는 비어 있다 — 그래도 그림은 나온다
+    expect(Array.isArray(seen[0])).toBe(true);
+    const saved = await projects.getProject(p.id);
+    expect(saved.cuts[0].image.url).toBe("img");
   });
 });
 

@@ -175,7 +175,7 @@ export default function ImagesStepPage() {
                   <span className={`badge ${c.source === "photo" ? "photo" : "ai"}`}>
                     {c.source === "photo" ? `내 사진 · ${photo?.filename || ""}` : "AI 생성"}
                   </span>
-                  {c.ref_photo_id && <span className="badge vlm">레퍼런스 적용</span>}
+                  {(c.ref_ids?.length || c.ref_photo_id) && <span className="badge vlm">레퍼런스 적용</span>}
                   {c.vlm?.note && <span className="badge ai">{c.vlm.note.slice(0, 30)}</span>}
                   <span className="badge ai">{c.seconds}초</span>
                 </div>
@@ -250,7 +250,7 @@ function PreviewPane({ cut, url, photoName, aspect, hasSynopsis, stalled, onRege
       </div>
       <div className="badges mt-md">
         <span className={`badge ${isPhoto ? "photo" : "ai"}`}>{isPhoto ? `내 사진 · ${photoName || ""}` : "AI 생성"}</span>
-        {cut.ref_photo_id && <span className="badge vlm">레퍼런스 적용</span>}
+        {(cut.ref_ids?.length || cut.ref_photo_id) && <span className="badge vlm">레퍼런스 적용</span>}
         <span className="badge ai">{cut.seconds}초</span>
       </div>
       <p className="preview-sentence">“{cut.sentence}”</p>

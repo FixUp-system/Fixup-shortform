@@ -219,15 +219,33 @@ describe("buildImagePrompt — 화면 근거", () => {
   });
 
   it("컷 비율·레퍼런스 지시가 반영된다", () => {
-    const cut = { idx: 0, sentence: "문장", shows: "화면", source: "ai", ref_photo_id: "p1" };
-    const prompt = buildImagePrompt(cut, project);
+    const cut = { idx: 0, sentence: "문장", shows: "화면", source: "ai", ref_ids: ["p1"] };
+    const prompt = buildImagePrompt(cut, project, [{ path: "/x/라떼.jpg", kind: "thing" }]);
     expect(prompt).toMatch(/vertical|9:16/);
     expect(prompt).toContain("reference");
   });
 
-  it("사진 목록에 없는 ref는 레퍼런스 문장을 붙이지 않는다", () => {
-    const cut = { idx: 0, sentence: "문장", shows: "화면", source: "ai", ref_photo_id: "지워진사진" };
-    expect(buildImagePrompt(cut, project)).not.toContain("reference");
+  it("사람 레퍼런스에는 같은 사람으로 그리라고 한다 — 제품 문구는 사람에게 틀리다", () => {
+    const cut = { idx: 0, sentence: "문장.", shows: "아이가 자전거를 끄는 미디엄 샷", ref_ids: ["c1"] };
+    const withCast = {
+      ...project,
+      cast: [{ id: "c1", who: "아이", ref: { from: "avatar", id: "av-child" } }],
+    };
+    const p = buildImagePrompt(cut, withCast, [{ path: "/x/child.jpg", kind: "person" }]);
+    expect(p).toMatch(/same person/i);
+    expect(p).not.toMatch(/packaging/i);
+  });
+
+  it("사물 레퍼런스에는 모양·색을 그대로 지킨다고 한다", () => {
+    const cut = { idx: 0, sentence: "문장.", shows: "라떼 클로즈업", ref_ids: ["p1"] };
+    const p = buildImagePrompt(cut, project, [{ path: "/x/latte.jpg", kind: "thing" }]);
+    expect(p).toMatch(/packaging/i);
+  });
+
+  it("레퍼런스가 없으면 첨부를 가리키는 말을 넣지 않는다", () => {
+    const cut = { idx: 0, sentence: "문장.", shows: "빈 매장 풀 샷" };
+    const p = buildImagePrompt(cut, project, []);
+    expect(p).not.toMatch(/attached/i);
   });
 
   it("브리핑 주제가 있으면 전 컷에 주제 앵커가 들어간다", () => {
