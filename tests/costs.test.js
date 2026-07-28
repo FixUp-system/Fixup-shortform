@@ -23,6 +23,13 @@ describe("estimateCost", () => {
     expect(estimateCost("fal-ai/ltx-2.3/text-to-video", 10)).toBe(0.6);
   });
 
+  it("이미지는 장당이다 — edit 계열도 같은 값으로 잡힌다", () => {
+    // 단가가 imagegen.js 에 따로 박혀 있던 것을 표로 옮겼다. 두 곳에 두면 어긋나도 모른다.
+    expect(estimateCost("fal-ai/nano-banana", 1)).toBe(0.04);
+    expect(estimateCost("fal-ai/nano-banana/edit", 1)).toBe(0.04);
+    expect(estimateCost("fal-ai/nano-banana", 2)).toBe(0.08);
+  });
+
   it("모르는 엔드포인트는 기본 단가로 떨어진다", () => {
     // 새 모델을 env로만 바꾸고 표에 안 넣으면 여기로 온다 — 값이 틀려도 조용하다.
     expect(estimateCost("fal-ai/wan/v2.5/image-to-video", 10)).toBe(1);
