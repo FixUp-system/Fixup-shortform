@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateScript, validateCutRanges, validateShows, validateBriefing, validateDevelopQuestions, dropAnsweredQuestions } from "../lib/validate.js";
+import { validateScript, validateCutRanges, validateShows, validateCast, validateBriefing, validateDevelopQuestions, dropAnsweredQuestions } from "../lib/validate.js";
 
 describe("validateScript — 하나로 흐르는 원고", () => {
   it("원고 문자열을 받아 다듬어 돌려준다", () => {
@@ -231,5 +231,45 @@ describe("dropAnsweredQuestions — 이미 아는 것을 되묻지 않는다", (
       ],
     }, 자료);
     expect(b.asked.map((a) => a.question)).toEqual(["어떤 손님이 주로 오시나요?"]);
+  });
+});
+
+describe("validateCast", () => {
+  const ids = ["av-child", "av-owner"];
+
+  it("인물 목록을 받는다", () => {
+    const got = validateCast({ cast: [
+      { who: "가게 주인", avatar_id: "av-owner" },
+      { who: "초등학생 아이", avatar_id: "av-child" },
+    ] }, ids);
+    expect(got).toEqual([
+      { id: "c1", who: "가게 주인", avatar_id: "av-owner" },
+      { id: "c2", who: "초등학생 아이", avatar_id: "av-child" },
+    ]);
+  });
+
+  it("없는 아바타 id 는 조용히 제거한다 — 첨부되지 않을 사진을 가리키면 그림을 망친다", () => {
+    const got = validateCast({ cast: [{ who: "손님", avatar_id: "av-없음" }] }, ids);
+    expect(got).toEqual([{ id: "c1", who: "손님" }]);
+  });
+
+  it("who 가 없는 항목은 버린다", () => {
+    const got = validateCast({ cast: [{ avatar_id: "av-owner" }, { who: "아이" }] }, ids);
+    expect(got).toEqual([{ id: "c1", who: "아이" }]);
+  });
+
+  it("인물이 없는 원고는 빈 배열 — 실패가 아니다", () => {
+    expect(validateCast({ cast: [] }, ids)).toEqual([]);
+  });
+
+  it("모양이 틀리면 null — 호출측이 재시도를 판단한다", () => {
+    expect(validateCast(null, ids)).toBe(null);
+    expect(validateCast({}, ids)).toBe(null);
+    expect(validateCast({ cast: "아이" }, ids)).toBe(null);
+  });
+
+  it("인물이 너무 많으면 4명에서 자른다 — 30초 영상에 그 이상은 못 담는다", () => {
+    const many = { cast: Array.from({ length: 9 }, (_, i) => ({ who: `사람${i}` })) };
+    expect(validateCast(many, ids)).toHaveLength(4);
   });
 });
