@@ -153,6 +153,19 @@ describe("isReachable", () => {
     for (const k of ["material", "script", "voice", "images", "video"]) {
       expect(isReachable(k, p), k).toBe(true);
     }
+    // 이미지까지만 끝났으면 이어붙일 클립이 없다 — 완성은 아직 열지 않는다
     expect(isReachable("done", p)).toBe(false);
+  });
+  it("클립이 끝나면 완성이 열린다 — 아니면 아무도 완성본을 만들 수 없다", () => {
+    // 잠금 고리였다: ⑥완성은 status 가 done 이어야 열리는데, status 는 합성이 끝나야
+    // done 이 되고, 합성은 ⑥완성 화면에서만 시작할 수 있었다. 현재 단계는 ⑤영상으로
+    // 두는 것이 맞지만(완성은 사장님이 눌러야 시작된다), 열려는 있어야 한다.
+    const p = { briefing: { confirmed: true }, status: "video" };
+    expect(currentStepKey(p)).toBe("video");
+    expect(isReachable("done", p)).toBe(true);
+  });
+  it("완성한 뒤에도 완성 화면은 열려 있다 — 다시 합치거나 내려받는다", () => {
+    const p = { briefing: { confirmed: true }, status: "done" };
+    expect(isReachable("done", p)).toBe(true);
   });
 });
