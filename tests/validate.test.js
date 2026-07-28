@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateScript, validateCutRanges, validateShows, validateBriefing, validateDevelopQuestions } from "../lib/validate.js";
+import { validateScript, validateCutRanges, validateShows, validateBriefing, validateDevelopQuestions, dropAnsweredQuestions } from "../lib/validate.js";
 
 describe("validateScript — 하나로 흐르는 원고", () => {
   it("원고 문자열을 받아 다듬어 돌려준다", () => {
@@ -188,5 +188,48 @@ describe("validateBriefing", () => {
     expect(b.asked).toHaveLength(1);
     expect(b.asked[0].question).toBe("정상?");
     expect(b.asked[0].options).toEqual([]);
+  });
+});
+
+// 프롬프트에 "자료에 적혀 있으면 버려라"를 예시까지 들어 적었는데도 어겼다.
+// 관통 첫 브리핑에서 "성수역 2번 출구에서 도보 3분"을 key_points 에 넣어 두고
+// "수리점의 정확한 위치는 어디인가요?"를 물었다. 그래서 코드가 판정한다.
+describe("dropAnsweredQuestions — 이미 아는 것을 되묻지 않는다", () => {
+  const 자료 = `성수동에서 자전거 수리점 합니다. 펑크는 5분이면 되고 3,000원입니다.
+평일 아홉 시부터 일곱 시까지, 일요일은 쉽니다. 성수역 2번 출구에서 3분입니다.`;
+
+  it("자료에 답이 있으면 버린다", () => {
+    const q = [
+      { question: "수리점의 정확한 위치는 어디인가요?" },
+      { question: "펑크 수리 비용은 얼마인가요?" },
+      { question: "영업 시간은 언제인가요?" },
+    ];
+    expect(dropAnsweredQuestions(q, 자료)).toEqual([]);
+  });
+
+  it("자료에 없으면 남긴다", () => {
+    const q = [
+      { question: "어떤 손님이 주로 오시나요?" },
+      { question: "예약을 받으시나요?" },
+    ];
+    expect(dropAnsweredQuestions(q, 자료)).toHaveLength(2);
+  });
+
+  it("동 이름만 있으면 위치 질문을 살린다 — 찾아갈 수 없는 정보는 답이 아니다", () => {
+    const 얕은자료 = "성수동에서 자전거 수리점 합니다.";
+    const q = [{ question: "수리점의 정확한 위치는 어디인가요?" }];
+    expect(dropAnsweredQuestions(q, 얕은자료)).toHaveLength(1);
+  });
+
+  it("validateBriefing 이 자료를 받으면 그 질문을 걸러 낸다", () => {
+    const b = validateBriefing({
+      topic: "자전거 수리점",
+      key_points: ["성수역 2번 출구에서 도보 3분 거리", "펑크 수리 5분, 3,000원"],
+      questions: [
+        { question: "수리점의 정확한 위치는 어디인가요?" },
+        { question: "어떤 손님이 주로 오시나요?" },
+      ],
+    }, 자료);
+    expect(b.asked.map((a) => a.question)).toEqual(["어떤 손님이 주로 오시나요?"]);
   });
 });
