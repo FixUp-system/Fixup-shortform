@@ -24,10 +24,18 @@ export async function PATCH(req, { params }) {
         const changed = proj.briefing ? briefingContentChanged(proj.briefing, next.briefing) : false;
         next.briefing.version = (proj.briefing?.version || 1) + (changed ? 1 : 0);
       }
-      if (body.cut && Number.isInteger(body.cut.idx) && typeof body.cut.sentence === "string") {
-        next.cuts = proj.cuts.map((c) =>
-          c.idx === body.cut.idx ? { ...c, sentence: body.cut.sentence } : c
-        );
+      // 컷 한 줄 고치기 — 문장·화면·움직임. 준 것만 바꾼다(빈 값으로 지우지 않게).
+      // 사장님이 구성 단계에서 손보는 자리다. 이미지·클립은 이 값들을 읽어 만든다.
+      if (body.cut && Number.isInteger(body.cut.idx)) {
+        const patch = {};
+        for (const key of ["sentence", "shows", "motion"]) {
+          if (typeof body.cut[key] === "string" && body.cut[key].trim()) {
+            patch[key] = body.cut[key].trim();
+          }
+        }
+        if (Object.keys(patch).length) {
+          next.cuts = proj.cuts.map((c) => (c.idx === body.cut.idx ? { ...c, ...patch } : c));
+        }
       }
       // 원고 직접 편집. version을 올리지 않는다 — 사장님이 손으로 고친 것을
       // "원고가 바뀌었다"로 알리면 이미지 화면에 거짓 경고가 뜨고, 그 버튼은 유료 호출이다.

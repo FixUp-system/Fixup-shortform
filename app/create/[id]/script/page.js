@@ -20,6 +20,8 @@ export default function ScriptStepPage() {
   const [aspect, setAspect] = useState(project.settings?.aspect_ratio || "9:16");
   // 자동 생성이 한 번만 돌게 막는다 — busy는 비동기라 effect가 두 번 불리면 과금이 두 배가 된다.
   const autoGenFor = useRef(null);
+  const autoSplitFor = useRef(null);
+  const splitPollRef = useRef(null);
 
   // 원고가 아직 없으면 자동 생성 시작
   useEffect(() => {
@@ -31,6 +33,53 @@ export default function ScriptStepPage() {
 
   // 서버 원고가 바뀌면 편집 중인 초안을 버린다(재생성 결과가 화면에 보이게)
   useEffect(() => { setDraft(null); }, [project?.script?.version]);
+
+  // 원고가 준비되면 구성(컷·화면·움직임)을 이어서 만든다.
+  // 승인 뒤가 아니라 승인 앞에서 만드는 이유: 사장님이 원고와 구성을 함께 보고 고쳐야 한다.
+  // 분할은 OpenAI 만 쓰고 fal 을 부르지 않아 여기서 돌려도 돈이 들지 않는다.
+  //
+  // 원고 버전마다 한 번씩만 돈다 — 같은 원고로 두 번 나누면 사장님이 고쳐 둔 화면이 지워진다.
+  const scriptVersion = project?.script?.version;
+  const cutsReady = (project?.cuts || []).length > 0 && !areCutsStale(project);
+  useEffect(() => {
+    if (!project?.script?.text || cutsReady || busy) return;
+    const key = `${id}:${scriptVersion}`;
+    if (autoSplitFor.current === key) return;
+    autoSplitFor.current = key;
+    splitCuts();
+  }, [project?.script?.text, scriptVersion, cutsReady, busy]);
+
+  // 분할이 끝나기를 기다린다 — 컷이 채워지면 화면이 그대로 열린다
+  useEffect(() => {
+    const splitting = project?.status === "cuts" && (project?.cuts || []).length === 0 && !project?.cuts_error;
+    if (!splitting) { clearInterval(splitPollRef.current); splitPollRef.current = null; return; }
+    if (splitPollRef.current) return;
+    splitPollRef.current = setInterval(() => { load(id).catch(() => {}); }, 2000);
+    return () => { clearInterval(splitPollRef.current); splitPollRef.current = null; };
+  }, [project?.status, project?.cuts?.length, project?.cuts_error, id]);
+
+  async function splitCuts() {
+    const res = await fetch(`/api/projects/${id}/cuts`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ aspect_ratio: aspect }),
+    }).catch(() => null);
+    // 409(이미 나눈 컷이 있음)는 정상이다 — 되돌아온 화면에서 다시 부른 경우다
+    if (res && !res.ok && res.status !== 409) {
+      setErr((await res.json().catch(() => ({}))).error || "구성을 만들지 못했어요");
+    }
+    await load(id).catch(() => {});
+  }
+
+  // 컷 한 줄 고치기 — 문장·화면·움직임
+  async function saveCut(idx, patch) {
+    const res = await fetch(`/api/projects/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cut: { idx, ...patch } }),
+    }).catch(() => null);
+    if (!res || !res.ok) { setErr("고친 것을 저장하지 못했어요 — 다시 시도해 주세요"); return; }
+    setErr("");
+    await load(id).catch(() => {});
+  }
 
   async function genScript(instr) {
     setBusy(true); setErr("");
@@ -115,6 +164,9 @@ export default function ScriptStepPage() {
   const shown = draft ?? text;
   const staleCuts = areCutsStale(project);
   const madeCuts = (project.cuts || []).length > 0;
+  // 구성 — 낡은 컷은 보여주지 않는다(원고를 다시 썼으면 새로 나뉘는 중이다)
+  const cuts = staleCuts ? [] : project.cuts || [];
+  const splitting = project.status === "cuts" && cuts.length === 0 && !project.cuts_error;
   // 고른 길이를 못 채웠는가 — 사실 개수로 어림하지 않고 실제 원고를 재서 판단한다.
   // 모자라면 강요하지 않고 고르게 한다: 이야기를 더 들려주거나, 이대로 가거나.
   const chosen = project.settings?.target_seconds || null;
@@ -179,6 +231,55 @@ export default function ScriptStepPage() {
             ))}
           </div>
         </>
+      )}
+
+      {/* 구성 — 원고를 컷으로 나누고 컷마다 무엇을 보여줄지·어떻게 움직일지 정한 것.
+          승인 앞에 두는 이유: 그림과 클립이 여기서 나오므로, 만들기 전에 고쳐야 값이 안 든다. */}
+      <div className="eyebrow mt-lg">
+        구성 <small>이 순서로 그림이 만들어지고, 적힌 대로 움직여요</small>
+      </div>
+      {splitting ? (
+        <p className="pgsub">원고를 컷으로 나누는 중이에요…</p>
+      ) : project.cuts_error ? (
+        <p className="pgsub warn">
+          {project.cuts_error}{" "}
+          <button className="mini" disabled={busy} onClick={splitCuts}>다시 시도</button>
+        </p>
+      ) : cuts.length === 0 ? (
+        <p className="pgsub">잠시만요 — 구성을 준비하고 있어요</p>
+      ) : (
+        <div className="plan-list">
+          {cuts.map((c) => (
+            <div className="plan-row" key={c.idx}>
+              <span className="num">{c.idx + 1}</span>
+              <div className="plan-body">
+                <div className="preview-sentence">“{c.sentence}”</div>
+                <div className="plan-field">
+                  <b>화면</b>
+                  <span contentEditable suppressContentEditableWarning className="editable"
+                    onBlur={(e) => {
+                      const v = e.currentTarget.textContent.trim();
+                      if (v && v !== c.shows) saveCut(c.idx, { shows: v });
+                    }}>{c.shows || "(아직 없음)"}</span>
+                </div>
+                <div className="plan-field">
+                  <b>움직임</b>
+                  <span contentEditable suppressContentEditableWarning className="editable"
+                    onBlur={(e) => {
+                      const v = e.currentTarget.textContent.trim();
+                      if (v && v !== c.motion) saveCut(c.idx, { motion: v });
+                    }}>{c.motion || "거의 정지, 아주 느린 카메라 이동"}</span>
+                </div>
+                <div className="badges">
+                  <span className="badge ai">{c.seconds}초</span>
+                  {c.seconds > 10 && (
+                    <span className="badge warn">10초까지만 움직여요 — 나머지는 멈춰 있어요</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
       <div className="step-actions">
         <BackButton stepKey="script" />

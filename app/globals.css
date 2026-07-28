@@ -742,6 +742,21 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
   display: block;
 }
 
+/* 구성 목록 — 대본 화면에서 컷·화면·움직임을 함께 본다 */
+.plan-list { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; }
+.plan-row { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.plan-row:last-child { border-bottom: 0; }
+.plan-row .num {
+  flex: 0 0 24px; height: 24px; border-radius: 50%;
+  background: var(--surface2); color: var(--ink-soft);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-variant-numeric: tabular-nums;
+}
+.plan-body { flex: 1; min-width: 0; }
+.plan-field { display: flex; gap: 8px; margin-top: 6px; font-size: 14px; line-height: 1.6; }
+.plan-field b { flex: 0 0 44px; color: var(--ink-soft); font-weight: 400; }
+.plan-field .editable { flex: 1; color: var(--ink); }
+
 /* 완성 화면 — 미리보기를 가운데로 */
 .done-preview { width: 100%; max-width: 360px; margin: 14px auto 0; position: static; }
 
