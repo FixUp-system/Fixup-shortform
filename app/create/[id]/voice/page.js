@@ -223,7 +223,6 @@ export default function VoiceStepPage() {
             </>
           ) : (
             <>
-              <span className="hint">읽은 길이에 맞춰 컷마다 그림을 그려요</span>
               <button
                 className="cta"
                 disabled={busy || doneCount === 0}

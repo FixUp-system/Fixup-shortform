@@ -183,15 +183,17 @@ export default function ScriptStepPage() {
       <div className="step-actions">
         <BackButton stepKey="script" />
         <div className="fwd">
-          <span className="hint">
-            {hasCuts
-              ? "이미 만든 컷이 있어요 — 다시 만들지 않고 그대로 보여드려요"
-              : madeCuts
-              ? "지금 승인하면 컷을 처음부터 다시 만들어요 — 먼저 만든 이미지는 지워집니다"
-              : "원고를 컷으로 나누고 컷마다 화면을 설계해요 · 그다음 목소리를 입히고, 읽은 길이에 맞춰 그림을 그립니다"}
-          </span>
+          {/* 이미 만든 컷으로 되돌아가는 길에는 설명을 붙이지 않는다 — 지나온 자리다.
+              승인은 다르다: 무슨 일이 일어나는지, 무엇이 지워지는지 미리 말해야 한다. */}
+          {!hasCuts && (
+            <span className="hint">
+              {madeCuts
+                ? "지금 승인하면 컷을 처음부터 다시 만들어요 — 먼저 만든 이미지는 지워집니다"
+                : "원고를 컷으로 나누고 컷마다 화면을 설계해요 · 그다음 목소리를 입히고, 읽은 길이에 맞춰 그림을 그립니다"}
+            </span>
+          )}
           <button className="cta" disabled={busy} onClick={approve}>
-            {hasCuts ? "③ 목소리 만들러 가기" : "대본 승인 →"}
+            {hasCuts ? "③ 목소리 만들러 가기 →" : "대본 승인 →"}
           </button>
         </div>
       </div>
