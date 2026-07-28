@@ -135,3 +135,76 @@ describe("resolveCutRefs — 컷이 실제로 쓸 레퍼런스", () => {
     expect(resolveCutRefs({}, {})).toEqual([]);
   });
 });
+
+import { mergeCastIntoCuts } from "../lib/cast.js";
+
+describe("mergeCastIntoCuts — 인물을 컷에 꽂는다", () => {
+  const cuts = [
+    { idx: 0, ref_ids: ["p1"] },
+    { idx: 1 },
+    { idx: 2, ref_ids: ["p2"] },
+  ];
+  const cast = [
+    { id: "c1", who: "주인", cuts: [1, 2] },
+    { id: "c2", who: "손님", cuts: [0, 2] },
+  ];
+
+  it("인물이 적힌 컷에만 그 id 를 더한다", () => {
+    const got = mergeCastIntoCuts(cuts, cast);
+    expect(got[0].ref_ids).toEqual(["p1", "c2"]);
+    expect(got[1].ref_ids).toEqual(["c1"]);
+    expect(got[2].ref_ids).toEqual(["p2", "c1", "c2"]);
+  });
+
+  it("사진 id 를 지우지 않는다 — 사장님이 올린 것이 먼저다", () => {
+    expect(mergeCastIntoCuts(cuts, cast)[0].ref_ids[0]).toBe("p1");
+  });
+
+  it("원본을 바꾸지 않는다", () => {
+    mergeCastIntoCuts(cuts, cast);
+    expect(cuts[1].ref_ids).toBeUndefined();
+  });
+
+  it("캐스팅이 비면 컷이 그대로다", () => {
+    expect(mergeCastIntoCuts(cuts, [])).toEqual(cuts);
+    expect(mergeCastIntoCuts(cuts, null)).toEqual(cuts);
+  });
+
+  it("같은 인물이 두 번 적혀도 한 번만 꽂는다", () => {
+    const got = mergeCastIntoCuts([{ idx: 0 }], [{ id: "c1", who: "주인", cuts: [0, 0] }]);
+    expect(got[0].ref_ids).toEqual(["c1"]);
+  });
+});
+
+describe("resolveCutRefs — 인물 하나 + 사물 하나", () => {
+  const project = {
+    cast: [
+      { id: "c1", who: "주인", ref: { from: "avatar", id: "av-owner" } },
+      { id: "c2", who: "손님", ref: { from: "avatar", id: "av-adult" } },
+    ],
+    material: { photos: [{ id: "p1" }, { id: "p2" }] },
+  };
+
+  it("사진 둘이 있어도 인물 자리를 남긴다 — 안 그러면 인물 일관성이 통째로 죽는다", () => {
+    const got = resolveCutRefs({ ref_ids: ["p1", "p2", "c1"] }, project);
+    expect(got).toHaveLength(2);
+    expect(got.filter((r) => r.kind === "person")).toHaveLength(1);
+    expect(got.filter((r) => r.kind === "thing")).toHaveLength(1);
+    expect(got[0].id).toBe("p1"); // 사진이 먼저다
+  });
+
+  it("인물 둘이면 첫 인물만 쓴다", () => {
+    const got = resolveCutRefs({ ref_ids: ["c1", "c2"] }, project);
+    expect(got).toHaveLength(1);
+    expect(got[0].id).toBe("av-owner");
+  });
+
+  it("사진만 있으면 두 장까지 쓴다", () => {
+    expect(resolveCutRefs({ ref_ids: ["p1", "p2"] }, project)).toHaveLength(2);
+  });
+
+  it("같은 레퍼런스를 두 번 싣지 않는다", () => {
+    const got = resolveCutRefs({ ref_ids: ["p1", "p1"] }, project);
+    expect(got).toHaveLength(1);
+  });
+});

@@ -63,7 +63,7 @@ describe("defaultDeps.splitCuts — 두 패스", () => {
   const shots = { shots: [{ shows: "딸기를 가는 손 클로즈업", ref_ids: ["p1"] }, { shows: "골목을 걷는 시점 샷" }] };
 
   it("경계로 자른 컷에 화면을 붙여 돌려준다", async () => {
-    llmMock.callJson.mockResolvedValueOnce(ranges).mockResolvedValueOnce(noCast).mockResolvedValueOnce(shots);
+    llmMock.callJson.mockResolvedValueOnce(ranges).mockResolvedValueOnce(shots).mockResolvedValueOnce(noCast);
     const cuts = await pipeline.defaultDeps.splitCuts(await saved());
     expect(cuts).toHaveLength(2);
     // 텍스트는 코드가 원고에서 자른다 — 모델이 문장을 다시 쓰지 못한다
@@ -77,25 +77,29 @@ describe("defaultDeps.splitCuts — 두 패스", () => {
   });
 
   it("컷을 이어붙이면 원고와 같다 — 승인한 문장이 글자 그대로 살아남는다", async () => {
-    llmMock.callJson.mockResolvedValueOnce(ranges).mockResolvedValueOnce(noCast).mockResolvedValueOnce(shots);
+    llmMock.callJson.mockResolvedValueOnce(ranges).mockResolvedValueOnce(shots).mockResolvedValueOnce(noCast);
     const cuts = await pipeline.defaultDeps.splitCuts(await saved());
     const joined = cuts.map((c) => c.sentence).join(" ").replace(/\s/g, "");
     expect(joined).toBe(SCRIPT.replace(/\s/g, ""));
   });
 
-  it("원고에서 뽑은 인물이 프로젝트에 남는다 — 컷이 고를 목록이 된다", async () => {
+  it("화면에서 뽑은 인물이 프로젝트에 남고, 코드가 컷에 꽂는다", async () => {
     const p = await saved();
+    // 순서가 요점이다 — 화면 설계가 먼저 돌고, 캐스팅은 그 화면을 읽는다
     llmMock.callJson
       .mockResolvedValueOnce(ranges)
-      .mockResolvedValueOnce({ cast: [{ who: "10세 전후 남자아이" }] })
-      .mockResolvedValueOnce(shots);
-    await pipeline.defaultDeps.splitCuts(p);
+      .mockResolvedValueOnce(shots)
+      .mockResolvedValueOnce({ cast: [{ who: "10세 전후 남자아이", cuts: [1] }] });
+    const cuts = await pipeline.defaultDeps.splitCuts(p);
     const after = await projects.getProject(p.id);
-    expect(after.cast).toEqual([{ id: "c1", who: "10세 전후 남자아이" }]);
+    expect(after.cast).toEqual([{ id: "c1", who: "10세 전후 남자아이", cuts: [0] }]);
+    // 인물 id 를 컷에 꽂는 것은 모델이 아니라 코드다 — 이것이 인물 일관성의 전부다
+    expect(cuts[0].ref_ids).toEqual(["p1", "c1"]);
+    expect(cuts[1].ref_ids).toBeUndefined();
   });
 
   it("화면 패스가 실패해도 컷은 남는다 — 그림은 문장으로 폴백한다", async () => {
-    llmMock.callJson.mockResolvedValueOnce(ranges).mockResolvedValueOnce(noCast).mockResolvedValue({ shots: [] }); // 개수 불일치
+    llmMock.callJson.mockResolvedValueOnce(ranges).mockResolvedValue({ shots: [] }); // 개수 불일치
     const cuts = await pipeline.defaultDeps.splitCuts(await saved());
     expect(cuts).toHaveLength(2);
     expect(cuts[0].shows).toBeUndefined();
