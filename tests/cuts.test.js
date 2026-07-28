@@ -94,20 +94,13 @@ describe("buildShowsMessages", () => {
     }
   });
 
-  it("캐스팅을 프롬프트에 넣는다 — 컷은 이 목록에서만 고른다", () => {
-    const withCast = {
-      ...project,
-      cast: [{ id: "c1", who: "50대 남성 가게 주인" }, { id: "c2", who: "10세 전후 남자아이" }],
-    };
-    const { messages } = buildShowsMessages(withCast, [{ sentence: "한 문장." }]);
-    expect(messages[0].content).toContain("c1");
-    expect(messages[0].content).toContain("50대 남성 가게 주인");
-    expect(messages[0].content).toContain("c2");
-  });
-
-  it("캐스팅이 없으면 (없음) — 없는 인물을 고르라고 하면 안 된다", () => {
-    const { messages } = buildShowsMessages(project, [{ sentence: "한 문장." }]);
-    expect(messages[0].content).toContain("[출연]\n(없음)");
+  it("출연 목록을 넣지 않는다 — 캐스팅은 이 패스 뒤에 돈다", () => {
+    const withCast = { ...project, cast: [{ id: "c1", who: "50대 남성 가게 주인", cuts: [0] }] };
+    const { messages, system } = buildShowsMessages(withCast, [{ sentence: "한 문장." }]);
+    expect(messages[0].content).not.toContain("[출연]");
+    expect(messages[0].content).not.toContain("50대 남성 가게 주인");
+    // 화면 설계가 고를 수 있는 것은 사진뿐이다
+    expect(system).toContain("올린 사진");
   });
 });
 
