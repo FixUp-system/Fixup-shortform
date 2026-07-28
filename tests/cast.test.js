@@ -22,10 +22,15 @@ describe("buildCastMessages", () => {
     expect(messages[0].content).toContain("(없음)");
   });
 
-  it("이름 없이 불리는 사람도 화면에 보이면 넣으라고 지시한다 — 손님이 빠지던 결함", () => {
+  it("다시 나오거나 이야기의 한 자리를 차지하는 인물만 넣으라고 지시한다 — 배경은 자리를 잡아먹는다", () => {
     const { system } = buildCastMessages(project, AVATARS);
-    expect(system).toContain("손님·아이·직원처럼 이름 없이 일반명사로 불려도");
-    expect(system).toContain("✗ \"미용사가 아이 머리를 자릅니다\" 인데 cast 에 미용사만 두는 것");
+    expect(system).toContain("여러 컷에 걸쳐 같은 사람으로 다시 나오는 인물");
+    expect(system).toContain("이야기에서 특정 개인으로 다뤄지는 인물만 넣는다");
+    // 이름 없는 손님이라도 이야기의 주역이면 들어간다 — 손님이 통째로 빠지던 결함
+    expect(system).toContain("이름 없이 \"손님\"으로만 불려도 한 명의 인물이다");
+    // 반례는 배경 손님을 넣는 쪽이 틀린 경우를 보여준다
+    expect(system).toContain("✗ \"카페 안에 손님들이 앉아 있습니다\" 의 그 손님들을 cast 에 넣는 것");
+    expect(system).toContain("배경 손님·지나가는 사람은 누구인지가 중요하지 않으니 넣지 않는다");
     expect(system).toContain("전화 통화 상대"); // 화면에 안 나오는 사람을 빼는 원래 의도는 남아 있다
   });
 
