@@ -1,8 +1,15 @@
-# 프로토타입 — 로컬 구간 구현 계획 (스펙 1~3단계)
+# 프로토타입 — 로컬 e2e 30초 영상 구현 계획
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 예산을 코드로 막고, 목소리를 이미지 앞으로 옮긴 뒤, 실제 fal 을 처음으로 한 번 관통시킨다.
+**Goal:** 자료를 넣으면 **자막이 구워진 30초 mp4** 가 나온다. 로컬에서, 한 번도 막히지 않고.
+
+그러기 위해 예산을 코드로 막고(Task 1~2), 목소리를 이미지 앞으로 옮기고(Task 3~6),
+실제 fal 을 처음으로 관통시킨다(Task 8).
+
+> **실행 순서 주의:** Task 7(긴 컷 알림)은 관통에 필요 없다. **Task 8 을 먼저 하고 Task 7 로
+> 돌아온다.** 관통에서 나온 실측 데이터(10초 초과가 흔한가 드문가)를 보고 만드는 편이
+> 정확하다 — 흔하면 알림이 아니라 재분할이 필요할 수도 있다.
 
 **Architecture:** `lib/costs.js`가 fal 호출 직전에 누적 비용을 재어 상한을 넘으면 던진다.
 `runCutsPipeline`을 `runSplitPipeline`(분할, OpenAI만)과 `runImagesPipeline`(이미지, fal)으로
@@ -19,7 +26,12 @@
   **의도적으로** 바꾼다
 - 테스트에서 파일을 쓰는 모듈을 다룰 때는 `SHOTFORM_DATA_DIR`을 임시 폴더로 돌린다
   (`tests/projects.test.js` 패턴). 실제 `data/costs.json`을 오염시키지 않는다
-- 비용 상한 기본값: 전체 `$20`, 프로젝트당 `$3`
+- 비용 상한 기본값: 전체 `$20`, 프로젝트당 `$5` (30초 한 편이 약 $2, VLM 재시도 시 $3)
+- **단가 주의:** 단계별 워크플로의 클립은 `FAL_I2V_ENDPOINT`(기본 `ltx-2.3/image-to-video/fast`,
+  $0.04/s)를 쓴다. `FAL_VIDEO_ENDPOINT`(Veo 3.1, $0.40/s)는 `app/api/video/route.js`(옛 단발
+  t2v)만 쓴다 — 혼동하면 단가를 10배로 잘못 잡는다
+- **합성은 로컬 ffmpeg**(`lib/compose.js` 기본 경로). 배포하지 않으므로 자막이 구워진 mp4 가
+  그대로 나온다. `SHOTFORM_COMPOSER` 는 비워 둔다
 - i2v 상한: `I2V_MAX_SECONDS = 10` (`lib/i2v.js`)
 - 한국어 문구는 사장님이 읽는 말로 쓴다. 파일명·함수명을 노출하지 않는다
 - 커밋 메시지는 한국어, 기존 이력의 어조를 따른다 (무엇을 왜 바꿨는지 한 줄 + 본문)
@@ -213,7 +225,8 @@ function limitTotal() {
   return Number(process.env.SHOTFORM_BUDGET_TOTAL_USD ?? 20);
 }
 function limitProject() {
-  return Number(process.env.SHOTFORM_BUDGET_PROJECT_USD ?? 3);
+  // 30초 한 편이 약 $2(클립 $1.20 + 이미지 $0.80). 재생성 여지를 두어 두 배쯤 잡는다
+  return Number(process.env.SHOTFORM_BUDGET_PROJECT_USD ?? 5);
 }
 
 const sum = (records) => records.reduce((s, r) => s + (Number(r.est_cost_usd) || 0), 0);
@@ -1227,9 +1240,10 @@ git commit -m "feat: 잘릴 컷을 그림 값 치르기 전에 알린다
 
 ---
 
-## Task 8: 로컬에서 진짜 1편 관통
+## Task 8: e2e 30초 관통 ← **Task 7보다 먼저 한다**
 
 **실제 fal 호출이 처음 나가는 지점.** 여기까지의 모든 코드가 추정 위에 서 있다.
+그리고 **로컬 ffmpeg 합성은 가짜 모드에서 아예 건너뛰므로 한 번도 돈 적이 없다.**
 
 **Files:** 없음 (수동 검증). 발견한 것만 고친다.
 
@@ -1239,14 +1253,14 @@ git commit -m "feat: 잘릴 컷을 그림 값 치르기 전에 알린다
 
 ```
 SHOTFORM_FAKE=off
-SHOTFORM_COMPOSER=fal
-FAL_VIDEO_ENDPOINT=fal-ai/veo3.1/fast
+SHOTFORM_COMPOSER=                 # 비운다 — 로컬 ffmpeg 로 자막을 굽는다
 FAL_I2V_ENDPOINT=fal-ai/ltx-2.3/image-to-video/fast
-SHOTFORM_BUDGET_TOTAL_USD=10
-SHOTFORM_BUDGET_PROJECT_USD=4
+SHOTFORM_BUDGET_TOTAL_USD=20
+SHOTFORM_BUDGET_PROJECT_USD=5
 ```
 
-`SHOTFORM_FAKE_IMAGES` 가 남아 있으면 **지운다** — `1`이면 fal 이 전부 가짜가 된다.
+- `SHOTFORM_FAKE_IMAGES` 가 남아 있으면 **지운다** — `1`이면 fal 이 전부 가짜가 된다
+- `FAL_VIDEO_ENDPOINT` 는 이 경로가 쓰지 않는다. 값이 뭐든 상관없다
 
 - [ ] **Step 2: 가드가 실제로 막는지 먼저 본다**
 
@@ -1256,22 +1270,36 @@ Expected: 목소리 단계에서 "예산 상한($0.01)에 닿아 멈췄어요"�
 
 - [ ] **Step 3: 상한을 되돌리고 한 편을 관통한다**
 
-`SHOTFORM_BUDGET_PROJECT_USD=4` 로 되돌린다. `npm run dev` 로 띄우고:
+`SHOTFORM_BUDGET_PROJECT_USD=5` 로 되돌린다. `npm run dev` 로 띄우고:
 
-- 자료: 짧은 실제 가게 이야기 하나 (사진 없이 먼저)
-- 목표 길이: **15초** (컷 3초 × 5개 정도)
+- 자료: 짧은 실제 가게 이야기 하나 (사진 없이 먼저 — 사진은 업로드 경로가 얽히므로 다음 편에서)
+- 목표 길이: **30초** (컷 3초 × 10개 정도)
 - 자료 → 대본 승인 → 목소리 → 이미지 → 영상 → 완성
+
+예상 비용 약 $2 (클립 $1.20 + 이미지 $0.80 + 목소리 $0.01).
 
 - [ ] **Step 4: 확인 목록을 하나씩 대조한다**
 
+**fal 응답 형식**
 - [ ] TTS 응답의 `data.audio.url`·`data.audio.duration` 이 코드 가정과 맞는가
-- [ ] 실측 길이가 `cut.seconds` 를 덮었는가 (개발자 도구에서 프로젝트 JSON 확인)
-- [ ] 그 값이 클립 길이로 넘어갔는가
 - [ ] i2v 응답의 `data.video.url` 이 맞는가
-- [ ] 합성 3단(`merge-videos` → `merge-audios` → `merge-audio-video`)이 이어지는가
-- [ ] 완성 화면에서 mp4 가 재생되는가
-- [ ] **실측 길이가 추정치(5.5자/초)와 얼마나 벌어지는가** — 10초 초과 컷이 흔한지 드문지가
-      여기서 갈린다
+- [ ] 이미지 응답의 `data.images[0].url` 이 맞는가
+
+**길이가 이어지는가**
+- [ ] TTS 실측이 `cut.seconds` 를 덮었는가 (`data/projects/<id>.json` 을 직접 연다)
+- [ ] 그 값이 클립 길이로 넘어갔는가
+- [ ] 컷을 이어붙인 전체가 **30초 근처**인가
+- [ ] **실측이 추정치(5.5자/초)와 얼마나 벌어지는가** — 10초 초과 컷이 흔한지 드문지가
+      여기서 갈리고, 그 답이 Task 7 의 형태를 정한다
+
+**합성 — 이번에 처음 돈다**
+- [ ] `ffmpeg-static` 바이너리가 실제로 실행되는가
+- [ ] 클립이 소리보다 짧을 때 마지막 프레임 정지로 길이가 맞는가 (`buildFfmpegArgs` 의 `tpad`)
+- [ ] **자막이 화면에 구워져 나오는가** — 하단 18% 세이프존, 글자가 깨지지 않는가
+      (폰트를 `assets/` 에서 찾는다. 없으면 네모로 나온다)
+- [ ] 내려받은 mp4 를 다른 플레이어에서 열어도 자막이 있는가
+
+**돈**
 - [ ] `data/costs.json` 의 합계와 fal 대시보드의 실제 청구액을 대조한다 —
       `PRICE_TABLE` 이 얼마나 틀렸는가
 
@@ -1283,7 +1311,7 @@ Expected: 목소리 단계에서 "예산 상한($0.01)에 닿아 멈췄어요"�
 - [ ] **Step 6: 알아낸 것을 적는다**
 
 `docs/superpowers/specs/2026-07-28-prototype-qa-deploy-design.md` 의 **"미검증 가정"** 절을
-연다. 판명된 항목을 사실로 바꿔 적는다 — 계획 2(배포)가 이 값들 위에 선다.
+연다. 판명된 항목을 사실로 바꿔 적는다 — 다음에 무엇을 할지가 이 값들 위에서 정해진다.
 
 - [ ] **Step 7: 커밋**
 
@@ -1299,5 +1327,6 @@ git commit -m "fix: 처음으로 진짜 fal 을 관통시키고 어긋난 곳을
 
 ## 다음
 
-계획 2(배포: Supabase · Vercel 적응 · 자막 오버레이 · 팀 QA)는 **Task 8 이 끝난 뒤에** 쓴다.
-관통에서 나온 사실(응답 형식·실제 단가·낭독 길이 편차)이 그 계획의 전제이기 때문이다.
+Task 8(관통) → Task 7(긴 컷 알림) 순으로 끝내고, **그 다음은 관통에서 무엇이 부서졌는지 보고
+정한다.** 후보는 배포(Supabase · Vercel · 자막 오버레이 · 팀 QA)와 대본 품질 잔여과제 1~5 인데,
+지금 정하면 추정 위에 추정을 쌓는 것이 된다.
