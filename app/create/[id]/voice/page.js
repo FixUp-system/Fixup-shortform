@@ -1,8 +1,11 @@
 "use client";
 
-// ④ 목소리 — 컷마다 문장을 읽혀 실제 길이를 확정한다.
+// ③ 목소리 — 컷마다 문장을 읽혀 실제 길이를 확정한다.
 // 대본 화면의 "약 N초"는 글자 수로 어림잡은 값이고, 여기서 나온 길이가 진짜다 —
 // 클립 길이(⑤)와 자막 타이밍(⑥)이 이 값을 따른다.
+//
+// 이미지(④)보다 앞인 이유도 그것이다: 여기서 확정된 길이가 10초를 넘으면 클립이 잘리는데,
+// 그 사실을 그림 값(컷당 후보 2장)을 치르기 전에 알아야 한다.
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
@@ -18,6 +21,11 @@ export default function VoiceStepPage() {
   const [pollTimedOut, setPollTimedOut] = useState(false);
   const [picked, setPicked] = useState(project?.voice_label || VOICES[0].label);
   const pollRef = useRef(null);
+
+  // 컷 분할이 끝나기 전 — 대본 승인 직후 이 화면에 도착하면 여기부터 보인다.
+  // 훅 순서가 어긋나지 않게 이른 return 보다 위에서 정한다.
+  const splitting =
+    (project?.cuts || []).length === 0 && project?.status === "cuts" && !project?.cuts_error;
 
   // 언마운트 정리 — ref까지 비운다(이미지 화면과 같은 이유: 재마운트 시 폴링이 되살아나게)
   useEffect(() => () => { clearInterval(pollRef.current); pollRef.current = null; }, []);
@@ -65,6 +73,22 @@ export default function VoiceStepPage() {
     }
   }, [project?.status, project?.cuts]);
 
+  // 분할이 끝나기를 기다린다 — 컷이 생기면 아래 화면이 그대로 열린다
+  useEffect(() => {
+    if (!splitting) return;
+    const t = setInterval(() => { load(id).catch(() => {}); }, 2000);
+    return () => clearInterval(t);
+  }, [splitting, id]);
+
+  // 분할이 실패한 뒤의 다시 시도 — 컷이 비어 있을 때만 서버가 받아 준다
+  async function retrySplit() {
+    setErr(""); setBusy(true);
+    const res = await fetch(`/api/projects/${id}/cuts`, { method: "POST" });
+    if (!res.ok) setErr((await res.json().catch(() => ({}))).error || "다시 시도하지 못했어요");
+    await load(id).catch(() => {});
+    setBusy(false);
+  }
+
   async function start() {
     setBusy(true); setErr("");
     const res = await fetch(`/api/projects/${id}/voice`, {
@@ -95,13 +119,30 @@ export default function VoiceStepPage() {
   const doneCount = cuts.filter((c) => c.audio).length;
   const totalSeconds = cuts.reduce((s, c) => s + (Number(c.seconds) || 0), 0);
 
+  // 대본 승인 직후 이 화면에 도착하면 컷이 아직 없다 — 분할이 도는 중이다.
+  // 분할은 대본 승인이 띄우고(POST /cuts), 여기서는 컷이 생기기를 기다리기만 한다.
   if (!cuts.length) {
-    return <p className="pgsub">이미지를 먼저 만들어 주세요.</p>;
+    if (splitting) {
+      return (
+        <section className="panel panel--narrow">
+          <h2>대본을 컷으로 나누는 중이에요</h2>
+          <p className="pgsub">잠시만요 — 나뉜 컷부터 차례로 읽어 드립니다</p>
+        </section>
+      );
+    }
+    return (
+      <section className="panel panel--narrow">
+        <p className="pgsub warn">
+          {project.cuts_error || "컷을 나누지 못했어요"}{" "}
+          <button className="mini" onClick={retrySplit} disabled={busy}>다시 시도</button>
+        </p>
+      </section>
+    );
   }
 
   return (
     <section className="panel panel--narrow">
-      <h2>목소리를 입힙니다 <span className="badge vlm">④ 목소리</span></h2>
+      <h2>목소리를 입힙니다 <span className="badge vlm">③ 목소리</span></h2>
       {err && <p className="pgsub warn">{err}</p>}
 
       {!madeAny ? (
@@ -182,13 +223,13 @@ export default function VoiceStepPage() {
             </>
           ) : (
             <>
-              <span className="hint">읽은 길이만큼 컷이 움직여요</span>
+              <span className="hint">읽은 길이에 맞춰 컷마다 그림을 그려요</span>
               <button
                 className="cta"
                 disabled={busy || doneCount === 0}
-                onClick={() => router.push(`/create/${id}/video`)}
+                onClick={() => router.push(`/create/${id}/images`)}
               >
-                ⑤ 영상 만들러 가기 →
+                ④ 이미지 만들러 가기 →
               </button>
             </>
           )}

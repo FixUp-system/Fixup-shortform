@@ -1,7 +1,7 @@
 "use client";
 
 // ⑤ 영상 — 컷 이미지를 시작 프레임으로 클립을 만든다.
-// 길이는 ④에서 확정된 낭독 길이를 따르되, i2v 상한(10초)을 넘는 컷은 잘린다.
+// 길이는 ③목소리에서 확정된 낭독 길이를 따르되, i2v 상한(10초)을 넘는 컷은 잘린다.
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
@@ -89,8 +89,10 @@ export default function VideoStepPage() {
   const truncatedCount = cuts.filter((c) => c.video?.truncated).length;
   const selected = cuts.find((c) => c.idx === selectedIdx) || cuts.find((c) => c.video) || cuts[0];
 
-  if (!cuts.length) return <p className="pgsub">이미지를 먼저 만들어 주세요.</p>;
+  if (!cuts.length) return <p className="pgsub">대본을 먼저 만들어 주세요.</p>;
   if (!cuts.some((c) => c.audio)) return <p className="pgsub">목소리를 먼저 만들어 주세요.</p>;
+  if (!cuts.some((c) => c.image || c.source === "photo"))
+    return <p className="pgsub">이미지를 먼저 만들어 주세요.</p>;
 
   return (
     <section className="panel">

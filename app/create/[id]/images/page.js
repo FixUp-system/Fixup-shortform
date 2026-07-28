@@ -1,12 +1,17 @@
 "use client";
 
-// ③ 이미지 — 승인 게이트 3 (컷별 이미지 확인·재생성)
+// ④ 이미지 — 승인 게이트 (컷별 이미지 확인·재생성)
+//
+// 컷 분할은 여기가 아니라 대본 승인이 한다. 이 화면에 올 때는 컷도 낭독 길이도 이미 있다 —
+// 그림은 컷당 후보 2장이라 가장 비싸므로, 사장님이 버튼을 눌러야 시작한다.
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
+import BackButton from "../../../../components/BackButton";
 
 export default function ImagesStepPage() {
   const { id } = useParams();
+  const router = useRouter();
   const { project, setProject, load } = useProject();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -51,22 +56,23 @@ export default function ImagesStepPage() {
     }, 2000);
   }
 
-  // 진입·새로고침 복원: 컷 분할 대기(컷이 아직 없음)거나 생성 중인 컷이 남아 있으면 폴링 재개
+  // 진입·새로고침 복원: 만드는 중인 컷이 남아 있으면 폴링을 잇는다.
+  // status 가 voice 인 채로 그림이 도는 동안이다 — 다 끝나면 images 로 올라간다.
   useEffect(() => {
     const cuts = project?.cuts || [];
-    const waiting = cuts.length === 0 || cuts.some((c) => ["pending", "generating"].includes(c.state));
-    if (project?.status === "cuts" && !project.cuts_error && !pollRef.current && !pollTimedOut && waiting) {
+    const waiting = cuts.length > 0 && cuts.some((c) => ["pending", "generating"].includes(c.state));
+    if (waiting && !project.images_error && !pollRef.current && !pollTimedOut) {
       setBusy(true);
       startPolling();
     }
-  }, [project?.status, project?.cuts, project?.cuts_error]);
+  }, [project?.status, project?.cuts, project?.images_error]);
 
-  // 컷 분할이 실패한 뒤의 다시 시도 — 사용자가 누를 때만 파이프라인을 다시 띄운다
-  async function retry() {
+  // 그림 만들기 시작 — 컷당 후보 2장이라 가장 비싼 단계다. 눌러야 나간다.
+  async function start() {
     setErr(""); setPollTimedOut(false); setBusy(true);
-    const res = await fetch(`/api/projects/${id}/cuts`, { method: "POST" });
+    const res = await fetch(`/api/projects/${id}/images`, { method: "POST" });
     if (!res.ok) {
-      setErr((await res.json().catch(() => ({}))).error || "다시 시도하지 못했어요");
+      setErr((await res.json().catch(() => ({}))).error || "시작하지 못했어요");
       setBusy(false);
       return;
     }
@@ -74,8 +80,8 @@ export default function ImagesStepPage() {
     startPolling();
   }
 
-  // 컷이 남은 채 실패한 경우의 빠져나갈 길. 여기서 POST /cuts는 409로 막히고(만든 컷을 지우지 않으려고),
-  // cuts_error를 지우는 서버 경로도 없다 — load만으로는 같은 실패가 그대로 돌아온다.
+  // 실패가 남은 경우의 빠져나갈 길. 다시 [이미지 만들기]를 누르면 409로 막힌다(만든 그림을
+  // 지우지 않으려고). images_error를 지우는 서버 경로도 없다 — load만으로는 같은 실패가 돌아온다.
   // 그래서 화면에서 접고, 최신 상태를 한 번 받아온 뒤 컷별 [다시 생성]으로 이어가게 한다.
   async function dismiss() {
     setErr(""); setDismissed(true);
@@ -111,11 +117,11 @@ export default function ImagesStepPage() {
   const generating = cuts.some((c) => ["pending", "generating"].includes(c.state));
   // 새로고침·재진입으로 들어오면 실패는 화면 상태가 아니라 프로젝트에 남아 있다 — 둘 다 본다.
   // 접기(dismiss)는 프로젝트에 남은 실패에만 적용한다 — 그 뒤에 새로 난 실패는 그대로 보여야 한다.
-  const shownErr = err || (dismissed ? "" : project.cuts_error || "");
+  const shownErr = err || (dismissed ? "" : project.images_error || "");
   // 실패가 남아 있으면 파이프라인은 이미 죽었다 — 폴링을 기다릴 게 없으니 컷별 [다시 생성]을 열어준다
-  const stalled = pollTimedOut || !!project.cuts_error;
-  // 컷 분할이 끝나기 전 — 대본 승인 직후 이 화면에 도착하면 여기부터 보인다
-  const splitting = project.status === "cuts" && cuts.length === 0 && !shownErr;
+  const stalled = pollTimedOut || !!project.images_error;
+  // 아직 한 장도 만들지 않았는가 — 시작 버튼을 보일지 가른다
+  const madeAny = cuts.some((c) => c.image || c.source === "photo");
   // 구성이 없는 영상에서는 컷의 문장이 곧 그림을 만드는 글이다(lib/cuts.js buildImagePrompt).
   // 구성이 있으면 그림의 바탕은 장면 설명이지만, 그때도 문장은 어떤 그림을 고를지에 쓰인다(lib/vlm.js).
   const hasSynopsis = !!project.synopsis;
@@ -123,12 +129,11 @@ export default function ImagesStepPage() {
   return (
     <div className="images-layout">
       <section className="panel images-col">
-        <h2>{splitting ? "대본을 컷으로 나누는 중이에요"
-          : cuts.length === 0 ? "컷을 나누지 못했어요"
+        <h2>{cuts.length === 0 ? "대본을 먼저 만들어 주세요"
           : generating ? "컷별 이미지를 만들고 있어요"
-          : <>컷별 이미지를 확인해 주세요 <span className="badge vlm">승인 게이트 3</span></>}</h2>
-        {splitting && <p className="pgsub">잠시만요 — 나뉜 컷부터 차례로 이미지가 만들어집니다</p>}
-        {!splitting && cuts.length > 0 && (
+          : !madeAny ? <>컷마다 그림을 그립니다 <span className="badge vlm">④ 이미지</span></>
+          : <>컷별 이미지를 확인해 주세요 <span className="badge vlm">승인 게이트</span></>}</h2>
+        {cuts.length > 0 && (
           <p className="pgsub">
             {hasSynopsis
               ? "이미지를 클릭하면 오른쪽에서 크게 보고 고칠 수 있어요 · 아래 문장은 읽어 줄 말이에요 — 그림을 만드는 바탕은 ②구성에 적어 둔 장면이라, 그림을 바꾸려면 오른쪽에 수정 지시를 적거나 ②구성의 장면 글을 고쳐 주세요"
@@ -138,9 +143,7 @@ export default function ImagesStepPage() {
         {shownErr && (
           <p className="pgsub warn">
             {shownErr}{" "}
-            {cuts.length === 0
-              ? <button className="mini" onClick={retry} disabled={busy}>다시 시도</button>
-              : <button className="mini" onClick={dismiss} disabled={busy}>닫고 컷별로 다시 만들기</button>}
+            <button className="mini" onClick={dismiss} disabled={busy}>닫고 컷별로 다시 만들기</button>
           </p>
         )}
         {cuts.map((c) => {
@@ -176,9 +179,23 @@ export default function ImagesStepPage() {
         })}
         {!generating && !busy && cuts.length > 0 && (
           <div className="step-actions">
+            <BackButton stepKey="images" />
             <div className="fwd">
-              <span className="hint">여기까지가 지금 되는 데까지예요 — 이미지가 곧 각 컷의 시작 프레임이 됩니다</span>
-              <button className="cta" disabled>영상화 — 준비 중 (⑥)</button>
+              {!madeAny ? (
+                <>
+                  <span className="hint">컷 {cuts.length}개에 그림을 그려요 — 컷마다 두 장을 뽑아 나은 쪽을 고릅니다</span>
+                  <button className="cta" disabled={busy} onClick={start}>
+                    {busy ? "그리는 중…" : "이미지 만들기"}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="hint">이미지가 곧 각 컷의 시작 프레임이 됩니다</span>
+                  <button className="cta" onClick={() => router.push(`/create/${id}/video`)}>
+                    ⑤ 영상 만들러 가기 →
+                  </button>
+                </>
+              )}
             </div>
           </div>
         )}

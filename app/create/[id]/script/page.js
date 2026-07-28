@@ -7,7 +7,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 import BackButton from "../../../../components/BackButton";
 import { estimateSeconds } from "../../../../lib/script";
-import { currentStepKey, areCutsStale } from "../../../../lib/steps";
+import { areCutsStale } from "../../../../lib/steps";
 
 export default function ScriptStepPage() {
   const { id } = useParams();
@@ -76,12 +76,13 @@ export default function ScriptStepPage() {
     router.push(`/create/${id}/briefing`);
   }
 
-  // 이미 만든 컷이 있는가 — 단계 판정은 lib/steps 하나만 본다
-  const hasCuts = currentStepKey(project) === "images" && (project.cuts || []).length > 0;
+  // 지금 원고에서 나온 컷이 이미 있는가 — 낡은 컷은 다시 만들어야 하므로 세지 않는다.
+  // 서버(POST /cuts)와 같은 판정을 쓴다. 어긋나면 화면은 넘어가는데 서버가 409로 막는다.
+  const hasCuts = (project.cuts || []).length > 0 && !areCutsStale(project);
 
   async function approve() {
     // 이미 컷이 있으면 다시 만들지 않고 보러만 간다(서버도 409로 막는다 — 돈 나간 컷을 지우지 않게)
-    if (hasCuts) { router.push(`/create/${id}/images`); return; }
+    if (hasCuts) { router.push(`/create/${id}/voice`); return; }
     setBusy(true); setErr("");
     const res = await fetch(`/api/projects/${id}/cuts`, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -93,7 +94,8 @@ export default function ScriptStepPage() {
       return;
     }
     await load(id).catch(() => {});
-    router.push(`/create/${id}/images`);
+    // 분할이 도는 동안 목소리 화면에서 기다린다 — 그림보다 소리가 먼저다
+    router.push(`/create/${id}/voice`);
   }
 
   const text = project.script?.text;
@@ -186,10 +188,10 @@ export default function ScriptStepPage() {
               ? "이미 만든 컷이 있어요 — 다시 만들지 않고 그대로 보여드려요"
               : madeCuts
               ? "지금 승인하면 컷을 처음부터 다시 만들어요 — 먼저 만든 이미지는 지워집니다"
-              : "원고를 컷으로 나누고, 컷마다 화면을 설계해서 그려요 · 목소리는 이미지를 만든 뒤에 입힙니다"}
+              : "원고를 컷으로 나누고 컷마다 화면을 설계해요 · 그다음 목소리를 입히고, 읽은 길이에 맞춰 그림을 그립니다"}
           </span>
           <button className="cta" disabled={busy} onClick={approve}>
-            {hasCuts ? "③ 이미지 확인하러 가기" : "대본 승인 →"}
+            {hasCuts ? "③ 목소리 만들러 가기" : "대본 승인 →"}
           </button>
         </div>
       </div>

@@ -89,6 +89,7 @@ describe("POST /api/projects/[id]/cuts", () => {
     await updateProject(p.id, (proj) => ({
       ...proj,
       status: "cuts",
+      cuts_script_version: 1, // 지금 원고에서 나온 컷 — 낡지 않았다
       cuts: [{ idx: 0, sentence: "이미 만든 컷", state: "done", image: { url: "http://img/1" } }],
     }));
     const res = await cutsPOST(patchReq({}), ctx(p.id));
@@ -97,6 +98,22 @@ describe("POST /api/projects/[id]/cuts", () => {
     expect(after.cuts).toHaveLength(1);
     expect(after.cuts[0].image.url).toBe("http://img/1");
     expect(pipelineMock.run).not.toHaveBeenCalled();
+  });
+
+  it("낡은 컷은 막지 않는다 — 대본을 다시 쓴 뒤에는 다시 나눠야 한다", async () => {
+    // status 로 판정하면 이 자리가 막힌다. 새 흐름에서 status 는 목소리·이미지로 앞서 가므로
+    // "컷이 있다"만 보면 원고를 고친 뒤 컷을 영영 다시 만들 수 없다.
+    const p = await projectWithScript();
+    await updateProject(p.id, (proj) => ({
+      ...proj,
+      status: "voice",
+      script: { ...proj.script, version: 2 },
+      cuts_script_version: 1, // 버전 1 원고에서 나온 컷 — 낡았다
+      cuts: [{ idx: 0, sentence: "옛 원고의 컷", state: "done", image: { url: "http://img/1" } }],
+    }));
+    const res = await cutsPOST(patchReq({}), ctx(p.id));
+    expect(res.status).toBe(200);
+    expect(pipelineMock.run).toHaveBeenCalled();
   });
 
   it("컷이 비어 있으면(분할 실패 뒤 다시 시도) 다시 띄운다", async () => {

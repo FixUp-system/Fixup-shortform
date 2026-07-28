@@ -1,5 +1,6 @@
 import { getProject, updateProject } from "../../../../../lib/projects";
 import { runSplitPipeline } from "../../../../../lib/pipeline";
+import { areCutsStale } from "../../../../../lib/steps";
 
 export async function POST(req, { params }) {
   const { id } = await params;
@@ -17,12 +18,13 @@ export async function POST(req, { params }) {
     ? body.aspect_ratio
     : project.settings?.aspect_ratio || "9:16";
 
-  // 멱등 가드 — 컷이 하나라도 있으면 다시 나누지 않는다.
+  // 멱등 가드 — 지금 원고에서 나온 컷이 이미 있으면 다시 나누지 않는다.
   // 아래에서 cuts:[]를 선저장하므로, 막지 않으면 돈 주고 만든 소리·그림이 그 자리에서 지워진다.
-  // 컷이 비어 있는 경우(=분할 실패)는 다시 시도를 허용한다.
   //
-  // 판정은 컷의 유무다. status 로 보면 뒤 단계(목소리·이미지)에서 조건이 어긋나 통과해 버린다.
-  if ((project.cuts || []).length > 0) {
+  // 낡은 컷(원고를 다시 쓴 뒤 남은 것)은 막지 않는다 — 그때는 다시 나누는 것이 맞다.
+  // status 로 판정하지 않는 이유: 새 흐름에서 status 는 목소리·이미지로 계속 앞서 간다.
+  // 컷이 비어 있는 경우(=분할 실패)도 다시 시도를 허용한다.
+  if ((project.cuts || []).length > 0 && !areCutsStale(project)) {
     return Response.json(
       { error: "이미 나눈 컷이 있어요 — ③ 목소리에서 확인해 주세요" },
       { status: 409 }

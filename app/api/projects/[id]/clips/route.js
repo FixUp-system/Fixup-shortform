@@ -8,7 +8,7 @@ export async function POST(req, { params }) {
   if (!project) return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
 
   const cuts = project.cuts || [];
-  if (!cuts.length) return Response.json({ error: "이미지를 먼저 만들어 주세요" }, { status: 400 });
+  if (!cuts.length) return Response.json({ error: "대본을 먼저 만들어 주세요" }, { status: 400 });
   // 클립 길이는 낭독 길이에서 나온다 — 소리가 없으면 몇 초를 만들지 알 수 없다
   if (!cuts.some((c) => c.audio)) {
     return Response.json({ error: "목소리를 먼저 만들어 주세요" }, { status: 400 });
