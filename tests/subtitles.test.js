@@ -24,6 +24,33 @@ describe("buildCues", () => {
     expect(cues).toEqual([{ start: 2, end: 5, text: "둘째" }]);
   });
 
+  it("클립이 낭독보다 길면 그 클립 길이만큼 다음 자막을 밀어야 한다", () => {
+    // 눈금 올림(6·8·10…초)은 항상 클립을 낭독보다 길게 만든다. 합성은 짧은 소리를
+    // 구간 끝에 무음으로 채우므로, 다음 컷의 말은 클립 경계에서 시작한다.
+    // 낭독만 누적하면 자막이 갈수록 앞서고, 마지막에는 말하는데 자막이 없다.
+    const cues = buildCues([
+      { sentence: "첫", seconds: 9, video: { seconds: 10 } },
+      { sentence: "둘", seconds: 5, video: { seconds: 6 } },
+      { sentence: "셋", seconds: 9, video: { seconds: 10 } },
+    ]);
+    expect(cues).toEqual([
+      { start: 0, end: 9, text: "첫" },    // 9~10초는 무음
+      { start: 10, end: 15, text: "둘" },
+      { start: 16, end: 25, text: "셋" },
+    ]);
+  });
+
+  it("클립이 낭독보다 짧으면 낭독을 따른다 — 그 자리는 마지막 프레임을 늘려 메운다", () => {
+    const cues = buildCues([
+      { sentence: "첫", seconds: 13, video: { seconds: 10 } },
+      { sentence: "둘", seconds: 4, video: { seconds: 6 } },
+    ]);
+    expect(cues).toEqual([
+      { start: 0, end: 13, text: "첫" },
+      { start: 13, end: 17, text: "둘" },
+    ]);
+  });
+
   it("컷이 없으면 빈 배열", () => {
     expect(buildCues([])).toEqual([]);
     expect(buildCues(null)).toEqual([]);

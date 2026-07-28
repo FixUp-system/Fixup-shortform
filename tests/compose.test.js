@@ -49,6 +49,26 @@ describe("composeVideo", () => {
     expect(r.seconds).toBe(17);
   });
 
+  it("클립이 낭독보다 길면 그 길이를 돌려준다 — 화면의 초와 파일 길이가 같아야 한다", async () => {
+    // 눈금 올림(6·8·10…초) 때문에 클립은 거의 항상 낭독보다 길다. 합성은 짧은 소리를
+    // 무음으로 채우므로 파일은 클립 합만큼 나온다. 낭독 합을 보여주면 사장님이 읽는
+    // 초와 내려받은 파일 길이가 다르다(실측: 28초라고 적고 파일은 32.8초였다).
+    const cuts = [
+      { idx: 0, sentence: "첫", seconds: 9,
+        video: { url: "https://f/v0.mp4", seconds: 10 }, audio: { url: "https://f/a0.mp3", seconds: 9 } },
+      { idx: 1, sentence: "둘", seconds: 5,
+        video: { url: "https://f/v1.mp4", seconds: 6 }, audio: { url: "https://f/a1.mp3", seconds: 5 } },
+    ];
+    const r = await composeVideo({
+      projectId: "p1", cuts, aspect_ratio: "9:16",
+      runFfmpeg: async () => {},
+      downloadImpl: async (_url, dest) => dest,
+      writeFileImpl: async () => {},
+      mkdirImpl: async () => {},
+    });
+    expect(r.seconds).toBe(16); // 10 + 6, 낭독 합(14)이 아니다
+  });
+
   it("SHOTFORM_COMPOSER=fal 이면 ffmpeg를 돌리지 않는다", async () => {
     process.env.SHOTFORM_COMPOSER = "fal";
     let ran = false;

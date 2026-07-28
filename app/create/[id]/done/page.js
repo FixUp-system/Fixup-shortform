@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 import BackButton from "../../../../components/BackButton";
+import { cutSeconds } from "../../../../lib/subtitles";
 
 export default function DoneStepPage() {
   const { id } = useParams();
@@ -68,7 +69,9 @@ export default function DoneStepPage() {
   const cuts = project?.cuts || [];
   const render = project?.render;
   const clipCount = cuts.filter((c) => c.video?.url).length;
-  const totalSeconds = cuts.reduce((s, c) => s + (Number(c.seconds) || 0), 0);
+  // 완성본 길이는 컷마다 낭독·클립 중 긴 쪽을 더한 값이다 — 낭독 합으로 예고하면
+  // 만든 뒤에 다른 초가 나온다(눈금 올림 때문에 클립이 거의 항상 더 길다)
+  const totalSeconds = cuts.reduce((s, c) => s + cutSeconds(c), 0);
 
   if (!clipCount) return <p className="pgsub">영상을 먼저 만들어 주세요.</p>;
 
