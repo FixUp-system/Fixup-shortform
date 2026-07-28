@@ -262,42 +262,72 @@ describe("dropAnsweredQuestions — 이미 아는 것을 되묻지 않는다", (
   });
 });
 
+// ⚠️ 모델은 컷을 **1부터** 센다(프롬프트가 "1. …" 로 매겨 준다). validateCast 가 0부터인
+// 내부 인덱스로 바꾼다. 아래 입력은 1부터, 기대값은 0부터다 — 이 변환이 이 함수의 요점이다.
 describe("validateCast", () => {
   const ids = ["av-child", "av-owner"];
 
-  it("인물 목록을 받는다", () => {
+  it("컷 번호를 1부터에서 0부터로 바꿔 받는다", () => {
     const got = validateCast({ cast: [
-      { who: "가게 주인", avatar_id: "av-owner" },
-      { who: "초등학생 아이", avatar_id: "av-child" },
-    ] }, ids);
+      { who: "50대 남성 주인", avatar_id: "av-owner", cuts: [2, 3] },
+      { who: "40대 여성 손님", avatar_id: "av-child", cuts: [1, 3] },
+    ] }, ids, 3);
     expect(got).toEqual([
-      { id: "c1", who: "가게 주인", avatar_id: "av-owner" },
-      { id: "c2", who: "초등학생 아이", avatar_id: "av-child" },
+      { id: "c1", who: "50대 남성 주인", avatar_id: "av-owner", cuts: [1, 2] },
+      { id: "c2", who: "40대 여성 손님", avatar_id: "av-child", cuts: [0, 2] },
     ]);
   });
 
-  it("없는 아바타 id 는 조용히 제거한다 — 첨부되지 않을 사진을 가리키면 그림을 망친다", () => {
-    const got = validateCast({ cast: [{ who: "손님", avatar_id: "av-없음" }] }, ids);
-    expect(got).toEqual([{ id: "c1", who: "손님" }]);
+  it("범위 밖 컷 번호는 버린다 — 없는 컷을 가리키면 아무 데도 못 꽂는다", () => {
+    // 컷 3개: 1·2·3 만 유효하다. 6 은 넘고, 0 은 1부터 세는 규약에서 없는 번호다
+    const got = validateCast({ cast: [{ who: "주인", cuts: [1, 6, 0] }] }, ids, 3);
+    expect(got[0].cuts).toEqual([0]);
+  });
+
+  it("중복을 없애고 오름차순으로 정렬한다", () => {
+    const got = validateCast({ cast: [{ who: "주인", cuts: [3, 1, 3] }] }, ids, 3);
+    expect(got[0].cuts).toEqual([0, 2]);
+  });
+
+  it("정수가 아닌 컷 번호는 버린다", () => {
+    const got = validateCast({ cast: [{ who: "주인", cuts: [1, "2", 2.5, null] }] }, ids, 3);
+    expect(got[0].cuts).toEqual([0]);
+  });
+
+  it("나오는 컷이 하나도 없는 인물은 버린다 — 꽂을 데가 없다", () => {
+    const got = validateCast({ cast: [
+      { who: "주인", cuts: [1] },
+      { who: "유령", cuts: [9] },
+    ] }, ids, 3);
+    expect(got).toEqual([{ id: "c1", who: "주인", cuts: [0] }]);
+  });
+
+  it("cuts 가 배열이 아니면 그 인물을 버린다", () => {
+    expect(validateCast({ cast: [{ who: "주인", cuts: 1 }] }, ids, 3)).toEqual([]);
+  });
+
+  it("없는 아바타 id 는 조용히 제거한다", () => {
+    const got = validateCast({ cast: [{ who: "손님", avatar_id: "av-없음", cuts: [1] }] }, ids, 3);
+    expect(got).toEqual([{ id: "c1", who: "손님", cuts: [0] }]);
   });
 
   it("who 가 없는 항목은 버린다", () => {
-    const got = validateCast({ cast: [{ avatar_id: "av-owner" }, { who: "아이" }] }, ids);
-    expect(got).toEqual([{ id: "c1", who: "아이" }]);
+    const got = validateCast({ cast: [{ cuts: [1] }, { who: "아이", cuts: [2] }] }, ids, 3);
+    expect(got).toEqual([{ id: "c1", who: "아이", cuts: [1] }]);
   });
 
-  it("인물이 없는 원고는 빈 배열 — 실패가 아니다", () => {
-    expect(validateCast({ cast: [] }, ids)).toEqual([]);
+  it("사람이 없는 영상은 빈 배열 — 실패가 아니다", () => {
+    expect(validateCast({ cast: [] }, ids, 3)).toEqual([]);
   });
 
   it("모양이 틀리면 null — 호출측이 재시도를 판단한다", () => {
-    expect(validateCast(null, ids)).toBe(null);
-    expect(validateCast({}, ids)).toBe(null);
-    expect(validateCast({ cast: "아이" }, ids)).toBe(null);
+    expect(validateCast(null, ids, 3)).toBe(null);
+    expect(validateCast({}, ids, 3)).toBe(null);
+    expect(validateCast({ cast: "주인" }, ids, 3)).toBe(null);
   });
 
-  it("인물이 너무 많으면 4명에서 자른다 — 30초 영상에 그 이상은 못 담는다", () => {
-    const many = { cast: Array.from({ length: 9 }, (_, i) => ({ who: `사람${i}` })) };
-    expect(validateCast(many, ids)).toHaveLength(4);
+  it("인물이 너무 많으면 4명에서 자른다", () => {
+    const many = { cast: Array.from({ length: 9 }, (_, i) => ({ who: `사람${i}`, cuts: [1] })) };
+    expect(validateCast(many, ids, 3)).toHaveLength(4);
   });
 });

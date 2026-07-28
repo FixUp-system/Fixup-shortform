@@ -2,41 +2,42 @@ import { describe, it, expect } from "vitest";
 import { buildCastMessages } from "../lib/cast.js";
 import { AVATARS } from "../lib/refs.js";
 
-const project = {
-  briefing: { topic: "성수동 자전거 수리점 소개" },
-  script: { text: "작년에 초등학생이 형에게 물려받은 자전거를 끌고 왔습니다. 그냥 교체해줬습니다." },
-};
-
 describe("buildCastMessages", () => {
-  it("원고 전문과 아바타 목록을 넘긴다", () => {
-    const { system, messages } = buildCastMessages(project, AVATARS);
-    const user = messages[0].content;
-    expect(user).toContain("초등학생이 형에게 물려받은");
+  const cuts = [
+    { idx: 0, sentence: "손님이 코트를 들고 오셨습니다.", shows: "손님이 코트를 들고 문을 들어서는 미디엄 샷" },
+    { idx: 1, sentence: "안감을 통째로 갈았습니다.", shows: "주인이 작업대에서 옷을 수선하는 클로즈업" },
+    { idx: 2, sentence: "치수는 입은 채로 잽니다.", shows: "주인이 손님에게 옷을 입히고 치수를 재는 미디엄 샷" },
+  ];
+
+  it("컷별 화면을 번호와 함께 넘긴다 — 인물은 여기 이미 쓰여 있다", () => {
+    const user = buildCastMessages(cuts, AVATARS).messages[0].content;
+    expect(user).toContain("1. 손님이 코트를 들고 문을 들어서는 미디엄 샷");
+    expect(user).toContain("3. 주인이 손님에게 옷을 입히고 치수를 재는 미디엄 샷");
+  });
+
+  it("화면이 없는 컷은 문장으로 대신한다 — 화면 설계가 실패해도 캐스팅은 돈다", () => {
+    const user = buildCastMessages([{ idx: 0, sentence: "문장뿐인 컷." }], AVATARS).messages[0].content;
+    expect(user).toContain("1. 문장뿐인 컷.");
+  });
+
+  it("아바타 목록을 id 와 설명으로 넘긴다", () => {
+    const user = buildCastMessages(cuts, AVATARS).messages[0].content;
     expect(user).toContain(AVATARS[0].id);
     expect(user).toContain(AVATARS[0].traits);
-    expect(system).toContain("JSON");
   });
 
-  it("아바타가 없으면 (없음) 이라고 적는다 — 없는 것을 고르라고 하면 안 된다", () => {
-    const { messages } = buildCastMessages(project, []);
-    expect(messages[0].content).toContain("(없음)");
+  it("아바타가 없으면 (없음) — 없는 것을 고르라고 하면 안 된다", () => {
+    expect(buildCastMessages(cuts, []).messages[0].content).toContain("(없음)");
   });
 
-  it("다시 나오거나 이야기의 한 자리를 차지하는 인물만 넣으라고 지시한다 — 배경은 자리를 잡아먹는다", () => {
-    const { system } = buildCastMessages(project, AVATARS);
-    expect(system).toContain("여러 컷에 걸쳐 같은 사람으로 다시 나오는 인물");
-    expect(system).toContain("이야기에서 특정 개인으로 다뤄지는 인물만 넣는다");
-    // 이름 없는 손님이라도 이야기의 주역이면 들어간다 — 손님이 통째로 빠지던 결함
-    expect(system).toContain("이름 없이 \"손님\"으로만 불려도 한 명의 인물이다");
-    // 반례는 배경 손님을 넣는 쪽이 틀린 경우를 보여준다
-    expect(system).toContain("✗ \"카페 안에 손님들이 앉아 있습니다\" 의 그 손님들을 cast 에 넣는 것");
-    expect(system).toContain("배경 손님·지나가는 사람은 누구인지가 중요하지 않으니 넣지 않는다");
-    expect(system).toContain("전화 통화 상대"); // 화면에 안 나오는 사람을 빼는 원래 의도는 남아 있다
+  it("어느 컷에 나오는지 함께 답하라고 지시한다 — 같은 사람을 컷에 꽂는 것은 코드가 한다", () => {
+    const { system } = buildCastMessages(cuts, AVATARS);
+    expect(system).toContain("cuts");
+    expect(system).toContain("컷 번호");
   });
 
-  it("주제를 안 밝힌 프로젝트도 견딘다", () => {
-    const { messages } = buildCastMessages({ script: { text: "한 문장." } }, AVATARS);
-    expect(messages[0].content).toContain("한 문장.");
+  it("화면에 보이는 사람만 세라고 지시한다", () => {
+    expect(buildCastMessages(cuts, AVATARS).system).toContain("화면에 보이는 사람");
   });
 });
 
