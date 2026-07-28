@@ -22,6 +22,13 @@ describe("buildCastMessages", () => {
     expect(messages[0].content).toContain("(없음)");
   });
 
+  it("이름 없이 불리는 사람도 화면에 보이면 넣으라고 지시한다 — 손님이 빠지던 결함", () => {
+    const { system } = buildCastMessages(project, AVATARS);
+    expect(system).toContain("손님·아이·직원처럼 이름 없이 일반명사로 불려도");
+    expect(system).toContain("✗ \"미용사가 아이 머리를 자릅니다\" 인데 cast 에 미용사만 두는 것");
+    expect(system).toContain("전화 통화 상대"); // 화면에 안 나오는 사람을 빼는 원래 의도는 남아 있다
+  });
+
   it("주제를 안 밝힌 프로젝트도 견딘다", () => {
     const { messages } = buildCastMessages({ script: { text: "한 문장." } }, AVATARS);
     expect(messages[0].content).toContain("한 문장.");
