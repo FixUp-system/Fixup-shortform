@@ -4,16 +4,17 @@ import { STEPS, currentStepKey, isReachable, areCutsStale, stepFromPathname, ste
 describe("단계 정의", () => {
   it("구성이 빠져 6단계다 — 원고가 곧 설계다", () => {
     expect(STEPS.map((s) => s.key)).toEqual([
-      "material", "script", "images", "voice", "video", "done",
+      "material", "script", "voice", "images", "video", "done",
     ]);
     expect(STEPS[1]).toMatchObject({ key: "script", label: "대본", seg: "script" });
   });
 
-  it("목소리는 이미지 뒤다 — 컷이 있어야 컷별로 읽힌다", () => {
-    // 컷 분할은 이미지 단계(POST /cuts)에서 일어난다. 목소리가 앞에 오면 읽을 컷이 없다.
+  it("목소리가 이미지 앞이다 — 낭독 길이가 컷 구조를 판정한다", () => {
+    // TTS 실측이 cut.seconds 를 덮는다. 그 값이 10초를 넘으면 클립이 잘린다.
+    // 이미지 값(컷당 후보 2장)을 치르기 전에 알아야 쪼갤 기회가 있다.
     const keys = STEPS.map((s) => s.key);
-    expect(keys.indexOf("voice")).toBeGreaterThan(keys.indexOf("images"));
-    expect(keys.indexOf("voice")).toBeLessThan(keys.indexOf("video"));
+    expect(keys.indexOf("voice")).toBeLessThan(keys.indexOf("images"));
+    expect(keys.indexOf("images")).toBeLessThan(keys.indexOf("video"));
   });
 
   it("준비 중 표시가 남아 있지 않다", () => {
@@ -67,22 +68,27 @@ describe("currentStepKey", () => {
   it("확정하면 바로 대본 단계 — 구성 게이트가 사라졌다", () => {
     expect(currentStepKey({ status: "briefing", briefing: confirmed })).toBe("script");
   });
-  it("컷이 시작되면 이미지 단계", () => {
-    expect(currentStepKey({ status: "cuts", briefing: confirmed })).toBe("images");
+  // status 는 "마지막으로 끝난 산출물", currentStepKey 는 "다음에 열릴 화면"이다
+  it("분할이 끝나면 목소리 차례", () => {
+    expect(currentStepKey({ status: "cuts", briefing: confirmed })).toBe("voice");
+  });
+  it("목소리가 끝나면 이미지 차례", () => {
+    expect(currentStepKey({ status: "voice", briefing: confirmed })).toBe("images");
   });
   it("뒤 단계 status 를 각각 읽는다", () => {
-    expect(currentStepKey({ status: "voice", briefing: confirmed })).toBe("voice");
+    // 이미지가 끝나도 완성은 사장님이 눌러야 시작된다 — 열려 있어야 할 화면은 ⑤영상이다
+    expect(currentStepKey({ status: "images", briefing: confirmed })).toBe("video");
     expect(currentStepKey({ status: "video", briefing: confirmed })).toBe("video");
     expect(currentStepKey({ status: "done", briefing: confirmed })).toBe("done");
   });
   it("뒤 단계 판정을 앞보다 먼저 본다 — 앞서간 프로젝트를 끌어내리지 않는다", () => {
-    // status 가 done 인데 cuts 조건에 먼저 걸려 이미지로 돌아가면, 완성본을 두고 뒤로 간다
+    // status 가 done 인데 cuts 조건에 먼저 걸려 되돌아가면, 완성본을 두고 뒤로 간다
     const finished = { status: "done", briefing: confirmed, cuts: [{ idx: 0 }] };
     expect(currentStepKey(finished)).toBe("done");
   });
-  it("구성 시절 프로젝트도 status가 cuts면 이미지 단계 — 돈 주고 만든 컷에서 쫓아내지 않는다", () => {
+  it("구성 시절 프로젝트도 status가 cuts면 목소리 차례 — 돈 주고 만든 컷에서 쫓아내지 않는다", () => {
     const old = { status: "cuts", briefing: confirmed, synopsis: { scenes: [] }, cuts: [{ id: "c1" }] };
-    expect(currentStepKey(old)).toBe("images");
+    expect(currentStepKey(old)).toBe("voice");
   });
   it("대본을 고쳐 status가 script로 내려가면 컷이 남아 있어도 대본 단계 — 컷을 다시 뽑을 수 있다", () => {
     const p = { status: "script", briefing: confirmed, cuts: [{ id: "c1" }] };
@@ -129,21 +135,22 @@ describe("isReachable", () => {
     expect(isReachable("voice", p)).toBe(false);
     expect(isReachable("images", p)).toBe(false);
   });
-  it("대본 승인 직후 status가 cuts로 서야 이미지 단계가 열린다", () => {
+  it("대본 승인 직후 status가 cuts로 서야 목소리 단계가 열린다", () => {
     // 라우트가 파이프라인보다 먼저 status:cuts를 세우는 이유 — script인 채로 오면 가드가 되돌린다
     const base = { briefing: { confirmed: true } };
-    expect(isReachable("images", { ...base, status: "script" })).toBe(false);
-    expect(isReachable("images", { ...base, status: "cuts", cuts: [] })).toBe(true); // 컷이 비어 있어도 열린다
+    expect(isReachable("voice", { ...base, status: "script" })).toBe(false);
+    expect(isReachable("voice", { ...base, status: "cuts", cuts: [] })).toBe(true); // 컷이 비어 있어도 열린다
   });
   it("지난 단계는 다시 열 수 있다", () => {
-    const p = { status: "cuts", briefing: { confirmed: true } };
+    const p = { status: "voice", briefing: { confirmed: true } };
     expect(isReachable("script", p)).toBe(true);
+    expect(isReachable("voice", p)).toBe(true);
     expect(isReachable("images", p)).toBe(true);
     expect(isReachable("video", p)).toBe(false);
   });
   it("영상 단계에 있으면 앞 단계가 전부 열려 있다", () => {
-    const p = { briefing: { confirmed: true }, status: "video" };
-    for (const k of ["material", "script", "images", "voice", "video"]) {
+    const p = { briefing: { confirmed: true }, status: "images" };
+    for (const k of ["material", "script", "voice", "images", "video"]) {
       expect(isReachable(k, p), k).toBe(true);
     }
     expect(isReachable("done", p)).toBe(false);
