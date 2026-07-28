@@ -161,11 +161,23 @@ export default function ScriptStepPage() {
     return <p className="pgsub">대본을 쓰는 중…</p>;
   }
 
-  const shown = draft ?? text;
   const staleCuts = areCutsStale(project);
   const madeCuts = (project.cuts || []).length > 0;
   // 구성 — 낡은 컷은 보여주지 않는다(원고를 다시 썼으면 새로 나뉘는 중이다)
   const cuts = staleCuts ? [] : project.cuts || [];
+
+  // 읽기 좋게 컷 경계마다 빈 줄을 넣어 보여준다. **저장되는 원고는 한 줄 그대로다.**
+  //
+  // 문단을 프롬프트로 요구했더니 지켜지지 않았다(빈 줄 하나 나오지 않았다). 문단은 창작이 아니라
+  // 형식이라 코드가 쥐는 것이 맞다. 컷 경계를 쓰는 이유는 그것이 이미 의미 단위이고,
+  // "컷을 이어붙이면 원고와 글자 그대로 같다"는 구조적 보장이 있어 글이 바뀔 수 없기 때문이다.
+  const paragraphed =
+    cuts.length > 1 && text ? cuts.map((c) => c.sentence).join("\n\n") : text;
+  const shown = draft ?? paragraphed;
+
+  // 저장할 때는 문단을 걷어 한 줄로 되돌린다 — 원고에 줄바꿈이 들어가면
+  // splitSentences 가 그것을 문장 경계로 읽어(cuts.js:7) 컷이 달라진다.
+  const flatten = (s) => s.replace(/\s*\n\s*/g, " ").replace(/\s{2,}/g, " ").trim();
   const splitting = project.status === "cuts" && cuts.length === 0 && !project.cuts_error;
   // 고른 길이를 못 채웠는가 — 사실 개수로 어림하지 않고 실제 원고를 재서 판단한다.
   // 모자라면 강요하지 않고 고르게 한다: 이야기를 더 들려주거나, 이대로 가거나.
@@ -188,7 +200,12 @@ export default function ScriptStepPage() {
         className="ref ref-lg script-draft"
         value={shown}
         onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => { if (draft !== null && draft.trim() && draft !== text) saveText(draft.trim()); }}
+        onBlur={() => {
+          if (draft === null) return;
+          const next = flatten(draft);
+          if (next && next !== text) saveText(next);
+          else setDraft(null); // 문단만 다르고 내용은 같다 — 저장하지 않고 표시본으로 되돌린다
+        }}
       />
       <div className="script-src">
         이대로 읽으면 약 {estimateSeconds({ text: shown })}초 · 글을 고치면 그대로 저장돼요
