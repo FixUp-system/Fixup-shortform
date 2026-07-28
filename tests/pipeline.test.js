@@ -34,6 +34,13 @@ async function makeProject() {
   });
 }
 
+// 분할과 이미지가 갈라지기 전에는 한 함수였다. 갈라져도 이어 부르면 결과가 같아야 하므로,
+// 그 시절 단언들은 이 헬퍼를 거쳐 그대로 살아 있다.
+const runBoth = async (id, d) => {
+  await pipeline.runSplitPipeline(id, d);
+  await pipeline.runImagesPipeline(id, d);
+};
+
 // 주입 deps가 전부 우회하는 자리 — buildCutsMessages와 validateCuts(obj, scenes)가
 // 실제로 맞물리는 유일한 지점이라 여기만 직접 부른다.
 describe("defaultDeps.splitCuts — 두 패스", () => {
@@ -87,12 +94,48 @@ describe("defaultDeps.splitCuts — 두 패스", () => {
   });
 });
 
-describe("runCutsPipeline", () => {
-  it("정상 흐름: ai 컷은 이미지·검수, photo 컷은 즉시 done", async () => {
+describe("분할과 이미지가 갈라져 있다", () => {
+  it("runSplitPipeline 은 컷만 만들고 이미지는 부르지 않는다", async () => {
+    let imageCalls = 0;
+    const d = { ...deps(), genImage: async () => { imageCalls++; return { url: "http://img/x" }; } };
     const p = await makeProject();
-    await pipeline.runCutsPipeline(p.id, deps());
+
+    await pipeline.runSplitPipeline(p.id, d);
+
     const after = await projects.getProject(p.id);
     expect(after.status).toBe("cuts");
+    expect(after.cuts.length).toBeGreaterThan(0);
+    expect(after.cuts.every((c) => c.state === "pending")).toBe(true);
+    expect(imageCalls).toBe(0); // 목소리가 먼저다 — 아직 그림 값을 치르지 않는다
+  });
+
+  it("runImagesPipeline 은 이미 있는 컷에 그림을 붙이고 status 를 images 로 올린다", async () => {
+    const d = {
+      ...deps(),
+      splitCuts: async () => { throw new Error("분할을 다시 부르면 안 된다"); },
+    };
+    const p = await makeProject();
+    await projects.updateProject(p.id, (proj) => ({
+      ...proj,
+      status: "voice",
+      cuts: [{ idx: 0, sentence: "첫 문장입니다.", seconds: 3, state: "pending", regen_count: 0, source: "ai" }],
+    }));
+
+    await pipeline.runImagesPipeline(p.id, d);
+
+    const after = await projects.getProject(p.id);
+    expect(after.status).toBe("images");
+    expect(after.cuts[0].state).toBe("done");
+    expect(after.cuts[0].image.url).toContain("http://img/");
+  });
+});
+
+describe("분할 → 이미지 (이어 부르면 갈라지기 전과 같다)", () => {
+  it("정상 흐름: ai 컷은 이미지·검수, photo 컷은 즉시 done", async () => {
+    const p = await makeProject();
+    await runBoth(p.id,deps());
+    const after = await projects.getProject(p.id);
+    expect(after.status).toBe("images");
     expect(after.cuts[0].state).toBe("done");
     expect(after.cuts[0].image.url).toContain("http://img/");
     expect(after.cuts[1].state).toBe("done");
@@ -101,7 +144,7 @@ describe("runCutsPipeline", () => {
 
   it("전원 탈락 컷은 자동 보정 후에도 실패하면 needs_attention — 다른 컷은 정상(실패 격리)", async () => {
     const p = await makeProject();
-    await pipeline.runCutsPipeline(p.id, deps({ failCut: 0 }));
+    await runBoth(p.id,deps({ failCut: 0 }));
     const after = await projects.getProject(p.id);
     expect(after.cuts[0].state).toBe("needs_attention");
     expect(after.cuts[1].state).toBe("done");
@@ -115,7 +158,7 @@ describe("runCutsPipeline", () => {
       splitCuts: async () => [{ idx: 0, sentence: "AI컷", shows: "딸기라떼 클로즈업", seconds: 6, source: "ai", regen_count: 0 }],
       select: async ({ scene }) => { seen.push(scene); return { selectedIndex: 0, passed: true, note: "ok" }; },
     };
-    await pipeline.runCutsPipeline(p.id, capturing);
+    await runBoth(p.id,capturing);
     expect(seen[0]?.shows).toBe("딸기라떼 클로즈업");
   });
 
@@ -131,13 +174,13 @@ describe("runCutsPipeline", () => {
       splitCuts: async () => [{ idx: 0, scene_idx: 0, sentence: "옛 컷", seconds: 6, source: "ai", regen_count: 0 }],
       select: async ({ scene }) => { seen.push(scene); return { selectedIndex: 0, passed: true, note: "ok" }; },
     };
-    await pipeline.runCutsPipeline(p.id, capturing);
+    await runBoth(p.id,capturing);
     expect(seen[0]?.shows).toBe("옛 장면 화면");
   });
 
   it("regenCut은 3회 제한", async () => {
     const p = await makeProject();
-    await pipeline.runCutsPipeline(p.id, deps());
+    await runBoth(p.id,deps());
     await pipeline.regenCut(p.id, 0, deps());
     await pipeline.regenCut(p.id, 0, deps());
     await pipeline.regenCut(p.id, 0, deps());
@@ -146,7 +189,7 @@ describe("runCutsPipeline", () => {
 
   it("regenCut instruction이 컷에 저장되고 이후 프롬프트에 실린다", async () => {
     const p = await makeProject();
-    await pipeline.runCutsPipeline(p.id, deps());
+    await runBoth(p.id,deps());
     const prompts = [];
     const capturing = { ...deps(), genImage: async ({ prompt }) => { prompts.push(prompt); return { url: "http://img/x" }; } };
     await pipeline.regenCut(p.id, 0, capturing, "딸기라떼가 보이게");
