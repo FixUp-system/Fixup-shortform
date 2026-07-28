@@ -309,6 +309,15 @@ describe("scriptFaults — 원고가 스스로 판정되는 셋", () => {
     expect(overTarget(project, "가".repeat(targetChars(project) + 5))).toBe(false);
   });
 
+  // 1.3배였을 때 30초 요청에 39초짜리가 결함 없음으로 통과했다 — 추정 오차(±15%)까지만 봐준다.
+  // 관통에서도 그대로 재현됐다: 목표 165자에 200자(121%)가 "결함 없음"으로 나갔다.
+  it("1.15배를 넘으면 잡는다", () => {
+    const target = targetChars(project);
+    expect(overTarget(project, "가".repeat(Math.round(target * 1.14)))).toBe(false);
+    expect(overTarget(project, "가".repeat(Math.round(target * 1.2)))).toBe(true);
+    expect(overTarget(project, "가".repeat(Math.round(target * 1.25)))).toBe(true);
+  });
+
   // 10초를 고른 사장님에게 5초를 주면 자료 부족이 아니라 그냥 실패다
   it("채울 재료가 남아 있는데 짧으면 잡는다", () => {
     const half = "가".repeat(Math.round(targetChars(project) * 0.5)); // 자료의 사실을 하나도 안 씀
@@ -385,7 +394,8 @@ describe("buildScriptRewriteMessages", () => {
     const user = messages[0].content;
     expect(user).toContain("늘어진 원고입니다");
     expect(user).toContain("같은 말 되풀이");
-    expect(user).toContain(`${targetChars(project)}자 안팎`);
+    const target = targetChars(project);
+    expect(user).toContain(`${Math.round(target * 0.9)}~${Math.round(target * 1.1)}자`);
     expect(system).toContain('{"script"');
   });
 
@@ -413,6 +423,15 @@ describe("buildScriptRewriteMessages", () => {
   it("다른 이유일 때는 사실 목록을 붙이지 않는다", () => {
     const user = buildScriptRewriteMessages(project, draft, ["분량 초과"]).messages[0].content;
     expect(user).not.toContain("[아직 안 쓴 사실]");
+  });
+
+  // "안팎"이라고만 하면 얼마나 안팎인지가 모델 재량이 된다. 아래로 깎는 것도 잘못이라고 못 박는다
+  it("사정권을 자릿수로 주고, 그 아래로 깎지 말라고 한다 — 진자 방지", () => {
+    const { system, messages } = buildScriptRewriteMessages(project, draft, ["분량 초과"]);
+    const target = targetChars(project);
+    expect(messages[0].content).toContain(`${Math.round(target * 0.9)}~${Math.round(target * 1.1)}자`);
+    expect(messages[0].content).toContain(`${Math.round(target * 0.9)}자 아래로 깎지 않는다`);
+    expect(system).toContain("범위 아래로 내려가면 그것도 똑같이 잘못이다");
   });
 });
 
