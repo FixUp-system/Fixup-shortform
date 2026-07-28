@@ -110,9 +110,10 @@ export default function ImagesStepPage() {
   const cuts = project.cuts || [];
   const imgUrl = (c) =>
     c.source === "photo" ? project.material.photos.find((p) => p.id === c.photo_id)?.url : c.image?.url;
-  // 우측 미리보기 대상 — 사용자가 고른 컷, 없으면 이미지가 준비된 첫 컷
-  const readyCuts = cuts.filter((c) => imgUrl(c));
-  const activeIdx = cuts.some((c) => c.idx === selectedIdx) ? selectedIdx : readyCuts[0]?.idx ?? null;
+  // 우측 미리보기 대상 — 사용자가 고른 컷, 고르기 전에는 첫 컷.
+  // "이미지가 준비된 첫 컷"이 아니라 그냥 첫 컷이다: 만드는 동안에도 자리가 잡혀 있어야
+  // 첫 장이 완성되는 순간 그 자리에서 보인다(빈 오른쪽을 보다가 갑자기 채워지지 않게).
+  const activeIdx = cuts.some((c) => c.idx === selectedIdx) ? selectedIdx : cuts[0]?.idx ?? null;
   const activeCut = cuts.find((c) => c.idx === activeIdx) || null;
   const generating = cuts.some((c) => ["pending", "generating"].includes(c.state));
   // 새로고침·재진입으로 들어오면 실패는 화면 상태가 아니라 프로젝트에 남아 있다 — 둘 다 본다.
