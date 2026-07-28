@@ -56,12 +56,15 @@ export default function ImagesStepPage() {
     }, 2000);
   }
 
-  // 진입·새로고침 복원: 만드는 중인 컷이 남아 있으면 폴링을 잇는다.
-  // status 가 voice 인 채로 그림이 도는 동안이다 — 다 끝나면 images 로 올라간다.
+  // 진입·새로고침 복원: **만드는 중인** 컷이 남아 있으면 폴링을 잇는다.
+  //
+  // generating 만 본다. pending 은 "아직 시작 안 함"이기도 하다 —
+  // 목소리를 마치면 컷이 pending 인 채로 이 화면에 오는데, 그때 폴링을 걸면
+  // 화면이 busy 로 잠겨 [이미지 만들기] 버튼이 사라지고 영원히 기다린다(실제로 그랬다).
   useEffect(() => {
     const cuts = project?.cuts || [];
-    const waiting = cuts.length > 0 && cuts.some((c) => ["pending", "generating"].includes(c.state));
-    if (waiting && !project.images_error && !pollRef.current && !pollTimedOut) {
+    const running = cuts.some((c) => c.state === "generating");
+    if (running && !project.images_error && !pollRef.current && !pollTimedOut) {
       setBusy(true);
       startPolling();
     }
@@ -115,7 +118,9 @@ export default function ImagesStepPage() {
   // 첫 장이 완성되는 순간 그 자리에서 보인다(빈 오른쪽을 보다가 갑자기 채워지지 않게).
   const activeIdx = cuts.some((c) => c.idx === selectedIdx) ? selectedIdx : cuts[0]?.idx ?? null;
   const activeCut = cuts.find((c) => c.idx === activeIdx) || null;
-  const generating = cuts.some((c) => ["pending", "generating"].includes(c.state));
+  // busy 는 방금 [이미지 만들기]를 누른 경우다 — 그때는 아직 컷이 pending 이라 generating 이 없다.
+  // busy 없이 pending 만으로 판단하면 시작 전과 구별되지 않는다.
+  const generating = cuts.some((c) => c.state === "generating") || (busy && cuts.some((c) => c.state === "pending"));
   // 새로고침·재진입으로 들어오면 실패는 화면 상태가 아니라 프로젝트에 남아 있다 — 둘 다 본다.
   // 접기(dismiss)는 프로젝트에 남은 실패에만 적용한다 — 그 뒤에 새로 난 실패는 그대로 보여야 한다.
   const shownErr = err || (dismissed ? "" : project.images_error || "");

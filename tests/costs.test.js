@@ -35,14 +35,17 @@ describe("estimateCost", () => {
     expect(estimateCost("fal-ai/wan/v2.5/image-to-video", 10)).toBe(1);
   });
 
-  it("센트 단위로 반올림한다", () => {
-    expect(estimateCost("fal-ai/kling-video/v3", 7)).toBe(0.88); // 0.882 → 0.88
+  it("센트로 뭉개지 않는다 — 소액 호출이 0원으로 사라진다", () => {
+    // 센트 반올림 시절 TTS 네 건($0.002씩)이 전부 $0 으로 기록됐다.
+    // 소리는 나왔는데 쓴 돈이 없는 것처럼 보였다 — 싼 항목은 부를수록 총합이 벌어진다.
+    expect(estimateCost("fal-ai/kling-video/v3", 7)).toBe(0.882);
+    expect(estimateCost("fal-ai/elevenlabs/tts/turbo-v2.5", 40)).toBeGreaterThan(0);
   });
 });
 
 describe("단위", () => {
   it("글자당 단가는 1000자 기준으로 계산한다", () => {
-    expect(estimateCost("fal-ai/elevenlabs/tts/turbo-v2.5", 165)).toBe(0.01); // 0.00825 → 0.01
+    expect(estimateCost("fal-ai/elevenlabs/tts/turbo-v2.5", 165)).toBe(0.00825);
     expect(estimateCost("fal-ai/elevenlabs/tts/turbo-v2.5", 2000)).toBe(0.1);
   });
 
@@ -55,7 +58,7 @@ describe("단위", () => {
   it("i2v와 ffmpeg 단가가 표에 있다", () => {
     expect(estimateCost("fal-ai/ltx-2.3/image-to-video/fast", 10)).toBe(0.4);
     expect(estimateCost("fal-ai/ffmpeg-api/merge-videos", 30)).toBe(0);
-    expect(estimateCost("fal-ai/ffmpeg-api/merge-audio-video", 30)).toBe(0.01); // 0.006 → 0.01
+    expect(estimateCost("fal-ai/ffmpeg-api/merge-audio-video", 30)).toBe(0.006);
   });
 });
 
