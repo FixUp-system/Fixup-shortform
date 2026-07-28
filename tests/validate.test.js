@@ -101,9 +101,37 @@ describe("validateShows — 화면 패스", () => {
   });
 
   it("있는 사진만 ref로 남긴다", () => {
-    const shots = validateShows({ shots: [{ shows: "화면", ref_photo_id: "p1" }, { shows: "화면2", ref_photo_id: "없는id" }] }, 2, ["p1"]);
-    expect(shots[0].ref_photo_id).toBe("p1");
-    expect(shots[1].ref_photo_id).toBeUndefined();
+    const shots = validateShows({ shots: [{ shows: "화면", ref_ids: ["p1"] }, { shows: "화면2", ref_ids: ["없는id"] }] }, 2, ["p1"]);
+    expect(shots[0].ref_ids).toEqual(["p1"]);
+    expect(shots[1].ref_ids).toBeUndefined();
+  });
+
+  it("ref_ids 배열을 받는다 — 인물과 사물을 함께 고를 수 있다", () => {
+    const got = validateShows(
+      { shots: [{ shows: "화면", motion: "움직임", ref_ids: ["c2", "p1"] }] },
+      1, ["c1", "c2", "p1"]
+    );
+    expect(got[0].ref_ids).toEqual(["c2", "p1"]);
+  });
+
+  it("모르는 id 는 조용히 지운다", () => {
+    const got = validateShows({ shots: [{ shows: "화면", ref_ids: ["c2", "없음"] }] }, 1, ["c2"]);
+    expect(got[0].ref_ids).toEqual(["c2"]);
+  });
+
+  it("2장에서 자른다 — 장수가 늘면 모델이 무엇을 따를지 헷갈린다", () => {
+    const got = validateShows({ shots: [{ shows: "화면", ref_ids: ["a", "b", "c"] }] }, 1, ["a", "b", "c"]);
+    expect(got[0].ref_ids).toEqual(["a", "b"]);
+  });
+
+  it("고른 것이 없으면 ref_ids 를 두지 않는다", () => {
+    const got = validateShows({ shots: [{ shows: "화면", ref_ids: ["없음"] }] }, 1, ["c1"]);
+    expect(got[0].ref_ids).toBeUndefined();
+  });
+
+  it("배열이 아니면 무시한다", () => {
+    const got = validateShows({ shots: [{ shows: "화면", ref_ids: "c1" }] }, 1, ["c1"]);
+    expect(got[0].ref_ids).toBeUndefined();
   });
 
   it("빈 화면이 있으면 null", () => {
