@@ -106,3 +106,72 @@ describe("가짜 모드", () => {
     ).resolves.toBeUndefined();
   });
 });
+
+// 가드를 만들어도 부르지 않으면 아무것도 막지 않는다.
+// 여기서 보는 것은 "던지는가"가 아니라 "fetch 가 안 불렸는가"다 — 그게 돈이 안 나갔다는 뜻이다.
+const bust = () => "?t=" + Date.now() + Math.random();
+
+describe("호출부 배선 — 가드에 걸리면 fal 로 나가지 않는다", () => {
+  beforeEach(() => fresh({ total: "0.01", project: "0.01" }));
+
+  it("이미지: 상한을 넘으면 fetch 를 부르지 않는다", async () => {
+    const { generateImage } = await import("../lib/imagegen.js" + bust());
+    let called = false;
+    const fetchImpl = async () => { called = true; return { ok: true, json: async () => ({}) }; };
+    await expect(
+      generateImage({ prompt: "p", aspect_ratio: "9:16", projectId: "p1", fetchImpl })
+    ).rejects.toThrow(/예산 상한/);
+    expect(called).toBe(false);
+  });
+
+  it("목소리: 상한을 넘으면 fetch 를 부르지 않는다", async () => {
+    const { generateSpeech } = await import("../lib/tts.js" + bust());
+    let called = false;
+    const fetchImpl = async () => { called = true; return { ok: true, json: async () => ({}) }; };
+    await expect(
+      generateSpeech({ text: "가".repeat(500), voiceId: "v", projectId: "p1", fetchImpl })
+    ).rejects.toThrow(/예산 상한/);
+    expect(called).toBe(false);
+  });
+
+  it("영상: 상한을 넘으면 fetch 를 부르지 않는다", async () => {
+    const { generateClip } = await import("../lib/i2v.js" + bust());
+    let called = false;
+    const fetchImpl = async () => { called = true; return { ok: true, json: async () => ({}) }; };
+    await expect(
+      generateClip({ imageUrl: "u", seconds: 5, aspect_ratio: "9:16", projectId: "p1", fetchImpl })
+    ).rejects.toThrow(/예산 상한/);
+    expect(called).toBe(false);
+  });
+});
+
+describe("비용 기록에 프로젝트가 남는다", () => {
+  beforeEach(() => fresh({ total: "100", project: "100" }));
+
+  it("이미지 기록에 project_id 가 들어간다", async () => {
+    const { generateImage } = await import("../lib/imagegen.js" + bust());
+    const fetchImpl = async () => ({
+      ok: true, json: async () => ({ images: [{ url: "https://x/y.png" }] }),
+    });
+    await generateImage({ prompt: "p", aspect_ratio: "9:16", projectId: "p1", fetchImpl });
+    expect(await costs.spentForProject("p1")).toBeGreaterThan(0);
+  });
+
+  it("목소리 기록에 project_id 가 들어간다", async () => {
+    const { generateSpeech } = await import("../lib/tts.js" + bust());
+    const fetchImpl = async () => ({
+      ok: true, json: async () => ({ audio: { url: "https://x/y.mp3", duration: 3 } }),
+    });
+    await generateSpeech({ text: "가".repeat(500), voiceId: "v", projectId: "p1", fetchImpl });
+    expect(await costs.spentForProject("p1")).toBeGreaterThan(0);
+  });
+
+  it("영상 기록에 project_id 가 들어간다", async () => {
+    const { generateClip } = await import("../lib/i2v.js" + bust());
+    const fetchImpl = async () => ({
+      ok: true, json: async () => ({ video: { url: "https://x/y.mp4" } }),
+    });
+    await generateClip({ imageUrl: "u", seconds: 5, aspect_ratio: "9:16", projectId: "p1", fetchImpl });
+    expect(await costs.spentForProject("p1")).toBeGreaterThan(0);
+  });
+});
