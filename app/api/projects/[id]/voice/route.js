@@ -8,9 +8,10 @@ export async function POST(req, { params }) {
   const project = await getProject(id);
   if (!project) return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
 
-  // 읽을 컷이 있어야 한다 — 목소리는 컷별로 만든다
+  // 읽을 컷이 있어야 한다 — 목소리는 컷별로 만든다.
+  // 컷은 대본 승인이 나눈다(POST /cuts).
   if (!(project.cuts || []).length) {
-    return Response.json({ error: "이미지를 먼저 만들어 주세요" }, { status: 400 });
+    return Response.json({ error: "대본을 먼저 만들어 주세요" }, { status: 400 });
   }
 
   const body = await req.json().catch(() => ({}));
@@ -23,8 +24,10 @@ export async function POST(req, { params }) {
     return Response.json({ error: "이 목소리는 아직 연결되지 않았어요" }, { status: 400 });
   }
 
-  // 멱등 가드 — 이미 만든 소리를 통째로 지우고 다시 만들지 않는다(컷별 재생성으로 처리)
-  if (project.status === "voice" && (project.cuts || []).some((c) => c.audio)) {
+  // 멱등 가드 — 이미 만든 소리를 통째로 지우고 다시 만들지 않는다(컷별 재생성으로 처리).
+  // status 조건을 두지 않는다: 목소리가 끝나면 status 는 이미지·영상으로 계속 앞서 가므로,
+  // status 로 판정하면 뒤 단계에서 소리를 다시 살 수 있다. 소리의 유무만 본다.
+  if ((project.cuts || []).some((c) => c.audio)) {
     return Response.json(
       { error: "이미 만든 목소리가 있어요 — 컷별로 다시 만들 수 있어요" },
       { status: 409 }

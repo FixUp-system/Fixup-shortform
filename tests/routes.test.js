@@ -8,7 +8,8 @@ import { createProject, getProject, updateProject } from "../lib/projects.js";
 
 const pipelineMock = vi.hoisted(() => ({ run: vi.fn(async () => {}) }));
 vi.mock("../lib/pipeline.js", () => ({
-  runCutsPipeline: (...a) => pipelineMock.run(...a),
+  runSplitPipeline: (...a) => pipelineMock.run(...a),
+  runImagesPipeline: (...a) => pipelineMock.run(...a),
   runVoicePipeline: (...a) => pipelineMock.run(...a),
   runVideoPipeline: (...a) => pipelineMock.run(...a),
   runRenderPipeline: (...a) => pipelineMock.run(...a),
@@ -18,6 +19,7 @@ const llmMock = vi.hoisted(() => ({ callJson: vi.fn() }));
 vi.mock("../lib/llm.js", () => ({ callJson: (...a) => llmMock.callJson(...a) }));
 
 const { POST: cutsPOST } = await import("../app/api/projects/[id]/cuts/route.js");
+const { POST: imagesPOST } = await import("../app/api/projects/[id]/images/route.js");
 const { PATCH } = await import("../app/api/projects/[id]/route.js");
 const { POST: briefingPOST } = await import("../app/api/projects/[id]/briefing/route.js");
 const { POST: scriptPOST } = await import("../app/api/projects/[id]/script/route.js");
@@ -54,7 +56,7 @@ async function projectWithBriefing() {
 }
 
 describe("POST /api/projects/[id]/cuts", () => {
-  it("파이프라인보다 먼저 status:cuts·빈 cuts를 세운다(응답 시점에 이미지 단계가 열려 있다)", async () => {
+  it("파이프라인보다 먼저 status:cuts·빈 cuts를 세운다(응답 시점에 목소리 단계가 열려 있다)", async () => {
     const p = await projectWithScript();
     let started = false;
     pipelineMock.run.mockImplementation(() => { started = true; return new Promise(() => {}); }); // 안 끝나는 파이프라인
@@ -82,6 +84,7 @@ describe("POST /api/projects/[id]/cuts", () => {
   });
 
   it("이미 컷이 있으면 409로 막고 만든 컷을 지우지 않는다(재승인이 유료 컷을 날리지 않게)", async () => {
+    // 판정은 컷의 유무다 — status 로 보면 목소리·이미지 단계에서 컷이 통째로 지워질 수 있다
     const p = await projectWithScript();
     await updateProject(p.id, (proj) => ({
       ...proj,
@@ -127,6 +130,65 @@ describe("POST /api/projects/[id]/cuts", () => {
     const res = await cutsPOST(patchReq({}), ctx(p.id));
     expect(res.status).toBe(400);
     expect(pipelineMock.run).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/projects/[id]/images", () => {
+  it("컷이 없으면 400 — 대본 승인이 컷을 나눈다", async () => {
+    const p = await projectWithScript();
+    const res = await imagesPOST(patchReq({}), ctx(p.id));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/대본/);
+    expect(pipelineMock.run).not.toHaveBeenCalled();
+  });
+
+  it("목소리가 없으면 400 — 길이를 모르는 채로 그림을 그리지 않는다", async () => {
+    // 낭독 실측이 cut.seconds 를 덮기 전에 그리면, 10초 넘는 컷을 뒤늦게 알고 값을 두 번 치른다
+    const p = await projectWithScript();
+    await updateProject(p.id, (proj) => ({
+      ...proj, status: "cuts",
+      cuts: [{ idx: 0, sentence: "문장입니다.", seconds: 3, state: "pending" }],
+    }));
+    const res = await imagesPOST(patchReq({}), ctx(p.id));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/목소리/);
+    expect(pipelineMock.run).not.toHaveBeenCalled();
+  });
+
+  it("소리가 있으면 시작한다 — 컷을 pending 으로 되돌리고 파이프라인을 띄운다", async () => {
+    const p = await projectWithScript();
+    await updateProject(p.id, (proj) => ({
+      ...proj, status: "voice",
+      cuts: [{ idx: 0, sentence: "문장입니다.", seconds: 3, audio: { url: "a" }, state: "done" }],
+    }));
+    const res = await imagesPOST(patchReq({}), ctx(p.id));
+    expect(res.status).toBe(200);
+    expect(pipelineMock.run).toHaveBeenCalledWith(p.id);
+    expect((await getProject(p.id)).cuts[0].state).toBe("pending");
+  });
+
+  it("이미 이미지가 있으면 409 — 컷당 두 장씩 다시 사지 않는다", async () => {
+    const p = await projectWithScript();
+    await updateProject(p.id, (proj) => ({
+      ...proj, status: "images",
+      cuts: [{ idx: 0, sentence: "문장입니다.", seconds: 3, audio: { url: "a" }, image: { url: "http://img/1" } }],
+    }));
+    const res = await imagesPOST(patchReq({}), ctx(p.id));
+    expect(res.status).toBe(409);
+    expect((await getProject(p.id)).cuts[0].image.url).toBe("http://img/1");
+    expect(pipelineMock.run).not.toHaveBeenCalled();
+  });
+
+  it("이미지 생성이 실패하면 images_error를 남긴다(화면이 기다리지 않게)", async () => {
+    const p = await projectWithScript();
+    await updateProject(p.id, (proj) => ({
+      ...proj, status: "voice",
+      cuts: [{ idx: 0, sentence: "문장입니다.", seconds: 3, audio: { url: "a" } }],
+    }));
+    pipelineMock.run.mockRejectedValue(new Error("이미지 생성 실패"));
+    await imagesPOST(patchReq({}), ctx(p.id));
+    await new Promise((r) => setTimeout(r, 10));
+    expect((await getProject(p.id)).images_error).toBe("이미지 생성 실패");
   });
 });
 
