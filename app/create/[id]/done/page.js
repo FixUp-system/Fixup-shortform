@@ -110,23 +110,10 @@ export default function DoneStepPage() {
               이 합성 방식에서는 자막이 들어가지 않아요 (SHOTFORM_COMPOSER=fal)
             </div>
           )}
-          {/* 만들고 나서도 무엇으로 만들어졌는지 남긴다 — 만들기 전에만 보여주고 치우면
-              완성본만 덩그러니 놓여 무엇을 확인해야 하는지 알 수 없다. */}
-          <div className="done-layout">
-            <div className="brief">
-              <div className="brief-row"><b>이어붙이기</b><div className="val">컷 {clipCount}개</div></div>
-              <div className="brief-row"><b>소리</b><div className="val">{project?.voice_label || "컷마다 읽은 목소리"}</div></div>
-              <div className="brief-row">
-                <b>자막</b>
-                <div className="val">{render.noSubtitles ? "이 방식에서는 들어가지 않아요" : "화면에 태웠어요"}</div>
-              </div>
-              <div className="brief-row"><b>비율</b><div className="val">{project?.settings?.aspect_ratio || "9:16"}</div></div>
-              <div className="brief-row"><b>길이</b><div className="val">약 {Math.round(render.seconds || 0)}초</div></div>
-            </div>
-            <div className="preview-pane done-preview">
-              <div className="preview-frame">
-                <video className="preview-video" controls src={render.url} />
-              </div>
+          {/* 완성본만 보여준다 — 무엇으로 만들어졌는지는 만들기 전에 이미 확인했다 */}
+          <div className="preview-pane done-preview">
+            <div className="preview-frame">
+              <video className="preview-video" controls src={render.url} />
             </div>
           </div>
         </>
