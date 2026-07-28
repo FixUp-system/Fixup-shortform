@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { splitSentences, buildSplitMessages, buildShowsMessages, buildImagePrompt, buildClipPrompt } from "../lib/cuts.js";
+import { splitSentences, buildSplitMessages, buildShowsMessages, buildImagePrompt, buildClipPrompt, stillOnly } from "../lib/cuts.js";
 
 const project = {
   settings: { aspect_ratio: "9:16" },
@@ -95,7 +95,90 @@ describe("buildShowsMessages", () => {
   });
 });
 
+// 표본은 실측이다 — 화면 설계 패스를 자료 6편 × 3회 돌려 절 122개를 모았고
+// (scripts/measure/shows-motion-leak.mjs), 그중 움직임이 섞인 절은 4개(3.3%)였다.
+// 아래 문장들은 그 표본에서 그대로 가져왔다. 규칙을 감으로 정하면 정당한 상태 서술까지
+// 지운다 — 첫 초안("-고 있다는 진행상이니 움직임")은 정밀도 50%로 반증됐다.
+describe("stillOnly — 정지 그림에 못 담을 절을 이미지 프롬프트에서 뺀다", () => {
+  it("명사·관형형으로 끝나는 절은 구도 서술이라 건드리지 않는다", () => {
+        // 표본 122절 중 93개(76%)가 이 형태다. 절 안에 '지나가며'가 있어도 구도다 —
+    // 그래서 절의 끝 형태로만 판정한다
+    const shows = "수리점 앞 거리, 초등학생이 자전거를 타고 지나가며 손을 흔드는 풀 샷, 맑은 날씨";
+    expect(stillOnly(shows)).toBe(shows);
+  });
+
+  it("움직임이 섞인 절만 뺀다 — 사장님이 본 '페달 없이 굴러가는 자전거'의 출처", () => {
+    expect(stillOnly("수리점 내부, 주인이 자전거를 타고 테스트하는 미디엄 샷, 자전거 바퀴가 천천히 회전한다"))
+      .toBe("수리점 내부, 주인이 자전거를 타고 테스트하는 미디엄 샷");
+  });
+
+  it("상태·착용은 남긴다 — '있다' 구성은 정지 그림이다", () => {
+    // 한국어의 '-고 있다'는 진행상이자 착용·소지 상태다. 문법 표지만으로는 갈리지 않는다
+    for (const s of [
+      "완성된 생딸기라떼가 하얀 테이블 위에 놓여 있다",
+      "책상 위에 여러 문서와 전선이 얽혀 있다",
+      "다양한 자전거 부품이 벽에 걸려 있다",
+      "체인이 헐거워져 있다",
+      "겨울 코트를 입고 있다",
+      "손이 원고를 가리키고 있다",
+    ]) {
+      expect(stillOnly(s), s).toBe(s);
+    }
+  });
+
+  it("빛이 주어인 조명 서술은 남긴다 — 프롬프트가 권장한 서술이다", () => {
+    for (const s of [
+      "한낮의 햇빛이 창문을 통해 들어온다",
+      "햇빛에 먼지가 떠다닌다",
+      "조명이 마이크에 부드럽게 비친다",
+      "겨울 햇살이 비친다",
+    ]) {
+      expect(stillOnly(s), s).toBe(s);
+    }
+  });
+
+  it("존재·양태도 남긴다", () => {
+    expect(stillOnly("딸기 조각이 가득하다")).toBe("딸기 조각이 가득하다");
+    expect(stillOnly("자전거 핸들 너머로 도로가 보인다")).toBe("자전거 핸들 너머로 도로가 보인다");
+  });
+
+  it("표본에서 나온 움직임 넷을 전부 뺀다", () => {
+    for (const s of [
+      "투명한 컵에 붉은 딸기 퓌레가 천천히 채워진다",
+      "한 초등학생이 자전거를 타고 지나간다",
+      "손이 키보드를 빠르게 치고 있다",       // '있다' 구성이지만 속도 부사가 있다
+      "화면에 반사된 조명이 부드럽게 깜빡인다", // 빛이 주어이지만 깜빡임은 시간 변화다
+    ]) {
+      expect(stillOnly(s), s).toBe("");
+    }
+  });
+
+  it("절이 하나뿐이고 그것이 움직임이면 빈 문자열이 된다 — 부르는 쪽이 폴백한다", () => {
+    expect(stillOnly("자전거가 천천히 지나간다")).toBe("");
+  });
+
+  it("빈 값과 없는 값을 견딘다", () => {
+    expect(stillOnly("")).toBe("");
+    expect(stillOnly(null)).toBe("");
+  });
+});
+
 describe("buildImagePrompt — 화면 근거", () => {
+  it("움직임이 섞인 절은 그림 지시에서 빠진다", () => {
+    // 정지 이미지 모델은 '회전한다'를 그릴 방법이 없어 회전을 암시하는 그림을 만든다 —
+    // 페달에서 뗀 발, 굴러가는 자세. 그 그림이 클립의 첫 프레임이 되어 결함이 굳는다
+    const cut = { idx: 0, sentence: "먼저 타봅니다.", shows: "주인이 자전거를 타고 테스트하는 미디엄 샷, 자전거 바퀴가 천천히 회전한다" };
+    const p = buildImagePrompt(cut, project);
+    expect(p).toContain("주인이 자전거를 타고 테스트하는 미디엄 샷");
+    expect(p).not.toContain("회전한다");
+  });
+
+  it("shows 가 통째로 움직임이면 문장으로 폴백한다 — 그림은 나와야 한다", () => {
+    const cut = { idx: 0, sentence: "폴백 문장입니다.", shows: "자전거가 천천히 지나간다" };
+    expect(buildImagePrompt(cut, project)).toContain("폴백 문장입니다.");
+  });
+
+
   it("컷의 보여줌을 쓴다. 나레이션 문장은 그릴 대상이 아니다", () => {
     const cut = { idx: 0, sentence: "매일 아침 딸기를 갈아 씁니다.", shows: "딸기 과육이 우유에 섞이는 클로즈업" };
     const p = buildImagePrompt(cut, project);
