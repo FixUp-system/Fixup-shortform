@@ -1,11 +1,13 @@
 "use client";
 
 // ⑤ 영상 — 컷 이미지를 시작 프레임으로 클립을 만든다.
-// 길이는 ③목소리에서 확정된 낭독 길이를 따르되, i2v 상한(10초)을 넘는 컷은 잘린다.
+// 길이는 ③목소리에서 확정된 낭독 길이를 따르되, 모델이 받는 눈금으로 올려 보낸다.
+// 상한(I2V_MAX_SECONDS)을 넘는 컷만 잘린 것으로 표시한다.
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 import BackButton from "../../../../components/BackButton";
+import { I2V_MAX_SECONDS } from "../../../../lib/clip-limits";
 
 export default function VideoStepPage() {
   const { id } = useParams();
@@ -102,7 +104,7 @@ export default function VideoStepPage() {
         {madeAny
           ? `${doneCount}/${cuts.length}개 컷을 만들었어요`
           : "이미지가 각 컷의 시작 프레임이 되고, 읽은 길이만큼 움직여요."}
-        {truncatedCount > 0 && ` · ${truncatedCount}개 컷은 10초까지만 움직여요`}
+        {truncatedCount > 0 && ` · ${truncatedCount}개 컷은 ${I2V_MAX_SECONDS}초까지만 움직여요`}
       </p>
 
       <div className="images-layout">
@@ -129,7 +131,7 @@ export default function VideoStepPage() {
                   {c.audio && <span className="badge ai">{c.audio.seconds}초 낭독</span>}
                   {c.video && <span className="badge photo">클립 {c.video.seconds}초</span>}
                   {c.video?.truncated && (
-                    <span className="badge warn">10초까지만 움직이고 나머지는 멈춰 있어요</span>
+                    <span className="badge warn">{I2V_MAX_SECONDS}초까지만 움직이고 나머지는 멈춰 있어요</span>
                   )}
                   {(c.video || c.video_error) && (
                     <>

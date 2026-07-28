@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { generateClip, I2V_MAX_SECONDS } from "../lib/i2v";
+import { generateClip, fitDuration, I2V_MAX_SECONDS } from "../lib/i2v";
 
 import { mkdtempSync } from "fs";
 import { tmpdir } from "os";
@@ -20,31 +20,46 @@ describe("generateClip", () => {
       fetchImpl: () => { called = true; },
     });
     expect(called).toBe(false);
-    expect(r).toEqual({ url: "data:image/svg+xml;base64,AAA", seconds: 4, truncated: false });
+    // 4초는 눈금(6·8·10…)에 없어 6초로 올라간다 — 가짜 모드도 진짜와 같은 값을 돌려줘야 한다
+    expect(r).toEqual({ url: "data:image/svg+xml;base64,AAA", seconds: 6, truncated: false });
   });
 
-  it("상한보다 긴 컷은 잘라 만들고 표시를 남긴다", async () => {
-    // 원고 컷이 12~13초로 나오는 경우가 있는데 i2v 모델은 10초가 상한이다.
-    // 남는 시간은 합성이 마지막 프레임 정지로 채운다.
+  // 관통에서 낭독 실측(9초·5초)을 그대로 보냈다가 네 컷 전부 422 로 거절당했다:
+  //   Input should be 6, 8, 10, 12, 14, 16, 18 or 20
+  it("모델이 받는 눈금으로 올려 보낸다 — 임의의 초는 422 로 거절당한다", () => {
+    expect(fitDuration(5)).toBe(6);    // 하한 — 5초짜리 컷은 만들 수 없다
+    expect(fitDuration(9)).toBe(10);
+    expect(fitDuration(6)).toBe(6);    // 눈금에 있으면 그대로
+    expect(fitDuration(4.3)).toBe(6);
+    expect(fitDuration(13)).toBe(14);
+    expect(fitDuration(25)).toBe(20);  // 상한에 묶는다
+  });
+
+  it("내리지 않고 올린다 — 내리면 소리가 그림보다 길어져 뒤가 잘린다", () => {
+    // 올린 만큼은 합성이 마지막 프레임을 늘려 메운다(lib/compose.js 의 tpad)
+    for (const s of [3, 5, 7, 9, 11]) expect(fitDuration(s)).toBeGreaterThan(s);
+  });
+
+  it("상한보다 긴 컷만 잘린 것으로 표시한다", async () => {
     let sent;
     const fetchImpl = async (_url, opts) => {
       sent = JSON.parse(opts.body);
       return { ok: true, json: async () => ({ video: { url: "https://fal.media/v.mp4" } }) };
     };
-    const r = await generateClip({ imageUrl: "i", seconds: 13, aspect_ratio: "9:16", fetchImpl });
+    const r = await generateClip({ imageUrl: "i", seconds: 25, aspect_ratio: "9:16", fetchImpl });
     expect(sent.duration).toBe(I2V_MAX_SECONDS);
     expect(r.seconds).toBe(I2V_MAX_SECONDS);
     expect(r.truncated).toBe(true);
   });
 
-  it("상한 안이면 그대로 보낸다", async () => {
+  it("눈금에 맞춰 올린 것은 잘린 것이 아니다", async () => {
     let sent;
     const fetchImpl = async (_url, opts) => {
       sent = JSON.parse(opts.body);
       return { ok: true, json: async () => ({ video: { url: "v" } }) };
     };
     const r = await generateClip({ imageUrl: "i", seconds: 4.3, aspect_ratio: "9:16", fetchImpl });
-    expect(sent.duration).toBe(4.3);
+    expect(sent.duration).toBe(6);
     expect(r.truncated).toBe(false);
   });
 
@@ -74,14 +89,14 @@ describe("generateClip", () => {
     expect(sent.prompt).toContain("카메라가 천천히 뒤로 물러난다");
   });
 
-  it("초가 없거나 0이어도 최소 1초는 만든다", async () => {
+  it("초가 없거나 0이어도 만들 수 있는 가장 짧은 길이로 간다", async () => {
     let sent;
     const fetchImpl = async (_url, opts) => {
       sent = JSON.parse(opts.body);
       return { ok: true, json: async () => ({ video: { url: "v" } }) };
     };
     await generateClip({ imageUrl: "i", seconds: 0, aspect_ratio: "9:16", fetchImpl });
-    expect(sent.duration).toBe(1);
+    expect(sent.duration).toBe(6);
   });
 
   it("결과가 비면 던진다", async () => {

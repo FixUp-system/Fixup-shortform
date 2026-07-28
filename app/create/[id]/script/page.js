@@ -8,6 +8,7 @@ import { useProject } from "../../../../components/ProjectContext";
 import BackButton from "../../../../components/BackButton";
 import { estimateSeconds } from "../../../../lib/script";
 import { areCutsStale } from "../../../../lib/steps";
+import { I2V_MAX_SECONDS } from "../../../../lib/clip-limits";
 
 export default function ScriptStepPage() {
   const { id } = useParams();
@@ -289,8 +290,10 @@ export default function ScriptStepPage() {
                 </div>
                 <div className="badges">
                   <span className="badge ai">{c.seconds}초</span>
-                  {c.seconds > 10 && (
-                    <span className="badge warn">10초까지만 움직여요 — 나머지는 멈춰 있어요</span>
+                  {c.seconds > I2V_MAX_SECONDS && (
+                    <span className="badge warn">
+                      {I2V_MAX_SECONDS}초까지만 움직여요 — 나머지는 멈춰 있어요
+                    </span>
                   )}
                 </div>
               </div>
