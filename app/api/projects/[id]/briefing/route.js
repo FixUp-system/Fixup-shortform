@@ -22,7 +22,7 @@ export async function POST(req, { params }) {
     let questions = null;
     for (let attempt = 0; attempt < 2 && !questions; attempt++) {
       try {
-        questions = validateDevelopQuestions(await callJson({ system: msg.system, messages: msg.messages }));
+        questions = validateDevelopQuestions(await callJson({ system: msg.system, messages: msg.messages, stage: "브리핑", projectId: id }));
       } catch (e) {
         console.error("소재 질문 생성 실패:", e);
       }
@@ -42,7 +42,7 @@ export async function POST(req, { params }) {
   let briefing = null;
   for (let attempt = 0; attempt < 2 && !briefing; attempt++) {
     try {
-      briefing = validateBriefing(await callJson({ system, messages }));
+      briefing = validateBriefing(await callJson({ system, messages, stage: "브리핑", projectId: id }));
     } catch (e) {
       // 일시적 호출 실패는 삼키고 다음 시도로 — 루프 조건이 상한을 쥔다.
       // 다만 왜 실패했는지는 남긴다(키 미설정·크레딧 소진·형식 거절이 전부 같은 502로 보이지 않게).

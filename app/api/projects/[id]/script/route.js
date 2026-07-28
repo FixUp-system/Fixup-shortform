@@ -26,7 +26,7 @@ export async function POST(req, { params }) {
   let draft = null;
   for (let attempt = 0; attempt < 2 && !draft; attempt++) {
     try {
-      draft = validateScript(await callJson({ system, messages }));
+      draft = validateScript(await callJson({ system, messages, stage: "대본", projectId: id }));
     } catch (e) {
       // 일시적 호출 실패는 삼키고 다음 시도로 — 루프 조건이 상한을 쥔다.
       // 다만 왜 실패했는지는 남긴다(키 미설정·크레딧 소진·형식 거절이 전부 같은 502로 보이지 않게).
@@ -52,7 +52,7 @@ export async function POST(req, { params }) {
     const rewrite = buildScriptRewriteMessages(project, draft, faults);
     let rewritten = null;
     try {
-      rewritten = validateScript(await callJson({ system: rewrite.system, messages: rewrite.messages }));
+      rewritten = validateScript(await callJson({ system: rewrite.system, messages: rewrite.messages, stage: "대본 되돌리기", projectId: id }));
     } catch (e) {
       console.error(`${tag} ${round}회차 호출 실패:`, e);
       break;
@@ -74,7 +74,7 @@ export async function POST(req, { params }) {
   const edit = buildScriptEditMessages(project, draft);
   for (let attempt = 0; attempt < 2 && !edited; attempt++) {
     try {
-      edited = validateScript(await callJson({ system: edit.system, messages: edit.messages }));
+      edited = validateScript(await callJson({ system: edit.system, messages: edit.messages, stage: "대본 교정", projectId: id }));
     } catch (e) {
       // 일시적 호출 실패는 삼키고 다음 시도로 — 끝내 못 얻으면 아래에서 초안으로 폴백한다
       console.error("대본 교정 실패:", e);

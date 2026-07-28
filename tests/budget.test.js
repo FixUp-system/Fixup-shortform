@@ -175,3 +175,34 @@ describe("비용 기록에 프로젝트가 남는다", () => {
     expect(await costs.spentForProject("p1")).toBeGreaterThan(0);
   });
 });
+
+// LLM 비용이 오랫동안 한 줄도 안 남았다. 비용 기록에는 fal 만 보이고,
+// 대본을 열 번 다시 써도 0원으로 보였다 — 대본 한 편에 예닐곱 번을 부르는데도.
+describe("LLM 비용도 기록한다", () => {
+  beforeEach(() => fresh({ total: "100", project: "100" }));
+
+  it("usage 로 값을 재어 남긴다 — 입력과 출력 단가가 다르다", async () => {
+    const { estimateLlmCost } = costs;
+    // gpt-4o: 입력 $2.50/1M · 출력 $10/1M
+    expect(estimateLlmCost("gpt-4o", { prompt_tokens: 1_000_000, completion_tokens: 0 })).toBe(2.5);
+    expect(estimateLlmCost("gpt-4o", { prompt_tokens: 0, completion_tokens: 1_000_000 })).toBe(10);
+    // 센트로 반올림하면 한 호출이 0원이 되어 총합이 실제보다 작아진다
+    expect(estimateLlmCost("gpt-4o", { prompt_tokens: 2000, completion_tokens: 300 })).toBeGreaterThan(0);
+    // 모르는 모델도 0원으로 보이지 않게 기본 단가로 떨어진다
+    expect(estimateLlmCost("모르는-모델", { prompt_tokens: 1_000_000, completion_tokens: 0 })).toBe(2.5);
+  });
+
+  it("callJson 이 호출마다 기록을 남긴다", async () => {
+    const { callJson } = await import("../lib/llm.js" + bust());
+    const fetchImpl = async () => ({
+      ok: true,
+      json: async () => ({
+        model: "gpt-4o",
+        usage: { prompt_tokens: 2000, completion_tokens: 400 },
+        choices: [{ message: { content: '{"script":"원고"}' } }],
+      }),
+    });
+    await callJson({ system: "s", messages: [{ role: "user", content: "u" }], apiKey: "k", fetchImpl, projectId: "p1", stage: "대본" });
+    expect(await costs.spentForProject("p1")).toBeGreaterThan(0);
+  });
+});
