@@ -122,14 +122,19 @@ describe("buildFfmpegArgs", () => {
     expect(graph).toMatch(/\[cv\]subtitles/);
   });
 
-  it("Windows 경로의 역슬래시를 슬래시로 바꾼다", () => {
-    // subtitles 필터가 역슬래시를 이스케이프로 읽는다
+  it("Windows 경로의 역슬래시를 슬래시로 바꾸고 콜론을 이스케이프한다", () => {
+    // 역슬래시: subtitles 필터가 이스케이프로 읽는다.
+    // 콜론: 드라이브 문자의 콜론을 필터 옵션 구분자로 읽어 "C"를 첫 옵션값으로 삼고
+    //       나머지를 original_size 로 해석하다 죽는다. 실제로 그렇게 죽었다
+    //       (tests/compose-live.test.js 가 그 자리를 진짜 ffmpeg 로 지킨다).
     const args = buildFfmpegArgs({
       local, assPath: "C:\\tmp\\s.ass", out: "C:\\tmp\\o.mp4", width: 1080, height: 1920,
     });
     const graph = args[args.indexOf("-filter_complex") + 1];
-    expect(graph).toContain("C:/tmp/s.ass");
+    expect(graph).toContain("C\\:/tmp/s.ass");
     expect(graph).not.toContain("C:\\tmp\\s.ass");
+    // 따옴표 안이라도 날콜론이 남으면 안 된다
+    expect(graph).not.toMatch(/subtitles='[A-Z]:/);
   });
 
   it("클립과 소리를 짝지어 입력한다", () => {
