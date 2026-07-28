@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { splitSentences, buildSplitMessages, buildShowsMessages, buildImagePrompt } from "../lib/cuts.js";
+import { splitSentences, buildSplitMessages, buildShowsMessages, buildImagePrompt, buildClipPrompt } from "../lib/cuts.js";
 
 const project = {
   settings: { aspect_ratio: "9:16" },
@@ -141,5 +141,24 @@ describe("buildImagePrompt — 화면 근거", () => {
     const prompt = buildImagePrompt(cut, project);
     expect(prompt).toContain("컵을 더 작게");
     expect(prompt).toMatch(/correction/i);
+  });
+});
+
+describe("buildClipPrompt — 이 그림이 어떻게 움직이는가", () => {
+  it("컷의 movement 를 그대로 싣고, 첫 프레임이라는 것을 알린다", () => {
+    const p = buildClipPrompt({ motion: "카메라가 천천히 뒤로 물러난다" });
+    expect(p).toContain("카메라가 천천히 뒤로 물러난다");
+    expect(p).toMatch(/first frame/i);
+  });
+
+  it("motion 이 없으면 조용한 기본값으로 간다 — 없는 움직임을 지어내면 그림이 무너진다", () => {
+    // 화면 패스가 실패한 컷과 옛 프로젝트가 여기로 온다
+    expect(buildClipPrompt({})).toContain("거의 정지");
+    expect(buildClipPrompt({ motion: "   " })).toContain("거의 정지");
+    expect(buildClipPrompt(null)).toContain("거의 정지");
+  });
+
+  it("말하는 얼굴을 막는다 — 지금 기술로는 뭉개진다", () => {
+    expect(buildClipPrompt({ motion: "인물이 웃는다" })).toMatch(/lip sync/i);
   });
 });

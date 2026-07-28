@@ -88,6 +88,14 @@ describe("validateShows — 화면 패스", () => {
   });
 
   it("개수가 어긋나면 null — 짝이 밀리면 엉뚱한 문장에 엉뚱한 그림이 붙는다", () => {
+    // motion 은 선택이다 — 없으면 컷을 버리지 않고 움직임만 기본값이 된다
+    const withMotion = validateShows(
+      { shots: [{ shows: "클로즈업", motion: "김이 피어오른다" }, { shows: "풀 샷" }] }, 2
+    );
+    expect(withMotion[0].motion).toBe("김이 피어오른다");
+    expect(withMotion[1].motion).toBeUndefined();
+    expect(withMotion[1].shows).toBe("풀 샷");
+
     expect(validateShows({ shots: [{ shows: "하나뿐" }] }, 2)).toBeNull();
     expect(validateShows({ shots: [{ shows: "가" }, { shows: "나" }, { shows: "다" }] }, 2)).toBeNull();
   });

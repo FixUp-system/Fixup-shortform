@@ -59,6 +59,21 @@ describe("generateClip", () => {
     expect(sent.aspect_ratio).toBe("1:1");
   });
 
+  it("움직임 지시를 요청에 담는다 — 없으면 모델 재량이 된다", async () => {
+    // 이 자리가 오래 비어 있었다. 이미지와 길이만 보내면 컷이 어떻게 움직일지를
+    // 아무도 정하지 않는다 — 숏폼에서 움직임은 컷 정보량의 절반이다.
+    let sent;
+    const fetchImpl = async (_url, opts) => {
+      sent = JSON.parse(opts.body);
+      return { ok: true, json: async () => ({ video: { url: "v" } }) };
+    };
+    await generateClip({
+      imageUrl: "https://img/1.png", seconds: 4, aspect_ratio: "9:16",
+      prompt: "카메라가 천천히 뒤로 물러난다", fetchImpl,
+    });
+    expect(sent.prompt).toContain("카메라가 천천히 뒤로 물러난다");
+  });
+
   it("초가 없거나 0이어도 최소 1초는 만든다", async () => {
     let sent;
     const fetchImpl = async (_url, opts) => {
