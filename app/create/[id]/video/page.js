@@ -17,6 +17,7 @@ export default function VideoStepPage() {
   const [err, setErr] = useState("");
   const [pollTimedOut, setPollTimedOut] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState(null);
+  const [regening, setRegening] = useState(null); // 다시 만드는 중인 컷 idx
   const pollRef = useRef(null);
 
   useEffect(() => () => { clearInterval(pollRef.current); pollRef.current = null; }, []);
@@ -75,14 +76,21 @@ export default function VideoStepPage() {
     startPolling();
   }
 
+  // 다시 만드는 동안 그 컷을 잠근다.
+  // 표시가 없던 때는 눌러도 아무 일이 없어 보여 한 번 더 누르게 됐고, 그만큼 돈이 더 나갔다.
   async function regen(idx) {
-    setErr("");
-    const res = await fetch(`/api/projects/${id}/clips/${idx}/regen`, { method: "POST" });
-    if (!res.ok) {
-      setErr((await res.json().catch(() => ({}))).error || "다시 만들지 못했어요");
-      return;
+    if (regening !== null) return;
+    setErr(""); setRegening(idx);
+    try {
+      const res = await fetch(`/api/projects/${id}/clips/${idx}/regen`, { method: "POST" });
+      if (!res.ok) {
+        setErr((await res.json().catch(() => ({}))).error || "다시 만들지 못했어요");
+        return;
+      }
+      await load(id).catch(() => {});
+    } finally {
+      setRegening(null);
     }
-    await load(id).catch(() => {});
   }
 
   const cuts = project?.cuts || [];
@@ -120,7 +128,9 @@ export default function VideoStepPage() {
               </div>
               <div>
                 <div className="preview-sentence">{c.sentence}</div>
-                {c.video_error ? (
+                {regening === c.idx ? (
+                  <div className="script-src">다시 만드는 중이에요 — 30초쯤 걸려요</div>
+                ) : c.video_error ? (
                   <div className="script-src warn">{c.video_error}</div>
                 ) : !c.video ? (
                   <div className="script-src">{busy ? "만드는 중…" : "아직 만들지 않았어요"}</div>
@@ -138,10 +148,10 @@ export default function VideoStepPage() {
                       <span className="badge ai">다시 만듦 {c.clip_regen_count || 0}/3</span>
                       <button
                         className="mini"
-                        disabled={busy || (c.clip_regen_count || 0) >= 3}
+                        disabled={busy || regening !== null || (c.clip_regen_count || 0) >= 3}
                         onClick={() => regen(c.idx)}
                       >
-                        다시 만들기
+                        {regening === c.idx ? "만드는 중…" : "다시 만들기"}
                       </button>
                     </>
                   )}
@@ -153,12 +163,18 @@ export default function VideoStepPage() {
 
         <div className="preview-pane">
           <div className="preview-frame">
-            {selected?.video?.url ? (
+            {/* 다시 만드는 중에는 옛 클립을 감춘다 — 그대로 두면 바뀐 줄 알고 또 누르게 된다 */}
+            {regening === selected?.idx ? (
+              selected?.image?.url ? <img src={selected.image.url} alt="" /> : null
+            ) : selected?.video?.url ? (
               <video className="preview-video" controls src={selected.video.url} />
             ) : selected?.image?.url ? (
               <img src={selected.image.url} alt="" />
             ) : (
               <span className="ph">컷을 고르면 여기서 크게 봅니다</span>
+            )}
+            {regening === selected?.idx && (
+              <span className="ph">다시 만드는 중이에요…</span>
             )}
           </div>
           {selected && <p className="preview-note">컷 {selected.idx + 1} · {selected.sentence}</p>}

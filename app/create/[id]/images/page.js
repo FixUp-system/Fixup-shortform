@@ -271,16 +271,17 @@ function PreviewPane({ cut, url, photoName, aspect, hasSynopsis, stalled, onRege
             value={instr}
             onChange={(e) => setInstr(e.target.value)}
           />
+          {/* 만드는 중에는 글자로도 알린다 — 잠기기만 하면 눌렸는지 알 수 없어 또 누르게 된다 */}
           <div className="preview-actions">
             <button
               className="cta"
               disabled={atLimit || busyCut || !instr.trim()}
               onClick={() => onRegen(cut.idx, instr.trim())}
             >
-              이 지시로 다시 만들기
+              {busyCut ? "만드는 중…" : "이 지시로 다시 만들기"}
             </button>
             <button className="mini" disabled={atLimit || busyCut} onClick={() => onRegen(cut.idx)}>
-              그냥 다시
+              {busyCut ? "만드는 중…" : "그냥 다시"}
             </button>
           </div>
           <span className="regen-note mono">{atLimit ? "재생성 상한 도달 (3/3)" : `재생성 ${cut.regen_count}/3`}</span>

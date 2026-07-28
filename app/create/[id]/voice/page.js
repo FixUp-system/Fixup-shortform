@@ -20,6 +20,7 @@ export default function VoiceStepPage() {
   const [err, setErr] = useState("");
   const [pollTimedOut, setPollTimedOut] = useState(false);
   const [picked, setPicked] = useState(project?.voice_label || VOICES[0].label);
+  const [regening, setRegening] = useState(null); // 다시 읽는 중인 컷 idx
   const pollRef = useRef(null);
 
   // 컷 분할이 끝나기 전 — 대본 승인 직후 이 화면에 도착하면 여기부터 보인다.
@@ -104,14 +105,20 @@ export default function VoiceStepPage() {
     startPolling();
   }
 
+  // 다시 읽는 동안 잠근다 — 표시가 없으면 눌러도 아무 일이 없어 보여 한 번 더 누르게 된다
   async function regen(idx) {
-    setErr("");
-    const res = await fetch(`/api/projects/${id}/voice/${idx}/regen`, { method: "POST" });
-    if (!res.ok) {
-      setErr((await res.json().catch(() => ({}))).error || "다시 만들지 못했어요");
-      return;
+    if (regening !== null) return;
+    setErr(""); setRegening(idx);
+    try {
+      const res = await fetch(`/api/projects/${id}/voice/${idx}/regen`, { method: "POST" });
+      if (!res.ok) {
+        setErr((await res.json().catch(() => ({}))).error || "다시 만들지 못했어요");
+        return;
+      }
+      await load(id).catch(() => {});
+    } finally {
+      setRegening(null);
     }
-    await load(id).catch(() => {});
   }
 
   const cuts = project?.cuts || [];
@@ -189,10 +196,10 @@ export default function VoiceStepPage() {
                     <span className="badge ai">다시 읽음 {c.voice_regen_count || 0}/3</span>
                     <button
                       className="mini"
-                      disabled={busy || (c.voice_regen_count || 0) >= 3}
+                      disabled={busy || regening !== null || (c.voice_regen_count || 0) >= 3}
                       onClick={() => regen(c.idx)}
                     >
-                      다시 읽기
+                      {regening === c.idx ? "읽는 중…" : "다시 읽기"}
                     </button>
                   </div>
                 </>
