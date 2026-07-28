@@ -110,9 +110,23 @@ export default function DoneStepPage() {
               이 합성 방식에서는 자막이 들어가지 않아요 (SHOTFORM_COMPOSER=fal)
             </div>
           )}
-          <div className="preview-pane done-preview">
-            <div className="preview-frame">
-              <video className="preview-video" controls src={render.url} />
+          {/* 만들고 나서도 무엇으로 만들어졌는지 남긴다 — 만들기 전에만 보여주고 치우면
+              완성본만 덩그러니 놓여 무엇을 확인해야 하는지 알 수 없다. */}
+          <div className="done-layout">
+            <div className="brief">
+              <div className="brief-row"><b>이어붙이기</b><div className="val">컷 {clipCount}개</div></div>
+              <div className="brief-row"><b>소리</b><div className="val">{project?.voice_label || "컷마다 읽은 목소리"}</div></div>
+              <div className="brief-row">
+                <b>자막</b>
+                <div className="val">{render.noSubtitles ? "이 방식에서는 들어가지 않아요" : "화면에 태웠어요"}</div>
+              </div>
+              <div className="brief-row"><b>비율</b><div className="val">{project?.settings?.aspect_ratio || "9:16"}</div></div>
+              <div className="brief-row"><b>길이</b><div className="val">약 {Math.round(render.seconds || 0)}초</div></div>
+            </div>
+            <div className="preview-pane done-preview">
+              <div className="preview-frame">
+                <video className="preview-video" controls src={render.url} />
+              </div>
             </div>
           </div>
         </>
@@ -120,18 +134,28 @@ export default function DoneStepPage() {
 
       <div className="step-actions">
         <BackButton stepKey="done" />
+        {/* 완성본이 있으면 사장님이 하고 싶은 일은 내려받기다 — 그것을 주 버튼으로 둔다.
+            다시 합치기는 컷을 고쳤을 때만 쓰는 보조 동작이다. */}
         <div className="fwd">
-          {render && !render.fake && render.url && (
-            <a className="mini" href={render.url} download>
-              내려받기
-            </a>
+          {render && !render.fake && render.url ? (
+            <>
+              <button className="mini" disabled={busy} onClick={start}>
+                {busy ? "합치는 중…" : "다시 합치기"}
+              </button>
+              <a className="cta" href={render.url} download>
+                내려받기
+              </a>
+            </>
+          ) : (
+            <>
+              <span className="hint">
+                {render ? "컷을 고쳤다면 다시 합쳐 주세요" : "합치는 데 조금 걸려요"}
+              </span>
+              <button className="cta" disabled={busy} onClick={start}>
+                {busy ? "합치는 중…" : render ? "다시 합치기" : "완성본 만들기"}
+              </button>
+            </>
           )}
-          <span className="hint">
-            {render ? "컷을 고쳤다면 다시 합쳐 주세요" : "합치는 데 조금 걸려요"}
-          </span>
-          <button className="cta" disabled={busy} onClick={start}>
-            {busy ? "합치는 중…" : render ? "다시 합치기" : "완성본 만들기"}
-          </button>
         </div>
       </div>
     </section>

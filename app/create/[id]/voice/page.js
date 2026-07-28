@@ -185,10 +185,13 @@ export default function VoiceStepPage() {
                   {/* 길이·재생성 횟수와 [다시 읽기]는 한 줄에 둔다 — 셋 다 이 낭독 하나에 대한 것이다 */}
                   <div className="badges">
                     <span className="badge ai">{c.audio.seconds}초</span>
-                    {(c.voice_regen_count || 0) > 0 && (
-                      <span className="badge ai">다시 읽음 {c.voice_regen_count}/3</span>
-                    )}
-                    <button className="mini" disabled={busy} onClick={() => regen(c.idx)}>
+                    {/* 남은 횟수는 항상 보인다 — 3회 상한에 언제 닿는지 누르기 전에 알아야 한다 */}
+                    <span className="badge ai">다시 읽음 {c.voice_regen_count || 0}/3</span>
+                    <button
+                      className="mini"
+                      disabled={busy || (c.voice_regen_count || 0) >= 3}
+                      onClick={() => regen(c.idx)}
+                    >
                       다시 읽기
                     </button>
                   </div>

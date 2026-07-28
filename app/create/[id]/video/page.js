@@ -118,28 +118,32 @@ export default function VideoStepPage() {
               </div>
               <div>
                 <div className="preview-sentence">{c.sentence}</div>
+                {c.video_error ? (
+                  <div className="script-src warn">{c.video_error}</div>
+                ) : !c.video ? (
+                  <div className="script-src">{busy ? "만드는 중…" : "아직 만들지 않았어요"}</div>
+                ) : null}
+                {/* 길이·재생성 횟수·[다시 만들기]를 한 줄에 — 목소리 단계와 같은 배치.
+                    남은 횟수는 항상 보인다: 3회 상한에 언제 닿는지 누르기 전에 알아야 한다. */}
                 <div className="badges">
                   {c.audio && <span className="badge ai">{c.audio.seconds}초 낭독</span>}
                   {c.video && <span className="badge photo">클립 {c.video.seconds}초</span>}
                   {c.video?.truncated && (
                     <span className="badge warn">10초까지만 움직이고 나머지는 멈춰 있어요</span>
                   )}
-                  {(c.clip_regen_count || 0) > 0 && (
-                    <span className="badge ai">다시 만듦 {c.clip_regen_count}/3</span>
+                  {(c.video || c.video_error) && (
+                    <>
+                      <span className="badge ai">다시 만듦 {c.clip_regen_count || 0}/3</span>
+                      <button
+                        className="mini"
+                        disabled={busy || (c.clip_regen_count || 0) >= 3}
+                        onClick={() => regen(c.idx)}
+                      >
+                        다시 만들기
+                      </button>
+                    </>
                   )}
                 </div>
-                {c.video_error ? (
-                  <div className="script-src warn">{c.video_error}</div>
-                ) : !c.video ? (
-                  <div className="script-src">{busy ? "만드는 중…" : "아직 만들지 않았어요"}</div>
-                ) : null}
-                {(c.video || c.video_error) && (
-                  <div className="res-ops">
-                    <button className="mini" disabled={busy} onClick={() => regen(c.idx)}>
-                      다시 만들기
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
           ))}
