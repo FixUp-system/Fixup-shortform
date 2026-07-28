@@ -665,7 +665,8 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
 .badge.photo { background: var(--good-soft); color: var(--good); }
 .badge.ai { background: var(--surface2); color: var(--ink-soft); }
 .badge.vlm { background: var(--surface2); color: var(--ink-soft); }
-.badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+/* align-items: center — 배지 사이에 버튼이 섞여도 세로가 맞는다(목소리 단계의 [다시 읽기]) */
+.badges { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
 .regen-note { font-size: 12px; color: var(--ink-soft); text-align: center; }
 .sent-input { width: 100%; border: 1px solid var(--line); background: var(--deep); color: var(--ink); border-radius: var(--r-ctl); padding: 9px 12px; font: inherit; font-size: 15px; }
 .sent-input:focus-visible { outline: 2px solid var(--ink); outline-offset: -1px; }

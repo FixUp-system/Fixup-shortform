@@ -182,27 +182,24 @@ export default function VoiceStepPage() {
               {c.audio ? (
                 <>
                   <audio className="audio-row" controls src={c.audio.url} />
+                  {/* 길이·재생성 횟수와 [다시 읽기]는 한 줄에 둔다 — 셋 다 이 낭독 하나에 대한 것이다 */}
                   <div className="badges">
                     <span className="badge ai">{c.audio.seconds}초</span>
                     {(c.voice_regen_count || 0) > 0 && (
                       <span className="badge ai">다시 읽음 {c.voice_regen_count}/3</span>
                     )}
-                  </div>
-                  <div className="res-ops">
                     <button className="mini" disabled={busy} onClick={() => regen(c.idx)}>
                       다시 읽기
                     </button>
                   </div>
                 </>
               ) : c.voice_error ? (
-                <>
-                  <div className="script-src warn">{c.voice_error}</div>
-                  <div className="res-ops">
-                    <button className="mini" disabled={busy} onClick={() => regen(c.idx)}>
-                      다시 읽기
-                    </button>
-                  </div>
-                </>
+                <div className="badges">
+                  <span className="script-src warn">{c.voice_error}</span>
+                  <button className="mini" disabled={busy} onClick={() => regen(c.idx)}>
+                    다시 읽기
+                  </button>
+                </div>
               ) : (
                 <div className="script-src">{busy ? "읽는 중…" : "아직 읽지 않았어요"}</div>
               )}
