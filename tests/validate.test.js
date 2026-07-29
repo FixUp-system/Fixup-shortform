@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateScript, validateCutRanges, validateShows, validateCast, validateBriefing, validateDevelopQuestions, dropAnsweredQuestions } from "../lib/validate.js";
+import { validateScript, validateCutRanges, validateShows, validateCast, validateBriefing, validateDevelopQuestions, dropAnsweredQuestions, validateProps } from "../lib/validate.js";
 
 describe("validateScript — 하나로 흐르는 원고", () => {
   it("원고 문자열을 받아 다듬어 돌려준다", () => {
@@ -363,5 +363,40 @@ describe("validateCast", () => {
   it("인물이 너무 많으면 4명에서 자른다", () => {
     const many = { cast: Array.from({ length: 9 }, (_, i) => ({ who: `사람${i}`, cuts: [1] })) };
     expect(validateCast(many, ids, 3)).toHaveLength(4);
+  });
+});
+
+describe("validateProps — 사물이 보이는 컷", () => {
+  it("사진과 컷 번호를 받는다 — 1부터 세는 번호를 0부터로 바꾼다", () => {
+    const got = validateProps({ props: [{ photo_id: "p1", cuts: [1, 3] }] }, ["p1"], 4);
+    expect(got).toEqual([{ photo_id: "p1", cuts: [0, 2] }]);
+  });
+
+  it("모르는 사진은 버린다 — 첨부되지 않을 것을 가리키면 그림을 망친다", () => {
+    expect(validateProps({ props: [{ photo_id: "없음", cuts: [1] }] }, ["p1"], 4)).toEqual([]);
+  });
+
+  it("범위 밖 컷 번호는 버리고 나머지는 살린다", () => {
+    const got = validateProps({ props: [{ photo_id: "p1", cuts: [1, 9, 0, -2] }] }, ["p1"], 3);
+    expect(got).toEqual([{ photo_id: "p1", cuts: [0] }]);
+  });
+
+  it("보이는 컷이 하나도 없으면 그 사진은 뺀다 — 꽂을 데가 없다", () => {
+    expect(validateProps({ props: [{ photo_id: "p1", cuts: [] }] }, ["p1"], 3)).toEqual([]);
+  });
+
+  it("같은 컷을 두 번 적어도 한 번만 남고 정렬된다", () => {
+    const got = validateProps({ props: [{ photo_id: "p1", cuts: [3, 1, 3] }] }, ["p1"], 4);
+    expect(got).toEqual([{ photo_id: "p1", cuts: [0, 2] }]);
+  });
+
+  it("props 가 없거나 깨져 있으면 빈 배열 — cast 는 따로 산다", () => {
+    expect(validateProps({}, ["p1"], 3)).toEqual([]);
+    expect(validateProps({ props: "이상함" }, ["p1"], 3)).toEqual([]);
+    expect(validateProps(null, ["p1"], 3)).toEqual([]);
+  });
+
+  it("사물 사진 목록이 비면 아무것도 통과하지 않는다", () => {
+    expect(validateProps({ props: [{ photo_id: "p1", cuts: [1] }] }, [], 3)).toEqual([]);
   });
 });

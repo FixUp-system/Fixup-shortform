@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildCastMessages } from "../lib/cast.js";
+import { buildCastMessages, mergePropsIntoCuts } from "../lib/cast.js";
 import { AVATARS } from "../lib/refs.js";
 
 describe("buildCastMessages", () => {
@@ -231,5 +231,52 @@ describe("resolveCutRefs — 인물 하나 + 사물 하나", () => {
   it("같은 레퍼런스를 두 번 싣지 않는다", () => {
     const got = resolveCutRefs({ ref_ids: ["p1", "p1"] }, project);
     expect(got).toHaveLength(1);
+  });
+});
+
+describe("buildCastMessages — 사물도 함께 묻는다", () => {
+  const cuts = [{ shows: "앰플 병 클로즈업" }, { shows: "바르는 손 미디엄 샷" }];
+
+  it("사물 사진을 목록으로 준다", () => {
+    const user = buildCastMessages(cuts, [], "", [{ id: "p1", what: "화장품 병" }]).messages[0].content;
+    expect(user).toContain("[올린 사진 — 사물]");
+    expect(user).toContain("id:p1 화장품 병");
+  });
+
+  it("사물 사진이 없으면 그 블록을 아예 넣지 않는다 — 칸이 있으면 모델이 채운다", () => {
+    const user = buildCastMessages(cuts, [], "").messages[0].content;
+    expect(user).not.toContain("[올린 사진 — 사물]");
+  });
+
+  it("사물이 보이는 컷을 빠짐없이 적으라고 지시한다", () => {
+    expect(buildCastMessages(cuts, [], "", [{ id: "p1", what: "화장품 병" }]).system).toContain("props");
+  });
+});
+
+describe("mergePropsIntoCuts — 사물을 컷에 꽂는다", () => {
+  const cuts = [{ idx: 0 }, { idx: 1 }, { idx: 2 }];
+
+  it("사진을 자기 컷에 꽂는다", () => {
+    const got = mergePropsIntoCuts(cuts, [{ photo_id: "p1", cuts: [0, 2] }]);
+    expect(got[0].ref_ids).toEqual(["p1"]);
+    expect(got[1].ref_ids).toBeUndefined();
+    expect(got[2].ref_ids).toEqual(["p1"]);
+  });
+
+  it("사물이 인물보다 앞에 온다 — resolveCutRefs 가 사물 한 자리·인물 한 자리로 나눈다", () => {
+    const withPeople = [{ idx: 0, ref_ids: ["c1"] }];
+    expect(mergePropsIntoCuts(withPeople, [{ photo_id: "p1", cuts: [0] }])[0].ref_ids)
+      .toEqual(["p1", "c1"]);
+  });
+
+  it("이미 있는 사진을 두 번 넣지 않는다", () => {
+    const already = [{ idx: 0, ref_ids: ["p1", "c1"] }];
+    expect(mergePropsIntoCuts(already, [{ photo_id: "p1", cuts: [0] }])[0].ref_ids)
+      .toEqual(["p1", "c1"]);
+  });
+
+  it("사물이 없으면 컷을 그대로 둔다", () => {
+    expect(mergePropsIntoCuts(cuts, [])).toEqual(cuts);
+    expect(mergePropsIntoCuts(cuts, null)).toEqual(cuts);
   });
 });
