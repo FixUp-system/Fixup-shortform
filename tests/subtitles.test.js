@@ -215,6 +215,12 @@ describe("splitSubtitleText — 두 줄을 넘으면 나눈다", () => {
     expect(splitSubtitleText("", MAX)).toEqual([]);
     expect(splitSubtitleText(null, MAX)).toEqual([]);
   });
+
+  it("공백만 있는 글도 이어붙이면 원문과 같다 — 보장에 예외를 두지 않는다", () => {
+    expect(splitSubtitleText("   ", MAX).join("")).toBe("   ");
+    expect(splitSubtitleText("", MAX)).toEqual([]);
+    expect(splitSubtitleText(null, MAX)).toEqual([]);
+  });
 });
 
 describe("breakTwoLines — 줄바꿈을 코드가 넣는다", () => {
