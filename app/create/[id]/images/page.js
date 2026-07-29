@@ -10,6 +10,17 @@ import { useProject } from "../../../../components/ProjectContext";
 import BackButton from "../../../../components/BackButton";
 import { isImageStale } from "../../../../lib/steps";
 
+// 그림이 아직 없는 자리에 뭐라고 쓸지.
+// "생성 중…"은 **실제로 도는 동안에만** 쓴다 — 누르기 전에도 그렇게 적혀 있으면
+// 자동으로 만들어지는 줄 알고 기다리게 된다(아무 일도 안 일어나는데).
+//
+// 모듈 스코프에 둔다. 컷 목록과 미리보기 패널이 **서로 다른 컴포넌트**인데 둘 다 이것을 쓴다.
+// 본 컴포넌트 안에 두면 PreviewPane 에서 ReferenceError 로 화면이 통째로 죽는다(실제로 죽었다).
+const placeholder = (state) =>
+  state === "needs_attention" ? "품질 확인 필요"
+    : state === "generating" ? "생성 중…"
+    : "아직 그리기 전";
+
 export default function ImagesStepPage() {
   const { id } = useParams();
   const router = useRouter();
@@ -114,13 +125,6 @@ export default function ImagesStepPage() {
   const cuts = project.cuts || [];
   // 화면 설명을 고친 뒤 옛 설명으로 그린 그림이 남아 있으면 클립을 사러 보내지 않는다
   const staleCount = cuts.filter(isImageStale).length;
-  // 그림이 아직 없는 자리에 뭐라고 쓸지.
-  // "생성 중…"은 **실제로 도는 동안에만** 쓴다 — 누르기 전에도 그렇게 적혀 있으면
-  // 자동으로 만들어지는 줄 알고 기다리게 된다(아무 일도 안 일어나는데).
-  const placeholder = (state) =>
-    state === "needs_attention" ? "품질 확인 필요"
-      : state === "generating" ? "생성 중…"
-      : "아직 그리기 전";
   const imgUrl = (c) =>
     c.source === "photo" ? project.material.photos.find((p) => p.id === c.photo_id)?.url : c.image?.url;
   // 우측 미리보기 대상 — 사용자가 고른 컷, 고르기 전에는 첫 컷.
