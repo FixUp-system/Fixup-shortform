@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { splitSentences, splitUnits, buildSplitMessages, buildShowsMessages, buildImagePrompt, buildClipPrompt, stillOnly } from "../lib/cuts.js";
+import { splitSentences, splitUnits, explodeLongRanges, buildSplitMessages, buildShowsMessages, buildImagePrompt, buildClipPrompt, stillOnly } from "../lib/cuts.js";
 import { I2V_STEPS, I2V_MAX_SECONDS } from "../lib/clip-limits.js";
 
 const project = {
@@ -446,5 +446,53 @@ describe("buildClipPrompt — 이 그림이 어떻게 움직이는가", () => {
 
   it("말하는 얼굴을 막는다 — 지금 기술로는 뭉개진다", () => {
     expect(buildClipPrompt({ motion: "인물이 웃는다" })).toMatch(/lip sync/i);
+  });
+});
+
+describe("explodeLongRanges — 8초를 넘고 두 조각 이상이면 푼다", () => {
+  // secondsForText 는 공백을 빼고 5.5자/초로 센다(2~15초로 묶임).
+  // 22자 → 4초, 44자 → 8초, 66자 → 12초, 55자 → 10초.
+  const A = "가".repeat(22);
+  const B = "나".repeat(22);
+  const C = "다".repeat(22);
+  const LONE = "라".repeat(55);   // 조각 하나로 10초 — 더 쪼갤 수 없다
+  const units = [A, B, C, LONE];
+
+  it("8초를 넘고 세 조각이면 조각 단위로 전부 푼다", () => {
+    // 1~3 = 66자 = 12초
+    const out = explodeLongRanges([{ from: 1, to: 3 }, { from: 4, to: 4 }], units);
+    expect(out).toEqual([
+      { from: 1, to: 1 }, { from: 2, to: 2 }, { from: 3, to: 3 }, { from: 4, to: 4 },
+    ]);
+  });
+
+  it("8초 이하면 묶음이 살아남는다 — 합치기가 없어지는 것이 아니라 예외가 된다", () => {
+    // 1~2 = 44자 = 8초(초과 아님) · 3~4 = 77자 = 14초(초과)
+    const out = explodeLongRanges([{ from: 1, to: 2 }, { from: 3, to: 4 }], units);
+    expect(out).toEqual([
+      { from: 1, to: 2 }, { from: 3, to: 3 }, { from: 4, to: 4 },
+    ]);
+  });
+
+  it("조각 하나짜리는 8초를 넘어도 그대로 둔다 — 되물어도 답이 같다", () => {
+    // LONE 하나가 원고 전부인 경우다. 55자 = 10초로 8초를 넘지만 더 쪼갤 수 없다.
+    expect(explodeLongRanges([{ from: 1, to: 1 }], [LONE])).toEqual([{ from: 1, to: 1 }]);
+  });
+
+  it("빈틈도 겹침도 만들지 않는다 — 원고 보존의 전제다", () => {
+    const out = explodeLongRanges([{ from: 1, to: 3 }, { from: 4, to: 4 }], units);
+    let expected = 1;
+    for (const r of out) {
+      expect(r.from).toBe(expected);
+      expected = r.to + 1;
+    }
+    expect(expected).toBe(units.length + 1);
+  });
+
+  it("망가진 입력은 빈 배열로 떨어뜨린다 — 부르는 쪽이 폴백을 쥔다", () => {
+    expect(explodeLongRanges(null, units)).toEqual([]);
+    expect(explodeLongRanges([{ from: 0, to: 2 }], units)).toEqual([]);
+    expect(explodeLongRanges([{ from: 1, to: 9 }], units)).toEqual([]);
+    expect(explodeLongRanges([{ from: 2, to: 1 }], units)).toEqual([]);
   });
 });

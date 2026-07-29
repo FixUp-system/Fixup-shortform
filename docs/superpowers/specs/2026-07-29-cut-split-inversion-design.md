@@ -102,8 +102,9 @@ OpenAI만 쓰므로 **fal 비용 0원**(편당 약 $0.005).
 ## 건드리는 곳
 
 **수정**
-- `lib/cuts.js` — `explodeLongCuts(cuts, ranges, units)` 신설. 순수 함수로 두어 LLM 호출 없이
-  테스트한다(`splitCuts` 안에 인라인하면 테스트가 무거워진다)
+- `lib/cuts.js` — `explodeLongRanges(ranges, units)` 신설. 컷 객체가 아니라 **경계 범위**를 다시 쓴다 —
+  결과를 `validateCutRanges` 에 다시 통과시키면 문장·초·idx 를 그 함수가 다시 뽑아 주고,
+  빈틈·겹침 검사도 한 번 더 받는다. 순수 함수라 LLM 호출 없이 테스트한다
 - `lib/pipeline.js` — `defaultDeps.splitCuts`에서 되묻기 루프와 `splittableLong` 제거,
   분해 호출과 로그 추가 / `runVoicePipeline`에 추정↔실측 로그
 - `tests/cuts.test.js` · `tests/pipeline.test.js`
