@@ -42,8 +42,20 @@ describe("⑥ 완성", () => {
   it("낡은 완성본은 내려받기가 잠긴다", () => {
     const src = read("app/create/[id]/done/page.js");
     expect(src).toContain("isRenderStale");
-    // 내려받기 링크는 낡지 않았을 때만 나온다
-    const anchor = src.slice(0, src.indexOf("내려받기"));
-    expect(anchor).toContain("!stale");
+    // download 속성이 붙은 <a> 를 구조로 찾아, 그 앵커를 감싼 삼항 조건의
+    // 참 분기 조건 안에 !stale 이 있는지 본다 — 낱말 등장 순서만으로는
+    // 조건이 실제로 앵커를 감싸는지 알 수 없다(주석 하나로도 순서가 어긋난다).
+    const downloadIdx = src.indexOf("download");
+    expect(downloadIdx, "download 속성이 붙은 내려받기 링크가 없다").toBeGreaterThan(-1);
+    const anchorStart = src.lastIndexOf("<a", downloadIdx);
+    const ternaryIdx = src.lastIndexOf("? (", anchorStart);
+    expect(ternaryIdx, "내려받기 앵커를 감싸는 삼항 조건을 찾지 못했다").toBeGreaterThan(-1);
+    const conditionStart = src.lastIndexOf("{", ternaryIdx);
+    const condition = src.slice(conditionStart, ternaryIdx);
+    expect(condition, "내려받기 앵커를 감싸는 조건에 !stale 이 없다").toContain("!stale");
+    // 앵커가 참 분기 안에 있는지(거짓 분기로 넘어간 뒤가 아닌지)도 구조로 확인한다
+    const falseBranchIdx = src.indexOf(") : (", ternaryIdx);
+    expect(falseBranchIdx, "삼항 조건의 거짓 분기 경계를 찾지 못했다").toBeGreaterThan(-1);
+    expect(falseBranchIdx).toBeGreaterThan(anchorStart);
   });
 });

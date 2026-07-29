@@ -133,8 +133,8 @@ export default function DoneStepPage() {
 
       <div className="step-actions">
         <BackButton stepKey="done" />
-        {/* 완성본이 있으면 사장님이 하고 싶은 일은 파일을 받는 것이다 — 그것을 주 버튼으로 둔다.
-            다시 합치기는 컷을 고쳤을 때만 쓰는 보조 동작이다. 낡았으면 받는 길을 아예 막는다. */}
+        {/* 완성본이 있으면 사장님이 하고 싶은 일은 내려받기다 — 그것을 주 버튼으로 둔다.
+            다시 합치기는 컷을 고쳤을 때만 쓰는 보조 동작이다. */}
         <div className="fwd">
           {render && !render.fake && render.url && !stale ? (
             <>
