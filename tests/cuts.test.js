@@ -218,6 +218,37 @@ describe("buildImagePrompt — 화면 근거", () => {
     expect(prompt).toContain("reference");
   });
 
+  // 2026-07-29 실측: 사진 두 장을 익명으로 보냈더니 모델이 배역을 뒤바꿨다.
+  // 캐스팅은 50대를 손님으로 정했는데 그림에서는 50대가 치수를 재고 30대가 코트를 입었다.
+  // 첨부를 번호로 세고 그 번호에 배역을 묶어 준다.
+  it("첨부마다 누구인지 번호로 지목한다 — 두 장이면 모델이 임의로 배정한다", () => {
+    const cut = { idx: 0, sentence: "문장.", shows: "손님과 수선사가 마주 선 미디엄 샷", ref_ids: ["c1", "c2"] };
+    const p = buildImagePrompt(cut, project, [
+      { path: "/x/a.jpg", kind: "person", who: "50대 남성 손님" },
+      { path: "/x/b.jpg", kind: "person", who: "30대 남성 수선사" },
+    ]);
+    expect(p).toMatch(/\[1\][^[]*50대 남성 손님/);
+    expect(p).toMatch(/\[2\][^[]*30대 남성 수선사/);
+    // 뒤바꾸지 말라고 명시한다
+    expect(p).toMatch(/do not swap/i);
+  });
+
+  it("인물과 사물이 섞여도 번호가 첨부 순서와 같다", () => {
+    const cut = { idx: 0, sentence: "문장.", shows: "가게 안 미디엄 샷", ref_ids: ["p1", "c1"] };
+    const p = buildImagePrompt(cut, project, [
+      { path: "/x/shop.jpg", kind: "thing" },
+      { path: "/x/a.jpg", kind: "person", who: "50대 남성 손님" },
+    ]);
+    expect(p).toMatch(/\[2\][^[]*50대 남성 손님/);
+    expect(p).toMatch(/packaging/i);
+  });
+
+  it("who 가 없는 인물 레퍼런스도 견딘다 — 옛 프로젝트에는 없다", () => {
+    const cut = { idx: 0, sentence: "문장.", shows: "가게 안 미디엄 샷" };
+    const p = buildImagePrompt(cut, project, [{ path: "/x/a.jpg", kind: "person" }]);
+    expect(p).toMatch(/same person/i);
+  });
+
   it("사람 레퍼런스에는 같은 사람으로 그리라고 한다 — 제품 문구는 사람에게 틀리다", () => {
     const cut = { idx: 0, sentence: "문장.", shows: "아이가 자전거를 끄는 미디엄 샷", ref_ids: ["c1"] };
     const withCast = {

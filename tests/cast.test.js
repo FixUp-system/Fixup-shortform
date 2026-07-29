@@ -106,7 +106,7 @@ describe("resolveCutRefs — 컷이 실제로 쓸 레퍼런스", () => {
   it("인물과 사물을 함께 붙인다", () => {
     expect(resolveCutRefs({ ref_ids: ["c2", "p1"] }, project)).toEqual([
       { from: "photo", id: "p1", kind: "thing" },
-      { from: "avatar", id: "av-child", kind: "person" },
+      { from: "avatar", id: "av-child", kind: "person", who: "아이" },
     ]);
   });
 
@@ -191,6 +191,13 @@ describe("resolveCutRefs — 인물 하나 + 사물 하나", () => {
     expect(got.filter((r) => r.kind === "person")).toHaveLength(1);
     expect(got.filter((r) => r.kind === "thing")).toHaveLength(1);
     expect(got[0].id).toBe("p1"); // 사진이 먼저다
+  });
+
+  it("인물 레퍼런스는 who 를 함께 들고 간다 — 첨부를 배역에 묶어야 한다", () => {
+    // 2026-07-29 실측: 사진 두 장을 익명으로 보냈더니 모델이 배역을 임의로 배정했다.
+    // 캐스팅은 50대를 손님으로 정했는데 그림에서는 50대가 수선사로 나왔다.
+    const got = resolveCutRefs({ ref_ids: ["c1"] }, project);
+    expect(got[0].who).toBe("주인");
   });
 
   it("사물이 없으면 인물 둘까지 쓴다 — 두 사람이 나오면 둘 다 일관돼야 한다", () => {
