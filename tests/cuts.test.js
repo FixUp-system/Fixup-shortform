@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { splitSentences, buildSplitMessages, buildShowsMessages, buildImagePrompt, buildClipPrompt, stillOnly } from "../lib/cuts.js";
+import { splitSentences, splitUnits, buildSplitMessages, buildShowsMessages, buildImagePrompt, buildClipPrompt, stillOnly } from "../lib/cuts.js";
 
 const project = {
   settings: { aspect_ratio: "9:16" },
@@ -20,6 +20,50 @@ describe("splitSentences", () => {
   it("빈 원고는 빈 배열", () => {
     expect(splitSentences("")).toEqual([]);
     expect(splitSentences(null)).toEqual([]);
+  });
+});
+
+describe("splitUnits — 긴 문장은 절로 나눈다", () => {
+  // 8초(= 공백 빼고 44자)를 넘는 문장만 나눈다. 짧은 문장은 통째로 둔다.
+  const LONG = "이 앰플은 PDRN과 엑소좀, 시카가 함께 들어 있어 자기 전에 토너를 바른 후, 2~3방울을 얼굴에 펴 바르고 자면 다음 날 아침 당김이 덜하다는 후기가 많습니다.";
+
+  it("짧은 문장은 통째로 둔다", () => {
+    const text = "30ml에 39,000원입니다. 재구매가 많습니다.";
+    expect(splitUnits(text)).toEqual(["30ml에 39,000원입니다.", "재구매가 많습니다."]);
+  });
+
+  it("8초를 넘는 문장은 여러 조각이 된다", () => {
+    const units = splitUnits(LONG);
+    expect(units.length).toBeGreaterThan(1);
+  });
+
+  it("★ 이어붙이면 원문과 같다 — 이 파이프라인의 유일한 구조적 보장이다", () => {
+    expect(splitUnits(LONG).join(" ")).toBe(LONG);
+  });
+
+  it("쉼표 뒤에서 나뉜다", () => {
+    const units = splitUnits(LONG);
+    expect(units.some((u) => u.endsWith(","))).toBe(true);
+  });
+
+  it("연결어미 뒤에서 나뉜다", () => {
+    const units = splitUnits(LONG);
+    expect(units.some((u) => u.endsWith("바르고"))).toBe(true);
+  });
+
+  it("너무 짧은 조각은 앞에 붙인다 — 한두 낱말짜리 컷은 쓸모가 없다", () => {
+    // "자면" 처럼 한 낱말만 떨어지는 자리가 생긴다. 그런 조각은 앞 조각에 붙인다.
+    expect(splitUnits(LONG).every((u) => u.replace(/\s/g, "").length >= 6)).toBe(true);
+  });
+
+  it("나눌 자리가 없는 긴 문장은 통째로 둔다 — 쪼갤 수 없는 문장도 있다", () => {
+    const noBreak = "아주아주아주아주아주아주아주아주아주아주아주아주아주아주긴한덩어리입니다.";
+    expect(splitUnits(noBreak)).toEqual([noBreak]);
+  });
+
+  it("빈 입력은 빈 배열", () => {
+    expect(splitUnits("")).toEqual([]);
+    expect(splitUnits(null)).toEqual([]);
   });
 });
 
