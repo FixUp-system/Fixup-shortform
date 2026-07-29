@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 import BackButton from "../../../../components/BackButton";
 import { cutSeconds } from "../../../../lib/subtitles";
+import { isRenderStale } from "../../../../lib/steps";
 
 export default function DoneStepPage() {
   const { id } = useParams();
@@ -72,6 +73,9 @@ export default function DoneStepPage() {
   // 완성본 길이는 컷마다 낭독·클립 중 긴 쪽을 더한 값이다 — 낭독 합으로 예고하면
   // 만든 뒤에 다른 초가 나온다(눈금 올림 때문에 클립이 거의 항상 더 길다)
   const totalSeconds = cuts.reduce((s, c) => s + cutSeconds(c), 0);
+  // 컷을 고친 뒤라면 이 완성본은 옛 소리·옛 그림으로 만든 것이다.
+  // 합성은 0원이라 막을 게 아니라 바로 다시 만들게 하는 것이 맞다.
+  const stale = isRenderStale(project);
 
   if (!clipCount) return <p className="pgsub">영상을 먼저 만들어 주세요.</p>;
 
@@ -108,6 +112,11 @@ export default function DoneStepPage() {
       ) : (
         <>
           <p className="pgsub">완성했어요 — 약 {Math.round(render.seconds || 0)}초.</p>
+          {stale && (
+            <div className="script-src warn">
+              컷을 고친 뒤라 이 영상은 옛 소리·옛 그림으로 만든 것이에요 — 다시 합쳐 주세요
+            </div>
+          )}
           {render.noSubtitles && (
             <div className="script-src warn">
               이 합성 방식에서는 자막이 들어가지 않아요 (SHOTFORM_COMPOSER=fal)
@@ -124,10 +133,10 @@ export default function DoneStepPage() {
 
       <div className="step-actions">
         <BackButton stepKey="done" />
-        {/* 완성본이 있으면 사장님이 하고 싶은 일은 내려받기다 — 그것을 주 버튼으로 둔다.
-            다시 합치기는 컷을 고쳤을 때만 쓰는 보조 동작이다. */}
+        {/* 완성본이 있으면 사장님이 하고 싶은 일은 파일을 받는 것이다 — 그것을 주 버튼으로 둔다.
+            다시 합치기는 컷을 고쳤을 때만 쓰는 보조 동작이다. 낡았으면 받는 길을 아예 막는다. */}
         <div className="fwd">
-          {render && !render.fake && render.url ? (
+          {render && !render.fake && render.url && !stale ? (
             <>
               <button className="mini" disabled={busy} onClick={start}>
                 {busy ? "합치는 중…" : "다시 합치기"}
@@ -139,7 +148,11 @@ export default function DoneStepPage() {
           ) : (
             <>
               <span className="hint">
-                {render ? "컷을 고쳤다면 다시 합쳐 주세요" : "합치는 데 조금 걸려요"}
+                {stale
+                  ? "다시 합치면 지금 내용으로 내려받을 수 있어요"
+                  : render
+                  ? "컷을 고쳤다면 다시 합쳐 주세요"
+                  : "합치는 데 조금 걸려요"}
               </span>
               <button className="cta" disabled={busy} onClick={start}>
                 {busy ? "합치는 중…" : render ? "다시 합치기" : "완성본 만들기"}
