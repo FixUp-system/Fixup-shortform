@@ -41,6 +41,20 @@ describe("selectCandidate 검수 기준", () => {
     expect(text).not.toContain("문장 의도 일치");
   });
 
+  it("거울·반사 같은 물리 오류도 본다", async () => {
+    // 2026-07-29 실측: 거울을 등지고 선 사람이 거울 속에서는 정면으로 비쳤는데
+    // "신체 오류 없음"으로 통과했다. 검수 기준에 반사·그림자가 없었다.
+    // 어제는 허공을 잡은 손을 놓쳤다 — 두 번 연속이라 기준을 넓힌다.
+    // 장면 설명에는 거울을 넣지 않는다 — 넣으면 그 낱말이 프롬프트에 있다는 이유로
+    // 기준과 무관하게 통과해 버린다(실제로 그렇게 거짓 통과하는 테스트를 한 번 썼다)
+    const store = {};
+    await selectCandidate({ cut, scene: { shows: "작업대 위 코트 클로즈업" }, candidates,
+      fetchImpl: capturingFetch(store), apiKey: "k" });
+    const text = promptText(store);
+    expect(text).toContain("거울");
+    expect(text).toContain("반사");
+  });
+
   it("장면이 없으면(구성 전 옛 프로젝트) 나레이션 문장으로 폴백한다", async () => {
     const store = {};
     await selectCandidate({ cut, candidates, fetchImpl: capturingFetch(store), apiKey: "k" });

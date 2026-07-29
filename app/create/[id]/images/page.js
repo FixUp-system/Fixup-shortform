@@ -111,6 +111,13 @@ export default function ImagesStepPage() {
   }
 
   const cuts = project.cuts || [];
+  // 그림이 아직 없는 자리에 뭐라고 쓸지.
+  // "생성 중…"은 **실제로 도는 동안에만** 쓴다 — 누르기 전에도 그렇게 적혀 있으면
+  // 자동으로 만들어지는 줄 알고 기다리게 된다(아무 일도 안 일어나는데).
+  const placeholder = (state) =>
+    state === "needs_attention" ? "품질 확인 필요"
+      : state === "generating" ? "생성 중…"
+      : "아직 그리기 전";
   const imgUrl = (c) =>
     c.source === "photo" ? project.material.photos.find((p) => p.id === c.photo_id)?.url : c.image?.url;
   // 우측 미리보기 대상 — 사용자가 고른 컷, 고르기 전에는 첫 컷.
@@ -163,7 +170,7 @@ export default function ImagesStepPage() {
               >
                 <span className="num">{c.idx + 1}</span>
                 {img ? <img src={img} alt="" /> :
-                  <span className="ph">{c.state === "needs_attention" ? "품질 확인 필요" : "생성 중…"}</span>}
+                  <span className="ph">{placeholder(c.state)}</span>}
               </div>
               <div className="txt">
                 “<span contentEditable suppressContentEditableWarning className="editable"
@@ -189,7 +196,6 @@ export default function ImagesStepPage() {
             <div className="fwd">
               {!madeAny ? (
                 <>
-                  <span className="hint">컷 {cuts.length}개에 그림을 그려요 — 컷마다 두 장을 뽑아 나은 쪽을 고릅니다</span>
                   <button className="cta" disabled={busy} onClick={start}>
                     {busy ? "그리는 중…" : "이미지 만들기"}
                   </button>
@@ -246,7 +252,7 @@ function PreviewPane({ cut, url, photoName, aspect, hasSynopsis, stalled, onRege
   return (
     <aside className="panel preview-pane">
       <div className="preview-frame" style={frameStyle(aspect)}>
-        {url ? <img src={url} alt="" /> : <span className="ph">{cut.state === "needs_attention" ? "품질 확인 필요" : "생성 중…"}</span>}
+        {url ? <img src={url} alt="" /> : <span className="ph">{placeholder(cut.state)}</span>}
       </div>
       <div className="badges mt-md">
         <span className={`badge ${isPhoto ? "photo" : "ai"}`}>{isPhoto ? `내 사진 · ${photoName || ""}` : "AI 생성"}</span>

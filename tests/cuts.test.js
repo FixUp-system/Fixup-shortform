@@ -286,6 +286,21 @@ describe("buildImagePrompt — 화면 근거", () => {
     expect(p).toMatch(/packaging/i);
   });
 
+  it("인물이 정해진 컷에는 그 밖의 사람을 넣지 말라고 한다", () => {
+    // 2026-07-29 실측: shows 가 "손님이 들어오는" 뿐인 컷에 모델이 재봉틀 앞 중년 여성을
+    // 덤으로 그려 넣었다. 그 사람은 레퍼런스가 없어 컷마다 다른 얼굴이 된다.
+    // 초점(무엇을 따라가는지)을 선언해도 줄지 않아, 그림 지시에서 직접 막는다.
+    const cut = { idx: 0, sentence: "문장.", shows: "손님이 코트를 들고 들어오는 미디엄 샷", ref_ids: ["c1"] };
+    const p = buildImagePrompt(cut, project, [{ path: "/x/a.jpg", kind: "person", who: "30대 남성 손님" }]);
+    expect(p).toMatch(/no other people/i);
+  });
+
+  it("인물 레퍼런스가 없는 컷에는 그 말을 넣지 않는다 — 거리 풍경에서 행인까지 지운다", () => {
+    const cut = { idx: 0, sentence: "문장.", shows: "성수동 골목 풀 샷" };
+    expect(buildImagePrompt(cut, project, [])).not.toMatch(/no other people/i);
+    expect(buildImagePrompt(cut, project, [{ path: "/x/p.jpg", kind: "thing" }])).not.toMatch(/no other people/i);
+  });
+
   it("레퍼런스가 없으면 첨부를 가리키는 말을 넣지 않는다", () => {
     const cut = { idx: 0, sentence: "문장.", shows: "빈 매장 풀 샷" };
     const p = buildImagePrompt(cut, project, []);
