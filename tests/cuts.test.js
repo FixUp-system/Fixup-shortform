@@ -132,6 +132,21 @@ describe("buildShowsMessages", () => {
     expect(buildShowsMessages(project, [{ sentence: "한 문장." }]).messages[0].content)
       .not.toContain("[이 영상이 따라가는 것]");
   });
+
+  it("사진 목록은 여전히 준다 — 무엇을 찍을 수 있는지 알아야 화면에 넣는다", () => {
+    const withPhoto = { ...project, material: { ...project.material, photos: [{ id: "p1", filename: "b.jpg" }] } };
+    expect(buildShowsMessages(withPhoto, [{ sentence: "한 문장." }]).messages[0].content)
+      .toContain("id:p1");
+  });
+
+  it("사진 id 를 적으라고 시키지 않는다 — 그 책임은 캐스팅으로 갔다", () => {
+    expect(buildShowsMessages(project, [{ sentence: "한 문장." }]).system).not.toContain("ref_ids");
+  });
+
+  it("초점이 물건인데 사람이 보이면 둘을 한 화면에 담으라고 알려 준다", () => {
+    // 규칙을 조이는 대신 본보기를 준다 — 조이는 고침은 이 저장소에서 네 번 다 샜다
+    expect(buildShowsMessages(project, [{ sentence: "한 문장." }]).system).toContain("한 화면에");
+  });
 });
 
 // 표본은 실측이다 — 화면 설계 패스를 자료 6편 × 3회 돌려 절 122개를 모았고

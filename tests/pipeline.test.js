@@ -61,7 +61,8 @@ describe("defaultDeps.splitCuts — 두 패스", () => {
   }
   const ranges = { cuts: [{ from: 1, to: 2 }, { from: 3, to: 3 }] };
   const noCast = { cast: [] };
-  const shots = { shots: [{ shows: "딸기를 가는 손 클로즈업", ref_ids: ["p1"] }, { shows: "골목을 걷는 시점 샷" }] };
+  // 화면 설계는 사진을 고르지 않는다 — 사진은 props 로 온다
+  const shots = { shots: [{ shows: "딸기를 가는 손 클로즈업" }, { shows: "골목을 걷는 시점 샷" }] };
 
   it("경계로 자른 컷에 화면을 붙여 돌려준다", async () => {
     llmMock.callJson.mockResolvedValueOnce(ranges).mockResolvedValueOnce(shots).mockResolvedValueOnce(noCast);
@@ -71,7 +72,7 @@ describe("defaultDeps.splitCuts — 두 패스", () => {
     expect(cuts[0].sentence).toBe("매일 아침 딸기를 갈아 씁니다. 시럽은 쓰지 않습니다.");
     expect(cuts[1].sentence).toBe("성수역에서 2분입니다.");
     expect(cuts[0].shows).toBe("딸기를 가는 손 클로즈업");
-    expect(cuts[0].ref_ids).toEqual(["p1"]);
+    expect(cuts[0].ref_ids).toBeUndefined();   // 화면 설계는 사진을 고르지 않는다
     expect(cuts[1].ref_ids).toBeUndefined();
     expect(cuts[0].source).toBe("ai");
     expect(cuts[0].seconds).toBeGreaterThan(1);
@@ -95,7 +96,7 @@ describe("defaultDeps.splitCuts — 두 패스", () => {
     const after = await projects.getProject(p.id);
     expect(after.cast).toEqual([{ id: "c1", who: "10세 전후 남자아이", cuts: [0] }]);
     // 인물 id 를 컷에 꽂는 것은 모델이 아니라 코드다 — 이것이 인물 일관성의 전부다
-    expect(cuts[0].ref_ids).toEqual(["p1", "c1"]);
+    expect(cuts[0].ref_ids).toEqual(["c1"]);   // 인물만 꽂힌다
     expect(cuts[1].ref_ids).toBeUndefined();
   });
 
