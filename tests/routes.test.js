@@ -227,6 +227,35 @@ describe("PATCH /api/projects/[id] — 브리핑 버전은 내용 변경에 묶�
     await PATCH(patchReq({ briefing: { asked: [{ question: "가격은?", answer: "5천원", done: true }] } }), ctx(p.id));
     expect((await getProject(p.id)).briefing.version).toBe(3);
   });
+
+  it("초점을 바꾸면 컷을 비운다 — 화면과 캐스팅이 함께 달라져야 한다", async () => {
+    const p = await projectWithScript();
+    await updateProject(p.id, (proj) => ({
+      ...proj, status: "cuts",
+      briefing: { ...proj.briefing, focus: { mode: "사람", subject: "50대 남성 손님" } },
+      cuts: [{ idx: 0, sentence: SCRIPT_TEXT, seconds: 3, shows: "옛 화면" }],
+      cast: [{ id: "c1", who: "손님", cuts: [0] }],
+    }));
+    const res = await PATCH(
+      patchReq({ briefing: { focus: { mode: "물건", subject: "수선한 코트" } } }), ctx(p.id));
+    expect(res.status).toBe(200);
+    const saved = await getProject(p.id);
+    expect(saved.briefing.focus.mode).toBe("물건");
+    expect(saved.cuts).toEqual([]);
+  });
+
+  it("초점이 그대로면 컷을 건드리지 않는다 — 다시 만들면 고쳐 둔 화면이 지워진다", async () => {
+    const p = await projectWithScript();
+    const focus = { mode: "사람", subject: "50대 남성 손님" };
+    await updateProject(p.id, (proj) => ({
+      ...proj, status: "cuts",
+      briefing: { ...proj.briefing, focus },
+      cuts: [{ idx: 0, sentence: SCRIPT_TEXT, seconds: 3, shows: "고쳐 둔 화면" }],
+    }));
+    const res = await PATCH(patchReq({ briefing: { focus } }), ctx(p.id));
+    expect(res.status).toBe(200);
+    expect((await getProject(p.id)).cuts[0].shows).toBe("고쳐 둔 화면");
+  });
 });
 
 describe("PATCH script_text — 원고 손편집", () => {

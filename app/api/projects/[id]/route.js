@@ -23,6 +23,13 @@ export async function PATCH(req, { params }) {
         // 브리핑이 처음 생기는 저장은 "바뀐" 것이 아니다(직접 채우기 폴백) — 1에서 시작한다.
         const changed = proj.briefing ? briefingContentChanged(proj.briefing, next.briefing) : false;
         next.briefing.version = (proj.briefing?.version || 1) + (changed ? 1 : 0);
+        // 초점이 바뀌면 컷을 비운다 — 화면과 캐스팅이 그것을 기준으로 다시 만들어져야 한다.
+        // 실제로 달라졌을 때만 비운다: 같은 값으로 저장했는데 지우면 고쳐 둔 화면이 날아간다.
+        const focusKey = (f) => `${f?.mode || ""}|${(f?.subject || "").trim()}`;
+        if (focusKey(proj.briefing?.focus) !== focusKey(next.briefing?.focus)) {
+          next.cuts = [];
+          next.cuts_error = null;
+        }
       }
       // 컷 한 줄 고치기 — 문장·화면·움직임. 준 것만 바꾼다(빈 값으로 지우지 않게).
       // 사장님이 구성 단계에서 손보는 자리다. 이미지·클립은 이 값들을 읽어 만든다.

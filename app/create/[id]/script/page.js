@@ -82,6 +82,20 @@ export default function ScriptStepPage() {
     await load(id).catch(() => {});
   }
 
+  // 초점을 고치면 구성을 다시 만든다 — 라우트가 컷을 비우므로 이어서 부르면 새로 나뉜다.
+  // 분할·화면 설계·캐스팅은 OpenAI 만 써서 fal 값이 들지 않는다.
+  async function saveFocus(subject) {
+    const focus = { ...project.briefing.focus, subject };
+    const res = await fetch(`/api/projects/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ briefing: { focus } }),
+    }).catch(() => null);
+    if (!res || !res.ok) { setErr("고친 것을 저장하지 못했어요 — 다시 시도해 주세요"); return; }
+    setErr("");
+    await load(id).catch(() => {});
+    await splitCuts();
+  }
+
   async function genScript(instr) {
     setBusy(true); setErr("");
     const res = await fetch(`/api/projects/${id}/script`, {
@@ -248,6 +262,24 @@ export default function ScriptStepPage() {
               </button>
             ))}
           </div>
+        </>
+      )}
+
+      {/* 초점 — 이 영상이 무엇을 따라가는지. 여기서 고치면 구성을 다시 만든다.
+          그림과 클립이 이것을 기준으로 나오므로, 만들기 전에 고쳐야 값이 안 든다. */}
+      {project.briefing?.focus?.subject && (
+        <>
+          <div className="eyebrow mt-lg">
+            이 영상이 따라가는 것 <small>고치면 구성을 다시 만들어요</small>
+          </div>
+          <p className="pgsub">
+            <b>{project.briefing.focus.mode}</b>{" — "}
+            <span contentEditable suppressContentEditableWarning
+              onBlur={(e) => {
+                const v = e.currentTarget.textContent.trim();
+                if (v && v !== project.briefing.focus.subject) saveFocus(v);
+              }}>{project.briefing.focus.subject}</span>
+          </p>
         </>
       )}
 
