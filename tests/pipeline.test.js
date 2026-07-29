@@ -538,4 +538,28 @@ describe("사물 레퍼런스 — 캐스팅이 답하고 코드가 꽂는다", (
     await pipeline.defaultDeps.splitCuts(await projects.getProject(p.id));
     expect(llmMock.callJson).toHaveBeenCalledTimes(3);
   });
+
+  it("재시도 2차에 인물이 빠져도 1차에서 뽑은 인물을 잃지 않는다", async () => {
+    const p = await projectWithThingPhoto("물건");
+    llmMock.callJson
+      .mockResolvedValueOnce({ cuts: [{ from: 1, to: 1 }, { from: 2, to: 2 }] })
+      .mockResolvedValueOnce({ shots: [{ shows: "앰플 병 클로즈업" }, { shows: "바르는 손" }] })
+      .mockResolvedValueOnce({ cast: [{ who: "20대 여성", cuts: [1] }], props: [] })  // 1차 — 인물 있음, 제품 0개
+      .mockResolvedValueOnce({ cast: [], props: [{ photo_id: "p1", cuts: [1] }] });   // 2차 — 인물 사라짐
+    const cuts = await pipeline.defaultDeps.splitCuts(await projects.getProject(p.id));
+    const saved = await projects.getProject(p.id);
+    expect(saved.cast).toHaveLength(1);            // 1차 인물이 살아 있다
+    expect(cuts[0].ref_ids).toContain("p1");       // 2차 제품도 반영됐다
+  });
+
+  it("재시도 2차가 예외로 죽어도 1차 답을 지킨다", async () => {
+    const p = await projectWithThingPhoto("물건");
+    llmMock.callJson
+      .mockResolvedValueOnce({ cuts: [{ from: 1, to: 1 }, { from: 2, to: 2 }] })
+      .mockResolvedValueOnce({ shots: [{ shows: "앰플 병 클로즈업" }, { shows: "바르는 손" }] })
+      .mockResolvedValueOnce({ cast: [{ who: "20대 여성", cuts: [1] }], props: [] })
+      .mockRejectedValueOnce(new Error("네트워크"));
+    await pipeline.defaultDeps.splitCuts(await projects.getProject(p.id));
+    expect((await projects.getProject(p.id)).cast).toHaveLength(1);
+  });
 });
