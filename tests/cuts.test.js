@@ -102,6 +102,26 @@ describe("buildShowsMessages", () => {
     // 화면 설계가 고를 수 있는 것은 사진뿐이다
     expect(system).toContain("올린 사진");
   });
+
+  it("초점을 알려 준다 — 갈래와 대상을 함께 준다", () => {
+    const withFocus = { ...project, briefing: { ...project.briefing,
+      focus: { mode: "사람", subject: "50대 남성 손님" } } };
+    const { messages, system } = buildShowsMessages(withFocus, [{ sentence: "한 문장." }]);
+    expect(messages[0].content).toContain("[이 영상이 따라가는 것]\n사람 — 50대 남성 손님");
+    expect(system).toContain("따라가는 것");
+  });
+
+  it("물건 갈래도 그대로 전한다 — 사람만 특별대우하지 않는다", () => {
+    const withFocus = { ...project, briefing: { ...project.briefing,
+      focus: { mode: "물건", subject: "생딸기라떼" } } };
+    expect(buildShowsMessages(withFocus, [{ sentence: "한 문장." }]).messages[0].content)
+      .toContain("물건 — 생딸기라떼");
+  });
+
+  it("초점이 없으면 그 블록을 넣지 않는다", () => {
+    expect(buildShowsMessages(project, [{ sentence: "한 문장." }]).messages[0].content)
+      .not.toContain("[이 영상이 따라가는 것]");
+  });
 });
 
 // 표본은 실측이다 — 화면 설계 패스를 자료 6편 × 3회 돌려 절 122개를 모았고

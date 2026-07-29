@@ -39,6 +39,22 @@ describe("buildCastMessages", () => {
   it("화면에 보이는 사람만 세라고 지시한다", () => {
     expect(buildCastMessages(cuts, AVATARS).system).toContain("화면에 보이는 사람");
   });
+
+  it("사람 초점을 받으면 알려 준다 — 반드시 뽑아야 할 사람이다", () => {
+    const user = buildCastMessages(cuts, AVATARS, "50대 남성 손님").messages[0].content;
+    expect(user).toContain("[이 영상이 따라가는 사람]\n50대 남성 손님");
+  });
+
+  it("초점을 안 받으면 그 블록을 넣지 않는다 — 물건·정보 영상에서는 넘어오지 않는다", () => {
+    expect(buildCastMessages(cuts, AVATARS).messages[0].content)
+      .not.toContain("[이 영상이 따라가는 사람]");
+    expect(buildCastMessages(cuts, AVATARS, "  ").messages[0].content)
+      .not.toContain("[이 영상이 따라가는 사람]");
+  });
+
+  it("그 사람을 빠뜨리지 말라고 지시한다", () => {
+    expect(buildCastMessages(cuts, AVATARS, "x").system).toContain("따라가는 사람");
+  });
 });
 
 import { resolveCastRefs, resolveCutRefs } from "../lib/cast.js";
