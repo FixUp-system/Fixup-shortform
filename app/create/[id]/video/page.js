@@ -8,6 +8,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 import BackButton from "../../../../components/BackButton";
 import { I2V_MAX_SECONDS } from "../../../../lib/clip-limits";
+import { isClipStale } from "../../../../lib/steps";
 
 export default function VideoStepPage() {
   const { id } = useParams();
@@ -97,6 +98,8 @@ export default function VideoStepPage() {
   const madeAny = cuts.some((c) => c.video);
   const doneCount = cuts.filter((c) => c.video).length;
   const truncatedCount = cuts.filter((c) => c.video?.truncated).length;
+  // 그림이나 낭독이 바뀐 뒤 옛것으로 만든 클립이 남아 있으면 합치러 보내지 않는다
+  const staleCount = cuts.filter(isClipStale).length;
   const selected = cuts.find((c) => c.idx === selectedIdx) || cuts.find((c) => c.video) || cuts[0];
 
   if (!cuts.length) return <p className="pgsub">대본을 먼저 만들어 주세요.</p>;
@@ -142,6 +145,11 @@ export default function VideoStepPage() {
                   {c.video && <span className="badge photo">클립 {c.video.seconds}초</span>}
                   {c.video?.truncated && (
                     <span className="badge warn">{I2V_MAX_SECONDS}초까지만 움직이고 나머지는 멈춰 있어요</span>
+                  )}
+                  {isClipStale(c) && (
+                    <span className="badge warn">
+                      그림이나 낭독이 바뀐 뒤라 클립이 옛것이에요 — 다시 만들면 됩니다
+                    </span>
                   )}
                   {(c.video || c.video_error) && (
                     <>
@@ -193,10 +201,14 @@ export default function VideoStepPage() {
             </>
           ) : (
             <>
-              <span className="hint">이어 붙이고 소리와 자막을 얹으면 완성이에요</span>
+              <span className="hint">
+                {staleCount > 0
+                  ? `바뀐 컷 ${staleCount}개의 클립을 다시 만들어 주세요`
+                  : "이어 붙이고 소리와 자막을 얹으면 완성이에요"}
+              </span>
               <button
                 className="cta"
-                disabled={busy || doneCount === 0}
+                disabled={busy || doneCount === 0 || staleCount > 0}
                 onClick={() => router.push(`/create/${id}/done`)}
               >
                 ⑥ 완성하러 가기 →

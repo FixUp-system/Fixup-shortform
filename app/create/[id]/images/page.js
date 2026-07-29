@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 import BackButton from "../../../../components/BackButton";
+import { isImageStale } from "../../../../lib/steps";
 
 export default function ImagesStepPage() {
   const { id } = useParams();
@@ -111,6 +112,8 @@ export default function ImagesStepPage() {
   }
 
   const cuts = project.cuts || [];
+  // 화면 설명을 고친 뒤 옛 설명으로 그린 그림이 남아 있으면 클립을 사러 보내지 않는다
+  const staleCount = cuts.filter(isImageStale).length;
   // 그림이 아직 없는 자리에 뭐라고 쓸지.
   // "생성 중…"은 **실제로 도는 동안에만** 쓴다 — 누르기 전에도 그렇게 적혀 있으면
   // 자동으로 만들어지는 줄 알고 기다리게 된다(아무 일도 안 일어나는데).
@@ -185,6 +188,11 @@ export default function ImagesStepPage() {
                   {(c.ref_ids?.length || c.ref_photo_id) && <span className="badge vlm">레퍼런스 적용</span>}
                   {c.vlm?.note && <span className="badge ai">{c.vlm.note.slice(0, 30)}</span>}
                   <span className="badge ai">{c.seconds}초</span>
+                  {isImageStale(c) && (
+                    <span className="badge warn">
+                      화면 설명을 고친 뒤라 그림이 옛 설명으로 그려진 거예요 — 다시 만들면 됩니다
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -202,8 +210,16 @@ export default function ImagesStepPage() {
                 </>
               ) : (
                 <>
-                  <span className="hint">이미지가 곧 각 컷의 시작 프레임이 됩니다</span>
-                  <button className="cta" onClick={() => router.push(`/create/${id}/video`)}>
+                  <span className="hint">
+                    {staleCount > 0
+                      ? `고친 화면 ${staleCount}개를 다시 그려 주세요`
+                      : "이미지가 곧 각 컷의 시작 프레임이 됩니다"}
+                  </span>
+                  <button
+                    className="cta"
+                    disabled={staleCount > 0}
+                    onClick={() => router.push(`/create/${id}/video`)}
+                  >
                     ⑤ 영상 만들러 가기 →
                   </button>
                 </>

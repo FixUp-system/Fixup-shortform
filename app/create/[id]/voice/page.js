@@ -11,6 +11,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 import BackButton from "../../../../components/BackButton";
 import { VOICES } from "../../../../lib/voices";
+import { isAudioStale } from "../../../../lib/steps";
 
 export default function VoiceStepPage() {
   const { id } = useParams();
@@ -125,6 +126,8 @@ export default function VoiceStepPage() {
   const madeAny = cuts.some((c) => c.audio);
   const doneCount = cuts.filter((c) => c.audio).length;
   const totalSeconds = cuts.reduce((s, c) => s + (Number(c.seconds) || 0), 0);
+  // 문장을 고친 뒤 옛 문장을 읽은 소리가 남아 있으면 다음으로 보내지 않는다
+  const staleCount = cuts.filter(isAudioStale).length;
 
   // 대본 승인 직후 이 화면에 도착하면 컷이 아직 없다 — 분할이 도는 중이다.
   // 분할은 대본 승인이 띄우고(POST /cuts), 여기서는 컷이 생기기를 기다리기만 한다.
@@ -192,6 +195,11 @@ export default function VoiceStepPage() {
                   {/* 길이·재생성 횟수와 [다시 읽기]는 한 줄에 둔다 — 셋 다 이 낭독 하나에 대한 것이다 */}
                   <div className="badges">
                     <span className="badge ai">{c.audio.seconds}초</span>
+                    {isAudioStale(c) && (
+                      <span className="badge warn">
+                        문장을 고친 뒤라 소리가 옛 문장이에요 — 다시 읽히면 됩니다
+                      </span>
+                    )}
                     {/* 남은 횟수는 항상 보인다 — 3회 상한에 언제 닿는지 누르기 전에 알아야 한다 */}
                     <span className="badge ai">다시 읽음 {c.voice_regen_count || 0}/3</span>
                     <button
@@ -230,9 +238,12 @@ export default function VoiceStepPage() {
             </>
           ) : (
             <>
+              {staleCount > 0 && (
+                <span className="hint">고친 문장 {staleCount}개를 다시 읽혀 주세요</span>
+              )}
               <button
                 className="cta"
-                disabled={busy || doneCount === 0}
+                disabled={busy || doneCount === 0 || staleCount > 0}
                 onClick={() => router.push(`/create/${id}/images`)}
               >
                 ④ 이미지 만들러 가기 →
