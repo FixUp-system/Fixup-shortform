@@ -342,6 +342,25 @@ describe("runVoicePipeline — 컷마다 따로 읽힌다", () => {
     expect(isAudioStale(cut)).toBe(false);
     expect(isAudioStale({ ...cut, sentence: "고친 문장" })).toBe(true);
   });
+
+  it("실측이 8초를 넘으면 추정과 나란히 로그로 남긴다 — 흐름은 막지 않는다", async () => {
+    const p = await makeProject();
+    await runBoth(p.id, deps());
+    const logs = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((...a) => logs.push(a.join(" ")));
+    try {
+      // 추정 6초짜리 컷을 9초로 읽어 온다
+      await pipeline.runVoicePipeline(p.id, {
+        speak: async () => ({ url: "http://a.mp3", seconds: 9 }),
+      });
+    } finally {
+      spy.mockRestore();
+    }
+    expect(logs.some((l) => l.includes("추정") && l.includes("실측")), "긴 실측이 로그에 없다").toBe(true);
+    const after = await projects.getProject(p.id);
+    expect(after.status, "로그를 남겨도 흐름은 그대로 간다").toBe("voice");
+    expect(after.cuts.find((c) => c.source === "ai").seconds, "실측이 추정을 덮는다").toBe(9);
+  });
 });
 
 describe("runVideoPipeline — 이미지를 클립으로", () => {
