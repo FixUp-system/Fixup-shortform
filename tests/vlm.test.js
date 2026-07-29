@@ -72,6 +72,30 @@ describe("selectCandidate 검수 기준", () => {
     });
     expect(verdict).toEqual({ selectedIndex: 0, passed: true, note: "ok" });
   });
+
+  it("고르라고 하지 않는다 — 후보가 한 장이라 고를 것이 없다", async () => {
+    const store = {};
+    const got = await selectCandidate({
+      cut: { sentence: "문장." }, scene: { shows: "화면" },
+      candidates: [{ url: "http://a" }], fetchImpl: capturingFetch(store), apiKey: "k",
+    });
+    expect(promptText(store), "스키마에 selectedIndex 가 남아 있다").not.toContain("selectedIndex");
+    expect(got.selectedIndex, "호출부 호환을 위해 0 을 돌려준다").toBe(0);
+    expect(got.passed).toBe(true);
+  });
+
+  it("불합격은 그대로 전한다 — 이것이 다시 만들기를 부르는 유일한 신호다", async () => {
+    const fetchImpl = async () => ({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: JSON.stringify({ passed: false, note: "손가락 오류" }) } }] }),
+    });
+    const got = await selectCandidate({
+      cut: { sentence: "문장." }, scene: { shows: "화면" },
+      candidates: [{ url: "http://a" }], fetchImpl, apiKey: "k",
+    });
+    expect(got.passed).toBe(false);
+    expect(got.note).toBe("손가락 오류");
+  });
 });
 
 describe("describePhoto — 올린 사진에 무엇이 담겼나", () => {

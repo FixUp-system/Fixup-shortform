@@ -235,6 +235,16 @@ describe("분할 → 이미지 (이어 부르면 갈라지기 전과 같다)", (
     // 화면 설명을 고치면 그 자리에서 낡는다
     expect(isImageStale({ ...ai, shows: "다른 화면" })).toBe(true);
   });
+
+  it("컷마다 그림을 한 장만 만든다 — 후보 2장이던 것을 줄였다", async () => {
+    const p = await makeProject();
+    let calls = 0;
+    const d = { ...deps(), genImage: async () => { calls += 1; return { url: "http://img/" + calls }; } };
+    await runBoth(p.id, d);
+    const saved = await projects.getProject(p.id);
+    const aiCuts = saved.cuts.filter((c) => c.source === "ai").length;
+    expect(calls).toBe(aiCuts);
+  });
 });
 
 describe("이미지 생성에 레퍼런스가 배열로 간다", () => {
