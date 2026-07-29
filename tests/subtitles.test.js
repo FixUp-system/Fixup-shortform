@@ -249,3 +249,56 @@ describe("breakTwoLines — 줄바꿈을 코드가 넣는다", () => {
     expect(breakTwoLines(s, LINE)).toBe(s);
   });
 });
+
+describe("buildCues — 컷 하나가 자막 여러 개를 낸다", () => {
+  const V = { width: 1080, height: 1920 };
+  const LONG = "세탁소에서는 전문적인 장비와 세제를 사용하여 운동화를 새것처럼 만들어줍니다.";
+
+  it("치수를 주지 않으면 나누지 않는다 — 옛 호출을 그대로 받는다", () => {
+    expect(buildCues([{ sentence: LONG, seconds: 6 }])).toEqual([
+      { start: 0, end: 6, text: LONG },
+    ]);
+  });
+
+  it("치수를 주면 한 컷이 여러 자막이 된다", () => {
+    const cues = buildCues([{ sentence: LONG, seconds: 6 }], V);
+    expect(cues.length).toBeGreaterThan(1);
+  });
+
+  it("마지막 자막의 끝이 컷의 끝과 정확히 같다 — 오차가 다음 컷으로 안 넘어간다", () => {
+    const cues = buildCues([{ sentence: LONG, seconds: 6 }, { sentence: "화요일은 쉽니다.", seconds: 2 }], V);
+    const first = cues.filter((c) => c.end <= 6);
+    expect(first[first.length - 1].end).toBe(6);
+    expect(cues[cues.length - 1].end).toBe(8);
+  });
+
+  it("자막끼리 겹치지 않고 시간이 뒤로만 간다", () => {
+    const cues = buildCues([{ sentence: LONG, seconds: 6 }, { sentence: LONG, seconds: 6 }], V);
+    for (let i = 1; i < cues.length; i++) {
+      expect(cues[i].start).toBeGreaterThanOrEqual(cues[i - 1].end);
+      expect(cues[i].end).toBeGreaterThan(cues[i].start);
+    }
+  });
+
+  it("자막을 이어붙이면 컷 문장과 같다 — 줄바꿈과 공백만 다르다", () => {
+    const cues = buildCues([{ sentence: LONG, seconds: 6 }], V);
+    const joined = cues.map((c) => c.text.replace(/\n/g, " ")).join(" ").replace(/\s+/g, "");
+    expect(joined).toBe(LONG.replace(/\s+/g, ""));
+  });
+
+  it("긴 조각에는 줄바꿈이 들어간다", () => {
+    const cues = buildCues([{ sentence: LONG, seconds: 6 }], V);
+    expect(cues.some((c) => c.text.includes("\n"))).toBe(true);
+  });
+
+  it("빈 문장은 큐를 안 만들되 시간은 흐른다 — 치수를 줘도 그대로다", () => {
+    const cues = buildCues([{ sentence: "", seconds: 2 }, { sentence: "둘째", seconds: 3 }], V);
+    expect(cues).toEqual([{ start: 2, end: 5, text: "둘째" }]);
+  });
+
+  it("낭독이 없으면 클립 길이를 나눠 쓴다 — 목소리가 실패해도 자막은 나온다", () => {
+    const cues = buildCues([{ sentence: LONG, video: { seconds: 6 } }], V);
+    expect(cues.length).toBeGreaterThan(1);
+    expect(cues[cues.length - 1].end).toBe(6);
+  });
+});
