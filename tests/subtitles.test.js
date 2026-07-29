@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildCues, toAss, cutSeconds } from "../lib/subtitles";
+import { buildCues, toAss, cutSeconds, subtitleStyle, lineWidthUnits, textUnits, MAX_SUBTITLE_LINES } from "../lib/subtitles";
 
 describe("buildCues", () => {
   it("컷 길이를 누적해 시작·끝을 만든다", () => {
@@ -132,5 +132,43 @@ describe("buildCues — 자막 자리가 낭독 합과 맞는다", () => {
     const cues = buildCues(cuts);
     expect(cues[0]).toEqual({ start: 0, end: 3, text: "첫 문장." });
     expect(cues[1]).toEqual({ start: 3, end: 7, text: "둘째 문장." });
+  });
+});
+
+describe("폭 재기 — 자막이 몇 자에서 넘치는가", () => {
+  const V = { width: 1080, height: 1920 };   // 9:16
+  const H = { width: 1920, height: 1080 };   // 16:9
+
+  it("스타일 값이 지금 toAss 가 쓰던 것과 같다", () => {
+    // 이 함수는 새 규칙이 아니라 toAss 안에 있던 셈을 꺼낸 것이다 — 값이 달라지면 안 된다
+    expect(subtitleStyle(V)).toEqual({ fontSize: 81, marginH: 86, marginV: 346 });
+    expect(subtitleStyle(H)).toEqual({ fontSize: 45, marginH: 154, marginV: 194 });
+  });
+
+  it("한 줄에 들어가는 한글은 9:16 에서 열한 자 남짓이다", () => {
+    // (1080 - 86*2) / 81 = 11.2
+    expect(lineWidthUnits(V)).toBeCloseTo(11.2, 1);
+  });
+
+  it("가로 영상은 한 줄이 훨씬 길다 — 한계가 비율을 따라간다", () => {
+    // (1920 - 154*2) / 45 = 35.8
+    expect(lineWidthUnits(H)).toBeCloseTo(35.8, 1);
+    expect(lineWidthUnits(H)).toBeGreaterThan(lineWidthUnits(V));
+  });
+
+  it("한글은 한 칸, 숫자·영문은 반 칸, 공백은 그보다 좁게 센다", () => {
+    expect(textUnits("가나다")).toBeCloseTo(3.0, 2);
+    expect(textUnits("abc")).toBeCloseTo(1.5, 2);
+    expect(textUnits("가 나")).toBeCloseTo(2.3, 2);
+  });
+
+  it("숫자가 섞이면 글자 수보다 좁다 — 글자 수로 재면 쓸데없이 나눈다", () => {
+    const s = "바지 밑단은 3,000원";
+    expect(s.length).toBe(13);
+    expect(textUnits(s)).toBeLessThan(13);
+  });
+
+  it("두 줄이 한계다", () => {
+    expect(MAX_SUBTITLE_LINES).toBe(2);
   });
 });
