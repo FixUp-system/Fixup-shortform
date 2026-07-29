@@ -249,7 +249,9 @@ describe("buildCastMessages — 사물도 함께 묻는다", () => {
   });
 
   it("사물이 보이는 컷을 빠짐없이 적으라고 지시한다", () => {
-    expect(buildCastMessages(cuts, [], "", [{ id: "p1", what: "화장품 병" }]).system).toContain("props");
+    // "props" 는 JSON 스키마 이름이라 규칙 문구를 통째로 지워도 남는다 — 규칙이 실제로
+    // 있는지는 그 규칙의 특징적인 문구("하나도 빠뜨리지 않는다")로 확인해야 한다.
+    expect(buildCastMessages(cuts, [], "", [{ id: "p1", what: "화장품 병" }]).system).toContain("하나도 빠뜨리지 않는다");
   });
 });
 

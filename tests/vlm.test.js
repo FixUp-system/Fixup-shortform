@@ -75,11 +75,14 @@ describe("selectCandidate 검수 기준", () => {
 });
 
 describe("describePhoto — 올린 사진에 무엇이 담겼나", () => {
-  const reply = (obj) => async () => ({
-    ok: true,
-    json: async () => ({ model: "gpt-4o", usage: { prompt_tokens: 10, completion_tokens: 5 },
-      choices: [{ message: { content: JSON.stringify(obj) } }] }),
-  });
+  const reply = (obj, onCall) => async () => {
+    onCall?.();
+    return {
+      ok: true,
+      json: async () => ({ model: "gpt-4o", usage: { prompt_tokens: 10, completion_tokens: 5 },
+        choices: [{ message: { content: JSON.stringify(obj) } }] }),
+    };
+  };
 
   it("인물 사진이면 person 과 who 를 돌려준다", async () => {
     const got = await describePhoto({
@@ -122,6 +125,31 @@ describe("describePhoto — 올린 사진에 무엇이 담겼나", () => {
     });
     expect(called).toBe(false);
     expect(got.person).toBe(false);
+    delete process.env.SHOTFORM_FAKE;
+  });
+
+  it("fal 만 가짜인 모드(SHOTFORM_FAKE_IMAGES=1)는 부른다 — OpenAI 는 가짜가 아니다", async () => {
+    // 이미지가 가짜라고 해서 얼굴 사진 판정까지 건너뛰면, 그 판정이 person:false 로 저장돼
+    // 다음 실행부터 얼굴 사진이 영구히 사물로 취급된다. fal 만 가짜인 모드는 실제 판정 경로를 타야 한다.
+    process.env.SHOTFORM_FAKE_IMAGES = "1";
+    let called = false;
+    const got = await describePhoto({
+      photoPath: null, projectId: "p1", apiKey: "k",
+      fetchImpl: reply({ person: true, what: "작업복 남성", who: "50대 남성" }, () => { called = true; }),
+    });
+    expect(called).toBe(true);
+    expect(got).toEqual({ person: true, what: "작업복 남성", who: "50대 남성" });
+    delete process.env.SHOTFORM_FAKE_IMAGES;
+  });
+
+  it("둘 다 가짜인 모드(SHOTFORM_FAKE=all)는 여전히 부르지 않는다", async () => {
+    process.env.SHOTFORM_FAKE = "all";
+    let called = false;
+    await describePhoto({
+      photoPath: null, projectId: "p1", apiKey: "k",
+      fetchImpl: reply({ person: true, what: "작업복 남성", who: "50대 남성" }, () => { called = true; }),
+    });
+    expect(called).toBe(false);
     delete process.env.SHOTFORM_FAKE;
   });
 });

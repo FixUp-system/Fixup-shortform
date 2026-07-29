@@ -564,3 +564,44 @@ describe("사물 레퍼런스 — 캐스팅이 답하고 코드가 꽂는다", (
     expect((await projects.getProject(p.id)).cast).toHaveLength(1);
   });
 });
+
+describe("사진 판정 실패는 저장하지 않는다 — 다음 실행이 다시 본다", () => {
+  it("VLM 이 아무것도 알아내지 못한 판정(none)은 vision 을 저장하지 않는다", async () => {
+    // 실제 파일이 없어 describePhoto 내부의 fs.readFile 이 실패해 none({person:false, what:""})을
+    // 돌려준다 — 이것이 "실패한 판정"이다. 저장되면 다음 실행이 재판정하지 않고 사물로 굳는다.
+    const p = await projects.createProject({
+      settings: { aspect_ratio: "9:16" },
+      material: { text: "자료", photos: [{ id: "p1", filename: "c.jpg", url: "/api/uploads/c.jpg" }] },
+    });
+    const saved = await projects.updateProject(p.id, (proj) => ({
+      ...proj,
+      script: { text: "문장 하나입니다." },
+    }));
+    llmMock.callJson
+      .mockResolvedValueOnce({ cuts: [{ from: 1, to: 1 }] })
+      .mockResolvedValueOnce({ shots: [{ shows: "화면" }] })
+      .mockResolvedValueOnce({ cast: [], props: [] });
+    await pipeline.defaultDeps.splitCuts(saved);
+    const after = await projects.getProject(p.id);
+    expect(after.material.photos[0].vision).toBeUndefined();
+  });
+
+  it("성공한 판정({person:false, what:'화장품 병'})은 저장한다", async () => {
+    // 사람이 아니라고 '알아낸' 것은 성공이다 — none 과 구분해야 한다
+    const p = await projects.createProject({
+      settings: { aspect_ratio: "9:16" },
+      material: { text: "자료", photos: [{ id: "p1", filename: "b.jpg", vision: { person: false, what: "화장품 병" } }] },
+    });
+    const saved = await projects.updateProject(p.id, (proj) => ({
+      ...proj,
+      script: { text: "문장 하나입니다." },
+    }));
+    llmMock.callJson
+      .mockResolvedValueOnce({ cuts: [{ from: 1, to: 1 }] })
+      .mockResolvedValueOnce({ shots: [{ shows: "화면" }] })
+      .mockResolvedValueOnce({ cast: [], props: [] });
+    await pipeline.defaultDeps.splitCuts(saved);
+    const after = await projects.getProject(p.id);
+    expect(after.material.photos[0].vision).toEqual({ person: false, what: "화장품 병" });
+  });
+});
