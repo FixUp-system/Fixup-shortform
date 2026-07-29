@@ -223,6 +223,15 @@ describe("buildShowsMessages", () => {
     // 규칙을 조이는 대신 본보기를 준다 — 조이는 고침은 이 저장소에서 네 번 다 샜다
     expect(buildShowsMessages(project, [{ sentence: "한 문장." }]).system).toContain("한 화면에");
   });
+
+  it("화면 안에 읽히는 글자·숫자를 요구하지 말라고 한다", () => {
+    // 이미지 프롬프트에 이미 no text or letters 가 있는데도 가격표에 79,000원이 나왔다
+    // (대본은 39,000원). 같은 프롬프트의 장면 서술이 글자를 요구해 두 지시가 모순됐고
+    // 장면이 이겼다. 막을 자리는 shows 다.
+    const { system } = buildShowsMessages(project, [{ sentence: "한 문장." }]);
+    expect(system).toContain("가격표");
+    expect(system).toContain("자막");
+  });
 });
 
 // 표본은 실측이다 — 화면 설계 패스를 자료 6편 × 3회 돌려 절 122개를 모았고
