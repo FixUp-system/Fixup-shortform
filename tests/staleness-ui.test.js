@@ -39,6 +39,19 @@ describe("낡은 것이 있으면 다음 단계로 못 간다", () => {
 });
 
 describe("⑥ 완성", () => {
+  it("클립·그림이 낡아도 잠근다 — 사이드바로 ⑥에 바로 들어올 수 있다", () => {
+    // ④로 돌아가 그림을 다시 만들면 그림 주소가 바뀌어 클립이 낡는다. 그런데 renderKey 는
+    // 소리·클립 주소와 문장만 이어 붙이므로 **그림을 다시 만든 것만으로는 완성본이 안 낡는다.**
+    // 앞 단계의 [다음] 버튼 잠금은 사이드바 링크로 우회되므로(isReachable 은 status 만 본다),
+    // ⑥이 스스로 클립·그림의 낡음까지 봐야 옛 mp4 가 내려받히지 않는다.
+    const src = read("app/create/[id]/done/page.js");
+    const at = src.indexOf("const stale");
+    expect(at, "⑥ 화면에 stale 판정이 없다").toBeGreaterThan(-1);
+    const staleLine = src.slice(at, src.indexOf(";", at));
+    expect(staleLine, "⑥의 stale 이 클립 낡음을 보지 않는다").toContain("isClipStale");
+    expect(staleLine, "⑥의 stale 이 그림 낡음을 보지 않는다").toContain("isImageStale");
+  });
+
   it("낡은 완성본은 내려받기가 잠긴다", () => {
     const src = read("app/create/[id]/done/page.js");
     expect(src).toContain("isRenderStale");

@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 import BackButton from "../../../../components/BackButton";
 import { cutSeconds } from "../../../../lib/subtitles";
-import { isRenderStale } from "../../../../lib/steps";
+import { isRenderStale, isClipStale, isImageStale } from "../../../../lib/steps";
 
 export default function DoneStepPage() {
   const { id } = useParams();
@@ -75,7 +75,14 @@ export default function DoneStepPage() {
   const totalSeconds = cuts.reduce((s, c) => s + cutSeconds(c), 0);
   // 컷을 고친 뒤라면 이 완성본은 옛 소리·옛 그림으로 만든 것이다.
   // 합성은 0원이라 막을 게 아니라 바로 다시 만들게 하는 것이 맞다.
-  const stale = isRenderStale(project);
+  //
+  // 완성본 자체의 각인만 보면 안 된다. renderKey 는 소리·클립 주소와 문장만 이어 붙이므로
+  // **④로 돌아가 그림을 다시 만든 것만으로는 완성본이 낡지 않는다** — 그림 주소는 클립 각인
+  // (clipKey)에만 들어 있다. 앞 단계의 [다음] 잠금이 그것을 막아 줄 거라 봤지만, 사이드바는
+  // status 만 보고 링크를 여니(isReachable) 잠금을 지나쳐 ⑥으로 바로 들어올 수 있다.
+  // 그래서 ⑥이 스스로 클립·그림까지 본다. 안 그러면 옛 클립으로 만든 mp4 가 그대로 내려받히고,
+  // 거기서 [다시 합치기]를 눌러도 옛 클립으로 다시 합쳐져 "안 낡음"으로 굳는다.
+  const stale = isRenderStale(project) || cuts.some(isClipStale) || cuts.some(isImageStale);
 
   if (!clipCount) return <p className="pgsub">영상을 먼저 만들어 주세요.</p>;
 
