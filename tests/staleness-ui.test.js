@@ -21,11 +21,19 @@ describe("낡은 것이 있으면 다음 단계로 못 간다", () => {
     });
 
     it(`${step} 화면의 다음 버튼이 낡은 것에 잠긴다`, () => {
-      // 다음 화면으로 보내는 버튼에 staleCount 조건이 걸려 있어야 한다
+      // 다음 화면으로 보내는 버튼의 disabled 조건 안에 staleCount 가 있어야 한다.
+      // 버튼 바로 위 안내문(hint)에도 staleCount 가 나오므로, disabled={...} 안쪽만
+      // 좁혀서 봐야 잠금 조건 자체가 지워지는 회귀를 잡을 수 있다.
       const src = read(path);
       expect(src).toContain("staleCount");
-      const button = src.slice(src.indexOf("router.push") - 400, src.indexOf("router.push"));
-      expect(button, `${path} 의 다음 버튼에 staleCount 조건이 없다`).toContain("staleCount");
+      const pushIdx = src.indexOf("router.push");
+      const buttonStart = src.lastIndexOf("<button", pushIdx);
+      const button = src.slice(buttonStart, pushIdx);
+      const disabledMatch = button.match(/disabled=\{([^}]*)\}/);
+      expect(disabledMatch, `${path} 의 다음 버튼에 disabled 속성이 없다`).toBeTruthy();
+      expect(disabledMatch[1], `${path} 의 다음 버튼 disabled 조건에 staleCount 가 없다`).toContain(
+        "staleCount"
+      );
     });
   }
 });
