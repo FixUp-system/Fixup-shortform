@@ -5,6 +5,7 @@ import path from "path";
 
 // 라우트가 정적으로 물고 있는 저장소와 같은 인스턴스를 쓴다(데이터 디렉터리는 호출 시점 env를 읽는다)
 import { createProject, getProject, updateProject } from "../lib/projects.js";
+import { isAudioStale, isImageStale, isClipStale, isRenderStale, renderKey } from "../lib/steps.js";
 
 const pipelineMock = vi.hoisted(() => ({ run: vi.fn(async () => {}) }));
 vi.mock("../lib/pipeline.js", () => ({
@@ -497,5 +498,58 @@ describe("완성본 내려받기", () => {
   it("없는 파일은 404", async () => {
     const res = await renderFileGET(new Request("http://x"), nameCtx("nothing-here.mp4"));
     expect(res.status).toBe(404);
+  });
+});
+
+describe("무효화 관통 — 고치면 낡고, 안 고친 것은 살아남는다", () => {
+  async function projectWithCuts() {
+    const p = await projectWithScript();
+    return updateProject(p.id, (proj) => ({
+      ...proj,
+      status: "video",
+      cuts: [
+        {
+          idx: 0, sentence: "첫 문장.", shows: "주인이 코트를 든다", motion: "천천히", seconds: 6,
+          audio: { url: "a0", seconds: 6, of: "첫 문장." },
+          image: { url: "i0", of: "주인이 코트를 든다" },
+          video: { url: "v0", seconds: 6, of: "i0|6|천천히" },
+        },
+      ],
+    }));
+  }
+
+  it("문장을 고치면 소리만 낡는다 — 그림은 살아남는다", async () => {
+    const p = await projectWithCuts();
+    const res = await PATCH(patchReq({ cut: { idx: 0, sentence: "고친 문장." } }), ctx(p.id));
+    expect(res.status).toBe(200);
+    const cut = (await getProject(p.id)).cuts[0];
+    expect(isAudioStale(cut)).toBe(true);
+    expect(isImageStale(cut)).toBe(false);
+    expect(isClipStale(cut)).toBe(false);
+  });
+
+  it("화면 설명을 고치면 그림만 낡는다", async () => {
+    const p = await projectWithCuts();
+    await PATCH(patchReq({ cut: { idx: 0, shows: "손님이 코트를 든다" } }), ctx(p.id));
+    const cut = (await getProject(p.id)).cuts[0];
+    expect(isImageStale(cut)).toBe(true);
+    expect(isAudioStale(cut)).toBe(false);
+  });
+
+  it("움직임을 고치면 클립이 낡는다", async () => {
+    const p = await projectWithCuts();
+    await PATCH(patchReq({ cut: { idx: 0, motion: "정지" } }), ctx(p.id));
+    expect(isClipStale((await getProject(p.id)).cuts[0])).toBe(true);
+  });
+
+  it("컷을 고치면 완성본이 낡는다", async () => {
+    const p = await projectWithCuts();
+    await updateProject(p.id, (proj) => ({
+      ...proj, status: "done",
+      render: { url: "r.mp4", seconds: 6, of: renderKey({ cuts: proj.cuts }) },
+    }));
+    expect(isRenderStale(await getProject(p.id))).toBe(false);
+    await PATCH(patchReq({ cut: { idx: 0, sentence: "고친 문장." } }), ctx(p.id));
+    expect(isRenderStale(await getProject(p.id))).toBe(true);
   });
 });

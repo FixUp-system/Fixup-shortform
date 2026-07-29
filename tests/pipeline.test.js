@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mkdtempSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
+import { isAudioStale, isImageStale, isClipStale, isRenderStale } from "../lib/steps.js";
 
 const llmMock = vi.hoisted(() => ({ callJson: vi.fn() }));
 vi.mock("../lib/llm.js", () => ({ callJson: (...a) => llmMock.callJson(...a) }));
@@ -221,6 +222,17 @@ describe("분할 → 이미지 (이어 부르면 갈라지기 전과 같다)", (
     expect(cut.edit_instruction).toBe("딸기라떼가 보이게");
     expect(prompts.some((pr) => pr.includes("딸기라떼가 보이게"))).toBe(true);
   });
+
+  it("그림에 무엇을 보고 그렸는지를 각인한다", async () => {
+    const p = await makeProject();
+    await runBoth(p.id, deps());
+    const saved = await projects.getProject(p.id);
+    const ai = saved.cuts.find((c) => c.source === "ai");
+    expect(ai.image.of).toBe(ai.shows || "");
+    expect(isImageStale(ai)).toBe(false);
+    // 화면 설명을 고치면 그 자리에서 낡는다
+    expect(isImageStale({ ...ai, shows: "다른 화면" })).toBe(true);
+  });
 });
 
 describe("이미지 생성에 레퍼런스가 배열로 간다", () => {
@@ -266,7 +278,7 @@ describe("runVoicePipeline — 컷마다 따로 읽힌다", () => {
 
     const saved = await projects.getProject(p.id);
     expect(saved.status).toBe("voice");
-    expect(saved.cuts[0].audio).toEqual({ url: "a/첫 문장", seconds: 4.3 });
+    expect(saved.cuts[0].audio).toEqual({ url: "a/첫 문장", seconds: 4.3, of: "첫 문장" });
     // 추정치 3초·9초가 실측 4.3초로 덮인다 — 소리와 그림이 어긋나지 않게
     expect(saved.cuts[0].seconds).toBe(4.3);
     expect(saved.cuts[1].seconds).toBe(4.3);
@@ -308,6 +320,16 @@ describe("runVoicePipeline — 컷마다 따로 읽힌다", () => {
     const saved = await projects.getProject(p.id);
     expect(saved.cuts[0].voice_error).toBe(null);
   });
+
+  it("소리에 읽은 문장을 각인한다 — 문장을 고치면 낡는다", async () => {
+    const p = await makeProject();
+    await pipeline.runSplitPipeline(p.id, deps());
+    await pipeline.runVoicePipeline(p.id, { speak: async () => ({ url: "http://a", seconds: 5 }) });
+    const cut = (await projects.getProject(p.id)).cuts[0];
+    expect(cut.audio.of).toBe(cut.sentence);
+    expect(isAudioStale(cut)).toBe(false);
+    expect(isAudioStale({ ...cut, sentence: "고친 문장" })).toBe(true);
+  });
 });
 
 describe("runVideoPipeline — 이미지를 클립으로", () => {
@@ -331,7 +353,7 @@ describe("runVideoPipeline — 이미지를 클립으로", () => {
 
     const saved = await projects.getProject(p.id);
     expect(saved.status).toBe("video");
-    expect(saved.cuts[0].video).toEqual({ url: "v4", seconds: 4, truncated: false });
+    expect(saved.cuts[0].video).toEqual({ url: "v4", seconds: 4, truncated: false, of: "i0|4|" });
     expect(saved.cuts[1].video.truncated).toBe(true);
     // 소리 길이(13초)는 그대로 둔다 — 합성이 정지로 늘려 맞춘다
     expect(saved.cuts[1].seconds).toBe(13);
@@ -380,6 +402,22 @@ describe("runVideoPipeline — 이미지를 클립으로", () => {
     expect(called).toBe(false);
     const saved = await projects.getProject(p.id);
     expect(saved.cuts[0].video_error).toMatch(/이미지/);
+  });
+
+  it("클립에 그림·길이·움직임을 각인한다 — 소리를 다시 만들면 낡는다", async () => {
+    const p = await makeProject();
+    await pipeline.runSplitPipeline(p.id, deps());
+    await projects.updateProject(p.id, (proj) => ({
+      ...proj,
+      cuts: proj.cuts.map((c) => ({ ...c, image: { url: "http://img/" + c.idx } })),
+    }));
+    await pipeline.runVideoPipeline(p.id, {
+      clip: async () => ({ url: "http://v", seconds: 6, truncated: false }),
+    });
+    const cut = (await projects.getProject(p.id)).cuts[0];
+    expect(isClipStale(cut)).toBe(false);
+    // 낭독을 다시 만들어 길이가 바뀐 상태
+    expect(isClipStale({ ...cut, seconds: cut.seconds + 3 })).toBe(true);
   });
 });
 
@@ -431,5 +469,23 @@ describe("runRenderPipeline — 하나로 합친다", () => {
     });
     expect(got.aspect_ratio).toBe("1:1");
     expect(got.cuts).toHaveLength(1);
+  });
+
+  it("완성본에 컷별 소리·클립·문장을 각인한다 — 컷을 고치면 낡는다", async () => {
+    const p = await makeProject();
+    await pipeline.runSplitPipeline(p.id, deps());
+    await projects.updateProject(p.id, (proj) => ({
+      ...proj,
+      cuts: proj.cuts.map((c) => ({
+        ...c, audio: { url: "http://a" + c.idx, seconds: 5 }, video: { url: "http://v" + c.idx, seconds: 6 },
+      })),
+    }));
+    await pipeline.runRenderPipeline(p.id, {
+      compose: async () => ({ url: "http://out.mp4", seconds: 12 }),
+    });
+    const saved = await projects.getProject(p.id);
+    expect(isRenderStale(saved)).toBe(false);
+    const edited = { ...saved, cuts: [{ ...saved.cuts[0], sentence: "고친 문장" }, ...saved.cuts.slice(1)] };
+    expect(isRenderStale(edited)).toBe(true);
   });
 });
