@@ -49,10 +49,10 @@ describe("composeVideo", () => {
     expect(r.seconds).toBe(17);
   });
 
-  it("클립이 낭독보다 길면 그 길이를 돌려준다 — 화면의 초와 파일 길이가 같아야 한다", async () => {
-    // 눈금 올림(6·8·10…초) 때문에 클립은 거의 항상 낭독보다 길다. 합성은 짧은 소리를
-    // 무음으로 채우므로 파일은 클립 합만큼 나온다. 낭독 합을 보여주면 사장님이 읽는
-    // 초와 내려받은 파일 길이가 다르다(실측: 28초라고 적고 파일은 32.8초였다).
+  it("클립이 낭독보다 길어도 낭독 합을 돌려준다 — 합성이 남는 클립을 잘라낸다", async () => {
+    // 눈금 올림(6·8·10…초) 때문에 클립은 거의 항상 낭독보다 길다. 예전에는 합성이
+    // 자르지 않고 무음으로 채워 파일이 클립 합만큼 나왔다(28초라 적고 파일은 32.8초).
+    // 이제 합성이 남는 클립을 잘라내므로 낭독 합이 실제 파일 길이와 맞는다.
     const cuts = [
       { idx: 0, sentence: "첫", seconds: 9,
         video: { url: "https://f/v0.mp4", seconds: 10 }, audio: { url: "https://f/a0.mp3", seconds: 9 } },
@@ -66,7 +66,7 @@ describe("composeVideo", () => {
       writeFileImpl: async () => {},
       mkdirImpl: async () => {},
     });
-    expect(r.seconds).toBe(16); // 10 + 6, 낭독 합(14)이 아니다
+    expect(r.seconds).toBe(14); // 9 + 5, 낭독 합. 클립 합(16)이 아니다
   });
 
   it("SHOTFORM_COMPOSER=fal 이면 ffmpeg를 돌리지 않는다", async () => {
@@ -167,5 +167,37 @@ describe("buildFfmpegArgs", () => {
     const args = buildFfmpegArgs({ local, assPath: "/t/s.ass", out: "/t/o.mp4", width: 1920, height: 1080 });
     const graph = args[args.indexOf("-filter_complex") + 1];
     expect(graph).toContain("scale=1920:1080");
+  });
+
+  it("클립이 낭독보다 길면 잘라낸다 — 남는 시간이 무음이 되던 자리다", () => {
+    const args = buildFfmpegArgs({
+      local: [{ video: "v0.mp4", audio: "a0.m4a", wantSeconds: 3, haveSeconds: 6 }],
+      assPath: "s.ass", out: "out.mp4", width: 1080, height: 1920,
+    });
+    const filter = args.join(" ");
+    expect(filter).toContain("trim=duration=3.00");
+    expect(filter, "자른 뒤에는 타임스탬프를 0부터 다시 매겨야 concat 이 어긋나지 않는다")
+      .toContain("setpts=PTS-STARTPTS");
+    expect(filter, "자를 때는 늘리지 않는다").not.toContain("tpad");
+  });
+
+  it("클립이 낭독보다 짧으면 지금처럼 마지막 프레임을 늘린다", () => {
+    const args = buildFfmpegArgs({
+      local: [{ video: "v0.mp4", audio: "a0.m4a", wantSeconds: 25, haveSeconds: 20 }],
+      assPath: "s.ass", out: "out.mp4", width: 1080, height: 1920,
+    });
+    const filter = args.join(" ");
+    expect(filter).toContain("tpad=stop_mode=clone:stop_duration=5.00");
+    expect(filter).not.toContain("trim=");
+  });
+
+  it("낭독을 모르면 클립을 그대로 쓴다 — 목소리가 실패해도 합성은 돌아야 한다", () => {
+    const args = buildFfmpegArgs({
+      local: [{ video: "v0.mp4", audio: "a0.m4a", wantSeconds: 0, haveSeconds: 6 }],
+      assPath: "s.ass", out: "out.mp4", width: 1080, height: 1920,
+    });
+    const filter = args.join(" ");
+    expect(filter).not.toContain("trim=");
+    expect(filter).not.toContain("tpad");
   });
 });

@@ -78,4 +78,33 @@ describe("로컬 합성 — 실제 ffmpeg", () => {
     // 확인용으로 남긴다 — 눈으로 볼 수 있게 경로를 출력한다
     console.log("결과물:", out);
   }, 120000);
+
+  it("클립이 낭독보다 길면 잘라내 낭독 길이로 맞춘다", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "compose-trim-"));
+    // 클립 6초 / 소리 3초 — 눈금 올림이 만드는 흔한 모양이다.
+    await run(["-y", "-f", "lavfi", "-i", "color=c=0x2A3040:s=1080x1920:d=6,format=yuv420p", "-c:v", "libx264", path.join(dir, "v0.mp4")]);
+    await run(["-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-t", "3", "-c:a", "aac", path.join(dir, "a0.m4a")]);
+
+    const cuts = [{ idx: 0, sentence: "30ml에 39,000원입니다.", seconds: 3 }];
+    const assPath = path.join(dir, "sub.ass");
+    await fs.writeFile(assPath, toAss(buildCues(cuts), { width: W, height: H }), "utf8");
+
+    const local = [{ video: path.join(dir, "v0.mp4"), audio: path.join(dir, "a0.m4a"), wantSeconds: 3, haveSeconds: 6 }];
+    const out = path.join(dir, "out.mp4");
+    const { code, tail } = await run(buildFfmpegArgs({ local, assPath, out, width: W, height: H }));
+    expect(code, `ffmpeg stderr:\n${tail}`).toBe(0);
+
+    const probe = await new Promise((res) => {
+      const p = spawn(ffmpegPath, ["-i", out]);
+      let t = "";
+      p.stderr.on("data", (d) => { t += d; });
+      p.on("close", () => res(t));
+    });
+    const m = probe.match(/Duration:\s*(\d+):(\d+):([\d.]+)/);
+    const seconds = m ? Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) : 0;
+    console.log("자르기 결과 길이:", seconds, "초 (낭독 3초)");
+    // 예전에는 6초가 나오고 뒤 3초가 무음이었다
+    expect(seconds).toBeGreaterThan(2.7);
+    expect(seconds).toBeLessThan(3.4);
+  }, 120000);
 });
