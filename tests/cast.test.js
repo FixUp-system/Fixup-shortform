@@ -193,10 +193,12 @@ describe("resolveCutRefs — 인물 하나 + 사물 하나", () => {
     expect(got[0].id).toBe("p1"); // 사진이 먼저다
   });
 
-  it("인물 둘이면 첫 인물만 쓴다", () => {
+  it("사물이 없으면 인물 둘까지 쓴다 — 두 사람이 나오면 둘 다 일관돼야 한다", () => {
+    // ⚠️ 얼굴 레퍼런스 두 장이 섞여 제3의 얼굴이 되는지는 아직 실측 전이다.
+    // 섞이면 다시 한 명으로 줄인다(그때 이 테스트도 함께 바뀐다).
     const got = resolveCutRefs({ ref_ids: ["c1", "c2"] }, project);
-    expect(got).toHaveLength(1);
-    expect(got[0].id).toBe("av-owner");
+    expect(got).toHaveLength(2);
+    expect(got.map((r) => r.id)).toEqual(["av-owner", "av-adult"]);
   });
 
   it("사진만 있으면 두 장까지 쓴다", () => {
