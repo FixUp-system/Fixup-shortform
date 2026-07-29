@@ -76,6 +76,16 @@ describe("buildShowsMessages", () => {
     expect(system).toContain("삽화가 아니다");
   });
 
+  it("거울에 사람이 비치는 화면은 적지 말라고 지시한다 — 지금 기술로는 반드시 어긋난다", () => {
+    // 2026-07-29 실측: "거울 앞에 서 있는" 컷이 두 번 다 깨졌다. 처음엔 등지고 선 사람이
+    // 정면으로 비쳤고, 다시 만드니 거울 속 인물의 목이 돌아갔다. VLM 은 세 번 다 통과시켰다.
+    // 검수를 조이는 대신 못 그리는 것을 요구하지 않는다 — motion 규칙이 이미 같은 판단을 한다
+    // ("얼굴 표정·말하는 입·손가락을 세밀하게 쓰는 동작은 적지 않는다 — 지금 기술로는 뭉개진다").
+    const { system } = buildShowsMessages(project, cuts);
+    expect(system).toContain("거울");
+    expect(system).toContain("비친 상과 실제가 어긋난다");
+  });
+
   it("첫 컷을 설정 샷으로 열지 말라고 지시한다", () => {
     expect(buildShowsMessages(project, cuts).system).toContain("설정 샷으로 열지 않는다");
   });
