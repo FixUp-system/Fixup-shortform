@@ -489,3 +489,53 @@ describe("runRenderPipeline — 하나로 합친다", () => {
     expect(isRenderStale(edited)).toBe(true);
   });
 });
+
+describe("사물 레퍼런스 — 캐스팅이 답하고 코드가 꽂는다", () => {
+  // 자료에 사물 사진 하나. vision.person 이 false 라 인물 쪽으로 가지 않는다.
+  async function projectWithThingPhoto(focusMode = "물건") {
+    const p = await projects.createProject({
+      settings: { aspect_ratio: "9:16" },
+      material: { text: "자료", photos: [{ id: "p1", filename: "b.jpg", vision: { person: false, what: "화장품 병" } }] },
+    });
+    return projects.updateProject(p.id, (proj) => ({
+      ...proj,
+      briefing: { topic: "앰플", focus: { mode: focusMode, subject: "VT 앰플" } },
+      script: { text: "앰플이 있습니다. 얼굴에 바릅니다." },
+    }));
+  }
+
+  // 분할 → 화면 설계 → 캐스팅 순서로 응답을 준다
+  function answer({ props }) {
+    llmMock.callJson
+      .mockResolvedValueOnce({ cuts: [{ from: 1, to: 1 }, { from: 2, to: 2 }] })
+      .mockResolvedValueOnce({ shots: [{ shows: "앰플 병 클로즈업" }, { shows: "바르는 손" }] })
+      .mockResolvedValueOnce({ cast: [], props });
+  }
+
+  it("사물이 보이는 컷에 사진을 꽂는다", async () => {
+    const p = await projectWithThingPhoto();
+    answer({ props: [{ photo_id: "p1", cuts: [1, 2] }] });
+    const cuts = await pipeline.defaultDeps.splitCuts(await projects.getProject(p.id));
+    expect(cuts[0].ref_ids).toEqual(["p1"]);
+    expect(cuts[1].ref_ids).toEqual(["p1"]);
+  });
+
+  it("초점이 물건인데 사물이 0개면 한 번 더 묻는다", async () => {
+    const p = await projectWithThingPhoto("물건");
+    llmMock.callJson
+      .mockResolvedValueOnce({ cuts: [{ from: 1, to: 1 }, { from: 2, to: 2 }] })
+      .mockResolvedValueOnce({ shots: [{ shows: "앰플 병 클로즈업" }, { shows: "바르는 손" }] })
+      .mockResolvedValueOnce({ cast: [], props: [] })            // 1차 — 빈손
+      .mockResolvedValueOnce({ cast: [], props: [{ photo_id: "p1", cuts: [1] }] }); // 2차
+    const cuts = await pipeline.defaultDeps.splitCuts(await projects.getProject(p.id));
+    expect(cuts[0].ref_ids).toEqual(["p1"]);
+    expect(llmMock.callJson).toHaveBeenCalledTimes(4); // 분할·화면·캐스팅 두 번
+  });
+
+  it("초점이 물건이 아니면 0개라도 다시 묻지 않는다 — 값을 치를 이유가 없다", async () => {
+    const p = await projectWithThingPhoto("정보");
+    answer({ props: [] });
+    await pipeline.defaultDeps.splitCuts(await projects.getProject(p.id));
+    expect(llmMock.callJson).toHaveBeenCalledTimes(3);
+  });
+});
