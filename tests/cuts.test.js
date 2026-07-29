@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { splitSentences, splitUnits, buildSplitMessages, buildShowsMessages, buildImagePrompt, buildClipPrompt, stillOnly } from "../lib/cuts.js";
+import { I2V_STEPS, I2V_MAX_SECONDS } from "../lib/clip-limits.js";
 
 const project = {
   settings: { aspect_ratio: "9:16" },
@@ -94,6 +95,23 @@ describe("buildSplitMessages", () => {
     expect(system).toContain("3~8초");
     // 컷은 문장보다 잘게 쪼개질 수 없다 — 긴 문장은 그대로 두라는 예외가 함께 있어야 한다
     expect(system).toContain("문장을 쪼개지 않는다");
+  });
+
+  it("모델이 만들 수 있는 길이를 사실로 알려 준다 — 눈금에서 읽는다", () => {
+    const { system } = buildSplitMessages(["한 문장."]);
+    // lib/clip-limits.js 의 눈금(지금 6·8·10…20)에서 하한·상한을 읽어야 한다.
+    // 숫자를 프롬프트에 박으면 모델을 바꿀 때 지시가 어긋난다.
+    expect(system).toContain(String(I2V_STEPS[0]));
+    expect(system).toContain(String(I2V_MAX_SECONDS));
+  });
+
+  it("길이를 맞추려고 장면을 붙이거나 끊지 말라고 못 박는다", () => {
+    // 나누는 것은 시나리오다. 모델 길이는 목표가 아니라 고려할 사실이다.
+    expect(buildSplitMessages(["한 문장."]).system).toContain("억지로");
+  });
+
+  it("화면이 바뀌는 자리에서 끊으라는 규칙은 그대로다", () => {
+    expect(buildSplitMessages(["한 문장."]).system).toContain("화면이 바뀔 자리");
   });
 });
 

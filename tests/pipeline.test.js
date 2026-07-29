@@ -3,6 +3,7 @@ import { mkdtempSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
 import { isAudioStale, isImageStale, isClipStale, isRenderStale } from "../lib/steps.js";
+import { splitUnits } from "../lib/cuts.js";
 
 const llmMock = vi.hoisted(() => ({ callJson: vi.fn() }));
 vi.mock("../lib/llm.js", () => ({ callJson: (...a) => llmMock.callJson(...a) }));
@@ -603,5 +604,56 @@ describe("사진 판정 실패는 저장하지 않는다 — 다음 실행이 �
     await pipeline.defaultDeps.splitCuts(saved);
     const after = await projects.getProject(p.id);
     expect(after.material.photos[0].vision).toEqual({ person: false, what: "화장품 병" });
+  });
+});
+
+describe("컷 길이 — 쪼갤 수 있는데 안 쪼갰으면 다시 묻는다", () => {
+  // 8초를 넘는 컷이 있고 그 컷 안에 아직 안 쓴 후보가 남아 있으면 한 번 더 묻는다.
+  // 후보가 없으면(쪼갤 수 없는 문장) 통과시킨다 — 영영 실패하지 않게.
+  const LONG = "이 앰플은 PDRN과 엑소좀, 시카가 함께 들어 있어 자기 전에 토너를 바른 후, 2~3방울을 얼굴에 펴 바르고 자면 다음 날 아침 당김이 덜하다는 후기가 많습니다.";
+
+  async function projectWithLongSentence() {
+    const p = await projects.createProject({
+      settings: { aspect_ratio: "9:16" },
+      material: { text: "자료", photos: [] },
+    });
+    return projects.updateProject(p.id, (proj) => ({
+      ...proj, briefing: { topic: "앰플" }, script: { text: LONG },
+    }));
+  }
+
+  const splitCallCount = () =>
+    llmMock.callJson.mock.calls.filter((c) => c[0]?.stage === "컷 분할").length;
+
+  it("쪼갤 수 있는데 한 컷에 다 몰아넣으면 한 번 더 묻는다", async () => {
+    const p = await projectWithLongSentence();
+    const units = splitUnits(LONG);
+    expect(units.length, "이 문장이 여러 조각으로 나뉘어야 이 테스트가 의미가 있다").toBeGreaterThan(1);
+    llmMock.callJson
+      .mockResolvedValueOnce({ cuts: [{ from: 1, to: units.length }] })                    // 1차 — 통째로
+      .mockResolvedValueOnce({ cuts: [{ from: 1, to: 1 }, { from: 2, to: units.length }] }) // 2차 — 나눔
+      .mockResolvedValueOnce({ shots: [] })                                                 // 화면 설계
+      .mockResolvedValueOnce({ cast: [] });                                                 // 캐스팅
+    const cuts = await pipeline.defaultDeps.splitCuts(await projects.getProject(p.id));
+    expect(splitCallCount()).toBe(2);
+    expect(cuts.length).toBe(2);
+  });
+
+  it("쪼갤 수 없는 문장은 다시 묻지 않는다 — 영영 실패하지 않게", async () => {
+    // 조각 하나로 이뤄진 컷은 8초를 넘어도 더 쪼갤 수 없다. 되물어도 답이 같다.
+    const NO_BREAK = "아주긴한덩어리로이어져서끊을자리가전혀없는문장이길게이어지고또이어져서마침내끝납니다.";
+    const p = await projects.createProject({ settings: {}, material: { text: "자료", photos: [] } });
+    await projects.updateProject(p.id, (proj) => ({
+      ...proj, briefing: { topic: "t" }, script: { text: NO_BREAK },
+    }));
+    const units = splitUnits(NO_BREAK);
+    expect(units.length, "이 문장은 나눌 자리가 없어야 한다").toBe(1);
+    llmMock.callJson
+      .mockResolvedValueOnce({ cuts: [{ from: 1, to: 1 }] })
+      .mockResolvedValueOnce({ shots: [] })
+      .mockResolvedValueOnce({ cast: [] });
+    const cuts = await pipeline.defaultDeps.splitCuts(await projects.getProject(p.id));
+    expect(cuts[0].seconds, "이 컷은 8초를 넘는다 — 그런데도 되묻지 않아야 한다").toBeGreaterThan(8);
+    expect(splitCallCount()).toBe(1);
   });
 });
