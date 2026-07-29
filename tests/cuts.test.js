@@ -66,6 +66,19 @@ describe("splitUnits — 긴 문장은 절로 나눈다", () => {
     expect(splitUnits("")).toEqual([]);
     expect(splitUnits(null)).toEqual([]);
   });
+
+  it("★ 연속 공백·탭이 있어도 이어붙이면 원문과 같다", () => {
+    // 자를 자리를 한 칸 공백으로 제한하고 원본에서 잘라내면 성립한다.
+    // 토큰을 다시 이어 붙이면 여기서 깨진다.
+    const messy = "이 앰플은  PDRN과 엑소좀, 시카가\t함께 들어 있어 자기 전에 토너를 바른 후, 2~3방울을 얼굴에 펴 바르고 자면 다음 날 아침 당김이 덜하다는 후기가 많습니다.";
+    expect(splitUnits(messy).join(" ")).toBe(messy);
+  });
+
+  it("두 칸 공백 자리에서는 자르지 않는다 — 이으면 복원할 수 없다", () => {
+    // "바르고" 뒤가 두 칸이면 그 자리는 후보에서 빠진다.
+    const twoSpaces = "이 앰플은 PDRN과 엑소좀, 시카가 함께 들어 있어 자기 전에 토너를 바른 후, 2~3방울을 얼굴에 펴 바르고  자면 다음 날 아침 당김이 덜하다는 후기가 많습니다.";
+    expect(splitUnits(twoSpaces).join(" ")).toBe(twoSpaces);
+  });
 });
 
 describe("buildSplitMessages", () => {
@@ -75,7 +88,7 @@ describe("buildSplitMessages", () => {
     const user = buildSplitMessages(sentences).messages[0].content;
     expect(user).toContain("1. 매일 아침 딸기를 갈아 씁니다.");
     expect(user).toContain("3. 성수역 3번 출구에서 2분입니다.");
-    expect(user).toContain("문장 3개");
+    expect(user).toContain("조각 3개");
   });
 
   it("문장을 고쳐 쓰지 말고 경계만 고르라고 지시한다", () => {
@@ -92,9 +105,10 @@ describe("buildSplitMessages", () => {
   // 상한(15초)만 주자 두 문장씩 묶어 12~15초 컷이 나왔다. 이미지 한 장이 버티기엔 길다.
   it("컷 목표 길이를 준다 — 상한만으로는 넉넉하게 묶는다", () => {
     const { system } = buildSplitMessages(sentences);
-    expect(system).toContain("3~8초");
-    // 컷은 문장보다 잘게 쪼개질 수 없다 — 긴 문장은 그대로 두라는 예외가 함께 있어야 한다
-    expect(system).toContain("문장을 쪼개지 않는다");
+    expect(system).toContain("8초");
+    // 컷은 조각보다 잘게 쪼개질 수 없다 — 이제 쪼개는 것은 코드(splitUnits)이고,
+    // LLM에게는 "조각을 고쳐 쓰지 않는다(경계만 고른다)"로 같은 보장이 전달된다
+    expect(system).toContain("조각을 고쳐 쓰지 않는다");
   });
 
   it("모델이 만들 수 있는 길이를 사실로 알려 준다 — 눈금에서 읽는다", () => {

@@ -641,7 +641,7 @@ describe("컷 길이 — 쪼갤 수 있는데 안 쪼갰으면 다시 묻는다"
 
   it("쪼갤 수 없는 문장은 다시 묻지 않는다 — 영영 실패하지 않게", async () => {
     // 조각 하나로 이뤄진 컷은 8초를 넘어도 더 쪼갤 수 없다. 되물어도 답이 같다.
-    const NO_BREAK = "아주긴한덩어리로이어져서끊을자리가전혀없는문장이길게이어지고또이어져서마침내끝납니다.";
+    const NO_BREAK = "아주아주아주긴한덩어리로이어져서끊을자리가전혀없는문장이길게이어지고또이어져서마침내끝납니다.";
     const p = await projects.createProject({ settings: {}, material: { text: "자료", photos: [] } });
     await projects.updateProject(p.id, (proj) => ({
       ...proj, briefing: { topic: "t" }, script: { text: NO_BREAK },
