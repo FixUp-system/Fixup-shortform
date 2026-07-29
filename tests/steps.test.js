@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { STEPS, currentStepKey, isReachable, areCutsStale, stepFromPathname, stepHref } from "../lib/steps.js";
+import {
+  STEPS, currentStepKey, isReachable, areCutsStale, stepFromPathname, stepHref,
+  clipKey, renderKey, isAudioStale, isImageStale, isClipStale, isRenderStale,
+} from "../lib/steps.js";
 
 describe("단계 정의", () => {
   it("구성이 빠져 6단계다 — 원고가 곧 설계다", () => {
@@ -122,6 +125,109 @@ describe("areCutsStale — 낡음의 방향이 뒤집혔다", () => {
     expect(areCutsStale({ script: { version: 1 }, cuts: [] })).toBe(false);
     expect(areCutsStale({ cuts })).toBe(false);
     expect(areCutsStale(null)).toBe(false);
+  });
+});
+
+describe("낡음 판정 — 산출물마다 무엇에서 나왔는지 각인한다", () => {
+  describe("isAudioStale — 소리는 문장에서 나온다", () => {
+    it("읽은 문장이 그대로면 낡지 않았다", () => {
+      const cut = { sentence: "딸기를 갈아 씁니다.", audio: { url: "u", of: "딸기를 갈아 씁니다." } };
+      expect(isAudioStale(cut)).toBe(false);
+    });
+
+    it("문장을 고치면 소리가 낡는다", () => {
+      const cut = { sentence: "매일 딸기를 갈아 씁니다.", audio: { url: "u", of: "딸기를 갈아 씁니다." } };
+      expect(isAudioStale(cut)).toBe(true);
+    });
+
+    it("각인이 없는 옛 소리는 낡지 않은 것으로 본다 — 거짓 경고가 유료 호출을 부른다", () => {
+      expect(isAudioStale({ sentence: "문장", audio: { url: "u" } })).toBe(false);
+    });
+
+    it("소리가 아예 없으면 판정하지 않는다", () => {
+      expect(isAudioStale({ sentence: "문장" })).toBe(false);
+      expect(isAudioStale(null)).toBe(false);
+    });
+  });
+
+  describe("isImageStale — 그림은 화면 설명에서 나온다", () => {
+    it("화면 설명이 그대로면 낡지 않았다", () => {
+      expect(isImageStale({ shows: "주인이 코트를 든다", image: { url: "u", of: "주인이 코트를 든다" } })).toBe(false);
+    });
+
+    it("화면 설명을 고치면 그림이 낡는다", () => {
+      expect(isImageStale({ shows: "손님이 코트를 든다", image: { url: "u", of: "주인이 코트를 든다" } })).toBe(true);
+    });
+
+    it("문장만 고친 것은 그림을 낡게 하지 않는다 — 그림 두 장을 다시 사지 않는다", () => {
+      const cut = { sentence: "고친 문장", shows: "주인이 코트를 든다", image: { url: "u", of: "주인이 코트를 든다" } };
+      expect(isImageStale(cut)).toBe(false);
+    });
+
+    it("각인이 없거나 그림이 없으면 낡지 않은 것으로 본다", () => {
+      expect(isImageStale({ shows: "설명", image: { url: "u" } })).toBe(false);
+      expect(isImageStale({ shows: "설명" })).toBe(false);
+    });
+  });
+
+  describe("isClipStale — 클립은 그림·길이·움직임에서 나온다", () => {
+    const base = { image: { url: "img1" }, seconds: 6, motion: "천천히 다가간다" };
+
+    it("셋 다 그대로면 낡지 않았다", () => {
+      expect(isClipStale({ ...base, video: { url: "v", of: clipKey(base) } })).toBe(false);
+    });
+
+    it("그림을 다시 만들면 주소가 바뀌어 클립이 낡는다", () => {
+      const cut = { ...base, image: { url: "img2" }, video: { url: "v", of: clipKey(base) } };
+      expect(isClipStale(cut)).toBe(true);
+    });
+
+    it("소리를 다시 만들어 길이가 바뀌면 클립이 낡는다 — 지금 조용히 틀리는 자리다", () => {
+      const cut = { ...base, seconds: 9, video: { url: "v", of: clipKey(base) } };
+      expect(isClipStale(cut)).toBe(true);
+    });
+
+    it("움직임을 고쳐도 클립이 낡는다", () => {
+      const cut = { ...base, motion: "정지", video: { url: "v", of: clipKey(base) } };
+      expect(isClipStale(cut)).toBe(true);
+    });
+
+    it("각인이 없거나 클립이 없으면 낡지 않은 것으로 본다", () => {
+      expect(isClipStale({ ...base, video: { url: "v" } })).toBe(false);
+      expect(isClipStale(base)).toBe(false);
+    });
+  });
+
+  describe("isRenderStale — 완성본은 컷별 소리·클립·문장에서 나온다", () => {
+    const cuts = [
+      { idx: 0, sentence: "첫 문장", audio: { url: "a0" }, video: { url: "v0" } },
+      { idx: 1, sentence: "둘째 문장", audio: { url: "a1" }, video: { url: "v1" } },
+    ];
+    const proj = { cuts };
+
+    it("아무것도 안 바뀌었으면 낡지 않았다", () => {
+      expect(isRenderStale({ ...proj, render: { url: "r", of: renderKey(proj) } })).toBe(false);
+    });
+
+    it("컷 하나의 소리를 다시 만들면 완성본이 낡는다", () => {
+      const after = { cuts: [{ ...cuts[0], audio: { url: "a0-new" } }, cuts[1]] };
+      expect(isRenderStale({ ...after, render: { url: "r", of: renderKey(proj) } })).toBe(true);
+    });
+
+    it("문장만 고쳐도 완성본이 낡는다 — 자막이 문장에서 나온다", () => {
+      const after = { cuts: [{ ...cuts[0], sentence: "고친 문장" }, cuts[1]] };
+      expect(isRenderStale({ ...after, render: { url: "r", of: renderKey(proj) } })).toBe(true);
+    });
+
+    it("컷을 다시 나누면 완성본이 낡는다 — cuts 라우트에 코드를 더할 필요가 없다", () => {
+      expect(isRenderStale({ cuts: [], render: { url: "r", of: renderKey(proj) } })).toBe(true);
+    });
+
+    it("각인이 없거나 완성본이 없으면 낡지 않은 것으로 본다", () => {
+      expect(isRenderStale({ ...proj, render: { url: "r" } })).toBe(false);
+      expect(isRenderStale(proj)).toBe(false);
+      expect(isRenderStale(null)).toBe(false);
+    });
   });
 });
 
