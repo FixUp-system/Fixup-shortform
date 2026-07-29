@@ -83,3 +83,22 @@ describe("데이터 경로", () => {
     }
   });
 });
+
+describe("이미지 모델 단가 — prefix 순서가 뒤집히면 조용히 틀린다", () => {
+  it("nano-banana 2 는 장당 $0.08 이다", () => {
+    expect(estimateCost("fal-ai/nano-banana-2", 1)).toBeCloseTo(0.08, 4);
+    expect(estimateCost("fal-ai/nano-banana-2/edit", 1)).toBeCloseTo(0.08, 4);
+  });
+
+  it("옛 nano-banana 는 여전히 장당 $0.04 다", () => {
+    expect(estimateCost("fal-ai/nano-banana", 1)).toBeCloseTo(0.04, 4);
+    expect(estimateCost("fal-ai/nano-banana/edit", 1)).toBeCloseTo(0.04, 4);
+  });
+
+  it("컷당 한 장이면 컷당 $0.08 이다", () => {
+    // 예전에는 후보 2장 × $0.04 = $0.08 이었다. 모델을 올리고 장수를 줄여 같은 값이 된다.
+    expect(estimateCost("fal-ai/nano-banana-2/edit", 1)).toBeCloseTo(
+      estimateCost("fal-ai/nano-banana/edit", 2), 4
+    );
+  });
+});
