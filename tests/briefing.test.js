@@ -70,6 +70,19 @@ describe("buildBriefingMessages", () => {
     expect(user).toContain("5천원대");
     expect(user).toContain("추가 질문 없이");
   });
+
+  it("초점을 뽑으라고 지시한다 — 갈래를 먼저 고르게 한다", () => {
+    const { system } = buildBriefingMessages(project);
+    expect(system).toContain("focus");
+    for (const mode of ["사람", "물건", "정보"]) {
+      expect(system).toContain(mode);
+    }
+  });
+
+  it("사람이 중심이 아닌 영상에 사람을 만들지 말라고 못 박는다", () => {
+    // 칸이 있으면 모델이 채운다 — 정보 전달 영상에 억지 주인공이 생기는 것을 막는다
+    expect(buildBriefingMessages(project).system).toContain("억지로");
+  });
 });
 
 describe("buildDevelopMessages — 대본을 써 보고 모자랄 때만", () => {

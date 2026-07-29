@@ -217,6 +217,40 @@ describe("validateBriefing", () => {
     expect(b.asked[0].question).toBe("정상?");
     expect(b.asked[0].options).toEqual([]);
   });
+
+  it("초점을 통과시킨다 — 갈래와 대상이 함께 온다", () => {
+    const got = validateBriefing({
+      topic: "옷 수선집 소개", key_points: ["12년"], questions: [],
+      focus: { mode: "사람", subject: "20년 된 아버지 코트를 맡기러 온 50대 남성 손님" },
+    });
+    expect(got.focus).toEqual({
+      mode: "사람", subject: "20년 된 아버지 코트를 맡기러 온 50대 남성 손님",
+    });
+  });
+
+  it("물건·정보 갈래도 그대로 받는다", () => {
+    expect(validateBriefing({ topic: "t", key_points: ["k"], questions: [],
+      focus: { mode: "물건", subject: "생딸기라떼" } }).focus.mode).toBe("물건");
+    expect(validateBriefing({ topic: "t", key_points: ["k"], questions: [],
+      focus: { mode: "정보", subject: "가격과 영업시간" } }).focus.mode).toBe("정보");
+  });
+
+  it("모르는 갈래는 초점을 통째로 버린다 — 반쪽짜리는 뒤 단계를 헷갈리게만 한다", () => {
+    const got = validateBriefing({ topic: "t", key_points: ["k"], questions: [],
+      focus: { mode: "분위기", subject: "따뜻함" } });
+    expect(got.focus).toBe(null);
+  });
+
+  it("대상이 비면 초점을 버린다", () => {
+    const got = validateBriefing({ topic: "t", key_points: ["k"], questions: [],
+      focus: { mode: "사람", subject: "  " } });
+    expect(got.focus).toBe(null);
+  });
+
+  it("초점이 아예 없으면 null — 지금 동작 그대로 간다", () => {
+    expect(validateBriefing({ topic: "t", key_points: ["k"], questions: [] }).focus).toBe(null);
+    expect(validateBriefing({ topic: "t", key_points: ["k"], questions: [], focus: "사람" }).focus).toBe(null);
+  });
 });
 
 // 프롬프트에 "자료에 적혀 있으면 버려라"를 예시까지 들어 적었는데도 어겼다.
