@@ -171,4 +171,10 @@ describe("폭 재기 — 자막이 몇 자에서 넘치는가", () => {
   it("두 줄이 한계다", () => {
     expect(MAX_SUBTITLE_LINES).toBe(2);
   });
+
+  it("이모지는 한글만큼 넓게 센다 — 좁게 잡으면 세 줄로 넘친다", () => {
+    expect(textUnits("✨")).toBeCloseTo(1.0, 2);
+    expect(textUnits("🔥")).toBeCloseTo(1.0, 2);
+    expect(textUnits("가🔥")).toBeCloseTo(2.0, 2);
+  });
 });
