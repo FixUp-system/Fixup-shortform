@@ -85,15 +85,22 @@ export default function ScriptStepPage() {
   // 초점을 고치면 구성을 다시 만든다 — 라우트가 컷을 비우므로 이어서 부르면 새로 나뉜다.
   // 분할·화면 설계·캐스팅은 OpenAI 만 써서 fal 값이 들지 않는다.
   async function saveFocus(subject) {
-    const focus = { ...project.briefing.focus, subject };
-    const res = await fetch(`/api/projects/${id}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ briefing: { focus } }),
-    }).catch(() => null);
-    if (!res || !res.ok) { setErr("고친 것을 저장하지 못했어요 — 다시 시도해 주세요"); return; }
-    setErr("");
-    await load(id).catch(() => {});
-    await splitCuts();
+    // busy 로 잠근다 — 저장하는 동안 컷이 비어 있어, 그 틈에 승인을 누르면 분할이 한 번 더 돈다.
+    // 이 저장소가 같은 자리에서 이미 값을 치렀다(표시가 없어 두 번 눌렸다).
+    if (busy) return;
+    setBusy(true); setErr("");
+    try {
+      const focus = { ...project.briefing.focus, subject };
+      const res = await fetch(`/api/projects/${id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ briefing: { focus } }),
+      }).catch(() => null);
+      if (!res || !res.ok) { setErr("고친 것을 저장하지 못했어요 — 다시 시도해 주세요"); return; }
+      await load(id).catch(() => {});
+      await splitCuts();
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function genScript(instr) {
