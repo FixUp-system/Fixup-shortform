@@ -617,9 +617,9 @@ describe("사진 판정 실패는 저장하지 않는다 — 다음 실행이 �
   });
 });
 
-describe("컷 길이 — 쪼갤 수 있는데 안 쪼갰으면 다시 묻는다", () => {
-  // 8초를 넘는 컷이 있고 그 컷 안에 아직 안 쓴 후보가 남아 있으면 한 번 더 묻는다.
-  // 후보가 없으면(쪼갤 수 없는 문장) 통과시킨다 — 영영 실패하지 않게.
+describe("컷 길이 — 쪼갤 수 있으면 코드가 되돌린다", () => {
+  // 판정만 하고 되묻는 방식은 실패했다 — 모델이 같은 답을 다시 냈고 코드가 받았다.
+  // 이제 되묻지 않고 그 자리에서 푼다.
   const LONG = "이 앰플은 PDRN과 엑소좀, 시카가 함께 들어 있어 자기 전에 토너를 바른 후, 2~3방울을 얼굴에 펴 바르고 자면 다음 날 아침 당김이 덜하다는 후기가 많습니다.";
 
   async function projectWithLongSentence() {
@@ -635,22 +635,32 @@ describe("컷 길이 — 쪼갤 수 있는데 안 쪼갰으면 다시 묻는다"
   const splitCallCount = () =>
     llmMock.callJson.mock.calls.filter((c) => c[0]?.stage === "컷 분할").length;
 
-  it("쪼갤 수 있는데 한 컷에 다 몰아넣으면 한 번 더 묻는다", async () => {
+  it("한 컷에 다 몰아넣으면 되묻지 않고 코드가 푼다", async () => {
     const p = await projectWithLongSentence();
     const units = splitUnits(LONG);
     expect(units.length, "이 문장이 여러 조각으로 나뉘어야 이 테스트가 의미가 있다").toBeGreaterThan(1);
     llmMock.callJson
-      .mockResolvedValueOnce({ cuts: [{ from: 1, to: units.length }] })                    // 1차 — 통째로
-      .mockResolvedValueOnce({ cuts: [{ from: 1, to: 1 }, { from: 2, to: units.length }] }) // 2차 — 나눔
-      .mockResolvedValueOnce({ shots: [] })                                                 // 화면 설계
-      .mockResolvedValueOnce({ cast: [] });                                                 // 캐스팅
+      .mockResolvedValueOnce({ cuts: [{ from: 1, to: units.length }] })   // 통째로 몰아넣은 답
+      .mockResolvedValueOnce({ shots: [] })                               // 화면 설계
+      .mockResolvedValueOnce({ cast: [] });                               // 캐스팅
     const cuts = await pipeline.defaultDeps.splitCuts(await projects.getProject(p.id));
-    expect(splitCallCount()).toBe(2);
-    expect(cuts.length).toBe(2);
+    expect(splitCallCount(), "분할은 한 번만 묻는다").toBe(1);
+    expect(cuts.length, "조각 수만큼 풀린다").toBe(units.length);
   });
 
-  it("쪼갤 수 없는 문장은 다시 묻지 않는다 — 영영 실패하지 않게", async () => {
-    // 조각 하나로 이뤄진 컷은 8초를 넘어도 더 쪼갤 수 없다. 되물어도 답이 같다.
+  it("컷을 이어붙이면 원고와 같다 — 풀어도 보장은 그대로다", async () => {
+    const p = await projectWithLongSentence();
+    const units = splitUnits(LONG);
+    llmMock.callJson
+      .mockResolvedValueOnce({ cuts: [{ from: 1, to: units.length }] })
+      .mockResolvedValueOnce({ shots: [] })
+      .mockResolvedValueOnce({ cast: [] });
+    const cuts = await pipeline.defaultDeps.splitCuts(await projects.getProject(p.id));
+    const joined = cuts.map((c) => c.sentence).join(" ").replace(/\s/g, "");
+    expect(joined).toBe(LONG.replace(/\s/g, ""));
+  });
+
+  it("쪼갤 수 없는 문장은 그대로 둔다 — 영영 실패하지 않게", async () => {
     const NO_BREAK = "아주아주아주긴한덩어리로이어져서끊을자리가전혀없는문장이길게이어지고또이어져서마침내끝납니다.";
     const p = await projects.createProject({ settings: {}, material: { text: "자료", photos: [] } });
     await projects.updateProject(p.id, (proj) => ({
@@ -663,7 +673,23 @@ describe("컷 길이 — 쪼갤 수 있는데 안 쪼갰으면 다시 묻는다"
       .mockResolvedValueOnce({ shots: [] })
       .mockResolvedValueOnce({ cast: [] });
     const cuts = await pipeline.defaultDeps.splitCuts(await projects.getProject(p.id));
-    expect(cuts[0].seconds, "이 컷은 8초를 넘는다 — 그런데도 되묻지 않아야 한다").toBeGreaterThan(8);
+    expect(cuts).toHaveLength(1);
+    expect(cuts[0].seconds, "8초를 넘지만 더 쪼갤 수 없다").toBeGreaterThan(8);
     expect(splitCallCount()).toBe(1);
+  });
+
+  it("8초 이하로 묶은 답은 건드리지 않는다", async () => {
+    const TWO = "매일 아침 딸기를 갈아 씁니다. 시럽은 쓰지 않습니다.";
+    const p = await projects.createProject({ settings: {}, material: { text: "자료", photos: [] } });
+    await projects.updateProject(p.id, (proj) => ({
+      ...proj, briefing: { topic: "t" }, script: { text: TWO },
+    }));
+    llmMock.callJson
+      .mockResolvedValueOnce({ cuts: [{ from: 1, to: 2 }] })   // 둘을 한 컷으로 — 8초 이하다
+      .mockResolvedValueOnce({ shots: [] })
+      .mockResolvedValueOnce({ cast: [] });
+    const cuts = await pipeline.defaultDeps.splitCuts(await projects.getProject(p.id));
+    expect(cuts).toHaveLength(1);
+    expect(cuts[0].seconds).toBeLessThanOrEqual(8);
   });
 });
