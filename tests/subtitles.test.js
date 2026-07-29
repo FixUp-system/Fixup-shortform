@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildCues, toAss, cutSeconds, subtitleStyle, lineWidthUnits, textUnits, MAX_SUBTITLE_LINES } from "../lib/subtitles";
+import { buildCues, toAss, cutSeconds, subtitleStyle, lineWidthUnits, textUnits, MAX_SUBTITLE_LINES, splitSubtitleText, breakTwoLines } from "../lib/subtitles";
 
 describe("buildCues", () => {
   it("컷 길이를 누적해 시작·끝을 만든다", () => {
@@ -176,5 +176,70 @@ describe("폭 재기 — 자막이 몇 자에서 넘치는가", () => {
     expect(textUnits("✨")).toBeCloseTo(1.0, 2);
     expect(textUnits("🔥")).toBeCloseTo(1.0, 2);
     expect(textUnits("가🔥")).toBeCloseTo(2.0, 2);
+  });
+});
+
+describe("splitSubtitleText — 두 줄을 넘으면 나눈다", () => {
+  const MAX = 22.4;   // 9:16 두 줄
+
+  it("한계 이하면 통째로 둔다", () => {
+    const s = "화요일은 쉽니다.";
+    expect(splitSubtitleText(s, MAX)).toEqual([s]);
+  });
+
+  it("한 컷에 문장이 둘이면 문장 경계에서 갈린다", () => {
+    const s = "운동화를 세탁소에 맡기는 일이 많아졌습니다. 집에서 관리하기 번거롭고, 세탁 후 변형되기 쉬운 탓입니다.";
+    const out = splitSubtitleText(s, MAX);
+    expect(out.length).toBeGreaterThan(1);
+    expect(out[0].trim().endsWith("많아졌습니다.")).toBe(true);
+  });
+
+  it("한 문장이 길면 어절 경계에서 갈리고 어느 조각도 한계를 넘지 않는다", () => {
+    const s = "세탁소에서는 전문적인 장비와 세제를 사용하여 운동화를 새것처럼 만들어줍니다.";
+    const out = splitSubtitleText(s, MAX);
+    expect(out.length).toBeGreaterThan(1);
+    for (const p of out) expect(textUnits(p.trim())).toBeLessThanOrEqual(MAX);
+  });
+
+  it("이어붙이면 원문과 글자 그대로 같다 — 이것이 보장이다", () => {
+    const s = "세탁소에서는 전문적인 장비와 세제를 사용하여 운동화를 새것처럼 만들어줍니다. 그래서 많은 분들이 맡기러 오십니다.";
+    expect(splitSubtitleText(s, MAX).join("")).toBe(s);
+  });
+
+  it("어절 경계가 없는 덩어리는 한계를 넘어도 그대로 둔다 — 글자 중간을 자르지 않는다", () => {
+    const s = "아주아주아주긴한덩어리로이어져서끊을자리가전혀없는말입니다";
+    expect(splitSubtitleText(s, MAX)).toEqual([s]);
+  });
+
+  it("빈 글은 빈 배열", () => {
+    expect(splitSubtitleText("", MAX)).toEqual([]);
+    expect(splitSubtitleText(null, MAX)).toEqual([]);
+  });
+});
+
+describe("breakTwoLines — 줄바꿈을 코드가 넣는다", () => {
+  const LINE = 11.2;   // 9:16 한 줄
+
+  it("한 줄에 들면 그대로 둔다", () => {
+    expect(breakTwoLines("화요일은 쉽니다.", LINE)).toBe("화요일은 쉽니다.");
+  });
+
+  it("넘치면 어절 경계에 줄바꿈 하나를 넣는다", () => {
+    const out = breakTwoLines("전문적인 장비와 세제를 사용하여", LINE);
+    expect(out.split("\n")).toHaveLength(2);
+    // 낱말 중간에서 끊기지 않는다
+    for (const line of out.split("\n")) expect(line.trim()).toBe(line);
+    expect(out.replace("\n", " ")).toBe("전문적인 장비와 세제를 사용하여");
+  });
+
+  it("두 줄 길이가 비슷해진다 — 자동 줄바꿈이 만드는 한 줄짜리 꼬리를 피한다", () => {
+    const out = breakTwoLines("전문적인 장비와 세제를 사용하여", LINE);
+    const [a, b] = out.split("\n").map(textUnits);
+    expect(Math.abs(a - b)).toBeLessThan(LINE);
+  });
+
+  it("낱말이 하나면 넘쳐도 자르지 않는다", () => {
+    const s = "아주아주아주긴한덩어리로이어져서";
+    expect(breakTwoLines(s, LINE)).toBe(s);
   });
 });
