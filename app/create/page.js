@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { useProject } from "../../components/ProjectContext";
 import { TARGET_CHOICES } from "../../lib/script";
 import { DEFAULT_STYLE_ID } from "../../lib/styles";
+import { ASPECTS, DEFAULT_ASPECT_ID, aspectFor } from "../../lib/aspects";
 import StylePicker from "../../components/StylePicker";
 
 export default function CreatePage() {
@@ -22,6 +23,7 @@ export default function CreatePage() {
   const [text, setText] = useState("");
   const [photos, setPhotos] = useState([]); // {id, filename, url}
   const [seconds, setSeconds] = useState(null); // null = 자동(자료가 정함)
+  const [aspect, setAspect] = useState(DEFAULT_ASPECT_ID);
   const [stylePreset, setStylePreset] = useState(DEFAULT_STYLE_ID);
   const [styleNote, setStyleNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -61,7 +63,10 @@ export default function CreatePage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         material: { text, photos },
-        settings: { target_seconds: seconds, style: { preset: stylePreset, note: styleNote } },
+        settings: {
+          target_seconds: seconds, aspect_ratio: aspect,
+          style: { preset: stylePreset, note: styleNote },
+        },
       }),
     });
     const data = await res.json();
@@ -114,6 +119,22 @@ export default function CreatePage() {
               </div>
             </div>
 
+            {/* 사이즈 — 컷을 만든 뒤에는 못 바꾼다(그림이 그 모양으로 나온다). 그래서 여기가 자리다 */}
+            <div className="tray-row">
+              <span className="tray-label">사이즈</span>
+              <div className="tray-col">
+                <div className="chips">
+                  {ASPECTS.map((a) => (
+                    <button key={a.id} className={`chip${aspect === a.id ? " on" : ""}`}
+                      onClick={() => setAspect(a.id)}>
+                      {a.label} · {a.id}
+                    </button>
+                  ))}
+                </div>
+                <div className="tray-note">{aspectFor(aspect).note}에 맞는 규격이에요</div>
+              </div>
+            </div>
+
             <div className="tray-row">
               <span className="tray-label">컨셉</span>
               <div className="tray-col">
@@ -131,7 +152,6 @@ export default function CreatePage() {
             <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={onFiles} />
 
             <span className="spacer" />
-            <span className="count">{text.length} / 2,000자</span>
             <button className="cta" onClick={submit} disabled={busy || !text.trim()}>
               {busy ? "여는 중…" : "정리하기 →"} <span className="cr">무료</span>
             </button>

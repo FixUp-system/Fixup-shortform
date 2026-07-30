@@ -834,7 +834,6 @@ textarea.field::placeholder { color: var(--ink-soft); }
   padding-top: 12px;
 }
 .composer-bar .spacer { margin-left: auto; }
-.composer-bar .count { color: var(--ink-soft); font-size: 12px; }
 .composer-bar .cta { margin-top: 0; padding: 9px 16px; font-size: 14px; }
 
 /* 조작 알약 — 지금 값을 라벨에 이고 있다. 눌러야 알 수 있는 자리를 만들지 않는다 */
@@ -864,11 +863,14 @@ textarea.field::placeholder { color: var(--ink-soft); }
   gap: 12px;
 }
 .composer-tray .tray-row { display: flex; gap: 10px; align-items: baseline; }
+/* 라벨 칸 — 가장 긴 라벨("사이즈", 세 글자)이 한 줄에 들어가야 한다.
+   30px 이었을 때 "사이 / 즈" 로 갈렸다. nowrap 은 라벨이 늘어날 때 조용히 갈리는 것을 막는다. */
 .composer-tray .tray-label {
-  flex: 0 0 30px;
+  flex: 0 0 46px;
   color: var(--ink-soft);
   font-size: 12px;
   padding-top: 8px;
+  white-space: nowrap;
 }
 .composer-tray .tray-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .composer-tray .tray-note { color: var(--ink-soft); font-size: 12px; }

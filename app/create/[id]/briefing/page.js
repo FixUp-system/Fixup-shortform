@@ -12,6 +12,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 import { capacitySeconds } from "../../../../lib/script";
 import { activeStyle } from "../../../../lib/styles";
+import { ASPECTS, DEFAULT_ASPECT_ID } from "../../../../lib/aspects";
 import StylePicker from "../../../../components/StylePicker";
 
 export default function BriefingStepPage() {
@@ -99,6 +100,17 @@ export default function BriefingStepPage() {
     router.push(`/create/${id}/script`);
   }
 
+  // 사이즈 저장. 컷이 없을 때만 부를 수 있는 자리에 있다(위 sizePicker 가 감춘다).
+  async function saveAspect(aspect_ratio) {
+    const res = await fetch(`/api/projects/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings: { aspect_ratio } }),
+    }).catch(() => null);
+    if (!res || !res.ok) { setErr("사이즈를 저장하지 못했어요 — 다시 골라 주세요"); return; }
+    setErr("");
+    await load(id).catch(() => {});
+  }
+
   // 컨셉 저장. 컷을 비우지 않는다 — 컨셉은 글이 아니라 그림의 근거다.
   // 원고·컷·소리는 살아남고 ④이미지만 낡는다(image.style_of 각인이 판정한다).
   async function saveStyle(preset, note) {
@@ -118,6 +130,23 @@ export default function BriefingStepPage() {
   if (!project) return <p className="pgsub">준비 중…</p>;
 
   const styleId = activeStyle(project).id;
+  const aspectId = project.settings?.aspect_ratio || DEFAULT_ASPECT_ID;
+  // 사이즈는 컷이 생기면 감춘다 — 그림이 이미 그 모양으로 만들어졌고, 비율을 바꿔도
+  // 낡았다고 판정할 수단이 없어(각인이 화면 설명과 화풍만 본다) 조용히 다른 모양으로 남는다.
+  const madeCuts = (project.cuts || []).length > 0;
+  const sizePicker = madeCuts ? null : (
+    <>
+      <div className="eyebrow">영상 사이즈 <small>이 규격으로 만들어져요</small></div>
+      <div className="chips">
+        {ASPECTS.map((a) => (
+          <button key={a.id} className={`chip${aspectId === a.id ? " on" : ""}`}
+            disabled={busy} onClick={() => saveAspect(a.id)}>
+            {a.label} · {a.id}
+          </button>
+        ))}
+      </div>
+    </>
+  );
   // 컨셉을 바꾸는 값이 실제로 드는지 — 그림이 하나라도 나와 있을 때만이다.
   // 컷이 있는 것과 그림이 있는 것은 다르다: 그림 전에는 0원이라 값 얘기를 꺼내면 겁만 준다.
   const madeImages = (project.cuts || []).some((c) => c.image?.url);
@@ -153,6 +182,7 @@ export default function BriefingStepPage() {
         <h2>자료는 준비됐어요</h2>
         <p className="pgsub">{project.material?.text?.slice(0, 120)}…</p>
         {err && <p className="pgsub warn">{err}</p>}
+        {sizePicker}
         {stylePicker}
         <div className="step-actions">
           <div className="fwd">
@@ -198,6 +228,7 @@ export default function BriefingStepPage() {
         답하시면 그만큼 대본에 담을 이야기가 늘어요 — 지금 자료로는 약 {capacity}초예요.
       </div>
 
+      {sizePicker}
       {stylePicker}
 
       <div className="step-actions">

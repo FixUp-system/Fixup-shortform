@@ -1,4 +1,5 @@
 import { createProject } from "../../../lib/projects";
+import { isAspect, DEFAULT_ASPECT_ID } from "../../../lib/aspects";
 import { TARGET_CHOICES } from "../../../lib/script";
 import { normalizeStyle } from "../../../lib/styles";
 
@@ -23,9 +24,14 @@ export async function POST(req) {
       return Response.json({ error: e.message }, { status: 400 });
     }
   }
+  // 영상 사이즈도 자료를 넣는 화면에서 고른다. 길이와 같은 종류의 값이다 —
+  // 모르는 값은 조용히 기본(세로)으로 떨어진다: 이 값으로 유료 호출이 나가지만, 목록 밖
+  // 값은 우리 화면에서 나올 수 없고(닫힌 칩) 400 으로 막으면 자료를 다시 써야 한다.
+  const aspect = isAspect(body?.settings?.aspect_ratio)
+    ? body.settings.aspect_ratio
+    : DEFAULT_ASPECT_ID;
   const project = await createProject({
-    // 비율은 9:16으로 시작하고 대본 승인 직전에 고른다 — docs/…/2026-07-24-pipeline-roadmap.md
-    settings: { aspect_ratio: "9:16", target_seconds: target, ...(style ? { style } : {}) },
+    settings: { aspect_ratio: aspect, target_seconds: target, ...(style ? { style } : {}) },
     material: {
       text: body.material.text.slice(0, 4000),
       photos: Array.isArray(body.material.photos) ? body.material.photos : [],

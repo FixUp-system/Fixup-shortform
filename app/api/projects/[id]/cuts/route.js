@@ -1,4 +1,5 @@
 import { getProject, updateProject } from "../../../../../lib/projects";
+import { isAspect, DEFAULT_ASPECT_ID } from "../../../../../lib/aspects";
 import { runSplitPipeline } from "../../../../../lib/pipeline";
 import { areCutsStale } from "../../../../../lib/steps";
 
@@ -14,9 +15,9 @@ export async function POST(req, { params }) {
 
   // 화면 비율 — 이미지 생성이 이 값을 쓴다. 보내지 않으면 기존 설정(기본 9:16)을 유지한다.
   const body = await req.json().catch(() => ({}));
-  const aspect_ratio = ["9:16", "1:1", "16:9"].includes(body?.aspect_ratio)
+  const aspect_ratio = isAspect(body?.aspect_ratio)
     ? body.aspect_ratio
-    : project.settings?.aspect_ratio || "9:16";
+    : project.settings?.aspect_ratio || DEFAULT_ASPECT_ID;
 
   // 멱등 가드 — 지금 원고에서 나온 컷이 이미 있으면 다시 나누지 않는다.
   // 아래에서 cuts:[]를 선저장하므로, 막지 않으면 돈 주고 만든 소리·그림이 그 자리에서 지워진다.

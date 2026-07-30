@@ -18,7 +18,6 @@ export default function ScriptStepPage() {
   const [err, setErr] = useState("");
   const [instruction, setInstruction] = useState("");
   const [draft, setDraft] = useState(null); // 손으로 고치는 중인 원고(저장 전)
-  const [aspect, setAspect] = useState(project.settings?.aspect_ratio || "9:16");
   // 자동 생성이 한 번만 돌게 막는다 — busy는 비동기라 effect가 두 번 불리면 과금이 두 배가 된다.
   const textRef = useRef(null);
   const fixRef = useRef(null);
@@ -74,7 +73,7 @@ export default function ScriptStepPage() {
   async function splitCuts() {
     const res = await fetch(`/api/projects/${id}/cuts`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ aspect_ratio: aspect }),
+      body: "{}",
     }).catch(() => null);
     // 409(이미 나눈 컷이 있음)는 정상이다 — 되돌아온 화면에서 다시 부른 경우다
     if (res && !res.ok && res.status !== 409) {
@@ -159,7 +158,7 @@ export default function ScriptStepPage() {
     setBusy(true); setErr("");
     const res = await fetch(`/api/projects/${id}/cuts`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ aspect_ratio: aspect }),
+      body: "{}",
     });
     if (!res.ok) {
       setErr((await res.json().catch(() => ({}))).error || "시작 실패");
@@ -250,19 +249,6 @@ export default function ScriptStepPage() {
           {instruction ? "지시 반영" : "전체 다시 쓰기"}
         </button>
       </div>
-
-      {!hasCuts && (
-        <>
-          <div className="eyebrow mt-lg">화면 비율 <small>이 비율로 이미지가 만들어져요</small></div>
-          <div className="chips">
-            {[["9:16", "세로 (숏폼)"], ["1:1", "정사각"], ["16:9", "가로"]].map(([r, label]) => (
-              <button key={r} className={`chip${aspect === r ? " on" : ""}`} onClick={() => setAspect(r)}>
-                {r} · {label}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
 
       {/* 초점 — 이 영상이 무엇을 따라가는지. 여기서 고치면 구성을 다시 만든다.
           그림과 클립이 이것을 기준으로 나오므로, 만들기 전에 고쳐야 값이 안 든다. */}

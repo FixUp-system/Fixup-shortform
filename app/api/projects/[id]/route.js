@@ -2,6 +2,7 @@ import { getProject, updateProject } from "../../../../lib/projects";
 import { briefingContentChanged } from "../../../../lib/briefing";
 import { activeClipLimits } from "../../../../lib/clip-limits";
 import { normalizeStyle } from "../../../../lib/styles";
+import { isAspect } from "../../../../lib/aspects";
 
 export async function GET(req, { params }) {
   const { id } = await params;
@@ -16,12 +17,16 @@ export async function PATCH(req, { params }) {
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
 
-  // 화풍은 닫힌 목록이다. settings 는 화이트리스트 없이 머지되므로 여기서 막지 않으면
-  // 아무 값이나 들어가고, 그 값으로 유료 호출이 나간다. 모르는 값을 조용히 기본으로
-  // 바꾸지도 않는다 — 사장님이 고른 것과 그림에 실린 것이 달라지면 안 된다.
+  // settings 는 화이트리스트 없이 머지되므로 닫힌 목록은 여기서 판정한다. 막지 않으면 아무
+  // 값이나 들어가고 그 값으로 유료 호출이 나간다. 모르는 값을 조용히 기본으로 바꾸지도 않는다
+  // — 사장님이 고른 것과 실제로 만들어지는 것이 달라지면 아무도 못 알아본다.
   //
   // 락을 잡기 전에 판정한다. 아래 try 는 "프로젝트가 없다"를 404 로 돌려주는 자리라,
   // 그 안에서 던지면 잘못된 값이 없는 프로젝트로 보고된다.
+  if (body.settings?.aspect_ratio !== undefined && !isAspect(body.settings.aspect_ratio)) {
+    return Response.json({ error: "그 사이즈는 몰라요" }, { status: 400 });
+  }
+
   let style;
   if (body.settings?.style !== undefined) {
     try {
