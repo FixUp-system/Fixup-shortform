@@ -790,6 +790,9 @@ a.cta { text-decoration: none; }
 .composer:focus-within { border-color: var(--ink-soft); }
 
 /* 박스 안의 입력칸은 테두리도 배경도 없다. 박스가 이미 그 역할을 한다 */
+/* 글이 늘면 칸이 아래로 밀린다 — 스크롤을 만들지 않는다.
+   높이는 JS 가 내용 높이로 맞춘다(아래 min-height 가 바닥이다). 안에서 스크롤하면 사장님이
+   쓴 앞 문장이 보이지 않게 되고, 자료 전체를 훑으려면 칸 안에서 또 스크롤해야 한다. */
 .composer textarea.composer-text {
   width: 100%;
   min-height: 132px;
@@ -800,7 +803,8 @@ a.cta { text-decoration: none; }
   font-size: 15px;
   line-height: 1.65;
   padding: 0;
-  resize: vertical;
+  resize: none;
+  overflow-y: hidden;
 }
 .composer textarea.composer-text:focus { outline: none; }
 .composer textarea.composer-text::placeholder { color: var(--ink-soft); }
@@ -837,17 +841,25 @@ a.cta { text-decoration: none; }
 }
 .pill:hover { border-color: var(--ink-soft); color: var(--ink); }
 .pill b { color: var(--ink); font-weight: 500; }
-.pill.open { background: var(--surface2); border-color: var(--surface2); color: var(--ink); }
 
-/* 서랍 — 알약을 누르면 박스 안에서 열린다. 팝오버로 띄우지 않는다:
-   좁은 화면에서 잘리고, 열린 동안 무엇을 고르는 중인지 박스 밖으로 나가 버린다 */
+/* 고른 것들 — 박스 안에 **늘 펼쳐 둔다.**
+   접었다 펴는 방식을 그만둔 이유: 접힌 동안 무엇이 골라져 있는지 안 보이고, 값을 보려면
+   한 번 더 눌러야 한다. 자료를 적기 전에 알아야 하는 값이라 처음부터 보이는 것이 맞다. */
 .composer-tray {
   border-top: 1px solid var(--line);
   padding-top: 12px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
+.composer-tray .tray-row { display: flex; gap: 10px; align-items: baseline; }
+.composer-tray .tray-label {
+  flex: 0 0 30px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  padding-top: 8px;
+}
+.composer-tray .tray-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .composer-tray .tray-note { color: var(--ink-soft); font-size: 12px; }
 .composer-tray textarea.tray-input {
   width: 100%;
