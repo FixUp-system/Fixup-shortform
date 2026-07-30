@@ -9,7 +9,7 @@ import path from "path";
 // 이 테스트들은 addRecord 가 실제로 도는 경로를 지난다.
 process.env.SHOTFORM_DATA_DIR = mkdtempSync(path.join(tmpdir(), "shotform-t-"));
 
-afterEach(() => { delete process.env.SHOTFORM_FAKE; });
+afterEach(() => { delete process.env.SHOTFORM_FAKE; delete process.env.FAL_I2V_ENDPOINT; });
 
 describe("generateClip", () => {
   it("가짜 모드에서는 이미지 URL을 그대로 클립으로 돌려준다", async () => {
@@ -111,5 +111,62 @@ describe("generateClip", () => {
     await expect(
       generateClip({ imageUrl: "i", seconds: 4, aspect_ratio: "9:16", fetchImpl })
     ).rejects.toThrow(/500/);
+  });
+});
+
+// 모델을 바꾸면 눈금과 body 가 함께 따라와야 한다 — 눈금만 따라오면 오디오가 켜진 채로
+// 청구되고(단가 $0.084 → $0.126) 클립에 소리가 실려 낭독과 두 겹이 된다.
+describe("generateClip — 활성 프로필이 요청을 정한다", () => {
+  const KLING = "fal-ai/kling-video/v3/standard/image-to-video";
+  const sender = () => {
+    const box = {};
+    return {
+      box,
+      fetchImpl: async (url, opts) => {
+        box.url = url;
+        box.sent = JSON.parse(opts.body);
+        return { ok: true, json: async () => ({ video: { url: "https://fal.media/v.mp4" } }) };
+      },
+    };
+  };
+
+  it("Kling 에서는 낭독 초를 그대로 산다 — 올림 손실이 사라진다", async () => {
+    process.env.FAL_I2V_ENDPOINT = KLING;
+    const { box, fetchImpl } = sender();
+    const r = await generateClip({ imageUrl: "i", seconds: 7, aspect_ratio: "9:16", fetchImpl });
+    expect(box.sent.duration).toBe(7);
+    expect(r.seconds).toBe(7);
+    expect(box.url).toContain(KLING);
+  });
+
+  it("Kling 에서는 오디오를 끈다", async () => {
+    process.env.FAL_I2V_ENDPOINT = KLING;
+    const { box, fetchImpl } = sender();
+    await generateClip({ imageUrl: "i", seconds: 5, aspect_ratio: "9:16", fetchImpl });
+    expect(box.sent.generate_audio).toBe(false);
+  });
+
+  it("LTX 에는 그 필드를 보내지 않는다 — 모르는 필드는 거절될 수 있다", async () => {
+    const { box, fetchImpl } = sender();
+    await generateClip({ imageUrl: "i", seconds: 5, aspect_ratio: "9:16", fetchImpl });
+    expect("generate_audio" in box.sent).toBe(false);
+    expect(box.sent.duration).toBe(6);
+  });
+
+  it("잘림 판정도 활성 프로필의 상한으로 한다", async () => {
+    process.env.FAL_I2V_ENDPOINT = KLING;
+    const { box, fetchImpl } = sender();
+    const r = await generateClip({ imageUrl: "i", seconds: 16, aspect_ratio: "9:16", fetchImpl });
+    expect(box.sent.duration).toBe(15);
+    expect(r.truncated).toBe(true);
+    // 기본 프로필 상한(20)으로 재면 16초가 잘리지 않은 것으로 나온다 — 그 실수를 여기서 막는다
+    expect(I2V_MAX_SECONDS).toBe(20);
+  });
+
+  it("가짜 모드도 활성 프로필의 초를 돌려준다", async () => {
+    process.env.FAL_I2V_ENDPOINT = KLING;
+    process.env.SHOTFORM_FAKE = "1";
+    const r = await generateClip({ imageUrl: "img", seconds: 7, aspect_ratio: "9:16" });
+    expect(r.seconds).toBe(7);
   });
 });
