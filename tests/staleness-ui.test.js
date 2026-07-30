@@ -209,3 +209,25 @@ describe("영상 컨셉은 자료 쪽에서 고른다", () => {
     expect(briefSrc).toMatch(/madeImages\s*=\s*\(project\.cuts \|\| \[\]\)\.some/);
   });
 });
+
+// 컷 문장은 낭독·자막·이미지 프롬프트가 읽는 값이다(원고가 아니라 컷이다).
+// 그래서 사장님이 여기서 고칠 수 있어야 하고, 고치면 원고도 따라와야 한다.
+describe("②대본의 구성에서 문장을 고칠 수 있다", () => {
+  const src = read("app/create/[id]/script/page.js");
+
+  it("문장이 읽기 전용이 아니다 — saveCut 으로 sentence 를 보낸다", () => {
+    expect(src).toMatch(/saveCut\(c\.idx,\s*\{\s*sentence:/);
+    // 편집 대상은 따옴표 밖이어야 한다 — 안에 넣으면 textContent 에 따옴표가 섞인다
+    expect(src).toMatch(/“<span contentEditable/);
+  });
+
+  // 원고 칸은 컷 문장을 이어 붙여 보여준다. 저장 안 된 초안이 남아 있으면 방금 고친 문장이
+  // 화면에 안 보이고, 원고 칸 밖을 누르는 순간 낡은 초안이 그것을 덮는다.
+  it("문장을 고치면 원고 칸의 저장 안 된 초안을 버린다", () => {
+    expect(src).toMatch(/if \(patch\.sentence\) setDraft\(null\)/);
+  });
+
+  it("문장도 고칠 수 있다는 것을 라벨이 알린다", () => {
+    expect(src).toContain("눌러서 고칠 수 있어요");
+  });
+});

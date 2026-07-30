@@ -65,6 +65,18 @@ export async function PATCH(req, { params }) {
         }
         if (Object.keys(patch).length) {
           next.cuts = proj.cuts.map((c) => (c.idx === body.cut.idx ? { ...c, ...patch } : c));
+          // 문장을 고쳤으면 원고도 함께 따라온다.
+          //
+          // 컷은 원고를 잘라서 만들고 "이어붙이면 원고와 글자 그대로 같다"가 이 파이프라인의
+          // 유일한 구조적 보장이다. 컷만 고치고 원고를 두면 그 보장이 깨지고, 나중에 컷을 다시
+          // 나누는 순간(POST /cuts 는 script.text 를 자른다) 고친 문장이 조용히 사라진다.
+          //
+          // version 은 올리지 않는다 — 올리면 ②대본에 "원고가 바뀌었어요" 거짓 경고가 뜨고
+          // 그 안내의 버튼은 유료 호출이다. 게다가 컷이 낡은 것으로 판정돼 자동 재분할이 돌아
+          // 방금 고친 문장이 덮인다. 화면·움직임만 고쳤을 때는 원고와 무관하므로 건드리지 않는다.
+          if (patch.sentence && proj.script) {
+            next.script = { ...proj.script, text: next.cuts.map((c) => c.sentence).join(" ") };
+          }
         }
       }
       // 원고 직접 편집. version을 올리지 않는다 — 사장님이 손으로 고친 것을

@@ -520,6 +520,45 @@ describe("무효화 관통 — 고치면 낡고, 안 고친 것은 살아남는�
     }));
   }
 
+  // ★ 손으로 고친 문장이 원고에도 반영돼야 한다.
+  //
+  // 컷은 원고를 잘라서 만들고 "이어붙이면 원고와 글자 그대로 같다"가 이 파이프라인의 유일한
+  // 구조적 보장이다. 컷 문장만 고치고 원고를 그대로 두면 그 보장이 깨지고, 나중에 컷을 다시
+  // 나누는 순간(POST /cuts 는 script.text 를 자른다) 사장님이 고친 문장이 조용히 사라진다.
+  it("컷 문장을 고치면 원고도 함께 따라온다 — 이어붙이면 원고와 같다", async () => {
+    const p = await projectWithScript();
+    const two = await updateProject(p.id, (proj) => ({
+      ...proj,
+      status: "video",
+      cuts: [
+        { idx: 0, sentence: "매일 아침 딸기를 갈아 씁니다.", shows: "ㄱ", motion: "ㄴ", seconds: 4 },
+        { idx: 1, sentence: "시럽은 쓰지 않습니다.", shows: "ㄷ", motion: "ㄹ", seconds: 3 },
+      ],
+    }));
+    expect(two.cuts.map((c) => c.sentence).join(" ")).toBe(two.script.text); // 전제
+
+    await PATCH(patchReq({ cut: { idx: 1, sentence: "설탕도 넣지 않습니다." } }), ctx(p.id));
+    const saved = await getProject(p.id);
+    expect(saved.cuts[1].sentence).toBe("설탕도 넣지 않습니다.");
+    expect(saved.script.text).toBe("매일 아침 딸기를 갈아 씁니다. 설탕도 넣지 않습니다.");
+    expect(saved.cuts.map((c) => c.sentence).join(" ")).toBe(saved.script.text);
+  });
+
+  // 버전을 올리면 ②대본에 "원고가 바뀌었어요" 거짓 경고가 뜨고, 그 안내의 버튼은 유료 호출이다.
+  // 그리고 컷이 낡은 것으로 판정돼 자동 재분할이 돌아 방금 고친 문장이 덮인다.
+  it("컷 문장을 고쳐도 원고 버전은 오르지 않는다", async () => {
+    const p = await projectWithCuts();
+    const before = p.script.version;
+    await PATCH(patchReq({ cut: { idx: 0, sentence: "고친 문장." } }), ctx(p.id));
+    expect((await getProject(p.id)).script.version).toBe(before);
+  });
+
+  it("화면·움직임만 고칠 때는 원고를 건드리지 않는다", async () => {
+    const p = await projectWithCuts();
+    await PATCH(patchReq({ cut: { idx: 0, shows: "손님이 코트를 든다" } }), ctx(p.id));
+    expect((await getProject(p.id)).script.text).toBe(p.script.text);
+  });
+
   it("문장을 고치면 소리만 낡는다 — 그림은 살아남는다", async () => {
     const p = await projectWithCuts();
     const res = await PATCH(patchReq({ cut: { idx: 0, sentence: "고친 문장." } }), ctx(p.id));

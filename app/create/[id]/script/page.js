@@ -79,6 +79,13 @@ export default function ScriptStepPage() {
     }).catch(() => null);
     if (!res || !res.ok) { setErr("고친 것을 저장하지 못했어요 — 다시 시도해 주세요"); return; }
     setErr("");
+    // 문장을 고쳤으면 위 원고 칸의 저장 안 된 초안을 버린다.
+    //
+    // 원고 칸은 컷 문장을 이어 붙여 보여주므로, 초안이 남아 있으면 방금 고친 문장이 화면에
+    // 안 보이고, 그 상태로 원고 칸 밖을 누르면 낡은 초안이 저장돼 고친 것이 덮인다.
+    // draft 는 script.version 이 바뀔 때만 버려지는데 컷 편집은 버전을 올리지 않는다(그게 맞다).
+    // 화면·움직임은 원고와 무관하므로 초안을 건드리지 않는다 — 쓰던 글을 빼앗지 않는다.
+    if (patch.sentence) setDraft(null);
     await load(id).catch(() => {});
   }
 
@@ -296,7 +303,7 @@ export default function ScriptStepPage() {
       {/* 구성 — 원고를 컷으로 나누고 컷마다 무엇을 보여줄지·어떻게 움직일지 정한 것.
           승인 앞에 두는 이유: 그림과 클립이 여기서 나오므로, 만들기 전에 고쳐야 값이 안 든다. */}
       <div className="eyebrow mt-lg">
-        구성 <small>이 순서로 그림이 만들어지고, 적힌 대로 움직여요</small>
+        구성 <small>문장·화면·움직임을 눌러서 고칠 수 있어요</small>
       </div>
       {splitting ? (
         <p className="pgsub">원고를 컷으로 나누는 중이에요…</p>
@@ -313,7 +320,16 @@ export default function ScriptStepPage() {
             <div className="plan-row" key={c.idx}>
               <span className="num">{c.idx + 1}</span>
               <div className="plan-body">
-                <div className="preview-sentence">“{c.sentence}”</div>
+                {/* 문장도 손으로 고친다 — 낭독·자막이 이 값을 읽는다(원고가 아니라 컷이다).
+                    고치면 라우트가 원고도 함께 맞춰 준다. 따옴표는 편집 대상 밖에 둔다 —
+                    안에 넣으면 textContent 에 섞여 들어가 문장에 따옴표가 저장된다. */}
+                <div className="preview-sentence">
+                  “<span contentEditable suppressContentEditableWarning className="editable"
+                    onBlur={(e) => {
+                      const v = e.currentTarget.textContent.trim();
+                      if (v && v !== c.sentence) saveCut(c.idx, { sentence: v });
+                    }}>{c.sentence}</span>”
+                </div>
                 <div className="plan-field">
                   <b>화면</b>
                   <span contentEditable suppressContentEditableWarning className="editable"
