@@ -771,3 +771,95 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
 /* 투명 테두리 — .mini 의 1px 테두리만큼 높이가 어긋나는 것을 메운다 */
 .step-actions .fwd .cta { min-width: 132px; justify-content: center; border: 1px solid transparent; }
 a.cta { text-decoration: none; }
+
+/* ── 입력 박스(composer) — 자료를 넣는 화면
+   왜 층층이 쌓인 라벨+필드를 버렸는가: 자료·길이·컨셉·사진은 네 가지 서류가 아니라
+   "이 영상 한 편을 어떻게 만들까"라는 한 덩어리다. 박스 하나에 담고 조작을 그 안쪽 아래에
+   붙이면, 사장님이 보는 것이 '채워야 할 칸 넷'에서 '적고 누르는 자리 하나'로 바뀐다.
+   요즘 AI 도구들이 쓰는 모양이고, 사장님이 그 모양에 이미 익숙하다. */
+.composer {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  padding: 16px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* 글을 쓰는 동안 박스 전체가 살아난다 — 안쪽 칸에 따로 테두리를 두지 않기 때문이다 */
+.composer:focus-within { border-color: var(--ink-soft); }
+
+/* 박스 안의 입력칸은 테두리도 배경도 없다. 박스가 이미 그 역할을 한다 */
+.composer textarea.composer-text {
+  width: 100%;
+  min-height: 132px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.65;
+  padding: 0;
+  resize: vertical;
+}
+.composer textarea.composer-text:focus { outline: none; }
+.composer textarea.composer-text::placeholder { color: var(--ink-soft); }
+
+/* 붙인 사진 — 박스 안, 조작줄 위에 놓인다(무엇을 이미 넣었는지가 먼저 보이게) */
+.composer .uploads { gap: 8px; }
+.composer .up { width: 62px; height: 62px; }
+
+/* 조작줄 — 박스 안쪽 아래 */
+.composer-bar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.composer-bar .spacer { margin-left: auto; }
+.composer-bar .count { color: var(--ink-soft); font-size: 12px; }
+.composer-bar .cta { margin-top: 0; padding: 9px 16px; font-size: 14px; }
+
+/* 조작 알약 — 지금 값을 라벨에 이고 있다. 눌러야 알 수 있는 자리를 만들지 않는다 */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-soft);
+  border-radius: var(--r-pill);
+  padding: 7px 14px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.pill:hover { border-color: var(--ink-soft); color: var(--ink); }
+.pill b { color: var(--ink); font-weight: 500; }
+.pill.open { background: var(--surface2); border-color: var(--surface2); color: var(--ink); }
+
+/* 서랍 — 알약을 누르면 박스 안에서 열린다. 팝오버로 띄우지 않는다:
+   좁은 화면에서 잘리고, 열린 동안 무엇을 고르는 중인지 박스 밖으로 나가 버린다 */
+.composer-tray {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.composer-tray .tray-note { color: var(--ink-soft); font-size: 12px; }
+.composer-tray textarea.tray-input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  background: var(--deep);
+  color: var(--ink);
+  border-radius: var(--r-ctl);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 9px 11px;
+  resize: vertical;
+}
+.composer-tray textarea.tray-input:focus { outline: none; border-color: var(--ink-soft); }
