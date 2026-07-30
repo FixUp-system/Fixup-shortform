@@ -672,3 +672,39 @@ describe("화면 설계가 연출 바람을 받는다", () => {
     expect(near).toMatch(/글자|거울|금지|따르지 않는다/);
   });
 });
+
+describe("화면 설계가 컷마다 속도를 답한다", () => {
+  const cuts = [{ idx: 0, sentence: "가." }, { idx: 1, sentence: "나." }];
+
+  it("속도를 닫힌 목록으로 요구한다", () => {
+    const { system } = buildShowsMessages(project, cuts);
+    expect(system).toContain('"speed"');
+    for (const id of ["static", "slow", "realtime", "fast", "extreme_slowmo"]) {
+      expect(system, id).toContain(id);
+    }
+  });
+
+  it("대비를 요구한다 — 빠른 컷이 있어야 느린 컷이 산다", () => {
+    const { system } = buildShowsMessages(project, cuts);
+    expect(system).toMatch(/대비|같은 속도로 두지 않는다/);
+  });
+});
+
+describe("클립 요청이 속도를 반영한다", () => {
+  it("극단적 슬로모션이 클립 프롬프트에 실린다", () => {
+    const p = buildClipPrompt({ motion: "미드솔이 눌린다", speed: "extreme_slowmo" });
+    expect(p).toContain("extreme slow motion");
+    expect(p).toContain("미드솔이 눌린다");
+  });
+
+  it("빠른 컷도 실린다", () => {
+    expect(buildClipPrompt({ motion: "발이 방향을 튼다", speed: "fast" })).toContain("fast, explosive");
+  });
+
+  // 속도가 없던 옛 컷은 지금까지와 같은 프롬프트를 받아야 한다 — 클립을 다시 사게 하지 않는다
+  it("속도가 없으면 문구가 늘지 않는다", () => {
+    const before = buildClipPrompt({ motion: "천천히 다가간다" });
+    expect(before).not.toContain("slow, deliberate");
+    expect(before).toContain("천천히 다가간다");
+  });
+});

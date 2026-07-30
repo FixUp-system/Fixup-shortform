@@ -316,3 +316,18 @@ describe("isReachable", () => {
     expect(isReachable("done", p)).toBe(true);
   });
 });
+
+describe("clipKey — 속도가 바뀌면 클립이 낡는다", () => {
+  const base = { image: { url: "i0" }, seconds: 6, motion: "천천히" };
+
+  it("속도를 바꾸면 키가 달라진다", () => {
+    expect(clipKey({ ...base, speed: "fast" })).not.toBe(clipKey({ ...base, speed: "slow" }));
+  });
+
+  // ★ styleKey 때와 같은 함정이다. 형식을 바꾸면 옛 각인이 전부 불일치가 되어
+  //   이미 값을 치른 클립이 통째로 낡는다. 속도가 있을 때만 덧붙인다.
+  it("속도가 없는 옛 컷의 키는 그대로다", () => {
+    expect(clipKey(base)).toBe("i0|6|천천히");
+    expect(isClipStale({ ...base, video: { url: "v", of: "i0|6|천천히" } })).toBe(false);
+  });
+});
