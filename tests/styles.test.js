@@ -32,8 +32,8 @@ describe("STYLE_PRESETS — 화풍 표", () => {
     expect(photo.finish).toBe("Cinematic lighting, realistic");
   });
 
-  it("일러스트·애니메이션·SF 가 있고 서로 다른 문구를 쓴다", () => {
-    for (const id of ["illust", "anime", "scifi"]) {
+  it("실사 밖의 컨셉들이 있고 서로 다른 문구를 쓴다", () => {
+    for (const id of ["illust", "anime", "scifi", "studio", "render3d", "film"]) {
       expect(STYLE_PRESETS.some((s) => s.id === id), `${id} 프리셋이 없다`).toBe(true);
     }
     const mediums = STYLE_PRESETS.map((s) => s.medium);

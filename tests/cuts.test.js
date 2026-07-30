@@ -588,14 +588,14 @@ describe("buildImagePrompt — 화풍", () => {
     expect(p).not.toContain("Cinematic lighting, realistic");
   });
 
-  it("네 화풍이 서로 다른 프롬프트를 낸다", () => {
+  it("모든 컨셉이 서로 다른 프롬프트를 낸다", () => {
     const all = STYLE_PRESETS.map((s) => buildImagePrompt(cut, withStyle(s.id)));
     expect(new Set(all).size).toBe(STYLE_PRESETS.length);
   });
 
   // 가짜 모드 플레이스홀더가 프롬프트를 역파싱한다(lib/imagegen.js). 문형이 깨지면
   // 0원 확인이 조용히 쓸모없어진다 — 주석으로 적어 두는 것은 판정이 아니다.
-  it("어떤 화풍에서도 가짜 모드가 장면을 뽑아낼 수 있다", () => {
+  it("어떤 컨셉에서도 가짜 모드가 장면을 뽑아낼 수 있다", () => {
     const SCENE = /Scene:\s*(.+?)\.\s/;
     for (const s of STYLE_PRESETS) {
       const p = buildImagePrompt(cut, withStyle(s.id, "따뜻한 파스텔톤"));
