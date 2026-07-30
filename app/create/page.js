@@ -95,20 +95,6 @@ export default function CreatePage() {
             </div>
           )}
 
-          <div className="composer-bar">
-            <button className="pill" disabled={photos.length >= 10}
-              onClick={() => fileRef.current?.click()}>
-              ＋ 사진 {photos.length > 0 && <b>{photos.length}</b>}
-            </button>
-            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={onFiles} />
-
-            <span className="spacer" />
-            <span className="count">{text.length} / 2,000자</span>
-            <button className="cta" onClick={submit} disabled={busy || !text.trim()}>
-              {busy ? "여는 중…" : "정리하기 →"} <span className="cr">무료</span>
-            </button>
-          </div>
-
           {/* 고른 것들은 늘 펼쳐 둔다 — 접으면 무엇이 골라져 있는지 보려고 한 번 더 눌러야 한다 */}
           <div className="composer-tray">
             <div className="tray-row">
@@ -135,6 +121,20 @@ export default function CreatePage() {
                   onPreset={setStylePreset} onNote={setStyleNote} />
               </div>
             </div>
+          </div>
+
+          <div className="composer-bar">
+            <button className="pill" disabled={photos.length >= 10}
+              onClick={() => fileRef.current?.click()}>
+              ＋ 사진 {photos.length > 0 && <b>{photos.length}</b>}
+            </button>
+            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={onFiles} />
+
+            <span className="spacer" />
+            <span className="count">{text.length} / 2,000자</span>
+            <button className="cta" onClick={submit} disabled={busy || !text.trim()}>
+              {busy ? "여는 중…" : "정리하기 →"} <span className="cr">무료</span>
+            </button>
           </div>
         </div>
 
