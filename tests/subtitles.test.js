@@ -57,6 +57,18 @@ describe("자막을 절 경계에서 고르게 나눈다", () => {
     const s = "가".repeat(40);
     expect(splitSubtitleText(s, MAX)).toEqual([s]);
   });
+
+  // 손으로 지어낸 동거리 사례다 — 실제 소재 문장에서 부동소수점이 정확히 같은 자리로
+  // 떨어지는 경우를 자연히 만나기는 어렵다. 그래도 이 문자열은 실제 lib/subtitles.js 코드로
+  // 재현된다: "하면" 뒤(절 경계)와 그 앞 어절 경계가 목표 폭에서 정확히 같은 거리다.
+  // 절 우선 규칙을 되돌리면(diff < bestDiff 만 보고 절 여부를 안 보면) 이 테스트가 빨개진다
+  // — 되돌려서 실제로 확인했다(task-2-report.md 참고).
+  it("절 경계와 어절 경계가 목표 폭에 동거리이면 절 경계를 고른다", () => {
+    const s = "a   aaa  하면 bbbbb bbbbbbbb";
+    const pieces = splitSubtitleText(s, 5.6);
+    expect(pieces.join("")).toBe(s);
+    expect(pieces[0]).toBe("a   aaa  하면 ");
+  });
 });
 
 describe("buildCues", () => {
