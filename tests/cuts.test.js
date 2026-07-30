@@ -800,3 +800,61 @@ describe("지문이 스스로 모순되지 않는다", () => {
     expect(system).toContain("컷마다 장소·시간대를 새로 만들지 않는다");
   });
 });
+
+describe("인물 외형이 레퍼런스 없이도 프롬프트에 닿는다", () => {
+  // ★ 실측: 캐스팅이 "20대 남성 농구 선수"를 만들었는데 맞는 아바타가 없어 첨부가 비었고,
+  //   컷마다 다른 사람이 그려졌다(한 컷은 여성 캐릭터). 사진이 없을 때 일관성을 만들 수 있는
+  //   유일한 수단이 외형 서술이다 — 그것이 레퍼런스 첨부와 무관하게 실려야 한다.
+  const p = {
+    settings: { aspect_ratio: "9:16", style: { preset: "anime", note: "" } },
+    briefing: { topic: "농구화" },
+    cast: [
+      { id: "c1", who: "20대 남성 농구 선수", look: "짧은 검은 머리, 마른 근육형, 검정 민소매 유니폼과 빨강 반바지", cuts: [0, 1] },
+      { id: "c2", who: "40대 남성 코치", look: "회색 머리, 통통한 체형, 남색 트레이닝복", cuts: [1] },
+    ],
+  };
+
+  it("그 컷에 나오는 인물의 외형만 실린다", () => {
+    const first = buildImagePrompt({ idx: 0, sentence: "가.", shows: "선수 풀 샷" }, p);
+    expect(first).toContain("짧은 검은 머리");
+    expect(first).not.toContain("회색 머리");
+
+    const second = buildImagePrompt({ idx: 1, sentence: "나.", shows: "선수와 코치 미디엄 샷" }, p);
+    expect(second).toContain("짧은 검은 머리");
+    expect(second).toContain("회색 머리");
+  });
+
+  it("외형이 없는 인물은 문구를 늘리지 않는다", () => {
+    const noLook = { ...p, cast: [{ id: "c1", who: "선수", cuts: [0] }] };
+    expect(buildImagePrompt({ idx: 0, sentence: "가.", shows: "선수" }, noLook)).not.toContain("Characters");
+  });
+
+  it("캐스팅이 없으면 지금 동작 그대로다", () => {
+    const noCast = { settings: p.settings, briefing: p.briefing };
+    expect(buildImagePrompt({ idx: 0, sentence: "가.", shows: "신발" }, noCast)).not.toContain("Characters");
+  });
+
+  it("가짜 모드가 장면을 뽑아내는 문형이 유지된다", () => {
+    const prompt = buildImagePrompt({ idx: 0, sentence: "가.", shows: "선수 풀 샷" }, p);
+    expect(prompt.match(/Scene:\s*(.+?)\.\s/)?.[1]).toBe("선수 풀 샷");
+  });
+});
+
+describe("레퍼런스 지시가 화풍을 따른다", () => {
+  const cut = { idx: 0, sentence: "가.", shows: "신발" };
+  const styled = (preset) => ({
+    settings: { aspect_ratio: "9:16", style: { preset, note: "" } },
+    briefing: { topic: "농구화" },
+  });
+
+  it("실사에서는 똑같이 그리라고 한다", () => {
+    const prompt = buildImagePrompt(cut, styled("photo"), [{ path: "/x/shoe.jpg", kind: "thing" }]);
+    expect(prompt).toContain("exactly");
+  });
+
+  it("애니에서는 이 화풍으로 다시 그리라고 한다", () => {
+    const prompt = buildImagePrompt(cut, styled("anime"), [{ path: "/x/shoe.jpg", kind: "thing" }]);
+    expect(prompt).toContain("redraw");
+    expect(prompt).not.toContain("exactly");
+  });
+});

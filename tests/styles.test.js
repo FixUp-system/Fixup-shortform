@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   STYLE_PRESETS, DEFAULT_STYLE_ID, STYLE_NOTE_MAX,
-  styleFor, activeStyle, styleKey, normalizeStyle,
+  styleFor, activeStyle, styleKey, normalizeStyle, refHintFor,
 } from "../lib/styles.js";
 
 afterEach(() => vi.restoreAllMocks());
@@ -131,5 +131,30 @@ describe("lib/styles.js 는 fs 를 끌고 오지 않는다", () => {
     const src = readFileSync("lib/styles.js", "utf8");
     const imports = [...src.matchAll(/^\s*import\s.+$/gm)].map((m) => m[0]);
     expect(imports).toEqual([]);
+  });
+});
+
+describe("레퍼런스 지시가 화풍마다 다르다", () => {
+  // ★ "첨부와 똑같이 그려라"는 실사에서 맞는 말이지만 애니·일러스트와 정면으로 부딪친다.
+  //   비실사에서는 복사가 아니라 재해석이어야 한다 — 형태·배색은 가져오고 화풍으로 다시 그린다.
+  it("실사 계열은 똑같이 그리라고 한다", () => {
+    for (const id of ["photo", "studio", "film"]) {
+      expect(styleFor(id).realistic, id).toBe(true);
+    }
+  });
+
+  it("비실사는 다시 그리라고 한다", () => {
+    for (const id of ["illust", "anime", "render3d", "scifi"]) {
+      expect(styleFor(id).realistic, id).toBe(false);
+    }
+  });
+
+  it("제품·인물 문구를 화풍에 맞춰 돌려준다", () => {
+    expect(refHintFor(styleFor("photo"), "thing")).toContain("exactly");
+    expect(refHintFor(styleFor("anime"), "thing")).toContain("redraw");
+    expect(refHintFor(styleFor("photo"), "person")).toContain("same person");
+    expect(refHintFor(styleFor("anime"), "person")).toContain("redraw");
+    // 비실사에서 "사진을 붙이지 말라"를 못 박아야 반쯤 사진인 그림을 막는다
+    expect(refHintFor(styleFor("illust"), "thing")).toContain("do not paste");
   });
 });
