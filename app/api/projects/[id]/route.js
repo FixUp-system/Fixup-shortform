@@ -1,11 +1,14 @@
 import { getProject, updateProject } from "../../../../lib/projects";
 import { briefingContentChanged } from "../../../../lib/briefing";
+import { activeClipLimits } from "../../../../lib/clip-limits";
 
 export async function GET(req, { params }) {
   const { id } = await params;
   const project = await getProject(id);
   if (!project) return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
-  return Response.json(project);
+  // 활성 모델의 클립 상한을 함께 실어 보낸다 — 저장하지 않고 요청마다 지금 env 로 푼다.
+  // 화면은 서버 env 를 볼 수 없어서, 이 값 없이는 기본 프로필(20초)로 판정한다.
+  return Response.json({ ...project, clip_limits: activeClipLimits() });
 }
 
 export async function PATCH(req, { params }) {

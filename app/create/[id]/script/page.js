@@ -183,6 +183,9 @@ export default function ScriptStepPage() {
     return <p className="pgsub">대본을 쓰는 중…</p>;
   }
 
+  // 활성 모델의 클립 상한. 서버가 실어 보낸다 — 없으면(옛 응답) 기본 프로필 값으로 떨어진다
+  const clipMax = project?.clip_limits?.max ?? I2V_MAX_SECONDS;
+
   const staleCuts = areCutsStale(project);
   const madeCuts = (project.cuts || []).length > 0;
   // 구성 — 낡은 컷은 보여주지 않는다(원고를 다시 썼으면 새로 나뉘는 중이다)
@@ -329,9 +332,9 @@ export default function ScriptStepPage() {
                 </div>
                 <div className="badges">
                   <span className="badge ai">{c.seconds}초</span>
-                  {c.seconds > I2V_MAX_SECONDS && (
+                  {c.seconds > clipMax && (
                     <span className="badge warn">
-                      {I2V_MAX_SECONDS}초까지만 움직여요 — 나머지는 멈춰 있어요
+                      {clipMax}초까지만 움직여요 — 나머지는 멈춰 있어요
                     </span>
                   )}
                 </div>

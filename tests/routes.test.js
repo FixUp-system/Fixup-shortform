@@ -21,7 +21,7 @@ vi.mock("../lib/llm.js", () => ({ callJson: (...a) => llmMock.callJson(...a) }))
 
 const { POST: cutsPOST } = await import("../app/api/projects/[id]/cuts/route.js");
 const { POST: imagesPOST } = await import("../app/api/projects/[id]/images/route.js");
-const { PATCH } = await import("../app/api/projects/[id]/route.js");
+const { GET, PATCH } = await import("../app/api/projects/[id]/route.js");
 const { POST: briefingPOST } = await import("../app/api/projects/[id]/briefing/route.js");
 const { POST: scriptPOST } = await import("../app/api/projects/[id]/script/route.js");
 const { POST: renderPOST } = await import("../app/api/projects/[id]/render/route.js");
@@ -551,5 +551,30 @@ describe("무효화 관통 — 고치면 낡고, 안 고친 것은 살아남는�
     expect(isRenderStale(await getProject(p.id))).toBe(false);
     await PATCH(patchReq({ cut: { idx: 0, sentence: "고친 문장." } }), ctx(p.id));
     expect(isRenderStale(await getProject(p.id))).toBe(true);
+  });
+});
+
+// 화면은 서버 env 를 볼 수 없다. 상한을 실어 보내지 않으면 ②대본 화면이 기본값(20초)으로
+// 판정해, Kling(15초)에서 17초 컷에 경고를 띄우지 않는다 — 돈 쓰기 전에 잡을 유일한 자리다.
+describe("GET /api/projects/[id] — 활성 모델의 상한을 실어 보낸다", () => {
+  it("env 를 비우면 기본 프로필 값이다", async () => {
+    const p = await createProject({ settings: {}, material: { text: "자료", photos: [] } });
+    const res = await GET(new Request("http://x"), { params: Promise.resolve({ id: p.id }) });
+    const body = await res.json();
+    expect(body.clip_limits).toEqual({ min: 6, max: 20 });
+  });
+
+  it("env 를 바꾸면 따라 바뀐다 — 저장된 프로젝트에는 남지 않는다", async () => {
+    const p = await createProject({ settings: {}, material: { text: "자료", photos: [] } });
+    process.env.FAL_I2V_ENDPOINT = "fal-ai/kling-video/v3/standard/image-to-video";
+    try {
+      const res = await GET(new Request("http://x"), { params: Promise.resolve({ id: p.id }) });
+      expect((await res.json()).clip_limits).toEqual({ min: 3, max: 15 });
+      // 저장된 파일에는 없어야 한다 — 요청마다 다시 푸는 값이다
+      const { getProject } = await import("../lib/projects.js");
+      expect(await getProject(p.id)).not.toHaveProperty("clip_limits");
+    } finally {
+      delete process.env.FAL_I2V_ENDPOINT;
+    }
   });
 });

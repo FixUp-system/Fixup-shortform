@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import {
   CLIP_PROFILES, DEFAULT_CLIP_PROFILE, profileFor, activeClipProfile,
   fitDurationFor, minSecondsFor, maxSecondsFor,
-  I2V_STEPS, I2V_MAX_SECONDS, fitDuration,
+  I2V_STEPS, I2V_MAX_SECONDS, fitDuration, activeClipLimits,
 } from "../lib/clip-limits";
 
 afterEach(() => { delete process.env.FAL_I2V_ENDPOINT; });
@@ -110,5 +110,16 @@ describe("하위호환 — 화면이 쓰는 이름은 기본 프로필 값이다
   it("fitDuration 은 env 와 무관하게 기본 프로필로 푼다", () => {
     process.env.FAL_I2V_ENDPOINT = "fal-ai/kling-video/v3/standard/image-to-video";
     expect(fitDuration(7)).toBe(8); // 활성 프로필이면 7 이지만, 이 함수는 기본 프로필이다
+  });
+});
+
+describe("activeClipLimits — 화면에 실어 보낼 값", () => {
+  it("env 를 비우면 기본 프로필의 하한·상한이다", () => {
+    expect(activeClipLimits()).toEqual({ min: 6, max: 20 });
+  });
+
+  it("env 를 바꾸면 그 모델의 값이다", () => {
+    process.env.FAL_I2V_ENDPOINT = "fal-ai/kling-video/v3/standard/image-to-video";
+    expect(activeClipLimits()).toEqual({ min: 3, max: 15 });
   });
 });

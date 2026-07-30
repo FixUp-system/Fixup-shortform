@@ -72,3 +72,19 @@ describe("⑥ 완성", () => {
     expect(falseBranchIdx).toBeGreaterThan(anchorStart);
   });
 });
+
+// 상한은 모델마다 다르다. 화면이 lib 의 기본값으로 판정하면 브라우저에는 서버 env 가 없어
+// Kling(15초)에서 경고가 사라진다. 서버가 실어 보낸 clip_limits 를 봐야 한다.
+describe("화면이 활성 모델의 상한을 본다", () => {
+  for (const path of ["app/create/[id]/script/page.js", "app/create/[id]/video/page.js"]) {
+    it(`${path} 가 clip_limits 를 읽는다`, () => {
+      expect(read(path)).toContain("clip_limits");
+    });
+  }
+
+  it("②대본 화면의 경고 판정이 실려 온 상한을 쓴다 — 기본 상수로 재지 않는다", () => {
+    const src = read("app/create/[id]/script/page.js");
+    // 판정식에 I2V_MAX_SECONDS 가 남아 있으면 브라우저 기본값(20)으로 재게 된다
+    expect(src).not.toContain("c.seconds > I2V_MAX_SECONDS");
+  });
+});
