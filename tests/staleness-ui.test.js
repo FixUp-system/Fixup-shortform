@@ -139,3 +139,32 @@ describe("⑤영상 화면이 남은 컷을 센다", () => {
     expect(branchIdx).toBeGreaterThan(-1);
   });
 });
+
+// isImageStale 이 화풍을 보려면 project 를 함께 받아야 한다. 그런데 두 화면이 함수를
+// 그대로 넘기고 있었다 — cuts.filter(isImageStale) / cuts.some(isImageStale).
+// 그대로 두면 배열 번호가 project 자리에 들어가 화풍 판정이 조용히 죽는다. 화면이 아무
+// 경고도 띄우지 않고, 옛 실사 그림이 클립·완성본까지 그대로 간다.
+describe("그림 낡음 판정에 프로젝트를 넘긴다 — 화풍이 컷 밖에 있기 때문이다", () => {
+  const CALLERS = [
+    { step: "④ 이미지", path: "app/create/[id]/images/page.js" },
+    { step: "⑥ 완성", path: "app/create/[id]/done/page.js" },
+  ];
+
+  for (const { step, path } of CALLERS) {
+    it(`${step} 화면이 isImageStale 을 포인트프리로 넘기지 않는다`, () => {
+      const src = read(path);
+      // filter(isImageStale) · some(isImageStale) · map(isImageStale) 전부 금지
+      expect(src, `${path} 가 isImageStale 을 그대로 넘긴다 — 배열 번호가 project 자리로 간다`)
+        .not.toMatch(/\.(filter|some|every|map)\(\s*isImageStale\s*\)/);
+    });
+
+    it(`${step} 화면의 isImageStale 호출이 전부 인자를 둘 받는다`, () => {
+      const src = read(path);
+      const calls = [...src.matchAll(/isImageStale\(([^)]*)\)/g)].map((m) => m[1]);
+      expect(calls.length, `${path} 에 isImageStale 호출이 없다`).toBeGreaterThan(0);
+      for (const args of calls) {
+        expect(args, `${path} 의 isImageStale(${args}) 이 프로젝트를 안 넘긴다`).toContain("project");
+      }
+    });
+  }
+});

@@ -168,6 +168,47 @@ describe("낡음 판정 — 산출물마다 무엇에서 나왔는지 각인한�
       expect(isImageStale({ shows: "설명", image: { url: "u" } })).toBe(false);
       expect(isImageStale({ shows: "설명" })).toBe(false);
     });
+
+    // 화풍은 컷 밖(settings)에 있어서 project 를 함께 봐야 한다. isRenderStale 이 프로젝트를
+    // 받는 것과 같은 모양이다. 화풍을 도입하기 전에는 화풍을 바꿔도 옛 실사 그림이 살아남아
+    // 클립·완성본까지 갔다 — 판정이 화풍을 몰랐기 때문이다.
+    describe("화풍도 그림의 근거다", () => {
+      const cut = (styleOf) => ({
+        shows: "주인이 코트를 든다",
+        image: { url: "u", of: "주인이 코트를 든다", style_of: styleOf },
+      });
+      const proj = (preset, note) => ({ settings: { style: { preset, note } } });
+
+      it("화풍을 바꾸면 그림이 낡는다", () => {
+        expect(isImageStale(cut("photo|"), proj("illust"))).toBe(true);
+      });
+
+      it("같은 화풍이면 낡지 않았다", () => {
+        expect(isImageStale(cut("illust|"), proj("illust"))).toBe(false);
+      });
+
+      it("보정 한 줄만 고쳐도 그림이 낡는다 — 그림이 실제로 달라지기 때문이다", () => {
+        expect(isImageStale(cut("illust|파스텔"), proj("illust", "파스텔"))).toBe(false);
+        expect(isImageStale(cut("illust|파스텔"), proj("illust", "차가운 색"))).toBe(true);
+      });
+
+      // of 각인과 같은 계약이다: 각인이 없는 옛 산출물은 낡지 않은 것으로 본다.
+      // 거짓 경고의 버튼은 유료 호출이라, 화풍을 도입한 것만으로 옛 그림을 다시 사게 하면 안 된다.
+      it("화풍 각인이 없는 옛 그림은 조용히 실사로 남는다", () => {
+        expect(isImageStale({ shows: "설명", image: { url: "u", of: "설명" } }, proj("illust"))).toBe(false);
+      });
+
+      it("화면 설명이 바뀌면 화풍을 보기 전에 이미 낡았다", () => {
+        expect(isImageStale({ shows: "다른 설명", image: { url: "u", of: "설명" } }, proj("photo"))).toBe(true);
+      });
+
+      // ⚠️ cuts.filter(isImageStale) 처럼 함수를 그대로 넘기면 배열 번호가 project 자리에
+      //    들어간다. 그때도 화면이 죽지 않고 화풍 판정만 건너뛰어야 한다.
+      it("프로젝트를 안 주면 화풍 판정을 건너뛴다", () => {
+        expect(isImageStale(cut("illust|"))).toBe(false);
+        expect(isImageStale(cut("illust|"), 3)).toBe(false);
+      });
+    });
   });
 
   describe("isClipStale — 클립은 그림·길이·움직임에서 나온다", () => {

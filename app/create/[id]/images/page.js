@@ -123,8 +123,9 @@ export default function ImagesStepPage() {
   }
 
   const cuts = project.cuts || [];
-  // 화면 설명을 고친 뒤 옛 설명으로 그린 그림이 남아 있으면 클립을 사러 보내지 않는다
-  const staleCount = cuts.filter(isImageStale).length;
+  // 화면 설명이나 화풍을 고친 뒤 옛 값으로 그린 그림이 남아 있으면 클립을 사러 보내지 않는다.
+  // ⚠️ filter(isImageStale) 로 넘기면 배열 번호가 project 자리에 들어가 화풍 판정이 죽는다.
+  const staleCount = cuts.filter((c) => isImageStale(c, project)).length;
   const imgUrl = (c) =>
     c.source === "photo" ? project.material.photos.find((p) => p.id === c.photo_id)?.url : c.image?.url;
   // 우측 미리보기 대상 — 사용자가 고른 컷, 고르기 전에는 첫 컷.
@@ -192,9 +193,9 @@ export default function ImagesStepPage() {
                   {(c.ref_ids?.length || c.ref_photo_id) && <span className="badge vlm">레퍼런스 적용</span>}
                   {c.vlm?.note && <span className="badge ai">{c.vlm.note.slice(0, 30)}</span>}
                   <span className="badge ai">{c.seconds}초</span>
-                  {isImageStale(c) && (
+                  {isImageStale(c, project) && (
                     <span className="badge warn">
-                      화면 설명을 고친 뒤라 그림이 옛 설명으로 그려진 거예요 — 다시 만들면 됩니다
+                      화면 설명이나 화풍을 고친 뒤라 그림이 옛 값으로 그려진 거예요 — 다시 만들면 됩니다
                     </span>
                   )}
                 </div>

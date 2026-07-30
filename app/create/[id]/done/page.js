@@ -82,7 +82,8 @@ export default function DoneStepPage() {
   // status 만 보고 링크를 여니(isReachable) 잠금을 지나쳐 ⑥으로 바로 들어올 수 있다.
   // 그래서 ⑥이 스스로 클립·그림까지 본다. 안 그러면 옛 클립으로 만든 mp4 가 그대로 내려받히고,
   // 거기서 [다시 합치기]를 눌러도 옛 클립으로 다시 합쳐져 "안 낡음"으로 굳는다.
-  const stale = isRenderStale(project) || cuts.some(isClipStale) || cuts.some(isImageStale);
+  // ⚠️ some(isImageStale) 로 넘기면 배열 번호가 project 자리에 들어가 화풍 판정이 죽는다.
+  const stale = isRenderStale(project) || cuts.some(isClipStale) || cuts.some((c) => isImageStale(c, project));
 
   if (!clipCount) return <p className="pgsub">영상을 먼저 만들어 주세요.</p>;
 

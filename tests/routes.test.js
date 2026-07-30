@@ -537,6 +537,22 @@ describe("무효화 관통 — 고치면 낡고, 안 고친 것은 살아남는�
     expect(isAudioStale(cut)).toBe(false);
   });
 
+  it("화풍을 바꾸면 그림만 낡는다 — 원고와 소리는 살아남는다", async () => {
+    const p = await projectWithCuts();
+    await updateProject(p.id, (proj) => ({
+      ...proj,
+      cuts: proj.cuts.map((c) => ({ ...c, image: { ...c.image, style_of: "photo|" } })),
+    }));
+    const res = await PATCH(patchReq({ settings: { style: { preset: "illust" } } }), ctx(p.id));
+    expect(res.status ?? 200).toBe(200);
+    const saved = await getProject(p.id);
+    expect(isImageStale(saved.cuts[0], saved)).toBe(true);
+    expect(isAudioStale(saved.cuts[0])).toBe(false);
+    // 컷도 원고도 비우지 않는다 — 화풍은 글이 아니라 그림의 근거다
+    expect(saved.cuts.length).toBe(p.cuts.length);
+    expect(saved.script.text).toBe(p.script.text);
+  });
+
   it("움직임을 고치면 클립이 낡는다", async () => {
     const p = await projectWithCuts();
     await PATCH(patchReq({ cut: { idx: 0, motion: "정지" } }), ctx(p.id));

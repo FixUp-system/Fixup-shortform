@@ -234,6 +234,11 @@ describe("분할 → 이미지 (이어 부르면 갈라지기 전과 같다)", (
     expect(isImageStale(ai)).toBe(false);
     // 화면 설명을 고치면 그 자리에서 낡는다
     expect(isImageStale({ ...ai, shows: "다른 화면" })).toBe(true);
+    // 화풍도 함께 각인한다 — 컷 밖(settings)에 있어 따로 적어 둔다.
+    // 화풍을 안 고른 프로젝트라 실사로 파생된다.
+    expect(ai.image.style_of).toBe("photo|");
+    expect(isImageStale(ai, saved)).toBe(false);
+    expect(isImageStale(ai, { settings: { style: { preset: "anime" } } })).toBe(true);
   });
 
   it("컷마다 그림을 한 장만 만든다 — 후보 2장이던 것을 줄였다", async () => {
