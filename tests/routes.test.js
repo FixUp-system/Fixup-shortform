@@ -620,3 +620,48 @@ describe("POST /api/projects/[id]/clips — 남은 것이 있으면 돈다", () 
     expect(res.status).toBe(409);
   });
 });
+
+describe("PATCH /api/projects/[id] — 화풍", () => {
+  const make = () => createProject({ settings: {}, material: { text: "자료", photos: [] } });
+
+  it("고른 화풍과 보정을 settings 에 저장한다", async () => {
+    const p = await make();
+    const res = await PATCH(patchReq({ settings: { style: { preset: "illust", note: " 따뜻한 파스텔톤 " } } }), ctx(p.id));
+    expect(res.status ?? 200).toBe(200);
+    const saved = (await getProject(p.id)).settings.style;
+    expect(saved).toEqual({ preset: "illust", note: "따뜻한 파스텔톤" });
+  });
+
+  // settings 는 화이트리스트 없이 얕게 머지된다. 여기서 막지 않으면 아무 값이나 들어가고
+  // 그 값으로 유료 호출이 나간다 — 닫힌 목록은 코드가 판정한다.
+  it("모르는 화풍은 400 이고 아무것도 저장하지 않는다", async () => {
+    const p = await make();
+    const res = await PATCH(patchReq({ settings: { style: { preset: "클레이애니" } } }), ctx(p.id));
+    expect(res.status).toBe(400);
+    expect((await getProject(p.id)).settings.style).toBeUndefined();
+  });
+
+  it("상한을 넘는 보정은 400 이다 — 조용히 자르지 않는다", async () => {
+    const p = await make();
+    const res = await PATCH(patchReq({ settings: { style: { preset: "photo", note: "가".repeat(200) } } }), ctx(p.id));
+    expect(res.status).toBe(400);
+    expect((await getProject(p.id)).settings.style).toBeUndefined();
+  });
+
+  it("화풍을 바꿔도 비율 같은 다른 설정은 살아남는다", async () => {
+    const p = await make();
+    await PATCH(patchReq({ settings: { aspect_ratio: "1:1" } }), ctx(p.id));
+    await PATCH(patchReq({ settings: { style: { preset: "anime" } } }), ctx(p.id));
+    const s = (await getProject(p.id)).settings;
+    expect(s.aspect_ratio).toBe("1:1");
+    expect(s.style.preset).toBe("anime");
+  });
+
+  it("화풍을 안 보내는 기존 PATCH 는 그대로 돈다", async () => {
+    const p = await make();
+    await PATCH(patchReq({ settings: { style: { preset: "scifi" } } }), ctx(p.id));
+    await PATCH(patchReq({ settings: { aspect_ratio: "16:9" } }), ctx(p.id));
+    // 화풍을 건드리지 않았으니 남아 있어야 한다
+    expect((await getProject(p.id)).settings.style.preset).toBe("scifi");
+  });
+});
