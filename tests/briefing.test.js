@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildBriefingMessages, buildDevelopMessages, mergeAsked } from "../lib/briefing.js";
+import { buildBriefingMessages, buildDevelopMessages, mergeAsked, briefingContentChanged } from "../lib/briefing.js";
 
 const project = {
   material: {
@@ -153,5 +153,24 @@ describe("mergeAsked", () => {
       { question: "또?", options: [], answer: "", done: false },
     ];
     expect(mergeAsked(prev, fresh)).toEqual(fresh);
+  });
+});
+
+describe("연출 바람이 브리핑의 일부다", () => {
+  it("지문이 direction 을 요구한다 — 자료에서 연출을 뽑아 둔다", () => {
+    const { system } = buildBriefingMessages({
+      material: { text: "로우 앵글로 역동적으로 찍어주세요", photos: [] },
+    });
+    expect(system).toContain('"direction"');
+    // 사실과 갈라야 하는 이유가 지문에 있어야 한다 — 없으면 모델이 key_points 에 섞는다
+    expect(system).toContain("낭독");
+  });
+
+  // 연출 바람을 고치면 화면이 달라진다. 버전이 안 오르면 화면 설계가 옛 것으로 남는다.
+  it("연출 바람이 바뀌면 브리핑이 바뀐 것으로 본다", () => {
+    const a = { topic: "ㄱ", key_points: ["ㄴ"], direction: "로우 앵글" };
+    const b = { topic: "ㄱ", key_points: ["ㄴ"], direction: "하이 앵글" };
+    expect(briefingContentChanged(a, b)).toBe(true);
+    expect(briefingContentChanged(a, { ...a })).toBe(false);
   });
 });

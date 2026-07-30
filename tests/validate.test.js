@@ -372,3 +372,33 @@ describe("validateProps — 사물이 보이는 컷", () => {
     expect(validateProps({ props: [{ photo_id: "p1", cuts: [1] }] }, [], 3)).toEqual([]);
   });
 });
+
+describe("validateBriefing — 연출 바람(direction)", () => {
+  // 사장님은 자료 한 칸에 사실과 연출 바람을 섞어 쓴다. 갈라 받으면 쓰기가 번거로워지므로
+  // 코드가 갈라 쓴다: 사실은 대본이 보고, 연출 바람은 화면 설계가 본다.
+  //
+  // 이것이 없던 동안 연출 지시가 대본으로 흘러들어 낭독이 됐다 —
+  // "공중에 뜬 실루엣은 극단적 슬로모션으로 강조됩니다"(2026-07-30 실제 생성물).
+  const base = {
+    topic: "농구화 광고",
+    key_points: ["검정 빨강 배색", "하이톱"],
+    focus: { mode: "물건", subject: "하이톱 농구화" },
+    questions: [],
+  };
+
+  it("연출 바람을 그대로 담는다", () => {
+    const out = validateBriefing({ ...base, direction: " 로우 앵글 트래킹, 마찰 먼지, 역광 실루엣 " });
+    expect(out.direction).toBe("로우 앵글 트래킹, 마찰 먼지, 역광 실루엣");
+  });
+
+  it("없으면 빈 문자열이다 — 없다고 브리핑을 버리지 않는다", () => {
+    const out = validateBriefing(base);
+    expect(out.direction).toBe("");
+    expect(out.topic).toBe("농구화 광고");
+  });
+
+  it("문자열이 아니면 빈 문자열로 떨어진다", () => {
+    expect(validateBriefing({ ...base, direction: { 나쁜: "값" } }).direction).toBe("");
+    expect(validateBriefing({ ...base, direction: 42 }).direction).toBe("");
+  });
+});

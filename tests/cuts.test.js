@@ -633,3 +633,42 @@ describe("buildImagePrompt — 화풍", () => {
     expect(buildImagePrompt(cut, withStyle("클레이애니"))).toBe(buildImagePrompt(cut, project));
   });
 });
+
+describe("화면 설계가 연출 바람을 받는다", () => {
+  const cuts = [{ idx: 0, sentence: "검정에 빨강. 이 배색이 오래 사랑받았다." }];
+  const withDirection = {
+    ...project,
+    briefing: {
+      topic: "하이톱 농구화 광고",
+      direction: "로우 앵글 트래킹, 급격한 크로스오버, 마찰 먼지, 역광 실루엣, 절정만 극단적 슬로모션",
+    },
+  };
+
+  // ★ 이것이 없던 동안 사장님이 쓴 연출이 화면 설계에 한 글자도 도달하지 않았다.
+  //   자료 원문은 대본에만 전달됐고, 거기서 낭독으로 변했다(2026-07-30 실제 생성물).
+  //   그래서 화면은 전부 무난하고 움직임은 전부 "천천히"였다.
+  it("연출 바람이 지시문에 실린다", () => {
+    const user = buildShowsMessages(withDirection, cuts).messages[0].content;
+    expect(user).toContain("역광 실루엣");
+    expect(user).toContain("급격한 크로스오버");
+  });
+
+  it("연출 바람이 없으면 그 블록째 빠진다 — 지금 동작 그대로", () => {
+    const user = buildShowsMessages(project, cuts).messages[0].content;
+    expect(user).not.toContain("연출 바람");
+  });
+
+  it("연출 바람을 우선하라고 지시한다", () => {
+    const { system } = buildShowsMessages(withDirection, cuts);
+    expect(system).toContain("연출 바람");
+  });
+
+  // 사장님의 연출 바람이 못 그리는 것을 요구할 수도 있다("가격표가 보이게", "거울에 비치게").
+  // 그때 따르면 이 저장소가 값을 치르며 배운 것을 되돌린다 — 금지는 연출 바람보다 위다.
+  it("금지된 것은 연출 바람보다 위라고 못 박는다", () => {
+    const { system } = buildShowsMessages(withDirection, cuts);
+    const idx = system.indexOf("연출 바람");
+    const near = system.slice(idx, idx + 500);
+    expect(near).toMatch(/글자|거울|금지|따르지 않는다/);
+  });
+});
