@@ -168,3 +168,30 @@ describe("그림 낡음 판정에 프로젝트를 넘긴다 — 화풍이 컷 �
     });
   }
 });
+
+// 화풍을 고르는 자리는 ②대본이다. 비율 칩과 달리 **컷이 생긴 뒤에도 보여야** 한다 —
+// 바꿔도 원고·컷·소리는 살아남고 그림만 다시 만들면 되기 때문이다.
+describe("②대본 화면에서 화풍을 고른다", () => {
+  const src = read("app/create/[id]/script/page.js");
+
+  it("프리셋 표에서 칩을 그린다 — 화풍 이름을 화면에 박지 않는다", () => {
+    expect(src).toMatch(/from ["'][./]*lib\/styles["']/);
+    expect(src).toContain("STYLE_PRESETS.map");
+  });
+
+  it("화풍 칩이 컷 유무에 잠기지 않는다", () => {
+    // 비율 칩은 {!hasCuts && ...} 안에 있다. 화풍 칩이 그 블록 안으로 들어가면
+    // 컷이 생긴 뒤에 사라져 이 기능의 쓰임새("바꿔 보기")가 없어진다.
+    const gateIdx = src.indexOf("{!hasCuts && (");
+    const gateEnd = src.indexOf("</>", gateIdx);
+    const inGate = src.slice(gateIdx, gateEnd);
+    expect(inGate).toContain("화면 비율");                 // 비율은 잠긴 채로 둔다
+    expect(inGate, "화풍 칩이 컷 잠금 안에 들어갔다").not.toContain("STYLE_PRESETS");
+  });
+
+  it("그림이 이미 있을 때만 값 경고를 띄운다", () => {
+    // 그림을 만들기 전에는 화풍을 바꿔도 0원이다. 거기서 값 얘기를 꺼내면 겁만 준다.
+    expect(src).toContain("madeImages");
+    expect(src).toMatch(/madeImages\s*=\s*\(project\.cuts \|\| \[\]\)\.some/);
+  });
+});
