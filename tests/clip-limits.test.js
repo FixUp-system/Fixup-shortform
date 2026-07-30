@@ -40,6 +40,17 @@ describe("profileFor — prefix 순서가 곧 로직이다", () => {
       expect(isRange ? typeof p.min === "number" && typeof p.max === "number" : Array.isArray(p.steps)).toBe(true);
     }
   });
+
+  // 주석이 아니라 코드가 판정한다. 넓은 prefix 가 위에 오면 아래의 구체적인 항목이 조용히
+  // 가려지고, 그러면 눈금·오디오 플래그·단가가 함께 틀린다. 이 저장소가 같은 함정에
+  // 두 번 걸렸다(nano-banana vs -2, ltx-2 vs ltx-2.3).
+  it("뒤 항목이 앞 항목의 prefix 확장이 아니다 — 가려지는 항목이 없다", () => {
+    for (let i = 0; i < CLIP_PROFILES.length; i++) {
+      for (let j = i + 1; j < CLIP_PROFILES.length; j++) {
+        expect(CLIP_PROFILES[j].prefix.startsWith(CLIP_PROFILES[i].prefix)).toBe(false);
+      }
+    }
+  });
 });
 
 describe("fitDurationFor — 눈금 종류마다 다르게 올린다", () => {

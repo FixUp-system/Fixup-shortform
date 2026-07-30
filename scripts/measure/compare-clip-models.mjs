@@ -44,14 +44,21 @@ async function generate(endpoint) {
   const profile = profileFor(endpoint);
   const duration = fitDurationFor(profile, cut.seconds);
   const input = { image_url: cut.image.url, prompt, duration, aspect_ratio: aspect, ...(profile.extra || {}) };
-  const res = await fetch(`https://fal.run/${endpoint}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Key ${process.env.FAL_KEY}` },
-    body: JSON.stringify(input),
-  });
-  if (!res.ok) return { duration, error: `${res.status} ${(await res.text().catch(() => "")).slice(0, 300)}` };
-  const data = await res.json();
-  return { duration, url: data?.video?.url || null };
+  // fetch·res.json() 이 던지는 예외를 잡아야 한다 — A 다음에 B 를 부르는 순차 호출이라,
+  // A 가 fal 에 이미 접수(과금)된 뒤 소켓만 끊기면 여기서 죽어 B 가 아예 안 불리고,
+  // 재실행하면 이미 낸 A 값을 또 낸다.
+  try {
+    const res = await fetch(`https://fal.run/${endpoint}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Key ${process.env.FAL_KEY}` },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) return { duration, error: `${res.status} ${(await res.text().catch(() => "")).slice(0, 300)}` };
+    const data = await res.json();
+    return { duration, url: data?.video?.url || null };
+  } catch (err) {
+    return { duration, error: String(err?.message || err) };
+  }
 }
 
 console.log(`프로젝트 ${projectId} · 컷 ${cutArg} · 낭독 ${cut.seconds}초 · ${aspect}`);
