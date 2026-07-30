@@ -102,8 +102,10 @@ describe("explodeLongRanges — 8초를 넘고 두 조각 이상이면 푼다", 
   });
 
   it("조각 하나짜리는 8초를 넘어도 그대로 둔다 — 되물어도 답이 같다", () => {
-    const out = explodeLongRanges([{ from: 4, to: 4 }], units);
-    expect(out).toEqual([{ from: 4, to: 4 }]);
+    // LONE 하나가 원고 전부인 경우다. 55자 = 10초로 8초를 넘지만 더 쪼갤 수 없다.
+    // ⚠️ units 를 [LONE] 으로 주는 것이 요점이다 — 길이 4인 units 에 {from:4,to:4} 하나만
+    //    넘기면 전량 사용 검사(아래 Step 3)에 걸려 항상 빈 배열이 된다.
+    expect(explodeLongRanges([{ from: 1, to: 1 }], [LONE])).toEqual([{ from: 1, to: 1 }]);
   });
 
   it("빈틈도 겹침도 만들지 않는다 — 원고 보존의 전제다", () => {
@@ -479,22 +481,33 @@ git commit -m "feat: 낭독 실측이 8초를 넘으면 추정과 나란히 남�
 
 ```bash
 cd /c/Users/fixup/shotform-video
-node scripts/measure/run-pipeline.mjs thin 3 30
-node scripts/measure/run-pipeline.mjs tailor 3 30
-node scripts/measure/run-pipeline.mjs workshop 3 30
+node scripts/measure/run-pipeline.mjs thin 3 30 --cuts
+node scripts/measure/run-pipeline.mjs tailor 3 30 --cuts
+node scripts/measure/run-pipeline.mjs workshop 3 30 --cuts
 ```
 
-`--cuts` 를 붙이지 않는다 — 붙이면 이미지가 돈다(가짜 모드가 아니면 유료다).
+> ⚠️ **계획 정정(실행 중 확인).** 처음에는 "`--cuts` 를 붙이면 이미지가 돌아 유료"라고 적었는데
+> **틀렸다.** 스크립트 머리말의 그 경고는 분할과 이미지가 갈라지기 전에 쓰인 것이다.
+> 지금 `--cuts` 는 `POST /cuts` 만 부르고, 그것이 부르는 `runSplitPipeline` 은
+> `splitCuts` 하나뿐이다 — 컷 분할·사진 판정·화면 설계·캐스팅 전부 OpenAI 다.
+> 이미지는 `POST /images`(`runImagesPipeline`)에서 도는데 이 스크립트는 그 라우트를 부르지 않는다.
+> **그리고 `--cuts` 를 안 붙이면 스크립트가 원고에서 `return` 한다 — 아무것도 못 잰다.**
 
-- [ ] **Step 3: 서버 로그에서 분할 줄을 모은다**
+- [ ] **Step 3: 스크립트 출력에서 컷 지표를 모은다**
 
-서버 콘솔에 컷 분할마다 이 모양이 남는다:
+서버 콘솔이 아니라 **스크립트 stdout** 을 읽는다(서버 로그는 사장님 터미널에 있어 우리가 못 본다).
+편마다 이 모양이 나온다:
 
 ```
-[분할 a1b2c3d4] 조각 8개 → 컷 7개 · 분해 1건 · 8초 초과 0개
+--- 컷 7개 · 무결성 ✅ 원고와 일치 ---
+  [0] 4초 · 화면전사 0.11 · pending
 ```
 
-9줄을 모아 표로 옮긴다 — 조각 수, 컷 수, 분해 건수, 8초 초과 수.
+9편에서 모을 것: 컷 수, **컷별 초**(8초 초과 세기), 무결성 ✅ 여부.
+
+> 폴링 루프가 컷 상태를 `done` 으로 기다리는데 지금 분할은 `pending` 까지만 세운다
+> (이미지 단계가 갈라져 나갔다). 그래서 편마다 40회 × 1.5초를 헛돌고 끝난다 — 결과는 정상이고
+> 느릴 뿐이다. 이 스크립트 정리는 별건으로 남긴다.
 
 - [ ] **Step 4: 목표와 대조한다**
 
