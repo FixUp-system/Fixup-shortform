@@ -41,6 +41,14 @@ describe("estimateCost", () => {
     expect(estimateCost("fal-ai/kling-video/v3", 7)).toBe(0.882);
     expect(estimateCost("fal-ai/elevenlabs/tts/turbo-v2.5", 40)).toBeGreaterThan(0);
   });
+
+  // Kling v3 Standard 는 오디오를 끄면 ＄0.084/s, 켜면 ＄0.126/s 다.
+  // 오디오를 끄는 것이 코드 보장이므로(lib/clip-limits.js 의 프로필) standard 는 audio-off 값이다.
+  // ⚠️ 더 구체적인 prefix 가 위에 있어야 한다 — 아래 두 값이 같아지면 순서가 뒤집힌 것이다.
+  it("kling v3 standard 는 audio-off 단가로 잰다", () => {
+    expect(estimateCost("fal-ai/kling-video/v3/standard/image-to-video", 7)).toBeCloseTo(0.588, 3);
+    expect(estimateCost("fal-ai/kling-video/v3/pro/image-to-video", 7)).toBeCloseTo(0.882, 3);
+  });
 });
 
 describe("단위", () => {
