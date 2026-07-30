@@ -414,3 +414,33 @@ describe("연출 바람의 줄바꿈을 지킨다", () => {
     expect(out.direction.split("\n")).toHaveLength(2);
   });
 });
+
+describe("무대(environment)를 컷마다 나눠 갖는다", () => {
+  // ★ 실측(2026-07-30): 5컷이 5개의 다른 장소로 나왔다 — 야외 아스팔트 코트(노을) ·
+  //   야외 스트리트코트(한낮) · 실내 체육관(나무 마루) · 야외 코트(자주빛 노을) · 일본 거리(간판).
+  //   shows 에 장소가 적힌 컷이 하나뿐이었고, 나머지는 이미지 모델이 매번 만들었다.
+  //   애니 프리셋이 "자세히 그린 배경"을 요구하니 매번 다른 배경을 정성껏 그렸다.
+  const shots = (n) => ({ shots: Array.from({ length: n }, (_, i) => ({ shows: `화면 ${i}` })) });
+
+  it("무대를 전 컷에 나눠 넣는다", () => {
+    const out = validateShows({ ...shots(3), environment: " 실내 농구 코트, 야간, 강한 스포트라이트 " }, 3);
+    expect(out).toHaveLength(3);
+    for (const s of out) expect(s.environment).toBe("실내 농구 코트, 야간, 강한 스포트라이트");
+  });
+
+  it("무대가 없으면 넣지 않는다 — 지금 동작 그대로", () => {
+    const out = validateShows(shots(2), 2);
+    for (const s of out) expect(s.environment).toBeUndefined();
+  });
+
+  // 코트에서 거리로 넘어가는 영상이 있다 — 컷이 스스로 무대를 말하면 그것을 쓴다
+  it("컷이 자기 무대를 적으면 그것이 이긴다", () => {
+    const obj = {
+      environment: "실내 농구 코트, 야간",
+      shots: [{ shows: "가" }, { shows: "나", environment: "야외 거리, 낮" }],
+    };
+    const out = validateShows(obj, 2);
+    expect(out[0].environment).toBe("실내 농구 코트, 야간");
+    expect(out[1].environment).toBe("야외 거리, 낮");
+  });
+});

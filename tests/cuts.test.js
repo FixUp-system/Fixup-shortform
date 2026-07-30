@@ -755,3 +755,48 @@ describe("물건 초점이어도 제품이 쓰이는 모습을 보여준다", ()
     expect(system).toMatch(/사람이 쓰는|사람이 무엇을 하는지/);
   });
 });
+
+describe("이미지 프롬프트가 무대를 함께 준다", () => {
+  const cut = { idx: 0, sentence: "문장.", shows: "선수의 발목 미디엄 샷" };
+  const p = { settings: { aspect_ratio: "9:16" }, briefing: { topic: "농구화" } };
+
+  it("무대가 프롬프트에 실린다", () => {
+    const prompt = buildImagePrompt({ ...cut, environment: "실내 농구 코트, 야간, 강한 스포트라이트" }, p);
+    expect(prompt).toContain("실내 농구 코트, 야간, 강한 스포트라이트");
+  });
+
+  it("무대가 없으면 문구가 늘지 않는다 — 옛 컷의 그림이 달라지지 않게", () => {
+    expect(buildImagePrompt(cut, p)).not.toContain("Setting");
+  });
+
+  // 가짜 모드가 프롬프트에서 장면을 역파싱한다(lib/imagegen.js) — 무대를 끼워도 깨지지 않아야 한다
+  it("무대를 넣어도 가짜 모드가 장면을 뽑아낼 수 있다", () => {
+    const prompt = buildImagePrompt({ ...cut, environment: "실내 농구 코트, 야간" }, p);
+    expect(prompt.match(/Scene:\s*(.+?)\.\s/)?.[1]).toBe("선수의 발목 미디엄 샷");
+  });
+});
+
+describe("화면 설계가 무대를 하나 정한다", () => {
+  const cuts = [{ idx: 0, sentence: "가." }, { idx: 1, sentence: "나." }];
+
+  it("무대를 요구한다", () => {
+    const { system } = buildShowsMessages(project, cuts);
+    expect(system).toContain('"environment"');
+  });
+
+  it("컷마다 장소·시간대를 새로 만들지 말라고 못 박는다", () => {
+    const { system } = buildShowsMessages(project, cuts);
+    expect(system).toMatch(/컷마다.*(장소|시간대|무대)|새로 만들지 않는다/);
+  });
+});
+
+describe("지문이 스스로 모순되지 않는다", () => {
+  // ★ 무대를 하나로 정하라면서 바로 아래에서 "조명을 컷에 맞게 적는다(골든아워·한낮·황혼)"고
+  //   했다. 그것이 드리프트의 프롬프트 측 원인이었다 — 실측에서 한낮·노을·실내가 섞였다.
+  it("시간대·날씨를 컷마다 적으라고 하지 않는다", () => {
+    const { system } = buildShowsMessages(project, [{ idx: 0, sentence: "가." }]);
+    expect(system).toContain("시간대·날씨는 shows 에 적지 않는다");
+    // 무대 규칙과 shows 규칙이 같은 방향을 봐야 한다
+    expect(system).toContain("컷마다 장소·시간대를 새로 만들지 않는다");
+  });
+});
