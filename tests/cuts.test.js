@@ -858,3 +858,71 @@ describe("레퍼런스 지시가 화풍을 따른다", () => {
     expect(prompt).not.toContain("exactly");
   });
 });
+
+describe("카메라 낱말은 그림 지시에서 지운다", () => {
+  // ★ 실측(2026-07-30): shows 가 "로우 앵글 트래킹, 크로스오버로 방향을 트는 선수의 발"이었고
+  //   "트래킹"이 그림 지시로 갔다. 정지 이미지 모델은 이동을 그릴 방법이 없어 이동을 **암시**하는
+  //   그림을 만든다 — 그 컷에서 **다리가 셋** 나왔다(VLM 은 "오류 없음"으로 통과시켰다).
+  //   예전에 "자전거 바퀴가 회전한다"가 페달에서 뗀 발을 만든 것과 같은 패턴이다.
+  //
+  //   절 전체를 버리지 않는다 — "로우 앵글"은 정당한 구도 서술이라 살려야 한다.
+  it("절은 살리고 카메라 낱말만 지운다", () => {
+    expect(stillOnly("로우 앵글 트래킹, 크로스오버로 방향을 트는 선수의 발"))
+      .toBe("로우 앵글, 크로스오버로 방향을 트는 선수의 발");
+  });
+
+  it("여러 카메라 낱말을 지운다", () => {
+    for (const [before, after] of [
+      ["신발 클로즈업, 카메라가 오빗", "신발 클로즈업"],
+      ["선수 풀 샷 팬", "선수 풀 샷"],
+      ["발목 클로즈업 줌인", "발목 클로즈업"],
+      ["코트 광각 달리 인", "코트 광각"],
+      ["선수 미디엄 샷, 핸드헬드", "선수 미디엄 샷"],
+    ]) {
+      expect(stillOnly(before), before).toBe(after);
+    }
+  });
+
+  it("낱말을 지우고 남는 것이 없으면 그 절을 버린다", () => {
+    expect(stillOnly("트래킹, 선수 풀 샷")).toBe("선수 풀 샷");
+  });
+
+  // 제품 용어와 겹치는 낱말을 지우면 정당한 화면이 망가진다
+  it("정당한 화면은 건드리지 않는다", () => {
+    for (const ok of [
+      "아침 7시 주방, 딸기를 통째로 갈아 넣는 손 클로즈업, 창으로 든 새벽빛",
+      "선수의 전신 풀 샷, 로우 앵글",
+      "발목을 덮는 하이톱 클로즈업, 역광",
+    ]) {
+      expect(stillOnly(ok), ok).toBe(ok);
+    }
+  });
+});
+
+describe("제품 외형이 프롬프트에 실린다", () => {
+  // ★ 실측: 제품 서술이 "검정+빨강 하이톱 농구화" 한 줄뿐이라 배색만 맞고 디자인은 모델이
+  //   만들었다 — 아식스풍 줄무늬가 나왔다. 인물에 준 look 과 같은 방식이 필요하다.
+  const cut = { idx: 0, sentence: "가.", shows: "신발 클로즈업" };
+  const p = (focus) => ({ settings: { aspect_ratio: "9:16" }, briefing: { topic: "농구화", focus } });
+
+  it("물건 초점의 외형을 앵커 뒤에 붙인다", () => {
+    const prompt = buildImagePrompt(cut, p({
+      mode: "물건", subject: "검정+빨강 하이톱 농구화",
+      look: "검정 갑피에 빨강 스우시, 빨강 밑창, 발목을 덮는 하이톱, 흰 중창",
+    }));
+    expect(prompt).toContain("검정+빨강 하이톱 농구화");
+    expect(prompt).toContain("빨강 스우시");
+  });
+
+  it("외형이 없으면 문구가 늘지 않는다", () => {
+    const prompt = buildImagePrompt(cut, p({ mode: "물건", subject: "농구화" }));
+    expect(prompt).toContain("농구화");
+    expect(prompt).not.toContain("Its appearance");
+  });
+
+  // 사람 초점의 subject 는 제품이 아니다 — 그 외형을 "이 제품"이라 부르면 틀린 지시가 된다
+  it("사람 초점에서는 쓰지 않는다", () => {
+    const prompt = buildImagePrompt(cut, p({ mode: "사람", subject: "50대 주인", look: "반백 머리" }));
+    expect(prompt).not.toContain("반백 머리");
+  });
+});

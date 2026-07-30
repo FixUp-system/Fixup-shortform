@@ -444,3 +444,20 @@ describe("무대(environment)를 컷마다 나눠 갖는다", () => {
     expect(out[1].environment).toBe("야외 거리, 낮");
   });
 });
+
+describe("초점에 외형을 담는다", () => {
+  const base = { topic: "농구화", key_points: ["하이톱"], questions: [] };
+
+  it("물건 외형을 담는다", () => {
+    const out = validateBriefing({
+      ...base,
+      focus: { mode: "물건", subject: "하이톱 농구화", look: " 검정 갑피에 빨강 스우시, 빨강 밑창 " },
+    });
+    expect(out.focus.look).toBe("검정 갑피에 빨강 스우시, 빨강 밑창");
+  });
+
+  it("외형이 없어도 초점을 버리지 않는다", () => {
+    const out = validateBriefing({ ...base, focus: { mode: "물건", subject: "하이톱 농구화" } });
+    expect(out.focus).toEqual({ mode: "물건", subject: "하이톱 농구화" });
+  });
+});
