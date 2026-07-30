@@ -133,14 +133,16 @@ describe("splitClauses 는 clauseBoundaries 위에서 그대로 돈다", () => {
   it("경계 위치로 자른 것과 splitUnits 의 조각이 같다", () => {
     const s = "볼이 빨갛게 달아오르고 속당김이 심한 날, VT PDRN 시카 엑소좀 앰플이 도움이 되고 다음 날 아침 당김이 덜하다는 후기가 많고 재구매도 잦습니다.";
     const at = clauseBoundaries(s);
-    const cuts = [0, ...at, s.length];
+    // 컷 조각은 구분 공백을 품지 않는다 — 경계 앞 한 칸을 빼고 잘라야 splitUnits 와 같아진다
     const byPos = [];
-    for (let i = 0; i < cuts.length - 1; i++) byPos.push(s.slice(cuts[i], cuts[i + 1]));
+    let start = 0;
+    for (const pos of at) { byPos.push(s.slice(start, pos - 1)); start = pos; }
+    byPos.push(s.slice(start));
     // splitUnits 는 8초 초과 문장에서만 절을 나눈다 — 위 문장은 충분히 길다
     const units = splitUnits(s);
-    expect(units.join("")).toBe(s);            // 원문 보존
-    expect(byPos.join("")).toBe(s);            // 위치로 자른 것도 원문 보존
-    expect(units.length).toBe(byPos.length);   // 같은 개수로 나뉜다
+    expect(units.join(" ")).toBe(s);      // 컷의 계약
+    expect(byPos.join(" ")).toBe(s);      // 위치로 자른 것도 같은 계약을 지킨다
+    expect(units).toEqual(byPos);         // 조각이 글자 그대로 같다
   });
 });
 ```
@@ -210,7 +212,10 @@ function splitClauses(sentence) {
   const parts = [];
   let start = tokens[0].index;
   for (const pos of at) {
-    parts.push(sentence.slice(start, pos));
+    // 경계 앞 한 글자는 공백 정확히 한 칸이다(clauseBoundaries 가 sep === " " 만 후보로 삼는다).
+    // 그 한 칸을 빼고 자른다 — **컷 조각은 join(" ") 으로 원문을 복원하는 계약**이라
+    // 조각이 구분 공백을 품으면 그 자리에서 공백이 두 칸이 된다.
+    parts.push(sentence.slice(start, pos - 1));
     start = pos;
   }
   // 마지막 조각 — 마지막 토큰 끝이 아니라 문장 끝까지 slice 한다(뒤에 남은 문장부호 등을 지키기 위해)
@@ -223,12 +228,19 @@ function splitClauses(sentence) {
 }
 ```
 
-> ⚠️ 지금 `splitClauses` 는 경계에서 `parts.push(buf)` 할 때 `buf = sentence.slice(start, tokenEnd)`
-> 를 쓴다 — **토큰 끝까지**다. 위 새 코드는 `sentence.slice(start, pos)` — **다음 토큰 시작까지**다.
-> 그 차이는 **경계 사이의 공백 한 칸**이고, 붙일 때 `parts.join("")` 이 원문과 같으려면
-> 오히려 새 방식이 맞다. **하지만 기존 테스트가 앞의 모양(공백 없는 조각)을 단정하고 있을 수
-> 있다.** `npx vitest run tests/cuts.test.js` 로 확인하고, **깨지면 고치지 말고 보고하라** —
-> 어느 쪽이 맞는지는 사람이 정한다.
+> ### ★ 계약이 두 쪽에서 다르다 (2026-07-30 정정)
+>
+> 이 계획의 초판은 조각을 `sentence.slice(start, pos)` 로 자르라고 적었다. **틀렸다** —
+> 구현 중에 기존 테스트 5건이 그것을 반증했다(`★ 이어붙이면 원문과 같다` 포함).
+>
+> | | 조각이 구분 공백을 | 원문 복원 |
+> |---|---|---|
+> | **컷(units)** | 품지 않는다 | `join(" ")` — `lib/cuts.js:155` 가 그렇게 초를 잰다 |
+> | **자막** | 품는다 | `join("")` — `splitSubtitleText` 가 그렇게 돈다 |
+>
+> 그래서 **경계 목록만 공유하고, 자르는 방식은 부르는 쪽이 정한다.** 컷은 경계 앞 한 칸을
+> 뺀다(`pos - 1`). 그 한 칸이 공백임은 규칙이 보장한다(`sep === " "` 조건).
+> 이 정정으로 `splitClauses` 의 출력은 **글자 그대로 같다.**
 
 - [ ] **Step 4: 통과를 확인한다**
 
