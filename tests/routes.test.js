@@ -27,6 +27,7 @@ const { POST: scriptPOST } = await import("../app/api/projects/[id]/script/route
 const { POST: renderPOST } = await import("../app/api/projects/[id]/render/route.js");
 const { POST: clipsPOST } = await import("../app/api/projects/[id]/clips/route.js");
 const { GET: renderFileGET } = await import("../app/api/renders/[name]/route.js");
+const { POST: projectsPOST } = await import("../app/api/projects/route.js");
 
 const ctx = (id) => ({ params: Promise.resolve({ id }) });
 const patchReq = (body) => ({ json: async () => body });
@@ -634,6 +635,32 @@ describe("POST /api/projects/[id]/clips — 남은 것이 있으면 돈다", () 
     }));
     const res = await clipsPOST(new Request("http://x", { method: "POST" }), ctx(p.id));
     expect(res.status).toBe(409);
+  });
+});
+
+describe("POST /api/projects — 영상 컨셉", () => {
+  // 자료를 넣는 화면에서 컨셉을 함께 고른다. 길이(target_seconds)와 달리 조용히 무시하지
+  // 않는다 — 고른 컨셉과 그림에 실리는 컨셉이 달라지면 아무도 못 알아본다.
+  it("고른 컨셉을 settings 에 담아 만든다", async () => {
+    const res = await projectsPOST({
+      json: async () => ({ material: { text: "자료" }, settings: { style: { preset: "anime", note: " 파스텔 " } } }),
+    });
+    const p = await res.json();
+    expect(p.settings.style).toEqual({ preset: "anime", note: "파스텔" });
+  });
+
+  it("모르는 컨셉은 400 이고 프로젝트를 만들지 않는다", async () => {
+    const res = await projectsPOST({
+      json: async () => ({ material: { text: "자료" }, settings: { style: { preset: "클레이애니" } } }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("컨셉을 안 보내면 settings 에 넣지 않는다 — 기본값은 파생한다", async () => {
+    const res = await projectsPOST({ json: async () => ({ material: { text: "자료" } }) });
+    const p = await res.json();
+    expect(p.settings.style).toBeUndefined();
+    expect(p.settings.aspect_ratio).toBe("9:16");
   });
 });
 

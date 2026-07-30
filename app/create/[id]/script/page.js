@@ -9,7 +9,6 @@ import BackButton from "../../../../components/BackButton";
 import { estimateSeconds } from "../../../../lib/script";
 import { areCutsStale } from "../../../../lib/steps";
 import { I2V_MAX_SECONDS } from "../../../../lib/clip-limits";
-import { STYLE_PRESETS, activeStyle } from "../../../../lib/styles";
 
 export default function ScriptStepPage() {
   const { id } = useParams();
@@ -20,9 +19,6 @@ export default function ScriptStepPage() {
   const [instruction, setInstruction] = useState("");
   const [draft, setDraft] = useState(null); // 손으로 고치는 중인 원고(저장 전)
   const [aspect, setAspect] = useState(project.settings?.aspect_ratio || "9:16");
-  // 화풍은 비율과 달리 컷이 생긴 뒤에도 바꿀 수 있다 — "실사로 봤는데 일러스트로 바꿔보자"가
-  // 이 기능의 쓰임새다. 바꾸면 그림이 낡았다고 뜨고, 다시 만드는 것은 ④에서 값을 치른다.
-  const [styleNote, setStyleNote] = useState(project.settings?.style?.note || "");
   // 자동 생성이 한 번만 돌게 막는다 — busy는 비동기라 effect가 두 번 불리면 과금이 두 배가 된다.
   const autoGenFor = useRef(null);
   const autoSplitFor = useRef(null);
@@ -82,22 +78,6 @@ export default function ScriptStepPage() {
       body: JSON.stringify({ cut: { idx, ...patch } }),
     }).catch(() => null);
     if (!res || !res.ok) { setErr("고친 것을 저장하지 못했어요 — 다시 시도해 주세요"); return; }
-    setErr("");
-    await load(id).catch(() => {});
-  }
-
-  // 화풍 저장. 컷을 비우지 않는다 — 화풍은 글이 아니라 그림의 근거다. 원고·컷·소리는
-  // 살아남고 ④이미지만 낡는다(image.style_of 각인이 그것을 판정한다).
-  async function saveStyle(preset, note) {
-    const res = await fetch(`/api/projects/${id}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ settings: { style: { preset, note } } }),
-    }).catch(() => null);
-    if (!res || !res.ok) {
-      // 실패를 삼키지 않는다 — 고른 화풍과 그림에 실리는 화풍이 달라지면 아무도 못 알아본다
-      setErr((await res?.json().catch(() => ({})))?.error || "화풍을 저장하지 못했어요 — 다시 골라 주세요");
-      return;
-    }
     setErr("");
     await load(id).catch(() => {});
   }
@@ -208,9 +188,6 @@ export default function ScriptStepPage() {
 
   const staleCuts = areCutsStale(project);
   const madeCuts = (project.cuts || []).length > 0;
-  // 화풍을 바꾸는 값이 실제로 드는지 — 그림이 하나라도 나와 있을 때만이다
-  const madeImages = (project.cuts || []).some((c) => c.image?.url);
-  const styleId = activeStyle(project).id;
   // 구성 — 낡은 컷은 보여주지 않는다(원고를 다시 썼으면 새로 나뉘는 중이다)
   const cuts = staleCuts ? [] : project.cuts || [];
 
@@ -297,37 +274,6 @@ export default function ScriptStepPage() {
           </div>
         </>
       )}
-
-      {/* 화풍 — 어떤 그림으로 만들지. 비율과 달리 컷이 생긴 뒤에도 바꿀 수 있게 둔다:
-          바꿔도 원고·컷·소리는 살아남고 그림만 다시 만들면 되기 때문이다(비율은 바꾸면
-          화면 구성이 통째로 무의미해져서 잠근다). 바꾸면 ④이미지가 낡았다고 뜬다. */}
-      <div className="eyebrow mt-lg">화풍 <small>이 그림으로 영상이 만들어져요</small></div>
-      <div className="chips">
-        {STYLE_PRESETS.map((s) => (
-          <button key={s.id} className={`chip${styleId === s.id ? " on" : ""}`}
-            disabled={busy} onClick={() => saveStyle(s.id, styleNote)}>
-            {s.label}
-          </button>
-        ))}
-      </div>
-      <div className="script-src">{activeStyle(project).desc}</div>
-      {/* 컷이 있는 것과 그림이 있는 것은 다르다. 그림을 만들기 전에는 화풍을 바꿔도 0원이라
-          거기서 값 얘기를 꺼내면 겁만 주고 아무것도 알려주지 않는다. */}
-      {madeImages && (
-        <div className="script-src warn">
-          이미 만든 그림이 있어요 — 화풍을 바꾸면 그림과 영상을 다시 만들게 돼요
-          (컷당 약 $0.08 에 클립 값이 더 듭니다)
-        </div>
-      )}
-      <div className="fix-row">
-        <textarea className="sent-input fix-input"
-          placeholder='화풍 보정 (예: "따뜻한 파스텔톤", "80년대 애니 느낌")'
-          value={styleNote} onChange={(e) => setStyleNote(e.target.value)}
-          onBlur={() => {
-            // 보정만 고쳐도 그림은 달라진다 — 지금 고른 화풍에 얹어 저장한다
-            if (styleNote.trim() !== (project.settings?.style?.note || "")) saveStyle(styleId, styleNote);
-          }} />
-      </div>
 
       {/* 초점 — 이 영상이 무엇을 따라가는지. 여기서 고치면 구성을 다시 만든다.
           그림과 클립이 이것을 기준으로 나오므로, 만들기 전에 고쳐야 값이 안 든다. */}

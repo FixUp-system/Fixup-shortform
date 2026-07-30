@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useProject } from "../../components/ProjectContext";
 import { TARGET_CHOICES } from "../../lib/script";
+import { DEFAULT_STYLE_ID } from "../../lib/styles";
+import StylePicker from "../../components/StylePicker";
 
 export default function CreatePage() {
   const router = useRouter();
@@ -10,6 +12,8 @@ export default function CreatePage() {
   const [text, setText] = useState("");
   const [photos, setPhotos] = useState([]); // {id, filename, url}
   const [seconds, setSeconds] = useState(null); // null = 자동(자료가 정함)
+  const [stylePreset, setStylePreset] = useState(DEFAULT_STYLE_ID);
+  const [styleNote, setStyleNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
@@ -33,10 +37,14 @@ export default function CreatePage() {
     const res = await fetch("/api/projects", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ material: { text, photos }, settings: { target_seconds: seconds } }),
+      body: JSON.stringify({
+        material: { text, photos },
+        settings: { target_seconds: seconds, style: { preset: stylePreset, note: styleNote } },
+      }),
     });
     const data = await res.json();
     if (res.ok) router.push(`/create/${data.id}/briefing`);
+    // 실패해도 써 둔 자료는 화면에 남는다(로컬 state) — 다시 누르면 된다
     else { setErr(data.error || "생성 실패"); setBusy(false); }
   }
 
@@ -64,6 +72,11 @@ export default function CreatePage() {
             </button>
           ))}
         </div>
+
+        {/* 영상 컨셉도 길이와 같은 종류의 값이다 — 만들기 전에 정해져야 하고, 자료를 넣는
+            이 자리가 가장 이르다. 나중에 ①자료 화면에서 바꿀 수 있다. */}
+        <StylePicker preset={stylePreset} note={styleNote}
+          onPreset={setStylePreset} onNote={setStyleNote} />
 
         <div className="eyebrow">사진 <small>장면 소스 + AI 컷의 기준 이미지 (선택, ≤10장)</small></div>
         <div className="uploads">

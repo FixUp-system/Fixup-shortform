@@ -11,6 +11,8 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 import { capacitySeconds } from "../../../../lib/script";
+import { activeStyle } from "../../../../lib/styles";
+import StylePicker from "../../../../components/StylePicker";
 
 export default function BriefingStepPage() {
   const { id } = useParams();
@@ -18,6 +20,9 @@ export default function BriefingStepPage() {
   const { project, load } = useProject();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  // 저장 전 보정 글. project 가 늦게 오므로 도착한 뒤 한 번 맞춰 준다(아래 effect).
+  const [styleNote, setStyleNote] = useState("");
+  const noteLoadedFor = useRef(null);
   const started = useRef(false);
   const passed = useRef(null); // 자동 통과는 프로젝트당 한 번만 — 뒤로 돌아왔을 때 다시 튕기지 않게
 
@@ -28,6 +33,13 @@ export default function BriefingStepPage() {
       extract();
     }
   }, [project?.id, project?.briefing]);
+
+  // 저장된 보정을 칸에 한 번만 채운다 — 매번 덮으면 타이핑 중에 글자가 되돌아간다
+  useEffect(() => {
+    if (!project || noteLoadedFor.current === project.id) return;
+    noteLoadedFor.current = project.id;
+    setStyleNote(project.settings?.style?.note || "");
+  }, [project?.id]);
 
   const brief = project?.briefing;
   const pending = (brief?.asked || []).filter((a) => !a.done);
@@ -87,7 +99,42 @@ export default function BriefingStepPage() {
     router.push(`/create/${id}/script`);
   }
 
+  // 컨셉 저장. 컷을 비우지 않는다 — 컨셉은 글이 아니라 그림의 근거다.
+  // 원고·컷·소리는 살아남고 ④이미지만 낡는다(image.style_of 각인이 판정한다).
+  async function saveStyle(preset, note) {
+    const res = await fetch(`/api/projects/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings: { style: { preset, note } } }),
+    }).catch(() => null);
+    if (!res || !res.ok) {
+      // 실패를 삼키지 않는다 — 고른 컨셉과 그림에 실리는 컨셉이 달라지면 아무도 못 알아본다
+      setErr((await res?.json().catch(() => ({})))?.error || "영상 컨셉을 저장하지 못했어요 — 다시 골라 주세요");
+      return;
+    }
+    setErr("");
+    await load(id).catch(() => {});
+  }
+
   if (!project) return <p className="pgsub">준비 중…</p>;
+
+  const styleId = activeStyle(project).id;
+  // 컨셉을 바꾸는 값이 실제로 드는지 — 그림이 하나라도 나와 있을 때만이다.
+  // 컷이 있는 것과 그림이 있는 것은 다르다: 그림 전에는 0원이라 값 얘기를 꺼내면 겁만 준다.
+  const madeImages = (project.cuts || []).some((c) => c.image?.url);
+  const stylePicker = (
+    <StylePicker
+      preset={styleId} note={styleNote} disabled={busy}
+      onPreset={(p) => saveStyle(p, styleNote)}
+      onNote={setStyleNote}
+      onNoteCommit={() => {
+        // 보정만 고쳐도 그림은 달라진다. 바뀌었을 때만 보낸다 — 지나갈 때마다 PATCH 하지 않게
+        if (styleNote.trim() !== (project.settings?.style?.note || "")) saveStyle(styleId, styleNote);
+      }}
+      warn={madeImages
+        ? "이미 만든 그림이 있어요 — 컨셉을 바꾸면 그림과 영상을 다시 만들게 돼요 (컷당 약 $0.08 에 클립 값이 더 듭니다)"
+        : null}
+    />
+  );
 
   if (!brief) {
     return err ? (
@@ -105,6 +152,8 @@ export default function BriefingStepPage() {
       <section className="panel panel--narrow">
         <h2>자료는 준비됐어요</h2>
         <p className="pgsub">{project.material?.text?.slice(0, 120)}…</p>
+        {err && <p className="pgsub warn">{err}</p>}
+        {stylePicker}
         <div className="step-actions">
           <div className="fwd">
             <button className="cta" disabled={busy} onClick={() => router.push(`/create/${id}/script`)}>
@@ -148,6 +197,8 @@ export default function BriefingStepPage() {
       <div className="script-src">
         답하시면 그만큼 대본에 담을 이야기가 늘어요 — 지금 자료로는 약 {capacity}초예요.
       </div>
+
+      {stylePicker}
 
       <div className="step-actions">
         <div className="fwd">
