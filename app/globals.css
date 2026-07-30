@@ -882,3 +882,17 @@ textarea.field::placeholder { color: var(--ink-soft); }
   line-height: 1.6;
   padding: 9px 12px;
 }
+
+/* 컷 속도 고르기 — 초 배지 옆에 선다. 배지와 높이를 맞춘다.
+   select 를 쓴 이유: 다섯 갈래 × 컷 수만큼 칩을 깔면 구성 목록이 칩으로 덮인다. */
+select.speed-pick {
+  border: 1px solid var(--line);
+  background: var(--surface2);
+  color: var(--ink);
+  border-radius: var(--r-pill);
+  padding: 2px 8px;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+select.speed-pick:hover { border-color: var(--ink-soft); }

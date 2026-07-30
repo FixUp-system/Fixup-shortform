@@ -9,6 +9,7 @@ import BackButton from "../../../../components/BackButton";
 import { estimateSeconds } from "../../../../lib/script";
 import { areCutsStale } from "../../../../lib/steps";
 import { I2V_MAX_SECONDS } from "../../../../lib/clip-limits";
+import { SPEEDS, DEFAULT_SPEED_ID } from "../../../../lib/speeds";
 
 export default function ScriptStepPage() {
   const { id } = useParams();
@@ -270,6 +271,18 @@ export default function ScriptStepPage() {
 
       {/* 구성 — 원고를 컷으로 나누고 컷마다 무엇을 보여줄지·어떻게 움직일지 정한 것.
           승인 앞에 두는 이유: 그림과 클립이 여기서 나오므로, 만들기 전에 고쳐야 값이 안 든다. */}
+      {/* 브리핑이 자료에서 뽑은 연출 바람 — 화면 설계가 이것을 보고 만든다.
+          읽기 전용이다: 고치려면 자료를 고친다(브리핑이 다시 뽑는다). 여기서 고치게 하면
+          자료와 어긋난 값이 남고, 다음 정리에서 조용히 덮인다. */}
+      {project.briefing?.direction && (
+        <>
+          <div className="eyebrow mt-lg">
+            연출 <small>자료에서 이렇게 읽었어요 — 화면이 이걸 따라갑니다</small>
+          </div>
+          <p className="script-src">{project.briefing.direction}</p>
+        </>
+      )}
+
       <div className="eyebrow mt-lg">
         구성 <small>문장·화면·움직임을 눌러서 고칠 수 있어요</small>
       </div>
@@ -316,6 +329,14 @@ export default function ScriptStepPage() {
                 </div>
                 <div className="badges">
                   <span className="badge ai">{c.seconds}초</span>
+                  {/* 속도 — 컷 사이 대비를 만드는 값. 화면 설계가 정하지만 여기서 고칠 수 있다.
+                      고치면 클립이 낡는다(clipKey 에 들어간다) — 영상 전에 고쳐야 값이 안 든다. */}
+                  <select className="speed-pick" value={c.speed || DEFAULT_SPEED_ID}
+                    onChange={(e) => saveCut(c.idx, { speed: e.target.value })}>
+                    {SPEEDS.map((s) => (
+                      <option key={s.id} value={s.id}>{s.label}</option>
+                    ))}
+                  </select>
                   {c.seconds > clipMax && (
                     <span className="badge warn">
                       {clipMax}초까지만 움직여요 — 나머지는 멈춰 있어요

@@ -593,6 +593,25 @@ describe("무효화 관통 — 고치면 낡고, 안 고친 것은 살아남는�
     expect(saved.script.text).toBe(p.script.text);
   });
 
+  it("속도를 고치면 저장되고 클립이 낡는다", async () => {
+    const p = await projectWithCuts();
+    const res = await PATCH(patchReq({ cut: { idx: 0, speed: "fast" } }), ctx(p.id));
+    expect(res.status).toBe(200);
+    const cut = (await getProject(p.id)).cuts[0];
+    expect(cut.speed).toBe("fast");
+    // 속도가 클립 프롬프트에 실리므로 클립은 낡아야 한다
+    expect(isClipStale(cut)).toBe(true);
+    // 그림·소리는 속도와 무관하다
+    expect(isImageStale(cut)).toBe(false);
+    expect(isAudioStale(cut)).toBe(false);
+  });
+
+  it("목록 밖 속도는 무시한다 — 합성이 모르는 값이 저장되지 않게", async () => {
+    const p = await projectWithCuts();
+    await PATCH(patchReq({ cut: { idx: 0, speed: "아주느리게" } }), ctx(p.id));
+    expect((await getProject(p.id)).cuts[0].speed).toBeUndefined();
+  });
+
   it("움직임을 고치면 클립이 낡는다", async () => {
     const p = await projectWithCuts();
     await PATCH(patchReq({ cut: { idx: 0, motion: "정지" } }), ctx(p.id));

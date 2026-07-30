@@ -3,6 +3,7 @@ import { briefingContentChanged } from "../../../../lib/briefing";
 import { activeClipLimits } from "../../../../lib/clip-limits";
 import { normalizeStyle } from "../../../../lib/styles";
 import { isAspect } from "../../../../lib/aspects";
+import { isSpeed } from "../../../../lib/speeds";
 
 export async function GET(req, { params }) {
   const { id } = await params;
@@ -68,6 +69,9 @@ export async function PATCH(req, { params }) {
             patch[key] = body.cut[key].trim();
           }
         }
+        // 속도는 닫힌 목록이라 위 문자열 검사와 따로 본다 — 아무 낱말이나 들어가면
+        // 클립 프롬프트에 모르는 값이 실리고, 대비 판정도 거짓이 된다.
+        if (isSpeed(body.cut.speed)) patch.speed = body.cut.speed;
         if (Object.keys(patch).length) {
           next.cuts = proj.cuts.map((c) => (c.idx === body.cut.idx ? { ...c, ...patch } : c));
           // 문장을 고쳤으면 원고도 함께 따라온다.

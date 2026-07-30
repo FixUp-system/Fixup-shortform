@@ -279,3 +279,18 @@ describe("②대본에서 이야기 더 들려주기를 뺐다", () => {
     expect(rule).toContain("flex-direction: column");
   });
 });
+
+// 사장님이 로컬에서 눈으로 확인할 자리 — 뽑힌 연출과 컷마다의 속도가 화면에 보여야 한다.
+// 값이 코드 안에만 있으면 잘 됐는지 알 방법이 없다.
+describe("②대본이 연출 바람과 속도를 보여준다", () => {
+  const src = read("app/create/[id]/script/page.js");
+
+  it("브리핑이 뽑은 연출 바람을 보여준다", () => {
+    expect(src).toContain("briefing?.direction");
+  });
+
+  it("컷마다 속도를 보여주고 고칠 수 있다", () => {
+    expect(src).toMatch(/from ["'][./]*lib\/speeds["']/);
+    expect(src).toMatch(/saveCut\(c\.idx,\s*\{\s*speed:/);
+  });
+});
