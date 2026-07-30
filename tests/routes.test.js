@@ -25,6 +25,7 @@ const { GET, PATCH } = await import("../app/api/projects/[id]/route.js");
 const { POST: briefingPOST } = await import("../app/api/projects/[id]/briefing/route.js");
 const { POST: scriptPOST } = await import("../app/api/projects/[id]/script/route.js");
 const { POST: renderPOST } = await import("../app/api/projects/[id]/render/route.js");
+const { POST: clipsPOST } = await import("../app/api/projects/[id]/clips/route.js");
 const { GET: renderFileGET } = await import("../app/api/renders/[name]/route.js");
 
 const ctx = (id) => ({ params: Promise.resolve({ id }) });
@@ -576,5 +577,46 @@ describe("GET /api/projects/[id] — 활성 모델의 상한을 실어 보낸다
     } finally {
       delete process.env.FAL_I2V_ENDPOINT;
     }
+  });
+});
+
+// 컷 하나만 클립이 있는 상태가 실제로 생겼다(A/B 로 미리 산 클립을 심었다). 그때 나머지를
+// 만들 길이 없으면 안 된다 — 파이프라인은 살아 있는 클립을 건너뛰므로 다시 불러도 값이 없다.
+describe("POST /api/projects/[id]/clips — 남은 것이 있으면 돈다", () => {
+  const liveCut = (idx) => ({
+    idx, sentence: "문장", seconds: 3,
+    image: { url: `i${idx}` }, audio: { url: `a${idx}`, seconds: 3 },
+    video: { url: `v${idx}`, seconds: 3, truncated: false, of: `i${idx}|3|` },
+  });
+  const bareCut = (idx) => ({
+    idx, sentence: "문장", seconds: 3,
+    image: { url: `i${idx}` }, audio: { url: `a${idx}`, seconds: 3 },
+  });
+
+  it("클립 없는 컷이 남아 있으면 시작한다 — status 가 video 여도", async () => {
+    const p = await createProject({ settings: {}, material: { text: "자료", photos: [] } });
+    await updateProject(p.id, (proj) => ({
+      ...proj, status: "video", cuts: [liveCut(0), bareCut(1)],
+    }));
+    const res = await clipsPOST(new Request("http://x", { method: "POST" }), ctx(p.id));
+    expect(res.status).toBe(200);
+    expect((await res.json()).started).toBe(true);
+  });
+
+  it("낡은 클립이 남아 있으면 시작한다", async () => {
+    const p = await createProject({ settings: {}, material: { text: "자료", photos: [] } });
+    const stale = { ...liveCut(0), video: { url: "v0", seconds: 3, truncated: false, of: "옛그림|3|" } };
+    await updateProject(p.id, (proj) => ({ ...proj, status: "video", cuts: [stale] }));
+    const res = await clipsPOST(new Request("http://x", { method: "POST" }), ctx(p.id));
+    expect(res.status).toBe(200);
+  });
+
+  it("전부 살아 있으면 409 — 할 일이 없다", async () => {
+    const p = await createProject({ settings: {}, material: { text: "자료", photos: [] } });
+    await updateProject(p.id, (proj) => ({
+      ...proj, status: "video", cuts: [liveCut(0), liveCut(1)],
+    }));
+    const res = await clipsPOST(new Request("http://x", { method: "POST" }), ctx(p.id));
+    expect(res.status).toBe(409);
   });
 });

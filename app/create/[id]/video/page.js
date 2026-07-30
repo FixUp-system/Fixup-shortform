@@ -97,7 +97,8 @@ export default function VideoStepPage() {
   const cuts = project?.cuts || [];
   // 활성 모델의 클립 상한. 서버가 실어 보낸다 — 없으면(옛 응답) 기본 프로필 값으로 떨어진다
   const clipMax = project?.clip_limits?.max ?? I2V_MAX_SECONDS;
-  const madeAny = cuts.some((c) => c.video);
+  // 남은 컷 = 클립이 없거나 낡은 컷. runVideoPipeline 의 건너뛰기 조건의 정확한 반대다.
+  const remainingCount = cuts.filter((c) => !c.video?.url || isClipStale(c)).length;
   const doneCount = cuts.filter((c) => c.video).length;
   const truncatedCount = cuts.filter((c) => c.video?.truncated).length;
   // 그림이나 낭독이 바뀐 뒤 옛것으로 만든 클립이 남아 있으면 합치러 보내지 않는다
@@ -114,7 +115,7 @@ export default function VideoStepPage() {
       <h2>컷을 영상으로 만듭니다 <span className="badge vlm">⑤ 영상</span></h2>
       {err && <p className="pgsub warn">{err}</p>}
       <p className="pgsub">
-        {madeAny
+        {doneCount > 0
           ? `${doneCount}/${cuts.length}개 컷을 만들었어요`
           : "이미지가 각 컷의 시작 프레임이 되고, 읽은 길이만큼 움직여요."}
         {truncatedCount > 0 && ` · ${truncatedCount}개 컷은 ${clipMax}초까지만 움직여요`}
@@ -194,23 +195,23 @@ export default function VideoStepPage() {
       <div className="step-actions">
         <BackButton stepKey="video" />
         <div className="fwd">
-          {!madeAny ? (
+          {remainingCount > 0 ? (
             <>
-              <span className="hint">컷 {cuts.length}개를 각각 움직이는 영상으로 만들어요</span>
+              <span className="hint">
+                {doneCount > 0
+                  ? `남은 컷 ${remainingCount}개를 만들어요 — 이미 만든 ${doneCount}개는 그대로 씁니다`
+                  : `컷 ${cuts.length}개를 각각 움직이는 영상으로 만들어요`}
+              </span>
               <button className="cta" disabled={busy} onClick={start}>
-                {busy ? "만드는 중…" : "영상 만들기"}
+                {busy ? "만드는 중…" : doneCount > 0 ? `남은 ${remainingCount}개 만들기` : "영상 만들기"}
               </button>
             </>
           ) : (
             <>
-              <span className="hint">
-                {staleCount > 0
-                  ? `바뀐 컷 ${staleCount}개의 클립을 다시 만들어 주세요`
-                  : "이어 붙이고 소리와 자막을 얹으면 완성이에요"}
-              </span>
+              <span className="hint">이어 붙이고 소리와 자막을 얹으면 완성이에요</span>
               <button
                 className="cta"
-                disabled={busy || doneCount === 0 || staleCount > 0}
+                disabled={busy || doneCount === 0}
                 onClick={() => router.push(`/create/${id}/done`)}
               >
                 ⑥ 완성하러 가기 →

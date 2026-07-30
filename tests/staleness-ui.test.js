@@ -6,35 +6,69 @@ import { readFileSync } from "node:fs";
 
 const read = (p) => readFileSync(p, "utf8");
 
+// ⑤영상만 잠금 방식이 다르다. ③목소리·④이미지는 "남은 것이 있나"와 "낡았나"가 서로 다른
+// 값(cuts 개수 vs staleCount)이라 disabled 안에 staleCount 를 따로 얹어야 한다. ⑤영상은
+// Task 9 에서 "남은 컷"과 "낡은 컷"을 remainingCount 하나로 합쳤다 — 낡은 컷도 remainingCount
+// 에 들어가므로, 완성 버튼은 remainingCount > 0 인 동안 아예 렌더되지 않는다(disabled 로
+// 잠그는 게 아니라 갈래 자체가 다르다). 완성 버튼의 disabled 에 staleCount 를 남기면 그
+// 조건은 항상 이미 remainingCount === 0 인 자리에서만 평가되므로 아무도 못 알아보는 죽은
+// 코드가 된다 — 그래서 여기서만 검사 방식을 remainingCount 쪽으로 바꾼다.
 const PAGES = [
-  { step: "③ 목소리", path: "app/create/[id]/voice/page.js", fn: "isAudioStale" },
-  { step: "④ 이미지", path: "app/create/[id]/images/page.js", fn: "isImageStale" },
-  { step: "⑤ 영상", path: "app/create/[id]/video/page.js", fn: "isClipStale" },
+  { step: "③ 목소리", path: "app/create/[id]/voice/page.js", fn: "isAudioStale", lock: "staleCount" },
+  { step: "④ 이미지", path: "app/create/[id]/images/page.js", fn: "isImageStale", lock: "staleCount" },
+  { step: "⑤ 영상", path: "app/create/[id]/video/page.js", fn: "isClipStale", lock: "remaining" },
 ];
 
 describe("낡은 것이 있으면 다음 단계로 못 간다", () => {
-  for (const { step, path, fn } of PAGES) {
+  for (const { step, path, fn, lock } of PAGES) {
     it(`${step} 화면이 ${fn} 로 판정한다`, () => {
       const src = read(path);
       expect(src).toContain(fn);
       expect(src).toMatch(/from ["'][./]*lib\/steps["']/);
     });
 
-    it(`${step} 화면의 다음 버튼이 낡은 것에 잠긴다`, () => {
-      // 다음 화면으로 보내는 버튼의 disabled 조건 안에 staleCount 가 있어야 한다.
-      // 버튼 바로 위 안내문(hint)에도 staleCount 가 나오므로, disabled={...} 안쪽만
-      // 좁혀서 봐야 잠금 조건 자체가 지워지는 회귀를 잡을 수 있다.
-      const src = read(path);
-      expect(src).toContain("staleCount");
-      const pushIdx = src.indexOf("router.push");
-      const buttonStart = src.lastIndexOf("<button", pushIdx);
-      const button = src.slice(buttonStart, pushIdx);
-      const disabledMatch = button.match(/disabled=\{([^}]*)\}/);
-      expect(disabledMatch, `${path} 의 다음 버튼에 disabled 속성이 없다`).toBeTruthy();
-      expect(disabledMatch[1], `${path} 의 다음 버튼 disabled 조건에 staleCount 가 없다`).toContain(
-        "staleCount"
-      );
-    });
+    if (lock === "staleCount") {
+      it(`${step} 화면의 다음 버튼이 낡은 것에 잠긴다`, () => {
+        // 다음 화면으로 보내는 버튼의 disabled 조건 안에 staleCount 가 있어야 한다.
+        // 버튼 바로 위 안내문(hint)에도 staleCount 가 나오므로, disabled={...} 안쪽만
+        // 좁혀서 봐야 잠금 조건 자체가 지워지는 회귀를 잡을 수 있다.
+        const src = read(path);
+        expect(src).toContain("staleCount");
+        const pushIdx = src.indexOf("router.push");
+        const buttonStart = src.lastIndexOf("<button", pushIdx);
+        const button = src.slice(buttonStart, pushIdx);
+        const disabledMatch = button.match(/disabled=\{([^}]*)\}/);
+        expect(disabledMatch, `${path} 의 다음 버튼에 disabled 속성이 없다`).toBeTruthy();
+        expect(disabledMatch[1], `${path} 의 다음 버튼 disabled 조건에 staleCount 가 없다`).toContain(
+          "staleCount"
+        );
+      });
+    } else {
+      it(`${step} 화면의 다음 버튼이 남은 것(낡은 것 포함)에 잠긴다 — disabled 가 아니라 렌더 자체가 갈린다`, () => {
+        const src = read(path);
+        // 낡은 컷이 remainingCount 에 들어가야 이 갈래가 성립한다
+        const remainingIdx = src.indexOf("const remainingCount");
+        expect(remainingIdx, `${path} 에 remainingCount 정의가 없다`).toBeGreaterThan(-1);
+        const remainingLine = src.slice(remainingIdx, src.indexOf(";", remainingIdx));
+        expect(
+          remainingLine,
+          `${path} 의 remainingCount 가 isClipStale 을 포함하지 않는다 — 낡은 컷이 남은 것에 안 들어간다`
+        ).toContain("isClipStale");
+
+        // 완성(다음) 버튼은 remainingCount > 0 분기의 else 쪽에서만 렌더돼야 한다 —
+        // 남은 게(낡은 것 포함) 있으면 그 분기 자체에 오지 않는다
+        const branchIdx = src.indexOf("remainingCount > 0 ?");
+        expect(branchIdx, `${path} 에 remainingCount > 0 분기가 없다`).toBeGreaterThan(-1);
+        const elseIdx = src.indexOf(") : (", branchIdx);
+        expect(elseIdx, `${path} 의 remainingCount 삼항에 else 분기 경계가 없다`).toBeGreaterThan(-1);
+        const pushIdx = src.indexOf("router.push", branchIdx);
+        expect(pushIdx, `${path} 에 다음 화면으로 보내는 router.push 가 없다`).toBeGreaterThan(-1);
+        expect(
+          pushIdx,
+          `${path} 의 다음 버튼이 remainingCount > 0 분기의 참 쪽(=남은 게 있어도 렌더되는 자리)에 있다`
+        ).toBeGreaterThan(elseIdx);
+      });
+    }
   }
 });
 
@@ -86,5 +120,22 @@ describe("화면이 활성 모델의 상한을 본다", () => {
     const src = read("app/create/[id]/script/page.js");
     // 판정식에 I2V_MAX_SECONDS 가 남아 있으면 브라우저 기본값(20)으로 재게 된다
     expect(src).not.toContain("c.seconds > I2V_MAX_SECONDS");
+  });
+});
+
+// 컷 하나만 있는 중간 상태가 실제로 생겼고, 그때 만들기 버튼이 사라졌다.
+// 화면은 "하나라도 있나"가 아니라 "남은 게 있나"로 갈려야 한다.
+describe("⑤영상 화면이 남은 컷을 센다", () => {
+  const src = read("app/create/[id]/video/page.js");
+
+  it("만들기 버튼 분기가 cuts.some((c) => c.video) 로 갈리지 않는다", () => {
+    expect(src).not.toContain("const madeAny = cuts.some((c) => c.video)");
+  });
+
+  it("남은 컷 수를 세고, 그것으로 만들기를 띄운다", () => {
+    expect(src).toContain("remainingCount");
+    // 남은 것이 있으면 만들기, 없으면 완성하러 가기 — 그 분기가 remainingCount 로 갈린다
+    const branchIdx = src.indexOf("remainingCount > 0 ?");
+    expect(branchIdx).toBeGreaterThan(-1);
   });
 });
