@@ -279,7 +279,7 @@ export default function ScriptStepPage() {
           <div className="eyebrow mt-lg">
             연출 <small>자료에서 이렇게 읽었어요 — 화면이 이걸 따라갑니다</small>
           </div>
-          <p className="script-src">{project.briefing.direction}</p>
+          <p className="script-src direction-lines">{project.briefing.direction}</p>
         </>
       )}
 

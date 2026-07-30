@@ -294,3 +294,12 @@ describe("②대본이 연출 바람과 속도를 보여준다", () => {
     expect(src).toMatch(/saveCut\(c\.idx,\s*\{\s*speed:/);
   });
 });
+
+// 연출은 "연출 — 어느 순간" 쌍을 줄바꿈으로 잇는다. HTML 이 줄바꿈을 접으면 쌍 경계가 사라진다.
+describe("연출 여러 줄이 화면에서 접히지 않는다", () => {
+  it("줄바꿈을 살리는 클래스를 쓴다", () => {
+    expect(read("app/create/[id]/script/page.js")).toContain("direction-lines");
+    const css = read("app/globals.css");
+    expect(css).toMatch(/\.direction-lines\s*\{[^}]*white-space:\s*pre-line/);
+  });
+});

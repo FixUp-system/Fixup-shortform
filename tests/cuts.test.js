@@ -741,3 +741,15 @@ describe("이미지의 주제 앵커는 제품이다", () => {
     expect(prompt).not.toContain("50대 남성 주인");
   });
 });
+
+describe("물건 초점이어도 제품이 쓰이는 모습을 보여준다", () => {
+  const cuts = [{ idx: 0, sentence: "가." }, { idx: 1, sentence: "나." }];
+
+  // ★ 실측: 초점이 물건("신발")이었더니 6컷 중 사람이 나오는 컷이 1개뿐이고
+  //   나머지는 신발·발 클로즈업이었다. 광고에서 제품은 쓰이는 모습으로 팔린다.
+  it("제품만 놓인 정물 컷을 반복하지 말라고 지시한다", () => {
+    const { system } = buildShowsMessages(project, cuts);
+    expect(system).toMatch(/정물|제품만/);
+    expect(system).toContain("쓰이는");
+  });
+});

@@ -174,3 +174,23 @@ describe("연출 바람이 브리핑의 일부다", () => {
     expect(briefingContentChanged(a, { ...a })).toBe(false);
   });
 });
+
+describe("연출은 어느 순간에 쓸 것인지와 함께 뽑는다", () => {
+  // ★ 낱말만 뽑았더니 엉뚱한 컷에 배정됐다(2026-07-30 실측):
+  //   "마찰 먼지"는 크로스오버로 멈추는 순간의 것인데 착지 컷에 갔고,
+  //   "역광 실루엣"은 체공 슛의 것인데 거의 정지한 필러 컷에 소모됐다.
+  //   그리고 "선수가 신발을 신고 움직인다"는 피사체 정보가 아예 빠져 6컷 중 1컷만 사람이 나왔다.
+  it("지문이 연출 — 어느 순간 쌍을 요구한다", () => {
+    const { system } = buildBriefingMessages({
+      material: { text: "로우 앵글로 역동적으로", photos: [] },
+    });
+    expect(system).toContain("어느 순간");
+    // 피사체를 함께 적으라고 해야 사람이 화면에 남는다
+    expect(system).toMatch(/누가|피사체/);
+  });
+
+  it("줄바꿈으로 여러 쌍을 적게 한다 — 쉼표로만 이으면 쌍 경계가 사라진다", () => {
+    const { system } = buildBriefingMessages({ material: { text: "자료", photos: [] } });
+    expect(system).toMatch(/한 줄에 하나|줄바꿈/);
+  });
+});

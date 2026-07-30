@@ -402,3 +402,15 @@ describe("validateBriefing — 연출 바람(direction)", () => {
     expect(validateBriefing({ ...base, direction: 42 }).direction).toBe("");
   });
 });
+
+describe("연출 바람의 줄바꿈을 지킨다", () => {
+  // 연출은 "연출 — 어느 순간" 쌍을 줄바꿈으로 잇는다. 줄바꿈이 사라지면 쌍 경계가 무너진다.
+  it("여러 줄을 그대로 담는다", () => {
+    const pairs = "역광 실루엣 — 점프슛 정점에서 공중에 뜬 선수\n마찰 먼지 — 크로스오버로 멈추는 발";
+    const out = validateBriefing({
+      topic: "농구화", key_points: ["하이톱"], questions: [], direction: `  ${pairs}  `,
+    });
+    expect(out.direction).toBe(pairs);
+    expect(out.direction.split("\n")).toHaveLength(2);
+  });
+});

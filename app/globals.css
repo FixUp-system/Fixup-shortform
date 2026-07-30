@@ -896,3 +896,7 @@ select.speed-pick {
   cursor: pointer;
 }
 select.speed-pick:hover { border-color: var(--ink-soft); }
+
+/* 연출은 "연출 — 어느 순간" 쌍을 줄바꿈으로 잇는다. HTML 은 줄바꿈을 접으므로 살린다 —
+   접히면 쌍 경계가 사라져 사장님이 무엇이 무엇에 붙은 건지 못 읽는다. */
+.script-src.direction-lines { white-space: pre-line; }
