@@ -1,6 +1,64 @@
 import { describe, it, expect } from "vitest";
 import { buildCues, toAss, cutSeconds, subtitleStyle, lineWidthUnits, textUnits, MAX_SUBTITLE_LINES, splitSubtitleText, breakTwoLines } from "../lib/subtitles";
 
+describe("자막을 절 경계에서 고르게 나눈다", () => {
+  // 한 줄 11.21 · 두 줄 22.42 (1080×1920). 숫자를 박지 않고 같은 식에서 뽑는다.
+  const MAX = lineWidthUnits({ width: 1080, height: 1920 }) * MAX_SUBTITLE_LINES;
+
+  // 2026-07-30 완성본에서 눈으로 본 결함이다. ASS 에 "속당김이 심한 날, VT" 로 끝나고
+  // 다음 자막이 "PDRN 시카 엑소좀" 으로 시작했다 — 제품명이 갈렸다.
+  it("제품명을 가르지 않는다", () => {
+    const s = "볼이 빨갛게 달아오르고 속당김이 심한 날, VT PDRN 시카 엑소좀 앰플이 도움이 됩니다.";
+    const pieces = splitSubtitleText(s, MAX);
+    expect(pieces.join("")).toBe(s);                       // 원문 보존
+    expect(pieces.some((p) => p.includes("VT PDRN"))).toBe(true);
+    // "VT" 로 끝나는 조각이 있으면 제품명이 갈린 것이다
+    expect(pieces.some((p) => p.trim().endsWith("VT"))).toBe(false);
+  });
+
+  it("관형어와 명사를 가르지 않는다 — 다음 날", () => {
+    const s = "자기 전, 토너 후 2~3방울 얼굴에 펴 바르면 다음 날 아침 당김이 덜하다는 후기가 많습니다.";
+    const pieces = splitSubtitleText(s, MAX);
+    expect(pieces.join("")).toBe(s);
+    expect(pieces.some((p) => p.includes("다음 날"))).toBe(true);
+    expect(pieces.some((p) => p.trim().endsWith("다음"))).toBe(false);
+  });
+
+  it("모든 조각이 두 줄 폭 안에 들어간다 — 세 줄이 되살아나지 않는다", () => {
+    const samples = [
+      "볼이 빨갛게 달아오르고 속당김이 심한 날, VT PDRN 시카 엑소좀 앰플이 도움이 됩니다.",
+      "자기 전, 토너 후 2~3방울 얼굴에 펴 바르면 다음 날 아침 당김이 덜하다는 후기가 많습니다.",
+      "특히 20대 후반에서 30대 초반 여성들이 많이 찾고 재구매도 잦습니다.",
+      "30ml에 39,000원으로, 환절기 피부 고민을 덜어줍니다.",
+    ];
+    for (const s of samples) {
+      for (const p of splitSubtitleText(s, MAX)) {
+        expect(textUnits(p.trim()), `조각이 두 줄을 넘는다: ${p}`).toBeLessThanOrEqual(MAX);
+      }
+    }
+  });
+
+  it("조각 수는 최소다 — 자막이 산만해지지 않게", () => {
+    const s = "볼이 빨갛게 달아오르고 속당김이 심한 날, VT PDRN 시카 엑소좀 앰플이 도움이 됩니다.";
+    const need = Math.ceil(textUnits(s.trim()) / MAX);
+    expect(splitSubtitleText(s, MAX).length).toBe(need);
+  });
+
+  // 절 경계가 없는 문장은 어절 경계로 떨어진다 — 그때도 원문과 두 줄 규칙은 지킨다.
+  it("절 경계가 없으면 어절 경계로 나눈다", () => {
+    const s = "환절기 아침 거울 속 얼굴이 조금씩 달라지는 것을 느끼는 사람들이 부쩍 늘었습니다";
+    const pieces = splitSubtitleText(s, MAX);
+    expect(pieces.join("")).toBe(s);
+    expect(pieces.length).toBeGreaterThan(1);
+    for (const p of pieces) expect(textUnits(p.trim())).toBeLessThanOrEqual(MAX);
+  });
+
+  it("낱말 하나가 두 줄을 넘으면 그대로 둔다 — 글자 중간에서 자르지 않는다", () => {
+    const s = "가".repeat(40);
+    expect(splitSubtitleText(s, MAX)).toEqual([s]);
+  });
+});
+
 describe("buildCues", () => {
   it("컷 길이를 누적해 시작·끝을 만든다", () => {
     const cues = buildCues([
