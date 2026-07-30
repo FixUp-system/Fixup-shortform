@@ -127,6 +127,19 @@ describe("buildSplitMessages", () => {
   it("화면이 바뀌는 자리에서 끊으라는 규칙은 그대로다", () => {
     expect(buildSplitMessages(["한 문장."]).system).toContain("화면이 바뀔 자리");
   });
+
+  // 대본은 모델을 모르고 컷 분할부터 안다. 모델을 바꾸면 이 문장이 따라 움직여야 한다 —
+  // Kling 은 하한이 3초라 짧은 컷을 만드는 데 주저할 이유가 없다(LTX 하한 6초에서는 손실이었다).
+  it("모델을 바꾸면 알려 주는 길이도 바뀐다", () => {
+    process.env.FAL_I2V_ENDPOINT = "fal-ai/kling-video/v3/standard/image-to-video";
+    try {
+      const { system } = buildSplitMessages(["한 조각."]);
+      expect(system).toContain("3~15초");
+      expect(system).not.toContain("6~20초");
+    } finally {
+      delete process.env.FAL_I2V_ENDPOINT;
+    }
+  });
 });
 
 describe("buildShowsMessages", () => {
