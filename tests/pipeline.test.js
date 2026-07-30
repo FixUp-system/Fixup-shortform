@@ -450,6 +450,61 @@ describe("runVideoPipeline — 이미지를 클립으로", () => {
     // 낭독을 다시 만들어 길이가 바뀐 상태
     expect(isClipStale({ ...cut, seconds: cut.seconds + 3 })).toBe(true);
   });
+
+  // 클립은 한 편에서 가장 비싼 단계다. 있는 것을 또 사면 그 값이 그대로 두 배가 된다.
+  // 2026-07-30 A/B 측정으로 컷 하나를 미리 사 둔 일이 있었고, 그것을 심어도 다시 샀다.
+  it("살아 있는 클립이 있는 컷은 건너뛴다 — 부르지 않는다", async () => {
+    const p = await withCuts([
+      { idx: 0, sentence: "이미 있다", seconds: 3, image: { url: "i0" }, audio: { url: "a0", seconds: 3 },
+        video: { url: "https://fal/keep.mp4", seconds: 3, truncated: false, of: "i0|3|" } },
+      { idx: 1, sentence: "없다", seconds: 3, image: { url: "i1" }, audio: { url: "a1", seconds: 3 } },
+    ]);
+
+    const called = [];
+    await pipeline.runVideoPipeline(p.id, {
+      clip: async ({ imageUrl }) => { called.push(imageUrl); return { url: "new", seconds: 3, truncated: false }; },
+    });
+
+    expect(called).toEqual(["i1"]);                       // i0 는 부르지 않았다
+    const saved = await projects.getProject(p.id);
+    expect(saved.cuts[0].video.url).toBe("https://fal/keep.mp4"); // 있던 것이 그대로다
+    expect(saved.cuts[1].video.url).toBe("new");
+    expect(saved.status).toBe("video");
+  });
+
+  // 그림이나 낭독이 바뀐 뒤의 클립은 옛것이다. 아끼려고 그것을 두면 완성본이 어긋난다.
+  it("낡은 클립은 건너뛰지 않는다 — 다시 만든다", async () => {
+    const p = await withCuts([
+      // of 가 지금 clipKey(= "i0|3|") 와 다르다 — 그림이 바뀐 뒤다
+      { idx: 0, sentence: "낡음", seconds: 3, image: { url: "i0" }, audio: { url: "a0", seconds: 3 },
+        video: { url: "https://fal/old.mp4", seconds: 3, truncated: false, of: "옛그림|3|" } },
+    ]);
+
+    const called = [];
+    await pipeline.runVideoPipeline(p.id, {
+      clip: async ({ imageUrl }) => { called.push(imageUrl); return { url: "new", seconds: 3, truncated: false }; },
+    });
+
+    expect(called).toEqual(["i0"]);
+    expect((await projects.getProject(p.id)).cuts[0].video.url).toBe("new");
+  });
+
+  // 각인이 없는 옛 산출물은 낡지 않은 것으로 본다(isClipStale 의 규칙). 그러면 건너뛴다 —
+  // 유료 호출을 부르는 쪽에서는 "모르면 사지 않는다"가 안전한 방향이다.
+  it("각인이 없는 옛 클립도 건너뛴다", async () => {
+    const p = await withCuts([
+      { idx: 0, sentence: "각인없음", seconds: 3, image: { url: "i0" }, audio: { url: "a0", seconds: 3 },
+        video: { url: "https://fal/nostamp.mp4", seconds: 3 } },
+    ]);
+
+    const called = [];
+    await pipeline.runVideoPipeline(p.id, {
+      clip: async ({ imageUrl }) => { called.push(imageUrl); return { url: "new", seconds: 3, truncated: false }; },
+    });
+
+    expect(called).toEqual([]);
+    expect((await projects.getProject(p.id)).cuts[0].video.url).toBe("https://fal/nostamp.mp4");
+  });
 });
 
 describe("runRenderPipeline — 하나로 합친다", () => {
