@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { splitSentences, splitUnits, explodeLongRanges, buildSplitMessages, buildShowsMessages, buildImagePrompt, buildClipPrompt, stillOnly } from "../lib/cuts.js";
+import { splitSentences, splitUnits, explodeLongRanges, buildSplitMessages, buildShowsMessages, buildImagePrompt, buildClipPrompt, stillOnly, clauseBoundaries } from "../lib/cuts.js";
 import { I2V_STEPS, I2V_MAX_SECONDS } from "../lib/clip-limits.js";
 
 const project = {
@@ -507,5 +507,55 @@ describe("explodeLongRanges — 8초를 넘고 두 조각 이상이면 푼다", 
     expect(explodeLongRanges([{ from: 0, to: 2 }], units)).toEqual([]);
     expect(explodeLongRanges([{ from: 1, to: 9 }], units)).toEqual([]);
     expect(explodeLongRanges([{ from: 2, to: 1 }], units)).toEqual([]);
+  });
+});
+
+describe("clauseBoundaries — 절 경계 위치", () => {
+  // 위치만 돌려준다. 자막은 이 후보 중에서 폭을 보고 고른다 — 조각을 받으면 다시
+  // 이어 붙였다 자르는 일이 생기고, 그때 원문 보존이 깨질 자리가 난다.
+  it("연결어미와 쉼표 뒤를 후보로 돌려준다", () => {
+    const s = "볼이 빨갛게 달아오르고 속당김이 심한 날, VT PDRN 시카 엑소좀 앰플이 도움이 됩니다.";
+    const at = clauseBoundaries(s);
+    expect(at.length).toBeGreaterThanOrEqual(2);
+    // 각 위치는 뒤 조각의 시작이다 — 그 자리에서 자르면 앞이 어미로 끝난다
+    expect(s.slice(0, at[0]).trim().endsWith("달아오르고")).toBe(true);
+    expect(s.slice(at[0], at[1]).trim().endsWith("날,")).toBe(true);
+  });
+
+  it("오름차순이고 문장 안에 있다", () => {
+    const s = "자기 전, 토너 후 2~3방울 얼굴에 펴 바르면 다음 날 아침 당김이 덜하다는 후기가 많습니다.";
+    const at = clauseBoundaries(s);
+    for (let i = 1; i < at.length; i++) expect(at[i]).toBeGreaterThan(at[i - 1]);
+    for (const x of at) {
+      expect(x).toBeGreaterThan(0);
+      expect(x).toBeLessThan(s.length);
+    }
+  });
+
+  it("자를 자리가 없으면 빈 배열이다", () => {
+    expect(clauseBoundaries("환절기 아침입니다.")).toEqual([]);
+    expect(clauseBoundaries("")).toEqual([]);
+  });
+
+  // 6자 하한이 오검출을 걸러 준다 — "라면"·"장면"처럼 어미가 아닌 것도 어절 끝에서는 걸린다
+  it("앞 조각이 6자(공백 제외) 미만이면 후보가 아니다", () => {
+    expect(clauseBoundaries("라면 먹고 갈래요?")).toEqual([]);
+  });
+});
+
+describe("splitClauses 는 clauseBoundaries 위에서 그대로 돈다", () => {
+  // 리팩터링이 컷 분할 동작을 바꾸지 않았다는 증거. splitUnits 가 splitClauses 를 쓴다.
+  it("경계 위치로 자른 것과 splitUnits 의 조각이 같다", () => {
+    const s = "볼이 빨갛게 달아오르고 속당김이 심한 날, VT PDRN 시카 엑소좀 앰플이 도움이 되고 다음 날 아침 당김이 덜하다는 후기가 많고 재구매도 잦습니다.";
+    const at = clauseBoundaries(s);
+    // 컷 조각은 구분 공백을 품지 않는다 — 경계 앞 한 칸을 빼고 잘라야 splitUnits 와 같아진다
+    const byPos = [];
+    let start = 0;
+    for (const pos of at) { byPos.push(s.slice(start, pos - 1)); start = pos; }
+    byPos.push(s.slice(start));
+    const units = splitUnits(s);
+    expect(units.join(" ")).toBe(s);      // 컷의 계약
+    expect(byPos.join(" ")).toBe(s);      // 위치로 자른 것도 같은 계약을 지킨다
+    expect(units).toEqual(byPos);         // 조각이 글자 그대로 같다
   });
 });
