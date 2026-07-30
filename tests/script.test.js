@@ -8,6 +8,8 @@ import {
   copyRatio,
   repeatsWithin,
   scriptFaults,
+  sayableFacts,
+  buildScriptMessages,
   overTarget,
   underTarget,
   unusedFacts,
@@ -541,5 +543,54 @@ describe("메타 문장·연출 어휘를 코드가 잡는다", () => {
     const faults = scriptFaults(project, { text });
     const { messages } = buildScriptRewriteMessages(project, { text }, faults);
     expect(messages[0].content).toContain("슬로모션");
+  });
+});
+
+describe("대본이 '말할 것'을 정리된 사실로 받는다", () => {
+  // ★ 여기까지 대본이 받는 것은 자료 원문뿐이었다 — key_points 를 한 번도 보지 않았다.
+  //   그래서 기획서 2000자를 던져 주고 "무엇을 말할지"는 모델이 스스로 골랐고,
+  //   분량을 채우려 필러("이런 기능들이 모여", "직접 확인할 수 있습니다")를 썼다.
+
+  const brief = (key_points) => ({
+    material: { text: "자료 원문입니다.", photos: [] },
+    briefing: { topic: "농구화", key_points, asked: [] },
+    settings: { target_seconds: 30 },
+  });
+
+  it("사실만 골라 대본 지문에 넣는다", () => {
+    const p = brief(["하이톱이 발목을 지지한다", "미드솔이 충격을 흡수한다"]);
+    const user = buildScriptMessages(p).messages[0].content;
+    expect(user).toContain("하이톱이 발목을 지지한다");
+    expect(user).toContain("미드솔이 충격을 흡수한다");
+  });
+
+  // 실제로 이런 key_points 가 나왔다 — 네 개 전부 연출이고 제품 사실이 0개였다.
+  it("연출 서술은 말할 것에서 뺀다 — 그것을 주면 낭독하라는 말이 된다", () => {
+    const p = brief([
+      "로우 앵글 트래킹과 약한 슬로모션으로 방향 전환을 강조",
+      "극단적 슬로모션으로 점프슛을 하이라이트",
+      "하이톱이 발목을 지지한다",
+    ]);
+    const user = buildScriptMessages(p).messages[0].content;
+    expect(user).toContain("하이톱이 발목을 지지한다");
+    expect(user).not.toContain("극단적 슬로모션");
+    expect(user).not.toContain("로우 앵글");
+  });
+
+  it("사실이 하나도 안 남으면 블록째 뺀다 — 지금 동작 그대로", () => {
+    const p = brief(["로우 앵글 트래킹으로 강조", "카메라가 따라간다"]);
+    const user = buildScriptMessages(p).messages[0].content;
+    expect(user).not.toContain("[말할 것");
+  });
+
+  it("sayableFacts 가 사실만 돌려준다", () => {
+    expect(sayableFacts({ key_points: ["발목 지지", "로우 앵글 트래킹"] })).toEqual(["발목 지지"]);
+    expect(sayableFacts(null)).toEqual([]);
+  });
+
+  // 분량이 미달일 때 "아직 안 쓴 사실"로 연출을 넘기면, 되돌리기가 연출을 원고에 넣으려 한다
+  it("안 쓴 사실에도 연출이 섞이지 않는다", () => {
+    const p = brief(["하이톱이 발목을 지지한다", "극단적 슬로모션으로 하이라이트"]);
+    expect(unusedFacts(p, "짧은 원고입니다.")).toEqual(["하이톱이 발목을 지지한다"]);
   });
 });

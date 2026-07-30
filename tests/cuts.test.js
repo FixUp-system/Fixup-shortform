@@ -708,3 +708,36 @@ describe("클립 요청이 속도를 반영한다", () => {
     expect(before).toContain("천천히 다가간다");
   });
 });
+
+describe("이미지의 주제 앵커는 제품이다", () => {
+  const cut = { idx: 0, sentence: "문장.", shows: "신발 클로즈업" };
+
+  // ★ 자료가 기획서였을 때 topic 이 "신발을 주인공으로 한 감각적인 광고 영상" 이 됐고,
+  //   그것이 "이 제품을 전 컷에서 일관되게 유지하라"의 대상으로 들어갔다(2026-07-30 실측).
+  //   앵커가 기획 문구면 컷 간 제품 일관성이 그 자리에서 깨진다.
+  it("초점의 대상을 주제보다 먼저 쓴다", () => {
+    const p = {
+      settings: { aspect_ratio: "9:16" },
+      briefing: { topic: "신발을 주인공으로 한 감각적인 광고 영상", focus: { mode: "물건", subject: "검정+빨강 하이톱 농구화" } },
+    };
+    const prompt = buildImagePrompt(cut, p);
+    expect(prompt).toContain("검정+빨강 하이톱 농구화");
+    expect(prompt).not.toContain("감각적인 광고 영상");
+  });
+
+  it("초점이 없으면 주제로 떨어진다 — 지금 동작 그대로", () => {
+    const p = { settings: { aspect_ratio: "9:16" }, briefing: { topic: "생딸기라떼" } };
+    expect(buildImagePrompt(cut, p)).toContain("생딸기라떼");
+  });
+
+  // 사람 영상의 subject 는 인물이다. 그것을 "이 제품을 유지하라"의 대상으로 쓰면 틀린 지시가 된다.
+  it("초점이 사람이면 주제를 쓴다", () => {
+    const p = {
+      settings: { aspect_ratio: "9:16" },
+      briefing: { topic: "옷 수선집 이야기", focus: { mode: "사람", subject: "50대 남성 주인" } },
+    };
+    const prompt = buildImagePrompt(cut, p);
+    expect(prompt).toContain("옷 수선집 이야기");
+    expect(prompt).not.toContain("50대 남성 주인");
+  });
+});
