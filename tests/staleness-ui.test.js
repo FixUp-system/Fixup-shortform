@@ -231,3 +231,51 @@ describe("②대본의 구성에서 문장을 고칠 수 있다", () => {
     expect(src).toContain("눌러서 고칠 수 있어요");
   });
 });
+
+// 글 쓰는 칸은 규칙이 한 벌이다(textarea.field). 두 벌로 두면 한쪽만 고치는 날이 오고,
+// 그때 같은 일을 하는 칸이 화면마다 다르게 보인다.
+//
+// ⚠️ 실제로 겪었다: 공용 규칙을 뽑으면서 /create 쪽에 field 를 안 붙였더니 그 화면의 칸이
+//    브라우저 기본값(흰 배경·13px)으로 돌아갔다. 클래스 하나가 빠진 것을 코드가 판정한다.
+describe("글 쓰는 칸은 공용 규칙을 쓴다", () => {
+  const FIELDS = [
+    { 자리: "자료 넣는 화면", path: "app/create/page.js", cls: "composer-text" },
+    { 자리: "컨셉 보정", path: "components/StylePicker.jsx", cls: "tray-input" },
+    { 자리: "대본 원고", path: "app/create/[id]/script/page.js", cls: "script-draft" },
+    { 자리: "수정 지시", path: "app/create/[id]/script/page.js", cls: "fix-input" },
+  ];
+
+  for (const { 자리, path, cls } of FIELDS) {
+    it(`${자리} 칸이 field 와 함께 쓰인다`, () => {
+      const src = read(path);
+      const re = new RegExp(`className="field ${cls}"`);
+      expect(src, `${path} 의 ${cls} 에 field 가 빠졌다 — 브라우저 기본 스타일로 돌아간다`)
+        .toMatch(re);
+    });
+  }
+
+  it("공용 규칙이 검정 바탕·스크롤 없음을 정한다", () => {
+    const css = read("app/globals.css");
+    const block = css.slice(css.indexOf("textarea.field {"), css.indexOf("textarea.field:focus"));
+    expect(block).toContain("background: var(--deep)");
+    expect(block).toContain("overflow-y: hidden");
+    expect(block).toContain("resize: none");
+  });
+});
+
+// 대본 화면 아래쪽이 길어 사장님이 읽기 어려웠다. 분량 부족 안내와 [이야기 더 들려주기]를 뺐다.
+describe("②대본에서 이야기 더 들려주기를 뺐다", () => {
+  const src = read("app/create/[id]/script/page.js");
+
+  it("버튼도 그것을 부르는 함수도 남아 있지 않다", () => {
+    expect(src).not.toContain("이야기 더 들려주기");
+    expect(src).not.toContain("askMore");
+    expect(src).not.toContain("needsMore");
+  });
+
+  it("수정 지시 줄이 세로로 쌓인다 — 칸이 대본 칸과 같은 너비를 쓴다", () => {
+    const css = read("app/globals.css");
+    const rule = css.slice(css.indexOf(".fix-row {"), css.indexOf(".fix-row .mini"));
+    expect(rule).toContain("flex-direction: column");
+  });
+});

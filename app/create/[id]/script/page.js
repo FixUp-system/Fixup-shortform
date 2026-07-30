@@ -20,6 +20,8 @@ export default function ScriptStepPage() {
   const [draft, setDraft] = useState(null); // 손으로 고치는 중인 원고(저장 전)
   const [aspect, setAspect] = useState(project.settings?.aspect_ratio || "9:16");
   // 자동 생성이 한 번만 돌게 막는다 — busy는 비동기라 effect가 두 번 불리면 과금이 두 배가 된다.
+  const textRef = useRef(null);
+  const fixRef = useRef(null);
   const autoGenFor = useRef(null);
   const autoSplitFor = useRef(null);
   const splitPollRef = useRef(null);
@@ -34,6 +36,16 @@ export default function ScriptStepPage() {
 
   // 서버 원고가 바뀌면 편집 중인 초안을 버린다(재생성 결과가 화면에 보이게)
   useEffect(() => { setDraft(null); }, [project?.script?.version]);
+
+  // 글이 늘면 칸이 아래로 밀린다 — 자료 넣는 화면과 같은 방식이다(안에서 스크롤하지 않는다).
+  // auto 로 되돌린 뒤 재므로 지운 만큼 다시 접힌다. 바닥은 CSS 의 min-height 가 잡는다.
+  const grow = (el) => {
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  };
+  useEffect(() => { grow(textRef.current); }, [draft, project?.script?.text, project?.cuts]);
+  useEffect(() => { grow(fixRef.current); }, [instruction]);
 
   // 원고가 준비되면 구성(컷·화면·움직임)을 이어서 만든다.
   // 승인 뒤가 아니라 승인 앞에서 만드는 이유: 사장님이 원고와 구성을 함께 보고 고쳐야 한다.
@@ -137,23 +149,6 @@ export default function ScriptStepPage() {
     await load(id).catch(() => {});
   }
 
-  // 모자란 분량을 채울 이야기를 청한다 — 질문을 만들어 두고 답하는 화면(①자료)으로 보낸다.
-  // 답한 뒤 거기서 "이대로 대본 쓰기"를 누르면 원고가 다시 쓰인다.
-  async function askMore() {
-    setBusy(true); setErr("");
-    const res = await fetch(`/api/projects/${id}/briefing`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "develop" }),
-    });
-    if (!res.ok) {
-      setErr((await res.json().catch(() => ({}))).error || "여쭤볼 것을 찾지 못했어요");
-      setBusy(false);
-      return;
-    }
-    await load(id).catch(() => {});
-    router.push(`/create/${id}/briefing`);
-  }
-
   // 지금 원고에서 나온 컷이 이미 있는가 — 낡은 컷은 다시 만들어야 하므로 세지 않는다.
   // 서버(POST /cuts)와 같은 판정을 쓴다. 어긋나면 화면은 넘어가는데 서버가 409로 막는다.
   const hasCuts = (project.cuts || []).length > 0 && !areCutsStale(project);
@@ -211,12 +206,6 @@ export default function ScriptStepPage() {
   // splitSentences 가 그것을 문장 경계로 읽어(cuts.js:7) 컷이 달라진다.
   const flatten = (s) => s.replace(/\s*\n\s*/g, " ").replace(/\s{2,}/g, " ").trim();
   const splitting = project.status === "cuts" && cuts.length === 0 && !project.cuts_error;
-  // 고른 길이를 못 채웠는가 — 사실 개수로 어림하지 않고 실제 원고를 재서 판단한다.
-  // 모자라면 강요하지 않고 고르게 한다: 이야기를 더 들려주거나, 이대로 가거나.
-  const chosen = project.settings?.target_seconds || null;
-  const actual = estimateSeconds({ text: shown });
-  const short = chosen ? chosen - actual : 0;
-  const needsMore = chosen ? actual < chosen * 0.85 : false;
 
   return (
     <section className="panel panel--narrow">
@@ -229,7 +218,8 @@ export default function ScriptStepPage() {
       )}
 
       <textarea
-        className="ref ref-lg script-draft"
+        ref={textRef}
+        className="field script-draft"
         value={shown}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => {
@@ -246,21 +236,13 @@ export default function ScriptStepPage() {
       <div className="script-src">
         컷은 이 원고를 잘라서 만들어요 — 여기서 승인한 문장이 그대로 화면에 실립니다
       </div>
-      {needsMore && (
-        <div className="script-src warn">
-          고르신 {chosen}초에 <b>약 {short}초</b>가 모자라요 — 자료에 담긴 이야기를 다 썼거든요.
-          이야기를 조금 더 들려주시면 채울 수 있어요.{" "}
-          <button className="mini" disabled={busy} onClick={askMore}>이야기 더 들려주기</button>
-          {" "}또는 이대로 승인하셔도 됩니다.
-        </div>
-      )}
       {madeCuts && (
         <div className="script-src warn">
           이미 만들어 둔 이미지가 있어요 — 대본을 다시 쓰면 컷을 처음부터 다시 만들게 되고, 그 이미지는 지워져요
         </div>
       )}
       <div className="fix-row">
-        <textarea className="sent-input fix-input"
+        <textarea ref={fixRef} className="field fix-input"
           placeholder='수정 지시 (예: "더 짧게", "가게 이름을 빼줘", "손님 이야기를 앞으로")'
           value={instruction} onChange={(e) => setInstruction(e.target.value)} />
         <button className="mini"

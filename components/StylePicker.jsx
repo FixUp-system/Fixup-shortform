@@ -40,7 +40,7 @@ export default function StylePicker({
       <div className={bare ? "tray-note" : "script-src"}>{current.desc}</div>
       {warn && <div className={bare ? "tray-note" : "script-src warn"}>{warn}</div>}
       {bare ? (
-        <textarea ref={noteRef} rows={1} className="tray-input" maxLength={STYLE_NOTE_MAX}
+        <textarea ref={noteRef} rows={1} className="field tray-input" maxLength={STYLE_NOTE_MAX}
           placeholder='더 바라는 결이 있으면 한 줄 (예: "따뜻한 파스텔톤")'
           value={note} disabled={disabled}
           onChange={(e) => onNote(e.target.value)} onBlur={onNoteCommit} />

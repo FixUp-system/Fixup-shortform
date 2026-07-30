@@ -77,7 +77,7 @@ export default function CreatePage() {
 
       <section className="panel--wide">
         <div className="composer">
-          <textarea ref={textRef} className="composer-text" value={text} maxLength={2000}
+          <textarea ref={textRef} className="field composer-text" value={text} maxLength={2000}
             onChange={(e) => setText(e.target.value)}
             placeholder="무엇을 알리고 싶으세요? 제품 설명·홍보 포인트·손님 이야기를 자유롭게 적어 주세요" />
 
