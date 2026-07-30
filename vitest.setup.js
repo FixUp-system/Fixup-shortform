@@ -12,3 +12,7 @@ import { tmpdir } from "os";
 import path from "path";
 
 process.env.SHOTFORM_DATA_DIR = mkdtempSync(path.join(tmpdir(), "shotform-test-"));
+
+// 클립 모델 env 는 테스트에서 지운다 — .env.local 을 Kling 으로 바꿔 두면 눈금 기대값이
+// 머신마다 달라진다. 활성 프로필을 재는 테스트는 자기 안에서 직접 세운다.
+delete process.env.FAL_I2V_ENDPOINT;
