@@ -1,6 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { splitSentences, splitUnits, explodeLongRanges, buildSplitMessages, buildShowsMessages, buildImagePrompt, buildClipPrompt, stillOnly, clauseBoundaries } from "../lib/cuts.js";
 import { I2V_STEPS, I2V_MAX_SECONDS } from "../lib/clip-limits.js";
+import { STYLE_PRESETS } from "../lib/styles.js";
 
 const project = {
   settings: { aspect_ratio: "9:16" },
@@ -557,5 +558,78 @@ describe("splitClauses 는 clauseBoundaries 위에서 그대로 돈다", () => {
     expect(units.join(" ")).toBe(s);      // 컷의 계약
     expect(byPos.join(" ")).toBe(s);      // 위치로 자른 것도 같은 계약을 지킨다
     expect(units).toEqual(byPos);         // 조각이 글자 그대로 같다
+  });
+});
+
+describe("buildImagePrompt — 화풍", () => {
+  const cut = { idx: 0, sentence: "매일 아침 딸기를 갈아 씁니다.", shows: "딸기 과육이 우유에 섞이는 클로즈업" };
+  const withStyle = (preset, note) => ({
+    ...project,
+    settings: { ...project.settings, style: note === undefined ? { preset } : { preset, note } },
+  });
+
+  // ★ 회귀의 방어선. 화풍을 도입하기 전 이 함수가 내던 문장 그대로다. 실사 프로젝트의
+  //   그림이 달라지면 안 된다 — 사장님이 이미 완성한 영상을 다시 만들게 하는 일이다.
+  it("실사는 화풍 도입 전과 글자 그대로 같은 프롬프트를 낸다", () => {
+    const expected =
+      "High-quality photographic still for a short-form video, vertical 9:16 composition. " +
+      "Scene: 딸기 과육이 우유에 섞이는 클로즈업. " +
+      "The video's subject is: 생딸기라떼. Keep this exact product/subject consistent in every scene. " +
+      "Cinematic lighting, realistic, no text or letters in the image.";
+    expect(buildImagePrompt(cut, project)).toBe(expected);          // 화풍을 안 고른 프로젝트
+    expect(buildImagePrompt(cut, withStyle("photo"))).toBe(expected); // 실사를 고른 프로젝트
+  });
+
+  it("고른 화풍이 그림의 종류와 마감을 정한다", () => {
+    const p = buildImagePrompt(cut, withStyle("anime"));
+    expect(p).toContain("Anime-style animation still");
+    expect(p).toContain("cel shading");
+    expect(p).not.toContain("photographic still");
+    expect(p).not.toContain("Cinematic lighting, realistic");
+  });
+
+  it("네 화풍이 서로 다른 프롬프트를 낸다", () => {
+    const all = STYLE_PRESETS.map((s) => buildImagePrompt(cut, withStyle(s.id)));
+    expect(new Set(all).size).toBe(STYLE_PRESETS.length);
+  });
+
+  // 가짜 모드 플레이스홀더가 프롬프트를 역파싱한다(lib/imagegen.js). 문형이 깨지면
+  // 0원 확인이 조용히 쓸모없어진다 — 주석으로 적어 두는 것은 판정이 아니다.
+  it("어떤 화풍에서도 가짜 모드가 장면을 뽑아낼 수 있다", () => {
+    const SCENE = /Scene:\s*(.+?)\.\s/;
+    for (const s of STYLE_PRESETS) {
+      const p = buildImagePrompt(cut, withStyle(s.id, "따뜻한 파스텔톤"));
+      expect(p.match(SCENE)?.[1], `${s.id} 에서 장면을 못 뽑는다`).toBe("딸기 과육이 우유에 섞이는 클로즈업");
+    }
+  });
+
+  it("보정 한 줄이 프롬프트에 실린다", () => {
+    expect(buildImagePrompt(cut, withStyle("illust", "따뜻한 파스텔톤"))).toContain("따뜻한 파스텔톤");
+  });
+
+  // 보정은 우리 지시를 지울 수 없어야 한다. 위치가 그것을 보장한다 —
+  // 금지 문구를 포함한 꼬리는 항상 코드가 보정 **뒤에** 붙인다.
+  it("보정 뒤에 마감과 글자 금지가 온다", () => {
+    const p = buildImagePrompt(cut, withStyle("illust", "따뜻한 파스텔톤"));
+    expect(p.indexOf("따뜻한 파스텔톤")).toBeLessThan(p.indexOf("soft pastel palette"));
+    expect(p.indexOf("따뜻한 파스텔톤")).toBeLessThan(p.indexOf("no text or letters"));
+  });
+
+  it("보정이 없으면 아무 절도 늘지 않는다", () => {
+    expect(buildImagePrompt(cut, withStyle("anime", ""))).toBe(buildImagePrompt(cut, withStyle("anime")));
+    expect(buildImagePrompt(cut, withStyle("anime"))).not.toContain("Style note");
+  });
+
+  // 전 컷 공통 보정과 컷 하나의 재생성 지시는 다른 것이다. 서로 덮으면 사장님이 고친 것이
+  // 사라진다 — 한쪽은 화풍, 한쪽은 "이 컷만 이렇게".
+  it("보정과 컷 수정 지시가 함께 실린다", () => {
+    const p = buildImagePrompt({ ...cut, edit_instruction: "딸기를 더 크게" }, withStyle("illust", "따뜻한 파스텔톤"));
+    expect(p).toContain("따뜻한 파스텔톤");
+    expect(p).toContain("딸기를 더 크게");
+  });
+
+  it("모르는 화풍은 실사로 그린다 — 그림이 안 나오는 것보다 낫다", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(buildImagePrompt(cut, withStyle("클레이애니"))).toBe(buildImagePrompt(cut, project));
   });
 });
