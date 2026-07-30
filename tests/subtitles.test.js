@@ -69,6 +69,22 @@ describe("자막을 절 경계에서 고르게 나눈다", () => {
     expect(pieces.join("")).toBe(s);
     expect(pieces[0]).toBe("a   aaa  하면 ");
   });
+
+  // 절 경계가 n-1개 이상이라 절 경계만으로 시도하지만, 그 경계가 나쁜 자리에 있어
+  // (끝 조각이 두 줄을 넘는다) 실패한다. 이때 바로 그리디(packWords)로 던지면
+  // 절 경계 사이에 있던, 목표 폭에 더 가까운 어절 경계를 한 번도 못 본 채 진다.
+  // 폭을 넓혀 재시도해야 이 어절 경계가 후보에 든다.
+  // 재시도를 없애면(firstPool 실패 시 바로 packWords) 이 테스트가 빨개진다 — 직접
+  // 확인했다: greedy 결과는 "…늘어지는 문장을 좀 " / "더 이어서…" 로 갈린다.
+  it("절 경계 시도가 넘치면 어절 경계까지 넓혀 재시도한다 — 그리디로 바로 안 던진다", () => {
+    const s = "아침저녁으로 춥고 매우 길게 늘어지는 문장을 좀 더 이어서 자리를 찾아야 합니다";
+    const pieces = splitSubtitleText(s, MAX);
+    expect(pieces.join("")).toBe(s);
+    // 재시도가 고르는 자리(목표 폭에 더 가깝다): "…늘어지는 " 뒤에서 갈린다
+    expect(pieces[0]).toBe("아침저녁으로 춥고 매우 길게 늘어지는 ");
+    // 그리디였다면 "문장을 좀 " 까지 채웠을 것이다 — 그 자리에서 안 갈린다
+    expect(pieces.some((p) => p.trim().endsWith("문장을 좀"))).toBe(false);
+  });
 });
 
 describe("buildCues", () => {
