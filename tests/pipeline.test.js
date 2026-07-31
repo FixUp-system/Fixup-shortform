@@ -309,6 +309,33 @@ describe("이미지 생성에 레퍼런스가 배열로 간다", () => {
     await projects.updateProject(p.id, (proj) => ({
       ...proj,
       status: "voice",
+      cast: [{ id: "c1", who: "주인", ref: { from: "avatar", id: "av-man-30s" } }],
+      cuts: [{ idx: 0, sentence: "문장입니다.", seconds: 3, state: "pending",
+               shows: "주인이 자전거를 끄는 미디엄 샷", ref_ids: ["c1"], regen_count: 0 }],
+    }));
+    const seen = [];
+    const d = {
+      splitCuts: async () => { throw new Error("부르면 안 된다"); },
+      genImage: async (args) => { seen.push(args.refs); return { url: "img" }; },
+      select: async () => ({ passed: true, selectedIndex: 0, note: "" }),
+    };
+    await pipeline.runImagesPipeline(p.id, d);
+    // 경로가 아니라 출처와 키다 — 어디서 읽을지는 lib/refs-io.js 가 안다
+    expect(Array.isArray(seen[0])).toBe(true);
+    expect(seen[0][0]).toMatchObject({ source: "avatar", key: "man-30s.jpg", who: "주인" });
+    // 바이트까지 실려야 한다 — 못 읽은 레퍼런스는 애초에 배열에 없다
+    expect(Buffer.isBuffer(seen[0][0].bytes)).toBe(true);
+    const saved = await projects.getProject(p.id);
+    expect(saved.cuts[0].image.url).toBe("img");
+  });
+
+  it("못 읽는 레퍼런스는 버린다 — 그래도 그림은 나온다", async () => {
+    const p = await makeProject();
+    await projects.updateProject(p.id, (proj) => ({
+      ...proj,
+      status: "voice",
+      // assets/refs 에 없는 아바타다. 예전에는 avatarFile 이 null 을 줘서 걸러졌고,
+      // 지금은 바이트를 못 읽어 걸러진다 — 어느 쪽이든 컷은 살아남아야 한다.
       cast: [{ id: "c1", who: "아이", ref: { from: "avatar", id: "av-child" } }],
       cuts: [{ idx: 0, sentence: "문장입니다.", seconds: 3, state: "pending",
                shows: "아이가 자전거를 끄는 미디엄 샷", ref_ids: ["c1"], regen_count: 0 }],
@@ -320,8 +347,7 @@ describe("이미지 생성에 레퍼런스가 배열로 간다", () => {
       select: async () => ({ passed: true, selectedIndex: 0, note: "" }),
     };
     await pipeline.runImagesPipeline(p.id, d);
-    // 아바타 파일이 없으면 refs 는 비어 있다 — 그래도 그림은 나온다
-    expect(Array.isArray(seen[0])).toBe(true);
+    expect(seen[0]).toEqual([]);
     const saved = await projects.getProject(p.id);
     expect(saved.cuts[0].image.url).toBe("img");
   });
