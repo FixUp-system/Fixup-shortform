@@ -103,13 +103,19 @@ describe("sumCosts — DB 가 더한다", () => {
   it("sum_costs 함수를 부른다", async () => {
     H.rpcRespond = () => ({ data: "1.5", error: null }); // numeric 은 문자열로 올 수 있다
     expect(await supabaseStore.sumCosts({})).toBe(1.5);
-    expect(H.rpc[0]).toEqual({ fn: "sum_costs", args: { p_project_id: null } });
+    expect(H.rpc[0]).toEqual({ fn: "sum_costs", args: { p_project_id: null, p_actor: null } });
   });
 
   it("projectId 를 그대로 넘긴다", async () => {
     H.rpcRespond = () => ({ data: 0.25, error: null });
     expect(await supabaseStore.sumCosts({ projectId: "p-1" })).toBe(0.25);
-    expect(H.rpc[0].args).toEqual({ p_project_id: "p-1" });
+    expect(H.rpc[0].args).toEqual({ p_project_id: "p-1", p_actor: null });
+  });
+
+  it("actor 를 그대로 넘긴다", async () => {
+    H.rpcRespond = () => ({ data: 0.75, error: null });
+    expect(await supabaseStore.sumCosts({ actor: "u-1" })).toBe(0.75);
+    expect(H.rpc[0].args).toEqual({ p_project_id: null, p_actor: "u-1" });
   });
 
   it("합계를 숫자로 못 읽으면 던진다 — 조용히 적게 세면 예산 상한이 사라진다", async () => {
