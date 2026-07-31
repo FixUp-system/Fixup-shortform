@@ -18,6 +18,9 @@ const live = !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KE
 // `actor=eq.test` 같은 넓은 조건이나 접두사(`t-`, `test-`) 삭제는 쓰지 않는다 —
 // 실제 기록이 우연히 그 조건에 걸리면 원장을 날린다. 정리 코드가 데이터를 잃는
 // 사고로 바뀌는 것이 오염보다 더 나쁘다.
+const OWNER = "11111111-1111-1111-1111-111111111111";
+const OTHER = "22222222-2222-2222-2222-222222222222";
+
 const made = { projects: [], costs: [], objects: [] };
 
 // 만들기 **전에** 목록에 적는다. insert 가 도중에 실패해도(행은 들어갔는데 응답에서
@@ -100,8 +103,8 @@ describe.skipIf(!live)("Supabase store 계약", () => {
 
   it("넣고 꺼내면 버전이 0이다", async () => {
     const id = newProjectId();
-    await store.insertProject({ id, status: "draft", cuts: [] });
-    const row = await store.selectProject(id);
+    await store.insertProject({ id, status: "draft", cuts: [] }, OWNER);
+    const row = await store.selectProject(id, OWNER);
     expect(row.version).toBe(0);
     // 타입까지 본다. Postgres bigint 는 PostgREST 를 거치며 문자열로 올 수 있고,
     // 그러면 updateProjectRow 의 expectedVersion + 1 이 "0"+1="01" 이 된다.
@@ -110,17 +113,26 @@ describe.skipIf(!live)("Supabase store 계약", () => {
     expect(row.doc.status).toBe("draft");
   });
 
+  // ★ 이 자리가 supabase.js 의 `.eq("owner_id", ownerId)` 를 실제로 무는 유일한 계약
+  // 테스트다. 라이브가 아니면 skip 되어 CI 에서는 못 잡지만, 이 파일이 라이브로 도는
+  // 순간(Task 13) 그 필터가 빠지면 여기서 바로 드러난다.
+  it("남의 owner 로는 못 읽는다 — 없는 것과 구별되지 않는다", async () => {
+    const id = newProjectId();
+    await store.insertProject({ id, status: "draft", cuts: [] }, OWNER);
+    expect(await store.selectProject(id, OTHER)).toBeNull();
+  });
+
   it("낡은 버전으로는 갱신되지 않는다", async () => {
     const id = newProjectId();
-    await store.insertProject({ id, status: "draft" });
-    expect(await store.updateProjectRow(id, 0, { id, status: "script" })).toBe(true);
-    expect(await store.updateProjectRow(id, 0, { id, status: "cuts" })).toBe(false);
-    expect((await store.selectProject(id)).doc.status).toBe("script");
+    await store.insertProject({ id, status: "draft" }, OWNER);
+    expect(await store.updateProjectRow(id, OWNER, 0, { id, status: "script" })).toBe(true);
+    expect(await store.updateProjectRow(id, OWNER, 0, { id, status: "cuts" })).toBe(false);
+    expect((await store.selectProject(id, OWNER)).doc.status).toBe("script");
   });
 
   it("없는 프로젝트는 null 이다", async () => {
     // 여기만 추적하지 않는다 — 일부러 **만들지 않은** id 라서 지울 것도 없다.
-    expect(await store.selectProject(randomUUID())).toBeNull();
+    expect(await store.selectProject(randomUUID(), OWNER)).toBeNull();
   });
 
   it("같은 request_id 를 두 번 넣어도 한 건이다", async () => {

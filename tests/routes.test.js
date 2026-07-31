@@ -11,13 +11,19 @@ import { createProject, getProject, updateProject } from "../lib/projects.js";
 const OWNER = "00000000-0000-0000-0000-000000000000";
 import { isAudioStale, isImageStale, isClipStale, isRenderStale, renderKey } from "../lib/steps.js";
 
-const pipelineMock = vi.hoisted(() => ({ run: vi.fn(async () => {}) }));
+const pipelineMock = vi.hoisted(() => ({
+  run: vi.fn(async () => {}),
+  regen: vi.fn(async () => ({ idx: 0 })),
+}));
 vi.mock("../lib/pipeline.js", () => ({
   runSplitPipeline: (...a) => pipelineMock.run(...a),
   runImagesPipeline: (...a) => pipelineMock.run(...a),
   runVoicePipeline: (...a) => pipelineMock.run(...a),
   runVideoPipeline: (...a) => pipelineMock.run(...a),
   runRenderPipeline: (...a) => pipelineMock.run(...a),
+  regenCut: (...a) => pipelineMock.regen(...a),
+  regenVoice: (...a) => pipelineMock.regen(...a),
+  regenClip: (...a) => pipelineMock.regen(...a),
 }));
 
 const llmMock = vi.hoisted(() => ({ callJson: vi.fn() }));
@@ -32,13 +38,18 @@ const { POST: renderPOST } = await import("../app/api/projects/[id]/render/route
 const { POST: clipsPOST } = await import("../app/api/projects/[id]/clips/route.js");
 const { GET: renderFileGET } = await import("../app/api/renders/[name]/route.js");
 const { POST: projectsPOST } = await import("../app/api/projects/route.js");
+const { POST: cutRegenPOST } = await import("../app/api/projects/[id]/cuts/[idx]/regen/route.js");
+const { POST: voiceRegenPOST } = await import("../app/api/projects/[id]/voice/[idx]/regen/route.js");
+const { POST: clipRegenPOST } = await import("../app/api/projects/[id]/clips/[idx]/regen/route.js");
 
 const ctx = (id) => ({ params: Promise.resolve({ id }) });
+const idxCtx = (id, idx) => ({ params: Promise.resolve({ id, idx: String(idx) }) });
 const patchReq = (body) => ({ json: async () => body });
 
 beforeEach(async () => {
   resetMemoryStore();
   pipelineMock.run.mockReset().mockResolvedValue(undefined);
+  pipelineMock.regen.mockReset().mockResolvedValue({ idx: 0 });
   llmMock.callJson.mockReset();
 });
 
@@ -768,5 +779,33 @@ describe("PATCH /api/projects/[id] — 화풍", () => {
     await PATCH(patchReq({ settings: { aspect_ratio: "16:9" } }), ctx(p.id));
     // 화풍을 건드리지 않았으니 남아 있어야 한다
     expect((await getProject(p.id, OWNER)).settings.style.preset).toBe("scifi");
+  });
+});
+
+// ★ regen 라우트 3개는 리뷰에서 실측으로 드러난 자리다 — pipeline.js 가
+// regenCut(projectId, ownerId, idx, deps, instruction) 로 인자가 하나 늘었는데, 이 세
+// 라우트는 안 고쳐진 채 옛 자리에 idx 를 넣고 있었다(ownerId 자리에 idx 숫자가 들어가고,
+// idx 자리는 비었다). tests/routes.test.js 가 이 라우트들을 한 번도 안 불러 828 그린
+// 뒤에도 안 잡혔다 — 여기서 최소 한 번씩 부른다.
+describe("POST regen 라우트 — id·ownerId·idx 가 밀리지 않는다", () => {
+  it("컷 재생성 — id·ownerId·idx·instruction 순서로 넘긴다", async () => {
+    const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
+    const res = await cutRegenPOST(patchReq({ instruction: "더 밝게" }), idxCtx(p.id, 0));
+    expect(res.status).toBe(200);
+    expect(pipelineMock.regen).toHaveBeenCalledWith(p.id, OWNER, 0, undefined, "더 밝게");
+  });
+
+  it("목소리 재생성 — id·ownerId·idx 순서로 넘긴다", async () => {
+    const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
+    const res = await voiceRegenPOST(patchReq({}), idxCtx(p.id, 1));
+    expect(res.status).toBe(200);
+    expect(pipelineMock.regen).toHaveBeenCalledWith(p.id, OWNER, 1);
+  });
+
+  it("클립 재생성 — id·ownerId·idx 순서로 넘긴다", async () => {
+    const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
+    const res = await clipRegenPOST(patchReq({}), idxCtx(p.id, 2));
+    expect(res.status).toBe(200);
+    expect(pipelineMock.regen).toHaveBeenCalledWith(p.id, OWNER, 2);
   });
 });

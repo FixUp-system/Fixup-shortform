@@ -941,17 +941,17 @@ describe("재생성 상한 판정이 낙관적 락 재시도를 견딘다", () =
     const store = getStore();
     const real = store.updateProjectRow.bind(store);
     let first = true;
-    return vi.spyOn(store, "updateProjectRow").mockImplementation(async (id, expectedVersion, doc) => {
+    return vi.spyOn(store, "updateProjectRow").mockImplementation(async (id, ownerId, expectedVersion, doc) => {
       if (first) {
         first = false;
         const row = await store.selectProject(id, OWNER);
-        await real(id, row.version, {
+        await real(id, ownerId, row.version, {
           ...row.doc,
           cuts: row.doc.cuts.map((c) => ({ ...c, [field]: 0 })),
         });
         return false; // 우리 시도는 졌다 — version 이 이미 올라갔으니 진짜로도 진다
       }
-      return real(id, expectedVersion, doc);
+      return real(id, ownerId, expectedVersion, doc);
     });
   }
 

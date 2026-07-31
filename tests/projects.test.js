@@ -175,13 +175,13 @@ describe("낙관적 락", () => {
 
     let inFlight = 0;
     let maxInFlight = 0;
-    store.updateProjectRow = async (id, version, doc) => {
+    store.updateProjectRow = async (id, ownerId, version, doc) => {
       inFlight++;
       maxInFlight = Math.max(maxInFlight, inFlight);
       g[doc.status].arrive();
       await g[doc.status].opened;
       try {
-        return await real(id, version, doc);
+        return await real(id, ownerId, version, doc);
       } finally {
         inFlight--;
       }
