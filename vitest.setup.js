@@ -11,10 +11,19 @@ import path from "path";
 
 process.env.SHOTFORM_STORE = "memory";
 
-// 아직 파일로 남아 있는 것들(비용 원장 lib/costs.js·렌더 산출물 lib/compose.js)은
-// store 를 거치지 않으므로 임시 폴더로 계속 가둔다. 실제로 이 줄을 빼고 전체 테스트를
-// 한 번 돌렸더니 data/costs.json 에 0원짜리 15건이 다시 쌓였다 — 예전과 똑같은 오염이다.
-// 비용 원장이 store 로 옮겨가면(다음 태스크) 이 줄은 지운다.
+// SHOTFORM_DATA_DIR 을 아직 읽는 것들이 남아 있어 임시 폴더로 계속 가둔다.
+// 실제로 이 줄을 빼고 전체 테스트를 한 번 돌렸더니 data/costs.json 에 0원짜리 15건이
+// 다시 쌓였다 — 예전과 똑같은 오염이다.
+//
+// ★ 지우는 조건: **렌더 산출물이 로컬 파일로 남아 있는 한 지우지 않는다.**
+// "비용 원장이 store 로 가면"이 아니다. 이 env 에 아직 기대는 곳:
+//   - lib/costs.js               (비용 원장 — store 로 이관 예정)
+//   - lib/compose.js             (data/renders/ 아래 mp4)
+//   - app/api/renders/[name]/route.js (그 mp4 를 되읽는 라우트)
+//   - lib/pipeline.js            (data/uploads/ 경로)
+// 계획상 data/renders/ 는 이관 기간 내내 로컬에 남는다(ffmpeg 가 로컬 경로와 자식
+// 프로세스를 요구한다). 그러니 비용 원장만 store 로 갔다고 이 줄을 지우면, 이번엔
+// 12MB 짜리 mp4 가 저장소 data/renders/ 에 쌓이는 모양으로 같은 오염이 재발한다.
 process.env.SHOTFORM_DATA_DIR = mkdtempSync(path.join(tmpdir(), "shotform-test-"));
 
 // 클립 모델 env 는 테스트에서 지운다 — .env.local 을 Kling 으로 바꿔 두면 눈금 기대값이
