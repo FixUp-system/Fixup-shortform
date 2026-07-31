@@ -177,6 +177,58 @@ describe("분할 → 이미지 (이어 부르면 갈라지기 전과 같다)", (
     expect(after.cuts[1].state).toBe("done");
   });
 
+  // ★ 2026-07-31: 검수가 400 으로 던져 방금 $0.08 을 치른 그림이 사라졌다.
+  // 화면에는 옛 그림이 그대로여서 "아무것도 안 변했다"로 보였다. 값을 치른 것은 남긴다.
+  describe("산 그림은 버리지 않는다", () => {
+    it("검수가 물려도 그림은 남는다 — 판정은 passed:false 로 적힌다", async () => {
+      const p = await makeProject();
+      await runBoth(p.id, deps({ failCut: 0 }));
+      const cut = (await projects.getProject(p.id)).cuts[0];
+      expect(cut.state).toBe("needs_attention");
+      expect(cut.image.url).toContain("http://img/");
+      expect(cut.vlm.passed).toBe(false);
+    });
+
+    it("검수가 죽으면 그림은 남고 판정은 null 이다 — 물린 것과 구분한다", async () => {
+      const p = await makeProject();
+      await runBoth(p.id, {
+        ...deps(),
+        select: async () => { throw new Error("VLM 검수 실패 (400)"); },
+      });
+      const cut = (await projects.getProject(p.id)).cuts[0];
+      expect(cut.state).toBe("needs_attention");
+      expect(cut.image.url).toContain("http://img/");
+      expect(cut.vlm.passed).toBeNull();       // 판정이 없다 ≠ 물렸다
+      expect(cut.vlm.note).toContain("400");
+    });
+
+    it("각인도 함께 남는다 — 안 그러면 낡음 판정이 이 그림을 못 본다", async () => {
+      const p = await makeProject();
+      await runBoth(p.id, {
+        ...deps(),
+        splitCuts: async () => [
+          { idx: 0, sentence: "AI컷", shows: "딸기라떼 클로즈업", seconds: 6, source: "ai", regen_count: 0 },
+        ],
+        select: async () => { throw new Error("죽었다"); },
+      });
+      const cut = (await projects.getProject(p.id)).cuts[0];
+      expect(cut.image.of).toBe("딸기라떼 클로즈업");
+      expect(cut.image.style_of).toBeTruthy();
+    });
+
+    it("그림 생성 자체가 죽으면 남길 것이 없다 — 옛 그림을 덮지 않는다", async () => {
+      const p = await makeProject();
+      await runBoth(p.id, {
+        ...deps(),
+        genImage: async () => { throw new Error("fal 이 죽었다"); },
+      });
+      const cut = (await projects.getProject(p.id)).cuts[0];
+      expect(cut.state).toBe("needs_attention");
+      expect(cut.image).toBeUndefined();
+      expect(cut.vlm.passed).toBe(false);
+    });
+  });
+
   it("검수에 그 컷의 화면을 함께 넘긴다(그림과 심사가 같은 기준을 보게)", async () => {
     const p = await makeProject();
     const seen = [];

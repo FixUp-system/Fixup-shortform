@@ -633,11 +633,11 @@ describe("무효화 관통 — 고치면 낡고, 안 고친 것은 살아남는�
 // 화면은 서버 env 를 볼 수 없다. 상한을 실어 보내지 않으면 ②대본 화면이 기본값(20초)으로
 // 판정해, Kling(15초)에서 17초 컷에 경고를 띄우지 않는다 — 돈 쓰기 전에 잡을 유일한 자리다.
 describe("GET /api/projects/[id] — 활성 모델의 상한을 실어 보낸다", () => {
-  it("env 를 비우면 기본 프로필 값이다", async () => {
+  it("env 를 비우면 기본 엔드포인트(Kling)의 값이다", async () => {
     const p = await createProject({ settings: {}, material: { text: "자료", photos: [] } });
     const res = await GET(new Request("http://x"), { params: Promise.resolve({ id: p.id }) });
     const body = await res.json();
-    expect(body.clip_limits).toEqual({ min: 6, max: 20 });
+    expect(body.clip_limits).toEqual({ min: 3, max: 15 });
   });
 
   it("env 를 바꾸면 따라 바뀐다 — 저장된 프로젝트에는 남지 않는다", async () => {

@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import {
-  CLIP_PROFILES, DEFAULT_CLIP_PROFILE, profileFor, activeClipProfile,
+  CLIP_PROFILES, DEFAULT_CLIP_PROFILE, DEFAULT_I2V_ENDPOINT,
+  profileFor, activeClipProfile, activeI2vEndpoint,
   fitDurationFor, minSecondsFor, maxSecondsFor,
   I2V_STEPS, I2V_MAX_SECONDS, fitDuration, activeClipLimits,
 } from "../lib/clip-limits";
@@ -89,9 +90,23 @@ describe("fitDurationFor — 눈금 종류마다 다르게 올린다", () => {
   });
 });
 
+// ⚠️ "기본 프로필"과 "기본 엔드포인트"는 다른 것이다.
+//   DEFAULT_CLIP_PROFILE  = **모르는 모델**이 떨어질 자리(LTX·열거 — 범위 모델에서도 유효한 값)
+//   DEFAULT_I2V_ENDPOINT  = env 가 없을 때 **실제로 부를 모델**(Kling v3)
 describe("activeClipProfile — env 가 정한다", () => {
-  it("env 를 비우면 기본 프로필이다", () => {
-    expect(activeClipProfile()).toBe(DEFAULT_CLIP_PROFILE);
+  it("env 를 비우면 기본 엔드포인트(Kling)의 프로필이다 — 모르는 모델의 폴백이 아니다", () => {
+    expect(activeClipProfile()).toBe(profileFor(DEFAULT_I2V_ENDPOINT));
+    expect(maxSecondsFor(activeClipProfile())).toBe(15);
+    expect(activeClipProfile()).not.toBe(DEFAULT_CLIP_PROFILE);
+  });
+
+  // 기본값이 두 군데 있으면 갈린다 — 갈리는 순간 Kling 을 부르면서 LTX 프로필을 쓰고,
+  // `generate_audio:false` 가 빠져 오디오가 켜진 채 청구된다($0.084→$0.126).
+  it("엔드포인트와 프로필이 같은 곳에서 나온다", () => {
+    expect(activeI2vEndpoint()).toBe(DEFAULT_I2V_ENDPOINT);
+    process.env.FAL_I2V_ENDPOINT = "fal-ai/ltx-2.3/image-to-video/fast";
+    expect(activeI2vEndpoint()).toBe("fal-ai/ltx-2.3/image-to-video/fast");
+    expect(activeClipProfile()).toBe(profileFor(activeI2vEndpoint()));
   });
 
   it("env 를 바꾸면 그 모델의 프로필이다", () => {
@@ -101,20 +116,34 @@ describe("activeClipProfile — env 가 정한다", () => {
 });
 
 // 화면(script·video 페이지)이 이 세 이름을 import 한다. 없애면 빌드가 깨진다.
-describe("하위호환 — 화면이 쓰는 이름은 기본 프로필 값이다", () => {
-  it("눈금 상수가 그대로다", () => {
-    expect(I2V_STEPS).toEqual([6, 8, 10, 12, 14, 16, 18, 20]);
-    expect(I2V_MAX_SECONDS).toBe(20);
+//
+// 이 값들은 **기본 엔드포인트의 프로필**에서 나온다. 폴백 프로필(LTX)이 아니다 —
+// 그러면 화면이 상한 20 을 말하고 서버는 15 로 자른다(2026-07-30).
+describe("하위호환 — 화면이 쓰는 이름은 기본 엔드포인트의 값이다", () => {
+  it("상한이 기본 엔드포인트(Kling)의 것이다", () => {
+    expect(I2V_MAX_SECONDS).toBe(maxSecondsFor(profileFor(DEFAULT_I2V_ENDPOINT)));
+    expect(I2V_MAX_SECONDS).toBe(15);
   });
 
-  it("fitDuration 은 env 와 무관하게 기본 프로필로 푼다", () => {
-    process.env.FAL_I2V_ENDPOINT = "fal-ai/kling-video/v3/standard/image-to-video";
-    expect(fitDuration(7)).toBe(8); // 활성 프로필이면 7 이지만, 이 함수는 기본 프로필이다
+  // 눈금은 열거 모델에만 있다. 범위 모델에서 null 인 것이 정상이고, 그것을 모르고
+  // `I2V_STEPS[0]` 로 하한을 읽으면 죽는다 — 하한은 minSecondsFor 로 읽는다.
+  it("범위 모델에서는 눈금이 없다(null)", () => {
+    expect(I2V_STEPS).toBe(null);
+  });
+
+  it("fitDuration 은 env 와 무관하게 기본 엔드포인트로 푼다", () => {
+    process.env.FAL_I2V_ENDPOINT = "fal-ai/ltx-2.3/image-to-video/fast";
+    expect(fitDuration(7)).toBe(7); // 활성(LTX) 이면 8 이지만, 이 함수는 상수여야 한다
   });
 });
 
 describe("activeClipLimits — 화면에 실어 보낼 값", () => {
-  it("env 를 비우면 기본 프로필의 하한·상한이다", () => {
+  it("env 를 비우면 기본 엔드포인트(Kling)의 하한·상한이다", () => {
+    expect(activeClipLimits()).toEqual({ min: 3, max: 15 });
+  });
+
+  it("모르는 모델이면 폴백 프로필(LTX)의 하한·상한이다", () => {
+    process.env.FAL_I2V_ENDPOINT = "fal-ai/무엇인지-모르는-모델";
     expect(activeClipLimits()).toEqual({ min: 6, max: 20 });
   });
 

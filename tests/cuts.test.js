@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { splitSentences, splitUnits, explodeLongRanges, buildSplitMessages, buildShowsMessages, buildImagePrompt, buildClipPrompt, stillOnly, clauseBoundaries } from "../lib/cuts.js";
-import { I2V_STEPS, I2V_MAX_SECONDS } from "../lib/clip-limits.js";
+import { activeClipProfile, minSecondsFor, maxSecondsFor } from "../lib/clip-limits.js";
 import { STYLE_PRESETS } from "../lib/styles.js";
 
 const project = {
@@ -112,12 +112,14 @@ describe("buildSplitMessages", () => {
     expect(system).toContain("조각을 고쳐 쓰지 않는다");
   });
 
-  it("모델이 만들 수 있는 길이를 사실로 알려 준다 — 눈금에서 읽는다", () => {
+  it("모델이 만들 수 있는 길이를 사실로 알려 준다 — 활성 프로필에서 읽는다", () => {
     const { system } = buildSplitMessages(["한 문장."]);
-    // lib/clip-limits.js 의 눈금(지금 6·8·10…20)에서 하한·상한을 읽어야 한다.
-    // 숫자를 프롬프트에 박으면 모델을 바꿀 때 지시가 어긋난다.
-    expect(system).toContain(String(I2V_STEPS[0]));
-    expect(system).toContain(String(I2V_MAX_SECONDS));
+    // **지금 도는 모델**의 하한·상한이어야 한다. 숫자를 프롬프트에 박으면 모델을 바꿀 때
+    // 지시가 어긋난다. 이 테스트도 한때 LTX 상수(6·20)를 읽고 있었는데, 기본 엔드포인트가
+    // Kling(3~15)으로 바뀌자 코드는 맞고 테스트만 틀렸다 — 읽는 곳을 코드와 같게 둔다.
+    const profile = activeClipProfile();
+    expect(system).toContain(String(minSecondsFor(profile)));
+    expect(system).toContain(String(maxSecondsFor(profile)));
   });
 
   it("길이를 맞추려고 장면을 붙이거나 끊지 말라고 못 박는다", () => {
