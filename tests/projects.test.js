@@ -73,6 +73,91 @@ describe("낙관적 락", () => {
     }
   });
 
+  it("같은 프로젝트의 저장은 줄을 선다 — 겹치지 않으니 진 시도가 없다", async () => {
+    const p = await projects.createProject({ settings: {}, material: {} });
+    await projects.updateProject(p.id, (proj) => ({
+      ...proj,
+      cuts: Array.from({ length: 12 }, (_, i) => ({ idx: i })),
+    }));
+
+    const store = getStore();
+    const real = store.updateProjectRow.bind(store);
+    let calls = 0;
+    store.updateProjectRow = async (...a) => { calls++; return real(...a); };
+    try {
+      await Promise.all(Array.from({ length: 12 }, (_, i) =>
+        projects.updateProject(p.id, (proj) => ({
+          ...proj,
+          cuts: proj.cuts.map((c) => (c.idx === i ? { ...c, state: "done" } : c)),
+        })),
+      ));
+    } finally {
+      store.updateProjectRow = real;
+    }
+
+    const after = await projects.getProject(p.id);
+    expect(after.cuts.filter((c) => c.state === "done")).toHaveLength(12);
+    // 12번 시도해 12번 다 이겼다 — 재시도(=진 횟수)가 0이다.
+    expect(calls).toBe(12);
+  });
+
+  it("서로 다른 프로젝트는 줄이 따로다 — 같이 흐른다", async () => {
+    const a = await projects.createProject({ settings: {}, material: {} });
+    const b = await projects.createProject({ settings: {}, material: {} });
+
+    // a 의 저장을 붙잡아 둔 채로도 b 는 끝나야 한다 — 줄이 하나뿐이면 b 가 같이 멈춘다.
+    const store = getStore();
+    const real = store.updateProjectRow.bind(store);
+    let releaseA;
+    const heldA = new Promise((r) => { releaseA = r; });
+    store.updateProjectRow = async (id, ...rest) => {
+      if (id === a.id) await heldA;
+      return real(id, ...rest);
+    };
+    try {
+      const pendingA = projects.updateProject(a.id, (proj) => ({ ...proj, status: "script" }));
+      await projects.updateProject(b.id, (proj) => ({ ...proj, status: "voice" }));
+      expect((await projects.getProject(b.id)).status).toBe("voice");
+      releaseA();
+      await pendingA;
+    } finally {
+      store.updateProjectRow = real;
+    }
+  });
+
+  it("patchFn 이 던져도 줄이 막히지 않는다 — 다음 대기자가 들어간다", async () => {
+    const p = await projects.createProject({ settings: {}, material: {} });
+    const boom = projects.updateProject(p.id, () => { throw new Error("펑"); });
+    const next = projects.updateProject(p.id, (proj) => ({ ...proj, status: "cuts" }));
+    await expect(boom).rejects.toThrow("펑");
+    await expect(next).resolves.toMatchObject({ status: "cuts" });
+  });
+
+  it("재시도가 소진돼도 줄이 막히지 않는다 — 다음 대기자가 들어간다", async () => {
+    const p = await projects.createProject({ settings: {}, material: {} });
+    const store = getStore();
+    const real = store.updateProjectRow.bind(store);
+    store.updateProjectRow = async () => false; // 앞사람은 5회를 다 쓰고 진다
+    const doomed = projects.updateProject(p.id, (proj) => proj);
+    const next = projects.updateProject(p.id, (proj) => ({ ...proj, status: "images" }));
+    await expect(doomed).rejects.toThrow("충돌");
+    store.updateProjectRow = real; // 뒷사람 차례가 오기 전에 되돌린다
+    await expect(next).resolves.toMatchObject({ status: "images" });
+  });
+
+  it("줄이 다 빠지면 Map 이 비워진다 — 옛 락처럼 영구 누적되지 않는다", async () => {
+    const a = await projects.createProject({ settings: {}, material: {} });
+    const b = await projects.createProject({ settings: {}, material: {} });
+    await Promise.all([
+      projects.updateProject(a.id, (proj) => ({ ...proj, status: "script" })),
+      projects.updateProject(a.id, (proj) => ({ ...proj, status: "cuts" })),
+      projects.updateProject(b.id, (proj) => ({ ...proj, status: "voice" })),
+      projects.updateProject(b.id, () => { throw new Error("펑"); }).catch(() => {}),
+    ]);
+    await new Promise((r) => setTimeout(r, 0)); // 마지막 정리 마이크로태스크를 흘려보낸다
+    expect(projects._writeQueueSize()).toBe(0);
+  });
+
   it("저장소 오류는 '없음'으로 뭉개지 않는다 — 그대로 던진다", async () => {
     const store = getStore();
     const real = store.selectProject;
