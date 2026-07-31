@@ -5,6 +5,7 @@
 // 그래서 여기서 임시 파일을 만들 이유가 없어졌다(확장자는 key 에서만 딴다).
 import { describe, it, expect, beforeEach } from "vitest";
 import { generateImage } from "../lib/imagegen.js";
+import { runWithActor } from "../lib/actor.js";
 
 const person = { source: "upload", key: "person.jpg", kind: "person", bytes: Buffer.from("AAA") };
 const thing = { source: "upload", key: "thing.png", kind: "thing", bytes: Buffer.from("BBB") };
@@ -25,22 +26,22 @@ const ok = (seen) => async (url, init) => {
 describe("generateImage — 레퍼런스", () => {
   it("레퍼런스가 없으면 base 엔드포인트로 가고 image_urls 를 안 보낸다", async () => {
     const seen = {};
-    await generateImage({ prompt: "p", aspect_ratio: "9:16", projectId: "p1", fetchImpl: ok(seen) });
+    await runWithActor("t-user", () => generateImage({ prompt: "p", aspect_ratio: "9:16", projectId: "p1", fetchImpl: ok(seen) }));
     expect(seen.url).not.toContain("/edit");
     expect(seen.body.image_urls).toBeUndefined();
   });
 
   it("레퍼런스가 있으면 edit 엔드포인트로 간다 — base 모델은 image_urls 를 받지 않는다", async () => {
     const seen = {};
-    await generateImage({ prompt: "p", aspect_ratio: "9:16", projectId: "p1",
-      refs: [person], fetchImpl: ok(seen) });
+    await runWithActor("t-user", () => generateImage({ prompt: "p", aspect_ratio: "9:16", projectId: "p1",
+      refs: [person], fetchImpl: ok(seen) }));
     expect(seen.url).toContain("/edit");
   });
 
   it("두 장을 순서대로 싣는다 — 인물과 사물을 함께 붙이는 자리다", async () => {
     const seen = {};
-    await generateImage({ prompt: "p", aspect_ratio: "9:16", projectId: "p1",
-      refs: [person, thing], fetchImpl: ok(seen) });
+    await runWithActor("t-user", () => generateImage({ prompt: "p", aspect_ratio: "9:16", projectId: "p1",
+      refs: [person, thing], fetchImpl: ok(seen) }));
     expect(seen.body.image_urls).toHaveLength(2);
     expect(seen.body.image_urls[0]).toContain("image/jpeg");   // .jpg → jpeg
     expect(seen.body.image_urls[1]).toContain("image/png");

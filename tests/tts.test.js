@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { generateSpeech, VOICES } from "../lib/tts";
+import { runWithActor } from "../lib/actor.js";
 
 import { mkdtempSync } from "fs";
 import { tmpdir } from "os";
@@ -38,7 +39,7 @@ describe("generateSpeech", () => {
       ok: true,
       json: async () => ({ audio: { url: "https://fal.media/a.mp3", duration: 4.3 } }),
     });
-    const r = await generateSpeech({ text: "안녕하세요", voiceId: "v1", fetchImpl });
+    const r = await runWithActor("t-user", () => generateSpeech({ text: "안녕하세요", voiceId: "v1", fetchImpl }));
     expect(r).toEqual({ url: "https://fal.media/a.mp3", seconds: 4.3 });
   });
 
@@ -48,7 +49,7 @@ describe("generateSpeech", () => {
       ok: true,
       json: async () => ({ audio: { url: "https://fal.media/a.mp3" } }),
     });
-    const r = await generateSpeech({ text: "가".repeat(11), voiceId: "v1", fetchImpl });
+    const r = await runWithActor("t-user", () => generateSpeech({ text: "가".repeat(11), voiceId: "v1", fetchImpl }));
     expect(r.seconds).toBe(2);
   });
 
@@ -58,7 +59,7 @@ describe("generateSpeech", () => {
       sent = JSON.parse(opts.body);
       return { ok: true, json: async () => ({ audio: { url: "u", duration: 1 } }) };
     };
-    await generateSpeech({ text: "문장입니다", voiceId: "voice-abc", fetchImpl });
+    await runWithActor("t-user", () => generateSpeech({ text: "문장입니다", voiceId: "voice-abc", fetchImpl }));
     expect(sent.text).toBe("문장입니다");
     expect(JSON.stringify(sent)).toContain("voice-abc");
   });

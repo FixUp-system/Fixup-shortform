@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { generateClip, fitDuration, I2V_MAX_SECONDS } from "../lib/i2v";
 import { profileFor, fitDurationFor, maxSecondsFor } from "../lib/clip-limits";
+import { runWithActor } from "../lib/actor.js";
 
 const LTX = "fal-ai/ltx-2.3/image-to-video/fast";
 // 열거 눈금을 뜻할 때 쓴다. fitDuration(상수)은 기본 엔드포인트(Kling)로 풀리므로
@@ -61,7 +62,7 @@ describe("generateClip", () => {
       sent = JSON.parse(opts.body);
       return { ok: true, json: async () => ({ video: { url: "https://fal.media/v.mp4" } }) };
     };
-    const r = await generateClip({ imageUrl: "i", seconds: 25, aspect_ratio: "9:16", fetchImpl });
+    const r = await runWithActor("t-user", () => generateClip({ imageUrl: "i", seconds: 25, aspect_ratio: "9:16", fetchImpl }));
     const ltxMax = maxSecondsFor(profileFor(LTX));
     expect(sent.duration).toBe(ltxMax);
     expect(r.seconds).toBe(ltxMax);
@@ -74,7 +75,7 @@ describe("generateClip", () => {
       sent = JSON.parse(opts.body);
       return { ok: true, json: async () => ({ video: { url: "v" } }) };
     };
-    const r = await generateClip({ imageUrl: "i", seconds: 4.3, aspect_ratio: "9:16", fetchImpl });
+    const r = await runWithActor("t-user", () => generateClip({ imageUrl: "i", seconds: 4.3, aspect_ratio: "9:16", fetchImpl }));
     expect(sent.duration).toBe(6);
     expect(r.truncated).toBe(false);
   });
@@ -85,7 +86,7 @@ describe("generateClip", () => {
       sent = JSON.parse(opts.body);
       return { ok: true, json: async () => ({ video: { url: "v" } }) };
     };
-    await generateClip({ imageUrl: "https://img/1.png", seconds: 4, aspect_ratio: "1:1", fetchImpl });
+    await runWithActor("t-user", () => generateClip({ imageUrl: "https://img/1.png", seconds: 4, aspect_ratio: "1:1", fetchImpl }));
     expect(sent.image_url).toBe("https://img/1.png");
     expect(sent.aspect_ratio).toBe("1:1");
   });
@@ -98,10 +99,10 @@ describe("generateClip", () => {
       sent = JSON.parse(opts.body);
       return { ok: true, json: async () => ({ video: { url: "v" } }) };
     };
-    await generateClip({
+    await runWithActor("t-user", () => generateClip({
       imageUrl: "https://img/1.png", seconds: 4, aspect_ratio: "9:16",
       prompt: "카메라가 천천히 뒤로 물러난다", fetchImpl,
-    });
+    }));
     expect(sent.prompt).toContain("카메라가 천천히 뒤로 물러난다");
   });
 
@@ -111,7 +112,7 @@ describe("generateClip", () => {
       sent = JSON.parse(opts.body);
       return { ok: true, json: async () => ({ video: { url: "v" } }) };
     };
-    await generateClip({ imageUrl: "i", seconds: 0, aspect_ratio: "9:16", fetchImpl });
+    await runWithActor("t-user", () => generateClip({ imageUrl: "i", seconds: 0, aspect_ratio: "9:16", fetchImpl }));
     expect(sent.duration).toBe(6);
   });
 
@@ -151,7 +152,7 @@ describe("generateClip — 활성 프로필이 요청을 정한다", () => {
   // 오디오가 켜진 채 청구되며($0.084→$0.126) 클립 소리가 낭독과 두 겹이 된다.
   it("env 가 없어도 부르는 모델과 프로필이 같다", async () => {
     const { box, fetchImpl } = sender();
-    await generateClip({ imageUrl: "i", seconds: 7, aspect_ratio: "9:16", fetchImpl });
+    await runWithActor("t-user", () => generateClip({ imageUrl: "i", seconds: 7, aspect_ratio: "9:16", fetchImpl }));
     expect(box.url).toContain(KLING);
     expect(box.sent.generate_audio).toBe(false);
     expect(box.sent.duration).toBe(7);
@@ -160,7 +161,7 @@ describe("generateClip — 활성 프로필이 요청을 정한다", () => {
   it("Kling 에서는 낭독 초를 그대로 산다 — 올림 손실이 사라진다", async () => {
     process.env.FAL_I2V_ENDPOINT = KLING;
     const { box, fetchImpl } = sender();
-    const r = await generateClip({ imageUrl: "i", seconds: 7, aspect_ratio: "9:16", fetchImpl });
+    const r = await runWithActor("t-user", () => generateClip({ imageUrl: "i", seconds: 7, aspect_ratio: "9:16", fetchImpl }));
     expect(box.sent.duration).toBe(7);
     expect(r.seconds).toBe(7);
     expect(box.url).toContain(KLING);
@@ -169,14 +170,14 @@ describe("generateClip — 활성 프로필이 요청을 정한다", () => {
   it("Kling 에서는 오디오를 끈다", async () => {
     process.env.FAL_I2V_ENDPOINT = KLING;
     const { box, fetchImpl } = sender();
-    await generateClip({ imageUrl: "i", seconds: 5, aspect_ratio: "9:16", fetchImpl });
+    await runWithActor("t-user", () => generateClip({ imageUrl: "i", seconds: 5, aspect_ratio: "9:16", fetchImpl }));
     expect(box.sent.generate_audio).toBe(false);
   });
 
   it("LTX 에는 그 필드를 보내지 않는다 — 모르는 필드는 거절될 수 있다", async () => {
     process.env.FAL_I2V_ENDPOINT = "fal-ai/ltx-2.3/image-to-video/fast";
     const { box, fetchImpl } = sender();
-    await generateClip({ imageUrl: "i", seconds: 5, aspect_ratio: "9:16", fetchImpl });
+    await runWithActor("t-user", () => generateClip({ imageUrl: "i", seconds: 5, aspect_ratio: "9:16", fetchImpl }));
     expect("generate_audio" in box.sent).toBe(false);
     expect(box.sent.duration).toBe(6);
   });
@@ -184,7 +185,7 @@ describe("generateClip — 활성 프로필이 요청을 정한다", () => {
   it("잘림 판정도 활성 프로필의 상한으로 한다", async () => {
     process.env.FAL_I2V_ENDPOINT = KLING;
     const { box, fetchImpl } = sender();
-    const r = await generateClip({ imageUrl: "i", seconds: 16, aspect_ratio: "9:16", fetchImpl });
+    const r = await runWithActor("t-user", () => generateClip({ imageUrl: "i", seconds: 16, aspect_ratio: "9:16", fetchImpl }));
     expect(box.sent.duration).toBe(15);
     expect(r.truncated).toBe(true);
     // LTX 상한(20)으로 재면 16초가 잘리지 않은 것으로 나온다 — 그 실수를 여기서 막는다

@@ -2,6 +2,7 @@
 // 호출한 뒤에 재면 이미 돈이 나간 뒤다.
 import { describe, it, expect, beforeEach } from "vitest";
 import { resetMemoryStore } from "../lib/store/memory.js";
+import { runWithActor } from "../lib/actor.js";
 
 let costs;
 
@@ -154,7 +155,7 @@ describe("비용 기록에 프로젝트가 남는다", () => {
     const fetchImpl = async () => ({
       ok: true, json: async () => ({ images: [{ url: "https://x/y.png" }] }),
     });
-    await generateImage({ prompt: "p", aspect_ratio: "9:16", projectId: "p1", fetchImpl });
+    await runWithActor("t-user", () => generateImage({ prompt: "p", aspect_ratio: "9:16", projectId: "p1", fetchImpl }));
     expect(await costs.spentForProject("p1")).toBeGreaterThan(0);
   });
 
@@ -163,7 +164,7 @@ describe("비용 기록에 프로젝트가 남는다", () => {
     const fetchImpl = async () => ({
       ok: true, json: async () => ({ audio: { url: "https://x/y.mp3", duration: 3 } }),
     });
-    await generateSpeech({ text: "가".repeat(500), voiceId: "v", projectId: "p1", fetchImpl });
+    await runWithActor("t-user", () => generateSpeech({ text: "가".repeat(500), voiceId: "v", projectId: "p1", fetchImpl }));
     expect(await costs.spentForProject("p1")).toBeGreaterThan(0);
   });
 
@@ -172,7 +173,7 @@ describe("비용 기록에 프로젝트가 남는다", () => {
     const fetchImpl = async () => ({
       ok: true, json: async () => ({ video: { url: "https://x/y.mp4" } }),
     });
-    await generateClip({ imageUrl: "u", seconds: 5, aspect_ratio: "9:16", projectId: "p1", fetchImpl });
+    await runWithActor("t-user", () => generateClip({ imageUrl: "u", seconds: 5, aspect_ratio: "9:16", projectId: "p1", fetchImpl }));
     expect(await costs.spentForProject("p1")).toBeGreaterThan(0);
   });
 });
@@ -203,7 +204,7 @@ describe("LLM 비용도 기록한다", () => {
         choices: [{ message: { content: '{"script":"원고"}' } }],
       }),
     });
-    await callJson({ system: "s", messages: [{ role: "user", content: "u" }], apiKey: "k", fetchImpl, projectId: "p1", stage: "대본" });
+    await runWithActor("t-user", () => callJson({ system: "s", messages: [{ role: "user", content: "u" }], apiKey: "k", fetchImpl, projectId: "p1", stage: "대본" }));
     expect(await costs.spentForProject("p1")).toBeGreaterThan(0);
   });
 });

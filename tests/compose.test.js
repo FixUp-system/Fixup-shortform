@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { composeVideo, buildFfmpegArgs } from "../lib/compose";
+import { runWithActor } from "../lib/actor.js";
 
 import { mkdtempSync } from "fs";
 import { tmpdir } from "os";
@@ -76,10 +77,10 @@ describe("composeVideo", () => {
       ok: true,
       json: async () => ({ video: { url: "https://fal.media/final.mp4" } }),
     });
-    const r = await composeVideo({
+    const r = await runWithActor("t-user", () => composeVideo({
       projectId: "p1", cuts: CUTS, aspect_ratio: "9:16", fetchImpl,
       runFfmpeg: async () => { ran = true; },
-    });
+    }));
     expect(ran).toBe(false);
     expect(r.url).toBe("https://fal.media/final.mp4");
     // 이 경로는 자막을 태우지 못한다 — 화면이 그 사실을 표시해야 한다
@@ -102,7 +103,7 @@ describe("composeVideo", () => {
             : { video: { url: "https://fal.media/x.mp4" } },
       };
     };
-    await composeVideo({ projectId: "p1", cuts: CUTS, aspect_ratio: "9:16", fetchImpl });
+    await runWithActor("t-user", () => composeVideo({ projectId: "p1", cuts: CUTS, aspect_ratio: "9:16", fetchImpl }));
 
     const audioMerge = calls.find((c) => c.url.includes("merge-audios"));
     expect(audioMerge.body.audio_urls).toEqual(["https://f/a0.mp3", "https://f/a1.mp3"]);
