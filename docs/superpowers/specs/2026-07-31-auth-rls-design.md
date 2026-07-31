@@ -333,10 +333,39 @@ actor 는 인자로 받지 않고 **`currentActor()` 가 꺼낸다** — 호출�
   위험은 URL 이 `projects.doc` 에 통째로 저장돼 있어 **DB 가 새면 전 고객 산출물이 한 번에
   열린다**는 축이다 — 역으로 이번 인증·RLS 가 그 축을 낮춘다.
   **기한: 외부 고객을 받기 전(결제·오픈 직전)까지 닫는다.**
-  ⚠️ **조사 미완** — 2026-07-31 시점에 fal 문서 사이트가 429 로 막혀 **원문을 확인하지
-  못했다.** 검색 요약은 `X-Fal-Object-Lifecycle-Preference` 에 `initial_acl` 필드가 있어
-  생성 파일 접근을 제어한다고 하나 **미검증이다**(같은 날 검색 요약을 원문으로 취급해 틀린
-  전력이 있다). 계획에 **원문 확인 태스크**를 따로 둔다
+
+  ### fal File Access Controls — 원문 확인 완료 (2026-07-31)
+
+  문서 원문을 읽었다(`fal.ai/docs/documentation/model-apis/file-access-controls`).
+  요약이 아니라 원문이다.
+
+  - **기본값은 공개가 맞다** — *"By default, CDN URLs are publicly accessible to anyone
+    with the link."*
+  - **잠그는 방법은 요청 헤더다**: `X-Fal-Object-Lifecycle-Preference` 에
+    `initial_acl: { default: "forbid"|"hide"|"allow", rules: [...] }`.
+    `forbid` 는 403, `hide` 는 404 를 낸다. **`{default:"forbid", rules:[]}` 가
+    "나만 볼 수 있게"** 다
+  - ★ **계정 기본값은 셀프서비스가 안 된다** — *"Self-serve account-level configuration
+    is not yet available."* fal 계정 팀이나 support@fal.ai 에 연락해야 한다.
+    **즉 "설정 한 번"으로 끝나는 해법이 아니다** — 우리 코드가 fal 을 부르는 세 자리
+    (`lib/imagegen.js`·`lib/i2v.js`·`lib/tts.js`)에 헤더를 붙이는 쪽이 빠르다
+  - ★★ **이미 만든 파일도 사후에 잠글 수 있다** — `PUT rest.fal.ai/storage/files/acl?url=…`
+    에 `{default:"forbid", rules:[]}`. 지금까지 쌓인 산출물을 일괄로 닫을 길이 있다는 뜻이다
+  - **소유자는 항상 읽는다** — *"The file's owner … always retains access regardless of
+    the ACL."* 그래서 **i2v 가 우리 이미지 URL 을 받아 읽는 경로는 안 깨진다**(같은 계정이다)
+  - **비공개 파일을 읽으려면 CDN 토큰이 필요하다**: `FAL_KEY` 를
+    `rest.fal.ai/storage/auth/token` 에서 교환(최대 30일, `expiration_seconds` 로 단축)한 뒤
+    `Bearer` 로 GET. **브라우저가 `<img src>` 로 직접 못 읽는다**
+  - 계정 없는 사람과 공유하려면 **서명 URL**(기본 24시간, **최대 7일**)
+
+  **그래서 실제 작업은 두 갈래다**(둘 다 필요하다):
+  1. **새 산출물**: fal 호출 세 곳에 헤더 추가 — 작다
+  2. **읽는 쪽**: 화면이 fal URL 을 직접 못 쓰게 되므로 **`/api/assets/…` 라우트가
+     CDN 토큰으로 받아 흘려준다**. 서명 URL 은 최대 7일이라 `projects.doc` 에 박힌 URL 이
+     썩는다 — 업로드에서 이미 같은 이유로 라우트 방식을 골랐다(`/api/uploads/<name>`)
+
+  이 작업은 **이번 범위 밖**이고 별도 태스크다. 규모는 "설정 한 번"이 아니라
+  "라우트 하나 + 호출부 세 곳 + 화면의 URL 사용처 전부"다.
 - **ALS 가 fire-and-forget 을 넘어 살아남는지 미검증** — 계획 첫 태스크에서 실측한다.
   실패 시 명시적 인자 전달로 물러난다
 - **쓰기 큐는 프로세스 안에서만 유효하다** — 인증과 무관하게 그대로다
