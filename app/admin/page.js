@@ -46,7 +46,7 @@ export default function AdminPage() {
     <>
       <h1 className="pgtitle">사용자 승인</h1>
       <p className="pgsub">
-        승인은 상대가 다시 로그인할 때 반영돼요. 차단은 즉시 적용됩니다.
+        승인·차단 모두 상대의 다음 요청부터 바로 반영돼요 — 다시 로그인할 필요는 없어요.
       </p>
 
       {err && <p className="pgsub warn">{err}</p>}

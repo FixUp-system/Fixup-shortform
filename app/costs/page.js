@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { loadCostsRecords } from "../../lib/costs-client.js";
 
 function fmtTime(ts) {
   const d = new Date(ts);
@@ -20,12 +21,13 @@ const STATUS_LABEL = {
 
 export default function CostsPage() {
   const [records, setRecords] = useState(null);
+  const [err, setErr] = useState("");
 
   useEffect(() => {
-    fetch("/api/costs")
-      .then((r) => r.json())
-      .then((d) => setRecords(d.records || []))
-      .catch(() => setRecords([]));
+    loadCostsRecords().then(({ records, err }) => {
+      setRecords(records);
+      setErr(err);
+    });
   }, []);
 
   const total = (records || []).reduce((s, r) => s + (r.est_cost_usd || 0), 0);
@@ -42,22 +44,26 @@ export default function CostsPage() {
         <b>추정치</b> — fal 대시보드의 실청구액으로 검증하세요.
       </p>
 
-      <div className="cost-summary">
-        <div className="cost-tile">
-          <small>오늘</small>
-          <b>${todayTotal.toFixed(2)}</b>
+      {err ? (
+        <p className="pgsub warn">{err}</p>
+      ) : (
+        <div className="cost-summary">
+          <div className="cost-tile">
+            <small>오늘</small>
+            <b>${todayTotal.toFixed(2)}</b>
+          </div>
+          <div className="cost-tile">
+            <small>누적</small>
+            <b>${total.toFixed(2)}</b>
+          </div>
+          <div className="cost-tile">
+            <small>생성 횟수</small>
+            <b>{records ? records.length : "–"}회</b>
+          </div>
         </div>
-        <div className="cost-tile">
-          <small>누적</small>
-          <b>${total.toFixed(2)}</b>
-        </div>
-        <div className="cost-tile">
-          <small>생성 횟수</small>
-          <b>{records ? records.length : "–"}회</b>
-        </div>
-      </div>
+      )}
 
-      {records === null ? (
+      {err ? null : records === null ? (
         <p className="pgsub">불러오는 중…</p>
       ) : records.length === 0 ? (
         <p className="pgsub">아직 기록이 없어요 — 홈에서 영상을 만들면 여기에 쌓여요.</p>
