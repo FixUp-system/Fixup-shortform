@@ -23,17 +23,25 @@ function LoginForm() {
     e.preventDefault();
     setBusy(true);
     setError("");
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    );
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
-    });
-    if (error) setError("메일을 보내지 못했어요 — 주소를 확인해 주세요");
-    else setSent(true);
-    setBusy(false);
+    // ★ 최종 리뷰 Minor 5 — NEXT_PUBLIC_* 이 없으면 createBrowserClient 가 여기서 던지고
+    // setBusy(false)가 안 돌아 버튼이 "보내는 중…"에 영원히 멈췄다(오류 표시도 없었다).
+    // try/finally 로 감싸 어떤 경로로 끝나든 버튼이 풀리게 한다.
+    try {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      );
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      });
+      if (error) setError("메일을 보내지 못했어요 — 주소를 확인해 주세요");
+      else setSent(true);
+    } catch {
+      setError("로그인 기능을 쓸 수 없어요 — 잠시 후 다시 시도해 주세요");
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (sent) {

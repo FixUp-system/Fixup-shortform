@@ -3,7 +3,9 @@
 // 응답: {request_id, endpoint}
 
 import { addRecord, estimateCost, costActor, assertBudget } from "../../../lib/costs";
+import { fakeFal } from "../../../lib/fake";
 import { withUser } from "../../../lib/auth/require-user.js";
+import { randomUUID } from "crypto";
 
 const DEFAULT_ENDPOINT = "fal-ai/kling-video/v3/standard/text-to-video";
 
@@ -32,6 +34,14 @@ export const POST = withUser(async (req) => {
     : "9:16";
 
   const endpoint = process.env.FAL_VIDEO_ENDPOINT || DEFAULT_ENDPOINT;
+
+  // ★ 최종 리뷰 I3 — 가짜 모드인데 진짜 돈이 나가던 자리. assertBudget 은 fakeFal() 이면
+  // 즉시 return 해서 상한 검사를 건너뛸 뿐, fetch 자체를 막지는 않는다. 이 라우트에는
+  // lib/i2v.js·imagegen.js 같은 fake 분기가 아예 없어서 SHOTFORM_FAKE=all 로 띄워도
+  // queue.fal.run 을 실제로 불렀다. imagegen.js 의 placeholder 패턴과 같은 자리에서 막는다.
+  if (fakeFal()) {
+    return Response.json({ request_id: `fake-${randomUUID()}`, endpoint });
+  }
 
   // ── 모델별 입력 어댑터 — 모델마다 파라미터 이름·허용값이 다르다
   let input;

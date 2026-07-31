@@ -2,6 +2,7 @@ import { createProject, listProjects } from "../../../lib/projects";
 import { isAspect, DEFAULT_ASPECT_ID } from "../../../lib/aspects";
 import { TARGET_CHOICES } from "../../../lib/script";
 import { normalizeStyle } from "../../../lib/styles";
+import { ownedPhotoKeys } from "../../../lib/refs-io.js";
 import { withUser } from "../../../lib/auth/require-user.js";
 
 // 내 프로젝트 목록 — doc 통짜를 안 실어 보낸다(listProjects 가 이미 요약해서 준다).
@@ -36,6 +37,14 @@ export const POST = withUser(async (req, ctx, user) => {
   const aspect = isAspect(body?.settings?.aspect_ratio)
     ? body.settings.aspect_ratio
     : DEFAULT_ASPECT_ID;
+  // 생성 시에도 같은 구멍이 있다 — 남의 업로드 키를 처음부터 material.photos 에 심을 수
+  // 있었다(PATCH 와 같은 이유, 리뷰 I2).
+  if (
+    Array.isArray(body.material.photos) &&
+    !(await ownedPhotoKeys(body.material.photos, user.id))
+  ) {
+    return Response.json({ error: "본인이 올린 사진만 쓸 수 있어요" }, { status: 400 });
+  }
   const project = await createProject({
     settings: { aspect_ratio: aspect, target_seconds: target, ...(style ? { style } : {}) },
     material: {

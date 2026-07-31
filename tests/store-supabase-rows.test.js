@@ -27,6 +27,7 @@ vi.mock("@supabase/supabase-js", () => ({
         eq: (c, v) => ((state.eq ||= []).push([c, v]), b),
         order: (c, o) => ((state.order ||= []).push([c, o]), b),
         range: (a, z) => ((state.range = [a, z]), b),
+        limit: (n) => ((state.limit = n), b),
         maybeSingle: () => ((state.single = true), b),
         then: (res, rej) => Promise.resolve(H.respond(state)).then(res, rej),
       };
@@ -121,6 +122,27 @@ describe("sumCosts — DB 가 더한다", () => {
   it("합계를 숫자로 못 읽으면 던진다 — 조용히 적게 세면 예산 상한이 사라진다", async () => {
     H.rpcRespond = () => ({ data: null, error: null }); // 함수가 아직 안 올라간 경우 등
     await expect(supabaseStore.sumCosts({})).rejects.toThrow(/sum_costs/);
+  });
+});
+
+// ★ 리뷰 I1 — selectProject·listProjects·updateProjectRow 의 .eq("owner_id", ...) 세 자리는
+// 인메모리 저장소로는 절대 못 잡는다(인메모리는 소유자 필드가 없어도 물리적으로 격리돼 있다).
+// 여기서는 가짜 PostgREST 가 기록한 .eq 체인을 직접 들여다봐 실제로 owner_id 필터가
+// 나갔는지 잰다 — 셋 중 하나라도 지우면 이 테스트들이 빨개져야 한다.
+describe("owner_id 필터 — 세 함수 모두 .eq 로 건다", () => {
+  it("selectProject", async () => {
+    await supabaseStore.selectProject("p1", "owner-1");
+    expect(H.calls[0].eq).toContainEqual(["owner_id", "owner-1"]);
+  });
+
+  it("listProjects", async () => {
+    await supabaseStore.listProjects("owner-2");
+    expect(H.calls[0].eq).toContainEqual(["owner_id", "owner-2"]);
+  });
+
+  it("updateProjectRow", async () => {
+    await supabaseStore.updateProjectRow("p1", "owner-3", 0, { status: "draft" });
+    expect(H.calls[0].eq).toContainEqual(["owner_id", "owner-3"]);
   });
 });
 

@@ -4,6 +4,7 @@ import { activeClipLimits } from "../../../../lib/clip-limits";
 import { normalizeStyle } from "../../../../lib/styles";
 import { isAspect } from "../../../../lib/aspects";
 import { isSpeed } from "../../../../lib/speeds";
+import { ownedPhotoKeys } from "../../../../lib/refs-io.js";
 import { withUser } from "../../../../lib/auth/require-user.js";
 
 export const GET = withUser(async (req, { params }, user) => {
@@ -36,6 +37,12 @@ export const PATCH = withUser(async (req, { params }, user) => {
     } catch (e) {
       return Response.json({ error: e.message }, { status: 400 });
     }
+  }
+
+  // 남의 업로드 키를 material.photos 로 심으려는 시도를 막는다 — 리뷰 I2.
+  // 사진마다 upload_owners 를 물어 이 사용자 것이 아니면(주인 기록이 없는 경우 포함) 거부한다.
+  if (Array.isArray(body.material?.photos) && !(await ownedPhotoKeys(body.material.photos, user.id))) {
+    return Response.json({ error: "본인이 올린 사진만 쓸 수 있어요" }, { status: 400 });
   }
 
   try {

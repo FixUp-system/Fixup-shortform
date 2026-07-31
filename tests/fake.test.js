@@ -27,6 +27,15 @@ describe("fakeLevel", () => {
     expect(fakeLlm()).toBe(true);
   });
 
+  it("SHOTFORM_FAKE=fal 도 fal만 막는다", () => {
+    // ★ 최종 리뷰 I3 — CLAUDE.md 의 실행 예시 `SHOTFORM_FAKE=fal npm run dev` 가
+    // 실제로는 인식되지 않아 off(진짜, 돈이 나감)로 동작했다.
+    process.env.SHOTFORM_FAKE = "fal";
+    expect(fakeLevel()).toBe("fal");
+    expect(fakeFal()).toBe(true);
+    expect(fakeLlm()).toBe(false);
+  });
+
   it("옛 이름 SHOTFORM_FAKE_IMAGES=1 도 그대로 인정한다", () => {
     // tests/vlm.test.js 가 이 이름을 쓰고 있었다 — 깨뜨리지 않는다
     process.env.SHOTFORM_FAKE_IMAGES = "1";

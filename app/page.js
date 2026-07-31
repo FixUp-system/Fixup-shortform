@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import QuickCreate from "../components/QuickCreate";
+import { loadProjects } from "../lib/projects-client";
 
 // 단계 이름의 한국어 라벨. lib/steps.js 의 STEPS 와 같은 뜻이지만 여기서는
 // 목록에 짧게 찍을 한 단어만 필요해서 별도 표를 둔다.
@@ -18,12 +19,13 @@ const STATUS_LABEL = {
 
 export default function Home() {
   const [projects, setProjects] = useState(null); // null = 불러오는 중
+  const [err, setErr] = useState("");
 
   useEffect(() => {
-    fetch("/api/projects")
-      .then((r) => (r.ok ? r.json() : { projects: [] }))
-      .then((d) => setProjects(d.projects || []))
-      .catch(() => setProjects([]));
+    loadProjects().then(({ projects, err }) => {
+      setProjects(projects);
+      setErr(err);
+    });
   }, []);
 
   return (
@@ -36,7 +38,8 @@ export default function Home() {
       </div>
 
       {projects === null && <p className="pgsub">불러오는 중…</p>}
-      {projects?.length === 0 && (
+      {err && <p className="pgsub warn">{err}</p>}
+      {projects?.length === 0 && !err && (
         <p className="pgsub">아직 만든 영상이 없어요. 새로 만들어 보세요.</p>
       )}
       {projects && projects.length > 0 && (

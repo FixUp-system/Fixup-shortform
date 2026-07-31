@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { resetMemoryStore } from "../lib/store/memory.js";
+import { memoryStore, resetMemoryStore } from "../lib/store/memory.js";
 import { createProject, updateProject } from "../lib/projects.js";
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
 import { GET as getProjectRoute, PATCH as patchProjectRoute } from "../app/api/projects/[id]/route.js";
@@ -149,6 +149,43 @@ describe("변이 라우트 — 남의 id 로 부르면 실패한다", () => {
     expect(res.status).toBe(400);
     const after = await getProjectRoute(reqAs(A), ctx(p.id)).then((r) => r.json());
     expect(after.cuts[0].clip_regen_count).toBe(0);
+  });
+});
+
+// ★ 최종 리뷰 I2 — PATCH 가 material.photos 를 통째로 머지해서 남의 업로드 키를 자기
+// 프로젝트에 심을 수 있었다. pipeline.js 가 그 키로 원본 바이트를 읽어 VLM 판정을 태우고
+// 결과가 doc 에 저장돼 화면에 샌다. 소유자 검사가 실제로 거부하는지, 자기 키는 통과하는지를
+// 함께 잰다.
+describe("PATCH /api/projects/[id] — material.photos 소유자 검사", () => {
+  beforeEach(() => resetMemoryStore());
+
+  it("남의 업로드 키를 심으려 하면 거부된다", async () => {
+    const p = await make(A);
+    await memoryStore.insertUploadOwner("b-secret.jpg", B);
+    const res = await patchProjectRoute(
+      jsonReqAs(A, { material: { photos: [{ url: "/api/uploads/b-secret.jpg" }] } }),
+      ctx(p.id)
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("주인 기록이 없는 키(백필 전 옛 업로드)도 거부한다", async () => {
+    const p = await make(A);
+    const res = await patchProjectRoute(
+      jsonReqAs(A, { material: { photos: [{ url: "/api/uploads/no-owner.jpg" }] } }),
+      ctx(p.id)
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("자기 업로드 키는 통과한다", async () => {
+    const p = await make(A);
+    await memoryStore.insertUploadOwner("a-mine.jpg", A);
+    const res = await patchProjectRoute(
+      jsonReqAs(A, { material: { photos: [{ url: "/api/uploads/a-mine.jpg" }] } }),
+      ctx(p.id)
+    );
+    expect(res.status).toBe(200);
   });
 });
 

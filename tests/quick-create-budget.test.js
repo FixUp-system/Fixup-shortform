@@ -153,6 +153,27 @@ describe("Quick Create — POST /api/video 의 예산 가드", () => {
     expect(calls).toBe(1); // 두 번째는 fal 을 아예 안 불렀다
   });
 
+  // ★ 최종 리뷰 I3 — 가짜 모드인데 fal 을 실제로 불렀던 자리. SHOTFORM_FAKE=all("완전 0원")
+  // 로 띄워도 이 라우트만 예외적으로 진짜 queue.fal.run 을 불렀다.
+  it("가짜 모드에서는 fal 을 부르지 않고 플레이스홀더 request_id 를 돌려준다", async () => {
+    process.env.SHOTFORM_FAKE = "all";
+
+    let called = false;
+    global.fetch = async () => {
+      called = true;
+      return { ok: true, json: async () => ({ request_id: "real-should-not-happen" }) };
+    };
+
+    const res = await quickCreatePOST(
+      reqAs("u-1", { prompt: "고양이", duration: "5", aspect_ratio: "9:16" })
+    );
+
+    expect(called).toBe(false);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.request_id).toMatch(/^fake-/);
+  });
+
   it("헤더가 없으면(미인증) 500 이고 fal 을 부르지 않는다", async () => {
     let called = false;
     global.fetch = async () => {
