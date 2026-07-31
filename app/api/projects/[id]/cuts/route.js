@@ -2,14 +2,11 @@ import { getProject, updateProject } from "../../../../../lib/projects";
 import { isAspect, DEFAULT_ASPECT_ID } from "../../../../../lib/aspects";
 import { runSplitPipeline } from "../../../../../lib/pipeline";
 import { areCutsStale } from "../../../../../lib/steps";
+import { withUser } from "../../../../../lib/auth/require-user.js";
 
-// TEMP(Task 7 에서 requireUser 로 교체) — 인증이 붙기 전까지의 자리표시자.
-// 이 상수가 남아 있으면 Task 7 이 안 끝난 것이다.
-const TEMP_OWNER = process.env.SHOTFORM_TEMP_OWNER || "00000000-0000-0000-0000-000000000000";
-
-export async function POST(req, { params }) {
+export const POST = withUser(async (req, { params }, user) => {
   const { id } = await params;
-  const project = await getProject(id, TEMP_OWNER);
+  const project = await getProject(id, user.id);
   if (!project) return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
   // 컷은 원고를 잘라서 만든다 — 원고가 없으면 자를 것도, 그릴 근거도 없다.
   // 구성 시절 프로젝트(paragraphs만 있는)도 여기서 걸린다: 대본을 다시 쓰면 원고가 생긴다.
@@ -38,7 +35,7 @@ export async function POST(req, { params }) {
 
   // 파이프라인보다 먼저 status:cuts 를 세운다 — 응답 직후 화면이 ③목소리로 이동해도
   // 가드가 통과하고, 컷이 비어 있는 동안은 "컷을 나누는 중"으로 폴링한다.
-  await updateProject(id, TEMP_OWNER, (proj) => ({
+  await updateProject(id, user.id, (proj) => ({
     ...proj,
     settings: { ...proj.settings, aspect_ratio },
     status: "cuts", cuts: [], cuts_error: null,
@@ -47,13 +44,13 @@ export async function POST(req, { params }) {
   }));
 
   // 비동기 시작 — 완료를 기다리지 않고 폴링으로 확인 (로컬 node 서버 전제. 배포 시 잡 큐 이관)
-  runSplitPipeline(id, TEMP_OWNER).catch(async (e) => {
+  runSplitPipeline(id, user.id).catch(async (e) => {
     console.error("split pipeline error:", e);
     // 컷 분할이 죽으면 cuts가 영영 비어 있다 — 화면이 5분을 기다리지 않게 실패를 남긴다
-    await updateProject(id, TEMP_OWNER, (proj) => ({
+    await updateProject(id, user.id, (proj) => ({
       ...proj,
       cuts_error: e?.message || "컷을 나누지 못했어요",
     })).catch(() => {});
   });
   return Response.json({ started: true });
-}
+});

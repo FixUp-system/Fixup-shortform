@@ -3,14 +3,11 @@ import { callJson } from "../../../../../lib/llm";
 import { validateBriefing, validateDevelopQuestions } from "../../../../../lib/validate";
 import { buildBriefingMessages, buildDevelopMessages, mergeAsked, briefingContentChanged } from "../../../../../lib/briefing";
 import { estimateSeconds, targetChars, CHARS_PER_SEC } from "../../../../../lib/script";
+import { withUser } from "../../../../../lib/auth/require-user.js";
 
-// TEMP(Task 7 에서 requireUser 로 교체) — 인증이 붙기 전까지의 자리표시자.
-// 이 상수가 남아 있으면 Task 7 이 안 끝난 것이다.
-const TEMP_OWNER = process.env.SHOTFORM_TEMP_OWNER || "00000000-0000-0000-0000-000000000000";
-
-export async function POST(req, { params }) {
+export const POST = withUser(async (req, { params }, user) => {
   const { id } = await params;
-  const project = await getProject(id, TEMP_OWNER);
+  const project = await getProject(id, user.id);
   if (!project) return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
   if (!project.material?.text?.trim()) {
     return Response.json({ error: "정리할 자료가 없어요" }, { status: 400 });
@@ -34,7 +31,7 @@ export async function POST(req, { params }) {
     if (!questions) {
       return Response.json({ error: "여쭤볼 것을 찾지 못했어요. 자료를 직접 더 적어 주세요." }, { status: 502 });
     }
-    const updated = await updateProject(id, TEMP_OWNER, (proj) => ({
+    const updated = await updateProject(id, user.id, (proj) => ({
       ...proj,
       briefing: { ...proj.briefing, asked: [...(proj.briefing?.asked || []), ...questions] },
     }));
@@ -63,7 +60,7 @@ export async function POST(req, { params }) {
 
   // 이미 답한 이력은 보존하고, 질문 라운드는 1회로 코드가 강제한다.
   // (프롬프트로도 지시하지만 LLM이 어길 수 있으므로 여기서 잘라낸다)
-  const updated = await updateProject(id, TEMP_OWNER, (proj) => {
+  const updated = await updateProject(id, user.id, (proj) => {
     const asked = mergeAsked(proj.briefing?.asked, briefing.asked);
     const next = {
       ...briefing,
@@ -83,4 +80,4 @@ export async function POST(req, { params }) {
     };
   });
   return Response.json({ briefing: updated.briefing });
-}
+});

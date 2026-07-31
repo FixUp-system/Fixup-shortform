@@ -1,15 +1,12 @@
 import { getProject, updateProject } from "../../../../../lib/projects";
 import { runVideoPipeline } from "../../../../../lib/pipeline";
 import { isClipStale } from "../../../../../lib/steps";
-
-// TEMP(Task 7 에서 requireUser 로 교체) — 인증이 붙기 전까지의 자리표시자.
-// 이 상수가 남아 있으면 Task 7 이 안 끝난 것이다.
-const TEMP_OWNER = process.env.SHOTFORM_TEMP_OWNER || "00000000-0000-0000-0000-000000000000";
+import { withUser } from "../../../../../lib/auth/require-user.js";
 
 // 경로가 clips 인 이유: app/api/video (Quick Create 의 text-to-video)가 이미 있다.
-export async function POST(req, { params }) {
+export const POST = withUser(async (req, { params }, user) => {
   const { id } = await params;
-  const project = await getProject(id, TEMP_OWNER);
+  const project = await getProject(id, user.id);
   if (!project) return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
 
   const cuts = project.cuts || [];
@@ -42,13 +39,13 @@ export async function POST(req, { params }) {
     );
   }
 
-  await updateProject(id, TEMP_OWNER, (proj) => ({ ...proj, video_error: null }));
+  await updateProject(id, user.id, (proj) => ({ ...proj, video_error: null }));
 
-  runVideoPipeline(id, TEMP_OWNER).catch(async (e) => {
+  runVideoPipeline(id, user.id).catch(async (e) => {
     console.error("video pipeline error:", e);
-    await updateProject(id, TEMP_OWNER, (proj) => ({
+    await updateProject(id, user.id, (proj) => ({
       ...proj, video_error: e?.message || "영상을 만들지 못했어요",
     })).catch(() => {});
   });
   return Response.json({ started: true });
-}
+});

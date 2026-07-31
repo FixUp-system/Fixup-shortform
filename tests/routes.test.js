@@ -5,11 +5,14 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { resetMemoryStore } from "../lib/store/memory.js";
 import { createProject, getProject, updateProject } from "../lib/projects.js";
 
-// 라우트는 아직 TEMP_OWNER(Task 7 배선 전까지의 자리표시자)로 돈다 — 여기서 직접 만든
-// 프로젝트도 같은 값이어야 라우트가 "내 것"으로 찾는다. env(SHOTFORM_TEMP_OWNER)를 안 세운
-// 테스트라 라우트 쪽 기본값과 그대로 맞춘다.
+// 라우트는 이제 신원 헤더(withUser)로 소유자를 정한다 — 아래 AUTH_HEADERS 가 이 값을 싣는다.
 const OWNER = "00000000-0000-0000-0000-000000000000";
 import { isAudioStale, isImageStale, isClipStale, isRenderStale, renderKey } from "../lib/steps.js";
+import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
+
+// 라우트가 withUser 로 감싸인 뒤로는 신원 헤더가 없으면 500 이다(Task 8) —
+// 여기서 만드는 요청은 전부 이 헤더를 실어 보낸다.
+const AUTH_HEADERS = { [USER_HEADER]: OWNER, [STATUS_HEADER]: "approved", [ROLE_HEADER]: "user" };
 
 const pipelineMock = vi.hoisted(() => ({
   run: vi.fn(async () => {}),
@@ -44,7 +47,9 @@ const { POST: clipRegenPOST } = await import("../app/api/projects/[id]/clips/[id
 
 const ctx = (id) => ({ params: Promise.resolve({ id }) });
 const idxCtx = (id, idx) => ({ params: Promise.resolve({ id, idx: String(idx) }) });
-const patchReq = (body) => ({ json: async () => body });
+const patchReq = (body) => ({ json: async () => body, headers: new Headers(AUTH_HEADERS) });
+// new Request(...) 로 만들던 자리 전부를 대신한다 — 신원 헤더를 함께 싣는다
+const authReq = (url, init = {}) => new Request(url, { ...init, headers: { ...AUTH_HEADERS, ...(init.headers || {}) } });
 
 beforeEach(async () => {
   resetMemoryStore();
@@ -310,7 +315,7 @@ describe("POST /api/projects/[id]/briefing — 재추출", () => {
     await updateProject(p.id, OWNER, (proj) => ({ ...proj, status: "cuts", cuts: [{ idx: 0, sentence: "컷", state: "done" }] }));
     llmMock.callJson.mockResolvedValue({ topic: "새 주제", key_points: ["새 내용"], questions: [] });
 
-    const res = await briefingPOST({}, ctx(p.id));
+    const res = await briefingPOST(patchReq({}), ctx(p.id));
     expect(res.status).toBe(200);
     const after = await getProject(p.id, OWNER);
     expect(after.status).toBe("cuts"); // 되감기면 만든 이미지가 잠긴다
@@ -347,7 +352,7 @@ describe("POST /api/projects/[id]/briefing — 재추출", () => {
     const p = await projectWithScript();
     const raw = 'LLM 호출 실패 (429) {"error":{"message":"You exceeded your current quota"}}';
     llmMock.callJson.mockRejectedValue(new Error(raw));
-    const res = await briefingPOST({}, ctx(p.id));
+    const res = await briefingPOST(patchReq({}), ctx(p.id));
     expect(res.status).toBe(502);
     const body = await res.json();
     expect(body.error).toBe("자료를 정리하지 못했어요. 직접 채우거나 다시 시도해 주세요.");
@@ -484,7 +489,7 @@ describe("완성 라우트", () => {
     await updateProject(p.id, OWNER, (proj) => ({
       ...proj, status: "voice", cuts: [{ idx: 0, sentence: "문장", audio: { url: "a" } }],
     }));
-    const res = await renderPOST(new Request("http://x", { method: "POST" }), ctx(p.id));
+    const res = await renderPOST(authReq("http://x", { method: "POST" }), ctx(p.id));
     expect(res.status).toBe(400);
     expect((await res.json()).error).toMatch(/영상/);
   });
@@ -495,7 +500,7 @@ describe("완성 라우트", () => {
       ...proj, status: "video",
       cuts: [{ idx: 0, sentence: "문장", video: { url: "v" }, audio: { url: "a" } }],
     }));
-    const res = await renderPOST(new Request("http://x", { method: "POST" }), ctx(p.id));
+    const res = await renderPOST(authReq("http://x", { method: "POST" }), ctx(p.id));
     expect(res.status).toBe(200);
     expect((await res.json()).started).toBe(true);
   });
@@ -650,7 +655,7 @@ describe("무효화 관통 — 고치면 낡고, 안 고친 것은 살아남는�
 describe("GET /api/projects/[id] — 활성 모델의 상한을 실어 보낸다", () => {
   it("env 를 비우면 기본 엔드포인트(Kling)의 값이다", async () => {
     const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
-    const res = await GET(new Request("http://x"), { params: Promise.resolve({ id: p.id }) });
+    const res = await GET(authReq("http://x"), { params: Promise.resolve({ id: p.id }) });
     const body = await res.json();
     expect(body.clip_limits).toEqual({ min: 3, max: 15 });
   });
@@ -659,7 +664,7 @@ describe("GET /api/projects/[id] — 활성 모델의 상한을 실어 보낸다
     const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
     process.env.FAL_I2V_ENDPOINT = "fal-ai/kling-video/v3/standard/image-to-video";
     try {
-      const res = await GET(new Request("http://x"), { params: Promise.resolve({ id: p.id }) });
+      const res = await GET(authReq("http://x"), { params: Promise.resolve({ id: p.id }) });
       expect((await res.json()).clip_limits).toEqual({ min: 3, max: 15 });
       // 저장된 파일에는 없어야 한다 — 요청마다 다시 푸는 값이다
       const { getProject } = await import("../lib/projects.js");
@@ -688,7 +693,7 @@ describe("POST /api/projects/[id]/clips — 남은 것이 있으면 돈다", () 
     await updateProject(p.id, OWNER, (proj) => ({
       ...proj, status: "video", cuts: [liveCut(0), bareCut(1)],
     }));
-    const res = await clipsPOST(new Request("http://x", { method: "POST" }), ctx(p.id));
+    const res = await clipsPOST(authReq("http://x", { method: "POST" }), ctx(p.id));
     expect(res.status).toBe(200);
     expect((await res.json()).started).toBe(true);
   });
@@ -697,7 +702,7 @@ describe("POST /api/projects/[id]/clips — 남은 것이 있으면 돈다", () 
     const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
     const stale = { ...liveCut(0), video: { url: "v0", seconds: 3, truncated: false, of: "옛그림|3|" } };
     await updateProject(p.id, OWNER, (proj) => ({ ...proj, status: "video", cuts: [stale] }));
-    const res = await clipsPOST(new Request("http://x", { method: "POST" }), ctx(p.id));
+    const res = await clipsPOST(authReq("http://x", { method: "POST" }), ctx(p.id));
     expect(res.status).toBe(200);
   });
 
@@ -706,7 +711,7 @@ describe("POST /api/projects/[id]/clips — 남은 것이 있으면 돈다", () 
     await updateProject(p.id, OWNER, (proj) => ({
       ...proj, status: "video", cuts: [liveCut(0), liveCut(1)],
     }));
-    const res = await clipsPOST(new Request("http://x", { method: "POST" }), ctx(p.id));
+    const res = await clipsPOST(authReq("http://x", { method: "POST" }), ctx(p.id));
     expect(res.status).toBe(409);
   });
 });
@@ -715,22 +720,18 @@ describe("POST /api/projects — 영상 컨셉", () => {
   // 자료를 넣는 화면에서 컨셉을 함께 고른다. 길이(target_seconds)와 달리 조용히 무시하지
   // 않는다 — 고른 컨셉과 그림에 실리는 컨셉이 달라지면 아무도 못 알아본다.
   it("고른 컨셉을 settings 에 담아 만든다", async () => {
-    const res = await projectsPOST({
-      json: async () => ({ material: { text: "자료" }, settings: { style: { preset: "anime", note: " 파스텔 " } } }),
-    });
+    const res = await projectsPOST(patchReq({ material: { text: "자료" }, settings: { style: { preset: "anime", note: " 파스텔 " } } }));
     const p = await res.json();
     expect(p.settings.style).toEqual({ preset: "anime", note: "파스텔" });
   });
 
   it("모르는 컨셉은 400 이고 프로젝트를 만들지 않는다", async () => {
-    const res = await projectsPOST({
-      json: async () => ({ material: { text: "자료" }, settings: { style: { preset: "클레이애니" } } }),
-    });
+    const res = await projectsPOST(patchReq({ material: { text: "자료" }, settings: { style: { preset: "클레이애니" } } }));
     expect(res.status).toBe(400);
   });
 
   it("컨셉을 안 보내면 settings 에 넣지 않는다 — 기본값은 파생한다", async () => {
-    const res = await projectsPOST({ json: async () => ({ material: { text: "자료" } }) });
+    const res = await projectsPOST(patchReq({ material: { text: "자료" } }));
     const p = await res.json();
     expect(p.settings.style).toBeUndefined();
     expect(p.settings.aspect_ratio).toBe("9:16");

@@ -10,14 +10,11 @@ import {
   scriptScore,
   targetChars,
 } from "../../../../../lib/script";
+import { withUser } from "../../../../../lib/auth/require-user.js";
 
-// TEMP(Task 7 에서 requireUser 로 교체) — 인증이 붙기 전까지의 자리표시자.
-// 이 상수가 남아 있으면 Task 7 이 안 끝난 것이다.
-const TEMP_OWNER = process.env.SHOTFORM_TEMP_OWNER || "00000000-0000-0000-0000-000000000000";
-
-export async function POST(req, { params }) {
+export const POST = withUser(async (req, { params }, user) => {
   const { id } = await params;
-  const project = await getProject(id, TEMP_OWNER);
+  const project = await getProject(id, user.id);
   if (!project) return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
   if (!project.briefing?.confirmed) {
     return Response.json({ error: "브리핑을 먼저 확정해 주세요" }, { status: 400 });
@@ -92,7 +89,7 @@ export async function POST(req, { params }) {
   const script = editKeptContent(draft, edited) && !worse ? edited : draft;
   console.log(`${tag} 교정 ${edited ? `${chars(edited)}자${worse ? "(기각)" : ""}` : "실패"} → 최종 ${chars(script)}자(${Math.round(chars(script) / target * 100)}%) · 결함 ${scriptFaults(project, script).join(",") || "없음"}`);
 
-  const updated = await updateProject(id, TEMP_OWNER, (proj) => ({
+  const updated = await updateProject(id, user.id, (proj) => ({
     ...proj,
     status: "script",
     script: {
@@ -102,4 +99,4 @@ export async function POST(req, { params }) {
     },
   }));
   return Response.json({ script: updated.script });
-}
+});

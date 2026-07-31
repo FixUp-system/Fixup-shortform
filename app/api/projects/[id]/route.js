@@ -4,21 +4,18 @@ import { activeClipLimits } from "../../../../lib/clip-limits";
 import { normalizeStyle } from "../../../../lib/styles";
 import { isAspect } from "../../../../lib/aspects";
 import { isSpeed } from "../../../../lib/speeds";
+import { withUser } from "../../../../lib/auth/require-user.js";
 
-// TEMP(Task 7 에서 requireUser 로 교체) — 인증이 붙기 전까지의 자리표시자.
-// 이 상수가 남아 있으면 Task 7 이 안 끝난 것이다.
-const TEMP_OWNER = process.env.SHOTFORM_TEMP_OWNER || "00000000-0000-0000-0000-000000000000";
-
-export async function GET(req, { params }) {
+export const GET = withUser(async (req, { params }, user) => {
   const { id } = await params;
-  const project = await getProject(id, TEMP_OWNER);
+  const project = await getProject(id, user.id);
   if (!project) return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
   // 활성 모델의 클립 상한을 함께 실어 보낸다 — 저장하지 않고 요청마다 지금 env 로 푼다.
   // 화면은 서버 env 를 볼 수 없어서, 이 값 없이는 기본 프로필(20초)로 판정한다.
   return Response.json({ ...project, clip_limits: activeClipLimits() });
-}
+});
 
-export async function PATCH(req, { params }) {
+export const PATCH = withUser(async (req, { params }, user) => {
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
 
@@ -42,7 +39,7 @@ export async function PATCH(req, { params }) {
   }
 
   try {
-    const project = await updateProject(id, TEMP_OWNER, (proj) => {
+    const project = await updateProject(id, user.id, (proj) => {
       const next = { ...proj };
       if (body.material) next.material = { ...proj.material, ...body.material };
       if (body.settings) {
@@ -104,4 +101,4 @@ export async function PATCH(req, { params }) {
   } catch (e) {
     return Response.json({ error: e.message }, { status: 404 });
   }
-}
+});
