@@ -15,9 +15,12 @@ export async function GET(_req, { params }) {
   let buf;
   try {
     buf = await getStore().getObject(BUCKET, name);
-  } catch {
-    // 없는 파일과 저장소 오류를 여기서는 구분하지 않는다 — 어느 쪽이든 사용자에게는
-    // "그 사진이 없다"이고, 원인은 서버 로그에 남는다
+  } catch (e) {
+    // 없는 파일과 저장소 오류를 **사용자에게는** 구분해 주지 않는다 — 어느 쪽이든
+    // "그 사진이 없다"이다. 대신 원인은 반드시 로그에 남긴다. 예전에는 빈 catch 라
+    // env 누락도 Storage 장애도 똑같이 404 로만 보였고, 남는 기록이 한 줄도 없었다
+    // ("원인은 서버 로그에 남는다"고 적어 뒀는데 남기는 코드가 없었다).
+    console.error(`업로드 조회 실패: ${name} — ${e?.message || e}`);
     return new Response("파일을 찾을 수 없어요", { status: 404 });
   }
   return new Response(buf, {

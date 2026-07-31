@@ -898,3 +898,81 @@ describe("컷 길이 — 쪼갤 수 있으면 코드가 되돌린다", () => {
     expect(cuts[0].seconds).toBeLessThanOrEqual(8);
   });
 });
+
+// 재생성 3회 상한은 낙관적 락(updateProject) **안에서** 판정된다. 그런데 CAS 에 지면
+// 같은 patchFn 이 다시 불리므로, 바깥 변수(exceeded)를 시도마다 초기화하지 않으면
+// **버려진 시도가 세운 true 가 다음 시도까지 살아남는다** — 재시도가 성공해 카운트를
+// 올려놓고도 "3회까지예요"를 던지는 상태다. 그 회귀를 여기서 막는다.
+describe("재생성 상한 판정이 낙관적 락 재시도를 견딘다", () => {
+  async function projectWithCut(extra = {}) {
+    const p = await projects.createProject({
+      settings: { aspect_ratio: "9:16" },
+      material: { text: "자료", photos: [] },
+    });
+    return projects.updateProject(p.id, (proj) => ({
+      ...proj,
+      cuts: [{ idx: 0, sentence: "문장입니다.", seconds: 5, source: "ai", regen_count: 0, ...extra }],
+    }));
+  }
+
+  // 첫 CAS 한 번만 지게 한다 — 남이 먼저 쓴 상황을 그대로 흉내 낸다.
+  function loseFirstCas() {
+    const store = getStore();
+    const real = store.updateProjectRow.bind(store);
+    let first = true;
+    return vi.spyOn(store, "updateProjectRow").mockImplementation(async (...a) => {
+      if (first) { first = false; return false; }
+      return real(...a);
+    });
+  }
+
+  it("regenVoice — 첫 시도가 져도 재시도가 성공하면 던지지 않는다", async () => {
+    const p = await projectWithCut();
+    const spy = loseFirstCas();
+    try {
+      await pipeline.regenVoice(p.id, 0, { speak: async () => ({ url: "http://a.mp3", seconds: 3 }) });
+    } finally {
+      spy.mockRestore();
+    }
+    const cut = (await projects.getProject(p.id)).cuts[0];
+    // 버려진 시도는 세지 않는다 — 1이어야 한다
+    expect(cut.voice_regen_count).toBe(1);
+    expect(cut.audio?.url).toBe("http://a.mp3");
+  });
+
+  it("regenClip — 첫 시도가 져도 재시도가 성공하면 던지지 않는다", async () => {
+    const p = await projectWithCut({ image: { url: "http://img/a", of: "" } });
+    const spy = loseFirstCas();
+    try {
+      await pipeline.regenClip(p.id, 0, { clip: async () => ({ url: "http://v.mp4", seconds: 5 }) });
+    } finally {
+      spy.mockRestore();
+    }
+    const cut = (await projects.getProject(p.id)).cuts[0];
+    expect(cut.clip_regen_count).toBe(1);
+    expect(cut.video?.url).toBe("http://v.mp4");
+  });
+
+  it("regenCut — 첫 시도가 져도 재시도가 성공하면 던지지 않는다", async () => {
+    const p = await projectWithCut();
+    const spy = loseFirstCas();
+    try {
+      await pipeline.regenCut(p.id, 0, deps());
+    } finally {
+      spy.mockRestore();
+    }
+    expect((await projects.getProject(p.id)).cuts[0].regen_count).toBe(1);
+  });
+
+  it("진짜로 상한에 닿았으면 CAS 에 져도 여전히 던진다", async () => {
+    const p = await projectWithCut({ voice_regen_count: 3 });
+    const spy = loseFirstCas();
+    try {
+      await expect(
+        pipeline.regenVoice(p.id, 0, { speak: async () => ({ url: "x", seconds: 1 }) })
+      ).rejects.toThrow(/3회/);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
