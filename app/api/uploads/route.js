@@ -1,14 +1,14 @@
-// 사진 업로드 — 실험 단계용 로컬 저장. 배포 시 Supabase Storage 이관.
-import { promises as fs } from "fs";
-import path from "path";
+// 사진 업로드 — Supabase Storage 비공개 버킷.
+//
+// URL 형태(/api/uploads/<uuid>.<ext>)를 바꾸지 않는다. 이 문자열이 프로젝트 문서의
+// material.photos[].url 에 박히기 때문이다. 서명 URL 을 프론트에 직접 주면 만료되는데
+// 문서에 박힌 값은 안 바뀐다 — 그러면 과거 프로젝트의 사진이 조용히 깨진다.
 import { randomUUID } from "crypto";
+import { getStore } from "../../../lib/store/index.js";
 
 const ALLOWED = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 const MAX_BYTES = 10 * 1024 * 1024;
-
-function uploadsDir() {
-  return path.join(process.env.SHOTFORM_DATA_DIR || path.join(process.cwd(), "data"), "uploads");
-}
+const BUCKET = "uploads";
 
 export async function POST(req) {
   const form = await req.formData().catch(() => null);
@@ -22,7 +22,10 @@ export async function POST(req) {
 
   const id = randomUUID();
   const stored = `${id}.${ext}`;
-  await fs.mkdir(uploadsDir(), { recursive: true });
-  await fs.writeFile(path.join(uploadsDir(), stored), Buffer.from(await file.arrayBuffer()));
+  try {
+    await getStore().putObject(BUCKET, stored, Buffer.from(await file.arrayBuffer()), file.type);
+  } catch (e) {
+    return Response.json({ error: `파일을 저장하지 못했어요: ${e.message}` }, { status: 500 });
+  }
   return Response.json({ id, filename: file.name, url: `/api/uploads/${stored}` });
 }
