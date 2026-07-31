@@ -124,6 +124,35 @@ describe("Quick Create — POST /api/video 의 예산 가드", () => {
     expect(body.error).toMatch(/\$0\.00/);
   });
 
+  // ★ 리뷰 I1 — 위의 "남의 사용자 상한" 테스트는 상대가 addRecord 에 도달하기 전에
+  // 막히는 경로만 탔다. 이 태스크의 핵심 주장("같은 사용자가 두 번 부르면 누적돼 두
+  // 번째가 막힌다")을 무는 테스트가 없었다. actor 를 직접 꽂지 않고 **실제 라우트를
+  // 두 번 통과**시켜 addRecord → sumCosts({actor}) 경로를 실제로 탄다.
+  //
+  // lib/store/memory.js 의 insertCost 가 `user` → `actor` 매핑을 안 하면(리뷰 이전 상태)
+  // sumCosts({actor})가 항상 0을 봐서 두 번째 호출도 200으로 통과한다 — 그 회귀를 잡는다.
+  it("같은 사용자가 실제 라우트로 두 번 부르면 두 번째가 누적 차단된다", async () => {
+    process.env.SHOTFORM_BUDGET_TOTAL_USD = "20";
+    process.env.SHOTFORM_BUDGET_USER_USD = "1"; // kling v3 5초 = $0.63, 두 번이면 $1.26 > $1
+
+    let calls = 0;
+    global.fetch = async () => {
+      calls += 1;
+      return { ok: true, json: async () => ({ request_id: `r-${calls}` }) };
+    };
+
+    const first = await quickCreatePOST(
+      reqAs("u-1", { prompt: "고양이", duration: "5", aspect_ratio: "9:16" })
+    );
+    expect(first.status).toBe(200); // 첫 호출은 통과하고 원장에 실제로 기록된다
+
+    const second = await quickCreatePOST(
+      reqAs("u-1", { prompt: "고양이 두 번째", duration: "5", aspect_ratio: "9:16" })
+    );
+    expect(second.status).toBe(402); // 누적 $1.26 > $1 상한
+    expect(calls).toBe(1); // 두 번째는 fal 을 아예 안 불렀다
+  });
+
   it("헤더가 없으면(미인증) 500 이고 fal 을 부르지 않는다", async () => {
     let called = false;
     global.fetch = async () => {
