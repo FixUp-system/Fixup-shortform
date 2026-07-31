@@ -926,23 +926,50 @@ describe("재생성 상한 판정이 낙관적 락 재시도를 견딘다", () =
     });
   }
 
-  it("regenVoice — 첫 시도가 져도 재시도가 성공하면 던지지 않는다", async () => {
-    const p = await projectWithCut();
-    const spy = loseFirstCas();
+  // ★ 리셋 유무를 실제로 가르는 유일한 방법 — **두 시도가 서로 다른 문서를 보게 한다.**
+  //
+  // 첫 CAS 를 지게만 하면 재시도는 같은 문서를 다시 읽는다. 그러면 상한 판정도 같아서
+  // `exceeded = false;` 를 지워도 결과가 안 바뀐다(실제로 지워 보고 확인했다 — 전부 통과했다).
+  // 그래서 여기서는 **남이 먼저 쓴 그 쓰기가 문서를 바꾸게** 한다:
+  //   - 버려진 첫 시도 → 카운트가 이미 3 이라 **상한 초과**(exceeded = true)
+  //   - 재시도 → 남이 컷을 새로 만들어 카운트가 0 이므로 **정상**
+  // 재분할처럼 컷 배열을 통째로 새로 쓰는 요청이 겹치면 실제로 이렇게 된다.
+  // 리셋이 있으면 재시도가 성공해 던지지 않고, 없으면 버려진 true 가 살아남아 던진다.
+  function loseFirstCasAndResetCount(field) {
+    const store = getStore();
+    const real = store.updateProjectRow.bind(store);
+    let first = true;
+    return vi.spyOn(store, "updateProjectRow").mockImplementation(async (id, expectedVersion, doc) => {
+      if (first) {
+        first = false;
+        const row = await store.selectProject(id);
+        await real(id, row.version, {
+          ...row.doc,
+          cuts: row.doc.cuts.map((c) => ({ ...c, [field]: 0 })),
+        });
+        return false; // 우리 시도는 졌다 — version 이 이미 올라갔으니 진짜로도 진다
+      }
+      return real(id, expectedVersion, doc);
+    });
+  }
+
+  it("regenVoice — 버려진 시도가 본 상한이 재시도까지 살아남지 않는다", async () => {
+    const p = await projectWithCut({ voice_regen_count: 3 });
+    const spy = loseFirstCasAndResetCount("voice_regen_count");
     try {
       await pipeline.regenVoice(p.id, 0, { speak: async () => ({ url: "http://a.mp3", seconds: 3 }) });
     } finally {
       spy.mockRestore();
     }
     const cut = (await projects.getProject(p.id)).cuts[0];
-    // 버려진 시도는 세지 않는다 — 1이어야 한다
+    // 버려진 시도는 세지 않는다 — 0 에서 한 번 올라 1이어야 한다
     expect(cut.voice_regen_count).toBe(1);
     expect(cut.audio?.url).toBe("http://a.mp3");
   });
 
-  it("regenClip — 첫 시도가 져도 재시도가 성공하면 던지지 않는다", async () => {
-    const p = await projectWithCut({ image: { url: "http://img/a", of: "" } });
-    const spy = loseFirstCas();
+  it("regenClip — 버려진 시도가 본 상한이 재시도까지 살아남지 않는다", async () => {
+    const p = await projectWithCut({ clip_regen_count: 3, image: { url: "http://img/a", of: "" } });
+    const spy = loseFirstCasAndResetCount("clip_regen_count");
     try {
       await pipeline.regenClip(p.id, 0, { clip: async () => ({ url: "http://v.mp4", seconds: 5 }) });
     } finally {
@@ -953,9 +980,9 @@ describe("재생성 상한 판정이 낙관적 락 재시도를 견딘다", () =
     expect(cut.video?.url).toBe("http://v.mp4");
   });
 
-  it("regenCut — 첫 시도가 져도 재시도가 성공하면 던지지 않는다", async () => {
-    const p = await projectWithCut();
-    const spy = loseFirstCas();
+  it("regenCut — 버려진 시도가 본 상한이 재시도까지 살아남지 않는다", async () => {
+    const p = await projectWithCut({ regen_count: 3 });
+    const spy = loseFirstCasAndResetCount("regen_count");
     try {
       await pipeline.regenCut(p.id, 0, deps());
     } finally {
