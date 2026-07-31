@@ -13,9 +13,12 @@ import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "./lib/auth/headers.js";
 
 // startsWith 가 아니라 세그먼트 경계로 비교한다 — "/login-debug" 나 "/auth/callback-evil"
 // 같은 미래 경로가 접두어만 겹친다고 조용히 공개되면 안 된다.
+function matchesSegment(pathname, base) {
+  return pathname === base || pathname.startsWith(base + "/");
+}
 const PUBLIC_PATHS = ["/login", "/auth/callback"];
 function isPublicPath(pathname) {
-  return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
+  return PUBLIC_PATHS.some((p) => matchesSegment(pathname, p));
 }
 
 // setAll 이 어느 시점의 응답에 쓰든, 최종적으로 브라우저에 나가는 응답에는 그 쿠키가
@@ -90,7 +93,7 @@ export async function middleware(req) {
   headers.set(ROLE_HEADER, role);
   const res = copyCookies(cookieRes, NextResponse.next({ request: { headers } }));
 
-  if (status !== "approved" && !isApi && !pathname.startsWith("/pending")) {
+  if (status !== "approved" && !isApi && !matchesSegment(pathname, "/pending")) {
     const to = req.nextUrl.clone();
     to.pathname = "/pending";
     return copyCookies(cookieRes, NextResponse.redirect(to));

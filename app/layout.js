@@ -1,8 +1,8 @@
 import "./globals.css";
 import { GeistSans } from "geist/font/sans";
 import localFont from "next/font/local";
-import Sidebar from "../components/Sidebar";
 import { ProjectProvider } from "../components/ProjectContext";
+import AppShell from "../components/AppShell";
 
 // 라틴·숫자는 Geist가, 한글은 Pretendard가 받는다 (Geist에 한글 글리프가 없다).
 // 파일은 npm 패키지 pretendard 에서 app/fonts 로 복사해 둔 것 — 빌드 재현성을 위해
@@ -23,14 +23,10 @@ export default function RootLayout({ children }) {
   return (
     <html lang="ko" className={`${GeistSans.variable} ${pretendard.variable}`}>
       <body>
-        <div className="belt">
-          <b>BETA</b> 빠른 생성 실험 버전 — 대화로 정보를 모아 최신 비디오 모델에 전달합니다
-        </div>
+        {/* BETA 배너·사이드바는 AppShell이 화면(경로)에 따라 그린다 — 로그인/대기 화면은
+            단독 화면이다(components/AppShell.jsx) */}
         <ProjectProvider>
-          <div className="shell">
-            <Sidebar />
-            <main className="work">{children}</main>
-          </div>
+          <AppShell>{children}</AppShell>
         </ProjectProvider>
       </body>
     </html>
