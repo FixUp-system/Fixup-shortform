@@ -5,6 +5,7 @@
 // 사용법:  node ab-briefing.mjs setup   → 프로젝트 생성 + A 변형 2회
 //          node ab-briefing.mjs b       → 같은 프로젝트에 B 변형 2회 + 비교 출력
 import { readFileSync, writeFileSync, existsSync } from "fs";
+import { runWithActor } from "../../lib/actor.js";
 
 const BASE = "http://localhost:3000";
 const STATE = new URL("./ab-state.json", import.meta.url).pathname.replace(/^\//, "");
@@ -87,6 +88,10 @@ function measure(text, keyPoints) {
 
 const mode = process.argv[2];
 
+// 측정이 낸 비용은 운영자 지출이다. uuid 가 아닌 문자열이라 사장님 계정과 별개
+// 버킷이 된다 — 프롬프트를 재던 날 측정이 사장님의 사용자별 상한을 잡아먹으면
+// 화면에서 영상이 안 만들어진다. 전역 상한에는 둘 다 함께 잡힌다.
+await runWithActor("admin", async () => {
 if (mode === "setup") {
   const state = {};
   for (const [label, text] of Object.entries(MATERIALS)) {
@@ -141,3 +146,4 @@ if (mode === "setup") {
 } else {
   console.log("사용법: node ab-briefing.mjs setup | b");
 }
+});

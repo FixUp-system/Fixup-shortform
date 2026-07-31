@@ -19,6 +19,7 @@ import { readFileSync } from "fs";
 import path from "path";
 import { buildClipPrompt } from "../../lib/cuts.js";
 import { profileFor, fitDurationFor } from "../../lib/clip-limits.js";
+import { runWithActor } from "../../lib/actor.js";
 
 const [projectId, cutArg, modelA = "fal-ai/ltx-2.3/image-to-video/fast",
        modelB = "fal-ai/kling-video/v3/standard/image-to-video"] = process.argv.slice(2);
@@ -66,11 +67,16 @@ console.log(`움직임: ${cut.motion || "(없음 — 기본값)"}`);
 console.log(`화면:   ${cut.shows || "(없음)"}`);
 console.log(`이미지: ${cut.image.url}\n`);
 
-for (const [tag, endpoint] of [["A", modelA], ["B", modelB]]) {
-  const r = await generate(endpoint);
-  console.log(`${tag} ${endpoint}`);
-  console.log(`   ${r.duration}초 · ${r.url || "실패 " + r.error}\n`);
-}
+// 측정이 낸 비용은 운영자 지출이다. uuid 가 아닌 문자열이라 사장님 계정과 별개
+// 버킷이 된다 — 프롬프트를 재던 날 측정이 사장님의 사용자별 상한을 잡아먹으면
+// 화면에서 영상이 안 만들어진다. 전역 상한에는 둘 다 함께 잡힌다.
+await runWithActor("admin", async () => {
+  for (const [tag, endpoint] of [["A", modelA], ["B", modelB]]) {
+    const r = await generate(endpoint);
+    console.log(`${tag} ${endpoint}`);
+    console.log(`   ${r.duration}초 · ${r.url || "실패 " + r.error}\n`);
+  }
+});
 
 console.log(`두 영상을 나란히 열어 넷을 본다:`);
 console.log(`  1. 지시한 움직임이 실제로 일어나는가`);

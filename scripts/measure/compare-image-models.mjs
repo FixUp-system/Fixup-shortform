@@ -25,6 +25,7 @@ import { buildImagePrompt } from "../../lib/cuts.js";
 import { resolveCutRefs } from "../../lib/cast.js";
 import { AVATARS } from "../../lib/refs.js";
 import { readRefBytes, toDataUri } from "../../lib/refs-io.js";
+import { runWithActor } from "../../lib/actor.js";
 
 const [projectId, modelA = "fal-ai/nano-banana", modelB = "fal-ai/nano-banana-2"] = process.argv.slice(2);
 if (!projectId) {
@@ -86,19 +87,24 @@ const aspect = project.settings?.aspect_ratio || "9:16";
 console.log(`프로젝트 ${projectId} · 컷 ${(project.cuts || []).length}개 · ${aspect}`);
 console.log(`A = ${modelA}\nB = ${modelB}\n`);
 
-for (const cut of project.cuts || []) {
-  if (cut.source === "photo") { console.log(`컷${cut.idx + 1} — 올린 사진 컷이라 건너뜀`); continue; }
-  console.log(`\n━━ 컷${cut.idx + 1}`);
-  const refs = await loadRefs(cut);
-  const prompt = buildImagePrompt(cut, project, refs);
+// 측정이 낸 비용은 운영자 지출이다. uuid 가 아닌 문자열이라 사장님 계정과 별개
+// 버킷이 된다 — 프롬프트를 재던 날 측정이 사장님의 사용자별 상한을 잡아먹으면
+// 화면에서 영상이 안 만들어진다. 전역 상한에는 둘 다 함께 잡힌다.
+await runWithActor("admin", async () => {
+  for (const cut of project.cuts || []) {
+    if (cut.source === "photo") { console.log(`컷${cut.idx + 1} — 올린 사진 컷이라 건너뜀`); continue; }
+    console.log(`\n━━ 컷${cut.idx + 1}`);
+    const refs = await loadRefs(cut);
+    const prompt = buildImagePrompt(cut, project, refs);
 
-  console.log(`   레퍼런스 ${refs.length}장`);
-  console.log(`   shows: ${cut.shows || "(없음)"}`);
-  const a = await generate(modelA, prompt, refs, aspect);
-  const b = await generate(modelB, prompt, refs, aspect);
-  console.log(`   A: ${a.url || "실패 " + a.error}`);
-  console.log(`   B: ${b.url || "실패 " + b.error}`);
-}
+    console.log(`   레퍼런스 ${refs.length}장`);
+    console.log(`   shows: ${cut.shows || "(없음)"}`);
+    const a = await generate(modelA, prompt, refs, aspect);
+    const b = await generate(modelB, prompt, refs, aspect);
+    console.log(`   A: ${a.url || "실패 " + a.error}`);
+    console.log(`   B: ${b.url || "실패 " + b.error}`);
+  }
+});
 
 console.log(`\n두 URL 을 나란히 열어 넷을 본다:`);
 console.log(`  1. 제품이 레퍼런스와 같은 물건인가 (청록 띠·검정 캡·라벨 배치)`);

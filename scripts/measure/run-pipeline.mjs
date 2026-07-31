@@ -6,6 +6,8 @@
 //
 // 서버가 localhost:3000에 떠 있어야 한다. 이미지 비용을 안 쓰려면 SHOTFORM_FAKE_IMAGES=1로 띄운다.
 // 컷까지 보려면 --cuts를 붙인다(이미지 생성이 돌므로 가짜 이미지 모드 권장).
+import { runWithActor } from "../../lib/actor.js";
+
 const BASE = process.env.MEASURE_BASE || "http://localhost:3000";
 
 const MATERIALS = {
@@ -130,6 +132,11 @@ if (!text) {
   process.exit(1);
 }
 console.log(`자료 ${key} · ${reps}회 · 목표 ${seconds ? seconds + "초" : "자동"}`);
-for (let i = 0; i < reps; i++) {
-  try { await once(text); } catch (e) { console.log(`실패: ${e.message}`); }
-}
+// 측정이 낸 비용은 운영자 지출이다. uuid 가 아닌 문자열이라 사장님 계정과 별개
+// 버킷이 된다 — 프롬프트를 재던 날 측정이 사장님의 사용자별 상한을 잡아먹으면
+// 화면에서 영상이 안 만들어진다. 전역 상한에는 둘 다 함께 잡힌다.
+await runWithActor("admin", async () => {
+  for (let i = 0; i < reps; i++) {
+    try { await once(text); } catch (e) { console.log(`실패: ${e.message}`); }
+  }
+});

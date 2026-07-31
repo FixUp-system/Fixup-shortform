@@ -11,6 +11,7 @@
 // 까지 지운다. 그래서 분포를 먼저 센다.
 import { readdirSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
+import { runWithActor } from "../../lib/actor.js";
 
 const REPEATS = Number(process.argv[2]) || 3;
 const DIR = "data/projects";
@@ -91,22 +92,28 @@ if (!sources.length) {
 console.log(`자료 ${sources.length}편 × ${REPEATS}회 = ${sources.length * REPEATS}회 호출`);
 console.log(`예상 비용 약 $${(sources.length * REPEATS * 0.005).toFixed(2)} (OpenAI 만)\n`);
 
-const rows = [];
-for (let r = 0; r < REPEATS; r++) {
-  for (const src of sources) {
-    const shots = buildShowsMessages(src.project, src.cuts);
-    let designed = null;
-    try {
-      designed = validateShows(await callShows(shots), src.cuts.length);
-    } catch (e) {
-      console.error(`  ${src.id.slice(0, 8)} 회차${r + 1} 실패: ${e.message}`);
-      continue;
+// 측정이 낸 비용은 운영자 지출이다. uuid 가 아닌 문자열이라 사장님 계정과 별개
+// 버킷이 된다 — 프롬프트를 재던 날 측정이 사장님의 사용자별 상한을 잡아먹으면
+// 화면에서 영상이 안 만들어진다. 전역 상한에는 둘 다 함께 잡힌다.
+const rows = await runWithActor("admin", async () => {
+  const out = [];
+  for (let r = 0; r < REPEATS; r++) {
+    for (const src of sources) {
+      const shots = buildShowsMessages(src.project, src.cuts);
+      let designed = null;
+      try {
+        designed = validateShows(await callShows(shots), src.cuts.length);
+      } catch (e) {
+        console.error(`  ${src.id.slice(0, 8)} 회차${r + 1} 실패: ${e.message}`);
+        continue;
+      }
+      if (!designed) { console.error(`  ${src.id.slice(0, 8)} 회차${r + 1} 검증 실패`); continue; }
+      designed.forEach((d, i) => out.push({ src: src.id.slice(0, 8), round: r + 1, idx: i, shows: d.shows, motion: d.motion || "" }));
+      process.stdout.write(".");
     }
-    if (!designed) { console.error(`  ${src.id.slice(0, 8)} 회차${r + 1} 검증 실패`); continue; }
-    designed.forEach((d, i) => rows.push({ src: src.id.slice(0, 8), round: r + 1, idx: i, shows: d.shows, motion: d.motion || "" }));
-    process.stdout.write(".");
   }
-}
+  return out;
+});
 console.log("\n");
 
 const all = [];

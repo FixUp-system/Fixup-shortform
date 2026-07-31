@@ -30,6 +30,7 @@ import { resolveCutRefs } from "../../lib/cast.js";
 import { AVATARS } from "../../lib/refs.js";
 import { readRefBytes, toDataUri } from "../../lib/refs-io.js";
 import { STYLE_PRESETS } from "../../lib/styles.js";
+import { runWithActor } from "../../lib/actor.js";
 
 const argv = process.argv.slice(2);
 const flag = (name) => argv.includes(name);
@@ -90,57 +91,64 @@ if (!cut) {
   process.exit(1);
 }
 
-const refs = withRefs ? await loadRefs(cut) : [];
+// 측정이 낸 비용은 운영자 지출이다. uuid 가 아닌 문자열이라 사장님 계정과 별개
+// 버킷이 된다 — 프롬프트를 재던 날 측정이 사장님의 사용자별 상한을 잡아먹으면
+// 화면에서 영상이 안 만들어진다. 전역 상한에는 둘 다 함께 잡힌다.
+const { refs, results, aspect, PER_IMAGE } = await runWithActor("admin", async () => {
+  const refs = withRefs ? await loadRefs(cut) : [];
 
-async function generate(prompt, aspect_ratio) {
-  const endpoint = refs.length ? `${endpointBase}/edit` : endpointBase;
-  const input = { prompt, aspect_ratio, num_images: 1 };
-  if (refs.length) {
-    input.image_urls = refs.map((r) => toDataUri(r.bytes, r.key));
+  async function generate(prompt, aspect_ratio) {
+    const endpoint = refs.length ? `${endpointBase}/edit` : endpointBase;
+    const input = { prompt, aspect_ratio, num_images: 1 };
+    if (refs.length) {
+      input.image_urls = refs.map((r) => toDataUri(r.bytes, r.key));
+    }
+    const res = await fetch(`https://fal.run/${endpoint}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Key ${process.env.FAL_KEY}` },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) return { error: `${res.status} ${(await res.text().catch(() => "")).slice(0, 200)}` };
+    const data = await res.json();
+    return { url: data?.images?.[0]?.url || null };
   }
-  const res = await fetch(`https://fal.run/${endpoint}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Key ${process.env.FAL_KEY}` },
-    body: JSON.stringify(input),
-  });
-  if (!res.ok) return { error: `${res.status} ${(await res.text().catch(() => "")).slice(0, 200)}` };
-  const data = await res.json();
-  return { url: data?.images?.[0]?.url || null };
-}
 
-const aspect = project.settings?.aspect_ratio || "9:16";
-const PER_IMAGE = 0.08; // lib/costs.js 의 nano-banana 2 단가(실청구로 확인). 여기서는 안내용이다
+  const aspect = project.settings?.aspect_ratio || "9:16";
+  const PER_IMAGE = 0.08; // lib/costs.js 의 nano-banana 2 단가(실청구로 확인). 여기서는 안내용이다
 
-console.log(`프로젝트 ${projectId} · 컷${cut.idx + 1} · ${aspect} · 모델 ${endpointBase}`);
-console.log(`shows: ${cut.shows || "(없음)"}`);
-console.log(`레퍼런스: ${refs.length}장${withRefs ? "" : " (--refs 를 붙이면 붙는다)"}`);
-if (note) console.log(`보정: ${note}`);
-console.log(`예상 비용: ${STYLE_PRESETS.length}장 × $${PER_IMAGE} = 약 $${(STYLE_PRESETS.length * PER_IMAGE).toFixed(2)}\n`);
+  console.log(`프로젝트 ${projectId} · 컷${cut.idx + 1} · ${aspect} · 모델 ${endpointBase}`);
+  console.log(`shows: ${cut.shows || "(없음)"}`);
+  console.log(`레퍼런스: ${refs.length}장${withRefs ? "" : " (--refs 를 붙이면 붙는다)"}`);
+  if (note) console.log(`보정: ${note}`);
+  console.log(`예상 비용: ${STYLE_PRESETS.length}장 × $${PER_IMAGE} = 약 $${(STYLE_PRESETS.length * PER_IMAGE).toFixed(2)}\n`);
 
-// 프롬프트가 코드로 판정할 수 있는 것은 여기까지다 — 가짜 모드가 장면을 뽑아내는 문형인가.
-// lib/imagegen.js 의 정규식과 같은 것을 쓴다.
-const SCENE = /Scene:\s*(.+?)\.\s/;
-const results = [];
+  // 프롬프트가 코드로 판정할 수 있는 것은 여기까지다 — 가짜 모드가 장면을 뽑아내는 문형인가.
+  // lib/imagegen.js 의 정규식과 같은 것을 쓴다.
+  const SCENE = /Scene:\s*(.+?)\.\s/;
+  const results = [];
 
-for (const s of STYLE_PRESETS) {
-  const styled = {
-    ...project,
-    settings: { ...project.settings, style: { preset: s.id, note } },
-  };
-  const prompt = buildImagePrompt(cut, styled, refs);
-  const sceneOk = SCENE.test(prompt);
-  const out = await generate(prompt, aspect);
-  results.push({ id: s.id, label: s.label, prompt, sceneOk, ...out });
-  console.log(`━━ ${s.label} (${s.id})${sceneOk ? "" : "  ⚠️ 장면 역파싱 실패 — 가짜 모드가 깨진다"}`);
-  console.log(`   ${prompt}`);
-  console.log(`   → ${out.url || "실패 " + out.error}\n`);
-}
+  for (const s of STYLE_PRESETS) {
+    const styled = {
+      ...project,
+      settings: { ...project.settings, style: { preset: s.id, note } },
+    };
+    const prompt = buildImagePrompt(cut, styled, refs);
+    const sceneOk = SCENE.test(prompt);
+    const out = await generate(prompt, aspect);
+    results.push({ id: s.id, label: s.label, prompt, sceneOk, ...out });
+    console.log(`━━ ${s.label} (${s.id})${sceneOk ? "" : "  ⚠️ 장면 역파싱 실패 — 가짜 모드가 깨진다"}`);
+    console.log(`   ${prompt}`);
+    console.log(`   → ${out.url || "실패 " + out.error}\n`);
+  }
 
-console.log("┌ 결과 표");
-for (const r of results) {
-  console.log(`│ ${r.label.padEnd(6)} ${r.url ? "✅" : "❌"} ${r.url || r.error}`);
-}
-console.log(`└ 성공 ${results.filter((r) => r.url).length}/${results.length} · 실제 비용 약 $${(results.filter((r) => r.url).length * PER_IMAGE).toFixed(2)}`);
+  console.log("┌ 결과 표");
+  for (const r of results) {
+    console.log(`│ ${r.label.padEnd(6)} ${r.url ? "✅" : "❌"} ${r.url || r.error}`);
+  }
+  console.log(`└ 성공 ${results.filter((r) => r.url).length}/${results.length} · 실제 비용 약 $${(results.filter((r) => r.url).length * PER_IMAGE).toFixed(2)}`);
+
+  return { refs, results, aspect, PER_IMAGE };
+});
 
 console.log(`
 네 장을 나란히 열어 **사람이** 본다. VLM 에게 시키지 않는다 — 틀린 가격을 여섯 번 "명확함"이라
