@@ -1,7 +1,7 @@
 # shotform-saas — 작업 지침
 
 > 워크트리 `C:\Users\fixup\shotform-video` · 브랜치 `feature/video-compose`
-> (2026-07-31 기준: 테스트 **765 그린** · origin 대비 미푸시 67 · **origin/main 대비 231커밋 미병합**)
+> (2026-07-31 기준: 테스트 **810 그린 / 5 skip** · origin 대비 미푸시 90 · **origin/main 대비 238커밋 미병합**)
 
 ## 세션 마무리 규칙
 
