@@ -103,4 +103,25 @@ describe("middleware", () => {
     expect(res.status).toBe(307);
     expect(new URL(res.headers.get("location")).pathname).toBe("/login");
   });
+
+  // ★ Task 14 변이 검증에서 드러난 구멍: 인증 성공 경로는 delete 직후 set 이 항상 덮어써서
+  // delete 세 줄을 지워도 위 테스트들이 구별하지 못했다. delete 가 실제로 일하는 유일한
+  // 자리는 "비로그인 + 공개 경로"다 — 그 경로는 set 을 타지 않고 cookieRes 를 그대로
+  // 반환하므로, 위조 헤더가 delete 되지 않으면 그대로 다운스트림에 실려 간다.
+  // 지금은 /login·/auth/callback 핸들러가 이 헤더를 안 읽어 실제 뚫림은 없지만,
+  // 공개 경로가 늘거나 그 핸들러가 신원 헤더를 읽게 되는 날 구멍이 된다 — 그래서
+  // "지금 안전하다"가 아니라 "delete 가 실제로 지운다"를 여기서 직접 확인한다.
+  it("비로그인 + 공개 경로에서도 위조 신원 헤더가 라우트에 닿지 않는다", async () => {
+    userResult = { data: { user: null }, error: null };
+    const res = await middleware(
+      req("/login", {
+        [USER_HEADER]: "attacker",
+        [STATUS_HEADER]: "approved",
+        [ROLE_HEADER]: "admin",
+      })
+    );
+    expect(res.headers.get("x-middleware-request-" + USER_HEADER)).toBeNull();
+    expect(res.headers.get("x-middleware-request-" + STATUS_HEADER)).toBeNull();
+    expect(res.headers.get("x-middleware-request-" + ROLE_HEADER)).toBeNull();
+  });
 });
