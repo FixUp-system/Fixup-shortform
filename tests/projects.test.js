@@ -141,8 +141,70 @@ describe("낙관적 락", () => {
     const doomed = projects.updateProject(p.id, (proj) => proj);
     const next = projects.updateProject(p.id, (proj) => ({ ...proj, status: "images" }));
     await expect(doomed).rejects.toThrow("충돌");
-    store.updateProjectRow = real; // 뒷사람 차례가 오기 전에 되돌린다
+    // 여기서 되돌려도 뒷사람에게 통한다 — 뒷사람 task 는 이미 시작했지만,
+    // updateProjectNow 가 await store.selectProject(...) 로 한 번 양보한 **뒤에야**
+    // store.updateProjectRow 를 프로퍼티로 조회하기 때문이다. (결정적이라 플레이크는
+    // 아니지만 구현 내부 순서에 기대고 있다 — 그 순서가 바뀌면 이 테스트부터 손봐야 한다.)
+    store.updateProjectRow = real;
     await expect(next).resolves.toMatchObject({ status: "images" });
+  });
+
+  // ★ 이 테스트가 지키는 것은 writeQueues 의 **삭제 조건**(내가 꼬리일 때만 지운다)이다.
+  // 무조건 삭제로 바꾸면 여기서만 빨간불이 된다:
+  //   A·B 를 순서대로 넣는다 → A 완료(무조건 삭제면 이때 항목이 사라진다)
+  //   → B 가 아직 도는 중에 C 를 넣는다 → C 의 prev 가 Promise.resolve() 가 되어
+  //     B 와 C 가 동시에 나간다(줄이 끊겼다).
+  // "12개 동시" 테스트는 12개가 같은 tick 에 한꺼번에 붙어 삭제가 끼어들 틈이 없고,
+  // "Map 이 비워진다" 테스트는 늦게 붙는 대기자가 없어 둘 다 이 결함을 못 잡는다.
+  it("앞이 끝난 뒤 늦게 붙는 대기자도 줄 뒤에 선다 — 동시에 두 개가 나가지 않는다", async () => {
+    const p = await projects.createProject({ settings: {}, material: {} });
+    const store = getStore();
+    const real = store.updateProjectRow.bind(store);
+
+    // 라벨(=doc.status)마다 문을 하나 둔다. "도착했다"와 "열어 준다"를 따로 잡아야
+    // 늦게 붙는 C 를 정확히 "B 가 도는 중"인 순간에 끼워 넣을 수 있다.
+    const gate = () => {
+      let open, arrive;
+      const opened = new Promise((r) => { open = r; });
+      const arrived = new Promise((r) => { arrive = r; });
+      return { opened, open, arrived, arrive };
+    };
+    const g = { A: gate(), B: gate(), C: gate() };
+
+    let inFlight = 0;
+    let maxInFlight = 0;
+    store.updateProjectRow = async (id, version, doc) => {
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      g[doc.status].arrive();
+      await g[doc.status].opened;
+      try {
+        return await real(id, version, doc);
+      } finally {
+        inFlight--;
+      }
+    };
+
+    try {
+      const A = projects.updateProject(p.id, (proj) => ({ ...proj, status: "A" }));
+      const B = projects.updateProject(p.id, (proj) => ({ ...proj, status: "B" }));
+
+      g.A.open();
+      await A;
+      await new Promise((r) => setTimeout(r, 0)); // 정리 마이크로태스크가 돌 틈을 준다
+      await g.B.arrived; // B 는 지금 문 앞에 잡혀 **도는 중**이다
+
+      const C = projects.updateProject(p.id, (proj) => ({ ...proj, status: "C" }));
+      await new Promise((r) => setTimeout(r, 0)); // 줄이 끊겼다면 C 가 여기서 같이 나간다
+
+      g.B.open();
+      g.C.open();
+      await Promise.all([B, C]);
+      expect(maxInFlight).toBe(1);
+      expect((await projects.getProject(p.id)).status).toBe("C");
+    } finally {
+      store.updateProjectRow = real;
+    }
   });
 
   it("줄이 다 빠지면 Map 이 비워진다 — 옛 락처럼 영구 누적되지 않는다", async () => {
