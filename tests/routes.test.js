@@ -524,15 +524,16 @@ describe("완성본 내려받기", () => {
   const nameCtx = (name) => ({ params: Promise.resolve({ name }) });
 
   it("경로 탈출을 막는다", async () => {
-    // 파일명 정규식을 통과한 이름만 경로에 붙인다
-    for (const bad of ["../../secret.json", "..%2Fx.mp4", "a/b.mp4", "x.json"]) {
-      const res = await renderFileGET(new Request("http://x"), nameCtx(bad));
+    // 파일명 정규식을 통과한 이름만 경로에 붙인다(Task 9 부터는 uuid 형태만)
+    for (const bad of ["../../secret.json", "..%2Fx.mp4", "a/b.mp4", "x.json", "nothing-here.mp4"]) {
+      const res = await renderFileGET(authReq("http://x"), nameCtx(bad));
       expect(res.status, bad).toBe(400);
     }
   });
 
   it("없는 파일은 404", async () => {
-    const res = await renderFileGET(new Request("http://x"), nameCtx("nothing-here.mp4"));
+    // uuid 형태지만 그런 프로젝트가 없다
+    const res = await renderFileGET(authReq("http://x"), nameCtx("00000000-0000-0000-0000-000000000000.mp4"));
     expect(res.status).toBe(404);
   });
 });

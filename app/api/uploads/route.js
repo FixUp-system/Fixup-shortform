@@ -5,12 +5,13 @@
 // 문서에 박힌 값은 안 바뀐다 — 그러면 과거 프로젝트의 사진이 조용히 깨진다.
 import { randomUUID } from "crypto";
 import { getStore } from "../../../lib/store/index.js";
+import { withUser } from "../../../lib/auth/require-user.js";
 
 const ALLOWED = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 const MAX_BYTES = 10 * 1024 * 1024;
 const BUCKET = "uploads";
 
-export async function POST(req) {
+export const POST = withUser(async (req, _ctx, user) => {
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");
   if (!file || typeof file.arrayBuffer !== "function") {
@@ -24,8 +25,11 @@ export async function POST(req) {
   const stored = `${id}.${ext}`;
   try {
     await getStore().putObject(BUCKET, stored, Buffer.from(await file.arrayBuffer()), file.type);
+    // 소유자 기록은 저장 **뒤에** 한다 — 저장이 실패했는데 주인만 남으면
+    // 있지도 않은 파일의 소유자가 원장에 쌓인다.
+    await getStore().insertUploadOwner(stored, user.id);
   } catch (e) {
     return Response.json({ error: `파일을 저장하지 못했어요: ${e.message}` }, { status: 500 });
   }
   return Response.json({ id, filename: file.name, url: `/api/uploads/${stored}` });
-}
+});

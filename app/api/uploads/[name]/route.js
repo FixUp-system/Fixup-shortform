@@ -1,16 +1,23 @@
 // 업로드 파일 서빙 — 비공개 버킷에서 받아 흘려준다.
 //
-// 인증이 붙으면 여기가 소유자 검사 자리다. 지금은 이름만 알면 누구나 받을 수 있다.
+// 소유자 검사: upload_owners 테이블 역조회. 업로드는 프로젝트가 생기기 전에 일어나서
+// 파일명에서 프로젝트를 되짚을 수 없다 — 그래서 별도 원장이 필요하다(renders 와 다른 이유).
 import { getStore } from "../../../../lib/store/index.js";
+import { withUser } from "../../../../lib/auth/require-user.js";
 
 const MIME = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" };
 const BUCKET = "uploads";
 
-export async function GET(_req, { params }) {
+export const GET = withUser(async (_req, { params }, user) => {
   const { name } = await params;
   // 경로 조작 방지 — 버킷 키에 슬래시나 상위 경로가 들어가면 안 된다
   if (!/^[a-z0-9-]+\.(jpg|png|webp)$/.test(name)) {
     return new Response("잘못된 파일명", { status: 400 });
+  }
+  // 주인 기록이 없는 파일은 열지 않는다 — 옛 업로드는 백필(Task 13)이 채운다.
+  const owner = await getStore().findUploadOwner(name);
+  if (owner !== user.id) {
+    return new Response("파일을 찾을 수 없어요", { status: 404 });
   }
   let buf;
   try {
@@ -30,4 +37,4 @@ export async function GET(_req, { params }) {
       "Cache-Control": "private, max-age=31536000, immutable",
     },
   });
-}
+});
