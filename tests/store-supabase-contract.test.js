@@ -16,6 +16,10 @@ describe.skipIf(!live)("Supabase store 계약", () => {
     await store.insertProject({ id, status: "draft", cuts: [] });
     const row = await store.selectProject(id);
     expect(row.version).toBe(0);
+    // 타입까지 본다. Postgres bigint 는 PostgREST 를 거치며 문자열로 올 수 있고,
+    // 그러면 updateProjectRow 의 expectedVersion + 1 이 "0"+1="01" 이 된다.
+    // 라이브에서 이 위험이 드러나야 한다.
+    expect(typeof row.version).toBe("number");
     expect(row.doc.status).toBe("draft");
   });
 
