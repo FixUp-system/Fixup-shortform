@@ -14,10 +14,17 @@
 //
 // 비용 기록(costs.json)에는 남기지 않는다 — lib/costs.js 를 끌어오면 의존이 커진다.
 // 대시보드와 대조할 때 이 몫을 빼고 본다.
+//
+// 레퍼런스는 파일 경로가 아니라 **출처와 키**로 푼다 — 업로드는 Supabase Storage 로 갔고
+// 아바타만 로컬 파일로 남았다. 여기서 readFileSync 로 경로를 읽던 시절 코드를 그대로 두면
+// 사진 레퍼런스가 조용히 빠진 채 유료 호출이 나간다(아바타는 계속 읽혀서 절반만 동작한다).
+// 그래서 lib/refs-io.js 를 쓰고, 하나라도 못 얻으면 아래에서 크게 경고한다.
 import { readFileSync } from "fs";
 import path from "path";
 import { buildImagePrompt } from "../../lib/cuts.js";
-import { resolveCutRefs, avatarFile } from "../../lib/cast.js";
+import { resolveCutRefs } from "../../lib/cast.js";
+import { AVATARS } from "../../lib/refs.js";
+import { readRefBytes, toDataUri } from "../../lib/refs-io.js";
 
 const [projectId, modelA = "fal-ai/nano-banana", modelB = "fal-ai/nano-banana-2"] = process.argv.slice(2);
 if (!projectId) {
@@ -32,21 +39,38 @@ if (!process.env.FAL_KEY) {
 const DATA = process.env.SHOTFORM_DATA_DIR || "data";
 const project = JSON.parse(readFileSync(path.join(DATA, "projects", `${projectId}.json`), "utf8"));
 
-// lib/pipeline.js 의 uploadsPath 와 같은 규칙. 그 함수는 export 되지 않아 여기 세 줄을 둔다.
-const uploadsPath = (url) => {
-  const name = url?.split("/").pop();
-  return name ? path.join(DATA, "uploads", name) : null;
-};
+// lib/pipeline.js 가 refs 를 조립하는 규칙을 그대로 따른다 —
+// 업로드는 photos[].url 의 마지막 조각이 key, 아바타는 AVATARS[].file 이 key 다.
+// 그 함수는 export 되지 않아 여기 한 벌을 둔다. 규칙이 갈라지면 이 비교만 조용히 어긋난다.
+async function loadRefs(cut) {
+  const resolved = resolveCutRefs(cut, project).map((r) => ({
+    kind: r.kind,
+    who: r.who, // 첨부를 배역에 묶는 데 쓴다 — buildImagePrompt 가 읽는다
+    source: r.from === "photo" ? "upload" : "avatar",
+    key:
+      r.from === "photo"
+        ? (project.material?.photos || []).find((p) => p.id === r.id)?.url?.split("/").pop()
+        : (AVATARS.find((a) => a.id === r.id) || {}).file,
+  }));
+  const refs = [];
+  for (const r of resolved) {
+    const bytes = await readRefBytes(r);
+    // 조용히 넘기지 않는다 — 사진 없이 유료 생성이 나가는 것을 사람이 알아채야 한다.
+    if (bytes) refs.push({ ...r, bytes });
+    else console.error(`   ⚠️ 레퍼런스를 못 읽었다: ${r.source}/${r.key || "(키 없음)"} — 이 장은 그것 없이 그려진다`);
+  }
+  if (resolved.length && refs.length < resolved.length) {
+    console.error(`   ⚠️⚠️ 레퍼런스 ${resolved.length}장 중 ${refs.length}장만 실렸다. 업로드는 Storage 에 있다 —`);
+    console.error(`        SUPABASE_URL·SUPABASE_SERVICE_ROLE_KEY 를 넣고 다시 돌리는 편이 낫다(돈이 나가는 비교다).`);
+  }
+  return refs;
+}
 
 async function generate(endpointBase, prompt, refs, aspect_ratio) {
   const endpoint = refs.length ? `${endpointBase}/edit` : endpointBase;
   const input = { prompt, aspect_ratio, num_images: 1 };
   if (refs.length) {
-    input.image_urls = refs.map((r) => {
-      const buf = readFileSync(r.path);
-      const ext = r.path.split(".").pop();
-      return `data:image/${ext === "jpg" ? "jpeg" : ext};base64,${buf.toString("base64")}`;
-    });
+    input.image_urls = refs.map((r) => toDataUri(r.bytes, r.key));
   }
   const res = await fetch(`https://fal.run/${endpoint}`, {
     method: "POST",
@@ -64,18 +88,11 @@ console.log(`A = ${modelA}\nB = ${modelB}\n`);
 
 for (const cut of project.cuts || []) {
   if (cut.source === "photo") { console.log(`컷${cut.idx + 1} — 올린 사진 컷이라 건너뜀`); continue; }
-  const refs = resolveCutRefs(cut, project)
-    .map((r) => ({
-      path: r.from === "photo"
-        ? uploadsPath((project.material?.photos || []).find((p) => p.id === r.id)?.url)
-        : avatarFile(r.id),
-      kind: r.kind,
-      who: r.who,
-    }))
-    .filter((r) => r.path);
+  console.log(`\n━━ 컷${cut.idx + 1}`);
+  const refs = await loadRefs(cut);
   const prompt = buildImagePrompt(cut, project, refs);
 
-  console.log(`\n━━ 컷${cut.idx + 1} · 레퍼런스 ${refs.length}장`);
+  console.log(`   레퍼런스 ${refs.length}장`);
   console.log(`   shows: ${cut.shows || "(없음)"}`);
   const a = await generate(modelA, prompt, refs, aspect);
   const b = await generate(modelB, prompt, refs, aspect);
