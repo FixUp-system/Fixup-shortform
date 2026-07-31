@@ -2,6 +2,8 @@
 // 응답: {action:"ask", message, quick_replies[]} 또는
 //       {action:"generate", prompt, duration, aspect_ratio, summary}
 
+import { withUser } from "../../../lib/auth/require-user.js";
+
 const SYSTEM_PROMPT = `너는 shotform의 영상 제작 도우미다. 사용자와 한국어로 대화하며 숏폼 영상 클립 생성에 필요한 정보를 수집한다.
 
 수집할 정보:
@@ -25,7 +27,7 @@ prompt 작성 규칙 (매우 중요 — 결과 품질을 좌우한다):
 - 비디오 모델의 약점 회피: 빠른 스포츠 동작, 군중, 여러 인물의 상호작용, 손가락 클로즈업은 부자연스럽기 쉽다. 사용자가 명시하지 않았다면 슬로모션, 클로즈업, 단순한 카메라 무빙 등 모델이 잘하는 연출로 같은 의도를 표현한다.
 - 화면에 텍스트/자막/로고를 넣으라는 지시는 하지 않는다 (글자가 깨진다).`;
 
-export async function POST(req) {
+export const POST = withUser(async (req) => {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return Response.json(
@@ -114,4 +116,4 @@ export async function POST(req) {
     { error: "응답 해석에 실패했어요. 다시 한 번 보내 주세요." },
     { status: 502 }
   );
-}
+});

@@ -4,6 +4,7 @@
 //   (예: fal-ai/kling-video/v2.1/standard/text-to-video → fal-ai/kling-video)
 
 import { updateRecord } from "../../../../lib/costs";
+import { withUser } from "../../../../lib/auth/require-user.js";
 
 const DEFAULT_ENDPOINT = "fal-ai/kling-video/v3/standard/text-to-video";
 
@@ -12,7 +13,7 @@ function appBase(endpoint) {
   return parts.slice(0, 2).join("/");
 }
 
-export async function GET(req) {
+export const GET = withUser(async (req) => {
   const falKey = process.env.FAL_KEY;
   if (!falKey) {
     return Response.json({ error: "FAL_KEY 미설정" }, { status: 500 });
@@ -71,4 +72,4 @@ export async function GET(req) {
     return Response.json({ status: "queued", queue_position: status?.queue_position });
   }
   return Response.json({ status: "error", error: `알 수 없는 상태: ${status?.status}` });
-}
+});

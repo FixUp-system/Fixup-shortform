@@ -119,14 +119,18 @@ describe("generateClip", () => {
   it("결과가 비면 던진다", async () => {
     const fetchImpl = async () => ({ ok: true, json: async () => ({}) });
     await expect(
-      generateClip({ imageUrl: "i", seconds: 4, aspect_ratio: "9:16", fetchImpl })
+      runWithActor("t-user", () =>
+        generateClip({ imageUrl: "i", seconds: 4, aspect_ratio: "9:16", fetchImpl })
+      )
     ).rejects.toThrow(/비어/);
   });
 
   it("실패하면 상태 코드를 담아 던진다", async () => {
     const fetchImpl = async () => ({ ok: false, status: 500, text: async () => "boom" });
     await expect(
-      generateClip({ imageUrl: "i", seconds: 4, aspect_ratio: "9:16", fetchImpl })
+      runWithActor("t-user", () =>
+        generateClip({ imageUrl: "i", seconds: 4, aspect_ratio: "9:16", fetchImpl })
+      )
     ).rejects.toThrow(/500/);
   });
 });

@@ -2,11 +2,12 @@
 // 입력: {prompt, duration:"5"|"10", aspect_ratio:"9:16"|"1:1"|"16:9"}
 // 응답: {request_id, endpoint}
 
-import { addRecord, estimateCost, costActor } from "../../../lib/costs";
+import { addRecord, estimateCost, costActor, assertBudget } from "../../../lib/costs";
+import { withUser } from "../../../lib/auth/require-user.js";
 
 const DEFAULT_ENDPOINT = "fal-ai/kling-video/v3/standard/text-to-video";
 
-export async function POST(req) {
+export const POST = withUser(async (req) => {
   const falKey = process.env.FAL_KEY;
   if (!falKey) {
     return Response.json(
@@ -50,6 +51,18 @@ export async function POST(req) {
     // Kling 계열: duration "3"~"15"(초 숫자 문자열), 16:9|9:16|1:1
     seconds = Number(duration);
     input = { prompt, duration, aspect_ratio, generate_audio: true };
+  }
+
+  // ★ 여기가 이번 스펙이 실제로 막는 구멍이다. 지금까지 이 라우트는 addRecord(기록)만
+  // 하고 assertBudget 을 안 불렀다 — kling v3 는 초당 $0.126(오디오 포함)이라 10초 한
+  // 번에 $1.26 이 상한 없이 나갔다. project id 가 없는 자리라 전역·사용자 상한만 물린다.
+  try {
+    await assertBudget({ endpoint, amount: seconds });
+  } catch (e) {
+    if (e?.name === "BudgetExceeded") {
+      return Response.json({ error: e.message }, { status: 402 });
+    }
+    throw e;
   }
 
   const res = await fetch(`https://queue.fal.run/${endpoint}`, {
@@ -99,4 +112,4 @@ export async function POST(req) {
   }
 
   return Response.json({ request_id: data.request_id, endpoint });
-}
+});

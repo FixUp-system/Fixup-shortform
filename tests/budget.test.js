@@ -52,10 +52,17 @@ describe("누적 합계", () => {
 describe("assertBudget", () => {
   beforeEach(() => fresh({ total: "10", project: "3" }));
 
+  // ★ assertBudget 이 사용자 축도 함께 보게 되면서 costActor() 를 부른다 — actor
+  // 컨텍스트 없이 부르면 던진다(lib/actor.js). 이 describe 는 total·project 축만
+  // 보려는 것이므로 사용자 상한은 넉넉히 열어 두고 runWithActor 로 감싼다.
+  beforeEach(() => { process.env.SHOTFORM_BUDGET_USER_USD = "1000"; });
+
   it("여유가 있으면 통과한다", async () => {
     // veo3.1 $0.40/s × 5초 = $2.00
     await expect(
-      costs.assertBudget({ projectId: "p1", endpoint: "fal-ai/veo3.1", amount: 5 })
+      runWithActor("t-user", () =>
+        costs.assertBudget({ projectId: "p1", endpoint: "fal-ai/veo3.1", amount: 5 })
+      )
     ).resolves.toBeUndefined();
   });
 
@@ -63,14 +70,18 @@ describe("assertBudget", () => {
     await record(costs, { project_id: "p1", est_cost_usd: 2 });
     // 2 + 2 = 4 > 3
     await expect(
-      costs.assertBudget({ projectId: "p1", endpoint: "fal-ai/veo3.1", amount: 5 })
+      runWithActor("t-user", () =>
+        costs.assertBudget({ projectId: "p1", endpoint: "fal-ai/veo3.1", amount: 5 })
+      )
     ).rejects.toThrow(/예산 상한/);
   });
 
   it("다른 프로젝트가 쓴 것은 이 프로젝트 상한에 들어가지 않는다", async () => {
     await record(costs, { project_id: "p2", est_cost_usd: 2.9 });
     await expect(
-      costs.assertBudget({ projectId: "p1", endpoint: "fal-ai/veo3.1", amount: 5 })
+      runWithActor("t-user", () =>
+        costs.assertBudget({ projectId: "p1", endpoint: "fal-ai/veo3.1", amount: 5 })
+      )
     ).resolves.toBeUndefined();
   });
 
@@ -78,14 +89,17 @@ describe("assertBudget", () => {
     await record(costs, { project_id: "p2", est_cost_usd: 9 });
     // 9 + 2 = 11 > 10
     await expect(
-      costs.assertBudget({ projectId: "p1", endpoint: "fal-ai/veo3.1", amount: 5 })
+      runWithActor("t-user", () =>
+        costs.assertBudget({ projectId: "p1", endpoint: "fal-ai/veo3.1", amount: 5 })
+      )
     ).rejects.toThrow(/예산 상한/);
   });
 
   it("어느 상한에 걸렸는지 알려준다", async () => {
     await record(costs, { project_id: "p1", est_cost_usd: 2 });
-    await costs
-      .assertBudget({ projectId: "p1", endpoint: "fal-ai/veo3.1", amount: 5 })
+    await runWithActor("t-user", () =>
+      costs.assertBudget({ projectId: "p1", endpoint: "fal-ai/veo3.1", amount: 5 })
+    )
       .then(() => { throw new Error("막았어야 한다"); })
       .catch((e) => { expect(e.scope).toBe("project"); });
   });
@@ -93,7 +107,9 @@ describe("assertBudget", () => {
   it("projectId가 없으면 전체 상한만 본다", async () => {
     await record(costs, { project_id: "p1", est_cost_usd: 2.9 });
     await expect(
-      costs.assertBudget({ endpoint: "fal-ai/veo3.1", amount: 5 })
+      runWithActor("t-user", () =>
+        costs.assertBudget({ endpoint: "fal-ai/veo3.1", amount: 5 })
+      )
     ).resolves.toBeUndefined();
   });
 });

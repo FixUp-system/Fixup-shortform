@@ -66,11 +66,15 @@ describe("generateSpeech", () => {
 
   it("결과가 비면 던진다", async () => {
     const fetchImpl = async () => ({ ok: true, json: async () => ({}) });
-    await expect(generateSpeech({ text: "가", voiceId: "v1", fetchImpl })).rejects.toThrow(/비어/);
+    await expect(
+      runWithActor("t-user", () => generateSpeech({ text: "가", voiceId: "v1", fetchImpl }))
+    ).rejects.toThrow(/비어/);
   });
 
   it("실패하면 상태 코드를 담아 던진다", async () => {
     const fetchImpl = async () => ({ ok: false, status: 402, text: async () => "no credit" });
-    await expect(generateSpeech({ text: "가", voiceId: "v1", fetchImpl })).rejects.toThrow(/402/);
+    await expect(
+      runWithActor("t-user", () => generateSpeech({ text: "가", voiceId: "v1", fetchImpl }))
+    ).rejects.toThrow(/402/);
   });
 });
