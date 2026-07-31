@@ -3,7 +3,7 @@
 process.env.SHOTFORM_STORE = "memory";
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { resetMemoryStore } from "../lib/store/memory.js";
+import { memoryStore, resetMemoryStore } from "../lib/store/memory.js";
 import { getStore } from "../lib/store/index.js";
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
 
@@ -57,5 +57,15 @@ describe("업로드", () => {
   it("잘못된 파일명은 400 이다", async () => {
     const res = await get(authReq(), { params: Promise.resolve({ name: "../secret" }) });
     expect(res.status).toBe(400);
+  });
+
+  // 리뷰 M1: 소유자 검사가 먼저 걸러 주면서, "소유자는 맞는데 객체가 Storage 에서
+  // 사라진" 경우를 아무도 안 밟게 됐다 — getObject 의 catch(500 으로 안 새게 막는 자리)가
+  // 죽은 코드처럼 보일 수 있다. 소유자 기록은 있는데 객체는 없는 상태를 직접 만들어
+  // 그 catch 를 다시 검증한다.
+  it("주인은 맞는데 객체가 사라졌으면 404 다 — 500 으로 새지 않는다", async () => {
+    await memoryStore.insertUploadOwner("ghost.jpg", OWNER);
+    const res = await get(authReq(), { params: Promise.resolve({ name: "ghost.jpg" }) });
+    expect(res.status).toBe(404);
   });
 });
