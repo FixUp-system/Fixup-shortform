@@ -4,6 +4,11 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 // 정적 import 를 유지해야 라우트와 테스트가 **같은 store** 를 본다.
 import { resetMemoryStore } from "../lib/store/memory.js";
 import { createProject, getProject, updateProject } from "../lib/projects.js";
+
+// 라우트는 아직 TEMP_OWNER(Task 7 배선 전까지의 자리표시자)로 돈다 — 여기서 직접 만든
+// 프로젝트도 같은 값이어야 라우트가 "내 것"으로 찾는다. env(SHOTFORM_TEMP_OWNER)를 안 세운
+// 테스트라 라우트 쪽 기본값과 그대로 맞춘다.
+const OWNER = "00000000-0000-0000-0000-000000000000";
 import { isAudioStale, isImageStale, isClipStale, isRenderStale, renderKey } from "../lib/steps.js";
 
 const pipelineMock = vi.hoisted(() => ({ run: vi.fn(async () => {}) }));
@@ -40,8 +45,8 @@ beforeEach(async () => {
 const SCRIPT_TEXT = "매일 아침 딸기를 갈아 씁니다. 시럽은 쓰지 않습니다.";
 
 async function projectWithScript() {
-  const p = await createProject({ settings: {}, material: { text: "자료", photos: [] } });
-  return updateProject(p.id, (proj) => ({
+  const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
+  return updateProject(p.id, OWNER, (proj) => ({
     ...proj,
     status: "script",
     briefing: { topic: "주제", key_points: ["ㄱ"], asked: [], confirmed: true, version: 2 },
@@ -50,8 +55,8 @@ async function projectWithScript() {
 }
 
 async function projectWithBriefing() {
-  const p = await createProject({ settings: {}, material: { text: "자료", photos: [] } });
-  return updateProject(p.id, (proj) => ({
+  const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
+  return updateProject(p.id, OWNER, (proj) => ({
     ...proj,
     briefing: { topic: "주제", key_points: ["ㄱ"], asked: [], confirmed: true, version: 2 },
   }));
@@ -64,7 +69,7 @@ describe("POST /api/projects/[id]/cuts", () => {
     pipelineMock.run.mockImplementation(() => { started = true; return new Promise(() => {}); }); // 안 끝나는 파이프라인
     const res = await cutsPOST(patchReq({}), ctx(p.id));
     expect(res.status).toBe(200);
-    const after = await getProject(p.id);
+    const after = await getProject(p.id, OWNER);
     expect(after.status).toBe("cuts");
     expect(after.cuts).toEqual([]);
     expect(after.cuts_error).toBeNull();
@@ -74,7 +79,7 @@ describe("POST /api/projects/[id]/cuts", () => {
   it("어느 원고에서 나온 컷인지 기록한다 — 원고를 다시 쓰면 컷이 낡는다", async () => {
     const p = await projectWithScript();
     await cutsPOST(patchReq({}), ctx(p.id));
-    expect((await getProject(p.id)).cuts_script_version).toBe(1);
+    expect((await getProject(p.id, OWNER)).cuts_script_version).toBe(1);
   });
 
   it("컷 분할이 실패하면 cuts_error를 남긴다(화면이 5분을 기다리지 않게)", async () => {
@@ -82,13 +87,13 @@ describe("POST /api/projects/[id]/cuts", () => {
     pipelineMock.run.mockRejectedValue(new Error("컷 분할 실패"));
     await cutsPOST(patchReq({}), ctx(p.id));
     await new Promise((r) => setTimeout(r, 10));
-    expect((await getProject(p.id)).cuts_error).toBe("컷 분할 실패");
+    expect((await getProject(p.id, OWNER)).cuts_error).toBe("컷 분할 실패");
   });
 
   it("이미 컷이 있으면 409로 막고 만든 컷을 지우지 않는다(재승인이 유료 컷을 날리지 않게)", async () => {
     // 판정은 컷의 유무다 — status 로 보면 목소리·이미지 단계에서 컷이 통째로 지워질 수 있다
     const p = await projectWithScript();
-    await updateProject(p.id, (proj) => ({
+    await updateProject(p.id, OWNER, (proj) => ({
       ...proj,
       status: "cuts",
       cuts_script_version: 1, // 지금 원고에서 나온 컷 — 낡지 않았다
@@ -96,7 +101,7 @@ describe("POST /api/projects/[id]/cuts", () => {
     }));
     const res = await cutsPOST(patchReq({}), ctx(p.id));
     expect(res.status).toBe(409);
-    const after = await getProject(p.id);
+    const after = await getProject(p.id, OWNER);
     expect(after.cuts).toHaveLength(1);
     expect(after.cuts[0].image.url).toBe("http://img/1");
     expect(pipelineMock.run).not.toHaveBeenCalled();
@@ -106,7 +111,7 @@ describe("POST /api/projects/[id]/cuts", () => {
     // status 로 판정하면 이 자리가 막힌다. 새 흐름에서 status 는 목소리·이미지로 앞서 가므로
     // "컷이 있다"만 보면 원고를 고친 뒤 컷을 영영 다시 만들 수 없다.
     const p = await projectWithScript();
-    await updateProject(p.id, (proj) => ({
+    await updateProject(p.id, OWNER, (proj) => ({
       ...proj,
       status: "voice",
       script: { ...proj.script, version: 2 },
@@ -120,7 +125,7 @@ describe("POST /api/projects/[id]/cuts", () => {
 
   it("컷이 비어 있으면(분할 실패 뒤 다시 시도) 다시 띄운다", async () => {
     const p = await projectWithScript();
-    await updateProject(p.id, (proj) => ({ ...proj, status: "cuts", cuts: [] }));
+    await updateProject(p.id, OWNER, (proj) => ({ ...proj, status: "cuts", cuts: [] }));
     const res = await cutsPOST(patchReq({}), ctx(p.id));
     expect(res.status).toBe(200);
     expect(pipelineMock.run).toHaveBeenCalled();
@@ -129,23 +134,23 @@ describe("POST /api/projects/[id]/cuts", () => {
   it("보낸 화면 비율을 settings에 저장하고, 잘못된 값은 기본 9:16으로 둔다", async () => {
     const p = await projectWithScript();
     await cutsPOST(patchReq({ aspect_ratio: "1:1" }), ctx(p.id));
-    expect((await getProject(p.id)).settings.aspect_ratio).toBe("1:1");
+    expect((await getProject(p.id, OWNER)).settings.aspect_ratio).toBe("1:1");
 
     const q = await projectWithScript();
     await cutsPOST(patchReq({ aspect_ratio: "4:5" }), ctx(q.id));
-    expect((await getProject(q.id)).settings.aspect_ratio).toBe("9:16");
+    expect((await getProject(q.id, OWNER)).settings.aspect_ratio).toBe("9:16");
   });
 
   it("원고가 없으면 상태를 건드리지 않고 400", async () => {
     const p = await projectWithBriefing();
     const res = await cutsPOST(patchReq({}), ctx(p.id));
     expect(res.status).toBe(400);
-    expect((await getProject(p.id)).status).not.toBe("cuts");
+    expect((await getProject(p.id, OWNER)).status).not.toBe("cuts");
   });
 
   it("구성 시절 대본(문단만 있는)도 400 — 원고를 다시 써야 자를 수 있다", async () => {
     const p = await projectWithScript();
-    await updateProject(p.id, (proj) => ({ ...proj, script: { paragraphs: [{ text: "옛 문단" }], version: 1 } }));
+    await updateProject(p.id, OWNER, (proj) => ({ ...proj, script: { paragraphs: [{ text: "옛 문단" }], version: 1 } }));
     const res = await cutsPOST(patchReq({}), ctx(p.id));
     expect(res.status).toBe(400);
     expect(pipelineMock.run).not.toHaveBeenCalled();
@@ -164,7 +169,7 @@ describe("POST /api/projects/[id]/images", () => {
   it("목소리가 없으면 400 — 길이를 모르는 채로 그림을 그리지 않는다", async () => {
     // 낭독 실측이 cut.seconds 를 덮기 전에 그리면, 10초 넘는 컷을 뒤늦게 알고 값을 두 번 치른다
     const p = await projectWithScript();
-    await updateProject(p.id, (proj) => ({
+    await updateProject(p.id, OWNER, (proj) => ({
       ...proj, status: "cuts",
       cuts: [{ idx: 0, sentence: "문장입니다.", seconds: 3, state: "pending" }],
     }));
@@ -176,38 +181,38 @@ describe("POST /api/projects/[id]/images", () => {
 
   it("소리가 있으면 시작한다 — 컷을 pending 으로 되돌리고 파이프라인을 띄운다", async () => {
     const p = await projectWithScript();
-    await updateProject(p.id, (proj) => ({
+    await updateProject(p.id, OWNER, (proj) => ({
       ...proj, status: "voice",
       cuts: [{ idx: 0, sentence: "문장입니다.", seconds: 3, audio: { url: "a" }, state: "done" }],
     }));
     const res = await imagesPOST(patchReq({}), ctx(p.id));
     expect(res.status).toBe(200);
-    expect(pipelineMock.run).toHaveBeenCalledWith(p.id);
-    expect((await getProject(p.id)).cuts[0].state).toBe("pending");
+    expect(pipelineMock.run).toHaveBeenCalledWith(p.id, OWNER);
+    expect((await getProject(p.id, OWNER)).cuts[0].state).toBe("pending");
   });
 
   it("이미 이미지가 있으면 409 — 컷당 두 장씩 다시 사지 않는다", async () => {
     const p = await projectWithScript();
-    await updateProject(p.id, (proj) => ({
+    await updateProject(p.id, OWNER, (proj) => ({
       ...proj, status: "images",
       cuts: [{ idx: 0, sentence: "문장입니다.", seconds: 3, audio: { url: "a" }, image: { url: "http://img/1" } }],
     }));
     const res = await imagesPOST(patchReq({}), ctx(p.id));
     expect(res.status).toBe(409);
-    expect((await getProject(p.id)).cuts[0].image.url).toBe("http://img/1");
+    expect((await getProject(p.id, OWNER)).cuts[0].image.url).toBe("http://img/1");
     expect(pipelineMock.run).not.toHaveBeenCalled();
   });
 
   it("이미지 생성이 실패하면 images_error를 남긴다(화면이 기다리지 않게)", async () => {
     const p = await projectWithScript();
-    await updateProject(p.id, (proj) => ({
+    await updateProject(p.id, OWNER, (proj) => ({
       ...proj, status: "voice",
       cuts: [{ idx: 0, sentence: "문장입니다.", seconds: 3, audio: { url: "a" } }],
     }));
     pipelineMock.run.mockRejectedValue(new Error("이미지 생성 실패"));
     await imagesPOST(patchReq({}), ctx(p.id));
     await new Promise((r) => setTimeout(r, 10));
-    expect((await getProject(p.id)).images_error).toBe("이미지 생성 실패");
+    expect((await getProject(p.id, OWNER)).images_error).toBe("이미지 생성 실패");
   });
 });
 
@@ -215,24 +220,24 @@ describe("PATCH /api/projects/[id] — 브리핑 버전은 내용 변경에 묶�
   it("확정만 다시 눌러도 버전은 그대로다(거짓 stale 안내 방지)", async () => {
     const p = await projectWithScript();
     await PATCH(patchReq({ briefing: { confirmed: true } }), ctx(p.id));
-    expect((await getProject(p.id)).briefing.version).toBe(2);
+    expect((await getProject(p.id, OWNER)).briefing.version).toBe(2);
   });
 
   it("내용을 고쳐 저장하면 버전이 오른다", async () => {
     const p = await projectWithScript();
     await PATCH(patchReq({ briefing: { topic: "새 주제" } }), ctx(p.id));
-    expect((await getProject(p.id)).briefing.version).toBe(3);
+    expect((await getProject(p.id, OWNER)).briefing.version).toBe(3);
   });
 
   it("질문에 답하면 내용이 바뀐 것으로 본다(답변은 대본 프롬프트에 들어간다)", async () => {
     const p = await projectWithScript();
     await PATCH(patchReq({ briefing: { asked: [{ question: "가격은?", answer: "5천원", done: true }] } }), ctx(p.id));
-    expect((await getProject(p.id)).briefing.version).toBe(3);
+    expect((await getProject(p.id, OWNER)).briefing.version).toBe(3);
   });
 
   it("초점을 바꾸면 컷을 비운다 — 화면과 캐스팅이 함께 달라져야 한다", async () => {
     const p = await projectWithScript();
-    await updateProject(p.id, (proj) => ({
+    await updateProject(p.id, OWNER, (proj) => ({
       ...proj, status: "cuts",
       briefing: { ...proj.briefing, focus: { mode: "사람", subject: "50대 남성 손님" } },
       cuts: [{ idx: 0, sentence: SCRIPT_TEXT, seconds: 3, shows: "옛 화면" }],
@@ -241,7 +246,7 @@ describe("PATCH /api/projects/[id] — 브리핑 버전은 내용 변경에 묶�
     const res = await PATCH(
       patchReq({ briefing: { focus: { mode: "물건", subject: "수선한 코트" } } }), ctx(p.id));
     expect(res.status).toBe(200);
-    const saved = await getProject(p.id);
+    const saved = await getProject(p.id, OWNER);
     expect(saved.briefing.focus.mode).toBe("물건");
     expect(saved.cuts).toEqual([]);
   });
@@ -249,14 +254,14 @@ describe("PATCH /api/projects/[id] — 브리핑 버전은 내용 변경에 묶�
   it("초점이 그대로면 컷을 건드리지 않는다 — 다시 만들면 고쳐 둔 화면이 지워진다", async () => {
     const p = await projectWithScript();
     const focus = { mode: "사람", subject: "50대 남성 손님" };
-    await updateProject(p.id, (proj) => ({
+    await updateProject(p.id, OWNER, (proj) => ({
       ...proj, status: "cuts",
       briefing: { ...proj.briefing, focus },
       cuts: [{ idx: 0, sentence: SCRIPT_TEXT, seconds: 3, shows: "고쳐 둔 화면" }],
     }));
     const res = await PATCH(patchReq({ briefing: { focus } }), ctx(p.id));
     expect(res.status).toBe(200);
-    expect((await getProject(p.id)).cuts[0].shows).toBe("고쳐 둔 화면");
+    expect((await getProject(p.id, OWNER)).cuts[0].shows).toBe("고쳐 둔 화면");
   });
 });
 
@@ -264,39 +269,39 @@ describe("PATCH script_text — 원고 손편집", () => {
   it("원고를 고쳐 저장한다", async () => {
     const p = await projectWithScript();
     await PATCH(patchReq({ script_text: "손으로 고친 원고입니다." }), ctx(p.id));
-    expect((await getProject(p.id)).script.text).toBe("손으로 고친 원고입니다.");
+    expect((await getProject(p.id, OWNER)).script.text).toBe("손으로 고친 원고입니다.");
   });
 
   it("손편집은 version을 올리지 않는다 — 고친 것이 컷 낡음 경고를 띄우면 안 된다", async () => {
     const p = await projectWithScript();
     await PATCH(patchReq({ script_text: "손으로 고친 원고입니다." }), ctx(p.id));
-    expect((await getProject(p.id)).script.version).toBe(1);
+    expect((await getProject(p.id, OWNER)).script.version).toBe(1);
   });
 
   it("빈 문자열·공백·비문자열은 무시한다 — 원고를 실수로 지우지 않는다", async () => {
     const p = await projectWithScript();
     for (const bad of ["", "   ", 123, null]) {
       await PATCH(patchReq({ script_text: bad }), ctx(p.id));
-      expect((await getProject(p.id)).script.text).toBe(SCRIPT_TEXT);
+      expect((await getProject(p.id, OWNER)).script.text).toBe(SCRIPT_TEXT);
     }
   });
 
   it("원고가 아직 없으면 만들지 않는다", async () => {
     const p = await projectWithBriefing();
     await PATCH(patchReq({ script_text: "없던 원고" }), ctx(p.id));
-    expect((await getProject(p.id)).script).toBeFalsy();
+    expect((await getProject(p.id, OWNER)).script).toBeFalsy();
   });
 });
 
 describe("POST /api/projects/[id]/briefing — 재추출", () => {
   it("이미 진행된 프로젝트의 status·confirmed를 되감지 않는다", async () => {
     const p = await projectWithScript();
-    await updateProject(p.id, (proj) => ({ ...proj, status: "cuts", cuts: [{ idx: 0, sentence: "컷", state: "done" }] }));
+    await updateProject(p.id, OWNER, (proj) => ({ ...proj, status: "cuts", cuts: [{ idx: 0, sentence: "컷", state: "done" }] }));
     llmMock.callJson.mockResolvedValue({ topic: "새 주제", key_points: ["새 내용"], questions: [] });
 
     const res = await briefingPOST({}, ctx(p.id));
     expect(res.status).toBe(200);
-    const after = await getProject(p.id);
+    const after = await getProject(p.id, OWNER);
     expect(after.status).toBe("cuts"); // 되감기면 만든 이미지가 잠긴다
     expect(after.briefing.confirmed).toBe(true);
     expect(after.briefing.version).toBe(3); // 내용이 바뀌었으므로 오른다
@@ -306,12 +311,12 @@ describe("POST /api/projects/[id]/briefing — 재추출", () => {
     const p = await projectWithScript();
     llmMock.callJson.mockResolvedValue({ topic: "주제", key_points: ["ㄱ"], questions: [] });
     await briefingPOST({}, ctx(p.id));
-    expect((await getProject(p.id)).briefing.version).toBe(2);
+    expect((await getProject(p.id, OWNER)).briefing.version).toBe(2);
   });
 
   it("kind:develop이면 브리핑을 다시 뽑지 않고 질문만 덧붙인다", async () => {
     const p = await projectWithScript();
-    await updateProject(p.id, (proj) => ({
+    await updateProject(p.id, OWNER, (proj) => ({
       ...proj,
       settings: { ...proj.settings, target_seconds: 30 },
       briefing: { ...proj.briefing, asked: [{ question: "가격은?", answer: "5천원", done: true }] },
@@ -320,7 +325,7 @@ describe("POST /api/projects/[id]/briefing — 재추출", () => {
 
     const res = await briefingPOST(patchReq({ kind: "develop" }), ctx(p.id));
     expect(res.status).toBe(200);
-    const after = await getProject(p.id);
+    const after = await getProject(p.id, OWNER);
     expect(after.briefing.topic).toBe("주제");            // 정리된 내용을 다시 뽑지 않는다
     expect(after.briefing.asked).toHaveLength(2);          // 이미 받은 답을 지우지 않는다
     expect(after.briefing.asked[0].answer).toBe("5천원");
@@ -352,7 +357,7 @@ describe("POST /api/projects/[id]/script — 원고", () => {
   });
 
   it("브리핑이 확정되지 않았으면 400", async () => {
-    const p = await createProject({ settings: {}, material: { text: "자료", photos: [] } });
+    const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
     const res = await scriptPOST(patchReq({}), ctx(p.id));
     expect(res.status).toBe(400);
   });
@@ -362,14 +367,14 @@ describe("POST /api/projects/[id]/script — 원고", () => {
     llmMock.callJson.mockResolvedValue(plain);
     const res = await scriptPOST(patchReq({}), ctx(p.id));
     expect(res.status).toBe(200);
-    expect((await getProject(p.id)).script.text).toBe(plain.script);
+    expect((await getProject(p.id, OWNER)).script.text).toBe(plain.script);
   });
 
   it("초안→교정을 거쳐 교정본을 저장한다", async () => {
     const p = await projectWithBriefing();
     llmMock.callJson.mockResolvedValueOnce(cliche).mockResolvedValueOnce(plain);
     await scriptPOST(patchReq({}), ctx(p.id));
-    expect((await getProject(p.id)).script.text).toBe(plain.script);
+    expect((await getProject(p.id, OWNER)).script.text).toBe(plain.script);
     expect(llmMock.callJson).toHaveBeenCalledTimes(2); // 멀쩡한 초안에 되돌리기를 부르지 않는다
   });
 
@@ -377,7 +382,7 @@ describe("POST /api/projects/[id]/script — 원고", () => {
     const p = await projectWithBriefing();
     llmMock.callJson.mockResolvedValueOnce(cliche).mockResolvedValue({}); // 교정 스키마 불일치
     await scriptPOST(patchReq({}), ctx(p.id));
-    expect((await getProject(p.id)).script.text).toBe(cliche.script);
+    expect((await getProject(p.id, OWNER)).script.text).toBe(cliche.script);
   });
 
   it("교정본이 분량을 불려 놓으면 초안을 지킨다", async () => {
@@ -386,7 +391,7 @@ describe("POST /api/projects/[id]/script — 원고", () => {
     const bloated = { script: "나".repeat(140) };             // 교정이 두 배로 불림
     llmMock.callJson.mockResolvedValueOnce(fit).mockResolvedValue(bloated);
     await scriptPOST(patchReq({}), ctx(p.id));
-    expect((await getProject(p.id)).script.text).toBe(fit.script);
+    expect((await getProject(p.id, OWNER)).script.text).toBe(fit.script);
   });
 
   it("교정본이 분량을 흘리면 초안으로 폴백한다", async () => {
@@ -395,7 +400,7 @@ describe("POST /api/projects/[id]/script — 원고", () => {
     const gutted = { script: "나".repeat(20) }; // 초안의 80% 미만
     llmMock.callJson.mockResolvedValueOnce(long).mockResolvedValue(gutted);
     await scriptPOST(patchReq({}), ctx(p.id));
-    expect((await getProject(p.id)).script.text).toBe(long.script);
+    expect((await getProject(p.id, OWNER)).script.text).toBe(long.script);
   });
 
   it("되풀이가 있으면 한 번 다시 쓰게 부르고, 나아지면 받는다", async () => {
@@ -409,7 +414,7 @@ describe("POST /api/projects/[id]/script — 원고", () => {
       .mockResolvedValueOnce(고침);    // 교정
     await scriptPOST(patchReq({}), ctx(p.id));
     expect(llmMock.callJson).toHaveBeenCalledTimes(3);
-    expect((await getProject(p.id)).script.text).toBe(고침.script);
+    expect((await getProject(p.id, OWNER)).script.text).toBe(고침.script);
   });
 
   it("되돌리기가 실패해도 초안을 안고 간다", async () => {
@@ -421,14 +426,14 @@ describe("POST /api/projects/[id]/script — 원고", () => {
       .mockResolvedValueOnce(되풀이);
     const res = await scriptPOST(patchReq({}), ctx(p.id));
     expect(res.status).toBe(200);
-    expect((await getProject(p.id)).script.text).toBe(되풀이.script);
+    expect((await getProject(p.id, OWNER)).script.text).toBe(되풀이.script);
   });
 
   it("version을 올리고 브리핑 버전을 붙여 저장한다", async () => {
     const p = await projectWithScript(); // 이미 version 1
     llmMock.callJson.mockResolvedValue(plain);
     await scriptPOST(patchReq({}), ctx(p.id));
-    const after = await getProject(p.id);
+    const after = await getProject(p.id, OWNER);
     expect(after.script.version).toBe(2);
     expect(after.script.briefing_version).toBe(2);
     expect(after.status).toBe("script");
@@ -441,7 +446,7 @@ describe("POST /api/projects/[id]/script — 원고", () => {
     expect(res.status).toBe(502);
     expect((await res.json()).error).toBe("대본 생성에 실패했어요. 다시 시도해 주세요.");
     expect(llmMock.callJson).toHaveBeenCalledTimes(2); // 예외도 재시도한다
-    expect((await getProject(p.id)).script.text).toBe(SCRIPT_TEXT); // 기존 원고를 덮지 않는다
+    expect((await getProject(p.id, OWNER)).script.text).toBe(SCRIPT_TEXT); // 기존 원고를 덮지 않는다
   });
 
   it("두 번 다 스키마가 깨지면 502", async () => {
@@ -464,8 +469,8 @@ describe("POST /api/projects/[id]/script — 원고", () => {
 
 describe("완성 라우트", () => {
   it("클립이 없으면 합성을 시작하지 않는다", async () => {
-    const p = await createProject({ settings: {}, material: { text: "x" } });
-    await updateProject(p.id, (proj) => ({
+    const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "x" } });
+    await updateProject(p.id, OWNER, (proj) => ({
       ...proj, status: "voice", cuts: [{ idx: 0, sentence: "문장", audio: { url: "a" } }],
     }));
     const res = await renderPOST(new Request("http://x", { method: "POST" }), ctx(p.id));
@@ -474,8 +479,8 @@ describe("완성 라우트", () => {
   });
 
   it("클립이 있으면 시작한다", async () => {
-    const p = await createProject({ settings: {}, material: { text: "x" } });
-    await updateProject(p.id, (proj) => ({
+    const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "x" } });
+    await updateProject(p.id, OWNER, (proj) => ({
       ...proj, status: "video",
       cuts: [{ idx: 0, sentence: "문장", video: { url: "v" }, audio: { url: "a" } }],
     }));
@@ -505,7 +510,7 @@ describe("완성본 내려받기", () => {
 describe("무효화 관통 — 고치면 낡고, 안 고친 것은 살아남는다", () => {
   async function projectWithCuts() {
     const p = await projectWithScript();
-    return updateProject(p.id, (proj) => ({
+    return updateProject(p.id, OWNER, (proj) => ({
       ...proj,
       status: "video",
       cuts: [
@@ -526,7 +531,7 @@ describe("무효화 관통 — 고치면 낡고, 안 고친 것은 살아남는�
   // 나누는 순간(POST /cuts 는 script.text 를 자른다) 사장님이 고친 문장이 조용히 사라진다.
   it("컷 문장을 고치면 원고도 함께 따라온다 — 이어붙이면 원고와 같다", async () => {
     const p = await projectWithScript();
-    const two = await updateProject(p.id, (proj) => ({
+    const two = await updateProject(p.id, OWNER, (proj) => ({
       ...proj,
       status: "video",
       cuts: [
@@ -537,7 +542,7 @@ describe("무효화 관통 — 고치면 낡고, 안 고친 것은 살아남는�
     expect(two.cuts.map((c) => c.sentence).join(" ")).toBe(two.script.text); // 전제
 
     await PATCH(patchReq({ cut: { idx: 1, sentence: "설탕도 넣지 않습니다." } }), ctx(p.id));
-    const saved = await getProject(p.id);
+    const saved = await getProject(p.id, OWNER);
     expect(saved.cuts[1].sentence).toBe("설탕도 넣지 않습니다.");
     expect(saved.script.text).toBe("매일 아침 딸기를 갈아 씁니다. 설탕도 넣지 않습니다.");
     expect(saved.cuts.map((c) => c.sentence).join(" ")).toBe(saved.script.text);
@@ -549,20 +554,20 @@ describe("무효화 관통 — 고치면 낡고, 안 고친 것은 살아남는�
     const p = await projectWithCuts();
     const before = p.script.version;
     await PATCH(patchReq({ cut: { idx: 0, sentence: "고친 문장." } }), ctx(p.id));
-    expect((await getProject(p.id)).script.version).toBe(before);
+    expect((await getProject(p.id, OWNER)).script.version).toBe(before);
   });
 
   it("화면·움직임만 고칠 때는 원고를 건드리지 않는다", async () => {
     const p = await projectWithCuts();
     await PATCH(patchReq({ cut: { idx: 0, shows: "손님이 코트를 든다" } }), ctx(p.id));
-    expect((await getProject(p.id)).script.text).toBe(p.script.text);
+    expect((await getProject(p.id, OWNER)).script.text).toBe(p.script.text);
   });
 
   it("문장을 고치면 소리만 낡는다 — 그림은 살아남는다", async () => {
     const p = await projectWithCuts();
     const res = await PATCH(patchReq({ cut: { idx: 0, sentence: "고친 문장." } }), ctx(p.id));
     expect(res.status).toBe(200);
-    const cut = (await getProject(p.id)).cuts[0];
+    const cut = (await getProject(p.id, OWNER)).cuts[0];
     expect(isAudioStale(cut)).toBe(true);
     expect(isImageStale(cut)).toBe(false);
     expect(isClipStale(cut)).toBe(false);
@@ -571,20 +576,20 @@ describe("무효화 관통 — 고치면 낡고, 안 고친 것은 살아남는�
   it("화면 설명을 고치면 그림만 낡는다", async () => {
     const p = await projectWithCuts();
     await PATCH(patchReq({ cut: { idx: 0, shows: "손님이 코트를 든다" } }), ctx(p.id));
-    const cut = (await getProject(p.id)).cuts[0];
+    const cut = (await getProject(p.id, OWNER)).cuts[0];
     expect(isImageStale(cut)).toBe(true);
     expect(isAudioStale(cut)).toBe(false);
   });
 
   it("화풍을 바꾸면 그림만 낡는다 — 원고와 소리는 살아남는다", async () => {
     const p = await projectWithCuts();
-    await updateProject(p.id, (proj) => ({
+    await updateProject(p.id, OWNER, (proj) => ({
       ...proj,
       cuts: proj.cuts.map((c) => ({ ...c, image: { ...c.image, style_of: "photo|" } })),
     }));
     const res = await PATCH(patchReq({ settings: { style: { preset: "illust" } } }), ctx(p.id));
     expect(res.status ?? 200).toBe(200);
-    const saved = await getProject(p.id);
+    const saved = await getProject(p.id, OWNER);
     expect(isImageStale(saved.cuts[0], saved)).toBe(true);
     expect(isAudioStale(saved.cuts[0])).toBe(false);
     // 컷도 원고도 비우지 않는다 — 화풍은 글이 아니라 그림의 근거다
@@ -596,7 +601,7 @@ describe("무효화 관통 — 고치면 낡고, 안 고친 것은 살아남는�
     const p = await projectWithCuts();
     const res = await PATCH(patchReq({ cut: { idx: 0, speed: "fast" } }), ctx(p.id));
     expect(res.status).toBe(200);
-    const cut = (await getProject(p.id)).cuts[0];
+    const cut = (await getProject(p.id, OWNER)).cuts[0];
     expect(cut.speed).toBe("fast");
     // 속도가 클립 프롬프트에 실리므로 클립은 낡아야 한다
     expect(isClipStale(cut)).toBe(true);
@@ -608,24 +613,24 @@ describe("무효화 관통 — 고치면 낡고, 안 고친 것은 살아남는�
   it("목록 밖 속도는 무시한다 — 합성이 모르는 값이 저장되지 않게", async () => {
     const p = await projectWithCuts();
     await PATCH(patchReq({ cut: { idx: 0, speed: "아주느리게" } }), ctx(p.id));
-    expect((await getProject(p.id)).cuts[0].speed).toBeUndefined();
+    expect((await getProject(p.id, OWNER)).cuts[0].speed).toBeUndefined();
   });
 
   it("움직임을 고치면 클립이 낡는다", async () => {
     const p = await projectWithCuts();
     await PATCH(patchReq({ cut: { idx: 0, motion: "정지" } }), ctx(p.id));
-    expect(isClipStale((await getProject(p.id)).cuts[0])).toBe(true);
+    expect(isClipStale((await getProject(p.id, OWNER)).cuts[0])).toBe(true);
   });
 
   it("컷을 고치면 완성본이 낡는다", async () => {
     const p = await projectWithCuts();
-    await updateProject(p.id, (proj) => ({
+    await updateProject(p.id, OWNER, (proj) => ({
       ...proj, status: "done",
       render: { url: "r.mp4", seconds: 6, of: renderKey({ cuts: proj.cuts }) },
     }));
-    expect(isRenderStale(await getProject(p.id))).toBe(false);
+    expect(isRenderStale(await getProject(p.id, OWNER))).toBe(false);
     await PATCH(patchReq({ cut: { idx: 0, sentence: "고친 문장." } }), ctx(p.id));
-    expect(isRenderStale(await getProject(p.id))).toBe(true);
+    expect(isRenderStale(await getProject(p.id, OWNER))).toBe(true);
   });
 });
 
@@ -633,21 +638,21 @@ describe("무효화 관통 — 고치면 낡고, 안 고친 것은 살아남는�
 // 판정해, Kling(15초)에서 17초 컷에 경고를 띄우지 않는다 — 돈 쓰기 전에 잡을 유일한 자리다.
 describe("GET /api/projects/[id] — 활성 모델의 상한을 실어 보낸다", () => {
   it("env 를 비우면 기본 엔드포인트(Kling)의 값이다", async () => {
-    const p = await createProject({ settings: {}, material: { text: "자료", photos: [] } });
+    const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
     const res = await GET(new Request("http://x"), { params: Promise.resolve({ id: p.id }) });
     const body = await res.json();
     expect(body.clip_limits).toEqual({ min: 3, max: 15 });
   });
 
   it("env 를 바꾸면 따라 바뀐다 — 저장된 프로젝트에는 남지 않는다", async () => {
-    const p = await createProject({ settings: {}, material: { text: "자료", photos: [] } });
+    const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
     process.env.FAL_I2V_ENDPOINT = "fal-ai/kling-video/v3/standard/image-to-video";
     try {
       const res = await GET(new Request("http://x"), { params: Promise.resolve({ id: p.id }) });
       expect((await res.json()).clip_limits).toEqual({ min: 3, max: 15 });
       // 저장된 파일에는 없어야 한다 — 요청마다 다시 푸는 값이다
       const { getProject } = await import("../lib/projects.js");
-      expect(await getProject(p.id)).not.toHaveProperty("clip_limits");
+      expect(await getProject(p.id, OWNER)).not.toHaveProperty("clip_limits");
     } finally {
       delete process.env.FAL_I2V_ENDPOINT;
     }
@@ -668,8 +673,8 @@ describe("POST /api/projects/[id]/clips — 남은 것이 있으면 돈다", () 
   });
 
   it("클립 없는 컷이 남아 있으면 시작한다 — status 가 video 여도", async () => {
-    const p = await createProject({ settings: {}, material: { text: "자료", photos: [] } });
-    await updateProject(p.id, (proj) => ({
+    const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
+    await updateProject(p.id, OWNER, (proj) => ({
       ...proj, status: "video", cuts: [liveCut(0), bareCut(1)],
     }));
     const res = await clipsPOST(new Request("http://x", { method: "POST" }), ctx(p.id));
@@ -678,16 +683,16 @@ describe("POST /api/projects/[id]/clips — 남은 것이 있으면 돈다", () 
   });
 
   it("낡은 클립이 남아 있으면 시작한다", async () => {
-    const p = await createProject({ settings: {}, material: { text: "자료", photos: [] } });
+    const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
     const stale = { ...liveCut(0), video: { url: "v0", seconds: 3, truncated: false, of: "옛그림|3|" } };
-    await updateProject(p.id, (proj) => ({ ...proj, status: "video", cuts: [stale] }));
+    await updateProject(p.id, OWNER, (proj) => ({ ...proj, status: "video", cuts: [stale] }));
     const res = await clipsPOST(new Request("http://x", { method: "POST" }), ctx(p.id));
     expect(res.status).toBe(200);
   });
 
   it("전부 살아 있으면 409 — 할 일이 없다", async () => {
-    const p = await createProject({ settings: {}, material: { text: "자료", photos: [] } });
-    await updateProject(p.id, (proj) => ({
+    const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
+    await updateProject(p.id, OWNER, (proj) => ({
       ...proj, status: "video", cuts: [liveCut(0), liveCut(1)],
     }));
     const res = await clipsPOST(new Request("http://x", { method: "POST" }), ctx(p.id));
@@ -722,13 +727,13 @@ describe("POST /api/projects — 영상 컨셉", () => {
 });
 
 describe("PATCH /api/projects/[id] — 화풍", () => {
-  const make = () => createProject({ settings: {}, material: { text: "자료", photos: [] } });
+  const make = () => createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
 
   it("고른 화풍과 보정을 settings 에 저장한다", async () => {
     const p = await make();
     const res = await PATCH(patchReq({ settings: { style: { preset: "illust", note: " 따뜻한 파스텔톤 " } } }), ctx(p.id));
     expect(res.status ?? 200).toBe(200);
-    const saved = (await getProject(p.id)).settings.style;
+    const saved = (await getProject(p.id, OWNER)).settings.style;
     expect(saved).toEqual({ preset: "illust", note: "따뜻한 파스텔톤" });
   });
 
@@ -738,21 +743,21 @@ describe("PATCH /api/projects/[id] — 화풍", () => {
     const p = await make();
     const res = await PATCH(patchReq({ settings: { style: { preset: "클레이애니" } } }), ctx(p.id));
     expect(res.status).toBe(400);
-    expect((await getProject(p.id)).settings.style).toBeUndefined();
+    expect((await getProject(p.id, OWNER)).settings.style).toBeUndefined();
   });
 
   it("상한을 넘는 보정은 400 이다 — 조용히 자르지 않는다", async () => {
     const p = await make();
     const res = await PATCH(patchReq({ settings: { style: { preset: "photo", note: "가".repeat(200) } } }), ctx(p.id));
     expect(res.status).toBe(400);
-    expect((await getProject(p.id)).settings.style).toBeUndefined();
+    expect((await getProject(p.id, OWNER)).settings.style).toBeUndefined();
   });
 
   it("화풍을 바꿔도 비율 같은 다른 설정은 살아남는다", async () => {
     const p = await make();
     await PATCH(patchReq({ settings: { aspect_ratio: "1:1" } }), ctx(p.id));
     await PATCH(patchReq({ settings: { style: { preset: "anime" } } }), ctx(p.id));
-    const s = (await getProject(p.id)).settings;
+    const s = (await getProject(p.id, OWNER)).settings;
     expect(s.aspect_ratio).toBe("1:1");
     expect(s.style.preset).toBe("anime");
   });
@@ -762,6 +767,6 @@ describe("PATCH /api/projects/[id] — 화풍", () => {
     await PATCH(patchReq({ settings: { style: { preset: "scifi" } } }), ctx(p.id));
     await PATCH(patchReq({ settings: { aspect_ratio: "16:9" } }), ctx(p.id));
     // 화풍을 건드리지 않았으니 남아 있어야 한다
-    expect((await getProject(p.id)).settings.style.preset).toBe("scifi");
+    expect((await getProject(p.id, OWNER)).settings.style.preset).toBe("scifi");
   });
 });

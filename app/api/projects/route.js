@@ -3,6 +3,10 @@ import { isAspect, DEFAULT_ASPECT_ID } from "../../../lib/aspects";
 import { TARGET_CHOICES } from "../../../lib/script";
 import { normalizeStyle } from "../../../lib/styles";
 
+// TEMP(Task 7 에서 requireUser 로 교체) — 인증이 붙기 전까지의 자리표시자.
+// 이 상수가 남아 있으면 Task 7 이 안 끝난 것이다.
+const TEMP_OWNER = process.env.SHOTFORM_TEMP_OWNER || "00000000-0000-0000-0000-000000000000";
+
 export async function POST(req) {
   const body = await req.json().catch(() => null);
   if (typeof body?.material?.text !== "string") {
@@ -36,6 +40,7 @@ export async function POST(req) {
       text: body.material.text.slice(0, 4000),
       photos: Array.isArray(body.material.photos) ? body.material.photos : [],
     },
+    ownerId: TEMP_OWNER,
   });
   return Response.json(project);
 }
