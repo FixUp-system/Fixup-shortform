@@ -1,7 +1,12 @@
 // 단가표는 prefix 매칭이라 "순서"가 곧 로직이다.
 // 더 구체적인 prefix가 위에 있지 않으면 조용히 틀린 값이 기록된다 — 그걸 여기서 고정한다.
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { estimateCost } from "../lib/costs";
+import { resetMemoryStore } from "../lib/store/memory.js";
+
+// 원장은 모듈 하나짜리 인메모리다 — 비우지 않으면 합계 단언이 "이 파일의 다른 테스트가
+// 비용을 안 남긴다"는 우연에 기대게 된다. 그 우연은 테스트를 하나 더 쓰면 깨진다.
+beforeEach(() => resetMemoryStore());
 
 describe("estimateCost", () => {
   it("영상 모델별 단가를 초에 곱한다", () => {

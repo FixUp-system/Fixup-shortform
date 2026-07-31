@@ -5,11 +5,21 @@ import { splitUnits } from "../lib/cuts.js";
 const llmMock = vi.hoisted(() => ({ callJson: vi.fn() }));
 vi.mock("../lib/llm.js", () => ({ callJson: (...a) => llmMock.callJson(...a) }));
 
+// describePhoto 만 스파이로 바꾼다 — 나머지(selectCandidate)는 진짜를 그대로 쓴다.
+// 이 함수는 **불렸는가 안 불렸는가**가 곧 "유료 호출을 했는가"라, 결과만 봐서는
+// "판정이 실패했다"와 "볼 바이트가 없어 건너뛰었다"가 구분되지 않는다.
+const vlmMock = vi.hoisted(() => ({ describePhoto: vi.fn() }));
+vi.mock("../lib/vlm.js", async (importOriginal) => ({
+  ...(await importOriginal()),
+  describePhoto: (...a) => vlmMock.describePhoto(...a),
+}));
+
 // 정적 import 로 올린다 — 동적 재로드는 모듈 스코프의 locks Map 을 새로 만들기 위한
 // 것이었는데 낙관적 락으로 바뀌며 그 Map 이 사라졌다.
 import * as projects from "../lib/projects.js";
 import * as pipeline from "../lib/pipeline.js";
 import { resetMemoryStore } from "../lib/store/memory.js";
+import { getStore } from "../lib/store/index.js";
 
 function deps({ failCut } = {}) {
   return {
@@ -26,6 +36,10 @@ function deps({ failCut } = {}) {
 beforeEach(() => {
   resetMemoryStore();
   llmMock.callJson.mockReset();
+  // 기본은 "아무것도 알아내지 못했다" — 판정을 세우지 않은 테스트가 실수로
+  // vision 을 저장하는 일이 없게 한다
+  vlmMock.describePhoto.mockReset();
+  vlmMock.describePhoto.mockResolvedValue({ person: false, what: "", who: null });
 });
 
 async function makeProject() {
@@ -310,9 +324,12 @@ describe("이미지 생성에 레퍼런스가 배열로 간다", () => {
       ...proj,
       status: "voice",
       cast: [{ id: "c1", who: "주인", ref: { from: "avatar", id: "av-man-30s" } }],
+      // 사물(업로드 사진 p1)과 인물(아바타)을 함께 꽂는다 — 사물이 앞이다
       cuts: [{ idx: 0, sentence: "문장입니다.", seconds: 3, state: "pending",
-               shows: "주인이 자전거를 끄는 미디엄 샷", ref_ids: ["c1"], regen_count: 0 }],
+               shows: "주인이 자전거를 끄는 미디엄 샷", ref_ids: ["p1", "c1"], regen_count: 0 }],
     }));
+    // 업로드 바이트는 Storage 에 있다 — 없으면 레퍼런스가 버려져 이 단언이 무의미해진다
+    await getStore().putObject("uploads", "a.jpg", Buffer.from("사진"), "image/jpeg");
     const seen = [];
     const d = {
       splitCuts: async () => { throw new Error("부르면 안 된다"); },
@@ -321,10 +338,14 @@ describe("이미지 생성에 레퍼런스가 배열로 간다", () => {
     };
     await pipeline.runImagesPipeline(p.id, d);
     // 경로가 아니라 출처와 키다 — 어디서 읽을지는 lib/refs-io.js 가 안다
-    expect(Array.isArray(seen[0])).toBe(true);
-    expect(seen[0][0]).toMatchObject({ source: "avatar", key: "man-30s.jpg", who: "주인" });
+    expect(seen[0]).toHaveLength(2);
+    // ★ 업로드 key 는 photos[].url 의 마지막 조각("a.jpg")이지 photos[].id("p1") 가 아니다.
+    // id 를 쓰면 확장자가 없어 toDataUri 가 MIME 을 "image/p1" 으로 만든다 — 조용히 틀린다.
+    expect(seen[0][0]).toMatchObject({ source: "upload", key: "a.jpg", kind: "thing" });
+    expect(seen[0][1]).toMatchObject({ source: "avatar", key: "man-30s.jpg", who: "주인" });
     // 바이트까지 실려야 한다 — 못 읽은 레퍼런스는 애초에 배열에 없다
-    expect(Buffer.isBuffer(seen[0][0].bytes)).toBe(true);
+    expect(seen[0][0].bytes.toString()).toBe("사진");
+    expect(Buffer.isBuffer(seen[0][1].bytes)).toBe(true);
     const saved = await projects.getProject(p.id);
     expect(saved.cuts[0].image.url).toBe("img");
   });
@@ -733,9 +754,8 @@ describe("사물 레퍼런스 — 캐스팅이 답하고 코드가 꽂는다", (
 });
 
 describe("사진 판정 실패는 저장하지 않는다 — 다음 실행이 다시 본다", () => {
-  it("VLM 이 아무것도 알아내지 못한 판정(none)은 vision 을 저장하지 않는다", async () => {
-    // 실제 파일이 없어 describePhoto 내부의 fs.readFile 이 실패해 none({person:false, what:""})을
-    // 돌려준다 — 이것이 "실패한 판정"이다. 저장되면 다음 실행이 재판정하지 않고 사물로 굳는다.
+  // 사진 한 장짜리 프로젝트를 세우고 분할 두 패스를 흘려보낸다
+  async function withPhoto() {
     const p = await projects.createProject({
       settings: { aspect_ratio: "9:16" },
       material: { text: "자료", photos: [{ id: "p1", filename: "c.jpg", url: "/api/uploads/c.jpg" }] },
@@ -748,8 +768,37 @@ describe("사진 판정 실패는 저장하지 않는다 — 다음 실행이 �
       .mockResolvedValueOnce({ cuts: [{ from: 1, to: 1 }] })
       .mockResolvedValueOnce({ shots: [{ shows: "화면" }] })
       .mockResolvedValueOnce({ cast: [], props: [] });
+    return saved;
+  }
+
+  it("VLM 이 아무것도 알아내지 못한 판정(none)은 vision 을 저장하지 않는다", async () => {
+    // ★ 바이트를 Storage 에 심어야 describePhoto 가 실제로 불린다. 안 심으면 그 앞의
+    // "볼 것이 없으면 건너뛴다"에서 끊겨, 이 단언이 **다른 이유로** 통과한다(그렇게 무력해진 적이 있다).
+    await getStore().putObject("uploads", "c.jpg", Buffer.from("사진"), "image/jpeg");
+    const saved = await withPhoto();
+    // none({person:false, what:""}) = 실패한 판정. 저장되면 다음 실행이 재판정하지 않고 사물로 굳는다.
+    vlmMock.describePhoto.mockResolvedValue({ person: false, what: "", who: null });
     await pipeline.defaultDeps.splitCuts(saved);
-    const after = await projects.getProject(p.id);
+    expect(vlmMock.describePhoto).toHaveBeenCalledTimes(1);
+    const after = await projects.getProject(saved.id);
+    expect(after.material.photos[0].vision).toBeUndefined();
+  });
+
+  it("알아낸 판정은 저장한다 — none 과 갈리는 자리다", async () => {
+    await getStore().putObject("uploads", "c.jpg", Buffer.from("사진"), "image/jpeg");
+    const saved = await withPhoto();
+    vlmMock.describePhoto.mockResolvedValue({ person: false, what: "화장품 병", who: null });
+    await pipeline.defaultDeps.splitCuts(saved);
+    const after = await projects.getProject(saved.id);
+    expect(after.material.photos[0].vision).toEqual({ person: false, what: "화장품 병", who: null });
+  });
+
+  it("볼 바이트가 없으면 판정을 건너뛴다 — 못 보고 내리는 판정에 값을 치르지 않는다", async () => {
+    // Storage 에 c.jpg 를 안 심는다. 유료 호출(gpt-4o vision)이 아예 나가면 안 된다.
+    const saved = await withPhoto();
+    await pipeline.defaultDeps.splitCuts(saved);
+    expect(vlmMock.describePhoto).not.toHaveBeenCalled();
+    const after = await projects.getProject(saved.id);
     expect(after.material.photos[0].vision).toBeUndefined();
   });
 
