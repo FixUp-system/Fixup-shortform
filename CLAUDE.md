@@ -1,7 +1,25 @@
 # shotform-saas — 작업 지침
 
 > 워크트리 `C:\Users\fixup\shotform-video` · 브랜치 `feature/video-compose`
-> (2026-07-31 기준: 테스트 **810 그린 / 5 skip** · origin 대비 미푸시 90 · **origin/main 대비 238커밋 미병합**)
+> (2026-08-01 기준: 테스트 **920 그린 / 10 skip** · origin 대비 미푸시 124 · **origin/main 대비 272커밋 미병합**)
+
+> ## 인증이 붙었다 (2026-08-01)
+>
+> 앱이 **누가 만들었고 누가 돈을 냈는지** 안다. 매직링크 로그인 + 승인제.
+>
+> - **`getProject(id, ownerId)` — 소유자가 필수 인자다.** 안 넘기면 던진다. 이게 진짜
+>   방어선이고, RLS 정책은 anon 키가 샜을 때의 2차 방어다(앱은 `service_role` 로 붙어 우회한다)
+> - **`costActor()` 는 AsyncLocalStorage 에서 읽는다**(`lib/actor.js`). 컨텍스트가 없으면
+>   **던진다** — 라우트는 `withUser` 가, 스크립트는 `runWithActor("admin", …)` 가 세운다
+> - **신원 검증은 `middleware.js` 에서 요청당 한 번**, 결과를 요청 헤더로 주입한다.
+>   라우트는 `withUser(handler, {adminOnly})` 로 읽기만 한다. **matcher 가 곧 보안 경계다**
+> - 예산 축이 셋이다: 전역 · **사용자별** · 프로젝트별
+>
+> **처음 켤 때 할 일은 `docs/auth-setup.md` 에 있다** — 특히 첫 관리자는 `profiles` 와
+> `app_metadata` **양쪽**을 고쳐야 한다(한쪽만 하면 앱 전체가 대기 화면으로 튕긴다).
+>
+> ⚠️ **백필 전에는 배포하지 마라** — `.eq("owner_id")` 는 NULL 과 안 맞아 기존 프로젝트가
+> 전부 안 보인다.
 
 ## 세션 마무리 규칙
 
