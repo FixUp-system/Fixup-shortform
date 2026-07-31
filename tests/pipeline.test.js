@@ -1,14 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { mkdtempSync } from "fs";
-import { tmpdir } from "os";
-import path from "path";
 import { isAudioStale, isImageStale, isClipStale, isRenderStale } from "../lib/steps.js";
 import { splitUnits } from "../lib/cuts.js";
 
 const llmMock = vi.hoisted(() => ({ callJson: vi.fn() }));
 vi.mock("../lib/llm.js", () => ({ callJson: (...a) => llmMock.callJson(...a) }));
 
-let projects, pipeline;
+// 정적 import 로 올린다 — 동적 재로드는 모듈 스코프의 locks Map 을 새로 만들기 위한
+// 것이었는데 낙관적 락으로 바뀌며 그 Map 이 사라졌다.
+import * as projects from "../lib/projects.js";
+import * as pipeline from "../lib/pipeline.js";
+import { resetMemoryStore } from "../lib/store/memory.js";
 
 function deps({ failCut } = {}) {
   return {
@@ -22,10 +23,8 @@ function deps({ failCut } = {}) {
   };
 }
 
-beforeEach(async () => {
-  process.env.SHOTFORM_DATA_DIR = mkdtempSync(path.join(tmpdir(), "shotform-"));
-  projects = await import("../lib/projects.js?t=" + Date.now());
-  pipeline = await import("../lib/pipeline.js?t=" + Date.now());
+beforeEach(() => {
+  resetMemoryStore();
   llmMock.callJson.mockReset();
 });
 

@@ -1,9 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { mkdtempSync } from "fs";
-import { tmpdir } from "os";
-import path from "path";
 
-// 라우트가 정적으로 물고 있는 저장소와 같은 인스턴스를 쓴다(데이터 디렉터리는 호출 시점 env를 읽는다)
+// 라우트가 정적으로 물고 있는 저장소와 같은 인스턴스를 쓴다 —
+// 정적 import 를 유지해야 라우트와 테스트가 **같은 store** 를 본다.
+import { resetMemoryStore } from "../lib/store/memory.js";
 import { createProject, getProject, updateProject } from "../lib/projects.js";
 import { isAudioStale, isImageStale, isClipStale, isRenderStale, renderKey } from "../lib/steps.js";
 
@@ -33,7 +32,7 @@ const ctx = (id) => ({ params: Promise.resolve({ id }) });
 const patchReq = (body) => ({ json: async () => body });
 
 beforeEach(async () => {
-  process.env.SHOTFORM_DATA_DIR = mkdtempSync(path.join(tmpdir(), "shotform-"));
+  resetMemoryStore();
   pipelineMock.run.mockReset().mockResolvedValue(undefined);
   llmMock.callJson.mockReset();
 });

@@ -1,18 +1,15 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { mkdtempSync } from "fs";
-import { tmpdir } from "os";
-import path from "path";
 import { getStore } from "../lib/store/index.js";
+import { resetMemoryStore } from "../lib/store/memory.js";
+import * as projects from "../lib/projects.js";
 
-let projects;
+// 동적 import(`?t=` + timestamp)는 더 이상 필요 없다. 예전에는 모듈 스코프의 locks Map 을
+// 새로 만들기 위한 것이었는데, 낙관적 락으로 바뀌며 그 Map 이 사라졌다.
+beforeEach(() => {
+  resetMemoryStore();
+});
 
 describe("projects store", () => {
-  beforeEach(async () => {
-    process.env.SHOTFORM_DATA_DIR = mkdtempSync(path.join(tmpdir(), "shotform-"));
-    // env 반영을 위해 매번 새로 import
-    projects = await import("../lib/projects.js?t=" + Date.now());
-  });
-
   it("createProject는 id·status·created_ts를 부여한다", async () => {
     const p = await projects.createProject({
       settings: { aspect_ratio: "9:16" },
