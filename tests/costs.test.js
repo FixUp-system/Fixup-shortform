@@ -71,24 +71,20 @@ describe("단위", () => {
 });
 
 describe("데이터 경로", () => {
-  it("SHOTFORM_DATA_DIR 을 호출 시점에 읽는다", async () => {
-    // 모듈 로드 때 경로를 고정하면 이 값을 무시하고 저장소의 data/ 에 쓴다.
-    // 실제로 테스트가 data/costs.json 을 오염시킨 적이 있다.
-    const { mkdtempSync, existsSync } = await import("fs");
-    const { tmpdir } = await import("os");
-    const path = (await import("path")).default;
-    const { addRecord } = await import("../lib/costs.js");
+  it("★ 원장이 실제 저장소를 오염시키지 않는다 — 테스트는 인메모리다", async () => {
+    const { getStore } = await import("../lib/store/index.js");
+    const { memoryStore } = await import("../lib/store/memory.js");
+    expect(getStore()).toBe(memoryStore);
+  });
+});
 
-    const dir = mkdtempSync(path.join(tmpdir(), "shotform-costs-"));
-    const before = process.env.SHOTFORM_DATA_DIR;
-    process.env.SHOTFORM_DATA_DIR = dir;
-    try {
-      await addRecord({ request_id: "t1", ts: Date.now(), endpoint: "x", est_cost_usd: 0 });
-      expect(existsSync(path.join(dir, "costs.json"))).toBe(true);
-    } finally {
-      if (before === undefined) delete process.env.SHOTFORM_DATA_DIR;
-      else process.env.SHOTFORM_DATA_DIR = before;
-    }
+describe("원장 멱등성", () => {
+  it("같은 request_id 를 두 번 넣어도 합계가 두 배가 되지 않는다", async () => {
+    const { addRecord, spentTotal } = await import("../lib/costs.js");
+    const rec = { request_id: "dup-1", ts: Date.now(), endpoint: "fal-ai/x", actor: "test", est_cost_usd: 0.5 };
+    await addRecord(rec);
+    await addRecord(rec);
+    expect(await spentTotal()).toBe(0.5);
   });
 });
 

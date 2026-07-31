@@ -1,14 +1,15 @@
 // 예산 가드 — 기록이 아니라 "나가기 전에 막는 것"이 요점이다.
 // 호출한 뒤에 재면 이미 돈이 나간 뒤다.
 import { describe, it, expect, beforeEach } from "vitest";
-import { mkdtempSync } from "fs";
-import { tmpdir } from "os";
-import path from "path";
+import { resetMemoryStore } from "../lib/store/memory.js";
 
 let costs;
 
 async function fresh(env = {}) {
-  process.env.SHOTFORM_DATA_DIR = mkdtempSync(path.join(tmpdir(), "shotform-"));
+  // 원장이 store 로 옮겨가 임시 폴더로는 더 이상 격리되지 않는다 — 인메모리 store 는
+  // 모듈 하나라 앞 테스트가 넣은 기록이 그대로 남고, 그러면 합계가 상한을 미리 넘겨
+  // "막았어야 한다"와 "통과해야 한다"가 뒤바뀐다. 여기서 원장을 비운다.
+  resetMemoryStore();
   process.env.SHOTFORM_FAKE = "off";
   delete process.env.SHOTFORM_FAKE_IMAGES;
   process.env.SHOTFORM_BUDGET_TOTAL_USD = env.total ?? "20";
