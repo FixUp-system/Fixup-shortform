@@ -10,13 +10,12 @@
 // 조건부로 그리면 된다 — URL도, middleware의 PUBLIC_PATHS도 그대로다.
 import { usePathname } from "next/navigation";
 import Sidebar from "./Sidebar";
-
-// middleware.js의 isPublicPath와 같은 방식(세그먼트 경계)으로 비교한다 — "/login-debug"
-// 같은 미래 경로가 접두어만 겹친다고 조용히 단독 화면 취급되면 안 된다.
-const BARE_PATHS = ["/login", "/pending", "/auth/callback"];
-function isBarePath(pathname) {
-  return BARE_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
-}
+// BARE_PATHS(사이드바 경계)의 유일한 출처. middleware.js의 PUBLIC_PATHS(로그인 경계)와
+// 다른 목록이다 — "/pending"은 로그인은 필요하지만 사이드바는 없어야 한다. 왜 둘로
+// 나뉘는지, 왜 합치면 안 되는지는 lib/auth/paths.js 주석 참고.
+// 이 모듈은 순수 상수만 담고 있어 next/server 같은 서버 전용 의존을 끌고 오지 않는다 —
+// 클라이언트 컴포넌트(AppShell)에서 안전하게 import 할 수 있다.
+import { isBarePath } from "../lib/auth/paths.js";
 
 export default function AppShell({ children }) {
   const pathname = usePathname();
