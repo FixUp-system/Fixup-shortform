@@ -6,7 +6,10 @@ import { resetMemoryStore } from "../lib/store/memory.js";
 import { createProject, getProject, updateProject } from "../lib/projects.js";
 
 // 라우트는 이제 신원 헤더(withUser)로 소유자를 정한다 — 아래 AUTH_HEADERS 가 이 값을 싣는다.
-const OWNER = "00000000-0000-0000-0000-000000000000";
+// ★ 일부러 0 이 아닌 UUID다 — 옛 TEMP_OWNER 자리표시자의 기본값
+// ("00000000-0000-0000-0000-000000000000")과 우연히 같으면, 어느 라우트가 withUser 를 벗고
+// 그 자리표시자로 되돌아가도 이 파일의 테스트가 계속 통과해 되돌림을 못 잡는다(리뷰 I1).
+const OWNER = "33333333-3333-3333-3333-333333333333";
 import { isAudioStale, isImageStale, isClipStale, isRenderStale, renderKey } from "../lib/steps.js";
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
 
@@ -358,6 +361,17 @@ describe("POST /api/projects/[id]/briefing — 재추출", () => {
     expect(body.error).toBe("자료를 정리하지 못했어요. 직접 채우거나 다시 시도해 주세요.");
     expect(JSON.stringify(body)).not.toContain(raw);
     expect(llmMock.callJson).toHaveBeenCalledTimes(2); // 예외도 재시도한다
+  });
+
+  // ★ 리뷰 M1 — `typeof req?.json === "function" ? … : {}` 의 false 분기.
+  // patchReq 를 전부 헤더 실은 버전으로 바꾸면서(Task 8) json() 있는 요청만 남아 이 분기를
+  // 아무도 안 밟게 됐었다. 여기서 json 메서드가 없는(헤더만 있는) 요청으로 되살린다.
+  it("json 메서드가 없는 요청도 받아넘긴다(본문 없이 부르는 자리가 있다)", async () => {
+    const p = await projectWithScript();
+    llmMock.callJson.mockResolvedValue({ topic: "주제", key_points: ["ㄱ"], questions: [] });
+    const bare = { headers: new Headers(AUTH_HEADERS) }; // json 메서드가 없다
+    const res = await briefingPOST(bare, ctx(p.id));
+    expect(res.status).toBe(200);
   });
 });
 
