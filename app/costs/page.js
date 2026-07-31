@@ -81,7 +81,7 @@ export default function CostsPage() {
                 <tr key={r.request_id}>
                   <td className="mono">{fmtTime(r.ts)}</td>
                   <td>{r.stage || "–"}</td>
-                  <td className="mono">{r.user || "–"}</td>
+                  <td className="mono">{r.actor_label || "–"}</td>
                   <td>{modelName(r.endpoint)}</td>
                   <td className="mono">
                     {r.duration}s · {r.aspect_ratio}
