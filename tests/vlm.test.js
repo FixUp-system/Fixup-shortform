@@ -141,6 +141,18 @@ describe("describePhoto — 올린 사진에 무엇이 담겼나", () => {
     expect(got).toEqual({ person: false, what: "", who: null });
   });
 
+  it("actor 컨텍스트 없이 부르면 던진다 — fail-open 이 이것까지 삼키면 안 된다", async () => {
+    // describePhoto 의 fail-open 은 "VLM 호출 실패"를 삼키기 위한 것이지, "호출부가
+    // runWithActor 로 감싸는 것을 빠뜨렸다"를 삼키기 위한 것이 아니다. 이 둘을 못 가르면
+    // 배선이 빠진 채로도 늘 "정상 동작"처럼 보인다(사진마다 조용히 사물로 오판정).
+    await expect(
+      describePhoto({
+        photoBytes: null, projectId: "p1", apiKey: "k",
+        fetchImpl: reply({ person: true, what: "작업복 남성", who: "50대 남성" }),
+      })
+    ).rejects.toThrow(/actor 컨텍스트/);
+  });
+
   it("가짜 모드에서는 부르지 않는다", async () => {
     process.env.SHOTFORM_FAKE = "all";
     let called = false;
