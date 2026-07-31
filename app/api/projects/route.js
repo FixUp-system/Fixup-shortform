@@ -1,8 +1,13 @@
-import { createProject } from "../../../lib/projects";
+import { createProject, listProjects } from "../../../lib/projects";
 import { isAspect, DEFAULT_ASPECT_ID } from "../../../lib/aspects";
 import { TARGET_CHOICES } from "../../../lib/script";
 import { normalizeStyle } from "../../../lib/styles";
 import { withUser } from "../../../lib/auth/require-user.js";
+
+// 내 프로젝트 목록 — doc 통짜를 안 실어 보낸다(listProjects 가 이미 요약해서 준다).
+export const GET = withUser(async (_req, _ctx, user) => {
+  return Response.json({ projects: await listProjects(user.id) });
+});
 
 export const POST = withUser(async (req, ctx, user) => {
   const body = await req.json().catch(() => null);
