@@ -79,6 +79,23 @@ RLS는 켜져 있고 정책은 0개다(=전부 거부). 앱은 `service_role`로
 
 > ⚠️ 무료 플랜은 요청이 며칠 없으면 프로젝트가 **일시정지**된다. 갑자기 안 되면 대시보드에서 재개.
 
+### fal 산출물은 우리 것이 아니다 (2026-07-31 확인)
+`image.url`·`video.url`·`audio.url` 이 전부 fal CDN 외부 URL 이다. 합성한 프로젝트만 클립·소리
+사본이 `data/renders/` 에 남고 **이미지는 한 번도 안 내려받는다**(`lib/i2v.js:36` 이 `image_url` 로
+URL 을 그대로 넘긴다).
+
+보관은 걱정 안 해도 된다 — `X-Fal-Object-Lifecycle-Preference` 기본값이 **"forever and publicly
+readable if not configured"** 이고 보관 기간 과금도 문서에 없다. 실측으로도 3일 된 URL 이 200 이고
+`Cache-Control: max-age=5184000(60일), immutable` 이었다. (요청 페이로드 JSON 은 별개로 30일,
+`X-Fal-Store-IO: 0` 으로 차단 가능.)
+
+> ★ **문제는 만료가 아니라 `publicly readable` 이다.** 사장님이 올린 **입력** 사진은 비공개
+> 버킷으로 옮겼는데 AI 가 만든 **출력**은 fal 에 공개로 남아 있다 — 입력은 잠그고 출력은 열어둔
+> 셈이다. URL 이 무작위인 것은 자물쇠가 아니라 가림막이다.
+> 다음에 볼 것: fal 의 **File Access Controls** 로 계정 기본값을 비공개로 돌릴 수 있는가.
+> 되더라도 서명 URL 은 만료가 붙어 문서에 박은 URL 이 썩으므로, 업로드처럼 **라우트를 두어
+> 흘려주는** 방식이 필요하다. 남는 위험은 **fal 계정 종속**이다.
+
 ### ★ 저장은 줄을 서고, 정확성은 version이 지킨다
 `updateProject`는 프로젝트 id별 **직렬 큐** 뒤에 있다. 이것은 이관에서 걷어낸 in-memory 락의
 부활이 **아니다** — 정확성은 여전히 `version`이 지키고(서버가 여러 대면 이 큐는 서로를 모른다),
