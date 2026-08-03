@@ -25,7 +25,7 @@ describe("단계 정의", () => {
   });
 
   it("번호가 순서대로 붙어 있다", () => {
-    expect(STEPS.map((s) => s.no)).toEqual(["①", "②", "③", "④", "⑤", "⑥"]);
+    expect(STEPS.map((s) => s.no)).toEqual(["1", "2", "3", "4", "5", "6"]);
   });
 
   it("stepHref는 ①자료를 프로젝트 유무로 가른다", () => {

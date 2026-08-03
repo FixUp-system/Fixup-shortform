@@ -44,14 +44,14 @@ function StepList({ pathname }) {
           return (
             <span key={s.key} className={`${cls} locked`}>
               <i>{s.no}</i>{s.label}
-              <em>{s.soon ? "준비 중" : "잠김"}</em>
+              {s.soon ? <em>준비 중</em> : null}
             </span>
           );
         }
         return (
           <Link key={s.key} href={href} className={cls}>
-            <i>{s.no}</i>{s.label}
-            {s.soon ? <em>준비 중</em> : passed ? <em className="ok">✓</em> : active ? <em className="now">진행 중</em> : null}
+            <i>{passed ? <Icon name="check" size={12} /> : s.no}</i>{s.label}
+            {s.soon ? <em>준비 중</em> : null}
           </Link>
         );
       })}

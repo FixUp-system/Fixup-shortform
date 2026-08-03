@@ -173,7 +173,20 @@ aside.side {
   text-decoration: none;
 }
 a.side-step:hover { background: var(--surface2); color: var(--ink); }
-.side-step i { font-style: normal; opacity: 0.8; flex: none; }
+/* 단계 번호 — 배지. 원문자(①)는 획이 가늘어 잠긴 단계의 opacity 아래서 사라졌다. */
+.side-step i {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--surface2);
+  color: var(--ink-soft);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-style: normal;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+/* 완료 — 배지 자리에 체크가 들어간다 */
+.side-step.passed i { color: var(--good); }
 .side-step em {
   margin-left: auto;
   font-style: normal;
@@ -183,8 +196,6 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
   border-radius: var(--r-ctl);
   padding: 0 6px;
 }
-.side-step em.ok { color: var(--good); border-color: transparent; }
-.side-step em.now { color: var(--ink-soft); border-color: var(--line); }
 .side-step.passed { color: var(--ink); }
 .side-step.on { background: var(--surface2); color: var(--ink); font-weight: 600; }
 .side-step.locked { opacity: 0.5; cursor: default; }
