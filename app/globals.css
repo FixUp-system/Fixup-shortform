@@ -124,7 +124,6 @@ aside.side {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
   font-style: normal;
 }
 .side-item {
@@ -145,7 +144,7 @@ aside.side {
 .side-item.on { background: var(--surface2); font-weight: 600; }
 .side-item.soon { color: var(--ink-soft); cursor: default; }
 .side-item.soon:hover { background: transparent; }
-.side-item .ic { width: 18px; text-align: center; flex: none; opacity: 0.85; }
+.side-item .ic { display: inline-flex; flex: none; opacity: 0.85; }
 .side-item .soon-tag {
   margin-left: auto;
   font-size: 12px;

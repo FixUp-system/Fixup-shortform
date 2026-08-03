@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
+import Icon from "./Icon";
 import { useProject } from "./ProjectContext";
 import { STEPS, currentStepKey, isReachable, stepHref } from "../lib/steps";
 
@@ -68,38 +69,38 @@ export default function Sidebar() {
   return (
     <aside className="side">
       <div className="logo">
-        <i>▶</i>shotform
+        <i><Icon name="play" size={16} /></i>shotform
       </div>
       <Link href="/" className={`side-item${pathname === "/" ? " on" : ""}`}>
-        <span className="ic">⌂</span>홈 — 빠른 생성
+        <span className="ic"><Icon name="home" /></span>홈 — 빠른 생성
       </Link>
       <Link href={makeVideoHref} className={`side-item${inCreate ? " on" : ""}`}>
-        <span className="ic">✦</span>영상 만들기 (단계별)
+        <span className="ic"><Icon name="sparkle" /></span>영상 만들기 (단계별)
       </Link>
       {inCreate && <StepList pathname={pathname} />}
       {inCreate && project?.id && (
         <Link href="/create" className="side-new">+ 새로 만들기</Link>
       )}
       <button className="side-item soon" disabled>
-        <span className="ic">▤</span>보관함
+        <span className="ic"><Icon name="archive" /></span>보관함
         <span className="soon-tag">준비 중</span>
       </button>
       <button className="side-item soon" disabled>
-        <span className="ic">◫</span>템플릿
+        <span className="ic"><Icon name="template" /></span>템플릿
         <span className="soon-tag">준비 중</span>
       </button>
       <Link
         href="/costs"
         className={`side-item${pathname === "/costs" ? " on" : ""}`}
       >
-        <span className="ic">◷</span>비용 기록
+        <span className="ic"><Icon name="clock" /></span>비용 기록
       </Link>
       <button className="side-item soon" disabled>
-        <span className="ic">⚙︎</span>설정
+        <span className="ic"><Icon name="gear" /></span>설정
         <span className="soon-tag">준비 중</span>
       </button>
       <button className="side-item" onClick={() => handleLogout(router)}>
-        <span className="ic">⏻</span>로그아웃
+        <span className="ic"><Icon name="power" /></span>로그아웃
       </button>
       <div className="side-grow" />
       <div className="credit-box">
