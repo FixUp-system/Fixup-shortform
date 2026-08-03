@@ -4,6 +4,7 @@
 // 원래 홈(app/page.js) 전체였는데, 홈이 "내 영상" 목록 중심으로 바뀌면서
 // 이 컴포넌트로 옮겨졌다. 기능은 그대로다 — 이름과 자리만 바뀌었다.
 import { useEffect, useRef, useState } from "react";
+import Icon from "./Icon";
 
 const GREETING =
   "안녕하세요! 어떤 영상을 만들까요? 한 줄로 편하게 알려주세요.";
@@ -153,7 +154,7 @@ export default function QuickCreate() {
             {messages.map((m, i) => (
               <div key={i}>
                 <div className={`msg ${m.role}`}>
-                  {m.role === "ai" && <span className="who">▶</span>}
+                  {m.role === "ai" && <span className="who"><Icon name="play" size={14} /></span>}
                   <div className="bub">
                     {m.spinner ? (
                       <span className="gen-bub">

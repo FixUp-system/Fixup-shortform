@@ -285,9 +285,16 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
 }
 .project-item:hover { border-color: var(--ink-soft); }
 .project-item .title { font-weight: 600; }
+/* 홈의 두 갈래 — 위는 단계별(주력), 아래는 빠른 생성(실험). 같은 결로 띄운다. */
+.home-start { margin-top: 8px; }
 .home-quick { margin-top: 48px; border-top: 1px solid var(--line); padding-top: 24px; }
+/* 보조 버튼 — 주버튼(.cta)과 같은 모양이되 바탕을 비운다. 홈에서 '보관함'처럼
+   지금 하려는 일이 아닌 쪽으로 가는 링크에 쓴다. */
+.cta.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+.cta.ghost:hover { background: var(--surface); }
 
-.chat-wrap { max-width: 760px; margin: 0 auto; }
+/* 가운데로 밀지 않는다 — 제목·설명이 왼쪽 정렬이라 카드만 가운데면 축이 어긋난다(실측) */
+.chat-wrap { max-width: 760px; }
 .chat-card {
   background: var(--surface);
   border-radius: var(--r-card);

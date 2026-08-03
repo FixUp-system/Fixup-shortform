@@ -152,7 +152,7 @@ export default function VoiceStepPage() {
 
   return (
     <section className="panel panel--narrow">
-      <h2>목소리를 입힙니다 <span className="badge vlm">③ 목소리</span></h2>
+      <h2>목소리를 입힙니다 <span className="badge vlm">3 목소리</span></h2>
       {err && <p className="pgsub warn">{err}</p>}
 
       {!madeAny ? (
