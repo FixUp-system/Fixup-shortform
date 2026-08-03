@@ -42,15 +42,15 @@ function StepList({ pathname }) {
 
         if (!href || !reachable) {
           return (
-            <span key={s.key} className={`${cls} locked`}>
+            <span key={s.key} className={`${cls} locked`} aria-disabled="true">
               <i>{s.no}</i>{s.label}
               {s.soon ? <em>준비 중</em> : null}
             </span>
           );
         }
         return (
-          <Link key={s.key} href={href} className={cls}>
-            <i>{passed ? <Icon name="check" size={12} /> : s.no}</i>{s.label}
+          <Link key={s.key} href={href} className={cls} aria-current={active ? "step" : undefined}>
+            <i>{passed ? <><Icon name="check" size={12} /><span className="sr-only">완료</span></> : s.no}</i>{s.label}
             {s.soon ? <em>준비 중</em> : null}
           </Link>
         );
@@ -72,7 +72,7 @@ export default function Sidebar() {
         <i><Icon name="play" size={16} /></i>shotform
       </div>
       <Link href="/" className={`side-item${pathname === "/" ? " on" : ""}`}>
-        <span className="ic"><Icon name="home" /></span>홈 — 빠른 생성
+        <span className="ic"><Icon name="home" /></span>홈 — 새로 만들기
       </Link>
       <Link href={makeVideoHref} className={`side-item${inCreate ? " on" : ""}`}>
         <span className="ic"><Icon name="sparkle" /></span>영상 만들기 (단계별)
@@ -81,10 +81,12 @@ export default function Sidebar() {
       {inCreate && project?.id && (
         <Link href="/create" className="side-new">+ 새로 만들기</Link>
       )}
-      <button className="side-item soon" disabled>
+      <Link
+        href="/archive"
+        className={`side-item${pathname === "/archive" ? " on" : ""}`}
+      >
         <span className="ic"><Icon name="archive" /></span>보관함
-        <span className="soon-tag">준비 중</span>
-      </button>
+      </Link>
       <button className="side-item soon" disabled>
         <span className="ic"><Icon name="template" /></span>템플릿
         <span className="soon-tag">준비 중</span>
