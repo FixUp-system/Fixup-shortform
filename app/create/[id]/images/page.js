@@ -152,7 +152,7 @@ export default function ImagesStepPage() {
       <section className="panel images-col">
         <h2>{cuts.length === 0 ? "대본을 먼저 만들어 주세요"
           : generating ? "컷별 이미지를 만들고 있어요"
-          : !madeAny ? <>컷마다 그림을 그립니다 <span className="badge vlm">④ 이미지</span></>
+          : !madeAny ? <>컷마다 그림을 그립니다 <span className="badge vlm">4 이미지</span></>
           : <>컷별 이미지를 확인해 주세요 <span className="badge vlm">승인 게이트</span></>}</h2>
         {cuts.length > 0 && (
           <p className="pgsub">
@@ -225,7 +225,7 @@ export default function ImagesStepPage() {
                     disabled={staleCount > 0}
                     onClick={() => router.push(`/create/${id}/video`)}
                   >
-                    ⑤ 영상 만들러 가기 →
+                    5 영상 만들러 가기 →
                   </button>
                 </>
               )}

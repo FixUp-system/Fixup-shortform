@@ -118,7 +118,7 @@ describe("주 실행 버튼", () => {
     const users = [];
     for (const m of cssWithoutRoot().matchAll(/([^{}]+)\{([^}]*)\}/g)) {
       const [, selector, body] = m;
-      if (/background:\s*var\(--accent/.test(body)) users.push(selector.trim());
+      if (/var\(--accent/.test(body)) users.push(selector.trim());
     }
     // 화면에서 가장 강한 색은 사장님이 가장 알아야 할 것 — 지금 몇 단계인가 — 을 가리킨다.
     expect(users.length, "액센트를 쓰는 자리가 하나도 없다").toBeGreaterThan(0);
@@ -158,6 +158,38 @@ describe("인라인 스타일", () => {
       count += n;
     }
     expect(count, perFile.join("\n")).toBeLessThanOrEqual(10);
+  });
+});
+
+// 아이콘·단계 번호는 소스에 글리프로 남기 쉽다 — 색·타이포와 달리 CSS 에 흔적이 없어
+// 눈으로 보기 전에는 아무도 모른다. 실제로 이 단정이 없는 동안 화면 본문 일곱 자리가
+// 원문자로 남았고, 사이드바가 "4 이미지"인데 버튼은 "④ 이미지 만들러 가기"였다.
+describe("글리프", () => {
+  // 주석은 문서적 표현이라 원문자를 허용한다(lib/steps.js 의 "①자료는 ..." 등).
+  // 화면에 렌더되는 문자열만 판정한다.
+  const stripComments = (text) =>
+    text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+  it("화면 문자열에 단계 원문자가 없다", () => {
+    const offenders = [];
+    for (const { path, text } of readAll()) {
+      if (path.endsWith(".css")) continue;
+      for (const m of stripComments(text).matchAll(/[①②③④⑤⑥⑦⑧⑨]/g)) {
+        offenders.push(`${path}: ${m[0]}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("사이드바 아이콘이 유니코드 글리프가 아니다", () => {
+    const offenders = [];
+    for (const { path, text } of readAll()) {
+      if (path.endsWith(".css")) continue;
+      for (const m of stripComments(text).matchAll(/[⌂✦▤◫◷⚙⏻▶]/g)) {
+        offenders.push(`${path}: ${m[0]}`);
+      }
+    }
+    expect(offenders).toEqual([]);
   });
 });
 

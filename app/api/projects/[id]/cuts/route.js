@@ -28,7 +28,7 @@ export const POST = withUser(async (req, { params }, user) => {
   // 컷이 비어 있는 경우(=분할 실패)도 다시 시도를 허용한다.
   if ((project.cuts || []).length > 0 && !areCutsStale(project)) {
     return Response.json(
-      { error: "이미 나눈 컷이 있어요 — ③ 목소리에서 확인해 주세요" },
+      { error: "이미 나눈 컷이 있어요 — 3 목소리에서 확인해 주세요" },
       { status: 409 }
     );
   }

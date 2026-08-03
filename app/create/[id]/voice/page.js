@@ -246,7 +246,7 @@ export default function VoiceStepPage() {
                 disabled={busy || doneCount === 0 || staleCount > 0}
                 onClick={() => router.push(`/create/${id}/images`)}
               >
-                ④ 이미지 만들러 가기 →
+                4 이미지 만들러 가기 →
               </button>
             </>
           )}
