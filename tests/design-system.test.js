@@ -114,13 +114,15 @@ describe("주 실행 버튼", () => {
     expect(rule).toMatch(/color:\s*var\(--btn-ink\)/);
   });
 
-  it("액센트를 배경으로 쓰는 규칙은 크레딧 상자뿐이다", () => {
-    const offenders = [];
+  it("액센트는 진행 중 단계 표시에만 쓴다", () => {
+    const users = [];
     for (const m of cssWithoutRoot().matchAll(/([^{}]+)\{([^}]*)\}/g)) {
       const [, selector, body] = m;
-      if (/background:\s*var\(--accent/.test(body)) offenders.push(selector.trim());
+      if (/background:\s*var\(--accent/.test(body)) users.push(selector.trim());
     }
-    expect(offenders).toEqual([".credit-box"]);
+    // 화면에서 가장 강한 색은 사장님이 가장 알아야 할 것 — 지금 몇 단계인가 — 을 가리킨다.
+    expect(users.length, "액센트를 쓰는 자리가 하나도 없다").toBeGreaterThan(0);
+    expect(users.filter((s) => !s.includes(".side-step.on"))).toEqual([]);
   });
 });
 
