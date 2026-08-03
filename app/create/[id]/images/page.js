@@ -157,7 +157,7 @@ export default function ImagesStepPage() {
         {cuts.length > 0 && (
           <p className="pgsub">
             {hasSynopsis
-              ? "이미지를 클릭하면 오른쪽에서 크게 보고 고칠 수 있어요 · 아래 문장은 읽어 줄 말이에요 — 그림을 만드는 바탕은 ②구성에 적어 둔 장면이라, 그림을 바꾸려면 오른쪽에 수정 지시를 적거나 ②구성의 장면 글을 고쳐 주세요"
+              ? "이미지를 클릭하면 오른쪽에서 크게 보고 고칠 수 있어요 · 아래 문장은 읽어 줄 말이에요 — 그림을 만드는 바탕은 컷마다 적어 둔 장면 설명이라, 그림을 바꾸려면 오른쪽에 수정 지시를 적어 주세요"
               : "이미지를 클릭하면 오른쪽에서 크게 보고 고칠 수 있어요 · 아래 문장은 읽어 줄 말이면서, 이 영상에서는 그림을 만드는 글이기도 해요 — 문장을 고친 뒤 다시 만들면 그림도 달라져요"}
           </p>
         )}
@@ -288,7 +288,7 @@ function PreviewPane({ cut, url, photoName, aspect, hasSynopsis, stalled, onRege
         <div className="preview-edit">
           <p className="preview-note">
             {hasSynopsis
-              ? "그림을 바꾸려면 여기에 적어주세요 — 위 문장은 읽어 줄 말이고, 그림을 만드는 바탕은 ②구성에 적어 둔 장면이에요. 문장을 고친 뒤 다시 만들면 고르는 그림이 달라질 수 있어요."
+              ? "그림을 바꾸려면 여기에 적어주세요 — 위 문장은 읽어 줄 말이고, 그림을 만드는 바탕은 이 컷에 적어 둔 장면 설명이에요. 문장을 고친 뒤 다시 만들면 고르는 그림이 달라질 수 있어요."
               : "그림을 바꾸려면 여기에 적어주세요 — 위 문장은 읽어 줄 말이면서 그림을 만드는 글이기도 해서, 문장을 고친 뒤 다시 만들면 그림도 달라져요."}
           </p>
           {cut.edit_instruction && <p className="preview-note">지난 수정 지시: {cut.edit_instruction}</p>}

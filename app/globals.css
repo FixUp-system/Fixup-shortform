@@ -939,7 +939,10 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
    접히면 쌍 경계가 사라져 사장님이 무엇이 무엇에 붙은 건지 못 읽는다. */
 .script-src.direction-lines { white-space: pre-line; }
 
-/* 화면에는 안 보이되 스크린리더는 읽는다 — 단계 상태처럼 색·모양으로만 말하는 것의 대체 텍스트 */
+/* 화면에는 안 보이되 스크린리더는 읽는다 — 단계 상태처럼 색·모양으로만 말하는 것의 대체 텍스트.
+   이 규칙을 쓰는 Sidebar.jsx 쪽 마크업(aria-current·aria-disabled·완료 배지의 sr-only 텍스트)은
+   다른 세션의 미커밋 변경과 같은 파일에 섞여 있어 아직 커밋되지 않았다 — 이 CSS 가 먼저 도착한
+   것이고, Sidebar.jsx 가 나중에 커밋되면 그 자리에서 바로 동작한다. 죽은 CSS 아님. */
 .sr-only {
   position: absolute;
   width: 1px; height: 1px;
