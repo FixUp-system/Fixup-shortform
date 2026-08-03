@@ -40,7 +40,7 @@ body {
   /* 라틴·숫자는 Geist, 한글은 Pretendard가 받는다 (app/layout.js에서 주입) */
   font-family: var(--font-geist-sans), var(--font-pretendard), system-ui, sans-serif;
   line-height: 1.6;
-  font-size: 15px;
+  font-size: 16px;
 }
 
 button { font: inherit; }
@@ -66,7 +66,7 @@ button { font: inherit; }
   border-radius: var(--r-ctl);
   padding: 1px 8px;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0.04em;
   color: var(--ink-soft);
 }
@@ -80,7 +80,7 @@ main.work {
   padding: 24px 28px 64px;
   max-width: 1160px;
 }
-h1.pgtitle { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 4px; }
+h1.pgtitle { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 4px; }
 .pgsub { color: var(--ink-soft); font-size: 14px; margin: 0 0 18px; }
 /* 경고 문구 — 실패·주의를 말하는 한 줄.
    .badge.warn 은 배경까지 갖는 별개 규칙이고 구체성이 높아 이 규칙에 지지 않는다. */
@@ -90,7 +90,7 @@ h1.pgtitle { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; margin:
   font-size: 12px;
   border-radius: var(--r-ctl);
   padding: 2px 8px;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0.02em;
 }
 .badge.warn { background: var(--warn-soft); color: var(--warn); }
@@ -107,7 +107,7 @@ aside.side {
   border-right: 1px solid var(--line);
 }
 .logo {
-  font-weight: 800;
+  font-weight: 700;
   font-size: 16px;
   letter-spacing: -0.02em;
   padding: 6px 8px 16px;
@@ -142,7 +142,7 @@ aside.side {
   text-align: left;
 }
 .side-item:hover { background: var(--surface2); }
-.side-item.on { background: var(--surface2); font-weight: 500; }
+.side-item.on { background: var(--surface2); font-weight: 600; }
 .side-item.soon { color: var(--ink-soft); cursor: default; }
 .side-item.soon:hover { background: transparent; }
 .side-item .ic { width: 18px; text-align: center; flex: none; opacity: 0.85; }
@@ -187,7 +187,7 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
 .side-step em.ok { color: var(--good); border-color: transparent; }
 .side-step em.now { color: var(--ink-soft); border-color: var(--line); }
 .side-step.passed { color: var(--ink); }
-.side-step.on { background: var(--surface2); color: var(--ink); font-weight: 500; }
+.side-step.on { background: var(--surface2); color: var(--ink); font-weight: 600; }
 .side-step.locked { opacity: 0.5; cursor: default; }
 
 /* 뒤로 가기 — 조용한 테두리 칩. 시선 앵커는 앞으로 가는 주 버튼 하나에만 둔다. */
@@ -243,8 +243,8 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
 }
 .credit-box b {
   display: block;
-  font-size: 24px;
-  font-weight: 800;
+  font-size: 18px;
+  font-weight: 600;
   letter-spacing: -0.02em;
   margin-top: 2px;
 }
@@ -267,7 +267,7 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
   color: var(--ink);
 }
 .project-item:hover { border-color: var(--ink-soft); }
-.project-item .title { font-weight: 500; }
+.project-item .title { font-weight: 600; }
 .home-quick { margin-top: 48px; border-top: 1px solid var(--line); padding-top: 24px; }
 
 .chat-wrap { max-width: 760px; }
@@ -304,7 +304,7 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
   border-radius: var(--r-card);
   padding: 11px 15px;
   max-width: 80%;
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.6;
   background: var(--surface2);
   white-space: pre-wrap;
@@ -348,7 +348,7 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
   border-radius: var(--r-card);
   padding: 14px 16px;
   font: inherit;
-  font-size: 15px;
+  font-size: 16px;
   resize: none;
   height: 84px;
   line-height: 1.55;
@@ -364,8 +364,8 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
   border-radius: var(--r-card);
   height: 84px;
   padding: 0 22px;
-  font-size: 15px;
-  font-weight: 500;
+  font-size: 16px;
+  font-weight: 600;
   cursor: pointer;
   flex: none;
 }
@@ -412,7 +412,7 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
   background: var(--btn);
   border-color: var(--btn);
   color: var(--btn-ink);
-  font-weight: 500;
+  font-weight: 600;
   padding: 9px 16px;
   font-size: 14px;
 }
@@ -433,8 +433,8 @@ a.side-item { text-decoration: none; }
 }
 .cost-tile small { color: var(--ink-soft); font-size: 12px; display: block; }
 .cost-tile b {
-  font-size: 24px;
-  font-weight: 800;
+  font-size: 28px;
+  font-weight: 700;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }
@@ -450,7 +450,7 @@ a.side-item { text-decoration: none; }
   text-align: left;
   font-size: 12px;
   color: var(--ink-soft);
-  font-weight: 500;
+  font-weight: 600;
   padding: 11px 14px;
   border-bottom: 1px solid var(--line);
   white-space: nowrap;
@@ -461,7 +461,7 @@ a.side-item { text-decoration: none; }
   vertical-align: top;
 }
 .cost-table tr:last-child td { border-bottom: 0; }
-.st-badge { font-size: 12px; border-radius: var(--r-pill); padding: 2px 10px; font-weight: 500; }
+.st-badge { font-size: 12px; border-radius: var(--r-pill); padding: 2px 10px; font-weight: 600; }
 .st-done { background: var(--good-soft); color: var(--good); }
 .st-submitted { background: var(--surface2); color: var(--ink-soft); }
 .st-error { background: var(--warn-soft); color: var(--warn); }
@@ -511,7 +511,7 @@ a.side-item { text-decoration: none; }
 
 .eyebrow {
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--ink-soft);
   margin: 18px 0 8px;
 }
@@ -527,7 +527,7 @@ textarea.ref {
   border-radius: var(--r-card);
   padding: 12px 14px;
   font: inherit;
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.55;
   resize: vertical;
 }
@@ -575,7 +575,7 @@ label.up.add {
   border: 1px dashed var(--line);
   background: transparent;
   color: var(--ink-soft);
-  font-size: 24px;
+  font-size: 18px;
   cursor: pointer;
 }
 label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
@@ -596,7 +596,7 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
   background: var(--surface2);
   border-color: var(--surface2);
   color: var(--ink);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 /* 주 실행 버튼 — 한 화면에 하나. 바탕의 반대색이라 화면에서 유일하게 가장 밝다. */
@@ -609,8 +609,8 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
   color: var(--btn-ink);
   border-radius: var(--r-ctl);
   padding: 12px 20px;
-  font-size: 15px;
-  font-weight: 500;
+  font-size: 16px;
+  font-weight: 600;
   cursor: pointer;
   margin-top: 20px;
 }
@@ -622,14 +622,14 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
   border-radius: var(--r-ctl);
   padding: 1px 8px;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
 /* ── 단계별 워크플로우 */
 .stepper-h { display: flex; gap: 4px; margin: 0 0 20px; background: var(--surface); border-radius: var(--r-ctl); padding: 4px; width: fit-content; }
 .stepper-h button { border: 0; background: transparent; color: var(--ink-soft); padding: 8px 16px; font-size: 14px; cursor: pointer; border-radius: var(--r-ctl); }
-.stepper-h button.on { background: var(--surface2); color: var(--ink); font-weight: 500; }
+.stepper-h button.on { background: var(--surface2); color: var(--ink); font-weight: 600; }
 .stepper-h button.done { color: var(--good); }
 .stepper-h button:disabled { cursor: default; opacity: .6; }
 .script-box { background: var(--deep); border: 1px solid var(--line); border-radius: var(--r-card); padding: 20px 22px; font-size: 16px; line-height: 1.8; }
@@ -637,7 +637,7 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
 .script-box .tag {
   display: inline-block;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--ink-soft);
   background: var(--surface2);
   border-radius: var(--r-pill);
@@ -660,7 +660,7 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
 .preview-frame { width: 100%; max-width: calc((100vh - 210px) * 9 / 16); aspect-ratio: 9 / 16; margin: 0 auto; border-radius: var(--r-card); overflow: hidden; background: var(--surface2); border: 1px solid var(--line); position: relative; }
 .preview-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .preview-frame .ph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--ink-soft); font-size: 12px; }
-.preview-sentence { font-size: 15px; line-height: 1.65; margin: 12px 0; }
+.preview-sentence { font-size: 16px; line-height: 1.65; margin: 12px 0; }
 .preview-note { font-size: 12px; color: var(--ink-soft); margin: 0 0 8px; }
 .preview-edit textarea.ref { min-height: 68px; margin-bottom: 0; }
 /* 두 버튼은 공간을 반씩 나눠 같은 크기가 된다 — 한쪽이 내용 크기로 쪼그라들지 않게
@@ -691,7 +691,7 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
 /* align-items: center — 배지 사이에 버튼이 섞여도 세로가 맞는다(목소리 단계의 [다시 읽기]) */
 .badges { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
 .regen-note { font-size: 12px; color: var(--ink-soft); text-align: center; }
-.sent-input { width: 100%; border: 1px solid var(--line); background: var(--deep); color: var(--ink); border-radius: var(--r-ctl); padding: 9px 12px; font: inherit; font-size: 15px; }
+.sent-input { width: 100%; border: 1px solid var(--line); background: var(--deep); color: var(--ink); border-radius: var(--r-ctl); padding: 9px 12px; font: inherit; font-size: 16px; }
 .sent-input:focus-visible { outline: 2px solid var(--ink); outline-offset: -1px; }
 
 /* 보강 — 게이트 페이지에서 참조하는 소형 유틸 */
@@ -712,10 +712,10 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
 .brief-point { display: flex; gap: 8px; align-items: baseline; }
 .brief-point::before { content: "•"; color: var(--ink-soft); }
 .ask { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 14px 16px; margin-top: 14px; }
-.ask h3 { font-size: 14px; font-weight: 500; margin: 0 0 10px; }
+.ask h3 { font-size: 14px; font-weight: 600; margin: 0 0 10px; }
 .ask-q { margin-bottom: 14px; }
 .ask-q:last-child { margin-bottom: 0; }
-.ask-q p { margin: 0 0 7px; font-size: 15px; }
+.ask-q p { margin: 0 0 7px; font-size: 16px; }
 .ask-q .row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .ask-done { color: var(--good); font-size: 14px; }
 /* 아직 못 누를 상태 — disabled로 막으면 편집 칸의 저장(blur)까지 막혀서 표시만 흐리게 한다 */
@@ -782,7 +782,7 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
    내려받기는 a 태그라(download 속성이 필요하다) 밑줄이 따라온다. 지운다. */
 .step-actions .fwd .mini {
   padding: 12px 20px;
-  font-size: 15px;
+  font-size: 16px;
   min-width: 132px;
   text-align: center;
 }
@@ -826,7 +826,7 @@ textarea.field {
   border-radius: var(--r-ctl);
   color: var(--ink);
   font-family: inherit;
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.65;
   padding: 13px 15px;
   resize: none;
@@ -869,7 +869,7 @@ textarea.field::placeholder { color: var(--ink-soft); }
   cursor: pointer;
 }
 .pill:hover { border-color: var(--ink-soft); color: var(--ink); }
-.pill b { color: var(--ink); font-weight: 500; }
+.pill b { color: var(--ink); font-weight: 600; }
 
 /* 고른 것들 — 박스 안에 **늘 펼쳐 둔다.**
    접었다 펴는 방식을 그만둔 이유: 접힌 동안 무엇이 골라져 있는지 안 보이고, 값을 보려면

@@ -125,8 +125,8 @@ describe("주 실행 버튼", () => {
 });
 
 describe("타이포", () => {
-  it("font-weight는 400 · 500 · 800만 쓴다", () => {
-    const ALLOWED = ["400", "500", "800", "inherit", "normal"];
+  it("font-weight는 400 · 600 · 700만 쓴다", () => {
+    const ALLOWED = ["400", "600", "700", "inherit", "normal"];
     const offenders = [];
     for (const m of cssWithoutRoot().matchAll(/font-weight:\s*([^;]+);/g)) {
       const v = m[1].trim();
@@ -135,8 +135,8 @@ describe("타이포", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("font-size는 12 · 14 · 15 · 16 · 24px만 쓴다", () => {
-    const ALLOWED = ["12px", "14px", "15px", "16px", "24px", "inherit"];
+  it("font-size는 12 · 14 · 16 · 18 · 28px만 쓴다", () => {
+    const ALLOWED = ["12px", "14px", "16px", "18px", "28px", "inherit"];
     const offenders = [];
     for (const m of cssWithoutRoot().matchAll(/font-size:\s*([^;]+);/g)) {
       const v = m[1].trim();
