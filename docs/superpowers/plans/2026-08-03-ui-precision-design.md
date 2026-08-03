@@ -32,7 +32,7 @@
 | `tests/design-system.test.js:117` | 액센트 사용처 | Task 4 |
 
 **시작 HEAD:** `e9fb701` (설계 문서 커밋)
-**기준 테스트 수:** 809 통과 / 5 skip. 매 태스크 끝에서 이 수가 유지되거나 늘어야 한다.
+**기준 테스트 수:** 920 통과 / 10 skip. 매 태스크 끝에서 이 수가 유지되거나 늘어야 한다.
 
 ---
 
@@ -104,7 +104,7 @@ Expected: FAIL 2건. 굵기는 `["500","800", …]`이, 크기는 `["15px","24px
 - [ ] **Step 5: 그린을 확인한다**
 
 Run: `npx vitest run`
-Expected: 809 통과 / 5 skip. 타이포 2건이 그린
+Expected: 920 통과 / 10 skip. 타이포 2건이 그린
 
 - [ ] **Step 6: 변이로 단정이 무는지 본다**
 
@@ -243,7 +243,7 @@ Expected: 결과 없음
 - [ ] **Step 5: 테스트를 돌린다**
 
 Run: `npx vitest run`
-Expected: 809 통과 / 5 skip. 특히 hex 금지 테스트가 그린이어야 한다 — 빨개졌다면 `Icon.jsx`에 hex를 쓴 것이다
+Expected: 920 통과 / 10 skip. 특히 hex 금지 테스트가 그린이어야 한다 — 빨개졌다면 `Icon.jsx`에 hex를 쓴 것이다
 
 - [ ] **Step 6: 커밋**
 
@@ -363,7 +363,7 @@ export const STEPS = [
 - [ ] **Step 7: 테스트를 돌린다**
 
 Run: `npx vitest run`
-Expected: 809 통과 / 5 skip
+Expected: 920 통과 / 10 skip
 
 - [ ] **Step 8: 커밋**
 
@@ -447,7 +447,7 @@ Expected: FAIL — `.credit-box`가 `.side-step.on`을 포함하지 않아 걸�
 - [ ] **Step 5: 그린을 확인한다**
 
 Run: `npx vitest run`
-Expected: 809 통과 / 5 skip
+Expected: 920 통과 / 10 skip
 
 - [ ] **Step 6: 변이로 단정이 무는지 본다**
 
@@ -497,7 +497,7 @@ design-system.test.js 의 규칙도 함께 뒤집었다 — 새 테스트는 개
 - [ ] **Step 2: 테스트를 돌린다**
 
 Run: `npx vitest run`
-Expected: 809 통과 / 5 skip
+Expected: 920 통과 / 10 skip
 
 - [ ] **Step 3: 커밋**
 
@@ -550,7 +550,7 @@ main.work { flex: 1; min-width: 0; padding: 24px 28px 40px; max-width: 1160px; }
 - [ ] **Step 4: 테스트를 돌린다**
 
 Run: `npx vitest run`
-Expected: 809 통과 / 5 skip
+Expected: 920 통과 / 10 skip
 
 - [ ] **Step 5: 커밋**
 

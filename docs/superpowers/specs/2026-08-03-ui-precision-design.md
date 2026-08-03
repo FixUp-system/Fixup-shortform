@@ -90,12 +90,15 @@ SVG는 이미 크기가 고정이라 폭 보정이 필요 없다.
 `.side-step i`를 숫자 배지로 만든다:
 
 ```
-18×18 · border-radius 50% · font-size 11px · font-variant-numeric: tabular-nums
+18×18 · border-radius 50% · font-size 12px · font-variant-numeric: tabular-nums
 ```
+
+배지 글자는 **12px**다. 11px는 F가 정한 크기 목록(12/14/16/18/28)에 없어 규칙 테스트가 빨개진다.
 
 - **완료**: 숫자 자리에 `check` 아이콘(`--good`), 오른쪽 `em.ok` 제거 — 같은 말을 두 번 하지 않는다
 - **진행 중**: 아래 C 참조
-- **잠김**: 배지를 유지하되 `opacity: 0.45`. **"잠김" 글자는 뺀다** — 흐린 것으로 이미 말했다
+- **잠김**: 배지를 유지하고 `.locked`의 기존 `opacity: 0.5`를 그대로 쓴다.
+  **"잠김" 글자는 뺀다** — 흐린 것으로 이미 말했다
 
 > `tests/steps.test.js:28`이 `["①","②",…]`를 못 박고 있다. 함께 갱신한다.
 
@@ -176,7 +179,7 @@ SVG는 이미 크기가 고정이라 폭 보정이 필요 없다.
 
 ## 검증
 
-1. `npx vitest run` — 809개가 그린이어야 한다. 갱신 대상은 다음 셋뿐이다:
+1. `npx vitest run` — 920개가 그린이어야 한다. 갱신 대상은 다음 셋뿐이다:
    - `tests/design-system.test.js` — 액센트 규칙(C)·굵기·크기(F)
    - `tests/steps.test.js:28` — 단계 번호(B)
    - 그 밖의 테스트가 빨개지면 **범위를 넘은 것**이다. 고치지 말고 보고한다
