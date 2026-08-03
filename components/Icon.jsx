@@ -10,7 +10,12 @@
 const PATHS = {
   home: <path d="M3 10.5 12 3l9 7.5M5.5 9.5V20h13V9.5" />,
   sparkle: <path d="M12 3v6M12 15v6M3 12h6M15 12h6M6.5 6.5l3 3M14.5 14.5l3 3M17.5 6.5l-3 3M9.5 14.5l-3 3" />,
-  archive: <path d="M3 6h18M3 12h18M3 18h18" />,
+  archive: (
+    <>
+      <path d="M3 4.5h18v4H3zM4.5 8.5V20h15V8.5" />
+      <path d="M10 12h4" />
+    </>
+  ),
   template: <path d="M3.5 4.5h17v15h-17zM10 4.5v15" />,
   clock: (
     <>
