@@ -290,7 +290,6 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
 .chat-wrap { max-width: 760px; }
 .chat-card {
   background: var(--surface);
-  border: 1px solid var(--line);
   border-radius: var(--r-card);
   overflow: hidden;
 }
@@ -443,7 +442,6 @@ a.side-item { text-decoration: none; }
 .cost-summary { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
 .cost-tile {
   background: var(--surface);
-  border: 1px solid var(--line);
   border-radius: var(--r-card);
   padding: 14px 20px;
   min-width: 110px;
@@ -458,7 +456,6 @@ a.side-item { text-decoration: none; }
 
 .cost-table-wrap {
   background: var(--surface);
-  border: 1px solid var(--line);
   border-radius: var(--r-card);
   overflow-x: auto;
 }
@@ -518,7 +515,6 @@ a.side-item { text-decoration: none; }
 /* ── 단계별 만들기: 1단계 자료·설정 폼 */
 .panel {
   background: var(--surface);
-  border: 1px solid var(--line);
   border-radius: var(--r-card);
   padding: 20px;
 }
@@ -728,7 +724,7 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
 .brief-row .val.blank { color: var(--ink-soft); }
 .brief-point { display: flex; gap: 8px; align-items: baseline; }
 .brief-point::before { content: "•"; color: var(--ink-soft); }
-.ask { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 14px 16px; margin-top: 14px; }
+.ask { background: var(--surface); border-radius: var(--r-card); padding: 14px 16px; margin-top: 14px; }
 .ask h3 { font-size: 14px; font-weight: 600; margin: 0 0 10px; }
 .ask-q { margin-bottom: 14px; }
 .ask-q:last-child { margin-bottom: 0; }
