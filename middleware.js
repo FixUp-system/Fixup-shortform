@@ -42,6 +42,21 @@ export async function middleware(req) {
     throw new Error("SUPABASE_URL·SUPABASE_ANON_KEY 가 필요해요 (.env.local 확인)");
   }
 
+  // ★ 공개 경로에서는 세션을 확인하지 않는다 — 확인하면 안 된다.
+  //
+  // 라이브에서 밟았다: 매직링크를 누르면 "PKCE code verifier not found in storage" 로
+  // 세션 교환이 실패했다. 원인은 여기였다 — 세션이 없는 상태로 getUser() 를 부르면
+  // auth-js 가 저장소를 정리하면서 setAll 로 **삭제 쿠키**를 내보내는데, middleware 가
+  // NextResponse.next({request}) 로 쿠키를 건드리면 그것이 **다음 핸들러가 보는 요청
+  // 쿠키에도 반영된다.** 그래서 /auth/callback 이 실행될 때는 방금 로그인 화면이 심어 둔
+  // code verifier 가 이미 지워져 있었다.
+  //
+  // 공개 경로는 애초에 신원을 묻지 않는 자리다(로그인 화면과 그 콜백). 검증을 건너뛰면
+  // 쿠키를 건드릴 일도 없다. 위조 헤더 삭제는 위에서 이미 했으므로 방어는 그대로다.
+  if (isPublicPath(pathname)) {
+    return NextResponse.next({ request: { headers } });
+  }
+
   // supabase 가 세션을 갱신하면 setAll 이 쿠키를 여기에 쓴다. 이후 실제로 내보내는 응답이
   // 통과·리다이렉트·401 무엇이든 이 쿠키를 copyCookies 로 옮겨 싣는다.
   const cookieRes = NextResponse.next({ request: { headers } });
