@@ -269,23 +269,74 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
 .credit-box small { color: var(--ink-soft); font-size: 12px; }
 
 /* ── 홈 챗 */
-/* ── 홈 — 내 영상 목록 */
+/* ── 보관함 — 내 영상 카드 */
 .home-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
-.project-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; max-width: 760px; }
-.project-item {
+
+/* 만든 것을 눈으로 찾게 한다 — 제목 한 줄로는 무엇을 만들었는지 기억나지 않는다.
+   auto-fill 이라 폭이 좁아지면 열 수가 알아서 준다(별도 미디어쿼리가 필요 없다). */
+.project-grid {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 16px;
+}
+.project-card {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
   gap: 10px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--r-card);
-  padding: 14px 18px;
   text-decoration: none;
   color: var(--ink);
 }
-.project-item:hover { border-color: var(--ink-soft); }
-.project-item .title { font-weight: 600; }
+/* 9:16 고정 — 숏폼이라 세로가 기본이고, 비율을 카드마다 맞추면 격자가 들쭉날쭉해진다.
+   가로로 만든 영상은 cover 로 가운데가 잡힌다. */
+.project-thumb {
+  position: relative;
+  display: block;
+  aspect-ratio: 9 / 16;
+  border-radius: var(--r-card);
+  overflow: hidden;
+  background: var(--surface2);
+}
+.thumb-media { width: 100%; height: 100%; object-fit: cover; display: block; }
+.project-card:hover .project-thumb { outline: 2px solid var(--ink-soft); outline-offset: -2px; }
+.project-card:focus-visible .project-thumb { outline: 2px solid var(--ink); outline-offset: -2px; }
+.thumb-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+/* 영상이 있는 카드만 붙는 표식 — 마우스를 올리면 움직인다는 예고다.
+   그림 위에 얹히므로 순수 검정 반투명이 맞다(.thumb .num 과 같은 이유). */
+.thumb-tag {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--ink);
+  border-radius: var(--r-ctl);
+  padding: 1px 8px;
+  font-size: 12px;
+}
+.project-meta { display: flex; align-items: center; gap: 8px; }
+/* 제목이 남는 폭을 다 먹고, 넘치면 말줄임한다. min-width:0 이 없으면 flex 항목의
+   기본 min-width:auto 때문에 줄지 않아 배지를 밀어낸다. */
+.project-meta .title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 배지는 제 크기를 지킨다 — 없으면 "완성"이 "완/성" 두 줄로 찌그러진다(실측) */
+.project-meta .badge { flex: none; white-space: nowrap; }
 /* 홈의 두 갈래 — 위는 단계별(주력), 아래는 빠른 생성(실험). 같은 결로 띄운다. */
 .home-start { margin-top: 8px; }
 .home-quick { margin-top: 48px; border-top: 1px solid var(--line); padding-top: 24px; }

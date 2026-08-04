@@ -49,4 +49,28 @@ describe("프로젝트 소유자", () => {
     // doc 통짜를 실어 보내지 않는다
     expect(mine[0]).not.toHaveProperty("cuts");
   });
+
+  // 보관함 카드가 쓰는 두 URL. doc 통짜를 싣지 않는다는 계약을 지키면서도
+  // 화면이 썸네일을 그릴 수 있어야 한다 — 둘 중 하나라도 빠지면 카드가 빈 칸이 된다.
+  it("목록에 썸네일 URL 둘을 실어 준다 — 영상과 첫 컷 그림", async () => {
+    const p = await createProject({ settings: {}, material: { text: "썸네일", photos: [] }, ownerId: A });
+    await updateProject(p.id, A, (d) => ({
+      ...d,
+      render: { url: "/api/renders/x.mp4" },
+      cuts: [{ image: { url: "https://cdn.example/first.png" } }, { image: { url: "https://cdn.example/second.png" } }],
+    }));
+
+    const [row] = await listProjects(A);
+    expect(row.video_url).toBe("/api/renders/x.mp4");
+    // 첫 컷이다 — 둘째 컷 그림이 오면 카드마다 다른 장면이 뜬다
+    expect(row.image_url).toBe("https://cdn.example/first.png");
+    expect(row).not.toHaveProperty("cuts");
+  });
+
+  it("산출물이 없으면 썸네일 자리는 null 이다 — undefined 가 아니라", async () => {
+    await createProject({ settings: {}, material: { text: "아직", photos: [] }, ownerId: A });
+    const [row] = await listProjects(A);
+    expect(row.video_url).toBeNull();
+    expect(row.image_url).toBeNull();
+  });
 });
