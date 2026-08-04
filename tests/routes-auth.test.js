@@ -11,6 +11,7 @@ import { POST as renderPOST } from "../app/api/projects/[id]/render/route.js";
 import { POST as cutRegenPOST } from "../app/api/projects/[id]/cuts/[idx]/regen/route.js";
 import { POST as voiceRegenPOST } from "../app/api/projects/[id]/voice/[idx]/regen/route.js";
 import { POST as clipRegenPOST } from "../app/api/projects/[id]/clips/[idx]/regen/route.js";
+import { POST as autoPOST } from "../app/api/projects/[id]/auto/route.js";
 import { GET as cutsStatusGET } from "../app/api/projects/[id]/cuts/status/route.js";
 import { GET as voiceStatusGET } from "../app/api/projects/[id]/voice/status/route.js";
 import { GET as clipsStatusGET } from "../app/api/projects/[id]/clips/status/route.js";
@@ -110,6 +111,12 @@ describe("변이 라우트 — 남의 id 로 부르면 실패한다", () => {
   it("POST render — 남의 id 는 404", async () => {
     const p = await make(A);
     const res = await renderPOST(jsonReqAs(B, {}), ctx(p.id));
+    expect(res.status).toBe(404);
+  });
+
+  it("POST auto — 남의 id 는 404", async () => {
+    const p = await make(A);
+    const res = await autoPOST(jsonReqAs(B, {}), ctx(p.id));
     expect(res.status).toBe(404);
   });
 
