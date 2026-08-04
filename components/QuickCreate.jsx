@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import Icon from "./Icon";
 import { STYLE_PRESETS } from "../lib/styles";
 import { STEPS, stepHref, currentStepKey } from "../lib/steps";
+import { lastConfirmIndex, clearConfirms, restoreConfirm } from "../lib/quick-create-state";
 
 const GREETING = "안녕하세요! 어떤 영상을 만들까요? 한 줄로 편하게 알려주세요.";
 const POLL_INTERVAL_MS = 5000;
@@ -47,8 +48,10 @@ export default function QuickCreate() {
   const continueHref = (project) =>
     stepHref(STEPS.find((s) => s.key === currentStepKey(project)) || STEPS[0], project.id);
 
+  // 반환값은 "파이프라인이 실제로 출발했는가"다 — 출발 전 실패만 되돌릴 수 있다.
   async function startAuto(params) {
     push({ role: "ai", text: "영상을 만들기 시작했어요.", spinner: true, stage: "briefing" });
+    let started = false;
     try {
       const createRes = await fetch("/api/projects", {
         method: "POST",
@@ -72,6 +75,7 @@ export default function QuickCreate() {
       });
       const auto = await autoRes.json();
       if (!autoRes.ok) throw new Error(auto.error || "자동 생성 시작 실패");
+      started = true; // 여기서부터는 돈이 나가는 중이라 재시도 버튼을 주면 안 된다
 
       const deadline = Date.now() + POLL_TIMEOUT_MS;
       while (Date.now() < deadline) {
@@ -94,7 +98,7 @@ export default function QuickCreate() {
               archive: true,
             },
           ]);
-          return;
+          return started;
         }
         if (p.auto?.state === "failed") {
           setMessages((prev) => [
@@ -105,7 +109,7 @@ export default function QuickCreate() {
               continueTo: continueHref(p),
             },
           ]);
-          return;
+          return started;
         }
       }
       throw new Error("시간이 너무 오래 걸려서 화면 갱신을 멈췄어요. 보관함에서 확인해 주세요.");
@@ -115,6 +119,7 @@ export default function QuickCreate() {
         { role: "ai", text: `문제가 생겼어요 — ${e.message}` },
       ]);
     }
+    return started;
   }
 
   async function send(text) {
@@ -167,11 +172,13 @@ export default function QuickCreate() {
     if (!msg?.params) return;
     // 마지막 요약 카드가 아니면 돈이 나가지 않게 막는다(화면에서도 버튼을 숨기지만
     // 여기가 진짜 문이다 — 옛 카드의 params 는 사용자가 이미 고쳐 달라고 한 값이다).
-    const lastConfirm = messages.reduce((acc, m, i) => (m.confirm ? i : acc), -1);
-    if (idx !== lastConfirm) return;
+    if (idx !== lastConfirmIndex(messages)) return;
     setBusy(true);
-    setMessages((prev) => prev.map((m, i) => (i === idx ? { ...m, confirm: false } : m)));
-    await startAuto(msg.params);
+    // 누른 카드만 내리면 옛 카드가 다시 "마지막" 이 되어 버튼이 부활한다 — 전부 내린다.
+    setMessages((prev) => clearConfirms(prev));
+    const started = await startAuto(msg.params);
+    // 출발조차 못 했으면 그 카드만 되살려 재시도할 길을 남긴다(출발한 뒤면 두 번 결제된다).
+    if (!started) setMessages((prev) => restoreConfirm(prev, idx));
     setBusy(false);
   }
 
@@ -179,7 +186,7 @@ export default function QuickCreate() {
   // 누르면 수정 전 params 로 유료 파이프라인이 통째로 돈다 — 마지막 카드만 살려 둔다.
   // quickReplies 처럼 `i === messages.length - 1` 로 잡지 않는 이유: 요약 카드 뒤에
   // 사용자 메시지나 오류 안내가 붙으면 버튼이 통째로 사라져 되돌릴 길이 없어진다.
-  const lastConfirmIdx = messages.reduce((acc, m, i) => (m.confirm ? i : acc), -1);
+  const lastConfirmIdx = lastConfirmIndex(messages);
 
   return (
     <div className="chat-wrap">
