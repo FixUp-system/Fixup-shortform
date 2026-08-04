@@ -75,10 +75,21 @@ export default function VoiceStepPage() {
     }
   }, [project?.status, project?.cuts]);
 
-  // 분할이 끝나기를 기다린다 — 컷이 생기면 아래 화면이 그대로 열린다
+  // 분할이 끝나기를 기다린다 — 컷이 생기면 아래 화면이 그대로 열린다.
+  // ②대본과 같은 방식이다: 기다리는 동안은 가벼운 /status 만 보고, 컷이 생긴 뒤에만
+  // load(id) 로 통짜를 받는다(실측 13,236 → 35 bytes).
   useEffect(() => {
     if (!splitting) return;
-    const t = setInterval(() => { load(id).catch(() => {}); }, 2000);
+    const t = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/projects/${id}/status`);
+        if (!res.ok) return;
+        const st = await res.json();
+        if (st.cut_count > 0 || st.cuts_error) load(id).catch(() => {});
+      } catch {
+        // 한 번 실패는 다음 주기가 다시 본다
+      }
+    }, 2000);
     return () => clearInterval(t);
   }, [splitting, id]);
 

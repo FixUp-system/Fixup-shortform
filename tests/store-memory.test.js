@@ -73,3 +73,58 @@ describe("인메모리 store", () => {
     await expect(getStore().getObject("uploads", "없음.jpg")).rejects.toThrow();
   });
 });
+
+// 폴링용 부분 읽기 셋. 인메모리는 doc 전체가 이미 메모리에 있어 읽기량이 줄지 않지만,
+// **모양이 Supabase 와 다르면 여기서 통과한 코드가 프로덕션에서만 깨진다.**
+// (putObject 가 contentType 인자를 안 받아 같은 함정을 만들 뻔했다 — memory.js 주석 참고)
+describe("인메모리 store — 폴링용 부분 읽기", () => {
+  const doc = {
+    id: "p1",
+    status: "images",
+    cuts: [
+      { idx: 0, image: { url: "u0", of: "각인0" } },
+      { idx: 1, image: { url: "u1", of: "각인1" } },
+    ],
+    render: { url: "/api/renders/p1.mp4" },
+    cuts_error: null,
+    images_error: "그림 실패",
+    material: { text: "자료 원문" },
+  };
+  const seed = () => getStore().insertProject(doc, OWNER);
+
+  it("진행 상태는 상태·오류·컷 개수만 준다 — 컷 내용도 자료도 없다", async () => {
+    await seed();
+    const p = await getStore().selectProjectProgress("p1", OWNER);
+    expect(p.status).toBe("images");
+    expect(p.images_error).toBe("그림 실패");
+    expect(p.cut_count).toBe(2);
+    // 이 함수가 존재하는 이유다 — 무거운 것이 실리면 목적이 사라진다
+    expect(p).not.toHaveProperty("cuts");
+    expect(p).not.toHaveProperty("material");
+  });
+
+  it("합성 상태는 render 만 준다 — cuts 는 없다", async () => {
+    await seed();
+    const p = await getStore().selectProjectRender("p1", OWNER);
+    expect(p.render.url).toBe("/api/renders/p1.mp4");
+    expect(p).not.toHaveProperty("cuts");
+  });
+
+  it("컷 상태는 각인(of)을 그대로 실어 준다 — 떼면 낡음 판정이 죽는다", async () => {
+    await seed();
+    const p = await getStore().selectProjectCuts("p1", OWNER);
+    expect(p.cuts).toHaveLength(2);
+    // isImageStale 이 image.of 로 판정한다. 여기서 각인이 빠지면 화면이 setProject 로
+    // cuts 를 덮어쓰면서 "각인 없음 = 안 낡음"이 되어 낡은 그림에 경고가 안 뜬다.
+    expect(p.cuts[0].image.of).toBe("각인0");
+    expect(p).not.toHaveProperty("material");
+  });
+
+  it("남의 것은 셋 다 null 이다", async () => {
+    await seed();
+    const s = getStore();
+    expect(await s.selectProjectProgress("p1", OTHER)).toBeNull();
+    expect(await s.selectProjectRender("p1", OTHER)).toBeNull();
+    expect(await s.selectProjectCuts("p1", OTHER)).toBeNull();
+  });
+});

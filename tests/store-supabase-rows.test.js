@@ -144,6 +144,60 @@ describe("owner_id 필터 — 세 함수 모두 .eq 로 건다", () => {
     await supabaseStore.updateProjectRow("p1", "owner-3", 0, { status: "draft" });
     expect(H.calls[0].eq).toContainEqual(["owner_id", "owner-3"]);
   });
+
+  // 폴링용 부분 읽기 셋도 같은 경계 안에 있어야 한다. 소유자 필터를 빠뜨리면
+  // 2초마다 남의 진행 상태가 새어 나간다.
+  it("selectProjectProgress", async () => {
+    await supabaseStore.selectProjectProgress("p1", "owner-4");
+    expect(H.calls[0].eq).toContainEqual(["owner_id", "owner-4"]);
+  });
+
+  it("selectProjectRender", async () => {
+    await supabaseStore.selectProjectRender("p1", "owner-5");
+    expect(H.calls[0].eq).toContainEqual(["owner_id", "owner-5"]);
+  });
+
+  it("selectProjectCuts", async () => {
+    await supabaseStore.selectProjectCuts("p1", "owner-6");
+    expect(H.calls[0].eq).toContainEqual(["owner_id", "owner-6"]);
+  });
+});
+
+// ★ 이 세 함수가 존재하는 이유가 "doc 통짜를 읽지 않는 것"이다. select 에 doc 이
+// 통째로 들어가면 함수는 그대로 동작하지만 목적이 사라진다 — 실측 13,236 bytes 를
+// 2초마다, 합성 대기에는 300회까지 읽는다. 그 되돌림은 눈으로 안 보이므로 여기서 잰다.
+describe("폴링용 부분 읽기 — doc 통짜를 select 하지 않는다", () => {
+  // "doc" 단독(통짜)은 금지, "doc->cuts" 같은 경로는 허용이다.
+  const readsWholeDoc = (cols) =>
+    cols.split(",").map((c) => c.trim()).some((c) => c === "doc" || c.endsWith(":doc"));
+
+  it("selectProjectProgress 는 상태·오류만 읽는다", async () => {
+    await supabaseStore.selectProjectProgress("p1", "o");
+    const cols = H.calls[0].select.cols;
+    expect(readsWholeDoc(cols), cols).toBe(false);
+    expect(cols).toMatch(/status/);
+  });
+
+  it("selectProjectRender 는 render 만 읽는다", async () => {
+    await supabaseStore.selectProjectRender("p1", "o");
+    const cols = H.calls[0].select.cols;
+    expect(readsWholeDoc(cols), cols).toBe(false);
+    expect(cols).toMatch(/doc->render/);
+  });
+
+  it("selectProjectCuts 는 cuts 만 읽는다", async () => {
+    await supabaseStore.selectProjectCuts("p1", "o");
+    const cols = H.calls[0].select.cols;
+    expect(readsWholeDoc(cols), cols).toBe(false);
+    expect(cols).toMatch(/doc->cuts/);
+  });
+
+  // 반대편 — selectProject 는 통짜를 읽는 것이 맞다. 위 단정이 "아무것도 안 읽으면
+  // 통과"하는 허수아비가 아님을 여기서 보인다.
+  it("selectProject 는 통짜를 읽는다 (대조군)", async () => {
+    await supabaseStore.selectProject("p1", "o");
+    expect(readsWholeDoc(H.calls[0].select.cols)).toBe(true);
+  });
 });
 
 describe("allCosts — 행 상한", () => {

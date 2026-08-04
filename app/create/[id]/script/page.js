@@ -62,12 +62,27 @@ export default function ScriptStepPage() {
     splitCuts();
   }, [project?.script?.text, scriptVersion, cutsReady, busy]);
 
-  // 분할이 끝나기를 기다린다 — 컷이 채워지면 화면이 그대로 열린다
+  // 분할이 끝나기를 기다린다 — 컷이 채워지면 화면이 그대로 열린다.
+  //
+  // ★ 기다리는 동안에는 가벼운 /status 만 본다. 예전에는 load(id) 로 프로젝트 문서
+  //   전체를 2초마다 받았는데(실측 13,236 bytes), 여기서 보는 것은 "컷이 생겼나"
+  //   하나다. 다 되면 그때 한 번 load(id) 로 통짜를 받는다 — 15회 × 13KB 가
+  //   15회 × 35B + 1회 × 13KB 가 된다.
   useEffect(() => {
     const splitting = project?.status === "cuts" && (project?.cuts || []).length === 0 && !project?.cuts_error;
     if (!splitting) { clearInterval(splitPollRef.current); splitPollRef.current = null; return; }
     if (splitPollRef.current) return;
-    splitPollRef.current = setInterval(() => { load(id).catch(() => {}); }, 2000);
+    splitPollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/projects/${id}/status`);
+        if (!res.ok) return;
+        const st = await res.json();
+        // 컷이 생겼거나 실패로 끝났으면 그때 전체를 받는다
+        if (st.cut_count > 0 || st.cuts_error) load(id).catch(() => {});
+      } catch {
+        // 한 번 실패는 다음 주기가 다시 본다 — 여기서 폴링을 끊지 않는다
+      }
+    }, 2000);
     return () => { clearInterval(splitPollRef.current); splitPollRef.current = null; };
   }, [project?.status, project?.cuts?.length, project?.cuts_error, id]);
 
