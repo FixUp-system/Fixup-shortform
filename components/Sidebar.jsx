@@ -72,7 +72,7 @@ export default function Sidebar() {
         <i><Icon name="play" size={16} /></i>shotform
       </div>
       <Link href="/" className={`side-item${pathname === "/" ? " on" : ""}`}>
-        <span className="ic"><Icon name="home" /></span>홈 — 새로 만들기
+        <span className="ic"><Icon name="home" /></span>홈 — 빠른 생성
       </Link>
       <Link href={makeVideoHref} className={`side-item${inCreate ? " on" : ""}`}>
         <span className="ic"><Icon name="sparkle" /></span>영상 만들기 (단계별)
