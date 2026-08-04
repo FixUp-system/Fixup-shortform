@@ -12,8 +12,8 @@ export default function Home() {
         빠른 생성 <small className="badge warn">실험</small>
       </h1>
       <p className="pgsub">
-        대화로 필요한 정보만 모아서 비디오 모델에 바로 전달해요. 결과는 5~10초
-        단일 클립이에요.
+        대화로 필요한 정보만 모으면, 대본부터 완성까지 자동으로 만들어요.
+        낭독과 자막이 들어간 완성 영상이 나와요.
       </p>
       <QuickCreate />
     </>
