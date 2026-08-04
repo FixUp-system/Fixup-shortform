@@ -87,17 +87,24 @@ export default function QuickCreate() {
         setMessages((prev) =>
           prev.map((m) => (m.spinner ? { ...m, stage, text: `${STAGE_LABELS[stage] || "만드는 중"}…` } : m))
         );
-        if (p.auto?.state === "done" && p.render?.url) {
-          setMessages((prev) => [
-            ...prev.filter((m) => !m.spinner),
-            {
-              role: "ai",
-              text: "완성! 재생해 보세요. 보관함에도 저장돼 있어요.",
-              video: p.render.url,
-              aspect: params.aspect_ratio,
-              archive: true,
-            },
-          ]);
+        // 완료는 auto.state 하나로 판정한다 — 가짜 합성(SHOTFORM_FAKE)은 일부러 파일을
+        // 만들지 않아 render.url 이 영영 안 온다. url 을 AND 로 묶으면 성공한 관통이
+        // 15분 뒤 타임아웃 문구로 끝나 성공이 실패로 보인다.
+        if (p.auto?.state === "done") {
+          const done = p.render?.url
+            ? {
+                role: "ai",
+                text: "완성! 재생해 보세요. 보관함에도 저장돼 있어요.",
+                video: p.render.url,
+                aspect: params.aspect_ratio,
+                archive: true,
+              }
+            : {
+                role: "ai",
+                text: "완성! 가짜 모드라 파일은 만들어지지 않았어요. 보관함에서 확인해 보세요.",
+                archiveLink: true,
+              };
+          setMessages((prev) => [...prev.filter((m) => !m.spinner), done]);
           return started;
         }
         if (p.auto?.state === "failed") {
@@ -222,6 +229,14 @@ export default function QuickCreate() {
                         </a>
                       </div>
                     </>
+                  )}
+                  {m.archiveLink && (
+                    <div className="res-ops">
+                      <a className="mini" href="/archive"
+                        style={{ textDecoration: "none", display: "inline-flex", alignItems: "center" }}>
+                        보관함에서 보기
+                      </a>
+                    </div>
                   )}
                   {m.params && m.confirm && (
                     <details open>

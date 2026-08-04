@@ -68,6 +68,15 @@ describe("POST /api/projects/[id]/auto", () => {
     expect((await POST(reqAs(A), ctx(p.id))).status).toBe(409);
   });
 
+  // 가짜 합성(SHOTFORM_FAKE)은 일부러 파일을 안 만든다 — render = { fake: true } 뿐이다.
+  // url 로 완성을 판독하면 가짜 완성 프로젝트가 관통을 처음부터 다시 돈다.
+  it("가짜 완성(render.fake, url 없음)도 409 — 완성 이력은 render 객체 존재로 본다", async () => {
+    const p = await makeProject();
+    await projects.updateProject(p.id, A, (proj) => ({ ...proj, render: { fake: true, ts: 1 } }));
+    expect((await POST(reqAs(A), ctx(p.id))).status).toBe(409);
+    expect(runAutoPipeline).not.toHaveBeenCalled();
+  });
+
   it("자료 없는 프로젝트는 400 — 빈 자료로 관통을 시작하지 않는다", async () => {
     const p = await projects.createProject({
       ownerId: A, settings: { aspect_ratio: "9:16", target_seconds: 30 },

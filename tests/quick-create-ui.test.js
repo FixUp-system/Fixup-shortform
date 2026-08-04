@@ -22,6 +22,16 @@ describe("QuickCreate — 자동 관통 배선", () => {
   it("[만들기] 버튼은 마지막 요약 카드에만 살아 있다 — 옛 params 로 유료 실행 금지", () => {
     expect(src).toMatch(/m\.confirm && i === lastConfirmIdx/);
   });
+  // 가짜 합성은 파일을 안 만든다(render = { fake: true }) — url 을 완료 조건에 AND 로 묶으면
+  // 성공한 관통이 15분 뒤 타임아웃으로 "실패"가 된다.
+  it("완료 판정은 auto.state === done 하나다 — render.url 을 AND 로 묶지 않는다", () => {
+    expect(src).toMatch(/p\.auto\?\.state === "done"/);
+    expect(src).not.toMatch(/state === "done"\s*&&\s*p\.render/);
+  });
+  it("파일이 없는 가짜 완성은 안내 문구로 마무리한다", () => {
+    expect(src).toMatch(/가짜 모드라 파일은 만들어지지 않았어요/);
+  });
+
   it("확정은 카드를 전부 내리고, 출발 못 했을 때만 되살린다", () => {
     expect(src).toMatch(/clearConfirms\(prev\)/);
     expect(src).toMatch(/if \(!started\) setMessages\(\(prev\) => restoreConfirm\(prev, idx\)\)/);

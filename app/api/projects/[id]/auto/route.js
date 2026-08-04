@@ -27,7 +27,11 @@ export const POST = withUser(async (req, { params }, user) => {
       blocked = "이미 만드는 중이에요";
       return proj;
     }
-    if (proj.render?.url) {
+    // ★ url 이 아니라 render 객체 존재로 본다 — 가짜 합성(SHOTFORM_FAKE)은 일부러 파일을
+    // 만들지 않아 render = { fake: true } 만 남는다. url 로 판독하면 가짜 완성 프로젝트가
+    // 관통을 처음부터 다시 돈다. 실모드 재합성은 render 라우트가 render:null 로 리셋하므로
+    // "render 객체 존재 = 완성 이력 있음" 이 설계와 맞다.
+    if (proj.render) {
       blocked = "이미 완성한 프로젝트예요 — 보관함에서 확인해 주세요";
       return proj;
     }
