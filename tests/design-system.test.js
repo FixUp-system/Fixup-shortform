@@ -196,13 +196,14 @@ describe("글리프", () => {
 describe("서체", () => {
   it("layout.js 가 폰트를 실제로 주입한다", () => {
     const layout = readFileSync("app/layout.js", "utf8");
-    expect(layout).toMatch(/from ["']geist\/font\/sans["']/);
     expect(layout).toMatch(/from ["']next\/font\/local["']/);
   });
 
-  it("body 는 주입된 폰트 변수를 쓴다", () => {
+  // 서체는 한 벌이다. Geist 가 라틴·숫자를 맡고 한글만 Pretendard 로 폴백하던 시절에는
+  // "3 목소리" 한 낱말 안에서 두 서체가 섞여 숫자가 겉돌았다. 되돌리면 이 단정이 문다.
+  it("body 는 Pretendard 한 벌을 쓴다", () => {
     const css = readFileSync("app/globals.css", "utf8");
-    expect(css).toMatch(/var\(--font-geist-sans\)/);
     expect(css).toMatch(/var\(--font-pretendard\)/);
+    expect(css).not.toMatch(/var\(--font-geist-sans\)/);
   });
 });
