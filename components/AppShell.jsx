@@ -27,7 +27,7 @@ export default function AppShell({ children }) {
   return (
     <>
       <div className="belt">
-        <b>BETA</b> 빠른 생성 실험 버전 — 대화로 정보를 모아 최신 비디오 모델에 전달합니다
+        <b>BETA</b> 시험 서비스 — 대본부터 완성까지 자동으로 만듭니다
       </div>
       <div className="shell">
         <Sidebar />
