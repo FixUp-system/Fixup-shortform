@@ -37,10 +37,8 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  /* Pretendard 한 벌 — 한글·라틴·숫자를 한 골격으로 설계한 서체다.
-     예전에는 Geist가 앞에 있어 라틴·숫자를 가져가고 한글만 Pretendard로 폴백했는데,
-     그러면 "3 목소리"처럼 한 낱말 안에서 두 서체가 섞여 숫자가 겉돌았다(실측). */
-  font-family: var(--font-pretendard), system-ui, sans-serif;
+  /* 라틴·숫자는 Geist, 한글은 Pretendard가 받는다 (app/layout.js에서 주입) */
+  font-family: var(--font-geist-sans), var(--font-pretendard), system-ui, sans-serif;
   line-height: 1.6;
   font-size: 16px;
 }
