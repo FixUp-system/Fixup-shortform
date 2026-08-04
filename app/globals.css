@@ -197,11 +197,12 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
   padding: 0 6px;
 }
 .side-step.passed { color: var(--ink); }
+/* 왼쪽 액센트 바는 뺐다 — 옅은 배경과 채워진 배지만으로 "여기가 지금"이 충분히 읽힌다.
+   바까지 있으면 한 항목이 세 가지 방식으로 같은 말을 한다. */
 .side-step.on {
   background: var(--accent-soft);
   color: var(--ink);
   font-weight: 600;
-  box-shadow: inset 2px 0 0 var(--accent);
 }
 .side-step.on i { background: var(--accent); color: var(--deep); }
 .side-step.locked { opacity: 0.5; cursor: default; }
