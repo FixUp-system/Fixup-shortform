@@ -67,4 +67,26 @@ describe("POST /api/projects/[id]/auto", () => {
     await projects.updateProject(p.id, A, (proj) => ({ ...proj, render: { url: "/r.mp4" } }));
     expect((await POST(reqAs(A), ctx(p.id))).status).toBe(409);
   });
+
+  it("자료 없는 프로젝트는 400 — 빈 자료로 관통을 시작하지 않는다", async () => {
+    const p = await projects.createProject({
+      ownerId: A, settings: { aspect_ratio: "9:16", target_seconds: 30 },
+      material: { text: "   ", photos: [] },
+    });
+    expect((await POST(reqAs(A), ctx(p.id))).status).toBe(400);
+    expect(runAutoPipeline).not.toHaveBeenCalled();
+  });
+
+  // ★ 멱등 가드는 락 안(patchFn)에서 판정해야 한다. 읽고-나서-쓰면 [만들기] 동시 두 번에
+  // 둘 다 통과해 $2.59 를 두 번 산다.
+  it("동시에 두 번 눌러도 하나만 202 고 하나는 409 다", async () => {
+    const p = await makeProject();
+    const results = await Promise.all([
+      POST(reqAs(A), ctx(p.id)),
+      POST(reqAs(A), ctx(p.id)),
+    ]);
+    const codes = results.map((r) => r.status).sort();
+    expect(codes).toEqual([202, 409]);
+    expect(runAutoPipeline).toHaveBeenCalledTimes(1);
+  });
 });
