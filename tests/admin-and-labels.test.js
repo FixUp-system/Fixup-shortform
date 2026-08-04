@@ -126,6 +126,22 @@ describe("/costs 화면 — 403 을 오류로 보여준다", () => {
     expect(err).toBe("");
     expect(records).toHaveLength(1);
   });
+
+  // loadProjects 와 같은 결함이 여기에도 있었다 — 200 인데 본문이 JSON 이 아니면
+  // res.json() 이 던지고, 호출부(app/costs/page.js:27)는 .then 만 달아 두어 setState 를
+  // 못 한다. 화면이 "불러오는 중…"에서 멈추고 오류 문구도 못 띄운다.
+  it("200 이어도 본문이 JSON 이 아니면 오류로 준다 — 던지지 않는다", async () => {
+    const badJson = async () => ({
+      ok: true,
+      status: 200,
+      json: async () => {
+        throw new SyntaxError("Unexpected token < in JSON at position 0");
+      },
+    });
+    const { records, err } = await loadCostsRecords(badJson);
+    expect(records).toEqual([]);
+    expect(err).toBe("원장을 불러오지 못했어요");
+  });
 });
 
 // ── /api/admin/users/[id] — 승인은 profiles·app_metadata 둘 다 쓴다 ─────────

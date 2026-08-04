@@ -29,4 +29,21 @@ describe("loadProjects — 실패를 삼키지 않는다", () => {
     expect(err).toBe("");
     expect(projects).toHaveLength(1);
   });
+
+  // ★ 200 인데 본문이 JSON 이 아닐 수 있다 — 프록시가 HTML 오류 페이지를 끼워 넣거나
+  // dev 서버가 반쯤 깨진 상태일 때 실제로 그렇다. 그때 res.json() 이 던지면
+  // loadProjects 의 Promise 가 reject 되고, 화면은 setState 를 못 해 **"불러오는 중…"에서
+  // 영원히 멈춘다.** 오류 문구조차 못 띄우므로 사장님은 무엇이 잘못됐는지 알 수 없다.
+  it("200 이어도 본문이 JSON 이 아니면 오류로 준다 — 던지지 않는다", async () => {
+    const badJson = async () => ({
+      ok: true,
+      status: 200,
+      json: async () => {
+        throw new SyntaxError("Unexpected token < in JSON at position 0");
+      },
+    });
+    const { projects, err } = await loadProjects(badJson);
+    expect(projects).toEqual([]);
+    expect(err).toBe("목록을 불러오지 못했어요");
+  });
 });
