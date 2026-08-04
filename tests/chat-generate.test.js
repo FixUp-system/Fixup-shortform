@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
 import { POST } from "../app/api/chat/route.js";
+import { readFileSync } from "node:fs";
+import { STYLE_PRESETS } from "../lib/styles.js";
+import { VOICES } from "../lib/voices.js";
 
 const headersFor = () => ({
   [USER_HEADER]: "00000000-0000-4000-8000-00000000000a",
@@ -57,5 +60,14 @@ describe("POST /api/chat — generate 스키마", () => {
     const data = await (await POST(req([{ role: "me", text: "x" }]))).json();
     expect(data.action).toBe("ask");
     expect(data.quick_replies).toContain("그냥 바로 만들어줘");
+  });
+
+  // 프롬프트가 닫힌 목록을 글자로 열거하므로, lib 이 바뀌면 프롬프트가 낡는다.
+  // 코드는 목록 밖 값을 기본값으로 접어 버려 조용히 통과하니, 낡음은 여기서만 드러난다.
+  it("SYSTEM_PROMPT 가 lib 의 화풍 id·목소리 label 을 모두 열거한다", () => {
+    const src = readFileSync(new URL("../app/api/chat/route.js", import.meta.url), "utf8");
+    const prompt = src.slice(src.indexOf("const SYSTEM_PROMPT = `"), src.indexOf("export const POST"));
+    for (const id of STYLE_PRESETS.map((s) => s.id)) expect(prompt).toContain(`"${id}"`);
+    for (const label of VOICES.map((v) => v.label)) expect(prompt).toContain(`"${label}"`);
   });
 });
