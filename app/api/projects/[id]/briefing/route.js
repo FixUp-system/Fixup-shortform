@@ -1,7 +1,8 @@
 import { getProject, updateProject } from "../../../../../lib/projects";
 import { callJson } from "../../../../../lib/llm";
-import { validateBriefing, validateDevelopQuestions } from "../../../../../lib/validate";
-import { buildBriefingMessages, buildDevelopMessages, mergeAsked, briefingContentChanged } from "../../../../../lib/briefing";
+import { validateDevelopQuestions } from "../../../../../lib/validate";
+import { buildDevelopMessages, mergeAsked, briefingContentChanged } from "../../../../../lib/briefing";
+import { extractBriefing } from "../../../../../lib/briefing-extract";
 import { estimateSeconds, targetChars, CHARS_PER_SEC } from "../../../../../lib/script";
 import { withUser } from "../../../../../lib/auth/require-user.js";
 
@@ -38,22 +39,8 @@ export const POST = withUser(async (req, { params }, user) => {
     return Response.json({ briefing: updated.briefing });
   }
 
-  const { system, messages } = buildBriefingMessages(project);
-
-  let briefing = null;
-  for (let attempt = 0; attempt < 2 && !briefing; attempt++) {
-    try {
-      // 자료 원문을 함께 넘긴다 — 이미 답이 적혀 있는 질문을 코드가 버린다
-      briefing = validateBriefing(
-        await callJson({ system, messages, stage: "브리핑", projectId: id }),
-        project.material?.text || ""
-      );
-    } catch (e) {
-      // 일시적 호출 실패는 삼키고 다음 시도로 — 루프 조건이 상한을 쥔다.
-      // 다만 왜 실패했는지는 남긴다(키 미설정·크레딧 소진·형식 거절이 전부 같은 502로 보이지 않게).
-      console.error("자료 정리 실패:", e);
-    }
-  }
+  // 추출 루프는 lib 로 옮겼다 — 자동 관통(lib/auto.js)이 같은 함수를 부른다.
+  const briefing = await extractBriefing(project);
   if (!briefing) {
     return Response.json({ error: "자료를 정리하지 못했어요. 직접 채우거나 다시 시도해 주세요." }, { status: 502 });
   }
