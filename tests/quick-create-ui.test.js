@@ -18,4 +18,7 @@ describe("QuickCreate — 자동 관통 배선", () => {
   it("실패 시 단계별 화면으로 보낸다 — stepHref 가 경로의 진실의 원천", () => {
     expect(src).toMatch(/stepHref/);
   });
+  it("[만들기] 버튼은 마지막 요약 카드에만 살아 있다 — 옛 params 로 유료 실행 금지", () => {
+    expect(src).toMatch(/m\.confirm && i === lastConfirmIdx/);
+  });
 });

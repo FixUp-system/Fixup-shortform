@@ -165,11 +165,21 @@ export default function QuickCreate() {
     if (busy) return;
     const msg = messages[idx];
     if (!msg?.params) return;
+    // 마지막 요약 카드가 아니면 돈이 나가지 않게 막는다(화면에서도 버튼을 숨기지만
+    // 여기가 진짜 문이다 — 옛 카드의 params 는 사용자가 이미 고쳐 달라고 한 값이다).
+    const lastConfirm = messages.reduce((acc, m, i) => (m.confirm ? i : acc), -1);
+    if (idx !== lastConfirm) return;
     setBusy(true);
     setMessages((prev) => prev.map((m, i) => (i === idx ? { ...m, confirm: false } : m)));
     await startAuto(msg.params);
     setBusy(false);
   }
+
+  // 요약 카드가 여러 장 쌓일 수 있다("바꿔줘" 뒤에 새 카드가 온다). 옛 카드의 버튼을
+  // 누르면 수정 전 params 로 유료 파이프라인이 통째로 돈다 — 마지막 카드만 살려 둔다.
+  // quickReplies 처럼 `i === messages.length - 1` 로 잡지 않는 이유: 요약 카드 뒤에
+  // 사용자 메시지나 오류 안내가 붙으면 버튼이 통째로 사라져 되돌릴 길이 없어진다.
+  const lastConfirmIdx = messages.reduce((acc, m, i) => (m.confirm ? i : acc), -1);
 
   return (
     <div className="chat-wrap">
@@ -223,7 +233,7 @@ export default function QuickCreate() {
                       />
                     </details>
                   )}
-                  {m.confirm && (
+                  {m.confirm && i === lastConfirmIdx && (
                     <div className="res-ops">
                       <button
                         className="mini confirm-btn"

@@ -18,14 +18,14 @@ npm run dev
 
 ## 구조
 
-빠른 생성 (대화형 text-to-video):
+빠른 생성 (대화 → 단계별 파이프라인 자동 관통):
 
 ```
-app/page.js                    홈 챗 UI (메시지·퀵리플라이·결과 재생)
-components/Sidebar.jsx         사이드바
-app/api/chat/route.js          gpt-4o 대화 수집 → ask | generate JSON
-app/api/video/route.js         fal.ai 큐 제출
-app/api/video/status/route.js  fal.ai 큐 폴링 → video_url
+app/page.js                          홈 챗 UI (메시지·퀵리플라이·결과 재생)
+components/QuickCreate.jsx           대화 → 요약 카드 → 자동 관통 시작·진행 폴링
+components/Sidebar.jsx               사이드바
+app/api/chat/route.js                gpt-4o 대화 수집 → ask | generate JSON
+app/api/projects/[id]/auto/route.js  대본→목소리→그림→클립→합성 자동 관통
 ```
 
 단계별 워크플로우 (프로젝트 기반, M1):

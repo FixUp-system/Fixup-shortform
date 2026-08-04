@@ -100,39 +100,6 @@ describe("POST /api/chat — withUser", () => {
   });
 });
 
-// ── GET /api/video/status — withUser ────────────────────────────────────
-describe("GET /api/video/status — withUser", () => {
-  const ORIG_FAL = process.env.FAL_KEY;
-  beforeEach(() => {
-    process.env.FAL_KEY = "test-fal-key";
-  });
-  afterEach(() => {
-    if (ORIG_FAL === undefined) delete process.env.FAL_KEY;
-    else process.env.FAL_KEY = ORIG_FAL;
-  });
-
-  it("헤더가 없으면 500 이고 fal 을 부르지 않는다", async () => {
-    const { GET } = await import("../app/api/video/status/route.js");
-    let called = false;
-    global.fetch = async () => {
-      called = true;
-      return { ok: true, json: async () => ({ status: "IN_QUEUE" }) };
-    };
-    const bare = new Request("http://localhost/api/video/status?id=r1");
-    const res = await GET(bare);
-    expect(res.status).toBe(500);
-    expect(called).toBe(false);
-  });
-
-  it("신원이 있으면 조회를 시도한다(200)", async () => {
-    const { GET } = await import("../app/api/video/status/route.js");
-    global.fetch = async () => ({ ok: true, json: async () => ({ status: "IN_QUEUE", queue_position: 1 }) });
-    const req = new Request("http://localhost/api/video/status?id=r1", { headers: headersFor(A) });
-    const res = await GET(req);
-    expect(res.status).toBe(200);
-  });
-});
-
 // ── GET /api/admin/users — adminOnly ────────────────────────────────────
 // 이 라우트는 승인된 일반 사용자도 통과시키면(=adminOnly 가 빠지면) 전체 이메일·역할
 // 목록을 그대로 내보낸다 — 지금 4개 중 유일하게 "떼면 정보가 샌다" 종류다.

@@ -3,7 +3,8 @@ import { runVideoPipeline } from "../../../../../lib/pipeline";
 import { isClipStale } from "../../../../../lib/steps";
 import { withUser } from "../../../../../lib/auth/require-user.js";
 
-// 경로가 clips 인 이유: app/api/video (Quick Create 의 text-to-video)가 이미 있다.
+// 경로가 clips 인 이유: 옛 app/api/video (Quick Create 의 t2v)와 이름이 겹쳤다.
+// 그 라우트는 2026-08-04 에 제거됐지만 경로 이름은 그대로 둔다(화면·테스트가 문다).
 export const POST = withUser(async (req, { params }, user) => {
   const { id } = await params;
   const project = await getProject(id, user.id);
