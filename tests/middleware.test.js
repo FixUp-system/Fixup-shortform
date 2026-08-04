@@ -125,3 +125,55 @@ describe("middleware", () => {
     expect(res.headers.get("x-middleware-request-" + ROLE_HEADER)).toBeNull();
   });
 });
+
+// 로컬에서 화면을 볼 때마다 매직링크를 받는 것이 실질적인 방해라 개발 전용 우회를 뒀다.
+// 이 문은 **프로덕션에서 열릴 길이 없어야 한다** — 그것이 이 describe 의 전부다.
+describe("개발 전용 로그인 우회 — 프로덕션에서는 열리지 않는다", () => {
+  const DEV_ID = "dev-user-uuid";
+  const reqHeader = (res, name) => res.headers.get("x-middleware-request-" + name);
+
+  beforeEach(() => {
+    delete process.env.SHOTFORM_DEV_USER;
+    vi.stubEnv("NODE_ENV", "development");
+  });
+
+  it("★ NODE_ENV=production 이면 SHOTFORM_DEV_USER 가 있어도 무시한다", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    process.env.SHOTFORM_DEV_USER = DEV_ID;
+    userResult = { data: { user: null }, error: null };
+
+    const res = await middleware(req("/archive"));
+    // 우회가 먹었다면 200 통과였을 것이다. 로그인으로 튕겨야 한다.
+    expect(res.status).toBe(307);
+    expect(new URL(res.headers.get("location")).pathname).toBe("/login");
+    expect(reqHeader(res, USER_HEADER)).toBeNull();
+  });
+
+  it("env 가 없으면 개발 모드에서도 평소대로 로그인을 요구한다", async () => {
+    userResult = { data: { user: null }, error: null };
+    const res = await middleware(req("/archive"));
+    expect(res.status).toBe(307);
+    expect(new URL(res.headers.get("location")).pathname).toBe("/login");
+  });
+
+  it("개발 모드 + env 가 있으면 그 사용자로 통과시킨다", async () => {
+    process.env.SHOTFORM_DEV_USER = DEV_ID;
+    userResult = { data: { user: null }, error: null };
+
+    const res = await middleware(req("/archive"));
+    expect(res.status).toBe(200);
+    expect(reqHeader(res, USER_HEADER)).toBe(DEV_ID);
+    expect(reqHeader(res, STATUS_HEADER)).toBe("approved");
+  });
+
+  it("우회 중에도 클라이언트가 심은 신원 헤더는 버린다", async () => {
+    process.env.SHOTFORM_DEV_USER = DEV_ID;
+    userResult = { data: { user: null }, error: null };
+
+    const res = await middleware(
+      req("/archive", { [USER_HEADER]: "attacker", [ROLE_HEADER]: "admin" })
+    );
+    // 우리가 정한 값만 실린다 — 공격자가 넣은 id 가 아니다
+    expect(reqHeader(res, USER_HEADER)).toBe(DEV_ID);
+  });
+});

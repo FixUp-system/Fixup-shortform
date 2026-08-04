@@ -36,6 +36,25 @@ export async function middleware(req) {
   headers.delete(STATUS_HEADER);
   headers.delete(ROLE_HEADER);
 
+  // ── 개발 전용 로그인 우회 ──────────────────────────────────────────────
+  //
+  // 로컬에서 화면을 볼 때마다 매직링크를 받는 것이 실질적인 방해가 된다. 이 문은
+  // **프로덕션에서 열릴 길이 없어야 한다** — 그래서 게이트가 둘이다:
+  //   ① NODE_ENV 가 production 이면 env 값이 무엇이든 무시한다
+  //   ② 그 위에서 SHOTFORM_DEV_USER 에 실제 사용자 id 가 있어야 한다
+  // env 하나만으로는 켜지지 않는다. 프로덕션 빌드는 ①에서 막힌다.
+  //
+  // 이 자리는 위조 헤더 삭제(위) **뒤**여야 한다 — 클라이언트가 심은 x-shotform-user 는
+  // 이미 지워졌고, 여기서 넣는 것은 우리가 정한 값뿐이다.
+  const devUser =
+    process.env.NODE_ENV !== "production" ? process.env.SHOTFORM_DEV_USER : "";
+  if (devUser) {
+    headers.set(USER_HEADER, devUser);
+    headers.set(STATUS_HEADER, "approved");
+    headers.set(ROLE_HEADER, "admin");
+    return NextResponse.next({ request: { headers } });
+  }
+
   // env 가 없으면 @supabase/ssr 이 영어 메시지로 던지고 모든 요청이 원인 모를 500이 된다.
   // 여기가 보안 경계이니 lib/auth/supabase-server.js 와 같은 한국어 가드를 똑같이 둔다.
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
