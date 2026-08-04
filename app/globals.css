@@ -337,9 +337,20 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
 }
 /* 배지는 제 크기를 지킨다 — 없으면 "완성"이 "완/성" 두 줄로 찌그러진다(실측) */
 .project-meta .badge { flex: none; white-space: nowrap; }
-/* 홈의 두 갈래 — 위는 단계별(주력), 아래는 빠른 생성(실험). 같은 결로 띄운다. */
+/* 홈의 두 갈래 — 위는 만든 것(주력), 아래는 빠른 생성(실험). 같은 결로 띄운다.
+   실측한 AI 영상 서비스 6곳의 공통 패턴이 "만드는 입구가 위, 만든 것이 그 아래"다. */
 .home-start { margin-top: 8px; }
 .home-quick { margin-top: 48px; border-top: 1px solid var(--line); padding-top: 24px; }
+/* 홈은 최근 것만 깔고 전체는 보관함으로 보낸다 — 카드가 수십 개면 아래 빠른 생성이
+   화면 밖으로 밀려난다. */
+.home-more {
+  display: inline-block;
+  margin-top: 16px;
+  color: var(--ink-soft);
+  font-size: 14px;
+  text-decoration: none;
+}
+.home-more:hover { color: var(--ink); }
 /* 보조 버튼 — 주버튼(.cta)과 같은 모양이되 바탕을 비운다. 홈에서 '보관함'처럼
    지금 하려는 일이 아닌 쪽으로 가는 링크에 쓴다. */
 .cta.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
