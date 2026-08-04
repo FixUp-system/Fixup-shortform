@@ -4,6 +4,8 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { resetMemoryStore } from "../lib/store/memory.js";
 import { extractBriefing } from "../lib/briefing-extract.js";
 import { generateScript } from "../lib/script-gen.js";
+import { runAutoPipeline } from "../lib/auto.js";
+import * as projects from "../lib/projects.js";
 
 // validateBriefing 스키마를 통과하는 최소 형태 — briefing.test.js 의 실물과 같은 키
 const RAW_BRIEFING = {
@@ -67,5 +69,107 @@ describe("generateScript", () => {
       llm: async () => { throw new Error("죽음"); },
     });
     expect(script).toBeNull();
+  });
+});
+
+const OWNER = "00000000-0000-4000-8000-000000000001";
+
+async function makeProject() {
+  return projects.createProject({
+    ownerId: OWNER,
+    settings: { aspect_ratio: "9:16", target_seconds: 15 },
+    material: { text: "국산 딸기 딸기라떼 이번 주 출시", photos: [] },
+  });
+}
+
+// 성공 경로에서 파이프라인 단계가 프로젝트에 남기는 최소 흔적을 흉내 낸다.
+// 스토어를 실제로 거친다 — deps 는 "무엇을 불렀나"와 "무엇을 남겼나"를 함께 검증한다.
+function happyDeps(calls) {
+  const mark = (name, patch) => async (id, ownerId) => {
+    calls.push(name);
+    if (patch) await projects.updateProject(id, ownerId, patch);
+  };
+  return {
+    extractBriefing: async () => { calls.push("briefing"); return { topic: "딸기라떼", key_points: [], questions: [] }; },
+    generateScript: async () => { calls.push("script"); return { text: "문장 하나." }; },
+    runSplitPipeline: mark("split", (p) => ({ ...p, status: "cuts",
+      cuts: [{ idx: 0, sentence: "문장 하나.", seconds: 3, state: "pending", regen_count: 0 }] })),
+    runVoicePipeline: mark("voice", (p) => ({ ...p, status: "voice",
+      cuts: p.cuts.map((c) => ({ ...c, audio: { url: "a0", seconds: 3 }, seconds: 3 })) })),
+    runImagesPipeline: mark("images", (p) => ({ ...p, status: "images",
+      cuts: p.cuts.map((c) => ({ ...c, state: "done", image: { url: "i0" } })) })),
+    runVideoPipeline: mark("clips", (p) => ({ ...p, status: "video",
+      cuts: p.cuts.map((c) => ({ ...c, video: { url: "v0", seconds: 3 } })) })),
+    runRenderPipeline: mark("render", (p) => ({ ...p, status: "done", render: { url: "/r.mp4" } })),
+    regenVoice: async () => calls.push("regenVoice"),
+    regenCut: async () => calls.push("regenCut"),
+    regenClip: async () => calls.push("regenClip"),
+  };
+}
+
+describe("runAutoPipeline", () => {
+  beforeEach(() => resetMemoryStore());
+
+  it("단계를 순서대로 관통하고 auto.state=done 을 남긴다", async () => {
+    const p = await makeProject();
+    const calls = [];
+    await runAutoPipeline(p.id, OWNER, happyDeps(calls));
+    expect(calls).toEqual(["briefing", "script", "split", "voice", "images", "clips", "render"]);
+    const done = await projects.getProject(p.id, OWNER);
+    expect(done.auto).toEqual({ stage: "render", state: "done", error: null });
+    expect(done.briefing.confirmed).toBe(true);   // 자동 확정
+    expect(done.script.version).toBe(1);
+    expect(done.status).toBe("done");
+  });
+
+  it("실패 컷은 해당 regen 을 1회만 부르고 강행한다", async () => {
+    const p = await makeProject();
+    const calls = [];
+    const deps = happyDeps(calls);
+    // 목소리 단계가 컷 하나를 voice_error 로 남긴다 — regenVoice 가 정확히 1회 불려야 한다
+    deps.runVoicePipeline = async (id, ownerId) => {
+      calls.push("voice");
+      await projects.updateProject(id, ownerId, (proj) => ({ ...proj, status: "voice",
+        cuts: proj.cuts.map((c) => ({ ...c, voice_error: "읽지 못했어요" })) }));
+    };
+    await runAutoPipeline(p.id, OWNER, deps);
+    expect(calls.filter((c) => c === "regenVoice")).toHaveLength(1);
+    const done = await projects.getProject(p.id, OWNER);
+    expect(done.auto.state).toBe("done"); // 재시도가 실패해도(스텁이라 상태 그대로) 멈추지 않는다
+  });
+
+  it("브리핑 추출이 끝내 실패하면 auto.state=failed 를 남기고 던진다", async () => {
+    const p = await makeProject();
+    const deps = happyDeps([]);
+    deps.extractBriefing = async () => null;
+    await expect(runAutoPipeline(p.id, OWNER, deps)).rejects.toThrow();
+    const failed = await projects.getProject(p.id, OWNER);
+    expect(failed.auto.state).toBe("failed");
+    expect(failed.auto.error).toBeTruthy();
+  });
+
+  it("클립이 하나도 없으면 합성 없이 failed — 빈 완성본을 만들지 않는다", async () => {
+    const p = await makeProject();
+    const calls = [];
+    const deps = happyDeps(calls);
+    deps.runVideoPipeline = async (id, ownerId) => {
+      calls.push("clips");
+      await projects.updateProject(id, ownerId, (proj) => ({ ...proj, status: "video",
+        cuts: proj.cuts.map((c) => ({ ...c, video_error: "만들지 못했어요" })) }));
+    };
+    deps.regenClip = async () => calls.push("regenClip"); // 재시도도 실패(상태 그대로)
+    await expect(runAutoPipeline(p.id, OWNER, deps)).rejects.toThrow();
+    expect(calls).not.toContain("render");
+    expect((await projects.getProject(p.id, OWNER)).auto.state).toBe("failed");
+  });
+
+  it("컷 분할이 빈 컷을 남기면 failed", async () => {
+    const p = await makeProject();
+    const deps = happyDeps([]);
+    deps.runSplitPipeline = async (id, ownerId) => {
+      await projects.updateProject(id, ownerId, (proj) => ({ ...proj, status: "cuts", cuts: [] }));
+    };
+    await expect(runAutoPipeline(p.id, OWNER, deps)).rejects.toThrow();
+    expect((await projects.getProject(p.id, OWNER)).auto.state).toBe("failed");
   });
 });
