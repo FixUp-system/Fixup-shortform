@@ -13,8 +13,8 @@ npm run dev
 필요한 키:
 - `OPENAI_API_KEY` — 대화 수집 (gpt-4o)
 - `FAL_KEY` — 영상 생성 (fal.ai)
-- `FAL_VIDEO_ENDPOINT` — 사용할 비디오 모델 (기본: Kling 2.1 standard t2v). 모델 교체는 이 값만 바꾸면 됨
-- `FAL_IMAGE_ENDPOINT` — 단계별 워크플로우의 컷 이미지 모델 (기본: fal-ai/nano-banana, $0.04/장)
+- `FAL_IMAGE_ENDPOINT` — 컷 이미지 모델 (기본: fal-ai/nano-banana, $0.04/장)
+- `FAL_I2V_ENDPOINT` — 컷 클립 모델 (image-to-video). 빠른 생성도 단계별 파이프라인을 그대로 관통하므로 영상은 전부 이 값이 만든다
 
 ## 구조
 

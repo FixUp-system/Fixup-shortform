@@ -36,6 +36,20 @@ describe("QuickCreate — 자동 관통 배선", () => {
     expect(src).toMatch(/clearConfirms\(prev\)/);
     expect(src).toMatch(/if \(!started\) setMessages\(\(prev\) => restoreConfirm\(prev, idx\)\)/);
   });
+
+  // 파싱이 먼저면 202+비JSON 경계에서 throw → started=false → 카드 부활 → 재클릭이
+  // 새 프로젝트로 한 번 더 관통한다(이중 결제).
+  it("★출발 판정(started)은 auto 응답 파싱보다 앞이다 — 2xx 면 절대 되살리지 않는다", () => {
+    const startedAt = src.indexOf("if (autoRes.ok) started = true");
+    const parseAt = src.indexOf("await autoRes.json()");
+    expect(startedAt).toBeGreaterThan(-1);
+    expect(parseAt).toBeGreaterThan(startedAt);
+  });
+
+  it("응답 본문 파싱 실패가 판정을 대신하지 않는다 — 두 fetch 다 파싱을 감싼다", () => {
+    expect(src).toMatch(/await autoRes\.json\(\)\.catch\(\(\) => \(\{\}\)\)/);
+    expect(src).toMatch(/await createRes\.json\(\)\.catch\(\(\) => \(\{\}\)\)/);
+  });
 });
 
 // 버튼 부활은 소스 정규식으로 못 잡는 동작 결함이라, 상태 전이를 직접 문다.

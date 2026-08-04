@@ -65,7 +65,9 @@ export default function QuickCreate() {
           },
         }),
       });
-      const project = await createRes.json();
+      // 여기는 아직 돈이 나가기 전이다 — 본문을 못 읽으면 실패로 두는 게 맞다.
+      // id 없이는 폴링도 이어 만들기도 못 하고, 다시 눌러 프로젝트가 하나 더 생겨도 $0 다.
+      const project = await createRes.json().catch(() => ({}));
       if (!createRes.ok || !project.id) throw new Error(project.error || "프로젝트 생성 실패");
 
       const autoRes = await fetch(`/api/projects/${project.id}/auto`, {
@@ -73,9 +75,12 @@ export default function QuickCreate() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ voice_label: params.voice_label }),
       });
-      const auto = await autoRes.json();
+      // auto POST 가 2xx 면 파이프라인은 이미 출발했다 — 본문 파싱이 어떻게 되든
+      // (202+비JSON 같은 경계) 카드를 되살리면 안 된다. 되살리면 재클릭이 새 프로젝트로
+      // 한 번 더 관통해 돈이 두 번 나간다. 그래서 판정이 파싱보다 앞이다.
+      if (autoRes.ok) started = true; // 여기서부터는 돈이 나가는 중이라 재시도 버튼을 주면 안 된다
+      const auto = await autoRes.json().catch(() => ({}));
       if (!autoRes.ok) throw new Error(auto.error || "자동 생성 시작 실패");
-      started = true; // 여기서부터는 돈이 나가는 중이라 재시도 버튼을 주면 안 된다
 
       const deadline = Date.now() + POLL_TIMEOUT_MS;
       while (Date.now() < deadline) {
