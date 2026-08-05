@@ -98,4 +98,31 @@ describe("GET /api/credits", () => {
     const res = await creditsGET(new Request("http://localhost/api/credits", { headers: headersFor(A) }), {});
     expect((await res.json()).videos_left).toBe(0);
   });
+
+  // 게이트가 지금 적용되는지를 서버가 알려 준다. 화면이 SHOTFORM_FAKE 를 직접 볼 수
+  // 없기도 하지만, 진짜 이유는 **판정을 한 곳에 두려는 것**이다 — 시작 게이트가
+  // `if (!fakeFal())` 로 건너뛰는데 화면이 그걸 모르면 0원 관통이 화면에서 막힌다
+  // (실제로 막혔다: 서버는 202 인데 버튼이 disabled).
+  it("가짜 모드에서는 게이트가 꺼졌다고 알려 준다", async () => {
+    const before = process.env.SHOTFORM_FAKE;
+    process.env.SHOTFORM_FAKE = "all";
+    try {
+      const res = await creditsGET(new Request("http://localhost/api/credits", { headers: headersFor(A) }), {});
+      expect((await res.json()).gated).toBe(false);
+    } finally {
+      if (before === undefined) delete process.env.SHOTFORM_FAKE;
+      else process.env.SHOTFORM_FAKE = before;
+    }
+  });
+
+  it("실모드에서는 게이트가 켜져 있다고 알려 준다", async () => {
+    const before = process.env.SHOTFORM_FAKE;
+    delete process.env.SHOTFORM_FAKE;
+    try {
+      const res = await creditsGET(new Request("http://localhost/api/credits", { headers: headersFor(A) }), {});
+      expect((await res.json()).gated).toBe(true);
+    } finally {
+      if (before !== undefined) process.env.SHOTFORM_FAKE = before;
+    }
+  });
 });

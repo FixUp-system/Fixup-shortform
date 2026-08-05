@@ -46,7 +46,9 @@ export default function QuickCreate() {
       .catch(() => {});
     return () => { alive = false; };
   }, []);
-  const noCredits = credits && credits.videos_left < 1;
+  // 게이트가 꺼진 동안(가짜 모드)에는 잔액과 무관하게 열어 둔다 — 서버의 시작 게이트가
+  // `if (!fakeFal())` 로 건너뛰기 때문이다. 판정은 서버가 내려 준 gated 하나만 본다.
+  const noCredits = credits && credits.gated && credits.videos_left < 1;
 
   useEffect(() => {
     const el = chatRef.current;

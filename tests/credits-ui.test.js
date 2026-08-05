@@ -23,6 +23,17 @@ describe("빠른 생성 — 잔액 부족", () => {
   });
 });
 
+describe("빠른 생성 — 가짜 모드", () => {
+  // 서버 시작 게이트는 `if (!fakeFal())` 로 가짜 모드를 건너뛴다. 화면이 그 사실을
+  // 모르면 0원 관통이 화면에서 막힌다(서버는 202 인데 버튼이 disabled 였다).
+  // 주석에 "gated" 라고 적어 두는 것만으로는 통과하지 않게, 주석·블록주석을 걷어낸
+  // 코드에서 **막는 판정식 자체**가 gated 를 보는지 본다.
+  const code = quick.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+  it("막는 판정이 서버의 gated 신호를 본다", () => {
+    expect(code).toMatch(/noCredits\s*=[^;]*credits\.gated/);
+  });
+});
+
 describe("백오피스 — 충전", () => {
   it("충전 라우트를 부른다", () => {
     expect(admin).toMatch(/\/credits/);
