@@ -3,6 +3,7 @@ import { runVoicePipeline } from "../../../../../lib/pipeline";
 import { VOICES } from "../../../../../lib/voices";
 import { fakeFal } from "../../../../../lib/fake";
 import { withUser } from "../../../../../lib/auth/require-user.js";
+import { assertCanStart, NoCredits } from "../../../../../lib/credits";
 
 export const POST = withUser(async (req, { params }, user) => {
   const { id } = await params;
@@ -33,6 +34,18 @@ export const POST = withUser(async (req, { params }, user) => {
       { error: "이미 만든 목소리가 있어요 — 컷별로 다시 만들 수 있어요" },
       { status: 409 }
     );
+  }
+
+  // 시작 게이트 — 잔액이 사실상 0 이면 시작하지 않는다.
+  // 단계별은 사장님이 화면에서 보고 있으니 한 편치를 요구하지 않는다(need 를 작게 잡는다).
+  // 가짜 모드는 건너뛴다 — 0원이라 잴 것이 없다(assertBudget 과 같은 규칙).
+  if (!fakeFal()) {
+    try {
+      await assertCanStart(user.id, { need: 0.01 });
+    } catch (e) {
+      if (e instanceof NoCredits) return Response.json({ error: e.message }, { status: 402 });
+      throw e;
+    }
   }
 
   await updateProject(id, user.id, (proj) => ({

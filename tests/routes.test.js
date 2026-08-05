@@ -10,7 +10,18 @@ import { createProject, getProject, updateProject } from "../lib/projects.js";
 // ("00000000-0000-0000-0000-000000000000")과 우연히 같으면, 어느 라우트가 withUser 를 벗고
 // 그 자리표시자로 되돌아가도 이 파일의 테스트가 계속 통과해 되돌림을 못 잡는다(리뷰 I1).
 const OWNER = "33333333-3333-3333-3333-333333333333";
+import { getStore } from "../lib/store/index.js";
 import { isAudioStale, isImageStale, isClipStale, isRenderStale, renderKey } from "../lib/steps.js";
+
+// 시작 게이트(Task 4)가 붙은 뒤로, 잔액 0 인 사용자는 유료 시작 라우트에서 402 다.
+// 이 파일이 재는 것은 각 라우트의 가드·배선이므로, 유료 시작을 부르는 테스트는 충전해 두고
+// 부른다 — 게이트를 끄는 것이 아니라 통과시켜 **그 뒤의** 판정을 본다.
+// (게이트 자체는 tests/credits-gate.test.js 가 잰다.)
+const grant = () =>
+  getStore().insertGrant({
+    user_id: OWNER, amount_usd: 10, reason: "충전",
+    granted_by: "00000000-0000-4000-8000-0000000000ad",
+  });
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
 
 // 라우트가 withUser 로 감싸인 뒤로는 신원 헤더가 없으면 500 이다(Task 8) —
@@ -204,6 +215,7 @@ describe("POST /api/projects/[id]/images", () => {
       ...proj, status: "voice",
       cuts: [{ idx: 0, sentence: "문장입니다.", seconds: 3, audio: { url: "a" }, state: "done" }],
     }));
+    await grant();
     const res = await imagesPOST(patchReq({}), ctx(p.id));
     expect(res.status).toBe(200);
     expect(pipelineMock.run).toHaveBeenCalledWith(p.id, OWNER);
@@ -229,6 +241,7 @@ describe("POST /api/projects/[id]/images", () => {
       cuts: [{ idx: 0, sentence: "문장입니다.", seconds: 3, audio: { url: "a" } }],
     }));
     pipelineMock.run.mockRejectedValue(new Error("이미지 생성 실패"));
+    await grant();
     await imagesPOST(patchReq({}), ctx(p.id));
     await new Promise((r) => setTimeout(r, 10));
     expect((await getProject(p.id, OWNER)).images_error).toBe("이미지 생성 실패");
@@ -708,6 +721,7 @@ describe("POST /api/projects/[id]/clips — 남은 것이 있으면 돈다", () 
     await updateProject(p.id, OWNER, (proj) => ({
       ...proj, status: "video", cuts: [liveCut(0), bareCut(1)],
     }));
+    await grant();
     const res = await clipsPOST(authReq("http://x", { method: "POST" }), ctx(p.id));
     expect(res.status).toBe(200);
     expect((await res.json()).started).toBe(true);
@@ -717,6 +731,7 @@ describe("POST /api/projects/[id]/clips — 남은 것이 있으면 돈다", () 
     const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
     const stale = { ...liveCut(0), video: { url: "v0", seconds: 3, truncated: false, of: "옛그림|3|" } };
     await updateProject(p.id, OWNER, (proj) => ({ ...proj, status: "video", cuts: [stale] }));
+    await grant();
     const res = await clipsPOST(authReq("http://x", { method: "POST" }), ctx(p.id));
     expect(res.status).toBe(200);
   });
@@ -806,6 +821,7 @@ describe("PATCH /api/projects/[id] — 화풍", () => {
 describe("POST regen 라우트 — id·ownerId·idx 가 밀리지 않는다", () => {
   it("컷 재생성 — id·ownerId·idx·instruction 순서로 넘긴다", async () => {
     const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
+    await grant();
     const res = await cutRegenPOST(patchReq({ instruction: "더 밝게" }), idxCtx(p.id, 0));
     expect(res.status).toBe(200);
     expect(pipelineMock.regen).toHaveBeenCalledWith(p.id, OWNER, 0, undefined, "더 밝게");
@@ -813,6 +829,7 @@ describe("POST regen 라우트 — id·ownerId·idx 가 밀리지 않는다", ()
 
   it("목소리 재생성 — id·ownerId·idx 순서로 넘긴다", async () => {
     const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
+    await grant();
     const res = await voiceRegenPOST(patchReq({}), idxCtx(p.id, 1));
     expect(res.status).toBe(200);
     expect(pipelineMock.regen).toHaveBeenCalledWith(p.id, OWNER, 1);
@@ -820,6 +837,7 @@ describe("POST regen 라우트 — id·ownerId·idx 가 밀리지 않는다", ()
 
   it("클립 재생성 — id·ownerId·idx 순서로 넘긴다", async () => {
     const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
+    await grant();
     const res = await clipRegenPOST(patchReq({}), idxCtx(p.id, 2));
     expect(res.status).toBe(200);
     expect(pipelineMock.regen).toHaveBeenCalledWith(p.id, OWNER, 2);

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { memoryStore, resetMemoryStore } from "../lib/store/memory.js";
+import { getStore } from "../lib/store/index.js";
 import { createProject, updateProject } from "../lib/projects.js";
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
 import { GET as getProjectRoute, PATCH as patchProjectRoute } from "../app/api/projects/[id]/route.js";
@@ -39,6 +40,13 @@ const idxCtx = (id, idx) => ({ params: Promise.resolve({ id, idx: String(idx) })
 
 const make = (ownerId) =>
   createProject({ settings: {}, material: { text: "가", photos: [] }, ownerId });
+
+// 시작 게이트(Task 4)가 붙은 뒤로, 잔액 0 인 사용자는 소유자 검사에 닿기도 전에 402 다.
+// 여기서 재려는 것은 소유자 격리지 크레딧이 아니므로 부르는 쪽을 충전해 두고 부른다 —
+// 가드를 끄는 것이 아니라 통과시켜 **그 뒤의** 격리가 실제로 막는지를 본다.
+const ADMIN = "00000000-0000-4000-8000-0000000000ad";
+const grant = (userId) =>
+  getStore().insertGrant({ user_id: userId, amount_usd: 10, reason: "충전", granted_by: ADMIN });
 
 describe("프로젝트 라우트 인증", () => {
   beforeEach(() => resetMemoryStore());
@@ -129,6 +137,7 @@ describe("변이 라우트 — 남의 id 로 부르면 실패한다", () => {
     await updateProject(p.id, A, (proj) => ({
       ...proj, cuts: [{ idx: 0, sentence: "문장", regen_count: 0 }],
     }));
+    await grant(B);
     const res = await cutRegenPOST(jsonReqAs(B, {}), idxCtx(p.id, 0));
     expect(res.status).toBe(400);
     const after = await getProjectRoute(reqAs(A), ctx(p.id)).then((r) => r.json());
@@ -140,6 +149,7 @@ describe("변이 라우트 — 남의 id 로 부르면 실패한다", () => {
     await updateProject(p.id, A, (proj) => ({
       ...proj, cuts: [{ idx: 0, sentence: "문장", voice_regen_count: 0 }],
     }));
+    await grant(B);
     const res = await voiceRegenPOST(jsonReqAs(B, {}), idxCtx(p.id, 0));
     expect(res.status).toBe(400);
     const after = await getProjectRoute(reqAs(A), ctx(p.id)).then((r) => r.json());
@@ -152,6 +162,7 @@ describe("변이 라우트 — 남의 id 로 부르면 실패한다", () => {
       ...proj,
       cuts: [{ idx: 0, sentence: "문장", clip_regen_count: 0, image: { url: "i" } }],
     }));
+    await grant(B);
     const res = await clipRegenPOST(jsonReqAs(B, {}), idxCtx(p.id, 0));
     expect(res.status).toBe(400);
     const after = await getProjectRoute(reqAs(A), ctx(p.id)).then((r) => r.json());

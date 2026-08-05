@@ -3,6 +3,8 @@ import { getProject, updateProject } from "../../../../../lib/projects";
 import { runAutoPipeline } from "../../../../../lib/auto";
 import { VOICES } from "../../../../../lib/voices";
 import { withUser } from "../../../../../lib/auth/require-user.js";
+import { assertCanStart, NoCredits, perVideoUsd } from "../../../../../lib/credits";
+import { fakeFal } from "../../../../../lib/fake";
 
 export const POST = withUser(async (req, { params }, user) => {
   const { id } = await params;
@@ -14,6 +16,25 @@ export const POST = withUser(async (req, { params }, user) => {
   // 목소리는 대화가 고른 라벨. 목록 밖이면 기본으로 — 임의 문자열이 fal 로 새지 않게.
   const body = await req.json().catch(() => ({}));
   const voice = VOICES.find((v) => v.label === body?.voice_label) || VOICES[0];
+
+  // 시작 게이트 — 한 편치가 없으면 시작 자체를 막는다.
+  // 자동 관통은 한 번에 ~한 편치가 백그라운드로 나가고 중간에 사람이 보고 있지 않다.
+  // 잔액이 모자란 채 시작하면 호출 게이트가 중간에 끊고, 사장님에게는
+  // "돈은 나갔는데 영상이 없다"만 남는다.
+  //
+  // ★ 멱등 가드(아래 patchFn)보다 **앞**이다 — 크레딧이 없으면 auto.state="running" 을
+  // 세우지 않아야 한다. 세워 두면 402 를 받은 사용자가 충전 후 다시 눌러도 409 에 막힌다.
+  //
+  // 가짜 모드는 건너뛴다 — 0원이라 잴 것이 없고, 크레딧 없이도 흐름을 볼 수 있어야 한다
+  // (assertBudget 이 fakeFal() 에서 즉시 통과하는 것과 같은 규칙).
+  if (!fakeFal()) {
+    try {
+      await assertCanStart(user.id, { need: perVideoUsd() });
+    } catch (e) {
+      if (e instanceof NoCredits) return Response.json({ error: e.message }, { status: 402 });
+      throw e;
+    }
+  }
 
   // 멱등 가드 — 진행 중 재클릭·완성 후 재시작을 막는다. 한 번의 자동 관통이 ~$2.59 다.
   // 판정을 락 안(patchFn)에서 running 세우기와 **함께** 한다 — 읽고-나서-쓰면 [만들기] 를
