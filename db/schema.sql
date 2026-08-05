@@ -133,3 +133,27 @@ create policy profiles_self on profiles
 
 -- cost_records·upload_owners 는 정책을 만들지 않는다 = 전부 거부.
 -- 원장은 사용자가 읽을 이유도 쓸 이유도 없다.
+
+-- ── 크레딧 충전 장부 ────────────────────────────────────────────────────
+-- 잔액을 컬럼으로 두지 않는다: 잔액 = sum_grants(user) - sum_costs(null, user).
+-- 원장(cost_records)이 곧 차감이라 두 값이 갈라질 자리가 없다.
+-- 이 테이블은 감사 로그이기도 하다 — 누가(granted_by) 언제 왜(reason) 넣었는지가 남는다.
+create table if not exists credit_grants (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  amount_usd  numeric not null,          -- 양수=충전, 음수=회수(운영자 정정)
+  reason      text not null,
+  granted_by  uuid not null,
+  created_at  timestamptz not null default now()
+);
+create index if not exists credit_grants_user on credit_grants (user_id);
+
+-- 합계는 DB 가 낸다. 앱에서 행을 받아 더하면 PostgREST 행 상한(기본 1000)에 걸려
+-- 조용히 일부만 더한다 — sum_costs 가 이미 겪은 함정이고, 여기서는 잔액이 부풀어
+-- 크레딧이 없는 사람에게 생성을 열어 주는 모양이 된다.
+create or replace function sum_grants(p_user_id uuid)
+returns numeric language sql stable as $$
+  select coalesce(sum(amount_usd), 0) from credit_grants where user_id = p_user_id;
+$$;
+
+alter table credit_grants enable row level security;  -- 정책 0개 = 전부 거부(앱은 service_role)
