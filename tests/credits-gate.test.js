@@ -227,3 +227,72 @@ describe("시작 게이트 — 단계별", () => {
     expect((await imagesPOST(post("http://localhost/i"), ctx(p.id))).status).toBe(200);
   });
 });
+
+// /clips 만 하한이 다르다. 이 라우트는 runVideoPipeline 을 fire-and-forget 으로 띄우고
+// 클립이 편당 원가의 81% 다 — "잔액이 0 이 아닌가"(0.01)로는 컷 중간에 끊기는 것을 못 막는다.
+// 그래서 need = **남은 컷 값의 견적**이다.
+describe("시작 게이트 — /clips 는 남은 컷 값을 요구한다", () => {
+  const post = () => new Request("http://localhost/c", { method: "POST", headers: headersFor(A) });
+
+  // 활성 모델(Kling v3, $0.084/s)에서 5초 컷 하나가 $0.42 다. 아래 금액은 그 눈금에서 골랐다 —
+  // 값을 코드에 박지 않고 라우트가 lib/costs·lib/clip-limits 로 계산하므로, 모델이 바뀌면
+  // 이 테스트가 먼저 깨져서 알려 준다(그게 이 자리의 값어치다).
+  const bareCut = (idx) => ({
+    idx, sentence: "문장", seconds: 5,
+    image: { url: `i${idx}` }, audio: { url: `a${idx}`, seconds: 5 },
+  });
+  const liveCut = (idx) => ({
+    ...bareCut(idx),
+    video: { url: `v${idx}`, seconds: 5, truncated: false, of: `i${idx}|5|` },
+  });
+  const withCuts = async (cuts) => {
+    const p = await makeProject();
+    return projects.updateProject(p.id, A, (proj) => ({ ...proj, status: "video", cuts }));
+  };
+  const grant = (usd) =>
+    getStore().insertGrant({ user_id: A, amount_usd: usd, reason: "충전", granted_by: ADMIN });
+
+  beforeEach(() => { resetMemoryStore(); vi.clearAllMocks(); delete process.env.SHOTFORM_FAKE; });
+  afterEach(() => restore("SHOTFORM_FAKE"));
+
+  it("컷 셋을 감당 못 하는 잔액이면 402 이고 파이프라인이 안 불린다", async () => {
+    // 셋이면 ~$1.26 인데 $0.5 뿐이다. 옛 하한(0.01)이었으면 통과해 컷 중간에 끊겼다.
+    await grant(0.5);
+    const p = await withCuts([bareCut(0), bareCut(1), bareCut(2)]);
+    expect((await clipsPOST(post(), ctx(p.id))).status).toBe(402);
+    expect(pipelineMock.run).not.toHaveBeenCalled();
+  });
+
+  it("컷 셋을 감당하는 잔액이면 200 으로 시작한다", async () => {
+    await grant(2);
+    const p = await withCuts([bareCut(0), bareCut(1), bareCut(2)]);
+    expect((await clipsPOST(post(), ctx(p.id))).status).toBe(200);
+    expect(pipelineMock.run).toHaveBeenCalledTimes(1);
+  });
+
+  it("살아 있는 클립은 값을 안 매긴다 — 남은 컷 하나치만 요구한다", async () => {
+    // 같은 $0.5 다. 앞 테스트에서는 402 였고 여기서는 통과해야 한다 —
+    // 파이프라인이 살아 있는 클립을 건너뛰므로 그 둘에는 값이 들지 않는다.
+    await grant(0.5);
+    const p = await withCuts([liveCut(0), liveCut(1), bareCut(2)]);
+    expect((await clipsPOST(post(), ctx(p.id))).status).toBe(200);
+    expect(pipelineMock.run).toHaveBeenCalledTimes(1);
+  });
+
+  // 낭독 전이라 seconds 가 없는 컷이 섞일 수 있다(라우트는 컷 하나에만 audio 를 요구한다).
+  // 그때 모델 바닥(3초)으로 어림하면 늘 모자라게 잡힌다 — 콘텐츠 상한(8초)으로 넉넉히 잡는다.
+  it("seconds 가 없는 컷도 값으로 센다 — 넉넉한 쪽으로 어림한다", async () => {
+    await grant(0.5);
+    const p = await withCuts([
+      { idx: 0, sentence: "문장", audio: { url: "a0" }, image: { url: "i0" } },
+      { idx: 1, sentence: "문장", image: { url: "i1" } },
+    ]);
+    expect((await clipsPOST(post(), ctx(p.id))).status).toBe(402);
+  });
+
+  it("가짜 모드에서는 막지 않는다", async () => {
+    process.env.SHOTFORM_FAKE = "all";
+    const p = await withCuts([bareCut(0), bareCut(1), bareCut(2)]);
+    expect((await clipsPOST(post(), ctx(p.id))).status).toBe(200);
+  });
+});
