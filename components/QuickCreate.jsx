@@ -35,6 +35,19 @@ export default function QuickCreate() {
   const [busy, setBusy] = useState(false);
   const chatRef = useRef(null);
 
+  // 크레딧 잔액 — 화면 진입 때 한 번 읽는다. 실패하면 조용히 넘긴다(잔액을 모르면
+  // 막지 않는다 — 진짜 문은 서버의 시작 게이트다. 여기는 헛걸음을 줄이는 자리다).
+  const [credits, setCredits] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/credits")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (alive && d) setCredits(d); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  const noCredits = credits && credits.videos_left < 1;
+
   useEffect(() => {
     const el = chatRef.current;
     if (el) el.scrollTop = el.scrollHeight;
@@ -265,10 +278,13 @@ export default function QuickCreate() {
                       <button
                         className="mini confirm-btn"
                         onClick={() => confirmGenerate(i)}
-                        disabled={busy}
+                        disabled={busy || noCredits}
                       >
                         🎬 영상 만들기
                       </button>
+                      {noCredits && (
+                        <small>크레딧이 모자라요 — 운영자에게 문의해 주세요</small>
+                      )}
                     </div>
                   )}
                   {m.continueTo && (

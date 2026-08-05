@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import Icon from "./Icon";
@@ -64,6 +65,17 @@ export default function Sidebar() {
   const router = useRouter();
   const { project } = useProject();
   const inCreate = pathname.startsWith("/create");
+  // 크레딧 잔액 — 화면 진입 때 한 번 읽는다. 실패하면 조용히 숨긴다(사이드바가
+  // 오류로 시끄러워질 자리가 아니다). 소비 뒤 갱신은 새로고침이 맡는다.
+  const [credits, setCredits] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/credits")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (alive && d) setCredits(d); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
   // 진행 중인 프로젝트가 있으면 그 프로젝트로, 없으면 새로 시작 화면으로.
   const makeVideoHref = makeHref(project);
   return (
@@ -106,9 +118,13 @@ export default function Sidebar() {
       </button>
       <div className="side-grow" />
       <div className="credit-box">
-        실험 모드
-        <b>무제한</b>
-        <small>테스트 기간에는 크레딧을 차감하지 않아요 (실비용은 비용 기록에서)</small>
+        크레딧
+        <b>{credits ? `${credits.videos_left}편 남음` : "…"}</b>
+        <small>
+          {credits && credits.videos_left === 0
+            ? "운영자에게 문의해 주세요 (실비용은 비용 기록에서)"
+            : "영상 한 편을 만들 때마다 줄어요 (실비용은 비용 기록에서)"}
+        </small>
       </div>
     </aside>
   );

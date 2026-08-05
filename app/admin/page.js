@@ -42,6 +42,34 @@ export default function AdminPage() {
     setBusy("");
   }
 
+  // 편수와 사유를 받아 넣는다. prompt 를 쓰는 이유는 운영자 전용 화면이고 이 동작이
+  // 드물기 때문이다 — 전용 모달을 만들 만큼의 빈도가 아니다(필요해지면 그때 만든다).
+  // ⚠️ window.prompt 는 브라우저 모달이라 자동화 도구(E2E·스크립트)를 막는다.
+  // 운영자 전용 화면이라 그 대가를 받아들인 것이다.
+  async function grant(id) {
+    const raw = window.prompt("몇 편을 넣을까요? (회수는 음수)", "1");
+    if (raw === null) return;
+    const videos = Number(raw);
+    if (!Number.isInteger(videos) || videos === 0) return;
+    const reason = window.prompt("사유를 적어 주세요", "체험");
+    if (!reason || !reason.trim()) return;
+    setBusy(id);
+    setErr("");
+    try {
+      const r = await fetch(`/api/admin/users/${id}/credits`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ videos, reason }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "충전 실패");
+      await load();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy("");
+    }
+  }
+
   return (
     <>
       <h1 className="pgtitle">사용자 승인</h1>
@@ -63,6 +91,7 @@ export default function AdminPage() {
                 <th>이메일</th>
                 <th>상태</th>
                 <th>역할</th>
+                <th>크레딧</th>
                 <th></th>
               </tr>
             </thead>
@@ -77,6 +106,12 @@ export default function AdminPage() {
                   </td>
                   <td>{u.role}</td>
                   <td>
+                    <span className="st-badge">{u.videos_left ?? 0}편</span>
+                  </td>
+                  <td>
+                    <button className="mini" disabled={busy === u.id} onClick={() => grant(u.id)}>
+                      크레딧 넣기
+                    </button>{" "}
                     {u.status !== "approved" && (
                       <button className="mini" disabled={busy === u.id} onClick={() => setStatus(u.id, "approved")}>
                         승인
