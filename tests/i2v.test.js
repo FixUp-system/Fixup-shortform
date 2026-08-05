@@ -2,6 +2,13 @@ import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { generateClip, fitDuration, I2V_MAX_SECONDS } from "../lib/i2v";
 import { profileFor, fitDurationFor, maxSecondsFor } from "../lib/clip-limits";
 import { runWithActor } from "../lib/actor.js";
+import { memoryStore } from "../lib/store/memory.js";
+
+// 사용자 축은 이제 고정 상한이 아니라 **잔액**(크레딧)이다 — 충전이 없으면 유료 호출이
+// 나가기 전에 막힌다. 이 파일이 보는 것은 요청의 모양이므로 넉넉히 충전해 열어 둔다.
+beforeEach(() =>
+  memoryStore.insertGrant({ user_id: "t-user", amount_usd: 1000, reason: "테스트", granted_by: "admin" })
+);
 
 const LTX = "fal-ai/ltx-2.3/image-to-video/fast";
 // 열거 눈금을 뜻할 때 쓴다. fitDuration(상수)은 기본 엔드포인트(Kling)로 풀리므로

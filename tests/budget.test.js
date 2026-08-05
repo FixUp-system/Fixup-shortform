@@ -1,7 +1,7 @@
 // 예산 가드 — 기록이 아니라 "나가기 전에 막는 것"이 요점이다.
 // 호출한 뒤에 재면 이미 돈이 나간 뒤다.
 import { describe, it, expect, beforeEach } from "vitest";
-import { resetMemoryStore } from "../lib/store/memory.js";
+import { memoryStore, resetMemoryStore } from "../lib/store/memory.js";
 import { runWithActor } from "../lib/actor.js";
 
 let costs;
@@ -15,6 +15,12 @@ async function fresh(env = {}) {
   delete process.env.SHOTFORM_FAKE_IMAGES;
   process.env.SHOTFORM_BUDGET_TOTAL_USD = env.total ?? "20";
   process.env.SHOTFORM_BUDGET_PROJECT_USD = env.project ?? "5";
+  // 사용자 축은 이제 고정 상한이 아니라 **잔액**이다(크레딧). 이 파일이 보는 것은
+  // 전역·프로젝트 축이므로, 예전에 SHOTFORM_BUDGET_USER_USD="1000" 으로 열어 두던 자리를
+  // "넉넉한 충전"으로 바꾼다 — 충전이 없으면 사용자 축이 먼저 걸려 다른 축을 못 본다.
+  for (const u of ["t-user", "local"]) {
+    await memoryStore.insertGrant({ user_id: u, amount_usd: 1000, reason: "테스트", granted_by: "admin" });
+  }
   costs = await import("../lib/costs.js?t=" + Date.now() + Math.random());
 }
 
@@ -54,8 +60,7 @@ describe("assertBudget", () => {
 
   // ★ assertBudget 이 사용자 축도 함께 보게 되면서 costActor() 를 부른다 — actor
   // 컨텍스트 없이 부르면 던진다(lib/actor.js). 이 describe 는 total·project 축만
-  // 보려는 것이므로 사용자 상한은 넉넉히 열어 두고 runWithActor 로 감싼다.
-  beforeEach(() => { process.env.SHOTFORM_BUDGET_USER_USD = "1000"; });
+  // 보려는 것이므로 runWithActor 로 감싸고, 사용자 축은 fresh() 의 충전이 열어 둔다.
 
   it("여유가 있으면 통과한다", async () => {
     // veo3.1 $0.40/s × 5초 = $2.00
