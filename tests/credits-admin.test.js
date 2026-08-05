@@ -17,8 +17,18 @@ const grantReq = (who, role, body) =>
   });
 const ctx = (id) => ({ params: Promise.resolve({ id }) });
 
+// 충전 대상은 실재해야 한다 — 라우트가 insert 앞에서 존재를 확인하기 때문이다.
+// (프로덕션에서는 credit_grants.user_id 의 FK 가 같은 것을 훨씬 험한 방식으로 확인한다:
+// 없는 uuid 면 insert 가 거부되고 그 거부가 500 으로 새어 나간다. 메모리 스토어엔 FK 가
+// 없어 이 갈림이 안 보이므로, 라우트가 스스로 확인하고 테스트가 그것을 문다.)
+const seedTarget = async () =>
+  getStore().insertProfile({ id: A, email: "a@example.com", status: "approved", role: "user" });
+
 describe("POST /api/admin/users/[id]/credits", () => {
-  beforeEach(() => resetMemoryStore());
+  beforeEach(async () => {
+    resetMemoryStore();
+    await seedTarget();
+  });
 
   it("운영자가 편수로 넣으면 장부에 남고 잔액이 오른다", async () => {
     const res = await grantPOST(grantReq(ADMIN, "admin", { videos: 2, reason: "체험" }), ctx(A));
@@ -34,12 +44,26 @@ describe("POST /api/admin/users/[id]/credits", () => {
     expect((await res.json()).videos_left).toBe(1);
   });
 
+  // ★ 합계로 재지 않는다. 합계는 `granted_by` 를 빠뜨려도, 대상 id 를 운영자 자리에 잘못
+  // 넣어도 똑같이 나온다 — 그러면 이름만 감사인 테스트가 된다. 장부 행을 직접 꺼내
+  // "누가"(호출한 운영자)와 "왜"를 글자로 확인한다.
   it("누가 왜 넣었는지가 남는다 — 감사", async () => {
     await grantPOST(grantReq(ADMIN, "admin", { videos: 1, reason: "체험 1편" }), ctx(A));
-    const sum = await getStore().sumGrants(A);
-    expect(sum).toBeGreaterThan(0);
-    const m = await getStore().listGrantsFor([A]);
-    expect(m.get(A)).toBeCloseTo(sum, 6);
+
+    const rows = await getStore().listGrants(A);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].user_id).toBe(A);      // 받은 사람
+    expect(rows[0].granted_by).toBe(ADMIN); // 넣은 사람 — 대상 자신이 아니다
+    expect(rows[0].reason).toBe("체험 1편");
+    expect(rows[0].amount_usd).toBeGreaterThan(0);
+    expect(rows[0].created_at).toBeTruthy();
+  });
+
+  it("없는 사용자에게 충전하면 404 — FK 가 터지기 전에 우리가 막는다", async () => {
+    const ghost = "00000000-0000-4000-8000-00000000dead";
+    const res = await grantPOST(grantReq(ADMIN, "admin", { videos: 1, reason: "오타" }), ctx(ghost));
+    expect(res.status).toBe(404);
+    expect(await getStore().sumGrants(ghost)).toBe(0);
   });
 
   it("운영자가 아니면 403", async () => {
@@ -56,7 +80,10 @@ describe("POST /api/admin/users/[id]/credits", () => {
 });
 
 describe("GET /api/credits", () => {
-  beforeEach(() => resetMemoryStore());
+  beforeEach(async () => {
+    resetMemoryStore();
+    await seedTarget();
+  });
 
   it("내 잔액을 편수와 함께 준다", async () => {
     await grantPOST(grantReq(ADMIN, "admin", { videos: 2, reason: "충전" }), ctx(A));

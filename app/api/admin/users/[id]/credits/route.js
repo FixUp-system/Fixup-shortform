@@ -18,7 +18,17 @@ export const POST = withUser(async (req, { params }, user) => {
     return Response.json({ error: "사유를 적어 주세요" }, { status: 400 });
   }
 
-  await getStore().insertGrant({
+  // ★ 대상이 실재하는지 먼저 본다 — 선례(같은 폴더의 PATCH)와 같은 방식이다.
+  // 없으면 credit_grants.user_id 의 FK 가 insert 를 거부하고, 그 거부는 스토어의 raise()
+  // 로 던져지는데 withUser 는 핸들러 예외를 안 잡는다 — 운영자 오타의 결말이 정체불명
+  // 500 이 된다(uuid 형식이 틀리면 22P02 로 역시 500). 인메모리에는 FK 가 없어 이 갈림이
+  // 테스트에서 안 보이므로, 라우트가 스스로 확인해 404 로 말해 준다.
+  const store = getStore();
+  if (!(await store.findProfiles([id])).get(id)) {
+    return Response.json({ error: "사용자를 찾을 수 없어요" }, { status: 404 });
+  }
+
+  await store.insertGrant({
     user_id: id,
     amount_usd: videos * perVideoUsd(),
     reason,
