@@ -185,8 +185,10 @@ readable if not configured"** 이고 보관 기간 과금도 문서에 없다. �
 >
 > 새로 만들 것보다 **이어 붙일 것**이 많다:
 > - `cost_records.actor` 가 사용자 uuid 로 쌓인다 → **사용자별 집계가 이미 된다**
-> - `assertBudget` 에 **사용자 축이 이미 있다**(`SHOTFORM_BUDGET_USER_USD`).
->   상한을 "고정값"에서 "잔액"으로 바꾸는 것이 크레딧의 실체다
+> - `assertBudget` 의 **사용자 축이 잔액으로 바뀌었다** — 옛 고정 상한 env
+>   `SHOTFORM_BUDGET_USER_USD` 는 **이제 아무도 안 읽는다(죽은 env)**. 남은 안전핀은
+>   전역(`SHOTFORM_BUDGET_TOTAL_USD`)·프로젝트(`SHOTFORM_BUDGET_PROJECT_USD`) 둘뿐이다.
+>   편수 환산 기준가는 `SHOTFORM_PER_VIDEO_USD`(기본 $2.59)다
 > - `request_id` 가 기본키(멱등키)라 **이중 차감 방어선이 이미 있다**
 > - 합계는 `sum_costs(p_project_id, p_actor)` SQL 함수가 낸다(앱에서 더하면 행 상한에 걸린다)
 >
