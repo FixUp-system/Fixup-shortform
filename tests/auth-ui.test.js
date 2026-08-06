@@ -31,7 +31,7 @@ const css = readFileSync("app/globals.css", "utf8");
 
 describe("로그인 화면 시각", () => {
   it("로그인 전용 클래스가 CSS 에 있다", () => {
-    for (const cls of [".login-card", ".login-tabs", ".login-tab", ".sent-input--lg", ".cta--block"]) {
+    for (const cls of [".login-card", ".login-tabs", ".login-tab", ".sent-input--lg", ".cta--block", ".login-help"]) {
       expect(css).toContain(cls);
     }
   });
@@ -87,12 +87,19 @@ describe("로그인 화면 시각", () => {
     expect(login).toMatch(/cta--block/);
   });
 
+  // /login-tab.*\bon\b/s 로는 헐겁다 — dotall 이라 `login-tabs` 하나만 있어도 앞이 맞고
+  // `on` 은 파일 어디서든(onClick·onChange) 걸린다. 선택 상태가 **탭 버튼 className 안에서**
+  // 붙는지를 물도록 같은 템플릿 리터럴 안으로 범위를 가둔다.
   it("탭 선택 상태를 클래스로 드러낸다", () => {
-    expect(login).toMatch(/login-tab.*\bon\b/s);
+    expect(login).toMatch(/login-tab\$\{[^`]*" on"/);
   });
 
+  // 두 단정이 서로 다른 것을 막는다: 문구가 사라지는 것(/운영자/)과
+  // 안내 줄 자체가 사라지는 것(/login-help/). /운영자/ 는 가입 탭 문구에도 있어
+  // 혼자서는 이 <p> 가 지워져도 초록이다.
   it("비밀번호를 잊었을 때 어디로 갈지 알려 준다", () => {
     expect(login).toMatch(/운영자/);
+    expect(login).toMatch(/login-help/);
   });
 
   it("실패 문구는 여전히 서버가 준 것을 그대로 쓴다", () => {
