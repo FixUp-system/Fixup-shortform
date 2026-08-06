@@ -70,7 +70,7 @@ describe("호출 게이트 — 사용자 축은 잔액이다", () => {
   });
 
   it("충전이 있으면 그 안에서 통과한다", async () => {
-    await getStore().insertGrant({ user_id: A, amount_usd: 10, reason: "충전", granted_by: ADMIN });
+    await getStore().insertGrant({ user_id: A, amount_credits: 10, reason: "충전", granted_by: ADMIN });
     await runWithActor(A, async () => {
       await expect(assertBudget({ endpoint: KLING, amount: 5 }))
         .resolves.toBeUndefined();
@@ -79,7 +79,7 @@ describe("호출 게이트 — 사용자 축은 잔액이다", () => {
 
   it("쓴 만큼 줄어들어 결국 막힌다", async () => {
     const store = getStore();
-    await store.insertGrant({ user_id: A, amount_usd: 1, reason: "충전", granted_by: ADMIN });
+    await store.insertGrant({ user_id: A, amount_credits: 1, reason: "충전", granted_by: ADMIN });
     // ★ 스토어의 비용 기록 메서드 이름은 insertCost 다
     await store.insertCost({
       request_id: "spent-1", ts: 1, endpoint: "fal-ai/x", stage: "영상",
@@ -93,7 +93,7 @@ describe("호출 게이트 — 사용자 축은 잔액이다", () => {
 
   it("남의 지출은 내 잔액을 안 갉아먹는다", async () => {
     const store = getStore();
-    await store.insertGrant({ user_id: A, amount_usd: 1, reason: "충전", granted_by: ADMIN });
+    await store.insertGrant({ user_id: A, amount_credits: 1, reason: "충전", granted_by: ADMIN });
     await store.insertCost({
       request_id: "other-1", ts: 1, endpoint: "fal-ai/x", stage: "영상",
       actor: "00000000-0000-4000-8000-00000000000b", est_cost_usd: 0.95, status: "done",
@@ -106,7 +106,7 @@ describe("호출 게이트 — 사용자 축은 잔액이다", () => {
 
   it("전역 상한은 그대로 회사 안전핀이다 — 잔액이 넉넉해도 막힌다", async () => {
     process.env.SHOTFORM_BUDGET_TOTAL_USD = "0.01";
-    await getStore().insertGrant({ user_id: A, amount_usd: 1000, reason: "충전", granted_by: ADMIN });
+    await getStore().insertGrant({ user_id: A, amount_credits: 1000, reason: "충전", granted_by: ADMIN });
     await runWithActor(A, async () => {
       await expect(assertBudget({ endpoint: KLING, amount: 5 }))
         .rejects.toMatchObject({ name: "BudgetExceeded", scope: "total" });
@@ -147,14 +147,14 @@ describe("시작 게이트 — 자동 관통", () => {
 
   it("한 편치가 모자라면 402 — 반 편만 있는 상태로 시작시키지 않는다", async () => {
     const p = await makeProject();
-    await getStore().insertGrant({ user_id: A, amount_usd: 1.0, reason: "충전", granted_by: ADMIN });
+    await getStore().insertGrant({ user_id: A, amount_credits: 1.0, reason: "충전", granted_by: ADMIN });
     expect((await autoPOST(autoReq(A), ctx(p.id))).status).toBe(402);
     expect(runAutoPipeline).not.toHaveBeenCalled();
   });
 
   it("한 편치가 있으면 202 로 시작한다", async () => {
     const p = await makeProject();
-    await getStore().insertGrant({ user_id: A, amount_usd: 10, reason: "충전", granted_by: ADMIN });
+    await getStore().insertGrant({ user_id: A, amount_credits: 10, reason: "충전", granted_by: ADMIN });
     expect((await autoPOST(autoReq(A), ctx(p.id))).status).toBe(202);
     expect(runAutoPipeline).toHaveBeenCalledTimes(1);
   });
@@ -171,7 +171,7 @@ describe("시작 게이트 — 자동 관통", () => {
     const p = await makeProject();
     expect((await autoPOST(autoReq(A), ctx(p.id))).status).toBe(402);
     expect((await projects.getProject(p.id, A)).auto?.state).not.toBe("running");
-    await getStore().insertGrant({ user_id: A, amount_usd: 10, reason: "충전", granted_by: ADMIN });
+    await getStore().insertGrant({ user_id: A, amount_credits: 10, reason: "충전", granted_by: ADMIN });
     expect((await autoPOST(autoReq(A), ctx(p.id))).status).toBe(202);
   });
 });
@@ -215,7 +215,7 @@ describe("시작 게이트 — 단계별", () => {
   });
 
   it("조금이라도 남아 있으면 통과한다 — 단계별은 화면에서 보고 있으니 한 편치를 요구하지 않는다", async () => {
-    await getStore().insertGrant({ user_id: A, amount_usd: 0.5, reason: "충전", granted_by: ADMIN });
+    await getStore().insertGrant({ user_id: A, amount_credits: 0.5, reason: "충전", granted_by: ADMIN });
     const p = await projectWithAudio();
     expect((await imagesPOST(post("http://localhost/i"), ctx(p.id))).status).toBe(200);
     expect((await clipRegenPOST(post("http://localhost/r"), idxCtx(p.id, 0))).status).toBe(200);
@@ -250,7 +250,7 @@ describe("시작 게이트 — /clips 는 남은 컷 값을 요구한다", () =>
     return projects.updateProject(p.id, A, (proj) => ({ ...proj, status: "video", cuts }));
   };
   const grant = (usd) =>
-    getStore().insertGrant({ user_id: A, amount_usd: usd, reason: "충전", granted_by: ADMIN });
+    getStore().insertGrant({ user_id: A, amount_credits: usd, reason: "충전", granted_by: ADMIN });
 
   beforeEach(() => { resetMemoryStore(); vi.clearAllMocks(); delete process.env.SHOTFORM_FAKE; });
   afterEach(() => restore("SHOTFORM_FAKE"));

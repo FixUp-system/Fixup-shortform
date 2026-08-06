@@ -19,7 +19,7 @@ async function fresh(env = {}) {
   // 전역·프로젝트 축이므로, 예전에 SHOTFORM_BUDGET_USER_USD="1000" 으로 열어 두던 자리를
   // "넉넉한 충전"으로 바꾼다 — 충전이 없으면 사용자 축이 먼저 걸려 다른 축을 못 본다.
   for (const u of ["t-user", "local"]) {
-    await memoryStore.insertGrant({ user_id: u, amount_usd: 1000, reason: "테스트", granted_by: "admin" });
+    await memoryStore.insertGrant({ user_id: u, amount_credits: 1000, reason: "테스트", granted_by: "admin" });
   }
   costs = await import("../lib/costs.js?t=" + Date.now() + Math.random());
 }

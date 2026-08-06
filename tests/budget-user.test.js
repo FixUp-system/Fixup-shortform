@@ -9,7 +9,7 @@ import { runWithActor } from "../lib/actor.js";
 // nano-banana-2 는 장당 $0.08 — 아래 잔액 $0.01 은 못 내고 $1 은 낸다
 const call = () => assertBudget({ endpoint: "fal-ai/nano-banana-2", amount: 1 });
 const grant = (user, amount) =>
-  memoryStore.insertGrant({ user_id: user, amount_usd: amount, reason: "충전", granted_by: "admin" });
+  memoryStore.insertGrant({ user_id: user, amount_credits: amount, reason: "충전", granted_by: "admin" });
 const spend = (id, user, amount) =>
   memoryStore.insertCost({ request_id: id, ts: 1, endpoint: "e", actor: user, est_cost_usd: amount });
 

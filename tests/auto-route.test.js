@@ -19,7 +19,7 @@ const ADMIN = "00000000-0000-4000-8000-0000000000ad";
 // 게이트를 끄는 것이 아니라 통과시켜 **그 뒤의** 판정을 본다.
 // (게이트 자체는 tests/credits-gate.test.js 가 잰다.)
 const grant = () =>
-  getStore().insertGrant({ user_id: A, amount_usd: 10, reason: "충전", granted_by: ADMIN });
+  getStore().insertGrant({ user_id: A, amount_credits: 10, reason: "충전", granted_by: ADMIN });
 const headersFor = (id) => ({
   [USER_HEADER]: id, [STATUS_HEADER]: "approved", [ROLE_HEADER]: "user",
   "content-type": "application/json",

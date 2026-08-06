@@ -46,7 +46,7 @@ const make = (ownerId) =>
 // 가드를 끄는 것이 아니라 통과시켜 **그 뒤의** 격리가 실제로 막는지를 본다.
 const ADMIN = "00000000-0000-4000-8000-0000000000ad";
 const grant = (userId) =>
-  getStore().insertGrant({ user_id: userId, amount_usd: 10, reason: "충전", granted_by: ADMIN });
+  getStore().insertGrant({ user_id: userId, amount_credits: 10, reason: "충전", granted_by: ADMIN });
 
 describe("프로젝트 라우트 인증", () => {
   beforeEach(() => resetMemoryStore());

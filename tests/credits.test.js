@@ -19,29 +19,29 @@ describe("스토어 — 충전 장부", () => {
 
   it("충전을 더해서 돌려준다", async () => {
     const store = getStore();
-    await store.insertGrant({ user_id: A, amount_usd: 2.59, reason: "체험 1편", granted_by: ADMIN });
-    await store.insertGrant({ user_id: A, amount_usd: 5, reason: "유료 충전", granted_by: ADMIN });
+    await store.insertGrant({ user_id: A, amount_credits: 2.59, reason: "체험 1편", granted_by: ADMIN });
+    await store.insertGrant({ user_id: A, amount_credits: 5, reason: "유료 충전", granted_by: ADMIN });
     expect(await store.sumGrants(A)).toBeCloseTo(7.59, 6);
   });
 
   it("음수 충전(회수)도 반영된다", async () => {
     const store = getStore();
-    await store.insertGrant({ user_id: A, amount_usd: 5, reason: "유료 충전", granted_by: ADMIN });
-    await store.insertGrant({ user_id: A, amount_usd: -2, reason: "정정", granted_by: ADMIN });
+    await store.insertGrant({ user_id: A, amount_credits: 5, reason: "유료 충전", granted_by: ADMIN });
+    await store.insertGrant({ user_id: A, amount_credits: -2, reason: "정정", granted_by: ADMIN });
     expect(await store.sumGrants(A)).toBeCloseTo(3, 6);
   });
 
   it("남의 충전은 안 센다", async () => {
     const store = getStore();
-    await store.insertGrant({ user_id: B, amount_usd: 10, reason: "유료 충전", granted_by: ADMIN });
+    await store.insertGrant({ user_id: B, amount_credits: 10, reason: "유료 충전", granted_by: ADMIN });
     expect(await store.sumGrants(A)).toBe(0);
   });
 
   it("listGrantsFor 는 사용자별 합계를 한 번에 준다", async () => {
     const store = getStore();
-    await store.insertGrant({ user_id: A, amount_usd: 3, reason: "충전", granted_by: ADMIN });
-    await store.insertGrant({ user_id: A, amount_usd: 2, reason: "충전", granted_by: ADMIN });
-    await store.insertGrant({ user_id: B, amount_usd: 1, reason: "충전", granted_by: ADMIN });
+    await store.insertGrant({ user_id: A, amount_credits: 3, reason: "충전", granted_by: ADMIN });
+    await store.insertGrant({ user_id: A, amount_credits: 2, reason: "충전", granted_by: ADMIN });
+    await store.insertGrant({ user_id: B, amount_credits: 1, reason: "충전", granted_by: ADMIN });
     const m = await store.listGrantsFor([A, B, "없는-id"]);
     expect(m.get(A)).toBeCloseTo(5, 6);
     expect(m.get(B)).toBeCloseTo(1, 6);
@@ -56,7 +56,7 @@ describe("잔액", () => {
 
   it("충전에서 쓴 것을 뺀 값이다", async () => {
     const store = getStore();
-    await store.insertGrant({ user_id: A, amount_usd: 10, reason: "충전", granted_by: ADMIN });
+    await store.insertGrant({ user_id: A, amount_credits: 10, reason: "충전", granted_by: ADMIN });
     await store.insertCost({
       request_id: "r1", ts: 1, endpoint: "fal-ai/x", stage: "영상",
       actor: A, est_cost_usd: 2.5, status: "done",
@@ -66,7 +66,7 @@ describe("잔액", () => {
 
   it("남이 쓴 것은 내 잔액을 안 깎는다", async () => {
     const store = getStore();
-    await store.insertGrant({ user_id: A, amount_usd: 10, reason: "충전", granted_by: ADMIN });
+    await store.insertGrant({ user_id: A, amount_credits: 10, reason: "충전", granted_by: ADMIN });
     await store.insertCost({
       request_id: "r2", ts: 1, endpoint: "fal-ai/x", stage: "영상",
       actor: B, est_cost_usd: 4, status: "done",
@@ -76,7 +76,7 @@ describe("잔액", () => {
 
   it("초과하면 음수가 된다 — 병렬 호출이 조금 넘길 수 있고 그것을 숨기지 않는다", async () => {
     const store = getStore();
-    await store.insertGrant({ user_id: A, amount_usd: 1, reason: "충전", granted_by: ADMIN });
+    await store.insertGrant({ user_id: A, amount_credits: 1, reason: "충전", granted_by: ADMIN });
     await store.insertCost({
       request_id: "r3", ts: 1, endpoint: "fal-ai/x", stage: "영상",
       actor: A, est_cost_usd: 1.2, status: "done",
@@ -92,13 +92,13 @@ describe("잔액", () => {
 
   it("assertCanStart 는 모자라면 NoCredits 를 던진다", async () => {
     const store = getStore();
-    await store.insertGrant({ user_id: A, amount_usd: 0.5, reason: "충전", granted_by: ADMIN });
+    await store.insertGrant({ user_id: A, amount_credits: 0.5, reason: "충전", granted_by: ADMIN });
     await expect(assertCanStart(A, { need: perVideoUsd() })).rejects.toMatchObject({ name: "NoCredits" });
   });
 
   it("assertCanStart 는 충분하면 조용히 통과한다", async () => {
     const store = getStore();
-    await store.insertGrant({ user_id: A, amount_usd: 100, reason: "충전", granted_by: ADMIN });
+    await store.insertGrant({ user_id: A, amount_credits: 100, reason: "충전", granted_by: ADMIN });
     await expect(assertCanStart(A, { need: perVideoUsd() })).resolves.toBeUndefined();
   });
 });

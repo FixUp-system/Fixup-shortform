@@ -134,26 +134,58 @@ create policy profiles_self on profiles
 -- cost_records·upload_owners 는 정책을 만들지 않는다 = 전부 거부.
 -- 원장은 사용자가 읽을 이유도 쓸 이유도 없다.
 
--- ── 크레딧 충전 장부 ────────────────────────────────────────────────────
--- 잔액을 컬럼으로 두지 않는다: 잔액 = sum_grants(user) - sum_costs(null, user).
--- 원장(cost_records)이 곧 차감이라 두 값이 갈라질 자리가 없다.
--- 이 테이블은 감사 로그이기도 하다 — 누가(granted_by) 언제 왜(reason) 넣었는지가 남는다.
+-- ── 크레딧 ──────────────────────────────────────────────────────────────
+-- 장부가 둘이다. 알갱이가 다르기 때문이다:
+--   cost_records  = 우리가 쓴 돈(USD, fal 호출 단위)   ← 회계
+--   credit_charges= 사장님이 낸 값(크레딧, 행위 단위)  ← 청구
+-- 잔액 = sum_grants - sum_charges (둘 다 크레딧이라 단위가 안 섞인다).
 create table if not exists credit_grants (
-  id          uuid primary key default gen_random_uuid(),
-  user_id     uuid not null references auth.users(id) on delete cascade,
-  amount_usd  numeric not null,          -- 양수=충전, 음수=회수(운영자 정정)
-  reason      text not null,
-  granted_by  uuid not null,
-  created_at  timestamptz not null default now()
+  id             uuid primary key default gen_random_uuid(),
+  user_id        uuid not null references auth.users(id) on delete cascade,
+  amount_credits numeric not null,        -- 양수=충전, 음수=회수(운영자 정정)
+  reason         text not null,
+  granted_by     uuid not null,
+  created_at     timestamptz not null default now()
 );
 create index if not exists credit_grants_user on credit_grants (user_id);
 
+create table if not exists credit_charges (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  project_id  uuid,
+  kind        text not null,             -- video | regen_image | regen_clip | regen_voice | refund
+  credits     numeric not null,          -- 양수=청구, 음수=환불
+  idem_key    text not null unique,      -- 같은 청구를 두 번 하지 않는다
+  created_at  timestamptz not null default now()
+);
+create index if not exists credit_charges_user on credit_charges (user_id);
+
+-- 옛 열 이름 이관(2026-08-06). 있으면 바꾸고, 이미 새 이름이면 아무 일도 안 한다.
+--
+-- ★ 이 블록이 아래 sum_grants 정의보다 **먼저** 와야 한다. 위 `create table if not
+-- exists` 는 이미 있는 테이블을 바꾸지 못하므로, 옛 DB 에는 아직 amount_usd 가 남아 있다.
+-- 그 상태에서 `sum(amount_credits)` 를 세는 함수를 만들면 Postgres 가 함수 본문을
+-- 생성 시점에 검사해(check_function_bodies 기본 on) "column amount_credits does not
+-- exist" 로 거부한다 — 파일을 통째로 다시 올릴 수 없게 된다.
+do $$
+begin
+  if exists (select 1 from information_schema.columns
+             where table_name='credit_grants' and column_name='amount_usd') then
+    alter table credit_grants rename column amount_usd to amount_credits;
+  end if;
+end $$;
+
 -- 합계는 DB 가 낸다. 앱에서 행을 받아 더하면 PostgREST 행 상한(기본 1000)에 걸려
--- 조용히 일부만 더한다 — sum_costs 가 이미 겪은 함정이고, 여기서는 잔액이 부풀어
--- 크레딧이 없는 사람에게 생성을 열어 주는 모양이 된다.
+-- 조용히 일부만 더한다 — 잔액이 부풀어 없는 크레딧이 생긴다.
 create or replace function sum_grants(p_user_id uuid)
 returns numeric language sql stable as $$
-  select coalesce(sum(amount_usd), 0) from credit_grants where user_id = p_user_id;
+  select coalesce(sum(amount_credits), 0) from credit_grants where user_id = p_user_id;
 $$;
 
-alter table credit_grants enable row level security;  -- 정책 0개 = 전부 거부(앱은 service_role)
+create or replace function sum_charges(p_user_id uuid)
+returns numeric language sql stable as $$
+  select coalesce(sum(credits), 0) from credit_charges where user_id = p_user_id;
+$$;
+
+alter table credit_grants  enable row level security;  -- 정책 0개 = 전부 거부(앱은 service_role)
+alter table credit_charges enable row level security;
