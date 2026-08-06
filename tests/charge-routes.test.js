@@ -351,6 +351,22 @@ describe("재생성 청구 — 컷당 첫 회는 공짜", () => {
       expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE[30]);   // 첫 회는 여전히 공짜다
     });
 
+    // ★ 게이트를 블록 맨 앞에 두면 이 조합에서만 옛 결함이 되살아난다 —
+    // 정가를 받고 나서 상한으로 400. 드문 것과 없는 것은 다르다.
+    it(`${name} 재생성 — 환불된 프로젝트라도 상한에 닿았으면 청구 없이 400 이다`, async () => {
+      await grant(500);
+      const p = await withCuts(30, { [field]: MAX_REGEN_PER_CUT, image: { url: "i0" } });
+      await chargeVideo({ userId: A, projectId: p.id, seconds: 30 });
+      await refundVideo({ userId: A, projectId: p.id });
+      expect(await balanceFor(A)).toBe(500);
+
+      const res = await route(post(), idxCtx(p.id, 0));
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toMatch(/3회까지/);
+      expect(await balanceFor(A)).toBe(500);      // 정가도 회차 값도 안 나갔다
+      expect(pipelineMock.regen).not.toHaveBeenCalled();
+    });
+
     it(`${name} 재생성 — 환불된 프로젝트인데 잔액이 없으면 402 다`, async () => {
       await grant(VIDEO_PRICE[30]);
       const p = await withCuts(30, { [field]: 0, image: { url: "i0" } });

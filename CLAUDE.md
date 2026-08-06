@@ -1,7 +1,7 @@
 # shotform-saas — 작업 지침
 
 > 워크트리 `C:\Users\fixup\shotform-video` · 브랜치 `feature/video-compose`
-> (2026-08-06 기준: 테스트 **1102 그린 / 10 skip**(56파일) · **origin/main 에 미푸시**이고
+> (2026-08-06 기준: 테스트 **1105 그린 / 10 skip**(56파일) · **origin/main 에 미푸시**이고
 > `main` 도 뒤처져 있다(인증·크레딧 작업분). 커밋 수는 적는 순간 낡으니 세어라:
 > `git rev-list --count origin/main..HEAD` · `git rev-list --count main..HEAD`)
 
@@ -73,7 +73,7 @@
 npm run dev                      # localhost:3000
 SHOTFORM_FAKE=fal npm run dev    # fal(이미지·TTS·i2v·합성)만 가짜, OpenAI는 진짜
 SHOTFORM_FAKE=all npm run dev    # OpenAI까지 가짜 — 완전 0원, 배선·상태 전이만 확인
-npx vitest run                   # 테스트 (56파일 1102개)
+npx vitest run                   # 테스트 (56파일 1105개)
 ```
 
 `SHOTFORM_FAKE`는 `lib/fake.js` 한 곳에서 판정한다(`off`/`fal`/`all`). 옛 이름

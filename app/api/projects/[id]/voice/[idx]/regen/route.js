@@ -20,6 +20,16 @@ export const POST = withUser(async (req, { params }, user) => {
   let charged = null;
   if (!fakeFal()) {
     const project = await getProject(id, user.id);
+    const cut = (project?.cuts || []).find((c) => c.idx === Number(idx));
+    const prior = Number(cut?.voice_regen_count) || 0;
+
+    // ★ 상한 판정이 **어떤 청구보다도 앞**이다(아래 정가 게이트보다도 앞).
+    // 뒤에 두면 4회째에 값을 받고 나서 regenVoice 가 같은 상한으로 던져 400 이 된다 —
+    // 내고 아무것도 못 받는 응답이다. 정가 게이트를 이 앞에 두었을 때도 같은 결함이
+    // 환불된 프로젝트에서만 되살아났다. 드문 것과 없는 것은 다르다.
+    if (prior >= MAX_REGEN_PER_CUT) {
+      return Response.json({ error: "목소리 다시 만들기는 컷당 3회까지예요" }, { status: 400 });
+    }
 
     // ★ 재생성도 유료 입구다 — /clips 와 **같은 문**을 쓴다.
     // 회차 가격만 보면 구멍이 난다: 실패 → refundVideo(잔액 복구) → 그림·컷은 남음 →
@@ -37,15 +47,6 @@ export const POST = withUser(async (req, { params }, user) => {
         if (e instanceof NoCredits) return Response.json({ error: e.message }, { status: 402 });
         throw e;
       }
-    }
-
-    const cut = (project?.cuts || []).find((c) => c.idx === Number(idx));
-    const prior = Number(cut?.voice_regen_count) || 0;
-
-    // ★ 상한 판정이 **청구보다 앞**이다. 뒤에 두면 4회째에 값을 받고 나서 regenVoice 이
-    // 같은 상한으로 던져 400 이 된다 — 내고 아무것도 못 받는 응답이다.
-    if (prior >= MAX_REGEN_PER_CUT) {
-      return Response.json({ error: "목소리 다시 만들기는 컷당 3회까지예요" }, { status: 400 });
     }
 
     const price = regenPrice("voice", prior);
