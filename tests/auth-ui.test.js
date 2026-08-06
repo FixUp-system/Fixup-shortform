@@ -52,6 +52,26 @@ describe("로그인 화면 시각", () => {
     expect(block).toMatch(/max-width:\s*420px/);
   });
 
+  it("칸 사이 16px · 버튼 앞 28px 도 실측에서 온 값이다", () => {
+    expect(css).toMatch(
+      /\.login-card \.sent-input--lg \+ \.sent-input--lg \{[^}]*margin-top:\s*16px/
+    );
+    const block = css.slice(css.indexOf(".cta--block"));
+    expect(block).toMatch(/margin-top:\s*28px/);
+  });
+
+  // min-height 는 바닥값이라, 내용이 더 크면 조용히 아무 일도 안 한다.
+  // 글자 상자 계산이 어긋나면 CSS 문자열은 52·48 인데 화면 픽셀은 58·50 이 된다 —
+  // 아래 두 값이 그 계산을 붙잡는 자리다(box-sizing: border-box 기준).
+  it("실측 높이가 실제로 걸리도록 글자 상자를 계산해 뒀다", () => {
+    // 입력칸: 16 × 1.6 = 25.6 + 패딩 24 + 테두리 2 = 51.6 < 52
+    const input = css.slice(css.indexOf(".sent-input--lg"));
+    expect(input).toMatch(/padding:\s*12px 14px/);
+    // 주버튼: 16 × 1.2 = 19.2 + .cta 패딩 24 = 43.2 < 48
+    const cta = css.slice(css.indexOf(".cta--block"));
+    expect(cta).toMatch(/line-height:\s*1\.2/);
+  });
+
   it("기존 .sent-input 기본형을 키우지 않았다 — 브리핑·StylePicker 가 쓴다", () => {
     const base = css.match(/\n\.sent-input \{[^}]*\}/);
     expect(base).toBeTruthy();

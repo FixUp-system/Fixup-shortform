@@ -1027,16 +1027,23 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
 .login-tab.on { color: var(--ink); border-bottom-color: var(--ink); }
 .login-tab:disabled { cursor: default; }
 
-/* 큰 입력 변형. 기본형(.sent-input)은 브리핑·StylePicker 가 쓰므로 건드리지 않는다. */
-.sent-input--lg { min-height: 52px; padding: 15px 14px; }
+/* 큰 입력 변형. 기본형(.sent-input)은 브리핑·StylePicker 가 쓰므로 건드리지 않는다.
+   패딩이 12px 인 이유: min-height 는 바닥값이라 내용이 더 크면 아무 일도 안 한다.
+   글자 16px × body line-height 1.6 = 25.6 + 패딩 24 + 테두리 2 = 51.6 < 52 →
+   비로소 52px 가 걸린다. 15px 였을 때는 57.6px 라 실측값이 화면에 나오지 않았다. */
+.sent-input--lg { min-height: 52px; padding: 12px 14px; }
 /* 칸 사이 — 기본형의 10px 를 이 화면에서만 넓힌다 */
 .login-card .sent-input--lg + .sent-input--lg { margin-top: 16px; }
 
-/* 폭을 채우는 큰 버튼. .cta 의 색·반경 규칙은 그대로 물려받는다. */
+/* 폭을 채우는 큰 버튼. .cta 의 색·반경·패딩 규칙은 그대로 물려받는다.
+   line-height 를 죄는 이유: .cta 패딩(12px)은 공유 자산이라 못 건드리는데,
+   물려받은 1.6 이면 25.6 + 24 = 49.6px 라 min-height 48 이 영영 안 걸린다.
+   1.2 로 죄면 19.2 + 24 = 43.2 < 48 → 정확히 48px 가 된다. */
 .cta--block {
   display: flex;
   width: 100%;
   min-height: 48px;
+  line-height: 1.2;
   justify-content: center;
   margin-top: 28px;
 }
