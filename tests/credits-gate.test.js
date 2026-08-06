@@ -12,6 +12,7 @@ import { runWithActor } from "../lib/actor.js";
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
 import * as projects from "../lib/projects.js";
 import { VIDEO_PRICE } from "../lib/pricing.js";
+import { chargeVideo } from "../lib/charges.js";
 
 // 라우트가 fire-and-forget 으로 부르는 오케스트레이터는 모킹한다 —
 // 여기서 볼 것은 "시작을 막았는가"지 관통이 아니다.
@@ -230,15 +231,35 @@ describe("시작 게이트 — 단계별", () => {
     expect((await clipsPOST(post("http://localhost/c"), ctx(q.id))).status).toBe(200);
   });
 
+  // 재생성도 **살아 있는 청구를 요구한다** — 정가를 낸 프로젝트로 픽스처를 만든다.
+  // (안 낸/환불된 프로젝트가 재생성으로 걸어 들어오는 경우는 charge-routes 가 잰다)
+  const paidProject = async (cut) => {
+    const p = await projectWithAudio(cut);
+    await chargeVideo({ userId: A, projectId: p.id, seconds: 30 });
+    return p;
+  };
+
   it("컷당 첫 재생성은 공짜라 잔액 0 이어도 200 이다", async () => {
-    const p = await projectWithAudio();
+    await grantTo(A, VIDEO_PRICE[30]);          // 정가만 내고 잔액 0
+    const p = await paidProject();
     expect((await cutRegenPOST(post("http://localhost/r"), idxCtx(p.id, 0))).status).toBe(200);
     expect((await voiceRegenPOST(post("http://localhost/r"), idxCtx(p.id, 0))).status).toBe(200);
     expect((await clipRegenPOST(post("http://localhost/r"), idxCtx(p.id, 0))).status).toBe(200);
   });
 
   it("둘째 재생성부터는 잔액이 없으면 402 다", async () => {
-    const p = await projectWithAudio({ regen_count: 1, voice_regen_count: 1, clip_regen_count: 1 });
+    await grantTo(A, VIDEO_PRICE[30]);          // 정가만 내고 잔액 0
+    const p = await paidProject({ regen_count: 1, voice_regen_count: 1, clip_regen_count: 1 });
+    expect((await cutRegenPOST(post("http://localhost/r"), idxCtx(p.id, 0))).status).toBe(402);
+    expect((await voiceRegenPOST(post("http://localhost/r"), idxCtx(p.id, 0))).status).toBe(402);
+    expect((await clipRegenPOST(post("http://localhost/r"), idxCtx(p.id, 0))).status).toBe(402);
+    expect(pipelineMock.regen).not.toHaveBeenCalled();
+  });
+
+  // 정가를 아예 안 낸 프로젝트는 재생성 입구에서도 막힌다 — 첫 회가 공짜라도 그렇다.
+  // 이 문이 없으면 "실패 → 환불 → 컷별 재생성 → /render" 로 순지불 0 완성본이 나온다.
+  it("정가를 안 낸 프로젝트는 첫 회 재생성도 402 다", async () => {
+    const p = await projectWithAudio();
     expect((await cutRegenPOST(post("http://localhost/r"), idxCtx(p.id, 0))).status).toBe(402);
     expect((await voiceRegenPOST(post("http://localhost/r"), idxCtx(p.id, 0))).status).toBe(402);
     expect((await clipRegenPOST(post("http://localhost/r"), idxCtx(p.id, 0))).status).toBe(402);

@@ -1,7 +1,7 @@
 # shotform-saas — 작업 지침
 
 > 워크트리 `C:\Users\fixup\shotform-video` · 브랜치 `feature/video-compose`
-> (2026-08-06 기준: 테스트 **1095 그린 / 10 skip**(56파일) · **origin/main 에 미푸시**이고
+> (2026-08-06 기준: 테스트 **1102 그린 / 10 skip**(56파일) · **origin/main 에 미푸시**이고
 > `main` 도 뒤처져 있다(인증·크레딧 작업분). 커밋 수는 적는 순간 낡으니 세어라:
 > `git rev-list --count origin/main..HEAD` · `git rev-list --count main..HEAD`)
 
@@ -73,7 +73,7 @@
 npm run dev                      # localhost:3000
 SHOTFORM_FAKE=fal npm run dev    # fal(이미지·TTS·i2v·합성)만 가짜, OpenAI는 진짜
 SHOTFORM_FAKE=all npm run dev    # OpenAI까지 가짜 — 완전 0원, 배선·상태 전이만 확인
-npx vitest run                   # 테스트 (56파일 1095개)
+npx vitest run                   # 테스트 (56파일 1102개)
 ```
 
 `SHOTFORM_FAKE`는 `lib/fake.js` 한 곳에서 판정한다(`off`/`fal`/`all`). 옛 이름
@@ -208,6 +208,9 @@ readable if not configured"** 이고 보관 기간 과금도 문서에 없다. �
 > 있는 청구가 있으면 그냥 지나간다(정가에 포함된 정상 흐름). 못 내면 **402**.
 > 규칙을 한 곳에 둔 이유는 실제로 새어서다 — `/clips`·`/voice` 를 열어 뒀더니 **환불받은**
 > 프로젝트(그림은 남는다)로 클립을 순지불 0 에 살 수 있었다.
+> **재생성 3종(`cuts/[idx]/regen`·`voice/…`·`clips/…`)도 같은 문을 쓴다**(08-06 최종 리뷰).
+> 회차 가격만 보던 시절엔 그 셋이 같은 통로였다 — 환불 뒤 컷별 클립 재생성(컷당 첫 회 무료)
+> → `/render`(0원) 로 완성본이 나왔다. 살아 있는 청구가 있으면 0 으로 지나가 정상 흐름은 같다.
 > 가짜 모드(`fakeFal()`)에서는 게이트를 건너뛴다 — 0원이라 받을 것이 없다. 화면이 같은
 > 판정을 보도록 `GET /api/credits` 가 `{ balance, gated }` 를 준다(편수 표기는 폐지됐다:
 > 정가가 길이마다 달라 "N편 남음"이 거짓말이 된다).
@@ -238,6 +241,14 @@ readable if not configured"** 이고 보관 기간 과금도 문서에 없다. �
 >
 > 원가는 30초 한 편 **≈$3.06**(클립 81%)다 — 무료 체험 한 편이 그대로 손실이다.
 > 지금 크레딧에는 마진이 없다(사실상 사용 한도다). 판매가는 결제를 붙일 때 정한다.
+>
+> **남은 것**
+> - **청구·원가 병기 화면이 미구현이다.** 스펙(`docs/superpowers/specs/2026-08-06-credit-pricing-design.md`)
+>   화면 절의 "`/costs`: 프로젝트별로 청구(크레딧)와 원가(USD)를 나란히"가 안 만들어졌다 —
+>   `app/costs/page.js` 에 크레딧이 한 번도 안 나온다. 지금은 YAGNI 로 두었고,
+>   **`store.listCharges(userId)` 가 소비자 0 인 채 그 자리를 기다린다**(장부 쪽은 이미 있다).
+> - `/render` 에는 게이트가 없다(로컬 ffmpeg 0원). "환불된 프로젝트가 완성본을 받아도
+>   되는가"는 정책 질문으로 남겨 두었다 — 라우트 상단 주석 참고.
 1. ~~**이미지 모델 교체**~~ → **완료.** `nano-banana 2` + 컷당 1장이 기본이고 `.env.local`에도
    반영돼 있다(07-30). 컷당 $0.08 그대로
 2. **컷 분할 기본값 뒤집기 — ⚠️ 전제가 낡았다. 다시 볼 것**

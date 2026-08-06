@@ -1,7 +1,9 @@
 import { regenVoice } from "../../../../../../../lib/pipeline";
 import { getProject } from "../../../../../../../lib/projects";
 import { withUser } from "../../../../../../../lib/auth/require-user.js";
-import { assertCanAfford, chargeRegen, refundRegen, NoCredits } from "../../../../../../../lib/charges.js";
+import {
+  assertCanAfford, chargeRegen, refundRegen, requireVideoCharge, NoCredits,
+} from "../../../../../../../lib/charges.js";
 import { regenPrice, MAX_REGEN_PER_CUT } from "../../../../../../../lib/pricing.js";
 import { fakeFal } from "../../../../../../../lib/fake";
 
@@ -18,6 +20,25 @@ export const POST = withUser(async (req, { params }, user) => {
   let charged = null;
   if (!fakeFal()) {
     const project = await getProject(id, user.id);
+
+    // ★ 재생성도 유료 입구다 — /clips 와 **같은 문**을 쓴다.
+    // 회차 가격만 보면 구멍이 난다: 실패 → refundVideo(잔액 복구) → 그림·컷은 남음 →
+    // 컷별 재생성(컷당 첫 회 무료) → POST /render(로컬 ffmpeg 0원) = **순지불 0 완성본**.
+    // `balance < 0` 그물은 잔액이 양수라 못 잡는다.
+    // 살아 있는 청구가 있으면 0 으로 지나가므로 **정상 흐름은 안 바뀐다**.
+    // 프로젝트가 없으면(남의 것 포함) 문을 열지 않는다 — 볼 수도 없는 프로젝트에
+    // 값을 물리면 안 되고, 아래 regen 이 어차피 400 으로 끝낸다.
+    if (project) {
+      try {
+        await requireVideoCharge({
+          userId: user.id, projectId: id, seconds: project.settings?.target_seconds,
+        });
+      } catch (e) {
+        if (e instanceof NoCredits) return Response.json({ error: e.message }, { status: 402 });
+        throw e;
+      }
+    }
+
     const cut = (project?.cuts || []).find((c) => c.idx === Number(idx));
     const prior = Number(cut?.voice_regen_count) || 0;
 

@@ -169,8 +169,11 @@ create index if not exists credit_charges_user on credit_charges (user_id);
 -- exist" 로 거부한다 — 파일을 통째로 다시 올릴 수 없게 된다.
 do $$
 begin
+  -- table_schema 필터가 있어야 한다 — 다른 스키마에 동명 테이블이 있으면 조건이 참이 되고,
+  -- 정작 rename 은 search_path 의 public 테이블을 노려 실패한다(=스키마 통짜 적용 중단).
   if exists (select 1 from information_schema.columns
-             where table_name='credit_grants' and column_name='amount_usd') then
+             where table_schema='public'
+               and table_name='credit_grants' and column_name='amount_usd') then
     alter table credit_grants rename column amount_usd to amount_credits;
   end if;
 end $$;

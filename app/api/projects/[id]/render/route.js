@@ -2,6 +2,12 @@ import { getProject, updateProject } from "../../../../../lib/projects";
 import { runRenderPipeline } from "../../../../../lib/pipeline";
 import { withUser } from "../../../../../lib/auth/require-user.js";
 
+// 유료 입구 넷(/auto·/voice·/images·/clips)과 달리 여기에는 requireVideoCharge 가 없다 —
+// 합성은 로컬 ffmpeg 라 fal 지출이 0원이고, 게이트의 목적은 "돈이 나가기 전에 받는 것"이다.
+// ★ 다만 정책 질문은 남는다: **환불된 프로젝트가 완성본을 받아도 되는가.**
+// 클립까지 만들어 둔 뒤 환불된 프로젝트는 여기서 0원에 완성본을 가져갈 수 있다.
+// 지금은 "이미 만든 것을 합치는 데 또 받지 않는다"로 두었다(원가가 0이라). 판매가·정책이
+// 정해지면 다시 볼 자리다.
 export const POST = withUser(async (req, { params }, user) => {
   const { id } = await params;
   const project = await getProject(id, user.id);

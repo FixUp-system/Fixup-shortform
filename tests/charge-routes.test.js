@@ -268,70 +268,102 @@ describe("재생성 청구 — 컷당 첫 회는 공짜", () => {
     ["클립", clipRegenPOST, "clip_regen_count", "clip"],
   ];
 
+  // 재생성도 **살아 있는 청구를 요구한다** — 그래서 정상 흐름 픽스처는 정가를 이미 낸
+  // 프로젝트다. 여기서 재는 것은 그 위에 얹히는 **회차 값**이라, 기준선을 base 로 잡는다.
+  async function paidCuts(granted, cut) {
+    await grant(granted);
+    const p = await withCuts(30, cut);
+    await chargeVideo({ userId: A, projectId: p.id, seconds: 30 });
+    return { p, base: await balanceFor(A) };
+  }
+
   for (const [name, route, field, kind] of cases) {
-    it(`${name} 재생성 — 첫 회는 공짜다`, async () => {
-      await grant(500);
-      const p = await withCuts(30, { [field]: 0 });
+    it(`${name} 재생성 — 정상(청구 살아 있는) 프로젝트는 첫 회가 공짜 그대로다`, async () => {
+      const { p, base } = await paidCuts(500, { [field]: 0 });
       expect((await route(post(), idxCtx(p.id, 0))).status).toBe(200);
-      expect(await balanceFor(A)).toBe(500);
+      expect(await balanceFor(A)).toBe(base);
     });
 
     it(`${name} 재생성 — 둘째부터 정가를 받는다`, async () => {
-      await grant(500);
-      const p = await withCuts(30, { [field]: 1 });
+      const { p, base } = await paidCuts(500, { [field]: 1 });
       expect((await route(post(), idxCtx(p.id, 0))).status).toBe(200);
-      expect(await balanceFor(A)).toBe(500 - REGEN_PRICE[kind]);
+      expect(await balanceFor(A)).toBe(base - REGEN_PRICE[kind]);
     });
 
     it(`${name} 재생성 — 회차가 오르면 또 받는다(같은 컷이라도)`, async () => {
-      await grant(500);
-      const p = await withCuts(30, { [field]: 1 });
+      const { p, base } = await paidCuts(500, { [field]: 1 });
       await route(post(), idxCtx(p.id, 0));
       await projects.updateProject(p.id, A, (proj) => ({
         ...proj, cuts: proj.cuts.map((c) => ({ ...c, [field]: 2 })),
       }));
       await route(post(), idxCtx(p.id, 0));
-      expect(await balanceFor(A)).toBe(500 - REGEN_PRICE[kind] * 2);
+      expect(await balanceFor(A)).toBe(base - REGEN_PRICE[kind] * 2);
     });
 
     it(`${name} 재생성 — 모자라면 402 이고 청구도 시작도 없다`, async () => {
-      await grant(REGEN_PRICE[kind] - 1);
-      const p = await withCuts(30, { [field]: 1 });
+      const { p, base } = await paidCuts(VIDEO_PRICE[30] + REGEN_PRICE[kind] - 1, { [field]: 1 });
+      expect(base).toBe(REGEN_PRICE[kind] - 1);
       expect((await route(post(), idxCtx(p.id, 0))).status).toBe(402);
-      expect(await balanceFor(A)).toBe(REGEN_PRICE[kind] - 1);
+      expect(await balanceFor(A)).toBe(base);
       expect(pipelineMock.regen).not.toHaveBeenCalled();
     });
 
     // 상한이 청구 뒤에 있으면 4회째가 **값을 받고 나서** 400 이 된다 — 내고 아무것도 못 받는다.
     it(`${name} 재생성 — 상한(3회)에 닿으면 청구 없이 400 이다`, async () => {
-      await grant(500);
-      const p = await withCuts(30, { [field]: MAX_REGEN_PER_CUT });
+      const { p, base } = await paidCuts(500, { [field]: MAX_REGEN_PER_CUT });
       const res = await route(post(), idxCtx(p.id, 0));
       expect(res.status).toBe(400);
       expect((await res.json()).error).toMatch(/3회까지/);
-      expect(await balanceFor(A)).toBe(500);
+      expect(await balanceFor(A)).toBe(base);
       expect(pipelineMock.regen).not.toHaveBeenCalled();
     });
 
     // 카운터는 시도 **전**에 오른다 — 되돌리지 않으면 재시도가 다음 회차 값을 또 낸다.
     // 자동 관통이 실패를 환불하는 것과 같은 정책이어야 한다.
     it(`${name} 재생성 — 실패하면 받은 값을 되돌린다`, async () => {
-      await grant(500);
-      const p = await withCuts(30, { [field]: 1 });
+      const { p, base } = await paidCuts(500, { [field]: 1 });
       pipelineMock.regen.mockRejectedValueOnce(new Error("만들지 못했어요"));
       expect((await route(post(), idxCtx(p.id, 0))).status).toBe(400);
-      expect(await balanceFor(A)).toBe(500);
+      expect(await balanceFor(A)).toBe(base);
     });
 
     it(`${name} 재생성 — 실패해도 그 회차를 두 번 되돌리지는 않는다`, async () => {
-      await grant(500);
-      const p = await withCuts(30, { [field]: 1 });
+      const { p, base } = await paidCuts(500, { [field]: 1 });
       pipelineMock.regen.mockRejectedValue(new Error("만들지 못했어요"));
       await route(post(), idxCtx(p.id, 0));
       await route(post(), idxCtx(p.id, 0));   // 같은 회차 재시도 — 청구도 환불도 한 번씩이다
-      expect(await balanceFor(A)).toBe(500);
+      expect(await balanceFor(A)).toBe(base);
       pipelineMock.regen.mockReset();
       pipelineMock.regen.mockImplementation(async () => ({ idx: 0 }));
+    });
+
+    // ★ 최종 리뷰 ① — 회차 가격만 보면 여기가 순지불 0 통로였다.
+    // 실패 → 환불(잔액 복구) → 그림·컷은 남음 → 컷별 재생성(첫 회 무료) → /render(0원).
+    // 잔액이 양수라 `balance < 0` 그물에도 안 걸린다.
+    it(`${name} 재생성 — 환불된 프로젝트면 정가를 다시 받는다`, async () => {
+      await grant(500);
+      const p = await withCuts(30, { [field]: 0, image: { url: "i0" } });
+      await chargeVideo({ userId: A, projectId: p.id, seconds: 30 });
+      await refundVideo({ userId: A, projectId: p.id });
+      expect(await balanceFor(A)).toBe(500);          // 되돌려받았다
+
+      expect((await route(post(), idxCtx(p.id, 0))).status).toBe(200);
+      expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE[30]);   // 첫 회는 여전히 공짜다
+    });
+
+    it(`${name} 재생성 — 환불된 프로젝트인데 잔액이 없으면 402 다`, async () => {
+      await grant(VIDEO_PRICE[30]);
+      const p = await withCuts(30, { [field]: 0, image: { url: "i0" } });
+      await chargeVideo({ userId: A, projectId: p.id, seconds: 30 });
+      await refundVideo({ userId: A, projectId: p.id });
+      // 되돌려받은 크레딧을 다른 프로젝트에 썼다 — 잔액 0, 그림은 p 에 그대로 남아 있다
+      const q = await makeProject(30);
+      await chargeVideo({ userId: A, projectId: q.id, seconds: 30 });
+      expect(await balanceFor(A)).toBe(0);
+
+      expect((await route(post(), idxCtx(p.id, 0))).status).toBe(402);
+      expect(pipelineMock.regen).not.toHaveBeenCalled();
+      expect(await balanceFor(A)).toBe(0);
     });
   }
 
