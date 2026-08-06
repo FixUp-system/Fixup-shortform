@@ -13,13 +13,13 @@ const OWNER = "33333333-3333-3333-3333-333333333333";
 import { getStore } from "../lib/store/index.js";
 import { isAudioStale, isImageStale, isClipStale, isRenderStale, renderKey } from "../lib/steps.js";
 
-// 시작 게이트(Task 4)가 붙은 뒤로, 잔액 0 인 사용자는 유료 시작 라우트에서 402 다.
+// 시작 게이트가 붙은 뒤로, 영상 정가(30초 = 50 크레딧)가 없는 사용자는 유료 시작 라우트에서 402 다.
 // 이 파일이 재는 것은 각 라우트의 가드·배선이므로, 유료 시작을 부르는 테스트는 충전해 두고
 // 부른다 — 게이트를 끄는 것이 아니라 통과시켜 **그 뒤의** 판정을 본다.
 // (게이트 자체는 tests/credits-gate.test.js 가 잰다.)
 const grant = () =>
   getStore().insertGrant({
-    user_id: OWNER, amount_credits: 10, reason: "충전",
+    user_id: OWNER, amount_credits: 500, reason: "충전",
     granted_by: "00000000-0000-4000-8000-0000000000ad",
   });
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";

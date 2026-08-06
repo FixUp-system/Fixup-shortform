@@ -6,6 +6,8 @@ import { extractBriefing } from "../lib/briefing-extract.js";
 import { generateScript } from "../lib/script-gen.js";
 import { runAutoPipeline } from "../lib/auto.js";
 import * as projects from "../lib/projects.js";
+import { chargeVideo, balanceFor, alreadyChargedVideo } from "../lib/charges.js";
+import { VIDEO_PRICE } from "../lib/pricing.js";
 
 // validateBriefing 스키마를 통과하는 최소 형태 — briefing.test.js 의 실물과 같은 키
 const RAW_BRIEFING = {
@@ -171,5 +173,41 @@ describe("runAutoPipeline", () => {
     };
     await expect(runAutoPipeline(p.id, OWNER, deps)).rejects.toThrow();
     expect((await projects.getProject(p.id, OWNER)).auto.state).toBe("failed");
+  });
+});
+
+// 완성본을 못 준 값은 되돌린다 — 장부에 음수 행으로 남는다.
+// (청구는 auto 라우트가 시작 전에 한다. 여기서는 lib/charges.js 로 직접 심어
+//  "실패가 환불을 부르는가"만 본다.)
+describe("자동 관통 실패는 환불한다", () => {
+  beforeEach(() => resetMemoryStore());
+
+  it("실패하면 받은 정가를 되돌린다", async () => {
+    const p = await makeProject();
+    await chargeVideo({ userId: OWNER, projectId: p.id, seconds: 15 });
+    expect(await balanceFor(OWNER)).toBe(-VIDEO_PRICE[15]);
+
+    const deps = happyDeps([]);
+    deps.extractBriefing = async () => null;
+    await expect(runAutoPipeline(p.id, OWNER, deps)).rejects.toThrow();
+
+    expect(await balanceFor(OWNER)).toBe(0);
+    expect(await alreadyChargedVideo(p.id)).toBe(false);
+  });
+
+  it("성공하면 되돌리지 않는다", async () => {
+    const p = await makeProject();
+    await chargeVideo({ userId: OWNER, projectId: p.id, seconds: 15 });
+    await runAutoPipeline(p.id, OWNER, happyDeps([]));
+    expect(await balanceFor(OWNER)).toBe(-VIDEO_PRICE[15]);
+    expect(await alreadyChargedVideo(p.id)).toBe(true);
+  });
+
+  it("청구가 없었으면(가짜 모드) 환불도 조용히 지나간다", async () => {
+    const p = await makeProject();
+    const deps = happyDeps([]);
+    deps.extractBriefing = async () => null;
+    await expect(runAutoPipeline(p.id, OWNER, deps)).rejects.toThrow();
+    expect(await balanceFor(OWNER)).toBe(0);
   });
 });

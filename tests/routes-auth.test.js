@@ -41,12 +41,12 @@ const idxCtx = (id, idx) => ({ params: Promise.resolve({ id, idx: String(idx) })
 const make = (ownerId) =>
   createProject({ settings: {}, material: { text: "가", photos: [] }, ownerId });
 
-// 시작 게이트(Task 4)가 붙은 뒤로, 잔액 0 인 사용자는 소유자 검사에 닿기도 전에 402 다.
+// 시작 게이트가 붙은 뒤로, 영상 정가가 없는 사용자는 소유자 검사 뒤에서 402 다.
 // 여기서 재려는 것은 소유자 격리지 크레딧이 아니므로 부르는 쪽을 충전해 두고 부른다 —
 // 가드를 끄는 것이 아니라 통과시켜 **그 뒤의** 격리가 실제로 막는지를 본다.
 const ADMIN = "00000000-0000-4000-8000-0000000000ad";
 const grant = (userId) =>
-  getStore().insertGrant({ user_id: userId, amount_credits: 10, reason: "충전", granted_by: ADMIN });
+  getStore().insertGrant({ user_id: userId, amount_credits: 500, reason: "충전", granted_by: ADMIN });
 
 describe("프로젝트 라우트 인증", () => {
   beforeEach(() => resetMemoryStore());

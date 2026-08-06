@@ -14,12 +14,12 @@ const A = "00000000-0000-4000-8000-00000000000a";
 const B = "00000000-0000-4000-8000-00000000000b";
 const ADMIN = "00000000-0000-4000-8000-0000000000ad";
 
-// 시작 게이트(Task 4)가 붙은 뒤로, 잔액이 한 편치($2.59)에 못 미치면 402 다.
+// 시작 게이트가 붙은 뒤로, 잔액이 영상 정가(30초 = 50 크레딧)에 못 미치면 402 다.
 // 이 파일이 재는 것은 가드·멱등·voice 배선이므로 시작할 수 있는 상태를 만들어 두고 부른다 —
 // 게이트를 끄는 것이 아니라 통과시켜 **그 뒤의** 판정을 본다.
 // (게이트 자체는 tests/credits-gate.test.js 가 잰다.)
 const grant = () =>
-  getStore().insertGrant({ user_id: A, amount_credits: 10, reason: "충전", granted_by: ADMIN });
+  getStore().insertGrant({ user_id: A, amount_credits: 500, reason: "충전", granted_by: ADMIN });
 const headersFor = (id) => ({
   [USER_HEADER]: id, [STATUS_HEADER]: "approved", [ROLE_HEADER]: "user",
   "content-type": "application/json",

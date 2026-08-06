@@ -3,7 +3,6 @@ import { runVoicePipeline } from "../../../../../lib/pipeline";
 import { VOICES } from "../../../../../lib/voices";
 import { fakeFal } from "../../../../../lib/fake";
 import { withUser } from "../../../../../lib/auth/require-user.js";
-import { assertCanStart, NoCredits } from "../../../../../lib/credits";
 
 export const POST = withUser(async (req, { params }, user) => {
   const { id } = await params;
@@ -36,17 +35,8 @@ export const POST = withUser(async (req, { params }, user) => {
     );
   }
 
-  // 시작 게이트 — 잔액이 사실상 0 이면 시작하지 않는다.
-  // 단계별은 사장님이 화면에서 보고 있으니 한 편치를 요구하지 않는다(need 를 작게 잡는다).
-  // 가짜 모드는 건너뛴다 — 0원이라 잴 것이 없다(assertBudget 과 같은 규칙).
-  if (!fakeFal()) {
-    try {
-      await assertCanStart(user.id, { need: 0.01 });
-    } catch (e) {
-      if (e instanceof NoCredits) return Response.json({ error: e.message }, { status: 402 });
-      throw e;
-    }
-  }
+  // 시작 게이트가 없다 — 목소리는 영상 정가에 포함이고(편당 ~$0.014), 정가는 자동 관통
+  // 입구 또는 그림 시작에서 받는다. 여기서 또 재면 정가를 낸 사장님을 두 번 막는 셈이다.
 
   await updateProject(id, user.id, (proj) => ({
     ...proj, voice_id: voiceId, voice_label: body.voiceLabel, voice_error: null,
