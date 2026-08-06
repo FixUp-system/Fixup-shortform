@@ -12,6 +12,8 @@ import { useProject } from "../../../../components/ProjectContext";
 import BackButton from "../../../../components/BackButton";
 import { VOICES } from "../../../../lib/voices";
 import { isAudioStale } from "../../../../lib/steps";
+// 상한과 정가는 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다).
+import { MAX_REGEN_PER_CUT, priceLabel, regenPrice, videoPrice } from "../../../../lib/pricing";
 
 export default function VoiceStepPage() {
   const { id } = useParams();
@@ -139,6 +141,8 @@ export default function VoiceStepPage() {
   const totalSeconds = cuts.reduce((s, c) => s + (Number(c.seconds) || 0), 0);
   // 문장을 고친 뒤 옛 문장을 읽은 소리가 남아 있으면 다음으로 보내지 않는다
   const staleCount = cuts.filter(isAudioStale).length;
+  // 이 영상의 정가 — 길이마다 다르다. 목소리 시작이 이 값을 받는 자리다.
+  const price = videoPrice(project?.settings?.target_seconds);
 
   // 대본 승인 직후 이 화면에 도착하면 컷이 아직 없다 — 분할이 도는 중이다.
   // 분할은 대본 승인이 띄우고(POST /cuts), 여기서는 컷이 생기기를 기다리기만 한다.
@@ -211,14 +215,19 @@ export default function VoiceStepPage() {
                         문장을 고친 뒤라 소리가 옛 문장이에요 — 다시 읽히면 됩니다
                       </span>
                     )}
-                    {/* 남은 횟수는 항상 보인다 — 3회 상한에 언제 닿는지 누르기 전에 알아야 한다 */}
-                    <span className="badge ai">다시 읽음 {c.voice_regen_count || 0}/3</span>
+                    {/* 남은 횟수는 항상 보인다 — 상한에 언제 닿는지 누르기 전에 알아야 한다.
+                        값도 함께 적는다: 컷마다 첫 회는 공짜고 둘째부터 크레딧이 나간다 */}
+                    <span className="badge ai">
+                      다시 읽음 {c.voice_regen_count || 0}/{MAX_REGEN_PER_CUT}
+                    </span>
                     <button
                       className="mini"
-                      disabled={busy || regening !== null || (c.voice_regen_count || 0) >= 3}
+                      disabled={busy || regening !== null || (c.voice_regen_count || 0) >= MAX_REGEN_PER_CUT}
                       onClick={() => regen(c.idx)}
                     >
-                      {regening === c.idx ? "읽는 중…" : "다시 읽기"}
+                      {regening === c.idx
+                        ? "읽는 중…"
+                        : `다시 읽기 · ${priceLabel(regenPrice("voice", c.voice_regen_count || 0))}`}
                     </button>
                   </div>
                 </>
@@ -242,9 +251,16 @@ export default function VoiceStepPage() {
         <div className="fwd">
           {!madeAny ? (
             <>
-              <span className="hint">컷 {cuts.length}개를 골라주신 목소리로 읽어요</span>
+              {/* ★ 돈이 나가는 첫 문이 여기다. 단계별 흐름에서 영상 정가를 받는 자리가
+                  ④그림에서 ③목소리로 앞당겨졌다(POST /voice 가 requireVideoCharge 를 부른다) —
+                  누르기 전에 값을 알아야 한다. 이미 낸 프로젝트(자동 관통을 하다 멈춘 경우 등)
+                  에는 적지 않는다: 또 받는 것처럼 읽힌다. charged 는 서버가 장부에서 판정한다. */}
+              <span className="hint">
+                컷 {cuts.length}개를 골라주신 목소리로 읽어요
+                {!project.charged && ` · 여기서 영상 정가 ${price} 크레딧이 나가요`}
+              </span>
               <button className="cta" disabled={busy} onClick={start}>
-                {busy ? "읽는 중…" : "목소리 만들기"}
+                {busy ? "읽는 중…" : project.charged ? "목소리 만들기" : `목소리 만들기 · ${price} 크레딧`}
               </button>
             </>
           ) : (

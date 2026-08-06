@@ -9,6 +9,8 @@ import { useProject } from "../../../../components/ProjectContext";
 import BackButton from "../../../../components/BackButton";
 import { I2V_MAX_SECONDS } from "../../../../lib/clip-limits";
 import { isClipStale } from "../../../../lib/steps";
+// 상한과 값은 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다).
+import { MAX_REGEN_PER_CUT, priceLabel, regenPrice } from "../../../../lib/pricing";
 
 export default function VideoStepPage() {
   const { id } = useParams();
@@ -156,13 +158,19 @@ export default function VideoStepPage() {
                   )}
                   {(c.video || c.video_error) && (
                     <>
-                      <span className="badge ai">다시 만듦 {c.clip_regen_count || 0}/3</span>
+                      <span className="badge ai">
+                        다시 만듦 {c.clip_regen_count || 0}/{MAX_REGEN_PER_CUT}
+                      </span>
                       <button
                         className="mini"
-                        disabled={busy || regening !== null || (c.clip_regen_count || 0) >= 3}
+                        disabled={busy || regening !== null || (c.clip_regen_count || 0) >= MAX_REGEN_PER_CUT}
                         onClick={() => regen(c.idx)}
                       >
-                        {regening === c.idx ? "만드는 중…" : "다시 만들기"}
+                        {/* 컷마다 첫 회는 공짜다. 클립은 다시 만드는 값이 가장 비싸므로
+                            누르기 전에 보여 준다. */}
+                        {regening === c.idx
+                          ? "만드는 중…"
+                          : `다시 만들기 · ${priceLabel(regenPrice("clip", c.clip_regen_count || 0))}`}
                       </button>
                     </>
                   )}

@@ -7,6 +7,9 @@
 import { useEffect, useRef, useState } from "react";
 import Icon from "./Icon";
 import { STYLE_PRESETS } from "../lib/styles";
+// 정가는 가격표 한 곳에서 온다. lib/pricing.js 는 import 0 개의 순수 모듈이라
+// 화면에서 불러도 안전하다(lib/charges.js 는 스토어를 끌고 오므로 안 된다).
+import { videoPrice } from "../lib/pricing";
 import { STEPS, stepHref, currentStepKey } from "../lib/steps";
 import { lastConfirmIndex, clearConfirms, restoreConfirm } from "../lib/quick-create-state";
 
@@ -46,9 +49,11 @@ export default function QuickCreate() {
       .catch(() => {});
     return () => { alive = false; };
   }, []);
+  // 부족 판정은 **이 카드의 정가** 기준이다 — 15초와 60초는 값이 다르다.
   // 게이트가 꺼진 동안(가짜 모드)에는 잔액과 무관하게 열어 둔다 — 서버의 시작 게이트가
   // `if (!fakeFal())` 로 건너뛰기 때문이다. 판정은 서버가 내려 준 gated 하나만 본다.
-  const noCredits = credits && credits.gated && credits.videos_left < 1;
+  const price = (m) => videoPrice(m?.params?.target_seconds);
+  const noCredits = (m) => credits && credits.gated && credits.balance < price(m);
 
   useEffect(() => {
     const el = chatRef.current;
@@ -179,6 +184,7 @@ export default function QuickCreate() {
           text:
             `정리했어요 — ${data.summary || "요청하신 내용"}\n` +
             `(${data.target_seconds}초 · ${data.aspect_ratio} · ${styleLabel(data.style)} · ${data.voice_label})\n` +
+            `이 영상은 ${videoPrice(data.target_seconds)} 크레딧이에요.\n` +
             `아래 버튼을 누르면 완성까지 자동으로 만들어요. 바꾸고 싶은 게 있으면 그냥 이어서 말씀해 주세요.`,
           confirm: true,
           params: data,
@@ -280,12 +286,15 @@ export default function QuickCreate() {
                       <button
                         className="mini confirm-btn"
                         onClick={() => confirmGenerate(i)}
-                        disabled={busy || noCredits}
+                        disabled={busy || noCredits(m)}
                       >
-                        🎬 영상 만들기
+                        🎬 영상 만들기 · {price(m)} 크레딧
                       </button>
-                      {noCredits && (
-                        <small>크레딧이 모자라요 — 운영자에게 문의해 주세요</small>
+                      {noCredits(m) && (
+                        <small>
+                          크레딧이 모자라요 — 이 영상은 {price(m)} 크레딧인데 {credits.balance} 남았어요.
+                          운영자에게 문의해 주세요
+                        </small>
                       )}
                     </div>
                   )}

@@ -61,6 +61,31 @@ describe("스토어 — 청구 장부", () => {
     await s.insertGrant({ user_id: A, amount_credits: 500, reason: "체험", granted_by: ADMIN });
     expect(await s.sumGrants(A)).toBe(500);
   });
+
+  it("음수 충전(회수)도 반영된다", async () => {
+    const s = getStore();
+    await s.insertGrant({ user_id: A, amount_credits: 500, reason: "충전", granted_by: ADMIN });
+    await s.insertGrant({ user_id: A, amount_credits: -200, reason: "정정", granted_by: ADMIN });
+    expect(await s.sumGrants(A)).toBe(300);
+  });
+
+  it("남의 충전은 안 센다", async () => {
+    const s = getStore();
+    await s.insertGrant({ user_id: B, amount_credits: 500, reason: "충전", granted_by: ADMIN });
+    expect(await s.sumGrants(A)).toBe(0);
+  });
+
+  // 백오피스 목록이 쓰는 묶음 조회 — 행마다 왕복하지 않으려고 있다.
+  it("listGrantsFor 는 사용자별 합계를 한 번에 준다", async () => {
+    const s = getStore();
+    await s.insertGrant({ user_id: A, amount_credits: 300, reason: "충전", granted_by: ADMIN });
+    await s.insertGrant({ user_id: A, amount_credits: 200, reason: "충전", granted_by: ADMIN });
+    await s.insertGrant({ user_id: B, amount_credits: 100, reason: "충전", granted_by: ADMIN });
+    const m = await s.listGrantsFor([A, B, "없는-id"]);
+    expect(m.get(A)).toBe(500);
+    expect(m.get(B)).toBe(100);
+    expect(m.get("없는-id") ?? 0).toBe(0);
+  });
 });
 
 describe("청구", () => {

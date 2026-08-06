@@ -119,11 +119,11 @@ export default function Sidebar() {
       <div className="side-grow" />
       <div className="credit-box">
         크레딧
-        <b>{credits ? `${credits.videos_left}편 남음` : "…"}</b>
+        <b>{credits ? `${credits.balance}` : "…"}</b>
         <small>
-          {credits && credits.videos_left === 0
+          {credits && credits.balance <= 0
             ? "운영자에게 문의해 주세요 (실비용은 비용 기록에서)"
-            : "영상 한 편을 만들 때마다 줄어요 (실비용은 비용 기록에서)"}
+            : "영상을 만들 때마다 줄어요 (실비용은 비용 기록에서)"}
         </small>
       </div>
     </aside>

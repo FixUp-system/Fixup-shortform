@@ -6,6 +6,7 @@ import { isAspect } from "../../../../lib/aspects";
 import { isSpeed } from "../../../../lib/speeds";
 import { ownedPhotoKeys } from "../../../../lib/refs-io.js";
 import { withUser } from "../../../../lib/auth/require-user.js";
+import { alreadyChargedVideo } from "../../../../lib/charges.js";
 
 export const GET = withUser(async (req, { params }, user) => {
   const { id } = await params;
@@ -13,7 +14,16 @@ export const GET = withUser(async (req, { params }, user) => {
   if (!project) return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
   // 활성 모델의 클립 상한을 함께 실어 보낸다 — 저장하지 않고 요청마다 지금 env 로 푼다.
   // 화면은 서버 env 를 볼 수 없어서, 이 값 없이는 기본 프로필(20초)로 판정한다.
-  return Response.json({ ...project, clip_limits: activeClipLimits() });
+  //
+  // charged = 이 프로젝트의 정가를 냈고 아직 되돌려받지 않았는가. 화면이 "여기서
+  // N 크레딧이 나갑니다"를 **낼 때만** 적기 위한 값이다. 프로젝트 문서로는 알 수 없다 —
+  // 돈이 오간 사실은 장부에만 있고(auto 실패는 환불된다) 문서의 auto·render 로 추측하면
+  // 환불받은 프로젝트에 "이미 냈다"고 거짓말한다.
+  return Response.json({
+    ...project,
+    clip_limits: activeClipLimits(),
+    charged: await alreadyChargedVideo(id),
+  });
 });
 
 export const PATCH = withUser(async (req, { params }, user) => {

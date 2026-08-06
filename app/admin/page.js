@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+// 기본값은 가격표에서 온다 — 운영자가 매번 고르는 값이라도 출처는 한 곳이다.
+import { DEFAULT_GRANT } from "../../lib/pricing";
 
 const STATUS_LABEL = {
   pending: "대기 중",
@@ -42,15 +44,15 @@ export default function AdminPage() {
     setBusy("");
   }
 
-  // 편수와 사유를 받아 넣는다. prompt 를 쓰는 이유는 운영자 전용 화면이고 이 동작이
+  // 크레딧과 사유를 받아 넣는다. prompt 를 쓰는 이유는 운영자 전용 화면이고 이 동작이
   // 드물기 때문이다 — 전용 모달을 만들 만큼의 빈도가 아니다(필요해지면 그때 만든다).
   // ⚠️ window.prompt 는 브라우저 모달이라 자동화 도구(E2E·스크립트)를 막는다.
   // 운영자 전용 화면이라 그 대가를 받아들인 것이다.
   async function grant(id) {
-    const raw = window.prompt("몇 편을 넣을까요? (회수는 음수)", "1");
+    const raw = window.prompt("몇 크레딧을 넣을까요? (회수는 음수)", String(DEFAULT_GRANT));
     if (raw === null) return;
-    const videos = Number(raw);
-    if (!Number.isInteger(videos) || videos === 0) return;
+    const credits = Number(raw);
+    if (!Number.isInteger(credits) || credits === 0) return;
     const reason = window.prompt("사유를 적어 주세요", "체험");
     if (!reason || !reason.trim()) return;
     setBusy(id);
@@ -59,7 +61,7 @@ export default function AdminPage() {
       const r = await fetch(`/api/admin/users/${id}/credits`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ videos, reason }),
+        body: JSON.stringify({ credits, reason }),
       });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "충전 실패");
       await load();
@@ -106,7 +108,7 @@ export default function AdminPage() {
                   </td>
                   <td>{u.role}</td>
                   <td>
-                    <span className="st-badge">{u.videos_left ?? 0}편</span>
+                    <span className="st-badge">{u.balance ?? 0}</span>
                   </td>
                   <td>
                     <button className="mini" disabled={busy === u.id} onClick={() => grant(u.id)}>

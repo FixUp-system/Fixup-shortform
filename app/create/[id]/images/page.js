@@ -9,6 +9,8 @@ import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 import BackButton from "../../../../components/BackButton";
 import { isImageStale } from "../../../../lib/steps";
+// 상한과 값은 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다).
+import { MAX_REGEN_PER_CUT, priceLabel, regenPrice, videoPrice } from "../../../../lib/pricing";
 
 // 그림이 아직 없는 자리에 뭐라고 쓸지.
 // "생성 중…"은 **실제로 도는 동안에만** 쓴다 — 누르기 전에도 그렇게 적혀 있으면
@@ -209,8 +211,16 @@ export default function ImagesStepPage() {
             <div className="fwd">
               {!madeAny ? (
                 <>
+                  {/* 정가는 프로젝트당 한 번이고, 단계별 흐름에서는 보통 ③목소리에서 이미
+                      냈다(POST /voice 가 먼저 문을 연다). 그래서 charged 일 때는 적지 않는다 —
+                      적으면 같은 값을 두 번 내는 것처럼 읽힌다. 안 낸 채 여기 도착한 경우
+                      (③을 건너뛴 옛 프로젝트)에만 이 버튼이 정가를 받는다. */}
                   <button className="cta" disabled={busy} onClick={start}>
-                    {busy ? "그리는 중…" : "이미지 만들기"}
+                    {busy
+                      ? "그리는 중…"
+                      : project.charged
+                        ? "이미지 만들기"
+                        : `이미지 만들기 · ${videoPrice(project.settings?.target_seconds)} 크레딧`}
                   </button>
                 </>
               ) : (
@@ -268,7 +278,9 @@ function PreviewPane({ cut, url, photoName, aspect, hasSynopsis, stalled, onRege
   const [instr, setInstr] = useState("");
   const isPhoto = cut.source === "photo";
   const busyCut = !stalled && cut.state === "generating";
-  const atLimit = cut.regen_count >= 3;
+  const atLimit = cut.regen_count >= MAX_REGEN_PER_CUT;
+  // 컷마다 첫 회는 공짜, 둘째부터 값을 치른다 — 누르기 전에 보여 준다.
+  const regenLabel = priceLabel(regenPrice("image", cut.regen_count || 0));
 
   return (
     <aside className="panel preview-pane">
@@ -305,13 +317,17 @@ function PreviewPane({ cut, url, photoName, aspect, hasSynopsis, stalled, onRege
               disabled={atLimit || busyCut || !instr.trim()}
               onClick={() => onRegen(cut.idx, instr.trim())}
             >
-              {busyCut ? "만드는 중…" : "이 지시로 다시 만들기"}
+              {busyCut ? "만드는 중…" : `이 지시로 다시 만들기 · ${regenLabel}`}
             </button>
             <button className="mini" disabled={atLimit || busyCut} onClick={() => onRegen(cut.idx)}>
-              {busyCut ? "만드는 중…" : "그냥 다시"}
+              {busyCut ? "만드는 중…" : `그냥 다시 · ${regenLabel}`}
             </button>
           </div>
-          <span className="regen-note mono">{atLimit ? "재생성 상한 도달 (3/3)" : `재생성 ${cut.regen_count}/3`}</span>
+          <span className="regen-note mono">
+            {atLimit
+              ? `재생성 상한 도달 (${MAX_REGEN_PER_CUT}/${MAX_REGEN_PER_CUT})`
+              : `재생성 ${cut.regen_count}/${MAX_REGEN_PER_CUT}`}
+          </span>
         </div>
       )}
     </aside>
