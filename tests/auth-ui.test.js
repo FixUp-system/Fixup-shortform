@@ -28,6 +28,7 @@ describe("로그인 화면", () => {
 // 시각 규칙은 실측에서 왔다(2026-08-06 네이버·구글). 값이 흔들리면 근거가 사라지므로
 // 숫자를 그대로 못 박는다 — 바꾸려면 스펙과 이 테스트를 함께 고쳐야 한다.
 const css = readFileSync("app/globals.css", "utf8");
+const shell = strip(readFileSync("components/AppShell.jsx", "utf8"));
 
 describe("로그인 화면 시각", () => {
   it("로그인 전용 클래스가 CSS 에 있다", () => {
@@ -50,6 +51,37 @@ describe("로그인 화면 시각", () => {
 
   it("상자가 420px 로 좁다", () => {
     expect(css).toMatch(/\.login-card \{[^}]*max-width:\s*420px/);
+  });
+
+  // 제목·부제가 카드와 같은 기둥에 서지 않으면 한 화면에 정렬 축이 둘이 된다
+  // (1280 실측: 제목 x≈28 vs 카드 x≈368 — 340px 차이).
+  it("제목·부제가 카드와 같은 폭의 기둥에 선다", () => {
+    expect(css).toMatch(/\.login-head \{[^}]*max-width:\s*420px/);
+    expect(css).toMatch(/\.login-head \{[^}]*margin-inline:\s*auto/);
+    // h1 은 전역 `h1.pgtitle`(구체성이 한 단 높다)의 margin 단축 속성에 져서 폭만 걸리고
+    // 가운데로는 안 갔다(실측 x 88 vs 카드 430). 이 한 줄이 그 자리를 붙잡는다.
+    expect(css).toMatch(/h1\.login-head \{[^}]*margin-inline:\s*auto/);
+    expect(login).toMatch(/pgtitle login-head/);
+    expect(login).toMatch(/pgsub login-head/);
+  });
+
+  // 공유 규칙을 키워서 푼 것이 아니어야 한다 — .pgtitle·.pgsub 는 다른 화면 전부가 쓴다.
+  it("전역 제목 규칙에 폭을 심지 않았다", () => {
+    const t = css.match(/h1\.pgtitle \{[^}]*\}/);
+    const s = css.match(/\n\.pgsub \{[^}]*\}/);
+    expect(t).toBeTruthy();
+    expect(s).toBeTruthy();
+    expect(t[0]).not.toMatch(/max-width|margin-inline/);
+    expect(s[0]).not.toMatch(/max-width|margin-inline/);
+  });
+
+  // 카드가 화면이 아니라 1160 기둥 기준으로 가운데면 넓은 화면일수록 왼쪽으로 쏠린다.
+  // 사이드바 없는 화면에서만 기둥을 가운데로 옮긴다(수식자라 다른 화면에 안 샌다).
+  it("사이드바 없는 화면은 기둥 자체가 화면 가운데다", () => {
+    expect(css).toMatch(/\.work--bare \{[^}]*margin-inline:\s*auto/);
+    expect(shell).toMatch(/className="work work--bare"/);
+    // 사이드바가 있는 쪽은 그대로여야 한다.
+    expect(shell).toMatch(/<main className="work">/);
   });
 
   it("칸 사이 16px · 버튼 앞 28px 도 실측에서 온 값이다", () => {

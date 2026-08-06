@@ -21,7 +21,9 @@ export default function AppShell({ children }) {
   const pathname = usePathname();
 
   if (isBarePath(pathname)) {
-    return <main className="work">{children}</main>;
+    // work--bare — 사이드바가 없으니 기둥(1160)을 화면 가운데로 옮긴다. 새 수식자라
+    // 사이드바가 있는 화면(.work 만 쓰는 쪽)에는 새지 않는다.
+    return <main className="work work--bare">{children}</main>;
   }
 
   return (
