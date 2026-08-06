@@ -63,15 +63,18 @@ export async function middleware(req) {
 
   // ★ 공개 경로에서는 세션을 확인하지 않는다 — 확인하면 안 된다.
   //
-  // 라이브에서 밟았다: 매직링크를 누르면 "PKCE code verifier not found in storage" 로
-  // 세션 교환이 실패했다. 원인은 여기였다 — 세션이 없는 상태로 getUser() 를 부르면
-  // auth-js 가 저장소를 정리하면서 setAll 로 **삭제 쿠키**를 내보내는데, middleware 가
-  // NextResponse.next({request}) 로 쿠키를 건드리면 그것이 **다음 핸들러가 보는 요청
-  // 쿠키에도 반영된다.** 그래서 /auth/callback 이 실행될 때는 방금 로그인 화면이 심어 둔
-  // code verifier 가 이미 지워져 있었다.
+  // 매직링크 시절 라이브에서 밟았다: 링크를 누르면 "PKCE code verifier not found in
+  // storage" 로 세션 교환이 실패했다. 원인은 여기였다 — 세션이 없는 상태로 getUser() 를
+  // 부르면 auth-js 가 저장소를 정리하면서 setAll 로 **삭제 쿠키**를 내보내는데,
+  // middleware 가 NextResponse.next({request}) 로 쿠키를 건드리면 그것이 **다음 핸들러가
+  // 보는 요청 쿠키에도 반영된다.** 그래서 콜백이 실행될 때는 방금 로그인 화면이 심어 둔
+  // code verifier 가 이미 지워져 있었다. 매직링크와 그 콜백은 비밀번호 로그인으로 바뀌며
+  // 사라졌지만, 쿠키를 건드리는 이 성질 자체는 그대로다.
   //
-  // 공개 경로는 애초에 신원을 묻지 않는 자리다(로그인 화면과 그 콜백). 검증을 건너뛰면
-  // 쿠키를 건드릴 일도 없다. 위조 헤더 삭제는 위에서 이미 했으므로 방어는 그대로다.
+  // 공개 경로는 애초에 신원을 묻지 않는 자리다(로그인 화면과 가입·로그인 라우트).
+  // 게다가 가입·로그인 라우트는 **여기서 세션 쿠키를 건드리면 안 되는 자리**다 —
+  // 자기가 방금 심은 세션이 지워질 수 있다. 검증을 건너뛰면 그 일이 없다.
+  // 위조 헤더 삭제는 위에서 이미 했으므로 방어는 그대로다.
   if (isPublicPath(pathname)) {
     return NextResponse.next({ request: { headers } });
   }
