@@ -2,15 +2,17 @@ import { getProject, updateProject } from "../../../../../lib/projects";
 import { runVideoPipeline } from "../../../../../lib/pipeline";
 import { isClipStale } from "../../../../../lib/steps";
 import { withUser } from "../../../../../lib/auth/require-user.js";
+import { requireVideoCharge, NoCredits } from "../../../../../lib/charges.js";
+import { fakeFal } from "../../../../../lib/fake";
 
-// 이 라우트에는 **시작 게이트가 없다.** 클립은 영상 정가에 포함이고, 그 정가는 자동 관통
-// 입구(POST /auto) 또는 그림 시작(POST /images)에서 이미 받았다 — 여기서 또 재면
-// 정가를 낸 사장님이 원가 눈금에 두 번 걸린다.
+// 이 라우트는 **살아 있는 청구를 요구한다**(requireVideoCharge). 클립은 영상 정가에
+// 포함이라 정상 흐름에서는 그냥 지나가지만, 정가를 안 낸(또는 환불받은) 프로젝트로
+// 들어오면 여기서 정가를 받는다.
 //
-// 예전에는 남은컷×단가로 하한을 계산했다(clipsCostFor). 그 계산이 있던 이유는 사용자 축이
-// **USD 잔액**이라 컷 중간에 끊길 수 있었기 때문인데, 지금은 정가를 선불로 받으므로
-// 그 상황 자체가 없다. 남은 그물은 호출 게이트(lib/costs.js, 잔액 음수)와
-// 전역·프로젝트 USD 상한이다.
+// 예전에는 남은컷×단가로 USD 하한을 계산했고(clipsCostFor), 그다음엔 아예 문을 뺐다.
+// 문을 뺀 것이 구멍이었다: 실패 → 환불 → 그림은 남음 → /clips 로 순지불 0 완성본.
+// 견적 계산으로 되돌리지 않는 이유는 사용자 축이 더 이상 USD 가 아니어서다 —
+// 재는 것은 언제나 **정가를 냈는가** 하나다.
 
 // 경로가 clips 인 이유: 옛 app/api/video (Quick Create 의 t2v)와 이름이 겹쳤다.
 // 그 라우트는 2026-08-04 에 제거됐지만 경로 이름은 그대로 둔다(화면·테스트가 문다).
@@ -47,6 +49,19 @@ export const POST = withUser(async (req, { params }, user) => {
       { error: "이미 만든 영상이 있어요 — 컷별로 다시 만들 수 있어요" },
       { status: 409 }
     );
+  }
+
+  // 시작 게이트 + 청구 — 정가를 낸 프로젝트만 통과한다(/images 와 같은 문).
+  // 가짜 모드는 건너뛴다 — 0원이라 받을 것이 없다(assertBudget 과 같은 규칙).
+  if (!fakeFal()) {
+    try {
+      await requireVideoCharge({
+        userId: user.id, projectId: id, seconds: project.settings?.target_seconds,
+      });
+    } catch (e) {
+      if (e instanceof NoCredits) return Response.json({ error: e.message }, { status: 402 });
+      throw e;
+    }
   }
 
   await updateProject(id, user.id, (proj) => ({ ...proj, video_error: null }));

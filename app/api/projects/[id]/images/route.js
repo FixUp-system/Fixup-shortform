@@ -1,8 +1,7 @@
 import { getProject, updateProject } from "../../../../../lib/projects";
 import { runImagesPipeline } from "../../../../../lib/pipeline";
 import { withUser } from "../../../../../lib/auth/require-user.js";
-import { alreadyChargedVideo, assertCanAfford, chargeVideo, NoCredits } from "../../../../../lib/charges.js";
-import { videoPrice } from "../../../../../lib/pricing.js";
+import { requireVideoCharge, NoCredits } from "../../../../../lib/charges.js";
 import { fakeFal } from "../../../../../lib/fake";
 
 export const POST = withUser(async (req, { params }, user) => {
@@ -30,21 +29,17 @@ export const POST = withUser(async (req, { params }, user) => {
   }
 
   // 시작 게이트 + 청구 — 단계별로 온 사장님도 같은 정가를 낸다.
-  // 그림부터가 진짜 돈이 나가는 자리라 여기서 한 편치를 받는다(앞의 대본·목소리는
-  // 정가에 포함이고 따로 받지 않는다).
-  //
-  // 자동 관통으로 이미 산 프로젝트는 alreadyChargedVideo 가 true 라 건너뛴다 —
-  // 게이트도 안 돌린다(이미 낸 사람을 잔액으로 다시 막으면 안 된다).
+  // 이미 낸 프로젝트는 requireVideoCharge 가 그냥 지나간다(/clips·/voice 와 같은 문).
   // 가짜 모드는 건너뛴다 — 0원이라 받을 것이 없다(assertBudget 과 같은 규칙).
-  if (!fakeFal() && !(await alreadyChargedVideo(id))) {
-    const seconds = project.settings?.target_seconds;
+  if (!fakeFal()) {
     try {
-      await assertCanAfford(user.id, videoPrice(seconds));
+      await requireVideoCharge({
+        userId: user.id, projectId: id, seconds: project.settings?.target_seconds,
+      });
     } catch (e) {
       if (e instanceof NoCredits) return Response.json({ error: e.message }, { status: 402 });
       throw e;
     }
-    await chargeVideo({ userId: user.id, projectId: id, seconds });
   }
 
   await updateProject(id, user.id, (proj) => ({

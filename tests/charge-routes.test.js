@@ -8,8 +8,8 @@ import { resetMemoryStore } from "../lib/store/memory.js";
 import { getStore } from "../lib/store/index.js";
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
 import * as projects from "../lib/projects.js";
-import { VIDEO_PRICE, REGEN_PRICE } from "../lib/pricing.js";
-import { balanceFor } from "../lib/charges.js";
+import { VIDEO_PRICE, REGEN_PRICE, MAX_REGEN_PER_CUT } from "../lib/pricing.js";
+import { balanceFor, chargeVideo, refundVideo } from "../lib/charges.js";
 
 // 라우트가 fire-and-forget 으로 띄우는 것들은 전부 모킹한다 — 진짜로 돌면 fal 로 나간다.
 vi.mock("../lib/auto.js", () => ({ runAutoPipeline: vi.fn(async () => {}) }));
@@ -131,6 +131,28 @@ describe("자동 관통 청구", () => {
     expect((await autoPOST(autoReq(), ctx(p.id))).status).toBe(202);
     expect(await balanceFor(A)).toBe(0);
   });
+
+  // 청구가 멱등 가드보다 앞이면, 환불 이력이 있는 완성 프로젝트에서 **새 회차를 받고 나서**
+  // 409 를 준다 — 돈만 받고 아무것도 안 하는 응답이다. 선판정이 그 창을 닫는다.
+  it("이미 완성한 프로젝트는 청구 없이 409 다", async () => {
+    await grant(500);
+    const p = await makeProject(30);
+    await projects.updateProject(p.id, A, (proj) => ({ ...proj, render: { url: "/r.mp4" } }));
+    expect((await autoPOST(autoReq(), ctx(p.id))).status).toBe(409);
+    expect(await balanceFor(A)).toBe(500);
+    expect(runAutoPipeline).not.toHaveBeenCalled();
+  });
+
+  it("이미 만드는 중인 프로젝트는 청구 없이 409 다", async () => {
+    await grant(500);
+    const p = await makeProject(30);
+    await projects.updateProject(p.id, A, (proj) => ({
+      ...proj, auto: { stage: "voice", state: "running", error: null },
+    }));
+    expect((await autoPOST(autoReq(), ctx(p.id))).status).toBe(409);
+    expect(await balanceFor(A)).toBe(500);
+    expect(runAutoPipeline).not.toHaveBeenCalled();
+  });
 });
 
 describe("단계별 청구 — 정가는 그림에서 한 번", () => {
@@ -177,15 +199,53 @@ describe("단계별 청구 — 정가는 그림에서 한 번", () => {
     expect(pipelineMock.run).not.toHaveBeenCalled();
   });
 
-  it("목소리·클립 시작은 따로 받지 않는다 — 영상 정가에 포함이다", async () => {
+  it("이미 산 프로젝트는 목소리·클립에서 또 받지 않는다 — 영상 정가에 포함이다", async () => {
     await grant(500);
     const p = await withCuts(30, { audio: null });
-    expect((await voicePOST(post({ voiceLabel: "밝은 여성" }), ctx(p.id))).status).toBe(200);
-    expect(await balanceFor(A)).toBe(500);
-
+    await chargeVideo({ userId: A, projectId: p.id, seconds: 30 });
     const q = await withCuts(30, { image: { url: "i0" } });
+    await chargeVideo({ userId: A, projectId: q.id, seconds: 30 });
+    const after = await balanceFor(A);
+
+    expect((await voicePOST(post({ voiceLabel: "밝은 여성" }), ctx(p.id))).status).toBe(200);
     expect((await clipsPOST(post(), ctx(q.id))).status).toBe(200);
-    expect(await balanceFor(A)).toBe(500);
+    expect(await balanceFor(A)).toBe(after);
+  });
+
+  // ★ 여기가 구멍이었다. 실패 → 환불 → 그림·소리는 프로젝트에 그대로 남는다 →
+  // /clips 에 문이 없으면 순지불 0 크레딧으로 완성본이 나온다.
+  // `balance < 0` 그물은 잔액이 음수가 아니라 못 잡는다.
+  it("환불된 프로젝트로 클립을 부르면 정가를 다시 받는다", async () => {
+    await grant(500);
+    const p = await withCuts(30, { image: { url: "i0" } });
+    await chargeVideo({ userId: A, projectId: p.id, seconds: 30 });
+    await refundVideo({ userId: A, projectId: p.id });
+    expect(await balanceFor(A)).toBe(500);          // 되돌려받았다
+
+    expect((await clipsPOST(post(), ctx(p.id))).status).toBe(200);
+    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE[30]);
+  });
+
+  it("환불된 프로젝트인데 잔액이 없으면 클립·목소리가 402 다", async () => {
+    await grant(VIDEO_PRICE[30]);
+    const p = await withCuts(30, { image: { url: "i0" } });
+    await chargeVideo({ userId: A, projectId: p.id, seconds: 30 });
+    await refundVideo({ userId: A, projectId: p.id });
+    // 되돌려받은 크레딧을 다른 프로젝트에 썼다 — 잔액 0, 그림은 p 에 그대로 남아 있다
+    const q = await makeProject(30);
+    await chargeVideo({ userId: A, projectId: q.id, seconds: 30 });
+    expect(await balanceFor(A)).toBe(0);
+
+    expect((await clipsPOST(post(), ctx(p.id))).status).toBe(402);
+    expect(pipelineMock.run).not.toHaveBeenCalled();
+    expect(await balanceFor(A)).toBe(0);
+  });
+
+  it("정가를 안 낸 프로젝트는 목소리 시작도 402 다 — 걸어 들어올 문을 막는다", async () => {
+    const p = await withCuts(30, { audio: null });
+    expect((await voicePOST(post({ voiceLabel: "밝은 여성" }), ctx(p.id))).status).toBe(402);
+    expect(pipelineMock.run).not.toHaveBeenCalled();
+    expect(await balanceFor(A)).toBe(0);
   });
 
   it("가짜 모드는 청구하지 않는다", async () => {
@@ -240,6 +300,38 @@ describe("재생성 청구 — 컷당 첫 회는 공짜", () => {
       expect((await route(post(), idxCtx(p.id, 0))).status).toBe(402);
       expect(await balanceFor(A)).toBe(REGEN_PRICE[kind] - 1);
       expect(pipelineMock.regen).not.toHaveBeenCalled();
+    });
+
+    // 상한이 청구 뒤에 있으면 4회째가 **값을 받고 나서** 400 이 된다 — 내고 아무것도 못 받는다.
+    it(`${name} 재생성 — 상한(3회)에 닿으면 청구 없이 400 이다`, async () => {
+      await grant(500);
+      const p = await withCuts(30, { [field]: MAX_REGEN_PER_CUT });
+      const res = await route(post(), idxCtx(p.id, 0));
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toMatch(/3회까지/);
+      expect(await balanceFor(A)).toBe(500);
+      expect(pipelineMock.regen).not.toHaveBeenCalled();
+    });
+
+    // 카운터는 시도 **전**에 오른다 — 되돌리지 않으면 재시도가 다음 회차 값을 또 낸다.
+    // 자동 관통이 실패를 환불하는 것과 같은 정책이어야 한다.
+    it(`${name} 재생성 — 실패하면 받은 값을 되돌린다`, async () => {
+      await grant(500);
+      const p = await withCuts(30, { [field]: 1 });
+      pipelineMock.regen.mockRejectedValueOnce(new Error("만들지 못했어요"));
+      expect((await route(post(), idxCtx(p.id, 0))).status).toBe(400);
+      expect(await balanceFor(A)).toBe(500);
+    });
+
+    it(`${name} 재생성 — 실패해도 그 회차를 두 번 되돌리지는 않는다`, async () => {
+      await grant(500);
+      const p = await withCuts(30, { [field]: 1 });
+      pipelineMock.regen.mockRejectedValue(new Error("만들지 못했어요"));
+      await route(post(), idxCtx(p.id, 0));
+      await route(post(), idxCtx(p.id, 0));   // 같은 회차 재시도 — 청구도 환불도 한 번씩이다
+      expect(await balanceFor(A)).toBe(500);
+      pipelineMock.regen.mockReset();
+      pipelineMock.regen.mockImplementation(async () => ({ idx: 0 }));
     });
   }
 

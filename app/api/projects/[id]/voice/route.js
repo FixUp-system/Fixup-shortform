@@ -3,6 +3,7 @@ import { runVoicePipeline } from "../../../../../lib/pipeline";
 import { VOICES } from "../../../../../lib/voices";
 import { fakeFal } from "../../../../../lib/fake";
 import { withUser } from "../../../../../lib/auth/require-user.js";
+import { requireVideoCharge, NoCredits } from "../../../../../lib/charges.js";
 
 export const POST = withUser(async (req, { params }, user) => {
   const { id } = await params;
@@ -35,8 +36,21 @@ export const POST = withUser(async (req, { params }, user) => {
     );
   }
 
-  // 시작 게이트가 없다 — 목소리는 영상 정가에 포함이고(편당 ~$0.014), 정가는 자동 관통
-  // 입구 또는 그림 시작에서 받는다. 여기서 또 재면 정가를 낸 사장님을 두 번 막는 셈이다.
+  // 시작 게이트 + 청구 — 정가를 낸 프로젝트만 통과한다(/images·/clips 와 같은 문).
+  // 목소리는 영상 정가에 포함이라(편당 ~$0.014) 정상 흐름에서는 그냥 지나간다.
+  // 문을 다는 이유는 값이 아니라 **순서**다: 여기를 열어 두면 정가를 안 낸 프로젝트가
+  // 소리를 갖추고 /clips(편당 ~$2.10) 앞까지 걸어 들어온다.
+  // 가짜 모드는 건너뛴다 — 0원이라 받을 것이 없다(assertBudget 과 같은 규칙).
+  if (!fakeFal()) {
+    try {
+      await requireVideoCharge({
+        userId: user.id, projectId: id, seconds: project.settings?.target_seconds,
+      });
+    } catch (e) {
+      if (e instanceof NoCredits) return Response.json({ error: e.message }, { status: 402 });
+      throw e;
+    }
+  }
 
   await updateProject(id, user.id, (proj) => ({
     ...proj, voice_id: voiceId, voice_label: body.voiceLabel, voice_error: null,

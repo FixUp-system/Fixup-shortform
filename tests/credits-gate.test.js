@@ -211,9 +211,19 @@ describe("시작 게이트 — 단계별", () => {
     expect(pipelineMock.run).toHaveBeenCalledTimes(1);
   });
 
-  // ⚠️ 목소리·클립에는 **시작 게이트가 없다.** 둘 다 영상 정가에 포함이고, 정가는
-  // 자동 관통 입구 또는 그림 시작에서 이미 받는다. 남은 그물은 호출 게이트(잔액 음수)뿐이다.
-  it("목소리·클립 시작은 잔액 0 이어도 막지 않는다 — 영상 정가에 포함이다", async () => {
+  // 목소리·클립도 **살아 있는 청구를 요구한다.** 정가에 포함이라 값을 또 받지는 않지만,
+  // 안 낸(또는 환불받은) 프로젝트가 이 문으로 걸어 들어오면 그 자리에서 정가를 받는다.
+  // 문을 뺐더니 "실패 → 환불 → /clips" 로 순지불 0 완성본이 나왔다.
+  it("정가를 안 낸 프로젝트는 목소리·클립 시작도 402 다", async () => {
+    const p = await projectWithAudio({ audio: null });
+    expect((await voicePOST(post("http://localhost/v", { voiceLabel: "밝은 여성" }), ctx(p.id))).status).toBe(402);
+    const q = await projectWithAudio({ image: { url: "i0" } });
+    expect((await clipsPOST(post("http://localhost/c"), ctx(q.id))).status).toBe(402);
+    expect(pipelineMock.run).not.toHaveBeenCalled();
+  });
+
+  it("정가가 있으면 목소리·클립 시작이 200 이다", async () => {
+    await grantTo(A, 500);
     const p = await projectWithAudio({ audio: null });
     expect((await voicePOST(post("http://localhost/v", { voiceLabel: "밝은 여성" }), ctx(p.id))).status).toBe(200);
     const q = await projectWithAudio({ image: { url: "i0" } });
