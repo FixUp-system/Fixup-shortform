@@ -1025,7 +1025,10 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
 }
 /* 선택된 탭만 뚜렷하게 — 예전에는 둘 다 비슷해 어느 쪽이 켜졌는지 약했다 */
 .login-tab.on { color: var(--ink); border-bottom-color: var(--ink); }
-.login-tab:disabled { cursor: default; }
+/* 제출 중에는 탭도 잠근다. cursor 만으로는 화면에 아무 변화가 없어 눌리는 줄 알고
+   계속 누르게 된다 — 실측(2026-08-06)에서 주버튼만 흐려지고 탭은 멀쩡했다.
+   .cta:disabled 와 같은 0.4 를 쓴다(선택된 탭이 여전히 더 밝아 위치는 유지된다). */
+.login-tab:disabled { cursor: default; opacity: 0.4; }
 
 /* 큰 입력 변형. 기본형(.sent-input)은 브리핑·StylePicker 가 쓰므로 건드리지 않는다.
    패딩이 12px 인 이유: min-height 는 바닥값이라 내용이 더 크면 아무 일도 안 한다.
@@ -1052,5 +1055,14 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
   margin-top: 28px;
 }
 
-/* 보조 안내 — 두 사이트 다 이 자리에 링크를 둔다. 우리는 자가 재설정이 없어 문장이다. */
-.login-help { margin-top: 20px; color: var(--ink-soft); font-size: 14px; text-align: center; }
+/* 보조 안내 — 두 사이트 다 이 자리에 링크를 둔다. 우리는 자가 재설정이 없어 문장이다.
+   max-width 를 카드와 같이 두는 이유: 이 <p> 는 카드 **밖** 형제라 두지 않으면 화면 폭을
+   그대로 먹는다(1280 실측: 카드 420 vs 안내 상자 1104). 지금 문장이 짧아 가운데 정렬로
+   가려져 있을 뿐, 문장이 길어지면 카드보다 훨씬 넓은 한 줄로 접혀 카드에서 떨어져 보인다. */
+.login-help {
+  max-width: 420px;
+  margin: 20px auto 0;
+  color: var(--ink-soft);
+  font-size: 14px;
+  text-align: center;
+}

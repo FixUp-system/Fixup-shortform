@@ -36,28 +36,38 @@ describe("로그인 화면 시각", () => {
     }
   });
 
+  // 단정은 전부 규칙 범위(`\{[^}]*`)로 가둔다. 예전 방식(css.slice(indexOf(...)))은
+  // 그 클래스가 처음 나온 곳부터 **파일 끝까지**를 봐서, 규칙에서 값을 지워도
+  // 파일 아래 아무 규칙에 같은 선언이 있으면 초록으로 남았다.
   it("입력칸이 실측값(52px)만큼 크다", () => {
-    const block = css.slice(css.indexOf(".sent-input--lg"));
-    expect(block).toMatch(/min-height:\s*52px/);
+    expect(css).toMatch(/\.sent-input--lg \{[^}]*min-height:\s*52px/);
   });
 
   it("주버튼이 실측값(48px)이고 폭을 채운다", () => {
-    const block = css.slice(css.indexOf(".cta--block"));
-    expect(block).toMatch(/width:\s*100%/);
-    expect(block).toMatch(/min-height:\s*48px/);
+    expect(css).toMatch(/\.cta--block \{[^}]*width:\s*100%/);
+    expect(css).toMatch(/\.cta--block \{[^}]*min-height:\s*48px/);
   });
 
   it("상자가 420px 로 좁다", () => {
-    const block = css.slice(css.indexOf(".login-card"));
-    expect(block).toMatch(/max-width:\s*420px/);
+    expect(css).toMatch(/\.login-card \{[^}]*max-width:\s*420px/);
   });
 
   it("칸 사이 16px · 버튼 앞 28px 도 실측에서 온 값이다", () => {
     expect(css).toMatch(
       /\.login-card \.sent-input--lg \+ \.sent-input--lg \{[^}]*margin-top:\s*16px/
     );
-    const block = css.slice(css.indexOf(".cta--block"));
-    expect(block).toMatch(/margin-top:\s*28px/);
+    expect(css).toMatch(/\.cta--block \{[^}]*margin-top:\s*28px/);
+  });
+
+  // 안내 줄은 카드 **밖** 형제라 폭을 물려받지 않는다. 두 값이 갈라지면 안내가
+  // 카드보다 넓게 접혀 카드에서 떨어져 보인다(1280 실측: 안 두면 상자 1104px).
+  it("보조 안내가 카드와 같은 폭에서 접힌다", () => {
+    expect(css).toMatch(/\.login-help \{[^}]*max-width:\s*420px/);
+  });
+
+  // 제출 중에는 탭도 잠기는데 cursor 만으로는 화면에 아무 변화가 없다(실측 확인).
+  it("제출 중 탭이 잠긴 것이 눈에 보인다", () => {
+    expect(css).toMatch(/\.login-tab:disabled \{[^}]*opacity:\s*0\.4/);
   });
 
   // min-height 는 바닥값이라, 내용이 더 크면 조용히 아무 일도 안 한다.
@@ -70,8 +80,11 @@ describe("로그인 화면 시각", () => {
     expect(css).toMatch(/\.sent-input--lg \{[^}]*padding:\s*12px 14px/);
     expect(css).toMatch(/\.sent-input--lg \{[^}]*line-height:\s*1\.2/);
     // 주버튼: 16 × 1.2 = 19.2 + .cta 패딩 24 = 43.2 < 48
-    const cta = css.slice(css.indexOf(".cta--block"));
-    expect(cta).toMatch(/line-height:\s*1\.2/);
+    expect(css).toMatch(/\.cta--block \{[^}]*line-height:\s*1\.2/);
+    // 그 24 는 .cta 의 공유값이다 — 여기서 복제하지 않고 감시만 한다.
+    // 전역 버튼 패딩이 커지면 43.2 가 48 을 넘어 min-height 가 조용히 무력해지므로,
+    // 이 줄이 빨개져 로그인 계산을 다시 보게 만든다.
+    expect(css).toMatch(/\.cta \{[^}]*padding:\s*12px 20px/);
   });
 
   it("기존 .sent-input 기본형을 키우지 않았다 — 브리핑·StylePicker 가 쓴다", () => {
