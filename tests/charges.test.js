@@ -119,6 +119,58 @@ describe("청구", () => {
     expect(await balanceFor(A)).toBe(500);
   });
 
+  it("환불한 프로젝트를 다시 돌리면 다시 받는다 — 되돌려줬으면 공짜가 아니다", async () => {
+    await grant(500);
+    await chargeVideo({ userId: A, projectId: P, seconds: 30 });
+    await refundVideo({ userId: A, projectId: P });
+    const again = await chargeVideo({ userId: A, projectId: P, seconds: 30 });
+    expect(again).toBe(VIDEO_PRICE[30]);
+    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE[30]);   // 두 번 줄고 한 번 돌아왔다
+    expect(await alreadyChargedVideo(P)).toBe(true);
+  });
+
+  it("환불 뒤에는 이미 샀다고 하지 않는다", async () => {
+    await grant(500);
+    await chargeVideo({ userId: A, projectId: P, seconds: 30 });
+    expect(await alreadyChargedVideo(P)).toBe(true);
+    await refundVideo({ userId: A, projectId: P });
+    expect(await alreadyChargedVideo(P)).toBe(false);
+  });
+
+  it("환불한 회차를 또 청구하지는 않는다 — 새 회차만 받는다", async () => {
+    await grant(500);
+    await chargeVideo({ userId: A, projectId: P, seconds: 30 });
+    await refundVideo({ userId: A, projectId: P });
+    await chargeVideo({ userId: A, projectId: P, seconds: 30 });
+    expect(await chargeVideo({ userId: A, projectId: P, seconds: 30 })).toBe(0);
+    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE[30]);
+  });
+
+  it("동시에 눌러도 한 번만 받는다 — 멱등키가 마지막 방어선이다", async () => {
+    await grant(500);
+    const both = await Promise.all([
+      chargeVideo({ userId: A, projectId: P, seconds: 30 }),
+      chargeVideo({ userId: A, projectId: P, seconds: 30 }),
+    ]);
+    expect(both.filter((n) => n > 0).length).toBe(1);
+    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE[30]);
+  });
+
+  it("환불 행의 주인은 원 청구 행의 주인이다", async () => {
+    await grant(500);
+    await chargeVideo({ userId: A, projectId: P, seconds: 30 });
+    await refundVideo({ userId: B, projectId: P });   // 호출자가 남을 넘겨도
+    expect(await balanceFor(A)).toBe(500);            // 돈은 낸 사람에게 돌아간다
+    expect(await getStore().sumCharges(B)).toBe(0);
+  });
+
+  it("priorCount 를 빠뜨리면 조용히 공짜가 되지 않고 던진다", async () => {
+    await grant(500);
+    await expect(chargeRegen({ userId: A, projectId: P, kind: "clip", idx: 0 })).rejects.toThrow(/priorCount/);
+    await expect(chargeRegen({ userId: A, projectId: P, kind: "clip", idx: 0, priorCount: -1 })).rejects.toThrow(/priorCount/);
+    expect(await balanceFor(A)).toBe(500);
+  });
+
   it("assertCanAfford 는 모자라면 NoCredits 를 던지고 남은 값을 담는다", async () => {
     await grant(10);
     await expect(assertCanAfford(A, VIDEO_PRICE[30])).rejects.toMatchObject({
