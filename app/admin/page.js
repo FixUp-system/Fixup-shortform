@@ -72,6 +72,26 @@ export default function AdminPage() {
     }
   }
 
+  // 운영자 전용 화면이고 드문 동작이라 prompt 로 받는다(크레딧 넣기와 같은 이유).
+  async function resetPassword(id) {
+    const pw = window.prompt("새 비밀번호를 정해 주세요 (6자 이상)");
+    if (!pw) return;
+    setBusy(id);
+    try {
+      const r = await fetch(`/api/admin/users/${id}/password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: pw }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "재설정 실패");
+      setErr("");
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy("");
+    }
+  }
+
   return (
     <>
       <h1 className="pgtitle">사용자 승인</h1>
@@ -113,6 +133,9 @@ export default function AdminPage() {
                   <td>
                     <button className="mini" disabled={busy === u.id} onClick={() => grant(u.id)}>
                       크레딧 넣기
+                    </button>{" "}
+                    <button className="mini" disabled={busy === u.id} onClick={() => resetPassword(u.id)}>
+                      비밀번호 재설정
                     </button>{" "}
                     {u.status !== "approved" && (
                       <button className="mini" disabled={busy === u.id} onClick={() => setStatus(u.id, "approved")}>
