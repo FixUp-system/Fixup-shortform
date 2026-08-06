@@ -49,6 +49,17 @@ describe("POST /api/admin/users/[id]/password", () => {
     expect(updateUserById).not.toHaveBeenCalled();
   });
 
+  // Supabase 가 거절하면 조용히 200 을 주면 안 된다 — 운영자는 바뀐 줄 알고 사장님에게
+  // 새 비밀번호를 알려 준다. 실패도 응답에 비밀번호를 흘리지 않는지 같은 자리에서 본다.
+  it("Supabase 가 실패하면 502 이고 응답에 비밀번호가 없다", async () => {
+    updateUserById.mockResolvedValue({ error: { message: "User not allowed" } });
+    const res = await POST(req(ADMIN, "admin", { password: "s3cret-pw" }), ctx(A));
+    expect(res.status).toBe(502);
+    const body = await res.text();
+    expect(body).not.toContain("s3cret-pw");
+    expect(JSON.parse(body).error).toBe("비밀번호를 바꾸지 못했어요");
+  });
+
   it("응답에 비밀번호가 없다", async () => {
     const body = await (await POST(req(ADMIN, "admin", { password: "s3cret-pw" }), ctx(A))).text();
     expect(body).not.toContain("s3cret-pw");

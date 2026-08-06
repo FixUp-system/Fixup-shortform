@@ -759,6 +759,9 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
 .regen-note { font-size: 12px; color: var(--ink-soft); text-align: center; }
 .sent-input { width: 100%; border: 1px solid var(--line); background: var(--deep); color: var(--ink); border-radius: var(--r-ctl); padding: 9px 12px; font: inherit; font-size: 16px; }
 .sent-input:focus-visible { outline: 2px solid var(--ink); outline-offset: -1px; }
+/* 세로로 쌓였을 때만 띄운다 — 로그인 화면의 이메일·비밀번호가 맞닿아 한 칸처럼 보였다.
+   가로줄에 홀로 놓이는 자리(브리핑의 "직접 입력", 컨셉 보정)는 형제가 없어 안 걸린다. */
+.sent-input + .sent-input { margin-top: 10px; }
 
 /* 보강 — 게이트 페이지에서 참조하는 소형 유틸 */
 .credit-note { font-size: 12px; color: var(--ink-soft); margin-top: 8px; }

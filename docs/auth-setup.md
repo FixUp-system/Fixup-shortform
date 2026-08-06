@@ -33,19 +33,26 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon public key>
 > **`SUPABASE_SERVICE_ROLE_KEY` 에는 절대 붙이지 마라** — 붙는 순간 모든 방문자가
 > RLS 를 우회하는 열쇠를 갖는다.
 
-## 3. 매직링크·리다이렉트 URL
+## 3. 이메일 로그인 — ★ "Confirm email" 을 꺼야 한다
 
 대시보드 → **Authentication → Providers → Email**
 - "Enable Email provider" 켜기
+- **"Confirm email" 을 끈다.**
 
-대시보드 → **Authentication → URL Configuration**
-- Site URL: `http://localhost:3000` (나중에 배포 도메인으로 교체)
-- Redirect URLs 에 `http://localhost:3000/**` 추가
-  — 매직링크가 `/auth/callback` 으로 돌아온다(`app/login/page.js` 의 `emailRedirectTo`)
+> ⚠️ **이 스위치가 켜져 있으면 "가입했는데 못 들어간다" 가 된다.**
+> 로그인은 이메일·비밀번호로만 한다(메일 왕복이 없다). Confirm email 이 켜져 있으면
+> `signUp` 이 확인 메일을 보내고 **세션을 안 준다** — 가입은 성공했는데 쿠키가 안 서서
+> 화면은 그냥 `/login` 으로 되튕긴다. 안내 문구도 없다.
+> 커스텀 SMTP 없이는 그 확인 메일이 실제로 오지도 않는다(무료 플랜의 기본 메일러는
+> 시간당 몇 통으로 막혀 있다).
+
+리다이렉트 URL 설정은 **필요 없다.** 돌아올 링크가 없다 — `/auth/callback` 은 발급처와 함께
+사라졌다(`lib/auth/paths.js` 주석 참고).
 
 ## 4. 첫 관리자 계정 — ★ 두 곳을 다 고쳐야 한다
 
-1. 앱 `/login` 에서 사장님 이메일로 매직링크를 받아 로그인한다
+1. 앱 `/login` 의 **[회원가입]** 탭에서 사장님 이메일과 비밀번호로 가입한다
+   (가입 직후에는 승인 전이라 `/pending` 으로 간다 — 정상이다)
 2. SQL 편집기에서 원장을 올린다:
    ```sql
    update profiles set status = 'approved', role = 'admin'
@@ -134,6 +141,14 @@ curl -i http://localhost:3000/api/projects -H "x-shotform-user: 11111111-1111-11
 
 - **승인 반영은 즉시다.** middleware 가 매 요청 `getUser()` 로 Auth 서버에서 상태를 다시
   받는다. 차단도 다음 요청에 바로 걸린다
+- **개발 중 로그인은 `.env.local` 의 `SHOTFORM_DEV_USER` 하나다.** 사용자 uuid 를 넣어 두면
+  로그인 화면을 건너뛰고 그 사람으로 들어간다(승인·운영자 취급). 게이트가 둘이라
+  **프로덕션 빌드에서는 값이 있어도 무시된다**(`middleware.js`).
+  ★ 반대로 **로그인 화면을 보려면 이 값을 비워야 한다** — 안 비우면 그냥 통과해 버린다:
+  `SHOTFORM_DEV_USER= npm run dev`
+- **비밀번호를 잊었으면 운영자가 바꿔 준다.** 자가 재설정 화면은 없다 — 그것은 결국
+  메일 왕복이라 매직링크를 걷어낸 이유를 뒷문으로 되돌린다. `/admin` 목록에서 재설정한다
+  (`POST /api/admin/users/[id]/password`, 6자 이상)
 - **`/admin` 으로 가는 링크가 화면에 없다.** URL 을 직접 입력한다
 - **Supabase 무료 플랜은 며칠 요청이 없으면 일시정지된다.** 갑자기 전부 로그인 화면으로
   튕기면 대시보드에서 재개한다(서버 로그에 `getUser 실패` 가 남는다)

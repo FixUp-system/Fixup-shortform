@@ -17,11 +17,15 @@
 > 검증하려면 `SHOTFORM_FAKE=fal`(OpenAI 만 진짜, 클립·이미지는 가짜)로 띄운다.
 >
 > **처음 켤 때는 `docs/auth-setup.md`** — 특히 첫 관리자는 `profiles`·`app_metadata` 양쪽이다.
-> 개발 중 로그인은 메일 없이 된다: `admin.generateLink` → `hashed_token` →
-> `/auth/callback?token_hash=…&type=email`(★`magiclink` 아님) → **발급 즉시 브라우저 직접 열기**
-> (링크를 주고받으면 미리보기가 토큰을 소모한다).
+> 개발 중 로그인은 `.env.local` 의 **`SHOTFORM_DEV_USER`** 하나로 건너뛴다(프로덕션 빌드에서는
+> 값이 있어도 무시된다). ★ **로그인 화면을 보려면 그 값을 비워야 한다** — 안 비우면 통과한다.
 >
-> 앱이 **누가 만들었고 누가 돈을 냈는지** 안다. 매직링크 로그인 + 승인제.
+> 앱이 **누가 만들었고 누가 돈을 냈는지** 안다. **이메일·비밀번호 로그인**(2026-08-06 에
+> 매직링크를 걷어냈다 — 메일 왕복이 없다) + 승인제.
+>
+> ⚠️ **Supabase 대시보드 → Authentication → Providers → Email 의 "Confirm email" 을 꺼야 한다.**
+> 켜져 있으면 `signUp` 이 세션을 안 줘서 **가입은 되는데 안내 없이 /login 으로 되튕긴다.**
+> 비밀번호를 잊으면 자가 재설정이 아니라 **운영자가 바꿔 준다**(`/admin`).
 >
 > - **`getProject(id, ownerId)` — 소유자가 필수 인자다.** 안 넘기면 던진다. 이게 진짜
 >   방어선이고, RLS 정책은 anon 키가 샜을 때의 2차 방어다(앱은 `service_role` 로 붙어 우회한다)
@@ -30,9 +34,6 @@
 > - **신원 검증은 `middleware.js` 에서 요청당 한 번**, 결과를 요청 헤더로 주입한다.
 >   라우트는 `withUser(handler, {adminOnly})` 로 읽기만 한다. **matcher 가 곧 보안 경계다**
 > - 예산 축이 셋이다: 전역 · **사용자별** · 프로젝트별
->
-> **처음 켤 때 할 일은 `docs/auth-setup.md` 에 있다** — 특히 첫 관리자는 `profiles` 와
-> `app_metadata` **양쪽**을 고쳐야 한다(한쪽만 하면 앱 전체가 대기 화면으로 튕긴다).
 >
 > ⚠️ **백필 전에는 배포하지 마라** — `.eq("owner_id")` 는 NULL 과 안 맞아 기존 프로젝트가
 > 전부 안 보인다.

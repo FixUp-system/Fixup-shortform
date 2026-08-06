@@ -60,6 +60,7 @@ export default function LoginPage() {
           <button
             type="button"
             className={`mini${tab === "login" ? " confirm-btn" : ""}`}
+            disabled={busy}
             onClick={() => { setTab("login"); setError(""); }}
           >
             로그인
@@ -67,6 +68,7 @@ export default function LoginPage() {
           <button
             type="button"
             className={`mini${isSignup ? " confirm-btn" : ""}`}
+            disabled={busy}
             onClick={() => { setTab("signup"); setError(""); }}
           >
             회원가입
