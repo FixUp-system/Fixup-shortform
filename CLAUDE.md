@@ -1,9 +1,9 @@
 # shotform-saas — 작업 지침
 
 > 워크트리 `C:\Users\fixup\shotform-video` · 브랜치 `feature/video-compose`
-> (2026-08-06 기준: 테스트 **1105 그린 / 10 skip**(56파일) · **origin/main 에 미푸시**이고
-> `main` 도 뒤처져 있다(인증·크레딧 작업분). 커밋 수는 적는 순간 낡으니 세어라:
-> `git rev-list --count origin/main..HEAD` · `git rev-list --count main..HEAD`)
+> (2026-08-06 기준: **origin/main 에 미푸시**이고 `main` 도 뒤처져 있다(인증·크레딧 작업분).
+> 커밋 수도 테스트 수치도 적는 순간 낡으니 **세어라** — 불변인 것은 "**전부 그린**"뿐이다:
+> `git rev-list --count origin/main..HEAD` · `git rev-list --count main..HEAD` · `npx vitest run`)
 
 > ## 인증이 붙었고, 라이브로 관통했다 (2026-08-01 코드 · 08-04 검증)
 >
@@ -24,7 +24,10 @@
 > 매직링크를 걷어냈다 — 메일 왕복이 없다) + 승인제.
 >
 > ⚠️ **Supabase 대시보드 → Authentication → Providers → Email 의 "Confirm email" 을 꺼야 한다.**
-> 켜져 있으면 `signUp` 이 세션을 안 줘서 **가입은 되는데 안내 없이 /login 으로 되튕긴다.**
+> 켜져 있으면 `signUp` 이 오류 없이 세션을 **안 준다**. 이제 라우트가 그 자리를 잡아
+> **500 + "인증 설정에 문제가 있어요 — 이메일 확인이 켜져 있어요"** 로 답한다(조용히 되튕기지
+> 않는다). 즉 이 경고는 여전히 **설정 할 일**이고, 안 하면 가입이 화면에서 막힌다.
+> (2026-08-06 라이브 실측: `mailer_autoconfirm: false` = 아직 켜져 있다.)
 > 비밀번호를 잊으면 자가 재설정이 아니라 **운영자가 바꿔 준다**(`/admin`).
 >
 > - **`getProject(id, ownerId)` — 소유자가 필수 인자다.** 안 넘기면 던진다. 이게 진짜
@@ -74,7 +77,7 @@
 npm run dev                      # localhost:3000
 SHOTFORM_FAKE=fal npm run dev    # fal(이미지·TTS·i2v·합성)만 가짜, OpenAI는 진짜
 SHOTFORM_FAKE=all npm run dev    # OpenAI까지 가짜 — 완전 0원, 배선·상태 전이만 확인
-npx vitest run                   # 테스트 (56파일 1105개)
+npx vitest run                   # 테스트 — 개수는 여기서 센다(적어 두지 않는다)
 ```
 
 `SHOTFORM_FAKE`는 `lib/fake.js` 한 곳에서 판정한다(`off`/`fal`/`all`). 옛 이름

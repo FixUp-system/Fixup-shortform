@@ -7,6 +7,12 @@ import { authClient } from "../../../../lib/auth/supabase-server.js";
 
 const DOWN = "인증 서버에 연결하지 못했어요 — 잠시 후 다시 시도해 주세요";
 
+// 계정은 만들어졌는데 로그인이 안 되는 상태다. 사장님이 고칠 것은 없고, 운영자가
+// Supabase 설정 한 곳만 끄면 된다 — 무엇을 말해야 하는지까지 문구에 담는다.
+const NO_SESSION =
+  "인증 설정에 문제가 있어요 — 이메일 확인(Confirm email)이 켜져 있어서 가입해도 로그인이 되지 않아요. " +
+  "운영자에게 '가입 후 로그인이 안 된다, 이메일 확인 설정을 꺼 달라'고 알려 주세요";
+
 // ★ supabase-js 는 네트워크 실패·Supabase 5xx(무료 플랜 일시정지 포함)를 던지지 않고
 // error 로 돌려준다(status 가 0 이거나 5xx). 그걸 400 "가입하지 못했어요"로 답하면
 // 사장님은 자기 입력을 고치려 든다 — 고칠 것이 없는데. 사용자 잘못이 아닌 것은 500 이다.
@@ -41,7 +47,7 @@ export async function POST(req) {
     return Response.json({ error: "인증 설정에 문제가 있어요" }, { status: 500 });
   }
 
-  const { error } = await supabase.auth.signUp({ email, password });
+  const { data, error } = await supabase.auth.signUp({ email, password });
   if (error) {
     if (isInfra(error)) {
       console.error("인증 서버 오류:", error.status, error.message);
@@ -49,6 +55,20 @@ export async function POST(req) {
     }
     console.error("가입 실패:", error.message);
     return Response.json({ error: reason(error.message) }, { status: 400 });
+  }
+
+  // ★ 오류가 없는데 세션도 없으면 Supabase 의 "Confirm email" 이 켜져 있는 것이다.
+  // 계정은 만들어졌지만 확인 메일을 받기 전까지 세션이 안 선다 — 여기서 200 을 주면
+  // 화면은 "/" 로 가고 middleware 가 세션이 없어 /login 으로 되튕긴다.
+  // 사장님은 가입이 됐는지 안 됐는지도 모른 채 같은 화면을 다시 본다.
+  // 이건 사용자 잘못이 아니라 **설정 실패**다 — isInfra 와 같은 계급으로 500 이다.
+  if (!data?.session) {
+    console.error(
+      "가입은 됐는데 세션이 없다 — Supabase 의 Confirm email 이 켜져 있다.",
+      "대시보드 → Authentication → Providers → Email 의 'Confirm email' 을 꺼야 한다.",
+      "user:", data?.user?.id || "(없음)"
+    );
+    return Response.json({ error: NO_SESSION }, { status: 500 });
   }
   return Response.json({ ok: true });
 }

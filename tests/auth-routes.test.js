@@ -101,10 +101,32 @@ describe("POST /api/auth/signup", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("가입하면 200", async () => {
-    signUp.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
+    // 세션이 서야 진짜 가입이다 — 목도 실물처럼 세션을 담는다.
+    signUp.mockResolvedValue({
+      data: { user: { id: "u1" }, session: { access_token: "t" } },
+      error: null,
+    });
     const res = await signupPOST(req({ email: "a@b.com", password: "hunter22" }));
     expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
     expect(signUp).toHaveBeenCalledWith({ email: "a@b.com", password: "hunter22" });
+  });
+
+  // ★ Confirm email 이 켜져 있으면 signUp 은 오류 없이 session: null 을 준다.
+  // 200 으로 흘려보내면 화면이 "/" 로 갔다가 middleware 에 되튕겨 아무 안내 없이
+  // /login 으로 돌아온다 — 조용한 거짓 성공이다. 설정 실패는 500 이다.
+  it("오류가 없는데 세션도 없으면(Confirm email 켜짐) 200 이 아니라 500 이다", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    signUp.mockResolvedValue({ data: { user: { id: "u1" }, session: null }, error: null });
+    const res = await signupPOST(req({ email: "a@b.com", password: "hunter22" }));
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.ok).toBeUndefined();
+    expect(body.error).toMatch(/인증 설정에 문제가 있어요/);
+    expect(body.error).toMatch(/이메일 확인/);
+    // 서버 로그에 원인이 남아야 운영자가 무엇을 끌지 안다.
+    expect(logged(spy)).toMatch(/Confirm email/);
+    spy.mockRestore();
   });
 
   it("가입 실패는 원인을 알려 준다 — 로그인과 달리 사용자에게 필요한 정보다", async () => {
