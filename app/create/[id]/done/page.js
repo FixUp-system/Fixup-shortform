@@ -89,7 +89,7 @@ export default function DoneStepPage() {
 
   return (
     <section className="panel panel--narrow">
-      <h2>완성본을 내려받습니다 <span className="badge vlm">6 완성</span></h2>
+      <h2>완성본을 내려받습니다 <span className="badge vlm">완성</span></h2>
       {err && <p className="pgsub warn">{err}</p>}
 
       {!render ? (

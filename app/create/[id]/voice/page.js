@@ -163,7 +163,7 @@ export default function VoiceStepPage() {
 
   return (
     <section className="panel panel--narrow">
-      <h2>목소리를 입힙니다 <span className="badge vlm">3 목소리</span></h2>
+      <h2>목소리를 입힙니다 <span className="badge vlm">목소리</span></h2>
       {err && <p className="pgsub warn">{err}</p>}
 
       {!madeAny ? (
@@ -257,7 +257,7 @@ export default function VoiceStepPage() {
                 disabled={busy || doneCount === 0 || staleCount > 0}
                 onClick={() => router.push(`/create/${id}/images`)}
               >
-                4 이미지 만들러 가기 →
+                이미지 만들러 가기 →
               </button>
             </>
           )}

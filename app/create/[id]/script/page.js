@@ -376,7 +376,7 @@ export default function ScriptStepPage() {
             </span>
           )}
           <button className="cta" disabled={busy} onClick={approve}>
-            {hasCuts ? "3 목소리 만들러 가기 →" : "대본 승인 →"}
+            {hasCuts ? "목소리 만들러 가기 →" : "대본 승인 →"}
           </button>
         </div>
       </div>

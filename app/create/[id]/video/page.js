@@ -112,7 +112,7 @@ export default function VideoStepPage() {
 
   return (
     <section className="panel">
-      <h2>컷을 영상으로 만듭니다 <span className="badge vlm">5 영상</span></h2>
+      <h2>컷을 영상으로 만듭니다 <span className="badge vlm">영상</span></h2>
       {err && <p className="pgsub warn">{err}</p>}
       <p className="pgsub">
         {doneCount > 0
@@ -214,7 +214,7 @@ export default function VideoStepPage() {
                 disabled={busy || doneCount === 0}
                 onClick={() => router.push(`/create/${id}/done`)}
               >
-                6 완성하러 가기 →
+                완성하러 가기 →
               </button>
             </>
           )}
