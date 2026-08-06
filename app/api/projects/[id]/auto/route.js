@@ -53,9 +53,9 @@ export const POST = withUser(async (req, { params }, user) => {
     }
   }
 
-  // 멱등 가드 — 진행 중 재클릭·완성 후 재시작을 막는다. 한 번의 자동 관통이 ~$2.59 다.
+  // 멱등 가드 — 진행 중 재클릭·완성 후 재시작을 막는다. 한 번의 자동 관통이 30초 기준 ~$3.06 다.
   // 판정을 락 안(patchFn)에서 running 세우기와 **함께** 한다 — 읽고-나서-쓰면 [만들기] 를
-  // 동시에 두 번 눌렀을 때 둘 다 가드를 빠져나가 관통이 두 번 뜨고 $2.59 를 두 번 산다.
+  // 동시에 두 번 눌렀을 때 둘 다 가드를 빠져나가 관통이 두 번 뜨고 그 원가를 두 번 산다.
   let blocked = null;
   await updateProject(id, user.id, (proj) => {
     // ★ 시도마다 초기화한다. updateProject 는 낙관적 락이라 CAS 에 지면 같은 patchFn 을 다시

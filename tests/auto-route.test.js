@@ -74,7 +74,7 @@ describe("POST /api/projects/[id]/auto", () => {
     expect((await POST(reqAs(A), ctx(p.id))).status).toBe(409);
   });
 
-  it("이미 완성본이 있으면 409 — $2.59 를 두 번 사지 않는다", async () => {
+  it("이미 완성본이 있으면 409 — 한 편치 원가를 두 번 사지 않는다", async () => {
     const p = await makeProject();
     await projects.updateProject(p.id, A, (proj) => ({ ...proj, render: { url: "/r.mp4" } }));
     await grant();
@@ -101,7 +101,7 @@ describe("POST /api/projects/[id]/auto", () => {
   });
 
   // ★ 멱등 가드는 락 안(patchFn)에서 판정해야 한다. 읽고-나서-쓰면 [만들기] 동시 두 번에
-  // 둘 다 통과해 $2.59 를 두 번 산다.
+  // 둘 다 통과해 한 편치 원가(30초 ~$3.06)를 두 번 산다.
   it("동시에 두 번 눌러도 하나만 202 고 하나는 409 다", async () => {
     const p = await makeProject();
     await grant();
