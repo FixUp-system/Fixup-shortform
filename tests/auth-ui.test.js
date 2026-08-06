@@ -24,3 +24,37 @@ describe("로그인 화면", () => {
     expect(login).not.toMatch(/password=\$\{/);
   });
 });
+
+// 시각 규칙은 실측에서 왔다(2026-08-06 네이버·구글). 값이 흔들리면 근거가 사라지므로
+// 숫자를 그대로 못 박는다 — 바꾸려면 스펙과 이 테스트를 함께 고쳐야 한다.
+const css = readFileSync("app/globals.css", "utf8");
+
+describe("로그인 화면 시각", () => {
+  it("로그인 전용 클래스가 CSS 에 있다", () => {
+    for (const cls of [".login-card", ".login-tabs", ".login-tab", ".sent-input--lg", ".cta--block"]) {
+      expect(css).toContain(cls);
+    }
+  });
+
+  it("입력칸이 실측값(52px)만큼 크다", () => {
+    const block = css.slice(css.indexOf(".sent-input--lg"));
+    expect(block).toMatch(/min-height:\s*52px/);
+  });
+
+  it("주버튼이 실측값(48px)이고 폭을 채운다", () => {
+    const block = css.slice(css.indexOf(".cta--block"));
+    expect(block).toMatch(/width:\s*100%/);
+    expect(block).toMatch(/min-height:\s*48px/);
+  });
+
+  it("상자가 420px 로 좁다", () => {
+    const block = css.slice(css.indexOf(".login-card"));
+    expect(block).toMatch(/max-width:\s*420px/);
+  });
+
+  it("기존 .sent-input 기본형을 키우지 않았다 — 브리핑·StylePicker 가 쓴다", () => {
+    const base = css.match(/\n\.sent-input \{[^}]*\}/);
+    expect(base).toBeTruthy();
+    expect(base[0]).not.toMatch(/min-height/);
+  });
+});
