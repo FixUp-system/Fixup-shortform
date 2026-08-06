@@ -55,11 +55,11 @@ export default function LoginPage() {
           : "이메일과 비밀번호를 넣어 주세요."}
       </p>
 
-      <section className="panel panel--narrow">
-        <div className="res-ops">
+      <section className="panel login-card">
+        <div className="login-tabs">
           <button
             type="button"
-            className={`mini${tab === "login" ? " confirm-btn" : ""}`}
+            className={`login-tab${tab === "login" ? " on" : ""}`}
             disabled={busy}
             onClick={() => { setTab("login"); setError(""); }}
           >
@@ -67,7 +67,7 @@ export default function LoginPage() {
           </button>
           <button
             type="button"
-            className={`mini${isSignup ? " confirm-btn" : ""}`}
+            className={`login-tab${isSignup ? " on" : ""}`}
             disabled={busy}
             onClick={() => { setTab("signup"); setError(""); }}
           >
@@ -80,7 +80,7 @@ export default function LoginPage() {
             type="email"
             required
             autoComplete="email"
-            className="sent-input"
+            className="sent-input sent-input--lg"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
@@ -90,18 +90,22 @@ export default function LoginPage() {
             type="password"
             required
             autoComplete={isSignup ? "new-password" : "current-password"}
-            className="sent-input"
+            className="sent-input sent-input--lg"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="비밀번호"
             aria-label="비밀번호"
           />
-          <button type="submit" className="cta" disabled={busy}>
+          <button type="submit" className="cta cta--block" disabled={busy}>
             {busy ? "확인 중…" : isSignup ? "가입하기" : "로그인"}
           </button>
         </form>
         {error && <p className="pgsub warn">{error}</p>}
       </section>
+
+      {/* 두 사이트 다 이 자리에 "비밀번호 찾기"를 둔다. 우리는 자가 재설정이 없어
+          운영자에게 보낸다 — 없는 화면으로 보내지 않는 것이 요점이다. */}
+      <p className="login-help">비밀번호를 잊으셨다면 운영자에게 문의해 주세요.</p>
     </>
   );
 }

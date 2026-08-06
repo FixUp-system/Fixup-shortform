@@ -79,4 +79,23 @@ describe("로그인 화면 시각", () => {
     expect(base).toBeTruthy();
     expect(base[0]).not.toMatch(/min-height/);
   });
+
+  it("화면이 로그인 전용 클래스를 쓴다", () => {
+    expect(login).toMatch(/login-card/);
+    expect(login).toMatch(/login-tabs/);
+    expect(login).toMatch(/sent-input--lg/);
+    expect(login).toMatch(/cta--block/);
+  });
+
+  it("탭 선택 상태를 클래스로 드러낸다", () => {
+    expect(login).toMatch(/login-tab.*\bon\b/s);
+  });
+
+  it("비밀번호를 잊었을 때 어디로 갈지 알려 준다", () => {
+    expect(login).toMatch(/운영자/);
+  });
+
+  it("실패 문구는 여전히 서버가 준 것을 그대로 쓴다", () => {
+    expect(login).toMatch(/data\.error/);
+  });
 });
