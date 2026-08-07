@@ -32,6 +32,26 @@ function body(src, fnName) {
   return src.slice(open + 1);
 }
 
+// 함수 본문에서 **식별자 `me` 가 나타나는 자리**를 전부 집는다.
+//
+// ★ 왜 "식별자"인가 — 예전에는 `me` 뒤에 `&&`·`?`·`.` 중 하나가 붙은 것만 셌다.
+// 그러면 `me !== null &&`·`me != null &&`·`Boolean(me) &&` 처럼 **비교식으로** 조건을
+// 걸 때 수가 안 늘어 그대로 지나갔다. `me !== null &&` 는 `me &&` 못지않게 흔한 React
+// 표현이라 사각지대가 아니라 큰 구멍이었다. 뒤에 무엇이 오든 세면 표현과 무관해진다.
+//
+// ★ 왜 "반환 JSX"가 아니라 "본문 전체"인가 — 반환문 자리부터 잘라 세던 시절에는
+// 반환문 **위**(예: `const ready = !!me;` · `if (!me) { return <span /> }`)에서 `me` 를
+// 새로 쓰는 형태를 못 봤다. 본문 전체를 세면 그 구별이 사라진다 —
+// **이 컴포넌트가 `me` 를 언급하는 자리는 정확히 넷**이고, 하나라도 늘거나 줄면 걸린다.
+// (게다가 옛 표식 `"  return ("` 은 `useEffect` 정리 반환 줄에도 매치돼 자르는 자리가
+//  의도와 달랐다 — 세는 범위를 본문으로 못 박으면 그 표식 자체가 필요 없다.)
+//
+// 좌우 경계(`(?<![\w\/$.])`·`(?![\w$])`)가 `href="/me"`·`role="menu"`·`um-menu`·
+// `className`·`me?.name` 의 `name`·`theme`·`.me` 같은 남의 `me` 를 걸러낸다.
+function meMentions(src, fnName) {
+  return body(src, fnName).match(/(?<![\w\/$.])me(?![\w$])/g) || [];
+}
+
 // 함수 **최상위**(중첩 깊이 0)의 return 문만 골라 `{ head, firstToken }` 로 돌려준다.
 //  · head — 그 줄(예: `return (`)
 //  · firstToken — 돌려주는 식의 첫 글자. 앞의 여백과 여는 괄호를 걷어낸 뒤 한 글자다.
@@ -49,12 +69,16 @@ function body(src, fnName) {
 //   · 최상위 조기 반환 — 표현이 무엇이든(`return null`·JSX·`if (me === null)`)
 //   · 반환식을 감싼 조건 — `return me ? (…) : null`, `return ( !me ? null : <div…> )`
 //   · 블록으로 감싼 `return null` (호출부에서 표현으로 따로 문다)
-//   · JSX **안쪽**에 새로 끼는 `me` 조건 (호출부에서 `me` 쓰임 수를 세어 문다)
-//  못 막는 것:
-//   · 블록으로 감싼 **null 아닌** 조기 반환(`if (!me) { return <span /> }`) — 깊이 1이라
-//     이 스캔에 안 걸리고 `return null` 검사에도 안 걸린다
-//   · `me` 를 안 거치는 조건으로 로그아웃을 가리는 것(예: 다른 상태 변수를 새로 들여옴)
+//   · 본문에서 **식별자 `me` 가 언급되는 자리의 수가 바뀌는 것**(호출부의 `meMentions`).
+//     자리도 표현도 안 가린다 — JSX 안쪽이든 반환문 위든, `&&`·`?`·`.`·`!==`·`!=`·
+//     `Boolean(me)` 무엇이든 같은 식별자로 센다. 이 스캔이 못 보는 부류
+//     (블록으로 감싼 null 아닌 조기 반환 등)도 `me` 를 거치기만 하면 여기서 걸린다
+//  못 막는 것: — **한 부류다. `me` 를 한 글자도 안 거치고 로그아웃을 가리는 모든 것.**
+//   · 실측으로 확인한 유일한 생존자: `me` 대신 새 상태를 들여와
+//     (`const [ready, setReady] = useState(false)`) 그것으로 드롭다운을 가리기
 //   · 그 밖에, 소스 문자열로는 구별할 수 없는 모든 형태
+//   (로그아웃 항목을 **지우는** 것은 여기 안 든다 — 위 "마이페이지와 로그아웃을 담는다"가 문다)
+//   (개수를 적는 것이 아니다 — 이 부류는 무한하다. 무엇을 못 보는지의 **성질**만 적는다.)
 //  진짜로 막으려면 렌더 테스트가 필요한데, 이 저장소에는 React 렌더 테스트가 없다.
 //  (게다가 로그아웃이 `{open && …}` 드롭다운 안이라 SSR 렌더만으로는 열지도 못한다.)
 //
@@ -86,6 +110,16 @@ describe("회귀 그물을 지탱하는 헬퍼", () => {
   it("선언을 못 찾으면 조용히 넘어가지 않고 던진다", () => {
     expect(() => body("const F = () => { return 1; };", "F")).toThrow(/못 찾았다/);
   });
+  it("식별자 me 만 센다 — 남의 me 는 안 세고, 뒤에 오는 연산자는 안 가린다", () => {
+    const noise = 'function f() {\n  const t = <a href="/me" role="menu" className="um-menu">{me?.name}</a>;\n}\n';
+    expect(meMentions(noise, "f")).toHaveLength(1); // me?.name 하나뿐 — /me·menu·um-menu·className·name 은 남의 것
+    const cmp = "function f() {\n  return me !== null && me != null && Boolean(me) && me?.id;\n}\n";
+    expect(meMentions(cmp, "f")).toHaveLength(4);   // 비교식·Boolean·옵셔널 전부 같은 식별자
+  });
+  it("me 는 반환문 위에서 써도 센다 — 자리를 안 가린다", () => {
+    const above = "function f() {\n  const ready = !!me;\n  if (!me) { return <span />; }\n  return (\n    <div />\n  );\n}\n";
+    expect(meMentions(above, "f")).toHaveLength(2);
+  });
   it("최상위 return 만 센다 — 콜백 안의 return 은 안 센다", () => {
     const src = "function f() {\n  useEffect(() => {\n    if (!x) return;\n    return () => stop();\n  }, []);\n  return (\n    <div />\n  );\n}\n";
     expect(topLevelReturns(src, "f").map((r) => r.head)).toEqual(["return ("]);
@@ -96,10 +130,11 @@ describe("회귀 그물을 지탱하는 헬퍼", () => {
     expect(topLevelReturns(jsx, "f")[0].firstToken).toBe("<");
     expect(topLevelReturns(cond, "f")[0].firstToken).toBe("!");
   });
-  // ★ 이 it 은 **사각지대가 사각지대인 채로 있음**을 못 박는다. 나중에 헬퍼를 고쳐
-  // 블록 조기 반환까지 잡게 되면 이 it 이 빨개지는데, 그것은 **의도된 알림**이다 —
+  // ★ 이 it 은 **`topLevelReturns` 한 헬퍼의 한계**를 못 박는다(그물 전체의 한계가 아니다 —
+  // 블록 조기 반환은 `return null` 검사와 `meMentions` 가 각각 다시 문다). 나중에 이 헬퍼를
+  // 고쳐 블록 조기 반환까지 잡게 되면 이 it 이 빨개지는데, 그것은 **의도된 알림**이다 —
   // 개선을 되돌리지 말고 이 it 을 "이제 잡는다"로 고쳐 써라.
-  it("블록으로 감싼 조기 반환은 못 본다 — 알려진 사각지대(그래서 return null 을 따로 문다)", () => {
+  it("블록으로 감싼 조기 반환은 못 본다 — 이 헬퍼만의 한계(그래서 return null 을 따로 문다)", () => {
     const src = "function f() {\n  if (!x) { return null; }\n  return (\n    <div />\n  );\n}\n";
     expect(topLevelReturns(src, "f")).toHaveLength(1);
     expect(body(src, "f")).toMatch(/return\s+null/);
@@ -149,14 +184,19 @@ describe("상단 계정 바", () => {
     // **안쪽에서** 가리는 우회로가 그대로 남았다 — 특히 `{open && (` 를
     // `{me && open && (` 로 바꾸면 return 문을 한 글자도 안 건드리고 로그아웃만 사라진다.
     //
-    // 그래서 JSX 안에서 `me` 가 **값으로 쓰이는 자리의 수**를 센다. 지금 셋뿐이다:
-    //   ① 크레딧을 가리는 조건 `me &&`  ② 잔액 `me.balance`  ③ 이름 `me?.name`
-    // 하나라도 늘면 JSX 안쪽 어딘가에 **새 조건이 끼어든 것**이다(드롭다운을 가리는 것 포함).
+    // 그래서 컴포넌트 본문에서 **식별자 `me` 가 나타나는 자리의 수**를 센다. 지금 넷뿐이다:
+    //   ① 선언 `const [me, setMe]`  ② 크레딧 조건 `me &&`  ③ 잔액 `me.balance`  ④ 이름 `me?.name`
+    // 하나라도 늘면 **`me` 로 무언가를 새로 가린 것**이다 — 그것이 JSX 안쪽이든
+    // (`{me && open && (`) 반환문 위든(`const ready = !!me;`) 상관없이 걸린다.
+    // 표현도 안 가린다: `me !== null`·`me != null`·`Boolean(me)`·`me?.id` 전부 같은 식별자다.
+    //
     // 늘려야 할 정당한 이유가 생겼다면, 늘린 자리가 로그아웃을 가리지 않는지 눈으로 보고
     // 이 숫자를 함께 고쳐라 — 세는 것이 목적이 아니라 "조용히 늘지 않게" 하는 것이 목적이다.
-    // (`(?<![\w\/$.])` 는 `href="/me"`·`theme`·`.me` 같은 남의 `me` 를 걸러낸다.)
-    const jsx = menu.slice(menu.indexOf("  return ("));
-    expect(jsx.match(/(?<![\w\/$.])me\s*(&&|\?|\.)/g)).toHaveLength(3);
+    expect(
+      meMentions(menu, "UserMenu"),
+      "UserMenu 본문의 `me` 언급이 넷(선언·크레딧 조건·잔액·이름)에서 달라졌다 — " +
+      "새로 쓴 자리가 로그아웃을 가리는지 눈으로 확인하고, 정당하면 이 숫자를 함께 고쳐라"
+    ).toHaveLength(4);
     // 블록으로 감싼 조기 반환(`if (!me) { return null }`)은 중첩이라 위 스캔을 빠져나간다.
     // 표현으로 한 번 더 문다.
     expect(body(menu, "UserMenu")).not.toMatch(/return\s+null/);
