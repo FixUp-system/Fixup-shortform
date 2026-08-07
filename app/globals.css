@@ -1101,7 +1101,17 @@ h1.login-head { margin-inline: auto; }
 .me-row { display: flex; align-items: center; gap: 12px; width: 100%; }
 .me-label { flex: none; width: 120px; font-size: 14px; color: var(--ink-soft); }
 .me-value { font-size: 14px; }
+/* ★ 읽기 전용 값(이메일·가입일)을 이름 **입력칸 안의 글자**와 같은 자리에서 시작시킨다.
+   라벨 폭이 같으니 줄은 맞는데, 입력칸은 테두리 1px + 안쪽 여백 12px 만큼 글자가
+   들어가 있어 그냥 두면 값만 13px 왼쪽으로 튀어나와 보인다(실측으로 잡았다).
+   `.me-label +` 로 좁힌 이유: 라벨 없이 홀로 서는 값("내 영상 N편")은 기준이 없어
+   들여쓰면 안 된다. */
+.me-label + .me-value { padding-left: 13px; }
 .me-note { font-size: 12px; color: var(--ink-soft); }
+/* 폼 밖의 읽기 전용 줄들은 형제 사이 여백이 0 이라 두 줄이 붙어 한 덩어리로 읽혔다.
+   폼이 쓰는 리듬(gap 12px)과 같은 값을 준다. 첫 줄은 제외한다 — 카드 맨 위에
+   홀로 서는 줄("내 영상 N편")까지 밀려 내려간다. */
+.me-panel > .me-row:not(:first-child) { margin-top: 12px; }
 
 /* ── 상단 계정 바 */
 .um { position: relative; display: flex; align-items: center; gap: 12px; }
