@@ -144,7 +144,6 @@ export default function MePage() {
         <div className="me-row">
           <span className="me-label">이메일</span>
           <span className="me-value mono">{me ? me.email : "…"}</span>
-          <span className="me-note">바꿀 수 없어요</span>
         </div>
         <div className="me-row">
           <span className="me-label">가입일</span>

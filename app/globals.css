@@ -1107,7 +1107,6 @@ h1.login-head { margin-inline: auto; }
    `.me-label +` 로 좁힌 이유: 라벨 없이 홀로 서는 값("내 영상 N편")은 기준이 없어
    들여쓰면 안 된다. */
 .me-label + .me-value { padding-left: 13px; }
-.me-note { font-size: 12px; color: var(--ink-soft); }
 /* 폼 밖의 읽기 전용 줄들은 형제 사이 여백이 0 이라 두 줄이 붙어 한 덩어리로 읽혔다.
    폼이 쓰는 리듬(gap 12px)과 같은 값을 준다. 첫 줄은 제외한다 — 카드 맨 위에
    홀로 서는 줄("내 영상 N편")까지 밀려 내려간다. */
