@@ -1084,3 +1084,12 @@ h1.login-head { margin-inline: auto; }
   font-size: 14px;
   text-align: center;
 }
+
+/* ── 마이페이지 */
+.me-panel { margin-bottom: 16px; }
+.me-h { font-size: 16px; font-weight: 600; margin: 0 0 12px; }
+.me-form { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.me-row { display: flex; align-items: center; gap: 12px; width: 100%; }
+.me-label { flex: none; width: 120px; font-size: 14px; color: var(--ink-soft); }
+.me-value { font-size: 14px; }
+.me-note { font-size: 12px; color: var(--ink-soft); }
