@@ -32,6 +32,13 @@ const PATHS = {
   power: <path d="M12 3v9M6.8 6.8a7.5 7.5 0 1 0 10.4 0" />,
   play: <path d="M8 5.5l11 6.5-11 6.5z" />,
   check: <path d="M4.5 12.5l5 5 10-11" />,
+  caret: <path d="M6 9.5l6 6 6-6" />,
+  user: (
+    <>
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M4.5 20a7.5 7.5 0 0 1 15 0" />
+    </>
+  ),
 };
 
 export default function Icon({ name, size = 18 }) {

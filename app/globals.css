@@ -53,14 +53,19 @@ button { font: inherit; }
   height: 42px;
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 10px;
+  padding: 0 16px;
   background: var(--surface);
   border-bottom: 1px solid var(--line);
   font-size: 12px;
   font-weight: 400;
   color: var(--ink-soft);
 }
+/* BETA 안내는 화면 가운데를 지킨다 — 우측 계정 묶음을 그냥 더하면 문구가 왼쪽으로 밀린다.
+   좌·우 영역을 같은 flex 로 두면 가운데가 정확히 화면 중앙에 선다(오른쪽만 채워도). */
+.belt-side { flex: 1; display: flex; align-items: center; gap: 12px; min-width: 0; }
+.belt-right { justify-content: flex-end; }
+.belt-mid { display: flex; align-items: center; gap: 10px; flex: none; }
 .belt b {
   background: var(--surface2);
   border-radius: var(--r-ctl);
@@ -1095,3 +1100,60 @@ h1.login-head { margin-inline: auto; }
 .me-label { flex: none; width: 120px; font-size: 14px; color: var(--ink-soft); }
 .me-value { font-size: 14px; }
 .me-note { font-size: 12px; color: var(--ink-soft); }
+
+/* ── 상단 계정 바 */
+.um { position: relative; display: flex; align-items: center; gap: 12px; }
+.um-credit { font-size: 12px; color: var(--ink-soft); white-space: nowrap; }
+/* ★ 이미 있는 `.belt b` 가 BETA 배지를 만든다 — 계정 묶음이 .belt 안에 들어가므로
+   여기 <b> 도 그 규칙을 받아 **크레딧 숫자가 배지처럼 보인다.** 구체성이 같아(선택자
+   둘 다 클래스 1 + 요소 1) 나중에 오는 이 규칙이 이기지만, 배경·패딩은 덮지 않으면
+   그대로 남는다. 명시적으로 되돌린다.
+   (로그인 화면에서 전역 `h1.pgtitle` 의 margin 단축이 수정을 덮었던 것과 같은 계열이다.) */
+.um-credit b {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-weight: 600;
+  color: var(--ink);
+}
+.um-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--r-ctl);
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.um-btn:hover { background: var(--surface2); }
+.um-menu {
+  position: absolute;
+  right: 0;
+  top: 34px;
+  min-width: 168px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  padding: 6px;
+  z-index: 40;
+}
+.um-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  text-align: left;
+  text-decoration: none;
+  border-radius: var(--r-ctl);
+  padding: 8px;
+  cursor: pointer;
+}
+.um-item:hover { background: var(--surface2); }
