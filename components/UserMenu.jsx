@@ -27,7 +27,8 @@ export default function UserMenu() {
   const [open, setOpen] = useState(false);
   const box = useRef(null);
 
-  // 진입 때 한 번 읽는다. 실패하면 조용히 숨긴다 — 상단 띠가 오류로 시끄러워질 자리가 아니다.
+  // 진입 때 한 번 읽는다. 실패하면 조용히 넘긴다 — 상단 띠가 오류로 시끄러워질 자리가
+  // 아니다. 다만 **묶음을 통째로 숨기지는 않는다**(아래 주석 참고).
   useEffect(() => {
     let alive = true;
     fetch("/api/me")
@@ -50,11 +51,13 @@ export default function UserMenu() {
     };
   }, [open]);
 
-  if (!me) return null;
-
+  // ★ 로그아웃은 이제 화면에서 여기 하나뿐이다(사이드바에서 옮겨 왔다). 그래서 내 정보를
+  // 못 읽었다고 묶음을 통째로 숨기면 **세션을 끊을 방법이 아무 데도 없어진다** — 라이브
+  // GET /api/me 가 실제로 500 이었다(profiles.display_name 컬럼 없음). 데이터가 있어야
+  // 하는 것(크레딧)만 가리고, 이름 자리는 기본 라벨로 채워 빈 버튼을 만들지 않는다.
   return (
     <div className="um" ref={box}>
-      <span className="um-credit">크레딧 <b>{me.balance}</b></span>
+      {me && <span className="um-credit">크레딧 <b>{me.balance}</b></span>}
       <button
         className="um-btn"
         onClick={() => setOpen((v) => !v)}
@@ -62,7 +65,7 @@ export default function UserMenu() {
         aria-haspopup="menu"
       >
         <span className="ic"><Icon name="user" size={16} /></span>
-        {me.name}
+        {me?.name || "내 계정"}
         <span className="ic"><Icon name="caret" size={14} /></span>
       </button>
       {open && (

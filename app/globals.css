@@ -259,24 +259,8 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
 }
 .side-new:hover { background: var(--surface2); color: var(--ink); }
 
+/* 크레딧 상자는 2026-08-07 에 상단 계정 바(.um-credit)로 옮겼다 — 규칙도 함께 지웠다. */
 .side-grow { flex: 1; }
-/* 크레딧 상자 — 테스트 기간에만 유효한 안내문이다. 화면에서 가장 강한 자리를
-   차지할 이유가 없어 무채색으로 내렸다(액센트는 .side-step.on 으로 옮겼다). */
-.credit-box {
-  background: var(--surface2);
-  border: 0;
-  border-radius: var(--r-card);
-  padding: 14px;
-  font-size: 14px;
-}
-.credit-box b {
-  display: block;
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  margin-top: 2px;
-}
-.credit-box small { color: var(--ink-soft); font-size: 12px; }
 
 /* ── 홈 챗 */
 /* ── 보관함 — 내 영상 카드 */
@@ -1113,6 +1097,7 @@ h1.login-head { margin-inline: auto; }
   background: transparent;
   padding: 0;
   border-radius: 0;
+  letter-spacing: normal;
   font-weight: 600;
   color: var(--ink);
 }

@@ -1,23 +1,12 @@
 "use client";
 
+// 사이드바는 "무엇을 만들까"만 담는다. 내 계정에 관한 것(크레딧·로그아웃)은 2026-08-07 에
+// 상단 계정 바(components/UserMenu.jsx)로 옮겼다 — 두 곳에 두면 한쪽이 조용히 낡는다.
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import { createBrowserClient } from "@supabase/ssr";
+import { usePathname } from "next/navigation";
 import Icon from "./Icon";
 import { useProject } from "./ProjectContext";
 import { STEPS, currentStepKey, isReachable, stepHref } from "../lib/steps";
-
-// ★ 최종 리뷰 Minor 3 — signOut 호출이 코드 전체에 0건이었다. docs/auth-setup.md 4단계가
-// "로그아웃 후 다시 로그인"을 지시하는데 화면에 방법이 없었다.
-async function handleLogout(router) {
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  );
-  await supabase.auth.signOut();
-  router.push("/login");
-}
 
 // 진행 중인 프로젝트의 현재 단계 주소 — 없으면 새 프로젝트 화면.
 // 사이드바 '영상 만들기' 링크가 이걸 써서, 작업 중에 눌러도 프로젝트를 잃지 않는다.
@@ -62,20 +51,8 @@ function StepList({ pathname }) {
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
   const { project } = useProject();
   const inCreate = pathname.startsWith("/create");
-  // 크레딧 잔액 — 화면 진입 때 한 번 읽는다. 실패하면 조용히 숨긴다(사이드바가
-  // 오류로 시끄러워질 자리가 아니다). 소비 뒤 갱신은 새로고침이 맡는다.
-  const [credits, setCredits] = useState(null);
-  useEffect(() => {
-    let alive = true;
-    fetch("/api/credits")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (alive && d) setCredits(d); })
-      .catch(() => {});
-    return () => { alive = false; };
-  }, []);
   // 진행 중인 프로젝트가 있으면 그 프로젝트로, 없으면 새로 시작 화면으로.
   const makeVideoHref = makeHref(project);
   return (
@@ -113,19 +90,8 @@ export default function Sidebar() {
         <span className="ic"><Icon name="gear" /></span>설정
         <span className="soon-tag">준비 중</span>
       </button>
-      <button className="side-item" onClick={() => handleLogout(router)}>
-        <span className="ic"><Icon name="power" /></span>로그아웃
-      </button>
+      {/* 크레딧 상자가 없어도 목록을 위로 붙여 둔다 */}
       <div className="side-grow" />
-      <div className="credit-box">
-        크레딧
-        <b>{credits ? `${credits.balance}` : "…"}</b>
-        <small>
-          {credits && credits.balance <= 0
-            ? "운영자에게 문의해 주세요 (실비용은 비용 기록에서)"
-            : "영상을 만들 때마다 줄어요 (실비용은 비용 기록에서)"}
-        </small>
-      </div>
     </aside>
   );
 }

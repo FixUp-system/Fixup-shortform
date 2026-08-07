@@ -5,6 +5,7 @@ import { readFileSync } from "fs";
 
 const strip = (t) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 const sidebar = strip(readFileSync("components/Sidebar.jsx", "utf8"));
+const menu = strip(readFileSync("components/UserMenu.jsx", "utf8"));
 const quick = strip(readFileSync("components/QuickCreate.jsx", "utf8"));
 const admin = strip(readFileSync("app/admin/page.js", "utf8"));
 const voice = strip(readFileSync("app/create/[id]/voice/page.js", "utf8"));
@@ -18,9 +19,11 @@ describe("화면 — 크레딧", () => {
     expect(quick).not.toMatch(/videos_left/);
     expect(admin).not.toMatch(/videos_left/);
   });
-  it("사이드바가 잔액을 서버에서 읽어 크레딧으로 보여준다", () => {
-    expect(sidebar).toMatch(/\/api\/credits/);
-    expect(sidebar).toMatch(/balance/);
+  // 2026-08-07: 크레딧이 사이드바에서 상단 계정 바로 옮겨갔다. 판정 대상만 옮긴다 —
+  // 이 단정을 지우면 "크레딧이 화면에서 사라지는" 회귀를 아무도 못 잡는다.
+  it("상단 계정 바가 잔액을 서버에서 읽어 크레딧으로 보여준다", () => {
+    expect(menu).toMatch(/\/api\/me/);
+    expect(menu).toMatch(/balance/);
   });
   it("요약 카드가 이 영상의 정가를 보여준다", () => {
     expect(quick).toMatch(/videoPrice/);
