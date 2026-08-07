@@ -6,8 +6,9 @@ import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js"
 
 const signInWithPassword = vi.fn();
 const updateUserById = vi.fn();
+const signOut = vi.fn();
 const createClient = vi.fn(() => ({
-  auth: { signInWithPassword, admin: { updateUserById } },
+  auth: { signInWithPassword, admin: { updateUserById, signOut } },
 }));
 vi.mock("@supabase/supabase-js", () => ({ createClient: (...a) => createClient(...a) }));
 
@@ -33,8 +34,13 @@ describe("POST /api/me/password", () => {
     process.env.SUPABASE_URL = "https://example.supabase.co";
     process.env.SUPABASE_ANON_KEY = "anon-key";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
-    signInWithPassword.mockResolvedValue({ data: { user: { id: A } }, error: null });
+    // 실물처럼 세션까지 담는다 — 이 access_token 이 다른 기기 세션을 끊는 열쇠다.
+    signInWithPassword.mockResolvedValue({
+      data: { user: { id: A }, session: { access_token: "at-throwaway" } },
+      error: null,
+    });
     updateUserById.mockResolvedValue({ error: null });
+    signOut.mockResolvedValue({ data: null, error: null });
     await memoryStore.insertProfile({ id: A, email: "jaechan@fix-up.kr", status: "approved", role: "user" });
   });
 
@@ -105,6 +111,62 @@ describe("POST /api/me/password", () => {
     expect(logged(logSpy)).not.toContain("s3cret-new");
     errSpy.mockRestore();
     logSpy.mockRestore();
+  });
+
+  // ★ 이 라우트는 재검증마다 진짜 로그인 시도를 쏜다 — 429 에 다른 곳보다 쉽게 닿는다.
+  // 그걸 "비밀번호가 맞지 않아요"로 답하면 고칠 것도 없는데 계속 다시 누른다.
+  it("429(요청 과다)는 401 이 아니라 429 이고 '잠시 후' 문구다", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    signInWithPassword.mockResolvedValue({ data: null, error: { message: "Rate limit exceeded", status: 429 } });
+    const res = await POST(req(A, { current: "old-pass-1", next: "new-pass-1" }), {});
+    expect(res.status).toBe(429);
+    const body = await res.json();
+    expect(body.error).toMatch(/잠시 후/);
+    expect(body.error).not.toMatch(/현재 비밀번호/);
+    expect(updateUserById).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  // ★ 예방만으로는 절반이다 — 자리를 비운 사이 들어온 사람의 세션이 비밀번호를 바꾼
+  // 뒤에도 살아 있으면 복구가 안 된다. 바꾸면 그 사용자의 세션을 전부 끊는다.
+  it("바꾸고 나면 세션을 전부 끊는다(global)", async () => {
+    const res = await POST(req(A, { current: "old-pass-1", next: "new-pass-1" }), {});
+    expect(res.status).toBe(200);
+    expect(signOut).toHaveBeenCalledWith("at-throwaway", "global");
+    // 지금 브라우저도 함께 끊기므로 화면이 알아야 한다.
+    expect(await res.json()).toEqual({ ok: true, signedOut: true });
+  });
+
+  it("비밀번호가 안 바뀌었으면 세션도 안 끊는다", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    signInWithPassword.mockResolvedValue({ data: null, error: { message: "Invalid login credentials" } });
+    await POST(req(A, { current: "wrong", next: "new-pass-1" }), {});
+    expect(signOut).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  // ★ auth-js 의 admin.signOut 은 실패해도 던지지 않고 {data:null, error} 로 돌려준다.
+  // 판정하지 않으면 "세션을 끊었다"고 믿는 거짓 안전이 된다.
+  it("세션 끊기가 실패하면 조용히 넘어가지 않는다 — 로그에 남고 signedOut:false", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    signOut.mockResolvedValue({ data: null, error: { message: "invalid JWT", status: 401 } });
+    const res = await POST(req(A, { current: "old-pass-1", next: "new-pass-1" }), {});
+    // 비밀번호는 이미 바뀌었다 — 그걸 실패로 되돌리면 더 헷갈린다.
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, signedOut: false });
+    expect(logged(spy)).toMatch(/세션/);
+    spy.mockRestore();
+  });
+
+  it("재검증 응답에 세션이 없으면 끊을 열쇠가 없다 — 로그에 남고 signedOut:false", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    signInWithPassword.mockResolvedValue({ data: { user: { id: A } }, error: null });
+    const res = await POST(req(A, { current: "old-pass-1", next: "new-pass-1" }), {});
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, signedOut: false });
+    expect(signOut).not.toHaveBeenCalled();
+    expect(logged(spy)).toMatch(/세션/);
+    spy.mockRestore();
   });
 
   it("승인 대기자는 403 이다", async () => {

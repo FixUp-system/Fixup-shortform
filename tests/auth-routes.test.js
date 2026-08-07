@@ -89,6 +89,31 @@ describe("POST /api/auth/login", () => {
     expect((await loginPOST(req({ email: "a@b.com", password: "hunter22" }))).status).toBe(500);
   });
 
+  // ★ 429 도 사용자 잘못이 아니다 — 비밀번호는 맞는데 지금 답할 수 없는 것뿐이다.
+  // 401 한 문구로 뭉개면 사장님은 자기 입력을 의심하며 계속 다시 눌러 더 오래 막힌다.
+  // 계정 열거 계약과는 충돌하지 않는다: 429 는 인증 결과가 아니라 "지금은 답할 수 없다"라
+  // 계정이 있든 없든 똑같이 나간다.
+  it("429(요청 과다)는 401 이 아니라 429 이고 문구도 다르다", async () => {
+    signInWithPassword.mockResolvedValue({
+      data: null,
+      error: { message: "Request rate limit reached", status: 429 },
+    });
+    const res = await loginPOST(req({ email: "a@b.com", password: "hunter22" }));
+    expect(res.status).toBe(429);
+    const body = await res.json();
+    expect(body.error).not.toBe(WRONG_TEXT);
+    expect(body.error).toMatch(/잠시 후/);
+  });
+
+  it("429 문구는 계정이 있든 없든 같다 — 열거를 흘리지 않는다", async () => {
+    signInWithPassword.mockResolvedValue({ data: null, error: { message: "over_request_rate_limit", status: 429 } });
+    const a = await loginPOST(req({ email: "a@b.com", password: "hunter22" }));
+    signInWithPassword.mockResolvedValue({ data: null, error: { message: "over_email_send_rate_limit", status: 429 } });
+    const b = await loginPOST(req({ email: "ghost@b.com", password: "hunter22" }));
+    expect(a.status).toBe(b.status);
+    expect(await a.json()).toEqual(await b.json());
+  });
+
   it("status 없는 오류는 여전히 401 — 안전한 쪽으로 떨어뜨린다", async () => {
     signInWithPassword.mockResolvedValue({ data: null, error: { message: "Invalid login credentials" } });
     const res = await loginPOST(req({ email: "a@b.com", password: "hunter22" }));
@@ -166,6 +191,14 @@ describe("POST /api/auth/signup", () => {
   it("네트워크 실패(status 0)도 500 이다", async () => {
     signUp.mockResolvedValue({ data: null, error: { message: "Failed to fetch", status: 0 } });
     expect((await signupPOST(req({ email: "a@b.com", password: "hunter22" }))).status).toBe(500);
+  });
+
+  // 가입도 같은 계약이다 — 세 라우트가 429 를 똑같이 다룬다.
+  it("429(요청 과다)는 400 이 아니라 429 다", async () => {
+    signUp.mockResolvedValue({ data: null, error: { message: "over_request_rate_limit", status: 429 } });
+    const res = await signupPOST(req({ email: "a@b.com", password: "hunter22" }));
+    expect(res.status).toBe(429);
+    expect((await res.json()).error).toMatch(/잠시 후/);
   });
 
   it("status 없는 오류는 여전히 400 — 원인을 풀어 준다", async () => {
