@@ -62,6 +62,12 @@ create table if not exists profiles (
   approved_at timestamptz
 );
 
+-- 표시명 — 마이페이지에서 이용자가 직접 고친다(2026-08-07).
+-- ★ app_metadata 가 아니라 여기다. app_metadata 는 middleware 가 매 요청 읽는
+-- **게이트용 캐시**이고(status·role), 이름은 게이트가 아니다. 거기 두면 원장(profiles)과
+-- 이중 쓰기를 지켜야 하는 자리가 하나 더 는다.
+alter table profiles add column if not exists display_name text;
+
 -- 업로드는 프로젝트가 생기기 전에 일어나서 역조회할 대상이 없다.
 -- Storage 키에 owner 를 접두어로 넣는 방법도 있으나 URL 형태가 바뀌어
 -- 문서에 박힌 material.photos[].url 이 깨진다 — 이관에서 지킨 불변조건이다.
