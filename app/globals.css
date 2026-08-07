@@ -259,8 +259,10 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
 }
 .side-new:hover { background: var(--surface2); color: var(--ink); }
 
-/* 크레딧 상자는 2026-08-07 에 상단 계정 바(.um-credit)로 옮겼다 — 규칙도 함께 지웠다. */
+/* 목록을 사이드바 위쪽에 붙여 둔다 — 아래 여백을 이것이 먹는다. */
 .side-grow { flex: 1; }
+/* (여기 있던 .credit-box 규칙 셋은 2026-08-07 에 지웠다 — 크레딧이 상단 계정 바
+   .um-credit 으로 옮겨 갔다. 사이드바에는 더 이상 크레딧이 없다.) */
 
 /* ── 홈 챗 */
 /* ── 보관함 — 내 영상 카드 */
