@@ -10,8 +10,20 @@ const css = readFileSync("app/globals.css", "utf8");
 const cssRules = css.replace(/\/\*[\s\S]*?\*\//g, "");
 
 // 이름 붙은 함수의 본문(바깥 중괄호 안쪽)을 통째로 떼어낸다.
+// ★ 못 찾으면 **던진다.** 예전에는 조용히 넘어갔는데, indexOf 가 -1 을 주면
+// indexOf("{", -1) 이 파일 처음부터 훑어 `import { … }` 의 중괄호를 함수 본문으로 잡았다.
+// 그러면 컴포넌트를 화살표 함수로 바꾸는 것 같은 뜻 같은 리팩터에서 "returns=[]" 로
+// 빨개지는데 원인을 못 가리킨다 — 코드가 아니라 테스트를 고치게 만드는 거짓 실패다.
 function body(src, fnName) {
-  const open = src.indexOf("{", src.indexOf(`function ${fnName}(`));
+  const at = src.indexOf(`function ${fnName}(`);
+  if (at === -1) {
+    throw new Error(
+      `함수 선언 \`function ${fnName}(\` 를 못 찾았다. ` +
+      "선언 방식이 바뀌었다면(예: 화살표 함수) 이 헬퍼부터 고쳐야 한다 — " +
+      "그러지 않으면 아래 단정들이 엉뚱한 곳을 읽고 거짓으로 빨개진다."
+    );
+  }
+  const open = src.indexOf("{", at);
   let depth = 0;
   for (let i = open; i < src.length; i++) {
     if (src[i] === "{") depth++;
@@ -20,17 +32,22 @@ function body(src, fnName) {
   return src.slice(open + 1);
 }
 
-// 함수 **최상위**(중첩 깊이 1)의 return 문만 골라 첫 줄을 돌려준다.
+// 함수 **최상위**(중첩 깊이 0)의 return 문만 골라 `{ head, firstToken }` 로 돌려준다.
+//  · head — 그 줄(예: `return (`)
+//  · firstToken — 돌려주는 식의 첫 글자. 앞의 여백과 여는 괄호를 걷어낸 뒤 한 글자다.
+//    `<` 면 조건 없는 JSX 고, `!`·`m` 이면 괄호 **안쪽**에 조건이 끼어든 것이다.
+//    (head 만 보던 시절에는 `return (\n  !me ? null :\n  <div…>` 가 그냥 지나갔다.)
 // useEffect 콜백 안의 return(정리 함수·이른 탈출)은 더 깊이 있어 안 걸린다 —
 // 그래서 "컴포넌트가 화면에 무엇을 돌려주는가"만 남는다.
 //
 // 한계(소스 검사라 어쩔 수 없다, 알고 쓴다):
 //  · 중괄호를 세는 방식이라 문자열·정규식 안의 중괄호가 있으면 깊이가 흔들린다.
 //    지금 이 파일에는 없고, 생기면 이 테스트가 먼저 깨져 알려 준다.
-//  · 블록으로 감싼 조기 반환(`if (!me) { return … }`)은 깊이 2라 안 걸린다.
+//  · 블록으로 감싼 조기 반환(`if (!me) { return … }`)은 깊이 1이라 안 걸린다.
 //    그래서 호출부에서 `return null` 을 따로 한 번 더 문다.
-//    그 둘을 합쳐도 `if (!me) { return <span /> }` 는 못 잡는다 — 진짜로 막으려면
-//    렌더 테스트가 필요한데, 이 저장소에는 React 렌더 테스트가 없다.
+//    그 둘을 합쳐도 **`if (!me) { return <span /> }` 하나는 못 잡는다**(블록 + null 아님).
+//    진짜로 막으려면 렌더 테스트가 필요한데, 이 저장소에는 React 렌더 테스트가 없다.
+//    (로그아웃이 `{open && …}` 드롭다운 안이라 SSR 렌더만으로도 못 연다.)
 function topLevelReturns(src, fnName) {
   const inner = body(src, fnName);
   const out = [];
@@ -38,13 +55,41 @@ function topLevelReturns(src, fnName) {
   for (let i = 0; i < inner.length; i++) {
     if (inner[i] === "{") depth++;
     else if (inner[i] === "}") depth--;
-    else if (depth === 0 && inner.startsWith("return", i) && !/[\w$]/.test(inner[i - 1] || " ")) {
+    else if (depth === 0 && inner.startsWith("return", i) && !/[\w$.]/.test(inner[i - 1] || " ")) {
       const end = inner.indexOf("\n", i);
-      out.push(inner.slice(i, end === -1 ? undefined : end).trim().replace(/;$/, ""));
+      const head = inner.slice(i, end === -1 ? undefined : end).trim().replace(/;$/, "");
+      const expr = inner.slice(i + "return".length).replace(/^[\s(]+/, "");
+      out.push({ head, firstToken: expr[0] || "" });
     }
   }
   return out;
 }
+
+// 그물을 지탱하는 것이 이 헬퍼 둘이다. 여기가 조용히 틀리면 아래 단정이 전부 의미를 잃는데
+// 아무도 안 알려 준다 — 그래서 헬퍼 자체를 알려진 입력으로 문다.
+describe("회귀 그물을 지탱하는 헬퍼", () => {
+  it("함수 본문만 떼어낸다", () => {
+    expect(body("const x = { a: 1 };\nfunction f(a) { return 1; }\n", "f")).toBe(" return 1; ");
+  });
+  it("선언을 못 찾으면 조용히 넘어가지 않고 던진다", () => {
+    expect(() => body("const F = () => { return 1; };", "F")).toThrow(/못 찾았다/);
+  });
+  it("최상위 return 만 센다 — 콜백 안의 return 은 안 센다", () => {
+    const src = "function f() {\n  useEffect(() => {\n    if (!x) return;\n    return () => stop();\n  }, []);\n  return (\n    <div />\n  );\n}\n";
+    expect(topLevelReturns(src, "f").map((r) => r.head)).toEqual(["return ("]);
+  });
+  it("돌려주는 식의 첫 토큰을 집는다 — 괄호 안쪽까지 본다", () => {
+    const jsx = "function f() {\n  return (\n    <div />\n  );\n}\n";
+    const cond = "function f() {\n  return (\n    !x ? null :\n    <div />\n  );\n}\n";
+    expect(topLevelReturns(jsx, "f")[0].firstToken).toBe("<");
+    expect(topLevelReturns(cond, "f")[0].firstToken).toBe("!");
+  });
+  it("블록으로 감싼 조기 반환은 못 본다 — 알려진 사각지대(그래서 return null 을 따로 문다)", () => {
+    const src = "function f() {\n  if (!x) { return null; }\n  return (\n    <div />\n  );\n}\n";
+    expect(topLevelReturns(src, "f")).toHaveLength(1);
+    expect(body(src, "f")).toMatch(/return\s+null/);
+  });
+});
 
 describe("상단 계정 바", () => {
   it("내 정보를 서버에서 한 번에 읽는다 — 이름과 크레딧을 따로 부르지 않는다", () => {
@@ -75,12 +120,16 @@ describe("상단 계정 바", () => {
   // `if (me === null) return null;` 로 바꾸면 전부 그린인 채 로그아웃이 다시 사라졌다.
   // 그래서 문장이 아니라 **모양**을 문다: 컴포넌트가 돌려주는 것은 조건 없는 JSX 하나뿐이고,
   // 그 앞에 어떤 조기 반환도 없다.
-  it("내 정보를 못 읽어도 로그아웃은 그린다 — 조기 반환이 없다", () => {
+  it("내 정보를 못 읽어도 로그아웃은 그린다 — 조기 반환도 조건부 반환도 없다", () => {
     const returns = topLevelReturns(menu, "UserMenu");
     // 표현이 무엇이든(null·JSX·삼항) 조기 반환이 하나라도 생기면 여기서 걸린다.
     expect(returns).toHaveLength(1);
     // 유일한 반환이 곧 계정 묶음이다 — `return me ? (…) : null` 같은 감싸기도 못 지나간다.
-    expect(returns[0]).toBe("return (");
+    expect(returns[0].head).toBe("return (");
+    // ★ 괄호 **안쪽**까지 본다. 여는 괄호 다음 첫 토큰이 `<`(=조건 없는 JSX)여야 한다.
+    // 이게 없으면 `return (\n  !me ? null :\n  <div className="um">` 가 그냥 지나간다 —
+    // 최상위 return 은 하나고 첫 줄도 `return (` 라서 위 두 줄에 안 걸린다.
+    expect(returns[0].firstToken).toBe("<");
     // 블록으로 감싼 조기 반환(`if (!me) { return null }`)은 중첩이라 위 스캔을 빠져나간다.
     // 표현으로 한 번 더 문다.
     expect(body(menu, "UserMenu")).not.toMatch(/return\s+null/);
