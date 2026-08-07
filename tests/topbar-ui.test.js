@@ -145,8 +145,13 @@ describe("회귀 그물을 지탱하는 헬퍼", () => {
 });
 
 describe("상단 계정 바", () => {
-  it("내 정보를 서버에서 한 번에 읽는다 — 이름과 크레딧을 따로 부르지 않는다", () => {
-    expect(menu).toMatch(/\/api\/me/);
+  // ★ 판정 대상이 옮겨졌다 — 예전에는 이 컴포넌트가 GET /api/me 를 직접 불렀고 여기서
+  // `menu` 가 "/api/me" 를 담는지 물었다. 이제는 공유본(components/MeContext.jsx)이
+  // 한 번만 읽고 셋이 나눠 쓴다. "한 번만 읽는다"는 단정은 지우지 않고
+  // tests/me-context.test.js 로 옮겼다 — 여기서는 **직접 부르지 않는다**를 문다.
+  it("내 정보를 직접 읽지 않고 공유본에서 받는다 — 이름과 크레딧을 따로 부르지 않는다", () => {
+    expect(menu).toMatch(/useMe\(\)/);
+    expect(menu).not.toMatch(/fetch\(/);
     expect(menu).not.toMatch(/\/api\/credits/);
   });
 
@@ -188,7 +193,9 @@ describe("상단 계정 바", () => {
     // `{me && open && (` 로 바꾸면 return 문을 한 글자도 안 건드리고 로그아웃만 사라진다.
     //
     // 그래서 컴포넌트 본문에서 **식별자 `me` 가 나타나는 자리의 수**를 센다. 지금 넷뿐이다:
-    //   ① 선언 `const [me, setMe]`  ② 크레딧 조건 `me &&`  ③ 잔액 `me.balance`  ④ 이름 `me?.name`
+    //   ① 공유본에서 받기 `const { me } = useMe()`  ② 크레딧 조건 `me &&`
+    //   ③ 잔액 `me.balance`  ④ 이름 `me?.name`
+    // (예전 ①은 `const [me, setMe] = useState(null)` 이었다 — 자리가 바뀌었을 뿐 수는 같다.)
     // 하나라도 늘면 **`me` 로 무언가를 새로 가린 것**이다 — 그것이 JSX 안쪽이든
     // (`{me && open && (`) 반환문 위든(`const ready = !!me;`) 상관없이 걸린다.
     // 표현도 안 가린다: `me !== null`·`me != null`·`Boolean(me)`·`me?.id` 전부 같은 식별자다.

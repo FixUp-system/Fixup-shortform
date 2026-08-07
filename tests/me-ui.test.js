@@ -6,9 +6,44 @@ import { readFileSync } from "node:fs";
 const strip = (t) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 const me = strip(readFileSync("app/me/page.js", "utf8"));
 
+// 이름 붙은 함수의 본문만 떼어낸다(topbar-ui.test.js 와 같은 방식).
+// 못 찾으면 던진다 — 조용히 넘어가면 아래 단정이 엉뚱한 곳을 읽고 거짓으로 초록이 된다.
+function body(src, fnName) {
+  const at = src.indexOf(`function ${fnName}(`);
+  if (at === -1) throw new Error(`함수 선언 \`function ${fnName}(\` 를 못 찾았다 — 이 헬퍼부터 고쳐라`);
+  const open = src.indexOf("{", at);
+  let depth = 0;
+  for (let i = open; i < src.length; i++) {
+    if (src[i] === "{") depth++;
+    else if (src[i] === "}" && --depth === 0) return src.slice(open + 1, i);
+  }
+  return src.slice(open + 1);
+}
+
 describe("마이페이지", () => {
-  it("서버에서 내 정보를 읽는다", () => {
-    expect(me).toMatch(/\/api\/me/);
+  // ★ 읽기는 이제 공유본이 한다(components/MeContext.jsx). 여기서 따로 읽으면
+  // 이름을 저장해도 상단바가 옛 이름을 그대로 보여준다 — 그게 이번 수정의 원인이었다.
+  it("내 정보를 공유본에서 받는다 — 혼자 읽지 않는다", () => {
+    expect(me).toMatch(/useMe\(\)/);
+    expect(me).not.toMatch(/fetch\("\/api\/me"\)/);
+  });
+
+  // ★★ 이번 수정의 본체 — 이름을 저장한 뒤 **공유본을** 다시 읽는다.
+  // 그래야 상단 계정 바가 새로고침 없이 새 이름으로 바뀐다. 저장 함수 안에서 PATCH 뒤에
+  // load() 가 와야 하며(순서가 뒤집히면 옛 값을 다시 읽는다), 자기 상태만 갱신하면 안 된다.
+  it("이름을 저장하면 공유본을 다시 읽는다 — 상단바가 함께 바뀐다", () => {
+    const save = body(me, "saveName");
+    expect(save).toMatch(/method:\s*["']PATCH["'][\s\S]*?await load\(\)/);
+    // 공유본의 load 를 쓴다 — 이 화면만의 읽기를 새로 만들면 상단바는 또 모른다.
+    expect(save).not.toMatch(/fetch\("\/api\/me"\)/);
+    expect(me).toMatch(/const \{ me, failed, load \} = useMe\(\)/);
+  });
+
+  // ★ 비밀번호를 바꾸면 서버가 세션을 끊는다(scope: global). 그 뒤 GET /api/me 는 401 이라,
+  // 공유본을 다시 읽으면 "내 정보를 읽지 못했어요"가 떠 로그인 화면으로 넘어가는 1.5초 동안
+  // 화면이 시끄러워진다. 여기서는 다시 읽지 않는다.
+  it("비밀번호를 바꾼 뒤에는 공유본을 다시 읽지 않는다", () => {
+    expect(body(me, "changePassword")).not.toMatch(/load\(\)/);
   });
 
   it("이름을 PATCH 로 저장한다", () => {
@@ -61,6 +96,8 @@ describe("마이페이지", () => {
 
   it("정보를 못 읽으면 그 사실을 알리고 다시 시도할 길을 준다", () => {
     expect(me).toMatch(/loadErr/);
+    // 실패 여부는 공유본이 알려 준다 — 화면은 그것을 문구로 옮길 뿐이다.
+    expect(me).toMatch(/failed \?/);
     expect(me).toMatch(/읽지 못했어요/);
     expect(me).toMatch(/다시 불러오기/);
   });

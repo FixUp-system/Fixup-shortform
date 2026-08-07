@@ -8,14 +8,22 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { NAME_MAX } from "../../lib/display-name";
+import { useMe } from "../../components/MeContext";
 
 export default function MePage() {
   const router = useRouter();
-  const [me, setMe] = useState(null);
+  // 내 정보는 화면 셋(상단바·사이드바·여기)이 함께 보는 공유본에서 받는다.
+  // 여기서만 따로 읽으면 이름을 저장해도 상단바가 옛 이름을 그대로 보여준다
+  // (components/MeContext.jsx — 이번 수정의 본체).
+  const { me, failed, load } = useMe();
   const [name, setName] = useState("");
   const [nameMsg, setNameMsg] = useState("");
-  const [loadErr, setLoadErr] = useState("");
   const [busy, setBusy] = useState("");
+
+  // 못 읽었다는 사실을 화면에 드러낸다. 조용히 넘기면 이메일·가입일이 영원히 "…" 로 남아
+  // "불러오는 중"과 "못 읽었다"를 구분할 수 없고, 무엇보다 이름칸이 빈 채로 남아
+  // [저장] 을 누르면 저장돼 있던 이름이 지워진다.
+  const loadErr = failed ? "내 정보를 읽지 못했어요 — 잠시 뒤 다시 시도해 주세요." : "";
 
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -27,22 +35,9 @@ export default function MePage() {
   const goLoginTimer = useRef(null);
   useEffect(() => () => clearTimeout(goLoginTimer.current), []);
 
-  // 내 정보 읽기. 실패를 **삼키지 않는다** — 조용히 돌아가면 이메일·가입일이 영원히 "…" 로
-  // 남아 "불러오는 중"과 "못 읽었다"를 구분할 수 없고, 무엇보다 이름칸이 빈 채로 남아
-  // [저장] 을 누르면 저장돼 있던 이름이 지워진다.
-  async function load() {
-    setLoadErr("");
-    try {
-      const r = await fetch("/api/me");
-      if (!r.ok) throw new Error("내 정보를 읽지 못했어요");
-      const d = await r.json();
-      setMe(d);
-      setName(d.name);
-    } catch {
-      setLoadErr("내 정보를 읽지 못했어요 — 잠시 뒤 다시 시도해 주세요.");
-    }
-  }
-  useEffect(() => { load(); }, []);
+  // 공유본이 바뀌면 이름칸을 서버 값으로 맞춘다 — 첫 진입과 저장 뒤 재조회 양쪽에서 돈다.
+  // (읽기 자체는 MeProvider 가 한 번만 한다.)
+  useEffect(() => { if (me) setName(me.name); }, [me]);
 
   async function saveName(e) {
     e.preventDefault();
@@ -64,6 +59,10 @@ export default function MePage() {
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || "저장하지 못했어요");
       setNameMsg("저장했어요");
+      // ★ 이번 수정의 본체 — 저장 뒤 **공유본을** 다시 읽는다. 그래야 상단 계정 바가
+      // 새로고침 없이 새 이름으로 바뀐다(예전에는 이 화면의 상태만 갱신돼 상단바가 옛
+      // 이름을 그대로 들고 있었다). 실패해도 던지지 않고 failed 로 화면에 드러난다 —
+      // 저장은 이미 성공했으므로 "저장했어요"를 오류로 덮지 않는다.
       await load();
     } catch (err) {
       setNameMsg(err.message);
@@ -101,6 +100,9 @@ export default function MePage() {
         throw new Error(d.error || "바꾸지 못했어요");
       }
       setCurrent(""); setNext(""); setConfirm("");
+      // ★ 여기서는 공유본을 **다시 읽지 않는다.** 세션이 이미 끊긴 상태라 GET /api/me 는
+      // 401 이고, 공유본이 그 실패를 "못 읽었다"로 표시하면 로그인 화면으로 넘어가는
+      // 1.5초 동안 "내 정보를 읽지 못했어요"가 함께 떠 화면이 시끄러워진다.
       // ★ 서버가 살아 있는 세션을 전부 끊는다(scope: global) — 자리를 비운 사이 이미
       // 들어와 있던 사람을 쫓아내려면 그래야 한다. 지금 브라우저도 함께 끊기므로
       // 그 사실을 먼저 알리고 로그인 화면으로 보낸다. 이 안내가 없으면 사장님은

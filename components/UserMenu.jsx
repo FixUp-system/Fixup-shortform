@@ -10,6 +10,10 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import Icon from "./Icon";
+// 내 정보는 직접 읽지 않는다 — AppShell 이 세운 공유본에서 받는다(components/MeContext.jsx).
+// 예전에는 여기서 한 번, 사이드바에서 또 한 번 GET /api/me 를 불렀고, 마이페이지에서 이름을
+// 바꿔도 이 버튼은 옛 이름을 그대로 들고 있었다(새로고침해야 반영).
+import { useMe } from "./MeContext";
 
 // 사이드바에 있던 것을 그대로 옮겼다(새로 쓰지 않는다).
 async function handleLogout(router) {
@@ -23,20 +27,12 @@ async function handleLogout(router) {
 
 export default function UserMenu() {
   const router = useRouter();
-  const [me, setMe] = useState(null);
+  // 공유본이 진입 때 한 번 읽는다. 실패하면 여기서는 조용히 넘긴다(값이 null 로 남을 뿐) —
+  // 상단 띠가 오류로 시끄러워질 자리가 아니다. 다만 **묶음을 통째로 숨기지는 않는다**
+  // (아래 주석 참고). 마이페이지가 이름을 저장한 뒤 공유본을 다시 읽으면 이 버튼도 함께 바뀐다.
+  const { me } = useMe();
   const [open, setOpen] = useState(false);
   const box = useRef(null);
-
-  // 진입 때 한 번 읽는다. 실패하면 조용히 넘긴다 — 상단 띠가 오류로 시끄러워질 자리가
-  // 아니다. 다만 **묶음을 통째로 숨기지는 않는다**(아래 주석 참고).
-  useEffect(() => {
-    let alive = true;
-    fetch("/api/me")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (alive && d) setMe(d); })
-      .catch(() => {});
-    return () => { alive = false; };
-  }, []);
 
   // 바깥 클릭·Esc 로 닫는다. 열려 있을 때만 듣는다.
   useEffect(() => {

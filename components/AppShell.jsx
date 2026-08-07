@@ -17,6 +17,9 @@ import UserMenu from "./UserMenu";
 // 이 모듈은 순수 상수만 담고 있어 next/server 같은 서버 전용 의존을 끌고 오지 않는다 —
 // 클라이언트 컴포넌트(AppShell)에서 안전하게 import 할 수 있다.
 import { isBarePath } from "../lib/auth/paths.js";
+// 내 정보 공유본 — 상단바·사이드바·마이페이지가 GET /api/me 를 한 번만 읽어 나눠 쓴다.
+// ★ bare 갈래에는 두지 않는다: /login·/pending 에서 그 요청은 401(승인 대기자는 403)이다.
+import { MeProvider } from "./MeContext";
 
 export default function AppShell({ children }) {
   const pathname = usePathname();
@@ -28,7 +31,7 @@ export default function AppShell({ children }) {
   }
 
   return (
-    <>
+    <MeProvider>
       <div className="belt">
         <span className="belt-side" />
         <span className="belt-mid">
@@ -42,6 +45,6 @@ export default function AppShell({ children }) {
         <Sidebar />
         <main className="work">{children}</main>
       </div>
-    </>
+    </MeProvider>
   );
 }
