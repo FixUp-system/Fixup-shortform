@@ -8,7 +8,7 @@ import { withUser } from "../../../lib/auth/require-user.js";
 import { getStore } from "../../../lib/store/index.js";
 import { balanceFor } from "../../../lib/charges.js";
 import { fakeFal } from "../../../lib/fake.js";
-import { displayNameOf } from "../../../lib/display-name.js";
+import { displayNameOf, NAME_MAX } from "../../../lib/display-name.js";
 
 export const GET = withUser(async (_req, _ctx, user) => {
   const store = getStore();
@@ -28,4 +28,22 @@ export const GET = withUser(async (_req, _ctx, user) => {
     gated: !fakeFal(),
     projectCount: await store.countProjects(user.id),
   });
+});
+
+// PATCH /api/me — 이름만 고친다.
+//
+// ★ 몸통을 그대로 updateProfile 에 넘기면 status·role 이 함께 넘어간다(권한 상승).
+// 화이트리스트로 이름 하나만 뽑는다.
+export const PATCH = withUser(async (req, _ctx, user) => {
+  const body = await req.json().catch(() => ({}));
+  if (typeof body?.name !== "string") {
+    return Response.json({ error: "이름을 넣어 주세요" }, { status: 400 });
+  }
+  const name = body.name.trim();
+  if (name.length > NAME_MAX) {
+    return Response.json({ error: `이름은 ${NAME_MAX}자까지예요` }, { status: 400 });
+  }
+  // 빈 이름은 지우는 것으로 본다 — null 이면 화면이 이메일 앞부분으로 돌아간다.
+  await getStore().updateProfile(user.id, { display_name: name || null });
+  return Response.json({ ok: true });
 });
