@@ -1081,7 +1081,23 @@ h1.login-head { margin-inline: auto; }
 .me-h { font-size: 16px; font-weight: 600; margin: 0 0 12px; }
 /* 폭을 죈다 — 안 죄면 1280px 화면에서 이름·비밀번호 칸이 820px 가 된다(실측).
    20자 이름과 비밀번호에 그만한 칸은 "여기가 아직 안 끝났나" 로 읽힌다. */
-.me-form { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; max-width: 520px; }
+.me-form { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; max-width: 640px; }
+/* 실행 버튼은 입력칸과 **같은 줄**, 그 바로 오른쪽이다. 줄을 따로 두면 폼이 한 칸 더
+   길어 보이고, 무엇을 저장하는 버튼인지도 한 번 더 짚어야 한다.
+   ★ 입력칸에 남은 폭을 주면(flex:1) 버튼이 붙은 줄만 좁아진다 — 실측으로 388 vs 295 라
+   칸들의 오른쪽 끝이 계단처럼 어긋났다. 그래서 폭을 한 값으로 못 박고, 버튼은 그
+   오른쪽에 매달려 **줄만** 길어지게 한다. 그러면 입력칸의 좌·우 끝이 전부 한 줄에 선다. */
+.me-form .me-row { width: auto; }
+.me-row .sent-input { flex: none; width: 380px; }
+/* ★ 전역 .cta 에 margin-top: 20px 가 있다(버튼이 폼 아래에 홀로 설 때를 위한 값).
+   같은 줄에 들어오면 그 여백이 줄 높이를 46 → 66px 로 밀고 버튼만 10px 내려앉는다.
+   실측으로 잡았다 — 소스만 봐서는 이 줄에 남의 margin 이 실려 있는 줄 모른다. */
+.me-row .cta { flex: none; margin: 0; }
+/* 같은 줄에 서면 높이가 같아야 한다. 기본형끼리는 안 맞는다 — .sent-input 은 44.9px,
+   .cta 는 49.6px 라(실측) 버튼만 위아래로 삐져나와 입력칸에 얹힌 것처럼 보인다.
+   각자의 padding 을 고쳐 맞추면 남의 값 둘에 매달리므로, 이 줄에서만 높이를 못 박는다. */
+.me-row .sent-input,
+.me-row .cta { height: 46px; }
 .me-row { display: flex; align-items: center; gap: 12px; width: 100%; }
 .me-label { flex: none; width: 120px; font-size: 14px; color: var(--ink-soft); }
 .me-value { font-size: 14px; }

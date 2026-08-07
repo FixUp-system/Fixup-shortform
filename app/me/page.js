@@ -125,9 +125,10 @@ export default function MePage() {
           </p>
         )}
         <form className="me-form" onSubmit={saveName}>
-          <label className="me-row">
-            <span className="me-label">이름</span>
+          <div className="me-row">
+            <label className="me-label" htmlFor="me-name">이름</label>
             <input
+              id="me-name"
               className="sent-input"
               value={name}
               maxLength={NAME_MAX}
@@ -135,8 +136,8 @@ export default function MePage() {
               onChange={(e) => setName(e.target.value)}
               placeholder={me ? "화면에 보일 이름" : "불러오는 중…"}
             />
-          </label>
-          <button className="cta" disabled={busy === "name" || !me}>저장</button>
+            <button className="cta" disabled={busy === "name" || !me}>저장</button>
+          </div>
         </form>
         {nameMsg && <p className="pgsub">{nameMsg}</p>}
 
@@ -168,12 +169,15 @@ export default function MePage() {
             <input className="sent-input" type="password" autoComplete="new-password"
               value={next} onChange={(e) => setNext(e.target.value)} />
           </label>
-          <label className="me-row">
-            <span className="me-label">새 비밀번호 확인</span>
-            <input className="sent-input" type="password" autoComplete="new-password"
+          {/* 마지막 칸과 [바꾸기]를 같은 줄에 둔다 — 이름 쪽과 같은 모양이라야
+              두 폼이 따로 놀지 않는다. label 로 감싸면 버튼을 눌러도 입력칸이
+              포커스를 가져가므로 여기만 div + htmlFor 로 푼다. */}
+          <div className="me-row">
+            <label className="me-label" htmlFor="me-pw-confirm">새 비밀번호 확인</label>
+            <input id="me-pw-confirm" className="sent-input" type="password" autoComplete="new-password"
               value={confirm} onChange={(e) => setConfirm(e.target.value)} />
-          </label>
-          <button className="cta" disabled={busy === "pw"}>바꾸기</button>
+            <button className="cta" disabled={busy === "pw"}>바꾸기</button>
+          </div>
         </form>
         {pwMsg && <p className="pgsub">{pwMsg}</p>}
       </section>
