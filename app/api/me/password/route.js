@@ -60,49 +60,73 @@ export const POST = withUser(async (req, _ctx, user) => {
     return Response.json({ error: "현재 비밀번호가 맞지 않아요" }, { status: 401 });
   }
 
-  // ② 변경 — service_role.
   const admin = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false },
   });
-  const { error } = await admin.auth.admin.updateUserById(user.id, { password: next });
-  if (error) {
-    console.error("비밀번호 변경 실패:", error.message);
-    return Response.json({ error: "비밀번호를 바꾸지 못했어요" }, { status: 502 });
-  }
 
-  // ③ 살아 있는 세션을 전부 끊는다.
+  // ② 살아 있는 세션을 전부 끊는다 — **비밀번호를 바꾸기 전에.**
   //
   // ★ 여기까지는 **예방**이다 — 남이 비밀번호를 바꾸는 것은 막았지만, 자리를 비운 사이
-  // 이미 들어와 있던 사람의 세션은 비밀번호를 바꿔도 그대로 살아 있다(updateUserById 는
-  // refresh token 을 무효화하지 않는다). 그러면 **복구**가 안 된다 — 비밀번호를 바꾼
+  // 이미 들어와 있던 사람의 세션이 살아 있으면 **복구**가 안 된다. 비밀번호를 바꾼
   // 이유가 바로 그 사람을 쫓아내는 것인데.
+  //
+  // ★ 순서가 이 자리의 전부다(2026-08-07 라이브 실측). 예전에는 바꾼 **뒤** 끊었는데,
+  // updateUserById({password}) 가 ①에서 만든 재검증 세션까지 함께 무효화해서 그때 쥔
+  // access_token 이 이미 죽어 있었다 — signOut 이 **매번** `400 Auth session missing!`
+  // 으로 실패했고, 응답은 `signedOut:false` 로 나가 화면이 "다른 기기의 로그인을 끊지
+  // 못했어요"라는 **거짓 경고**를 띄웠다(실제로는 끊겼다). 바꾸기 전에 부르면 토큰이
+  // 살아 있어 성공한다.
   //
   // ★ auth-js 의 admin.signOut(jwt, scope) 은 첫 인자가 user id 가 **아니라 access token**
   // 이다(uuid 를 넘기면 던지지 않고 {data:null, error} 로 조용히 401 을 돌려준다 —
   // app/api/admin/users/[id]/route.js 에 그 사고 기록이 있다). 그래서 ①에서 재검증하며
-  // 받은 세션의 access_token 을 쓴다. 그리고 **오류를 반드시 판정한다** — 조용히 실패하면
-  // "세션을 끊었다"고 믿는 거짓 안전이 된다.
+  // 받은 세션의 access_token 을 쓴다.
   //
   // ★ scope 는 'global' 이다. 'others' 는 그 jwt 의 세션만 남기는데, 우리가 쥔 jwt 는
   // 지금 브라우저가 아니라 재검증용으로 잠깐 만든 세션이다 — 그걸 쓰면 침입자 대신
   // 버려질 세션만 살아남는다. 정반대다. 그래서 전부 끊고, **지금 브라우저도 함께 끊긴다**는
   // 사실을 응답의 signedOut 으로 화면에 알린다(다시 로그인하라고 안내할 수 있게).
-  // 지금 세션만 살리려면 브라우저의 access token 이 필요한데, 그건 쿠키 클라이언트를
-  // 건드려야 나온다 — ②의 이유(쿠키를 안 만진다)와 정면으로 부딪혀 택하지 않았다.
-  let signedOut = false;
+  //
+  // ★ 끊지 못하면 **비밀번호를 바꾸지 않고 멈춘다.** 여기서 그냥 지나가면 signedOut 이
+  // 다시 추측이 되고, 거짓 경고가 그대로 돌아온다. 멈추면 아무것도 안 바뀐 상태라
+  // 사장님은 그냥 다시 누르면 된다.
   const token = checked?.session?.access_token;
   if (!token) {
     console.error("세션을 끊지 못했다 — 재검증 응답에 access_token 이 없다:", user.id);
-  } else {
-    const { error: outErr } = await admin.auth.admin.signOut(token, "global");
-    if (outErr) {
-      console.error("세션 끊기 실패:", outErr.status, outErr.message);
-    } else {
-      signedOut = true;
-    }
+    return Response.json(
+      { error: "비밀번호를 바꾸지 못했어요 — 잠시 후 다시 시도해 주세요", signedOut: false },
+      { status: 502 }
+    );
+  }
+  const { error: outErr } = await admin.auth.admin.signOut(token, "global");
+  if (outErr) {
+    console.error("세션 끊기 실패:", outErr.status, outErr.message);
+    return Response.json(
+      { error: "비밀번호를 바꾸지 못했어요 — 잠시 후 다시 시도해 주세요", signedOut: false },
+      { status: 502 }
+    );
+  }
+
+  // ③ 변경 — service_role.
+  //
+  // ★ 여기서 실패하면 **비밀번호는 그대로인데 모든 기기가 로그아웃된 상태**다. 안전한
+  // 쪽(비밀번호가 안 새는 쪽)이지만 사장님에게는 당황스러우니, 문구가 그 상태를 그대로
+  // 말한다 — "쓰던 비밀번호로 다시 로그인하세요". signedOut:true 를 함께 보내 화면이
+  // 로그인 화면으로 안내할 수 있게 한다.
+  const { error } = await admin.auth.admin.updateUserById(user.id, { password: next });
+  if (error) {
+    console.error("비밀번호 변경 실패:", error.message);
+    console.log(`[비밀번호 변경] ${user.id} 본인 · 변경 실패 · 세션 끊김=true`);
+    return Response.json(
+      {
+        error: "비밀번호를 바꾸지 못했어요 — 안전을 위해 모든 기기에서 로그아웃했어요. 쓰던 비밀번호로 다시 로그인한 뒤 다시 시도해 주세요.",
+        signedOut: true,
+      },
+      { status: 502 }
+    );
   }
 
   // 감사 — 누가 언제 바꿨는지. 비밀번호 자체는 절대 남기지 않는다.
-  console.log(`[비밀번호 변경] ${user.id} 본인 · 세션 끊김=${signedOut}`);
-  return Response.json({ ok: true, signedOut });
+  console.log(`[비밀번호 변경] ${user.id} 본인 · 세션 끊김=true`);
+  return Response.json({ ok: true, signedOut: true });
 });

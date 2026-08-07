@@ -129,12 +129,22 @@ describe("POST /api/me/password", () => {
 
   // ★ 예방만으로는 절반이다 — 자리를 비운 사이 들어온 사람의 세션이 비밀번호를 바꾼
   // 뒤에도 살아 있으면 복구가 안 된다. 바꾸면 그 사용자의 세션을 전부 끊는다.
-  it("바꾸고 나면 세션을 전부 끊는다(global)", async () => {
+  it("세션을 전부 끊는다(global)", async () => {
     const res = await POST(req(A, { current: "old-pass-1", next: "new-pass-1" }), {});
     expect(res.status).toBe(200);
     expect(signOut).toHaveBeenCalledWith("at-throwaway", "global");
     // 지금 브라우저도 함께 끊기므로 화면이 알아야 한다.
     expect(await res.json()).toEqual({ ok: true, signedOut: true });
+  });
+
+  // ★ 이 순서가 이번 결함의 본체다 (2026-08-07 라이브 실측).
+  // updateUserById({password}) 가 ①의 재검증 세션까지 무효화해서, 바꾼 **뒤** signOut 을
+  // 부르면 그 access_token 이 이미 죽어 있다 — 실물이 매번 `400 Auth session missing!`
+  // 을 돌려줬다. 바꾸기 **전에** 부르면 토큰이 살아 있다.
+  it("세션 끊기가 비밀번호 변경보다 **먼저** 일어난다", async () => {
+    await POST(req(A, { current: "old-pass-1", next: "new-pass-1" }), {});
+    expect(signOut.mock.invocationCallOrder[0])
+      .toBeLessThan(updateUserById.mock.invocationCallOrder[0]);
   });
 
   it("비밀번호가 안 바뀌었으면 세션도 안 끊는다", async () => {
@@ -147,26 +157,54 @@ describe("POST /api/me/password", () => {
 
   // ★ auth-js 의 admin.signOut 은 실패해도 던지지 않고 {data:null, error} 로 돌려준다.
   // 판정하지 않으면 "세션을 끊었다"고 믿는 거짓 안전이 된다.
-  it("세션 끊기가 실패하면 조용히 넘어가지 않는다 — 로그에 남고 signedOut:false", async () => {
+  //
+  // ★ 목의 응답이 실물이 준 그대로다: 순서를 뒤집기 전 라이브 서버 로그가
+  // `세션 끊기 실패: 400 Auth session missing!` 이었다. 그 상황에서 예전 코드는
+  // **200 + signedOut:false** 를 내보냈고, 화면은 "다른 기기의 로그인을 끊지 못했어요"
+  // 라는 거짓 경고를 띄웠다(실제로는 끊겼다). 이제는 비밀번호를 **바꾸지 않고** 멈춘다 —
+  // 그래야 signedOut 이 추측이 아니게 된다.
+  it("세션을 못 끊으면 비밀번호를 바꾸지 않고 502 로 멈춘다", async () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
-    signOut.mockResolvedValue({ data: null, error: { message: "invalid JWT", status: 401 } });
+    signOut.mockResolvedValue({ data: null, error: { message: "Auth session missing!", status: 400 } });
     const res = await POST(req(A, { current: "old-pass-1", next: "new-pass-1" }), {});
-    // 비밀번호는 이미 바뀌었다 — 그걸 실패로 되돌리면 더 헷갈린다.
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, signedOut: false });
+    expect(res.status).toBe(502);
+    expect(updateUserById).not.toHaveBeenCalled();
+    const body = await res.json();
+    expect(body.signedOut).toBe(false);
+    expect(body.error).toMatch(/바꾸지 못했어요/);
+    // 예전의 거짓 경고("끊지 못했어요")를 다시 내보내지 않는다.
+    expect(body.ok).toBeUndefined();
     expect(logged(spy)).toMatch(/세션/);
     spy.mockRestore();
   });
 
-  it("재검증 응답에 세션이 없으면 끊을 열쇠가 없다 — 로그에 남고 signedOut:false", async () => {
+  it("재검증 응답에 세션이 없으면 끊을 열쇠가 없다 — 바꾸지 않고 502", async () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     signInWithPassword.mockResolvedValue({ data: { user: { id: A } }, error: null });
     const res = await POST(req(A, { current: "old-pass-1", next: "new-pass-1" }), {});
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, signedOut: false });
+    expect(res.status).toBe(502);
+    expect((await res.json()).signedOut).toBe(false);
     expect(signOut).not.toHaveBeenCalled();
+    expect(updateUserById).not.toHaveBeenCalled();
     expect(logged(spy)).toMatch(/세션/);
     spy.mockRestore();
+  });
+
+  // ★ 순서를 뒤집은 대가가 이 자리다 — 세션은 끊겼는데 비밀번호는 그대로다.
+  // 안전한 쪽이지만 사장님에게는 당황스러우니, 문구가 그 상태를 그대로 말해야 한다.
+  it("세션은 끊고 비밀번호 변경이 실패하면 '이미 로그아웃됐다'고 말한다", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    updateUserById.mockResolvedValue({ error: { message: "boom" } });
+    const res = await POST(req(A, { current: "old-pass-1", next: "new-pass-1" }), {});
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    // 화면이 로그인 화면으로 안내할 수 있어야 한다.
+    expect(body.signedOut).toBe(true);
+    expect(body.error).toMatch(/로그아웃/);
+    expect(body.error).toMatch(/다시 로그인/);
+    errSpy.mockRestore();
+    logSpy.mockRestore();
   });
 
   it("승인 대기자는 403 이다", async () => {

@@ -88,22 +88,30 @@ export default function MePage() {
         body: JSON.stringify({ current, next }),
       });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.error || "바꾸지 못했어요");
+      // ★ 서버는 **세션을 먼저 끊고** 비밀번호를 바꾼다. 그래서 실패해도 로그아웃은 이미
+      // 됐을 수 있다(signedOut) — 그때 오류만 띄우고 화면에 남겨 두면 사장님은 다음
+      // 이동에서 영문 모르고 튕긴다. 오류를 그대로 보여 주되 로그인 화면으로 안내한다.
+      if (!r.ok) {
+        if (d.signedOut) {
+          setCurrent(""); setNext(""); setConfirm("");
+          setPwMsg(d.error || "바꾸지 못했어요");
+          goLoginTimer.current = setTimeout(() => router.push("/login"), 1500);
+          return;
+        }
+        throw new Error(d.error || "바꾸지 못했어요");
+      }
       setCurrent(""); setNext(""); setConfirm("");
       // ★ 서버가 살아 있는 세션을 전부 끊는다(scope: global) — 자리를 비운 사이 이미
       // 들어와 있던 사람을 쫓아내려면 그래야 한다. 지금 브라우저도 함께 끊기므로
       // 그 사실을 먼저 알리고 로그인 화면으로 보낸다. 이 안내가 없으면 사장님은
       // "바꿨어요"를 본 직후 아무 설명 없이 튕긴다.
-      if (d.signedOut) {
-        setPwMsg("비밀번호를 바꿨어요 — 안전을 위해 모든 기기에서 로그아웃했어요. 다시 로그인해 주세요.");
-        goLoginTimer.current = setTimeout(() => router.push("/login"), 1500);
-        return;
-      }
-      // ★ 세션 끊기가 실패한 자리다. 위 안내문이 "모든 기기에서 로그아웃된다"고 약속했으므로
-      // 여기서 아무 말도 안 하면 사장님은 쫓아냈다고 믿는다 — 비밀번호를 바꾼 이유 자체가
-      // 조용히 실패한 것이다. 바꾸기는 성공했으니 실패처럼 보이게 하지 말고,
-      // 다음에 할 일(다른 기기에서 직접 로그아웃)을 알린다.
-      setPwMsg("비밀번호는 바꿨어요. 다만 다른 기기의 로그인을 끊지 못했어요 — 이미 로그인돼 있던 기기는 그대로 남아 있을 수 있어요. 쓰던 기기에서 직접 로그아웃해 주세요.");
+      //
+      // ★ 200 이면 signedOut 은 **항상 참**이다 — 끊기에 실패하면 서버가 비밀번호를
+      // 바꾸지 않고 502 로 멈춘다. 그래서 "못 끊었다"는 갈래가 없다. 예전에는 그 갈래가
+      // 있었는데, 실물에서는 끊겼는데도 signedOut:false 가 나와 **거짓 경고**만 띄웠다
+      // (2026-08-07 실측 — 라우트 주석 참고).
+      setPwMsg("비밀번호를 바꿨어요 — 안전을 위해 모든 기기에서 로그아웃했어요. 다시 로그인해 주세요.");
+      goLoginTimer.current = setTimeout(() => router.push("/login"), 1500);
     } catch (err) {
       setPwMsg(err.message);
     } finally {
