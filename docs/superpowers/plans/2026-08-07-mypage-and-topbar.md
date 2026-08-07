@@ -758,6 +758,15 @@ describe("마이페이지", () => {
     expect(me).toMatch(/confirm/);
   });
 
+  // ★ 라우트가 비밀번호를 바꾸면서 **지금 브라우저 세션까지 끊는다**(scope: global).
+  // 화면이 signedOut 을 안 읽으면 사장님은 "비밀번호를 바꿨어요"를 본 직후 아무 안내 없이
+  // 로그인 화면으로 튕긴다 — 무슨 일이 났는지 알 방법이 없다.
+  it("세션이 끊겼으면 다시 로그인해야 한다고 알리고 로그인 화면으로 보낸다", () => {
+    expect(me).toMatch(/signedOut/);
+    expect(me).toMatch(/다시 로그인/);
+    expect(me).toMatch(/\/login/);
+  });
+
   it("이메일은 바꿀 수 없다고 알린다 — 빈 입력칸을 두면 눌러 보게 된다", () => {
     expect(me).toMatch(/바꿀 수 없어요/);
   });
@@ -790,9 +799,11 @@ Expected: FAIL — `ENOENT: app/me/page.js`
 // 회원별로 갈려 있다 — 잘 도는 화면을 옮기면 회귀 위험만 생긴다. 링크로만 잇는다.
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { NAME_MAX } from "../../lib/display-name";
 
 export default function MePage() {
+  const router = useRouter();
   const [me, setMe] = useState(null);
   const [name, setName] = useState("");
   const [nameMsg, setNameMsg] = useState("");
@@ -850,8 +861,17 @@ export default function MePage() {
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || "바꾸지 못했어요");
-      setPwMsg("비밀번호를 바꿨어요");
       setCurrent(""); setNext(""); setConfirm("");
+      // ★ 서버가 살아 있는 세션을 전부 끊는다(scope: global) — 자리를 비운 사이 이미
+      // 들어와 있던 사람을 쫓아내려면 그래야 한다. 지금 브라우저도 함께 끊기므로
+      // 그 사실을 먼저 알리고 로그인 화면으로 보낸다. 이 안내가 없으면 사장님은
+      // "바꿨어요"를 본 직후 아무 설명 없이 튕긴다.
+      if (d.signedOut) {
+        setPwMsg("비밀번호를 바꿨어요 — 안전을 위해 모든 기기에서 로그아웃했어요. 다시 로그인해 주세요.");
+        setTimeout(() => router.push("/login"), 1500);
+        return;
+      }
+      setPwMsg("비밀번호를 바꿨어요");
     } catch (err) {
       setPwMsg(err.message);
     } finally {
@@ -896,6 +916,7 @@ export default function MePage() {
         <h2 className="me-h">비밀번호 변경</h2>
         <p className="pgsub">
           지금 쓰는 비밀번호를 함께 넣어 주세요 — 자리를 비운 사이 다른 사람이 바꾸지 못하게 합니다.
+          바꾸면 <b>모든 기기에서 로그아웃</b>되니 다시 로그인해 주세요.
         </p>
         <form className="me-form" onSubmit={changePassword}>
           <label className="me-row">
