@@ -8,9 +8,9 @@ vi.mock("../lib/charges.js", () => ({ balanceFor: async () => 85.18 }));
 const { GET, PATCH } = await import("../app/api/me/route.js");
 
 const A = "00000000-0000-4000-8000-00000000000a";
-const req = (id, status = "approved") =>
+const req = (id, status = "approved", role = "user") =>
   new Request("http://localhost/api/me", {
-    headers: { [USER_HEADER]: id, [STATUS_HEADER]: status, [ROLE_HEADER]: "user" },
+    headers: { [USER_HEADER]: id, [STATUS_HEADER]: status, [ROLE_HEADER]: role },
   });
 
 describe("GET /api/me", () => {
@@ -39,6 +39,22 @@ describe("GET /api/me", () => {
 
   it("승인 대기자는 403 이다", async () => {
     expect((await GET(req(A, "pending"), {})).status).toBe(403);
+  });
+
+  // 사이드바가 운영자 전용 링크(비용 기록)를 그릴지 이 하나로 정한다.
+  it("운영자에게 isAdmin: true 를 준다", async () => {
+    const body = await (await GET(req(A, "approved", "admin"), {})).json();
+    expect(body.isAdmin).toBe(true);
+  });
+
+  it("일반 사장님에게는 isAdmin: false 다", async () => {
+    const body = await (await GET(req(A), {})).json();
+    expect(body.isAdmin).toBe(false);
+  });
+
+  it("원문 role 은 흘리지 않는다 — 화면이 쓸 판정 하나만 준다", async () => {
+    const body = await (await GET(req(A, "approved", "admin"), {})).json();
+    expect(body.role).toBeUndefined();
   });
 
   it("프로필이 없으면 404 — 조용히 빈 값을 주지 않는다", async () => {

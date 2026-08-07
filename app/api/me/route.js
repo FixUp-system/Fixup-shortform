@@ -27,6 +27,9 @@ export const GET = withUser(async (_req, _ctx, user) => {
     // 실모드면 잔액과 무관하게 늘 true 이고, 잔액 판정은 화면이 gated && balance < 가격 으로 한다.
     gated: !fakeFal(),
     projectCount: await store.countProjects(user.id),
+    // ★ 원문 role 을 그대로 흘리지 않는다 — 화면이 쓸 판정 하나만 준다.
+    // 사이드바가 이걸 보고 운영자 전용 링크(비용 기록)를 그릴지 정한다.
+    isAdmin: user.role === "admin",
   });
 });
 

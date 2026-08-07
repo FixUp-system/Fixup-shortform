@@ -13,7 +13,7 @@ import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "./lib/auth/headers.js";
 // PUBLIC_PATHS(로그인 경계)·matchesSegment(세그먼트 경계 비교)의 유일한 출처.
 // components/AppShell.jsx의 BARE_PATHS(사이드바 경계)도 같은 파일을 본다 — 왜 둘로 나뉘는지는
 // lib/auth/paths.js 주석 참고. 여기서 합치면 안 된다.
-import { matchesSegment, isPublicPath } from "./lib/auth/paths.js";
+import { matchesSegment, isPublicPath, isAdminPath } from "./lib/auth/paths.js";
 
 // setAll 이 어느 시점의 응답에 쓰든, 최종적으로 브라우저에 나가는 응답에는 그 쿠키가
 // 실려 있어야 한다. res 를 여러 번 새로 만드는 이 middleware 에서 이 옮겨싣기를 빠뜨리면
@@ -127,6 +127,17 @@ export async function middleware(req) {
   if (status !== "approved" && !isApi && !matchesSegment(pathname, "/pending")) {
     const to = req.nextUrl.clone();
     to.pathname = "/pending";
+    return copyCookies(cookieRes, NextResponse.redirect(to));
+  }
+
+  // ★ 역할 게이트 — 운영자 전용 화면(/costs·/admin)은 여기서 막는다.
+  //
+  // 라우트의 withUser(…, {adminOnly:true}) 는 **데이터**를 막을 뿐이라 그것만으로는
+  // 페이지가 열린다(빈 화면). 원장 화면이 열린다는 사실 자체를 안 보여준다.
+  // API 는 그 403 이 이미 답이므로 화면(!isApi)만 홈으로 되돌린다 — 승인 게이트와 같은 방식.
+  if (isAdminPath(pathname) && role !== "admin" && !isApi) {
+    const to = req.nextUrl.clone();
+    to.pathname = "/";
     return copyCookies(cookieRes, NextResponse.redirect(to));
   }
   return res;
