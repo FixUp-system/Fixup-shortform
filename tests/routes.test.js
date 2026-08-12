@@ -33,12 +33,15 @@ const pipelineMock = vi.hoisted(() => ({
   run: vi.fn(async () => {}),
   regen: vi.fn(async () => ({ idx: 0 })),
 }));
+// 자막 재굽기는 따로 센다 — 라우트가 **어느** 파이프라인을 불렀는지 구별해야 한다
+const subtitleMock = vi.hoisted(() => ({ run: vi.fn(async () => ({})) }));
 vi.mock("../lib/pipeline.js", () => ({
   runSplitPipeline: (...a) => pipelineMock.run(...a),
   runImagesPipeline: (...a) => pipelineMock.run(...a),
   runVoicePipeline: (...a) => pipelineMock.run(...a),
   runVideoPipeline: (...a) => pipelineMock.run(...a),
   runRenderPipeline: (...a) => pipelineMock.run(...a),
+  runSubtitlePipeline: (...a) => subtitleMock.run(...a),
   regenCut: (...a) => pipelineMock.regen(...a),
   regenVoice: (...a) => pipelineMock.regen(...a),
   regenClip: (...a) => pipelineMock.regen(...a),
@@ -60,6 +63,7 @@ const { POST: cutRegenPOST } = await import("../app/api/projects/[id]/cuts/[idx]
 const { POST: voiceRegenPOST } = await import("../app/api/projects/[id]/voice/[idx]/regen/route.js");
 const { POST: voicePOST } = await import("../app/api/projects/[id]/voice/route.js");
 const { POST: clipRegenPOST } = await import("../app/api/projects/[id]/clips/[idx]/regen/route.js");
+const { POST: subtitlePOST } = await import("../app/api/projects/[id]/subtitle/route.js");
 
 const ctx = (id) => ({ params: Promise.resolve({ id }) });
 const idxCtx = (id, idx) => ({ params: Promise.resolve({ id, idx: String(idx) }) });
@@ -71,6 +75,7 @@ beforeEach(async () => {
   resetMemoryStore();
   pipelineMock.run.mockReset().mockResolvedValue(undefined);
   pipelineMock.regen.mockReset().mockResolvedValue({ idx: 0 });
+  subtitleMock.run.mockReset().mockResolvedValue({});
   llmMock.callJson.mockReset();
 });
 
@@ -547,6 +552,70 @@ describe("완성 라우트", () => {
     const res = await renderPOST(authReq("http://x", { method: "POST" }), ctx(p.id));
     expect(res.status).toBe(200);
     expect((await res.json()).started).toBe(true);
+  });
+});
+
+describe("POST /api/projects/[id]/subtitle — 자막만 다시 굽기", () => {
+  it("원본이 없으면 400 이다 — 먼저 완성본을 만들어야 한다", async () => {
+    const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "가", photos: [] } });
+    await updateProject(p.id, OWNER, (proj) => ({
+      ...proj, render: { url: "/api/renders/x.mp4", of: "..." },
+    }));
+    const res = await subtitlePOST(patchReq({}), ctx(p.id));
+    expect(res.status).toBe(400);
+    expect(subtitleMock.run).not.toHaveBeenCalled();
+  });
+
+  it("완성본이 아예 없어도 400 이다", async () => {
+    const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "가", photos: [] } });
+    const res = await subtitlePOST(patchReq({}), ctx(p.id));
+    expect(res.status).toBe(400);
+  });
+
+  it("원본이 있으면 자막만 다시 굽는다", async () => {
+    const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "가", photos: [] } });
+    await updateProject(p.id, OWNER, (proj) => ({
+      // ★ camelCase 다 — 저장은 composeVideo 반환값을 그대로 스프레드한다(lib/pipeline.js).
+      // `raw_url` 은 이 저장소에 없는 필드다.
+      ...proj, render: { url: "/api/renders/x.mp4", rawUrl: "/api/renders/x-raw.mp4", of: "..." },
+    }));
+    const res = await subtitlePOST(patchReq({}), ctx(p.id));
+    expect(res.status).toBe(200);
+    expect(subtitleMock.run).toHaveBeenCalledWith(p.id, OWNER);
+  });
+
+  it("없는 프로젝트는 404 다", async () => {
+    const res = await subtitlePOST(patchReq({}), ctx("없는id"));
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("PATCH — 자막 설정", () => {
+  it("모르는 값은 되돌려 저장한다 — 400 으로 막지 않는다", async () => {
+    const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "가", photos: [] } });
+    const res = await PATCH(
+      patchReq({ settings: { subtitle: { font: "코믹산스", size: 99, pos: [9, 9] } } }), ctx(p.id));
+    expect(res.status).toBe(200);
+    const after = await getProject(p.id, OWNER);
+    expect(after.settings.subtitle.font).toBe("basic");
+    expect(after.settings.subtitle.size).toBe(1.6);
+    expect(after.settings.subtitle.pos).toEqual([0.94, 0.94]);
+  });
+
+  it("고른 값은 그대로 저장한다", async () => {
+    const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "가", photos: [] } });
+    await PATCH(patchReq({ settings: { subtitle: { font: "impact", color: "#ff0000", size: 1.2, pos: [0.5, 0.7] } } }), ctx(p.id));
+    const after = await getProject(p.id, OWNER);
+    expect(after.settings.subtitle).toEqual({ font: "impact", color: "#FF0000", size: 1.2, pos: [0.5, 0.7] });
+  });
+
+  it("자막을 안 건드리는 저장은 자막 설정을 만들지 않는다", async () => {
+    // 되돌리기가 무조건 돌면 기본값이 **명시로** 박혀 각인이 달라진다(lib/steps.js 주석) —
+    // 픽셀이 같은 완성본을 다시 굽게 된다.
+    const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "가", photos: [] } });
+    await PATCH(patchReq({ settings: { subtitle_position: "top" } }), ctx(p.id));
+    const after = await getProject(p.id, OWNER);
+    expect(after.settings.subtitle).toBeUndefined();
   });
 });
 

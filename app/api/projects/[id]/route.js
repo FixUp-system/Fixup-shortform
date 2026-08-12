@@ -8,7 +8,7 @@ import { ownedPhotoKeys } from "../../../../lib/refs-io.js";
 import { withUser } from "../../../../lib/auth/require-user.js";
 import { alreadyChargedVideo } from "../../../../lib/charges.js";
 import { TARGET_CHOICES } from "../../../../lib/script";
-import { SUBTITLE_POSITIONS } from "../../../../lib/subtitles.js";
+import { SUBTITLE_POSITIONS, normalizeSubtitle } from "../../../../lib/subtitles.js";
 
 export const GET = withUser(async (req, { params }, user) => {
   const { id } = await params;
@@ -132,6 +132,15 @@ export const PATCH = withUser(async (req, { params }, user) => {
       if (body.settings) {
         next.settings = { ...proj.settings, ...body.settings };
         if (style) next.settings.style = style;
+        // ★ 자막 설정은 400 으로 막지 않는다 — 닫힌 목록인 모델·길이·자막 위치와 다르다.
+        // 되돌려도 사장님이 잃는 것이 없고(다시 고르면 된다), 슬라이더를 끌다가 400 이
+        // 뜨면 성가시다. 되돌리기 규칙은 lib/subtitles.js 하나가 쥔다(화면도 같은 것을 본다).
+        //
+        // 준 요청에서만 손댄다 — 자막과 무관한 저장(예: 화풍)에서 기본값을 **명시로**
+        // 박으면 각인이 달라져(lib/steps.js) 픽셀이 같은 완성본을 다시 굽게 된다.
+        if (body.settings.subtitle !== undefined) {
+          next.settings.subtitle = normalizeSubtitle(body.settings.subtitle);
+        }
       }
       if (body.briefing) {
         next.briefing = { ...proj.briefing, ...body.briefing };
