@@ -67,6 +67,22 @@ export default function DoneStepPage() {
     startPolling();
   }
 
+  // 자막 위치는 합성에만 쓰인다 — 클립·그림·소리는 그대로다. 그래서 바꿔도 값이 안 든다.
+  async function saveSubtitlePosition(position) {
+    if (busy) return;
+    setErr("");
+    const res = await fetch(`/api/projects/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings: { subtitle_position: position } }),
+    });
+    if (!res.ok) {
+      setErr((await res.json().catch(() => ({}))).error || "자막 위치를 저장하지 못했어요");
+      return;
+    }
+    await load(id).catch(() => {});
+  }
+
   const cuts = project?.cuts || [];
   const render = project?.render;
   const clipCount = cuts.filter((c) => c.video?.url).length;
@@ -138,6 +154,23 @@ export default function DoneStepPage() {
           </div>
         </>
       )}
+
+      <div className="eyebrow mt-lg">
+        자막 위치 <small>바꿔서 다시 만들어도 값이 들지 않아요</small>
+      </div>
+      <div className="chips">
+        {[["top", "위"], ["middle", "중간"], ["bottom", "아래"]].map(([value, label]) => (
+          <button
+            key={value}
+            className={`chip${(project?.settings?.subtitle_position || "bottom") === value ? " on" : ""}`}
+            disabled={busy}
+            onClick={() => saveSubtitlePosition(value)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <p className="pgsub">영상 아래쪽 UI에 가리지 않게 기본은 아래예요.</p>
 
       <div className="step-actions">
         <BackButton stepKey="done" />
