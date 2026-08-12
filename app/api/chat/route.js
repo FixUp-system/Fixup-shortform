@@ -3,6 +3,8 @@
 //       {action:"generate", material_text, target_seconds, aspect_ratio, style, voice_label, summary}
 
 import { withUser } from "../../../lib/auth/require-user.js";
+import { addRecord, assertBudget, costActor, estimateLlmCost } from "../../../lib/costs";
+import { randomUUID } from "crypto";
 import { TARGET_CHOICES } from "../../../lib/script";
 import { STYLE_PRESETS, DEFAULT_STYLE_ID } from "../../../lib/styles";
 import { VOICES } from "../../../lib/voices";
@@ -49,6 +51,13 @@ export const POST = withUser(async (req) => {
     );
   }
 
+  // ★ 이 라우트는 lib/llm.js 를 안 거치고 OpenAI 를 직접 부른다 — 그래서 오랫동안
+  // 한도도 기록도 없었다. 승인만 받으면 크레딧 0 으로 gpt-4o 를 무한히 태울 수 있었고,
+  // 그 지출은 우리 비용 화면에 **보이지도 않았다.**
+  //
+  // amount 는 0 이다 — 토큰 수는 호출한 뒤에야 안다(lib/llm.js 와 같은 이유).
+  await assertBudget({ endpoint: "openai/gpt-4o", amount: 0 });
+
   let body;
   try {
     body = await req.json();
@@ -92,6 +101,16 @@ export const POST = withUser(async (req) => {
     }
 
     const data = await res.json();
+    // 파싱에 실패해 재시도하더라도 부른 값은 치렀다 — 그래서 파싱 앞에서 기록한다
+    // (lib/llm.js 와 같은 규칙).
+    const model = data?.model || "gpt-4o";
+    await addRecord({
+      request_id: randomUUID(), ts: Date.now(), endpoint: `openai/${model}`,
+      stage: "대화", user: costActor(), project_id: null,
+      prompt: "", duration: `${data?.usage?.prompt_tokens ?? 0}+${data?.usage?.completion_tokens ?? 0}tok`,
+      aspect_ratio: "-",
+      est_cost_usd: estimateLlmCost(model, data?.usage), status: "done", video_url: "-",
+    }).catch(() => {});
     const raw = data?.choices?.[0]?.message?.content ?? "";
     try {
       const parsed = JSON.parse(raw);
