@@ -331,3 +331,53 @@ describe("clipKey — 속도가 바뀌면 클립이 낡는다", () => {
     expect(isClipStale({ ...base, video: { url: "v", of: "i0|6|천천히" } })).toBe(false);
   });
 });
+
+describe("자막 위치와 완성본 각인", () => {
+  const withCuts = (settings) => ({
+    settings,
+    cuts: [
+      { audio: { url: "a0" }, video: { url: "v0" }, sentence: "첫 문장" },
+      { audio: { url: "a1" }, video: { url: "v1" }, sentence: "둘째 문장" },
+    ],
+  });
+
+  // ★★ 이 단정이 이 태스크의 전부다. 형식을 무조건 바꾸면 이미 만든 완성본이
+  //    통째로 낡는다 — clipKey 가 speed 를 다루는 방식과 같은 이유다.
+  it("자막 설정이 없는 옛 프로젝트의 각인은 그대로다", () => {
+    const 옛것 = renderKey(withCuts(undefined));
+    const 빈설정 = renderKey(withCuts({}));
+    // 손으로 적은 기대값 — 이 형식이 바뀌면 옛 완성본이 전부 낡는다
+    expect(옛것).toBe("a0|v0|첫 문장\na1|v1|둘째 문장");
+    expect(빈설정).toBe(옛것);
+  });
+
+  it("기본값(bottom)을 명시해도 각인이 달라진다 — 그것이 고른 것이다", () => {
+    // 사장님이 실제로 '아래'를 눌러 저장한 상태다. 옛것과 구별되어야
+    // 그 뒤에 '위'로 바꿨을 때도 정상적으로 낡는다.
+    expect(renderKey(withCuts({ subtitle_position: "bottom" }))).not.toBe(
+      renderKey(withCuts(undefined))
+    );
+  });
+
+  it("위치를 바꾸면 각인이 바뀐다", () => {
+    const 아래 = renderKey(withCuts({ subtitle_position: "bottom" }));
+    const 위 = renderKey(withCuts({ subtitle_position: "top" }));
+    const 중간 = renderKey(withCuts({ subtitle_position: "middle" }));
+    expect(new Set([아래, 위, 중간]).size).toBe(3);
+  });
+
+  it("바꾸면 완성본이 낡는다", () => {
+    const p = withCuts({ subtitle_position: "bottom" });
+    p.render = { url: "/api/renders/x.mp4", of: renderKey(p) };
+    expect(isRenderStale(p)).toBe(false);
+    p.settings.subtitle_position = "top";
+    expect(isRenderStale(p)).toBe(true);
+  });
+
+  it("자막 위치는 클립·그림·소리를 낡게 하지 않는다", () => {
+    const cut = { image: { url: "i", of: "장면" }, video: { url: "v", of: clipKey({ image: { url: "i" }, seconds: 3, motion: "m" }) }, seconds: 3, motion: "m" };
+    const before = clipKey(cut);
+    // 자막 위치는 컷에 없다 — clipKey 의 입력이 아니다
+    expect(clipKey(cut)).toBe(before);
+  });
+});
