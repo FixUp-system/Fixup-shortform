@@ -4,6 +4,7 @@ import { TARGET_CHOICES } from "../../../lib/script";
 import { normalizeStyle } from "../../../lib/styles";
 import { ownedPhotoKeys } from "../../../lib/refs-io.js";
 import { withUser } from "../../../lib/auth/require-user.js";
+import { DEFAULT_I2V_MODEL, I2V_MODEL_IDS } from "../../../lib/clip-limits";
 
 // 내 프로젝트 목록 — doc 통짜를 안 실어 보낸다(listProjects 가 이미 요약해서 준다).
 export const GET = withUser(async (_req, _ctx, user) => {
@@ -46,7 +47,16 @@ export const POST = withUser(async (req, ctx, user) => {
     return Response.json({ error: "본인이 올린 사진만 쓸 수 있어요" }, { status: 400 });
   }
   const project = await createProject({
-    settings: { aspect_ratio: aspect, target_seconds: target, ...(style ? { style } : {}) },
+    settings: {
+      aspect_ratio: aspect,
+      target_seconds: target,
+      // ★ 기본값을 **명시 저장**한다. 값이 없는 것은 "안 골랐다"가 아니라 "이 기능 전에
+      //   만들어졌다"는 뜻이고, 그런 프로젝트는 Kling 으로 돈다(lib/clip-limits.js).
+      i2v_model: I2V_MODEL_IDS.includes(body.settings?.i2v_model)
+        ? body.settings.i2v_model
+        : DEFAULT_I2V_MODEL,
+      ...(style ? { style } : {}),
+    },
     material: {
       text: body.material.text.slice(0, 4000),
       photos: Array.isArray(body.material.photos) ? body.material.photos : [],

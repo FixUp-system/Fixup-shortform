@@ -1,6 +1,6 @@
 import { getProject, updateProject } from "../../../../lib/projects";
 import { briefingContentChanged } from "../../../../lib/briefing";
-import { activeClipLimits } from "../../../../lib/clip-limits";
+import { clipLimitsForProject, I2V_MODEL_IDS } from "../../../../lib/clip-limits";
 import { normalizeStyle } from "../../../../lib/styles";
 import { isAspect } from "../../../../lib/aspects";
 import { isSpeed } from "../../../../lib/speeds";
@@ -14,8 +14,8 @@ export const GET = withUser(async (req, { params }, user) => {
   const { id } = await params;
   const project = await getProject(id, user.id);
   if (!project) return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
-  // 활성 모델의 클립 상한을 함께 실어 보낸다 — 저장하지 않고 요청마다 지금 env 로 푼다.
-  // 화면은 서버 env 를 볼 수 없어서, 이 값 없이는 기본 프로필(20초)로 판정한다.
+  // 이 프로젝트가 고른 모델의 클립 상한을 함께 실어 보낸다 — 저장하지 않고 요청마다 푼다.
+  // 화면은 모델별 눈금표를 갖고 있지 않아서, 이 값 없이는 폴백 프로필로 판정한다.
   //
   // charged = 이 프로젝트의 정가를 냈고 아직 되돌려받지 않았는가. 화면이 "여기서
   // N 크레딧이 나갑니다"를 **낼 때만** 적기 위한 값이다. 프로젝트 문서로는 알 수 없다 —
@@ -23,7 +23,7 @@ export const GET = withUser(async (req, { params }, user) => {
   // 환불받은 프로젝트에 "이미 냈다"고 거짓말한다.
   return Response.json({
     ...project,
-    clip_limits: activeClipLimits(),
+    clip_limits: clipLimitsForProject(project),
     charged: await alreadyChargedVideo(id),
   });
 });
@@ -40,6 +40,15 @@ export const PATCH = withUser(async (req, { params }, user) => {
   // 그 안에서 던지면 잘못된 값이 없는 프로젝트로 보고된다.
   if (body.settings?.aspect_ratio !== undefined && !isAspect(body.settings.aspect_ratio)) {
     return Response.json({ error: "그 사이즈는 몰라요" }, { status: 400 });
+  }
+
+  // 영상 모델도 닫힌 목록이다. 모르는 값이 들어가면 clip-limits 가 조용히 레거시로
+  // 떨어뜨리는데, 고른 것과 만들어지는 것이 달라지면 아무도 못 알아본다.
+  if (
+    body.settings?.i2v_model !== undefined &&
+    !I2V_MODEL_IDS.includes(body.settings.i2v_model)
+  ) {
+    return Response.json({ error: "그 영상 모델은 몰라요" }, { status: 400 });
   }
 
   // 자막 위치도 닫힌 목록이다. 모르는 값이 들어가면 합성이 조용히 아래로 떨어뜨리는데
@@ -69,6 +78,24 @@ export const PATCH = withUser(async (req, { params }, user) => {
     ) {
       return Response.json(
         { error: "이미 결제된 영상은 길이를 바꿀 수 없어요 — 새로 만들어 주세요" },
+        { status: 400 }
+      );
+    }
+  }
+
+  // 클립이 하나라도 있으면 모델을 못 바꾼다. 클립이 한 편에서 가장 비싸서(Seedance 컷당
+  // $1.51), 중간에 바꾸면 한 영상 안에 두 모델이 섞이거나 이미 낸 돈을 버려야 한다.
+  // (바로 위 — 정가를 낸 뒤 길이를 못 바꾸게 한 것과 같은 자리·같은 이유다.)
+  // 같은 값을 다시 보내는 것은 막지 않는다: 화면이 헛 PATCH 를 보내도 400 이 뜨면 안 된다.
+  if (body.settings?.i2v_model !== undefined) {
+    const project = await getProject(id, user.id);
+    if (
+      project &&
+      body.settings.i2v_model !== project.settings?.i2v_model &&
+      (project.cuts || []).some((c) => c.video?.url)
+    ) {
+      return Response.json(
+        { error: "이미 영상을 만들기 시작해서 모델을 바꿀 수 없어요" },
         { status: 400 }
       );
     }

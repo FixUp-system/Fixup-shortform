@@ -695,26 +695,22 @@ describe("무효화 관통 — 고치면 낡고, 안 고친 것은 살아남는�
 
 // 화면은 서버 env 를 볼 수 없다. 상한을 실어 보내지 않으면 ②대본 화면이 기본값(20초)으로
 // 판정해, Kling(15초)에서 17초 컷에 경고를 띄우지 않는다 — 돈 쓰기 전에 잡을 유일한 자리다.
-describe("GET /api/projects/[id] — 활성 모델의 상한을 실어 보낸다", () => {
-  it("env 를 비우면 기본 엔드포인트(Kling)의 값이다", async () => {
+describe("GET /api/projects/[id] — 이 프로젝트 모델의 상한을 실어 보낸다", () => {
+  it("모델이 없는 옛 프로젝트는 Kling 의 값이다", async () => {
     const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
     const res = await GET(authReq("http://x"), { params: Promise.resolve({ id: p.id }) });
     const body = await res.json();
     expect(body.clip_limits).toEqual({ min: 3, max: 15 });
   });
 
-  it("env 를 바꾸면 따라 바뀐다 — 저장된 프로젝트에는 남지 않는다", async () => {
-    const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
-    process.env.FAL_I2V_ENDPOINT = "fal-ai/kling-video/v3/standard/image-to-video";
-    try {
-      const res = await GET(authReq("http://x"), { params: Promise.resolve({ id: p.id }) });
-      expect((await res.json()).clip_limits).toEqual({ min: 3, max: 15 });
-      // 저장된 파일에는 없어야 한다 — 요청마다 다시 푸는 값이다
-      const { getProject } = await import("../lib/projects.js");
-      expect(await getProject(p.id, OWNER)).not.toHaveProperty("clip_limits");
-    } finally {
-      delete process.env.FAL_I2V_ENDPOINT;
-    }
+  it("프로젝트가 고른 모델을 따라간다 — 저장된 프로젝트에는 남지 않는다", async () => {
+    const p = await createProject({
+      ownerId: OWNER, settings: { i2v_model: "seedance-2.0" }, material: { text: "자료", photos: [] },
+    });
+    const res = await GET(authReq("http://x"), { params: Promise.resolve({ id: p.id }) });
+    expect((await res.json()).clip_limits).toEqual({ min: 4, max: 15 });
+    // 저장된 문서에는 없어야 한다 — 요청마다 다시 푸는 값이다
+    expect(await getProject(p.id, OWNER)).not.toHaveProperty("clip_limits");
   });
 });
 
@@ -825,6 +821,90 @@ describe("PATCH /api/projects/[id] — 화풍", () => {
     await PATCH(patchReq({ settings: { aspect_ratio: "16:9" } }), ctx(p.id));
     // 화풍을 건드리지 않았으니 남아 있어야 한다
     expect((await getProject(p.id, OWNER)).settings.style.preset).toBe("scifi");
+  });
+});
+
+// 영상 모델은 클립 값을 정한다 — 클립이 한 편에서 가장 비싸다(Seedance 컷당 $1.51).
+// 그래서 닫힌 목록이고, 클립이 하나라도 생기면 잠근다.
+describe("PATCH /api/projects/[id] — 영상 모델", () => {
+  const make = (settings = {}) =>
+    createProject({ ownerId: OWNER, settings, material: { text: "가", photos: [] } });
+
+  it("영상 모델은 아는 값만 받는다", async () => {
+    const p = await make();
+    const res = await PATCH(patchReq({ settings: { i2v_model: "seedance-3" } }), ctx(p.id));
+    expect(res.status).toBe(400);
+    expect((await getProject(p.id, OWNER)).settings.i2v_model).toBeUndefined();
+  });
+
+  it("아는 값이면 저장된다", async () => {
+    const p = await make();
+    const res = await PATCH(patchReq({ settings: { i2v_model: "seedance-2.0" } }), ctx(p.id));
+    expect(res.status ?? 200).toBe(200);
+    expect((await getProject(p.id, OWNER)).settings.i2v_model).toBe("seedance-2.0");
+  });
+
+  // ★★ 잠금 — 클립이 하나라도 있으면 못 바꾼다
+  it("영상을 만들기 시작했으면 모델을 못 바꾼다", async () => {
+    const p = await make({ i2v_model: "seedance-2.0" });
+    await updateProject(p.id, OWNER, (proj) => ({
+      ...proj, cuts: [{ idx: 0, video: { url: "https://x/v.mp4" } }],
+    }));
+    const res = await PATCH(patchReq({ settings: { i2v_model: "kling-v3" } }), ctx(p.id));
+    expect(res.status).toBe(400);
+    expect((await getProject(p.id, OWNER)).settings.i2v_model).toBe("seedance-2.0");
+  });
+
+  it("클립이 아직 없으면 바꿀 수 있다", async () => {
+    const p = await make({ i2v_model: "seedance-2.0" });
+    await updateProject(p.id, OWNER, (proj) => ({
+      ...proj, cuts: [{ idx: 0, image: { url: "https://x/i.png" } }],
+    }));
+    const res = await PATCH(patchReq({ settings: { i2v_model: "kling-v3" } }), ctx(p.id));
+    expect(res.status ?? 200).toBe(200);
+    expect((await getProject(p.id, OWNER)).settings.i2v_model).toBe("kling-v3");
+  });
+
+  // 화면이 헛 PATCH 를 보내도 400 이 뜨면 안 된다 — 바꾸는 것이 아니라 같은 값이다.
+  it("같은 값을 다시 보내는 것은 클립이 있어도 통과한다", async () => {
+    const p = await make({ i2v_model: "seedance-2.0" });
+    await updateProject(p.id, OWNER, (proj) => ({
+      ...proj, cuts: [{ idx: 0, video: { url: "https://x/v.mp4" } }],
+    }));
+    const res = await PATCH(patchReq({ settings: { i2v_model: "seedance-2.0" } }), ctx(p.id));
+    expect(res.status ?? 200).toBe(200);
+  });
+
+  it("모델을 안 보내는 PATCH 는 클립이 있어도 통과한다", async () => {
+    const p = await make();
+    await updateProject(p.id, OWNER, (proj) => ({
+      ...proj, cuts: [{ idx: 0, video: { url: "https://x/v.mp4" } }],
+    }));
+    const res = await PATCH(patchReq({ settings: { aspect_ratio: "9:16" } }), ctx(p.id));
+    expect(res.status ?? 200).toBe(200);
+    expect((await getProject(p.id, OWNER)).settings.aspect_ratio).toBe("9:16");
+  });
+});
+
+describe("POST /api/projects — 영상 모델", () => {
+  // ★ createProject() 를 직접 부르면 라우트의 명시 저장을 안 거친다 — POST 라우트를 부른다.
+  // 값이 없는 것은 "안 골랐다"가 아니라 "이 기능 전에 만들어졌다"는 뜻이어야 한다.
+  it("새로 만드는 프로젝트는 기본 모델을 명시 저장한다", async () => {
+    const res = await projectsPOST(patchReq({ material: { text: "가" }, settings: { aspect_ratio: "9:16", target_seconds: 30 } }));
+    expect(res.status ?? 200).toBe(200);
+    expect((await res.json()).settings.i2v_model).toBe("seedance-2.0");
+  });
+
+  it("고른 모델이 있으면 그것을 저장한다", async () => {
+    const res = await projectsPOST(patchReq({ material: { text: "가" }, settings: { i2v_model: "kling-v3" } }));
+    expect((await res.json()).settings.i2v_model).toBe("kling-v3");
+  });
+
+  // 길이(target_seconds)와 같은 종류다 — 목록 밖 값은 우리 화면에서 나올 수 없고,
+  // 400 으로 막으면 써 둔 자료를 다시 써야 한다.
+  it("모르는 모델은 조용히 기본값으로 떨어진다", async () => {
+    const res = await projectsPOST(patchReq({ material: { text: "가" }, settings: { i2v_model: "seedance-3" } }));
+    expect((await res.json()).settings.i2v_model).toBe("seedance-2.0");
   });
 });
 
