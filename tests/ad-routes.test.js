@@ -229,3 +229,86 @@ describe("광고 라우트 — 시나리오", () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe("광고 라우트 — 굽기", () => {
+  beforeEach(() => resetMemoryStore());
+
+  async function withScenario() {
+    const made = await (await createAd(post(OK))).json();
+    const { getStore } = await import("../lib/store/index.js");
+    const row = await getStore().selectProject(made.id, U);
+    await getStore().updateProjectRow(made.id, U, row.version, {
+      ...row.doc, scenario: { text: "P", shots: [{ beat: "가" }], endpoint: "t2v", tries: 1 }, status: "scenario",
+    });
+    return made;
+  }
+
+  it("잔액이 없으면 402", async () => {
+    const { POST: render } = await import("../app/api/ads/[id]/render/route.js");
+    const made = await withScenario();
+    const res = await render(new Request("http://x", { method: "POST", headers: H }), {
+      params: Promise.resolve({ id: made.id }),
+    });
+    expect(res.status).toBe(402);
+  });
+
+  it("시나리오가 없으면 400 — 값을 받기 전에 막는다", async () => {
+    const { POST: render } = await import("../app/api/ads/[id]/render/route.js");
+    const made = await (await createAd(post(OK))).json();
+    const res = await render(new Request("http://x", { method: "POST", headers: H }), {
+      params: Promise.resolve({ id: made.id }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("잔액이 있으면 202 로 시작한다", async () => {
+    process.env.SHOTFORM_FAKE = "fal";
+    const { getStore } = await import("../lib/store/index.js");
+    await getStore().insertGrant({ user_id: U, amount_credits: 200, reason: "t" });
+    const { POST: render } = await import("../app/api/ads/[id]/render/route.js");
+    const made = await withScenario();
+    const res = await render(new Request("http://x", { method: "POST", headers: H }), {
+      params: Promise.resolve({ id: made.id }),
+    });
+    expect(res.status).toBe(202);
+    delete process.env.SHOTFORM_FAKE;
+  });
+
+  it("기존 문서면 404", async () => {
+    const { POST: render } = await import("../app/api/ads/[id]/render/route.js");
+    const p = await runWithActor(U, () => createProject({ material: { text: "옛것" }, ownerId: U }));
+    const res = await render(new Request("http://x", { method: "POST", headers: H }), {
+      params: Promise.resolve({ id: p.id }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  // Task 11 → Task 12 에서 두 번 되살아난 결함(rendering 잠금에 테스트가 없었다)의 세 번째
+  // 재발을 막는다. status:"rendering" 을 store 직접 조작으로 세우는 것은 위 describe 들과 같은 방식.
+  it("★ 이미 rendering 이면 400", async () => {
+    const { POST: render } = await import("../app/api/ads/[id]/render/route.js");
+    const made = await withScenario();
+    const { getStore } = await import("../lib/store/index.js");
+    const row = await getStore().selectProject(made.id, U);
+    await getStore().updateProjectRow(made.id, U, row.version, { ...row.doc, status: "rendering" });
+    const res = await render(new Request("http://x", { method: "POST", headers: H }), {
+      params: Promise.resolve({ id: made.id }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  // 다시 굽기는 새 회차가 아니라 살아 있는 청구를 그대로 쓰는 정상 흐름이다(파이프라인의
+  // chargeAd 도 같은 판정으로 재청구를 막는다) — 잔액이 0 이어도 402 를 내면 안 된다.
+  it("★ 살아 있는 청구가 있으면 잔액이 0 이어도 잔액 검사를 건너뛰고 202", async () => {
+    process.env.SHOTFORM_FAKE = "fal";
+    const made = await withScenario();
+    const { chargeAd } = await import("../lib/charges.js");
+    await chargeAd({ userId: U, projectId: made.id, seconds: 15 });
+    const { POST: render } = await import("../app/api/ads/[id]/render/route.js");
+    const res = await render(new Request("http://x", { method: "POST", headers: H }), {
+      params: Promise.resolve({ id: made.id }),
+    });
+    expect(res.status).toBe(202);
+    delete process.env.SHOTFORM_FAKE;
+  });
+});
