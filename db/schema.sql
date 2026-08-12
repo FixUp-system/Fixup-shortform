@@ -51,6 +51,11 @@ insert into storage.buckets (id, name, public)
 values ('uploads', 'uploads', false)
 on conflict (id) do nothing;
 
+-- 완성 mp4. uploads 와 같은 이유로 비공개다 — /api/renders 라우트가 소유자를 확인하고 흘려준다.
+insert into storage.buckets (id, name, public)
+values ('renders', 'renders', false)
+on conflict (id) do nothing;
+
 -- ── 인증·소유자 (2026-07-31) ──────────────────────────────────────────────
 
 create table if not exists profiles (

@@ -72,6 +72,15 @@ describe("인메모리 store", () => {
   it("없는 객체는 던진다 — 빈 값으로 흘리지 않는다", async () => {
     await expect(getStore().getObject("uploads", "없음.jpg")).rejects.toThrow();
   });
+
+  it("renders 버킷도 같은 방식으로 넣고 꺼낸다", async () => {
+    const s = getStore();
+    await s.putObject("renders", "p1.mp4", Buffer.from("mp4-bytes"), "video/mp4");
+    expect((await s.getObject("renders", "p1.mp4")).toString()).toBe("mp4-bytes");
+    // 버킷이 갈라져 있다 — 같은 key 라도 uploads 것과 섞이지 않는다
+    await s.putObject("uploads", "p1.mp4", Buffer.from("사진"), "image/jpeg");
+    expect((await s.getObject("renders", "p1.mp4")).toString()).toBe("mp4-bytes");
+  });
 });
 
 // 폴링용 부분 읽기 셋. 인메모리는 doc 전체가 이미 메모리에 있어 읽기량이 줄지 않지만,
