@@ -70,4 +70,28 @@ describe("광고 청구", () => {
     await grant(10);
     await expect(assertCanAfford(U, AD_VIDEO_PRICE[15])).rejects.toBeInstanceOf(NoCredits);
   });
+
+  // ★ 매출 누수 회귀(Task 17) — 성공한 회차의 청구는 refundAd 가 안 돌아 영원히 "살아 있다".
+  // openNewAttempt 없이는 이 자리에서 또 받을 방법이 없었다(그래서 fal 원가는 나가는데
+  // 청구가 0 이었다). openNewAttempt:true 는 "이미 영상을 낸 회차"를 뜻하고, 그때는
+  // 살아 있는 청구가 있어도 새 회차를 열어 다시 받아야 한다.
+  it("★ openNewAttempt 면 살아 있는 청구가 있어도 새 회차로 또 받는다", async () => {
+    await grant(200);
+    const first = await chargeAd({ userId: U, projectId: P, seconds: 15 });
+    expect(first).toBe(AD_VIDEO_PRICE[15]);
+    const again = await chargeAd({ userId: U, projectId: P, seconds: 15, openNewAttempt: true });
+    expect(again).toBe(AD_VIDEO_PRICE[15]);
+    expect(await balanceFor(U)).toBe(200 - AD_VIDEO_PRICE[15] * 2);
+    // 새 회차 키가 열렸다 — 첫 청구를 덮어쓴 것이 아니다
+    expect(adKey(P, 2)).toBe(`ad:${P}:2`);
+    expect(await getStore().findCharge(adKey(P, 2))).toBeTruthy();
+  });
+
+  it("openNewAttempt 가 없으면(기본값 false) 지금까지처럼 또 받지 않는다", async () => {
+    await grant(200);
+    await chargeAd({ userId: U, projectId: P, seconds: 15 });
+    const again = await chargeAd({ userId: U, projectId: P, seconds: 15 });
+    expect(again).toBe(0);
+    expect(await balanceFor(U)).toBe(200 - AD_VIDEO_PRICE[15]);
+  });
 });

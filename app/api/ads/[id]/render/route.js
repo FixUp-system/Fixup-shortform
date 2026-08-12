@@ -3,6 +3,7 @@ import { updateProject } from "../../../../../lib/projects.js";
 import { runAdRenderPipeline } from "../../../../../lib/ad/pipeline.js";
 import { assertCanAfford, NoCredits, alreadyChargedAd } from "../../../../../lib/charges.js";
 import { adVideoPrice } from "../../../../../lib/pricing.js";
+import { hasRenderedAdVideo } from "../../../../../lib/ad/attempt.js";
 import { loadAd } from "../route.js";
 
 // ★ 유료 입구다. 청구는 파이프라인이 하지만, **낼 수 있는지는 여기서 먼저 본다** —
@@ -19,8 +20,14 @@ export const POST = withUser(async (_req, { params }, user) => {
     return Response.json({ error: "이미 만드는 중이에요" }, { status: 400 });
   }
 
-  // 살아 있는 청구가 없을 때만 잔액을 본다(다시 굽기는 새 회차라 또 받는다).
-  if (!(await alreadyChargedAd(id))) {
+  // 살아 있는 청구가 없거나, 이미 영상을 낸 회차([다시 만들기]가 새 회차를 열 것)면
+  // 잔액을 본다. "이미 영상 있음" 판정은 lib/ad/attempt.js 하나 — 파이프라인의 chargeAd
+  // 호출(lib/ad/pipeline.js)과 같은 판정을 써야 한다. 여기서만 통과시키고 파이프라인이
+  // 못 받으면(또는 반대) 두 자리가 어긋나 사고가 난다.
+  //
+  // 굽는 도중(청구는 했지만 아직 videos 가 없는) 재시도는 여기서 openNewAttempt==false 라
+  // 계속 통과한다 — 그게 옳다(같은 회차를 이어서 굽는 정상 흐름).
+  if (!(await alreadyChargedAd(id)) || hasRenderedAdVideo(project)) {
     try {
       await assertCanAfford(user.id, adVideoPrice(project.settings?.seconds));
     } catch (e) {

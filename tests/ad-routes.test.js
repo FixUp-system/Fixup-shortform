@@ -21,6 +21,7 @@ import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js"
 import { createProject } from "../lib/projects.js";
 import { runWithActor } from "../lib/actor.js";
 import { DEFAULT_AD_MODEL } from "../lib/ad/models.js";
+import { AD_VIDEO_PRICE } from "../lib/pricing.js";
 
 const U = "00000000-0000-4000-8000-00000000000a";
 const H = { [USER_HEADER]: U, [STATUS_HEADER]: "approved", [ROLE_HEADER]: "user" };
@@ -299,11 +300,56 @@ describe("광고 라우트 — 굽기", () => {
 
   // 다시 굽기는 새 회차가 아니라 살아 있는 청구를 그대로 쓰는 정상 흐름이다(파이프라인의
   // chargeAd 도 같은 판정으로 재청구를 막는다) — 잔액이 0 이어도 402 를 내면 안 된다.
+  // ★ 이 프로젝트는 아직 videos 가 없다(hasRenderedAdVideo == false) — 굽는 도중에 살아
+  //   있는 청구가 생긴 정상 흐름이지, 성공해서 소진된 회차가 아니다. 그래서 여전히 202.
   it("★ 살아 있는 청구가 있으면 잔액이 0 이어도 잔액 검사를 건너뛰고 202", async () => {
     process.env.SHOTFORM_FAKE = "fal";
     const made = await withScenario();
     const { chargeAd } = await import("../lib/charges.js");
     await chargeAd({ userId: U, projectId: made.id, seconds: 15 });
+    const { POST: render } = await import("../app/api/ads/[id]/render/route.js");
+    const res = await render(new Request("http://x", { method: "POST", headers: H }), {
+      params: Promise.resolve({ id: made.id }),
+    });
+    expect(res.status).toBe(202);
+    delete process.env.SHOTFORM_FAKE;
+  });
+
+  // ★ 매출 누수 회귀(Task 17) — 성공해서 videos 가 생긴 뒤(=hasRenderedAdVideo == true)의
+  //   살아 있는 청구는 "정상 흐름 중"이 아니라 "이미 소진된 회차"다. 그때는 잔액 검사를
+  //   건너뛰면 안 된다 — 새 회차를 열 것이므로 못 내면 402 를 받아야 한다.
+  //   고치기 전에는(alreadyChargedAd 만 보고 건너뛰므로) 이 자리가 202 로 나와 RED 다.
+  it("★ 이미 영상을 낸 회차면 잔액이 모자랄 때 402 — 살아 있는 청구가 있어도", async () => {
+    const made = await withScenario();
+    const { getStore } = await import("../lib/store/index.js");
+    const { chargeAd } = await import("../lib/charges.js");
+    // 첫 회차가 이미 성공해 영상이 나온 상태를 만든다: 청구는 살아 있고(환불 안 됨), videos 도 있다.
+    await chargeAd({ userId: U, projectId: made.id, seconds: 15 });
+    const row = await getStore().selectProject(made.id, U);
+    await getStore().updateProjectRow(made.id, U, row.version, {
+      ...row.doc, status: "done", videos: [{ url: "/api/renders/x.mp4", seconds: 15 }],
+    });
+    // 잔액은 0 이다 — grant 를 한 번도 안 했다.
+    const { POST: render } = await import("../app/api/ads/[id]/render/route.js");
+    const res = await render(new Request("http://x", { method: "POST", headers: H }), {
+      params: Promise.resolve({ id: made.id }),
+    });
+    expect(res.status).toBe(402);
+  });
+
+  // 위 402 테스트의 대조군 — 이미 영상을 낸 회차라도 잔액이 있으면 새 회차를 열어 202.
+  it("이미 영상을 낸 회차라도 잔액이 있으면 새 회차를 열어 202", async () => {
+    process.env.SHOTFORM_FAKE = "fal";
+    const made = await withScenario();
+    const { getStore } = await import("../lib/store/index.js");
+    const { chargeAd } = await import("../lib/charges.js");
+    await chargeAd({ userId: U, projectId: made.id, seconds: 15 });
+    const row = await getStore().selectProject(made.id, U);
+    await getStore().updateProjectRow(made.id, U, row.version, {
+      ...row.doc, status: "done", videos: [{ url: "/api/renders/x.mp4", seconds: 15 }],
+    });
+    // 이미 첫 회차로 65 를 썼으니(위 chargeAd), 새 회차 65 를 또 낼 잔액을 채운다.
+    await getStore().insertGrant({ user_id: U, amount_credits: AD_VIDEO_PRICE[15] * 2, reason: "t" });
     const { POST: render } = await import("../app/api/ads/[id]/render/route.js");
     const res = await render(new Request("http://x", { method: "POST", headers: H }), {
       params: Promise.resolve({ id: made.id }),

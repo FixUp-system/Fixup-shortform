@@ -6,6 +6,7 @@ import { runWithActor } from "../lib/actor.js";
 import { runScenarioStep, runAdRenderPipeline } from "../lib/ad/pipeline.js";
 import { balanceFor } from "../lib/charges.js";
 import { AD_VIDEO_PRICE } from "../lib/pricing.js";
+import { hasRenderedAdVideo } from "../lib/ad/attempt.js";
 
 const U = "00000000-0000-4000-8000-00000000000a";
 const SETTINGS = {
@@ -92,6 +93,59 @@ describe("광고 파이프라인", () => {
       runWithActor(U, () => runAdRenderPipeline(p.id, U, { generateAdVideo: async () => ({ url: "x", seconds: 15 }) }))
     ).rejects.toThrow();
     expect(await balanceFor(U)).toBe(200);
+  });
+
+  // ★ 매출 누수 회귀(Task 17) — 첫 생성은 65 크레딧을 받는데, 성공한 뒤 [다시 만들기]는
+  // 0 크레딧이었다. 그런데 fal 원가는 매번 나간다(readAdLedger 의 active 가 성공 뒤에도
+  // 영원히 살아 있어서 chargeAd 가 `if (active) return 0` 로 안 받았다).
+  // 이 테스트는 고치기 전에는 두 번째 balanceFor 단정에서 실패해야 한다(RED).
+  it("★ 성공해서 done 이 된 뒤 다시 구우면 정가를 또 받는다", async () => {
+    const p = await makeAd();
+    await getStore().insertGrant({ user_id: U, amount_credits: 200, reason: "t" });
+    await runWithActor(U, () => runScenarioStep(p.id, U, { generateScenario: async () => scenario }));
+    const deps = {
+      generateAdVideo: async () => ({ url: "https://fal.example/v.mp4", seconds: 15 }),
+      storeVideo: async (url) => url,
+    };
+    await runWithActor(U, () => runAdRenderPipeline(p.id, U, deps));
+    expect((await getProject(p.id, U)).status).toBe("done");
+    expect(await balanceFor(U)).toBe(200 - AD_VIDEO_PRICE[15]);
+
+    // [다시 만들기] — 시나리오는 그대로고 영상만 새로 굽는다. fal 원가는 또 나간다.
+    await runWithActor(U, () => runAdRenderPipeline(p.id, U, deps));
+    const back = await getProject(p.id, U);
+    expect(back.status).toBe("done");
+    expect(back.videos.length).toBe(1); // 최신 한 편으로 덮어쓴다 — 회차 목록이 아니다
+    // ★ 핵심 단정 — 정가를 또 받아 잔액이 두 번째로 준다
+    expect(await balanceFor(U)).toBe(200 - AD_VIDEO_PRICE[15] * 2);
+  });
+
+  // ★ 한 번의 굽기 안에서는 여전히 한 번만 받는다 — openNewAttempt 를 더한 것이
+  //   runAdRenderPipeline 안에서 chargeAd 를 두 번 부르게 만들지 않았는지 확인한다.
+  it("한 번의 굽기 안에서는 여전히 한 번만 받는다", async () => {
+    const p = await makeAd();
+    await getStore().insertGrant({ user_id: U, amount_credits: 200, reason: "t" });
+    await runWithActor(U, () => runScenarioStep(p.id, U, { generateScenario: async () => scenario }));
+    await runWithActor(U, () =>
+      runAdRenderPipeline(p.id, U, {
+        generateAdVideo: async () => ({ url: "https://fal.example/v.mp4", seconds: 15 }),
+        storeVideo: async (url) => url,
+      })
+    );
+    expect(await balanceFor(U)).toBe(200 - AD_VIDEO_PRICE[15]);
+  });
+});
+
+// hasRenderedAdVideo — "이미 영상 있음" 판정을 한 곳에 두는 순수 헬퍼(lib/ad/attempt.js).
+// 파이프라인과 라우트가 이 함수를 같이 불러 판정이 갈리지 않게 한다.
+describe("hasRenderedAdVideo — 회차 판정 헬퍼", () => {
+  it("videos[0].url 이 있으면 true", () => {
+    expect(hasRenderedAdVideo({ videos: [{ url: "/api/renders/x.mp4" }] })).toBe(true);
+  });
+  it("videos 가 없거나 비어 있으면 false", () => {
+    expect(hasRenderedAdVideo({})).toBe(false);
+    expect(hasRenderedAdVideo({ videos: [] })).toBe(false);
+    expect(hasRenderedAdVideo(null)).toBe(false);
   });
 });
 
