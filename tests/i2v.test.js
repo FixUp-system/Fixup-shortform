@@ -249,13 +249,15 @@ describe("클립이 프로젝트의 모델로 나간다", () => {
 
   const base = { imageUrl: "https://x/i.png", seconds: 5, aspect_ratio: "9:16", prompt: "움직인다", projectId: "p1" };
 
-  it("Seedance 프로젝트는 Seedance 로 나가고 오디오가 꺼져 있다", async () => {
+  // ★ 뒤집혔다 — 이 모델은 클립이 직접 말한다(profile.speaks). 대신 우리 TTS 를 만들지
+  //   않는다(둘 다 만들면 소리가 두 겹이 된다). 페이로드에 이 필드가 실리는지 재는 유일한 자리다.
+  it("Seedance 프로젝트는 Seedance 로 나가고 오디오가 켜져 있다 — 클립이 직접 말한다", async () => {
     const { calls, fetchImpl } = captor();
     await runWithActor("t-user", () =>
       generateClip({ ...base, project: { settings: { i2v_model: "seedance-2.0" } }, fetchImpl })
     );
     expect(calls[0].url).toBe(SEEDANCE);
-    expect(calls[0].body.generate_audio).toBe(false);
+    expect(calls[0].body.generate_audio).toBe(true);
     expect(calls[0].body.duration).toBe(5);
   });
 
