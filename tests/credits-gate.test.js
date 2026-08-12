@@ -11,6 +11,8 @@ import { assertBudget } from "../lib/costs.js";
 import { runWithActor } from "../lib/actor.js";
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
 import * as projects from "../lib/projects.js";
+// 정가는 길이 × 모델로 갈린다. 이 파일은 모델을 안 넘기는 경로만 재므로
+// 레거시(Kling) 표를 읽는다 — 라우트가 폴백하는 표와 같은 자리다.
 import { VIDEO_PRICE } from "../lib/pricing.js";
 import { chargeVideo } from "../lib/charges.js";
 
@@ -86,8 +88,8 @@ describe("호출 게이트 — 사용자 축은 잔액이다", () => {
   });
 
   it("정가를 다 쓴 잔액 0 은 통과한다 — 그 값은 시작 전에 이미 받았다", async () => {
-    await grantTo(A, VIDEO_PRICE[30]);
-    await chargeTo(A, VIDEO_PRICE[30], "paid-1");
+    await grantTo(A, VIDEO_PRICE["kling-v3"][30]);
+    await chargeTo(A, VIDEO_PRICE["kling-v3"][30], "paid-1");
     await runWithActor(A, async () => {
       await expect(assertBudget({ endpoint: KLING, amount: 5 })).resolves.toBeUndefined();
     });
@@ -152,14 +154,14 @@ describe("시작 게이트 — 자동 관통", () => {
 
   it("정가에 한 크레딧이라도 모자라면 402 — 반 편만 만들게 두지 않는다", async () => {
     const p = await makeProject();
-    await grantTo(A, VIDEO_PRICE[30] - 1);
+    await grantTo(A, VIDEO_PRICE["kling-v3"][30] - 1);
     expect((await autoPOST(autoReq(A), ctx(p.id))).status).toBe(402);
     expect(runAutoPipeline).not.toHaveBeenCalled();
   });
 
   it("정가가 있으면 202 로 시작한다", async () => {
     const p = await makeProject();
-    await grantTo(A, VIDEO_PRICE[30]);
+    await grantTo(A, VIDEO_PRICE["kling-v3"][30]);
     expect((await autoPOST(autoReq(A), ctx(p.id))).status).toBe(202);
     expect(runAutoPipeline).toHaveBeenCalledTimes(1);
   });
@@ -199,14 +201,14 @@ describe("시작 게이트 — 단계별", () => {
   afterEach(() => restore("SHOTFORM_FAKE"));
 
   it("정가가 없으면 이미지 시작이 402 이고 파이프라인이 안 불린다", async () => {
-    await grantTo(A, VIDEO_PRICE[30] - 1);
+    await grantTo(A, VIDEO_PRICE["kling-v3"][30] - 1);
     const p = await projectWithAudio();
     expect((await imagesPOST(post("http://localhost/i"), ctx(p.id))).status).toBe(402);
     expect(pipelineMock.run).not.toHaveBeenCalled();
   });
 
   it("정가가 있으면 이미지 시작이 200 이다", async () => {
-    await grantTo(A, VIDEO_PRICE[30]);
+    await grantTo(A, VIDEO_PRICE["kling-v3"][30]);
     const p = await projectWithAudio();
     expect((await imagesPOST(post("http://localhost/i"), ctx(p.id))).status).toBe(200);
     expect(pipelineMock.run).toHaveBeenCalledTimes(1);
@@ -240,7 +242,7 @@ describe("시작 게이트 — 단계별", () => {
   };
 
   it("컷당 첫 재생성은 공짜라 잔액 0 이어도 200 이다", async () => {
-    await grantTo(A, VIDEO_PRICE[30]);          // 정가만 내고 잔액 0
+    await grantTo(A, VIDEO_PRICE["kling-v3"][30]);          // 정가만 내고 잔액 0
     const p = await paidProject();
     expect((await cutRegenPOST(post("http://localhost/r"), idxCtx(p.id, 0))).status).toBe(200);
     expect((await voiceRegenPOST(post("http://localhost/r"), idxCtx(p.id, 0))).status).toBe(200);
@@ -248,7 +250,7 @@ describe("시작 게이트 — 단계별", () => {
   });
 
   it("둘째 재생성부터는 잔액이 없으면 402 다", async () => {
-    await grantTo(A, VIDEO_PRICE[30]);          // 정가만 내고 잔액 0
+    await grantTo(A, VIDEO_PRICE["kling-v3"][30]);          // 정가만 내고 잔액 0
     const p = await paidProject({ regen_count: 1, voice_regen_count: 1, clip_regen_count: 1 });
     expect((await cutRegenPOST(post("http://localhost/r"), idxCtx(p.id, 0))).status).toBe(402);
     expect((await voiceRegenPOST(post("http://localhost/r"), idxCtx(p.id, 0))).status).toBe(402);

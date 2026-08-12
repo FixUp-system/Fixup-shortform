@@ -8,6 +8,8 @@ import { resetMemoryStore } from "../lib/store/memory.js";
 import { getStore } from "../lib/store/index.js";
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
 import * as projects from "../lib/projects.js";
+// 정가는 길이 × 모델로 갈린다. 이 파일의 라우트들은 모델을 안 넘기므로
+// 레거시(Kling) 표를 읽는다 — lib/pricing.js 의 폴백이 가리키는 그 표다.
 import { VIDEO_PRICE, REGEN_PRICE, MAX_REGEN_PER_CUT } from "../lib/pricing.js";
 import { balanceFor, chargeVideo, refundVideo } from "../lib/charges.js";
 
@@ -97,7 +99,7 @@ describe("자동 관통 청구", () => {
     await grant(500);
     const p = await makeProject(30);
     expect((await autoPOST(autoReq(), ctx(p.id))).status).toBe(202);
-    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE[30]);
+    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["kling-v3"][30]);
     expect(runAutoPipeline).toHaveBeenCalledTimes(1);
   });
 
@@ -105,7 +107,7 @@ describe("자동 관통 청구", () => {
     await grant(500);
     const p = await makeProject(60);
     await autoPOST(autoReq(), ctx(p.id));
-    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE[60]);
+    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["kling-v3"][60]);
   });
 
   it("모자라면 402 이고 청구도 시작도 없다", async () => {
@@ -122,7 +124,7 @@ describe("자동 관통 청구", () => {
     await autoPOST(autoReq(), ctx(p.id));
     // 두 번째는 멱등 가드에 걸려 409 — 그 전에 청구가 또 일어나면 안 된다
     expect((await autoPOST(autoReq(), ctx(p.id))).status).toBe(409);
-    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE[30]);
+    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["kling-v3"][30]);
   });
 
   it("가짜 모드는 청구하지 않는다", async () => {
@@ -177,7 +179,7 @@ describe("단계별 청구 — 정가는 그림에서 한 번", () => {
     await grant(500);
     const p = await withCuts(30);
     expect((await imagesPOST(post(), ctx(p.id))).status).toBe(200);
-    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE[30]);
+    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["kling-v3"][30]);
   });
 
   it("이미지를 두 번 시작해도 한 번만 받는다 — 두 번째는 409 다", async () => {
@@ -188,7 +190,7 @@ describe("단계별 청구 — 정가는 그림에서 한 번", () => {
       ...proj, cuts: proj.cuts.map((c) => ({ ...c, image: { url: "i0" } })),
     }));
     expect((await imagesPOST(post(), ctx(p.id))).status).toBe(409);
-    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE[30]);
+    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["kling-v3"][30]);
   });
 
   it("모자라면 402 이고 청구도 시작도 없다", async () => {
@@ -223,11 +225,11 @@ describe("단계별 청구 — 정가는 그림에서 한 번", () => {
     expect(await balanceFor(A)).toBe(500);          // 되돌려받았다
 
     expect((await clipsPOST(post(), ctx(p.id))).status).toBe(200);
-    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE[30]);
+    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["kling-v3"][30]);
   });
 
   it("환불된 프로젝트인데 잔액이 없으면 클립·목소리가 402 다", async () => {
-    await grant(VIDEO_PRICE[30]);
+    await grant(VIDEO_PRICE["kling-v3"][30]);
     const p = await withCuts(30, { image: { url: "i0" } });
     await chargeVideo({ userId: A, projectId: p.id, seconds: 30 });
     await refundVideo({ userId: A, projectId: p.id });
@@ -278,6 +280,9 @@ describe("재생성 청구 — 컷당 첫 회는 공짜", () => {
   }
 
   for (const [name, route, field, kind] of cases) {
+    // 클립 정가만 모델을 탄다. 이 라우트들은 모델을 안 넘기므로 레거시(Kling) 값이다.
+    const price = kind === "clip" ? REGEN_PRICE.clip["kling-v3"] : REGEN_PRICE[kind];
+
     it(`${name} 재생성 — 정상(청구 살아 있는) 프로젝트는 첫 회가 공짜 그대로다`, async () => {
       const { p, base } = await paidCuts(500, { [field]: 0 });
       expect((await route(post(), idxCtx(p.id, 0))).status).toBe(200);
@@ -287,7 +292,7 @@ describe("재생성 청구 — 컷당 첫 회는 공짜", () => {
     it(`${name} 재생성 — 둘째부터 정가를 받는다`, async () => {
       const { p, base } = await paidCuts(500, { [field]: 1 });
       expect((await route(post(), idxCtx(p.id, 0))).status).toBe(200);
-      expect(await balanceFor(A)).toBe(base - REGEN_PRICE[kind]);
+      expect(await balanceFor(A)).toBe(base - price);
     });
 
     it(`${name} 재생성 — 회차가 오르면 또 받는다(같은 컷이라도)`, async () => {
@@ -297,12 +302,12 @@ describe("재생성 청구 — 컷당 첫 회는 공짜", () => {
         ...proj, cuts: proj.cuts.map((c) => ({ ...c, [field]: 2 })),
       }));
       await route(post(), idxCtx(p.id, 0));
-      expect(await balanceFor(A)).toBe(base - REGEN_PRICE[kind] * 2);
+      expect(await balanceFor(A)).toBe(base - price * 2);
     });
 
     it(`${name} 재생성 — 모자라면 402 이고 청구도 시작도 없다`, async () => {
-      const { p, base } = await paidCuts(VIDEO_PRICE[30] + REGEN_PRICE[kind] - 1, { [field]: 1 });
-      expect(base).toBe(REGEN_PRICE[kind] - 1);
+      const { p, base } = await paidCuts(VIDEO_PRICE["kling-v3"][30] + price - 1, { [field]: 1 });
+      expect(base).toBe(price - 1);
       expect((await route(post(), idxCtx(p.id, 0))).status).toBe(402);
       expect(await balanceFor(A)).toBe(base);
       expect(pipelineMock.regen).not.toHaveBeenCalled();
@@ -348,7 +353,7 @@ describe("재생성 청구 — 컷당 첫 회는 공짜", () => {
       expect(await balanceFor(A)).toBe(500);          // 되돌려받았다
 
       expect((await route(post(), idxCtx(p.id, 0))).status).toBe(200);
-      expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE[30]);   // 첫 회는 여전히 공짜다
+      expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["kling-v3"][30]);   // 첫 회는 여전히 공짜다
     });
 
     // ★ 게이트를 블록 맨 앞에 두면 이 조합에서만 옛 결함이 되살아난다 —
@@ -368,7 +373,7 @@ describe("재생성 청구 — 컷당 첫 회는 공짜", () => {
     });
 
     it(`${name} 재생성 — 환불된 프로젝트인데 잔액이 없으면 402 다`, async () => {
-      await grant(VIDEO_PRICE[30]);
+      await grant(VIDEO_PRICE["kling-v3"][30]);
       const p = await withCuts(30, { [field]: 0, image: { url: "i0" } });
       await chargeVideo({ userId: A, projectId: p.id, seconds: 30 });
       await refundVideo({ userId: A, projectId: p.id });
