@@ -57,6 +57,25 @@ describe("광고 옵션", () => {
     expect(() => normalizeAdOptions({ style: "없는화풍" })).toThrow();
   });
 
+  it("★ 프로토타입 키도 모르는 값이다 — 대괄호 접근의 구멍", () => {
+    // style 은 Object.keys 로만 검증해야 한다. AD_STYLE_LINES[style] 로 검사하면
+    // Object.prototype 의 멤버(constructor, toString 등)가 truthy 여서 통과해 버린다.
+    // 그 값이 저장되면 뒤에서 AD_STYLE_LINES["constructor"] 가 함수를 주고, 프롬프트에 붙으면 터진다.
+    for (const bad of ["constructor", "toString", "valueOf", "hasOwnProperty", "__proto__"]) {
+      expect(() => normalizeAdOptions({ style: bad })).toThrow();
+    }
+  });
+
+  it("세 축도 프로토타입 키를 안 통과시킨다 — 회귀 방지", () => {
+    // format, mood, narration_lang 은 list.some() 로 검사해서 이미 안전하다.
+    // 회귀 방지로 확인한다.
+    for (const bad of ["constructor", "toString", "valueOf", "hasOwnProperty", "__proto__"]) {
+      expect(() => normalizeAdOptions({ format: bad })).toThrow();
+      expect(() => normalizeAdOptions({ mood: bad })).toThrow();
+      expect(() => normalizeAdOptions({ narration_lang: bad })).toThrow();
+    }
+  });
+
   it("import 문이 없다", async () => {
     const { readFile } = await import("fs/promises");
     const src = await readFile(new URL("../lib/ad/options.js", import.meta.url), "utf8");
