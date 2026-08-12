@@ -45,6 +45,8 @@ describe("composeVideo", () => {
       downloadImpl: async (_url, dest) => dest,
       writeFileImpl: async () => {},
       mkdirImpl: async () => {},
+      readFileImpl: async () => Buffer.from("mp4"),
+      putObjectImpl: async () => {},
     });
     expect(r.url).toBe("/api/renders/p1.mp4");
     expect(r.seconds).toBe(17);
@@ -66,6 +68,8 @@ describe("composeVideo", () => {
       downloadImpl: async (_url, dest) => dest,
       writeFileImpl: async () => {},
       mkdirImpl: async () => {},
+      readFileImpl: async () => Buffer.from("mp4"),
+      putObjectImpl: async () => {},
     });
     expect(r.seconds).toBe(14); // 9 + 5, 낭독 합. 클립 합(16)이 아니다
   });
@@ -116,6 +120,55 @@ describe("composeVideo", () => {
     await expect(
       composeVideo({ projectId: "p1", cuts: [{ idx: 0, sentence: "x", seconds: 3 }], aspect_ratio: "9:16" })
     ).rejects.toThrow(/영상/);
+  });
+
+  it("최종본만 Storage 에 올린다 — 중간물은 안 올린다", async () => {
+    const put = [];
+    await composeVideo({
+      projectId: "p1", cuts: CUTS, aspect_ratio: "9:16",
+      runFfmpeg: async () => {},
+      downloadImpl: async (_url, dest) => dest,
+      writeFileImpl: async () => {},
+      mkdirImpl: async () => {},
+      mkdtempImpl: async () => "/tmp/x",
+      rmImpl: async () => {},
+      readFileImpl: async () => Buffer.from("mp4"),
+      putObjectImpl: async (bucket, key, bytes, ct) => put.push({ bucket, key, ct }),
+    });
+    // 올린 것은 하나뿐이고 최종본이다 — 클립(p1-0.mp4)·소리(p1-0.m4a)·자막(p1.ass)은 아니다
+    expect(put).toEqual([{ bucket: "renders", key: "p1.mp4", ct: "video/mp4" }]);
+  });
+
+  it("합성이 실패해도 임시 폴더를 치운다", async () => {
+    const removed = [];
+    await expect(composeVideo({
+      projectId: "p1", cuts: CUTS, aspect_ratio: "9:16",
+      runFfmpeg: async () => { throw new Error("ffmpeg 죽음"); },
+      downloadImpl: async (_url, dest) => dest,
+      writeFileImpl: async () => {},
+      mkdirImpl: async () => {},
+      mkdtempImpl: async () => "/tmp/x",
+      rmImpl: async (dir) => removed.push(dir),
+      readFileImpl: async () => Buffer.from("mp4"),
+      putObjectImpl: async () => {},
+    })).rejects.toThrow("ffmpeg 죽음");
+    // 값을 치른 뒤 실패해도 디스크는 안 남긴다 — 지금은 그대로 쌓인다
+    expect(removed).toEqual(["/tmp/x"]);
+  });
+
+  it("URL 형태는 그대로다 — 각인이 이 문자열로 낡음을 판정한다", async () => {
+    const r = await composeVideo({
+      projectId: "p1", cuts: CUTS, aspect_ratio: "9:16",
+      runFfmpeg: async () => {},
+      downloadImpl: async (_url, dest) => dest,
+      writeFileImpl: async () => {},
+      mkdirImpl: async () => {},
+      mkdtempImpl: async () => "/tmp/x",
+      rmImpl: async () => {},
+      readFileImpl: async () => Buffer.from("mp4"),
+      putObjectImpl: async () => {},
+    });
+    expect(r.url).toBe("/api/renders/p1.mp4");
   });
 });
 
