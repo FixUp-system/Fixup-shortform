@@ -1,0 +1,204 @@
+"use client";
+
+// 광고 영상 한 방 만들기 — 입력 박스 하나다. app/create/page.js 와 같은 결을 그대로 따른다:
+// 층층이 쌓인 라벨+필드가 아니라 "이 광고를 어떻게 만들까"라는 한 덩어리를 박스 하나에 담고,
+// 조작은 그 안쪽 아래에 붙인다. 옵션(포맷·분위기·화풍·언어·사이즈)은 박스 안에 **늘 펼쳐 둔다**
+// — 접었다 펴면 접힌 동안 무엇이 골라져 있는지 안 보이고, 값을 확인하려고 한 번 더 눌러야 한다.
+// 사진만 알약으로 남는다: 그것은 값이 아니라 행동(파일 고르기)이다.
+//
+// 이 화면에서는 돈이 안 나간다 — [시나리오 만들기]는 LLM 만 쓰고 무료다
+// (docs/superpowers/specs/2026-08-12-ad-video-oneshot-design.md:86).
+// 유료 승인([이대로 만들기])은 다음 화면(/ads/[id])의 몫이다.
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { AD_FORMATS, AD_MOODS, AD_LANGS, AD_STYLE_LINES, DEFAULT_AD_OPTIONS } from "../../../lib/ad/options";
+import { STYLE_PRESETS } from "../../../lib/styles";
+import { ASPECTS, DEFAULT_ASPECT_ID, aspectFor } from "../../../lib/aspects";
+
+// 화풍 라벨은 styles.js 에 있지만, 고를 수 있는 것은 AD_STYLE_LINES 에 영상용 문구가 있는
+// id 뿐이어야 한다 — 둘이 어긋나면 화면에는 있는데 서버(normalizeAdOptions)가 400 을 낸다.
+const AD_STYLES = STYLE_PRESETS.filter((s) => Object.keys(AD_STYLE_LINES).includes(s.id));
+
+// 서버(app/api/ads/route.js·[id]/route.js)와 같은 값. 갈리면 화면은 통과시키는데 서버가
+// 거절한다 — 사장님이 5장을 다 올린 뒤에 거절당하지 않게 화면이 먼저 막는다.
+const MAX_PHOTOS = 4;
+
+export default function AdNewPage() {
+  const router = useRouter();
+  const [text, setText] = useState("");
+  const [photos, setPhotos] = useState([]); // {id, filename, url}
+  const [format, setFormat] = useState(DEFAULT_AD_OPTIONS.format);
+  const [mood, setMood] = useState(DEFAULT_AD_OPTIONS.mood);
+  const [lang, setLang] = useState(DEFAULT_AD_OPTIONS.narration_lang);
+  const [style, setStyle] = useState(DEFAULT_AD_OPTIONS.style);
+  const [aspect, setAspect] = useState(DEFAULT_ASPECT_ID);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const fileRef = useRef(null);
+  const textRef = useRef(null);
+
+  // 글이 늘면 칸이 아래로 밀린다 — 안에서 스크롤하지 않는다(app/create/page.js 와 같은 규칙).
+  useEffect(() => {
+    const el = textRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [text]);
+
+  async function onFiles(e) {
+    const files = Array.from(e.target.files);
+    const room = MAX_PHOTOS - photos.length;
+    if (files.length > room) setErr(`사진은 ${MAX_PHOTOS}장까지 올릴 수 있어요`);
+    for (const file of files.slice(0, Math.max(room, 0))) {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/uploads", { method: "POST", body: fd });
+      const data = await res.json();
+      if (res.ok) setPhotos((p) => [...p, data]);
+      else setErr(data.error || "업로드 실패");
+    }
+    e.target.value = "";
+  }
+
+  async function submit() {
+    setBusy(true); setErr("");
+    const res = await fetch("/api/ads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        material: { text, photos },
+        settings: { format, mood, narration_lang: lang, style, aspect_ratio: aspect },
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) { setErr(data.error || "생성 실패"); setBusy(false); return; }
+
+    // 시나리오는 동기다(몇 초) — 만드는 자리에서 바로 이어 부른다. 사장님은 버튼 한 번만 누른다.
+    const res2 = await fetch(`/api/ads/${data.id}/scenario`, { method: "POST" });
+    const data2 = await res2.json();
+    // 실패해도 써 둔 자료는 화면에 남는다(로컬 state) — app/create/page.js 와 같은 판단.
+    if (!res2.ok) { setErr(data2.error || "시나리오를 만들지 못했어요"); setBusy(false); return; }
+    router.push(`/ads/${data.id}`);
+  }
+
+  return (
+    <>
+      <h1 className="pgtitle">광고 영상 만들기</h1>
+      <p className="pgsub">무엇을 광고할지 적어 주시면 15초 시나리오를 무료로 만들어 드려요 — 확인하고 그대로 만들면 끝나요</p>
+
+      <section className="panel--wide">
+        <div className="composer">
+          <textarea ref={textRef} className="field composer-text" value={text} maxLength={2000}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="무엇을 광고하고 싶으세요? 제품·강조하고 싶은 점·타깃을 자유롭게 적어 주세요" />
+
+          {/* 붙인 사진이 먼저 보인다 — 무엇을 이미 넣었는지가 조작보다 앞이다 */}
+          {photos.length > 0 && (
+            <div className="uploads">
+              {photos.map((p) => (
+                <div key={p.id} className="up photo-mark">
+                  <img src={p.url} alt={p.filename} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  <button className="tag" onClick={() => setPhotos((ps) => ps.filter((x) => x.id !== p.id))}>
+                    ✕ {p.filename.slice(0, 6)}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 고른 것들은 늘 펼쳐 둔다 — 접으면 무엇이 골라져 있는지 보려고 한 번 더 눌러야 한다 */}
+          <div className="composer-tray">
+            <div className="tray-row">
+              <span className="tray-label">포맷</span>
+              <div className="tray-col">
+                <div className="chips">
+                  {AD_FORMATS.map((f) => (
+                    <button key={f.id} className={`chip${format === f.id ? " on" : ""}`}
+                      onClick={() => setFormat(f.id)}>
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="tray-note">{AD_FORMATS.find((f) => f.id === format)?.beat}</div>
+              </div>
+            </div>
+
+            <div className="tray-row">
+              <span className="tray-label">분위기</span>
+              <div className="tray-col">
+                <div className="chips">
+                  {AD_MOODS.map((m) => (
+                    <button key={m.id} className={`chip${mood === m.id ? " on" : ""}`}
+                      onClick={() => setMood(m.id)}>
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="tray-row">
+              <span className="tray-label">화풍</span>
+              <div className="tray-col">
+                <div className="chips">
+                  {AD_STYLES.map((s) => (
+                    <button key={s.id} className={`chip${style === s.id ? " on" : ""}`}
+                      onClick={() => setStyle(s.id)}>
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="tray-note">{AD_STYLES.find((s) => s.id === style)?.desc}</div>
+              </div>
+            </div>
+
+            <div className="tray-row">
+              <span className="tray-label">언어</span>
+              <div className="tray-col">
+                <div className="chips">
+                  {AD_LANGS.map((l) => (
+                    <button key={l.id} className={`chip${lang === l.id ? " on" : ""}`}
+                      onClick={() => setLang(l.id)}>
+                      {l.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* 사이즈 — 컷을 만든 뒤에는 못 바꾼다. app/create/page.js 와 같은 이유로 여기가 자리다 */}
+            <div className="tray-row">
+              <span className="tray-label">사이즈</span>
+              <div className="tray-col">
+                <div className="chips">
+                  {ASPECTS.map((a) => (
+                    <button key={a.id} className={`chip${aspect === a.id ? " on" : ""}`}
+                      onClick={() => setAspect(a.id)}>
+                      {a.label} · {a.id}
+                    </button>
+                  ))}
+                </div>
+                <div className="tray-note">{aspectFor(aspect).note}에 맞는 규격이에요</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="composer-bar">
+            <button className="pill" disabled={photos.length >= MAX_PHOTOS}
+              onClick={() => fileRef.current?.click()}>
+              ＋ 사진 {photos.length > 0 && <b>{photos.length}</b>}
+            </button>
+            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={onFiles} />
+
+            <span className="spacer" />
+            <button className="cta" onClick={submit} disabled={busy || !text.trim()}>
+              {busy ? "만드는 중…" : "시나리오 만들기 →"} <span className="cr">무료</span>
+            </button>
+          </div>
+        </div>
+
+        {err && <p className="pgsub warn">{err}</p>}
+      </section>
+    </>
+  );
+}
