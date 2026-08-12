@@ -176,9 +176,6 @@ export default function AdDetailPage() {
       {status === "rendering" && (
         <section className="panel panel--wide">
           <p className="pgsub">영상을 만드는 중이에요 — 몇 분 걸릴 수 있어요…</p>
-          {pollTimedOut && (
-            <button className="mini" disabled={busy} onClick={startPolling}>다시 확인</button>
-          )}
         </section>
       )}
 
