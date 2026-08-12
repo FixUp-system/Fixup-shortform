@@ -22,43 +22,52 @@ async function spend(usd) {
   // 스토어 메서드는 insertCost 다(addRecord 는 lib/costs.js 의 감싼 이름).
   await memoryStore.insertCost({
     request_id: `r-${Date.now()}-${Math.random()}`, ts: Date.now(),
-    endpoint: "openai/gpt-4o", stage: "대화", user: A, project_id: null,
+    endpoint: "anthropic/claude-opus-5", stage: "대화", user: A, project_id: null,
     est_cost_usd: usd, status: "done",
   });
 }
 
 const okBody = {
-  model: "gpt-4o",
-  usage: { prompt_tokens: 100, completion_tokens: 50 },
+  id: "msg_test", type: "message", role: "assistant",
+  model: "claude-opus-5",
+  usage: { input_tokens: 100, output_tokens: 50 },
   // ask 는 message 가 문자열이어야 라우트가 받는다 — 아니면 재시도로 넘어가 502 다
   // (그러면 호출이 두 번이라 원장 행도 두 줄이다).
-  choices: [{ message: { content: '{"action":"ask","message":"네"}' } }],
+  content: [{ type: "text", text: '{"action":"ask","message":"네"}' }],
+  stop_reason: "end_turn",
 };
+
+// SDK 는 Response 다운 객체를 요구한다 — headers.get 을 부른다
+const okRes = () => ({
+  ok: true, status: 200,
+  headers: new Headers({ "content-type": "application/json" }),
+  json: async () => okBody,
+});
 
 describe("POST /api/chat", () => {
   beforeEach(() => {
     resetMemoryStore();
     vi.unstubAllGlobals();
-    vi.stubEnv("OPENAI_API_KEY", "test-key");
+    vi.stubEnv("CLAUDE_API_KEY", "test-key");
   });
   afterEach(() => vi.unstubAllEnvs());
 
   it("부른 값을 원장에 남긴다 — 안 남기면 우리 비용 화면에서 안 보인다", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => okBody })));
+    vi.stubGlobal("fetch", vi.fn(okRes));
     const res = await POST(req(), {});
     expect(res.status).toBe(200);
     // 스토어의 읽기 메서드는 allCosts 다. 사용자 필드는 `actor` 로 저장된다.
     const rows = await memoryStore.allCosts();
     const mine = rows.filter((r) => r.actor === A);
     expect(mine).toHaveLength(1);
-    expect(mine[0].endpoint).toMatch(/gpt-4o/);
+    expect(mine[0].endpoint).toMatch(/claude-opus-5/);
     expect(mine[0].est_cost_usd).toBeGreaterThan(0);
   });
 
   // ★ 막는 것이 부르는 것보다 먼저다.
-  it("한도를 넘으면 OpenAI 를 안 부르고 402 다", async () => {
+  it("한도를 넘으면 Claude 를 안 부르고 402 다", async () => {
     await spend(FREE_TRIAL_USD + 0.01);
-    const f = vi.fn(async () => ({ ok: true, json: async () => okBody }));
+    const f = vi.fn(okRes);
     vi.stubGlobal("fetch", f);
     const res = await POST(req(), {});
     expect(res.status).toBe(402);
@@ -73,8 +82,9 @@ describe("POST /api/chat", () => {
   // 그래서 재는 것은 결과가 아니라 **순서**다: 두 번 부르면 두 줄이다.
   it("파싱에 실패해 두 번 불러도 두 줄 다 남는다 — 부른 값은 치렀다", async () => {
     const f = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({ ...okBody, choices: [{ message: { content: "JSON 아님" } }] }),
+      ok: true, status: 200,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({ ...okBody, content: [{ type: "text", text: "JSON 아님" }] }),
     }));
     vi.stubGlobal("fetch", f);
     const res = await POST(req(), {});
@@ -97,7 +107,7 @@ describe("POST /api/chat", () => {
   it("SHOTFORM_FAKE=fal 이어도 게이트는 살아 있다 — 대화는 진짜로 나간다", async () => {
     await spend(FREE_TRIAL_USD + 0.01);
     vi.stubEnv("SHOTFORM_FAKE", "fal");
-    const f = vi.fn(async () => ({ ok: true, json: async () => okBody }));
+    const f = vi.fn(okRes);
     vi.stubGlobal("fetch", f);
     const res = await POST(req(), {});
     expect(res.status).toBe(402);
