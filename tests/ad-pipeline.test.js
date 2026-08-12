@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { resetMemoryStore } from "../lib/store/memory.js";
 import { getStore } from "../lib/store/index.js";
 import { createProject, getProject } from "../lib/projects.js";
@@ -92,5 +92,55 @@ describe("광고 파이프라인", () => {
       runWithActor(U, () => runAdRenderPipeline(p.id, U, { generateAdVideo: async () => ({ url: "x", seconds: 15 }) }))
     ).rejects.toThrow();
     expect(await balanceFor(U)).toBe(200);
+  });
+});
+
+// storeVideoDefault(진짜 fal → 우리 renders 버킷) — deps.storeVideo 를 안 주입해서 재는 자리.
+// 위 테스트들은 전부 storeVideo 를 주입해 이 함수를 건너뛰었다 — 그래서 이름을 무작위 uuid 로
+// 짓던 버그(app/api/renders/[name]/route.js 가 파일명에서 프로젝트 id 를 되찾지 못해 404)를
+// 어떤 테스트도 못 잡았다.
+describe("광고 파이프라인 — storeVideoDefault", () => {
+  beforeEach(() => resetMemoryStore());
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("★ 완성본을 프로젝트 id 이름으로 renders 버킷에 올리고 그 URL 을 돌려준다", async () => {
+    const p = await makeAd();
+    await getStore().insertGrant({ user_id: U, amount_credits: 200, reason: "t" });
+    await runWithActor(U, () => runScenarioStep(p.id, U, { generateScenario: async () => scenario }));
+
+    const bytes = new Uint8Array([1, 2, 3, 4]);
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, arrayBuffer: async () => bytes.buffer })));
+
+    await runWithActor(U, () =>
+      // storeVideo 를 안 준다 — 진짜 storeVideoDefault 경로를 부른다
+      runAdRenderPipeline(p.id, U, {
+        generateAdVideo: async () => ({ url: "https://fal.example/v.mp4", seconds: 15 }),
+      })
+    );
+
+    const back = await getProject(p.id, U);
+    // ★ 가장 중요한 단정 — 파일명에서 뽑은 uuid 가 프로젝트 id 와 같아야
+    // /api/renders/[name] 라우트(UUID_MP4 정규식으로 이름에서 id 를 되찾는다)가 소유자를 찾는다.
+    // 무작위 이름이면 getProject(무작위id, ownerId) 가 null 이라 그 라우트는 404 를 낸다.
+    expect(back.videos[0].url).toBe(`/api/renders/${p.id}.mp4`);
+
+    const stored = await getStore().getObject("renders", `${p.id}.mp4`);
+    expect(Buffer.from(stored)).toEqual(Buffer.from(bytes));
+  });
+
+  it("완성본을 못 내려받으면(res.ok===false) 던진다", async () => {
+    const p = await makeAd();
+    await getStore().insertGrant({ user_id: U, amount_credits: 200, reason: "t" });
+    await runWithActor(U, () => runScenarioStep(p.id, U, { generateScenario: async () => scenario }));
+
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 500 })));
+
+    await expect(
+      runWithActor(U, () =>
+        runAdRenderPipeline(p.id, U, {
+          generateAdVideo: async () => ({ url: "https://fal.example/v.mp4", seconds: 15 }),
+        })
+      )
+    ).rejects.toThrow();
   });
 });
