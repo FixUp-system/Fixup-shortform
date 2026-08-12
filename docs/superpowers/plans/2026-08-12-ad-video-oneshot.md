@@ -2126,11 +2126,17 @@ git commit -m "feat(ad): 문서 라우트 — 옵션은 닫힌 목록, 고치면
 ```js
 // LLM 경계만 가짜로 막는다 — 라우트·파이프라인·시나리오 검증은 **진짜로** 돈다.
 // 이 저장소의 기존 방식과 같다(tests/auto-route.test.js:9 참고).
+//
+// ★ endpoint 를 일부러 "i2v" 로 준다. 사진 0장이면 코드가 t2v 로 **강제**하는데,
+//   여기서 "t2v" 를 주면 강제하는 값과 LLM 이 말한 값이 우연히 같아져
+//   `expect(endpoint).toBe("t2v")` 가 아무것도 판정하지 않는다 —
+//   pickEndpointKind 를 통째로 건너뛰고 raw.endpoint 를 그대로 써도 통과한다.
+//   다른 값을 줘야 그 단정이 "코드가 LLM 을 이긴다"를 진짜로 잰다.
 vi.mock("../lib/llm.js", () => ({
   callJson: vi.fn(async () => ({
     text: "Vertical commercial. Slow push-in on the product, then a hand lifts it.",
     shots: [{ beat: "제품 등장", camera: "slow push-in", action: "병이 놓인다", line: "매일 아침" }],
-    endpoint: "t2v",
+    endpoint: "i2v",
   })),
 }));
 ```
