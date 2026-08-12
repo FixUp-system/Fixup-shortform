@@ -294,8 +294,9 @@ export default function DoneStepPage() {
     fontSize: previewFontSize,
     lineHeight: 1.25,
     fontWeight: 700,
-    // ⚠️ 폰트 파일은 assets/ 에 있고 브라우저는 그 폴더를 못 읽는다(웹폰트 배달은 아직 없다).
-    // 그때까지는 시스템 폰트로 근사한다 — 자리·크기·색은 맞고 **글꼴만** 최종과 다르다.
+    // 폰트 이름은 lib 의 family 그대로다 — ffmpeg 의 ASS Fontname 과 같은 이름이고,
+    // app/globals.css 의 @font-face 가 public/fonts/ 의 같은 파일을 그 이름으로 물린다.
+    // 뒤의 sans-serif 는 폰트를 받는 동안(font-display: swap) 대신 그릴 글씨다.
     fontFamily: `"${font.family}", sans-serif`,
     color: sub.color,
     textShadow: outlineShadow,

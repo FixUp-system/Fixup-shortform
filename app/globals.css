@@ -2,6 +2,33 @@
    규칙: 색은 반드시 토큰으로 참조한다(:root 밖 hex 금지) · 모서리 3단 ·
    굵기 400/500/800 · 크기 12/14/15/16/24 · 그라디언트 없음 ·
    액센트는 크레딧 자리에만 · 주 실행 버튼은 바탕의 반대색 */
+/* ── 자막 폰트 — ⑥완성의 자막 미리보기가 쓴다.
+   ★ font-family 이름은 lib/subtitles.js 의 SUBTITLE_FONTS[].family 와 **글자 그대로** 같다.
+   그 이름이 ffmpeg 의 ASS Fontname 이자 브라우저의 font-family 다 — 두 벌로 적으면 갈리고,
+   갈리면 브라우저가 조용히 대체 폰트로 그려 미리보기와 완성본이 달라진다.
+
+   파일은 assets/ 의 것을 public/fonts/ 로 복사한 것이다(원본은 ffmpeg 가 읽으므로 그대로 둔다).
+   ★ 미리 받지 않는다 — preload 도 document.fonts.load 도 쓰지 않는다. @font-face 는 선언만
+   해 두면 브라우저가 **그 폰트가 실제로 화면에 쓰일 때만** 내려받는다. 기본만 쓰는 사장님은
+   7.2MB 짜리 '부드럽게'를 받지 않는다.
+
+   swap: 받는 동안 대체 폰트로 먼저 그린다 — 자막이 잠깐이라도 안 보이면 안 된다. */
+@font-face {
+  font-family: "Pretendard";
+  src: url("/fonts/subtitle-basic.otf") format("opentype");
+  font-display: swap;
+}
+@font-face {
+  font-family: "Black Han Sans";
+  src: url("/fonts/subtitle-impact.ttf") format("truetype");
+  font-display: swap;
+}
+@font-face {
+  font-family: "Gowun Dodum";
+  src: url("/fonts/subtitle-soft.ttf") format("truetype");
+  font-display: swap;
+}
+
 :root {
   --bg: #1A1A1A;
   --surface: #232323;

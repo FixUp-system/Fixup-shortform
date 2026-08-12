@@ -2,7 +2,8 @@
 // 이 저장소에는 화면 단위 테스트가 없고(tests/staleness-ui.test.js·credits-ui.test.js 가 선례),
 // 이 기능의 실패 모드는 "화면이 값을 손으로 다시 적는 것"이라 소스에서 잡힌다.
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync, statSync } from "node:fs";
+import { SUBTITLE_FONTS } from "../lib/subtitles.js";
 
 const src = readFileSync("app/create/[id]/done/page.js", "utf8");
 
@@ -108,6 +109,49 @@ describe("⑥완성 — 빠른 위치 칩", () => {
     const chipBlock = src.slice(chipIdx, src.indexOf("</div>", chipIdx));
     expect(chipBlock, "칩 켜짐을 subtitle_position 으로 판정한다").not.toContain("subtitle_position");
     expect(src, "옛 위치를 다시 저장하지 않는다").not.toContain("subtitle_position:");
+  });
+});
+
+// 미리보기가 진짜 폰트로 그려지려면 브라우저도 폰트 파일을 받아야 한다(assets/ 는 못 읽는다).
+// 이름이 한 글자라도 어긋나면 브라우저는 오류 없이 **대체 폰트로 그린다** — 사장님이 "강조"를
+// 골랐는데 미리보기는 기본 글씨고, 완성본에서야 달라진 것을 본다.
+describe("⑥완성 — 자막 웹폰트", () => {
+  const css = readFileSync("app/globals.css", "utf8");
+  // @font-face 블록을 통째로 떠서 그 안에서만 본다 — 낱말 등장 순서로는 어느 블록의
+  // font-family 인지 알 수 없다.
+  const faces = [...css.matchAll(/@font-face\s*\{([^}]*)\}/g)].map((m) => m[1]);
+
+  for (const f of SUBTITLE_FONTS) {
+    it(`${f.id}(${f.label}) 의 @font-face 가 목록의 family 와 같은 이름이다`, () => {
+      const face = faces.find((b) => b.includes(`font-family: "${f.family}"`));
+      expect(face, `"${f.family}" 를 선언한 @font-face 가 없다 — 브라우저가 대체 폰트로 그린다`)
+        .toBeTruthy();
+      expect(face, `${f.id} 의 @font-face 가 /fonts/ 파일을 안 가리킨다`).toMatch(/url\("\/fonts\/[^"]+"\)/);
+      // 받는 동안 자막이 안 보이면 안 된다
+      expect(face, `${f.id} 에 font-display: swap 이 없다`).toContain("font-display: swap");
+    });
+
+    it(`${f.id} 의 public 폰트 파일이 실제로 있다`, () => {
+      const face = faces.find((b) => b.includes(`font-family: "${f.family}"`)) || "";
+      const url = face.match(/url\("(\/fonts\/[^"]+)"\)/)?.[1];
+      expect(url, `${f.id} 의 url 을 못 찾았다`).toBeTruthy();
+      const path = `public${url}`;
+      expect(existsSync(path), `${path} 가 없다 — 브라우저가 조용히 대체 폰트로 그린다`).toBe(true);
+      // 오류 HTML 을 받아 놓고 폰트라고 믿는 것을 막는다(assets.test.js 와 같은 하한)
+      expect(statSync(path).size).toBeGreaterThan(50_000);
+    });
+  }
+
+  // ★ 용량 규칙 — 미리 받지 않는다. @font-face 는 그 폰트가 화면에 실제로 쓰일 때만
+  // 내려받는다. preload 를 붙이면 아무도 안 고른 7.2MB 를 모두가 받는다.
+  it("폰트를 미리 받지 않는다", () => {
+    for (const [name, text] of [
+      ["⑥완성 화면", src],
+      ["globals.css", css],
+      ["layout.js", readFileSync("app/layout.js", "utf8")],
+    ]) {
+      expect(text, `${name} 이 폰트를 미리 받는다`).not.toMatch(/rel=["']preload["']|fonts\.load\(/);
+    }
   });
 });
 
