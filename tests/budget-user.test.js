@@ -31,9 +31,13 @@ describe("사용자별 예산 축 — 크레딧 잔액", () => {
     await expect(runWithActor("u-1", call)).rejects.toThrow(BudgetExceeded);
   });
 
+  // ★ 누적 원가를 얹어야 이 계약이 실제로 물린다. 원장이 비어 있으면 체험 한도($0.5)
+  //   아래라 **아무 판정도 안 거치고** 우연히 통과한다($0.08 짜리 호출 하나뿐이므로).
+  //   30초 한 편 원가가 $3.06 이라 실제로는 여기서 그 값을 이미 넘긴 상태다.
   it("잔액이 0 이면 통과한다 — 그 값은 시작 전에 이미 받았다", async () => {
     await grant("u-1", 50);
     await charge("c1", "u-1", 50);
+    await spend("r-paid", "u-1", 3.06);
     await expect(runWithActor("u-1", call)).resolves.toBeUndefined();
   });
 

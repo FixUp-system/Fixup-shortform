@@ -150,6 +150,17 @@ curl -i http://localhost:3000/api/projects -H "x-shotform-user: 11111111-1111-11
   메일 왕복이라 매직링크를 걷어낸 이유를 뒷문으로 되돌린다. `/admin` 목록에서 재설정한다
   (`POST /api/admin/users/[id]/password`, 6자 이상)
 - **`/admin` 으로 가는 링크가 화면에 없다.** URL 을 직접 입력한다
+- ★ **측정 스크립트(`scripts/measure/*.mjs`)는 체험 한도에 걸린다.** 여섯 개가 전부
+  `runWithActor("admin", …)` 으로 도는데, `assertBudget` 의 체험 한도는 **결제 이력도
+  크레딧 잔액도 없는 사람**을 체험자로 보고 누적 원가 **$0.5**(`FREE_TRIAL_USD`)에서
+  막는다. `"admin"` 은 둘 다 없으므로 체험자다 — 누적이 넘는 순간 유료 호출이
+  `BudgetExceeded(scope="trial")` 로 죽는다.
+  **`"admin"` 에 크레딧을 넣어 푸는 방법은 없다**: `credit_grants.user_id` 가
+  `uuid references auth.users(id)` 라 `"admin"` 이라는 문자열은 애초에 들어가지 않는다.
+  그러니 **크레딧을 가진 실제 사용자 uuid 로 돌려라** — 스크립트의 `runWithActor("admin", …)`
+  를 그 uuid 로 바꾼 뒤 실행한다(잔액이 있으면 이 그물을 지나간다).
+  코드에 `"admin"` 예외를 파지 않는다 — 그러면 그 이름 하나로 한도가 통째로 열린다.
+  가짜 모드(`SHOTFORM_FAKE=all`)로 도는 측정은 애초에 이 게이트를 안 거친다.
 - **Supabase 무료 플랜은 며칠 요청이 없으면 일시정지된다.** 갑자기 전부 로그인 화면으로
   튕기면 대시보드에서 재개한다(서버 로그에 `getUser 실패` 가 남는다)
 - 배포는 아직 막혀 있다 — `lib/compose.js` 가 ffmpeg 자식 프로세스와 로컬 경로를 요구한다

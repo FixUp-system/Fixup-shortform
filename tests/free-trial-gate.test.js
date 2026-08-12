@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { memoryStore, resetMemoryStore } from "../lib/store/memory.js";
 import { runWithActor } from "../lib/actor.js";
 import { assertBudget, BudgetExceeded } from "../lib/costs.js";
+import { requireVideoCharge, refundVideo } from "../lib/charges.js";
 import { FREE_TRIAL_USD } from "../lib/pricing.js";
 
 const A = "00000000-0000-4000-8000-00000000000a";
@@ -65,6 +66,44 @@ describe("체험 한도", () => {
       user: B, project_id: null, est_cost_usd: FREE_TRIAL_USD * 5, status: "done",
     });
     await expect(guard()).resolves.toBeUndefined();
+  });
+
+  // 경계값 — 정확히 한도인 지점은 아직 통과다(`>` 이지 `>=` 가 아니다).
+  // 이 케이스가 없으면 판정을 `>=` 로 바꿔도 아무도 안 잡는다.
+  it("딱 한도까지는 통과한다 — 넘어야 막는다", async () => {
+    await spend(FREE_TRIAL_USD);
+    await expect(guard()).resolves.toBeUndefined();
+  });
+
+  it("한도를 티끌만큼만 넘어도 막는다", async () => {
+    await spend(FREE_TRIAL_USD);
+    await spend(0.000001);
+    await expect(guard()).rejects.toThrow(BudgetExceeded);
+  });
+
+  // ★★ 이 그룹이 이번 수정의 본체다 — 돈을 낸 사장님이 자기가 산 영상 도중에 갇히면 안 된다.
+  describe("결제한 사장님은 잔액이 0 이 되어도 갇히지 않는다", () => {
+    const P = "p-paid";
+
+    it("정가를 내면 잔액이 0 이 되는데, 그 뒤에도 컷이 계속 나가야 한다", async () => {
+      await memoryStore.insertGrant({ user_id: A, amount_credits: 50, reason: "충전" });
+      // 30초 한 편 = 50 크레딧. 내고 나면 잔액이 정확히 0 이다.
+      await requireVideoCharge({ userId: A, projectId: P, seconds: 30 });
+      // 30초 한 편 원가가 $3.06 이라 컷 두어 개면 체험 한도($0.5)를 훌쩍 넘는다.
+      await spend(FREE_TRIAL_USD * 6);
+      await expect(guard()).resolves.toBeUndefined();
+    });
+
+    // 실패 → 환불 → 재시도. 옛 판정에서는 재시도 때마다 잔액이 다시 0 이 되어
+    // 같은 자리에서 또 막혔다 — 빠져나갈 문이 없는 무한 루프였다.
+    it("실패해서 되돌려받고 다시 돌려도 갇히지 않는다", async () => {
+      await memoryStore.insertGrant({ user_id: A, amount_credits: 50, reason: "충전" });
+      await requireVideoCharge({ userId: A, projectId: P, seconds: 30 });
+      await spend(FREE_TRIAL_USD * 6);
+      await refundVideo({ userId: A, projectId: P });      // 못 준 것은 받지 않는다
+      await requireVideoCharge({ userId: A, projectId: P, seconds: 30 }); // 새 회차 = 잔액 다시 0
+      await expect(guard()).resolves.toBeUndefined();
+    });
   });
 
   it("가짜 모드는 잴 것이 없다 — 그물을 아예 안 친다", async () => {
