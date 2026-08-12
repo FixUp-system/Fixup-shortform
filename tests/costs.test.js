@@ -1,7 +1,7 @@
 // 단가표는 prefix 매칭이라 "순서"가 곧 로직이다.
 // 더 구체적인 prefix가 위에 있지 않으면 조용히 틀린 값이 기록된다 — 그걸 여기서 고정한다.
 import { describe, it, expect, beforeEach } from "vitest";
-import { estimateCost } from "../lib/costs";
+import { estimateCost, estimateLlmCost } from "../lib/costs";
 import { resetMemoryStore } from "../lib/store/memory.js";
 
 // 원장은 모듈 하나짜리 인메모리다 — 비우지 않으면 합계 단언이 "이 파일의 다른 테스트가
@@ -109,5 +109,33 @@ describe("이미지 모델 단가 — prefix 순서가 뒤집히면 조용히 �
     expect(estimateCost("fal-ai/nano-banana-2/edit", 1)).toBeCloseTo(
       estimateCost("fal-ai/nano-banana/edit", 2), 4
     );
+  });
+});
+
+describe("LLM 원가 — 두 공급자의 usage 모양", () => {
+  it("Claude 는 input_tokens·output_tokens 로 잰다", () => {
+    // 1000 입력 · 500 출력 = 1000*5/1e6 + 500*25/1e6 = 0.005 + 0.0125
+    expect(estimateLlmCost("claude-opus-5", { input_tokens: 1000, output_tokens: 500 }))
+      .toBeCloseTo(0.0175, 6);
+  });
+
+  // ★ vlm.js 가 gpt-4o 로 남는다 — 이 모양이 죽으면 이미지 검수 원가가 0 이 된다
+  it("gpt-4o 는 prompt_tokens·completion_tokens 로 잰다 — 그대로다", () => {
+    expect(estimateLlmCost("gpt-4o", { prompt_tokens: 1000, completion_tokens: 500 }))
+      .toBeCloseTo(0.0075, 6);
+  });
+
+  it("모르는 모델은 기본 단가로 떨어진다", () => {
+    expect(estimateLlmCost("모르는모델", { input_tokens: 1000, output_tokens: 0 })).toBeGreaterThan(0);
+  });
+
+  it("usage 가 없으면 0 이다 — 던지지 않는다", () => {
+    expect(estimateLlmCost("claude-opus-5", undefined)).toBe(0);
+    expect(estimateLlmCost("claude-opus-5", {})).toBe(0);
+  });
+
+  it("6자리까지 남긴다 — 센트로 자르면 한 호출이 0 이 되어 총합이 작아진다", () => {
+    // 입력 1토큰 = 0.000005
+    expect(estimateLlmCost("claude-opus-5", { input_tokens: 1, output_tokens: 0 })).toBe(0.000005);
   });
 });
