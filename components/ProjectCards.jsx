@@ -17,6 +17,16 @@ export const STATUS_LABEL = {
   done: "완성",
 };
 
+// 광고 경로(kind:"ad")의 상태 라벨 — 별도 표를 둔다. 광고 문서도 status 값으로
+// "draft"·"done"을 쓰지만(lib/ad/pipeline.js) 뜻이 기존 6단계와 다르다("draft"는
+// 시나리오 전, "done"은 굽기 완료뿐) — 표를 섞으면 카드가 엉뚱한 단어를 보여준다.
+const AD_STATUS_LABEL = {
+  draft: "자료",
+  scenario: "시나리오",
+  rendering: "만드는 중",
+  done: "완성",
+};
+
 // 카드 썸네일 — 완성본이 있으면 영상을, 없으면 첫 컷 그림을 보여준다.
 //
 // 영상은 마우스를 올렸을 때만 재생한다. 카드가 열 개여도 한 번에 하나만 움직이므로
@@ -54,24 +64,34 @@ function Thumb({ video, image, alt }) {
 }
 
 // limit 을 주면 그만큼만 그린다(홈은 최근 몇 개, 보관함은 전부).
+//
+// ★ 두 세계가 한 목록에 섞인다. listProjects 요약의 kind 로 가른다 — 없으면(옛 문서)
+// null 이고, 이때는 기존 동작을 한 톨도 바꾸지 않는다(아래 분기의 else 쪽이 옛 코드 그대로다).
 export default function ProjectCards({ projects, limit }) {
   const shown = limit ? projects.slice(0, limit) : projects;
   return (
     <ul className="project-grid">
-      {shown.map((p) => (
-        <li key={p.id}>
-          <Link href={`/create/${p.id}`} className="project-card">
-            <span className="project-thumb">
-              <Thumb video={p.video_url} image={p.image_url} alt={p.title || "만든 영상"} />
-              {p.video_url && <span className="thumb-tag">영상</span>}
-            </span>
-            <span className="project-meta">
-              <span className="title">{p.title || "제목 없음"}</span>
-              <span className="badge ai">{STATUS_LABEL[p.status] || p.status}</span>
-            </span>
-          </Link>
-        </li>
-      ))}
+      {shown.map((p) => {
+        const isAd = p.kind === "ad";
+        const href = isAd ? `/ads/${p.id}` : `/create/${p.id}`;
+        const label = isAd ? (AD_STATUS_LABEL[p.status] || p.status) : (STATUS_LABEL[p.status] || p.status);
+        return (
+          <li key={p.id}>
+            <Link href={href} className="project-card">
+              <span className="project-thumb">
+                <Thumb video={p.video_url} image={p.image_url} alt={p.title || "만든 영상"} />
+                {p.video_url && <span className="thumb-tag">영상</span>}
+              </span>
+              <span className="project-meta">
+                <span className="title">{p.title || "제목 없음"}</span>
+                {/* 종류 표시 — 광고 문서에만 붙는다. 옛 문서는 이 배지가 아예 없다(기존 모양 그대로). */}
+                {isAd && <span className="badge ai">광고</span>}
+                <span className="badge ai">{label}</span>
+              </span>
+            </Link>
+          </li>
+        );
+      })}
     </ul>
   );
 }
