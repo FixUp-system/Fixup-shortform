@@ -7,9 +7,11 @@ import { useProject } from "../../../../components/ProjectContext";
 import BackButton from "../../../../components/BackButton";
 import {
   cutSeconds,
-  DEFAULT_SUBTITLE_POSITION,
+  SUBTITLE_POSITIONS,
   DEFAULT_SUBTITLE,
   SUBTITLE_FONTS,
+  SIZE_MIN,
+  SIZE_MAX,
   normalizeSubtitle,
   clampPos,
   outlineFor,
@@ -50,6 +52,23 @@ function seedSubtitle(project) {
     pos: posFromLegacyPosition(project?.settings?.subtitle_position),
   });
 }
+
+// 빠른 위치 — 드래그가 자유롭다고 칩이 쓸모없어지지 않는다. "대충 아래로"를 한 번에 하는 길이다.
+//
+// 자리는 posFromLegacyPosition 하나에서 온다(값이 세 벌이 되면 안 된다). 목록도 lib 의
+// SUBTITLE_POSITIONS 를 그대로 쓰고, 화면이 더하는 것은 한국어 이름뿐이다.
+// 순서는 y 로 정렬한다 — 표의 키 순서(아래·중간·위)가 아니라 사장님이 보는 위→아래 순이다.
+const POSITION_LABELS = { top: "위", middle: "중간", bottom: "아래" };
+const POSITION_PRESETS = SUBTITLE_POSITIONS.map((id) => ({
+  id,
+  label: POSITION_LABELS[id] || id,
+  pos: posFromLegacyPosition(id),
+})).sort((a, b) => a.pos[1] - b.pos[1]);
+
+// 켜진 칩은 pos 에서 거꾸로 판정한다 — settings.subtitle_position 을 읽으면 화면이 거짓말을
+// 한다(드래그로 옮겨도 칩은 켜진 채다). 드래그해서 어느 프리셋과도 다르면 아무 칩도 안 켜진다.
+// 눈금 하나 차이로 꺼지지 않게 아주 작은 여유만 둔다.
+const samePos = (a, b) => Math.abs(a[0] - b[0]) < 0.005 && Math.abs(a[1] - b[1]) < 0.005;
 
 export default function DoneStepPage() {
   const { id } = useParams();
@@ -223,24 +242,6 @@ export default function DoneStepPage() {
     startPolling();
   }
 
-  // 자막 위치는 합성에만 쓰인다 — 클립·그림·소리는 그대로다. 그래서 바꿔도 값이 안 든다.
-  async function saveSubtitlePosition(position) {
-    if (busy) return;
-    // 이미 켜진 칩을 눌러도 헛 PATCH 가 안 나가게 — 연타 레이스도 함께 줄어든다
-    if ((project?.settings?.subtitle_position || DEFAULT_SUBTITLE_POSITION) === position) return;
-    setErr("");
-    const res = await fetch(`/api/projects/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ settings: { subtitle_position: position } }),
-    });
-    if (!res.ok) {
-      setErr((await res.json().catch(() => ({}))).error || "자막 위치를 저장하지 못했어요");
-      return;
-    }
-    await load(id).catch(() => {});
-  }
-
   const cuts = project?.cuts || [];
   const render = project?.render;
   const clipCount = cuts.filter((c) => c.video?.url).length;
@@ -370,6 +371,19 @@ export default function DoneStepPage() {
               <div className="eyebrow mt-lg">
                 자막 꾸미기 <small>끌어서 옮기고 폰트·색·크기를 골라요 — 다시 굽는 데 값이 들지 않아요</small>
               </div>
+              {/* 빠른 위치. 켜짐은 pos 에서 거꾸로 판정하므로, 끌어서 옮기면 아무 칩도 안 켜진다 */}
+              <div className="chips">
+                {POSITION_PRESETS.map((p) => (
+                  <button
+                    key={p.id}
+                    className={`chip${samePos(sub.pos, p.pos) ? " on" : ""}`}
+                    disabled={applying}
+                    onClick={() => setSub((s) => ({ ...s, pos: clampPos(p.pos) }))}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
               <div className="chips">
                 {SUBTITLE_FONTS.map((f) => (
                   <button
@@ -398,10 +412,11 @@ export default function DoneStepPage() {
                 <div className="brief-row">
                   <b>크기</b>
                   <div className="val">
+                    {/* 범위는 lib 이 쥔다 — 두 벌이면 슬라이더 끝과 저장되는 값이 갈린다 */}
                     <input
                       type="range"
-                      min="0.7"
-                      max="1.6"
+                      min={SIZE_MIN}
+                      max={SIZE_MAX}
                       step="0.05"
                       value={sub.size}
                       disabled={applying}
@@ -433,23 +448,6 @@ export default function DoneStepPage() {
           )}
         </>
       )}
-
-      <div className="eyebrow mt-lg">
-        자막 위치 <small>바꿔서 다시 만들어도 값이 들지 않아요</small>
-      </div>
-      <div className="chips">
-        {[["top", "위"], ["middle", "중간"], ["bottom", "아래"]].map(([value, label]) => (
-          <button
-            key={value}
-            className={`chip${(project?.settings?.subtitle_position || DEFAULT_SUBTITLE_POSITION) === value ? " on" : ""}`}
-            disabled={busy}
-            onClick={() => saveSubtitlePosition(value)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      <p className="pgsub">영상 아래쪽 UI에 가리지 않게 기본은 아래예요.</p>
 
       <div className="step-actions">
         <BackButton stepKey="done" />

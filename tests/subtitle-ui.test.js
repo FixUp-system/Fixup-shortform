@@ -46,6 +46,13 @@ describe("⑥완성 — 두 벌이 되지 않게", () => {
     expect(src).not.toMatch(/Black Han Sans|Gowun Dodum|Pretendard/);
   });
 
+  // 크기 범위도 lib 이 쥔다 — 두 벌이면 슬라이더 끝과 저장되는 값이 갈린다.
+  it("크기 범위를 화면에 박지 않는다", () => {
+    expect(src).toMatch(/min=\{SIZE_MIN\}/);
+    expect(src).toMatch(/max=\{SIZE_MAX\}/);
+    expect(src).not.toMatch(/min="0\.7"|max="1\.6"/);
+  });
+
   // 화면 밖으로 끌어도 되돌아와야 한다 — 규칙은 lib 의 clampPos 하나다.
   it("드래그 자리를 clampPos 로 되돌린다", () => {
     expect(src).toContain("clampPos");
@@ -77,6 +84,30 @@ describe("⑥완성 — 옛 위치를 이어받는다", () => {
     const fn = src.slice(at, src.indexOf("\n}", at));
     expect(fn, "표에서 파생시키지 않는다").toContain("subtitleStyle");
     expect(fn, "여백 비율을 손으로 적었다").not.toMatch(/0\.12|0\.18|0\.82/);
+  });
+});
+
+// 위/중간/아래 칩은 자유 위치가 생긴 뒤 무시되는 버튼이 됐었다 — 눌러도 아무 일이
+// 안 일어나면 사장님은 "고장 났나"로 읽는다. 지우지 않고 pos 프리셋으로 살렸다.
+describe("⑥완성 — 빠른 위치 칩", () => {
+  it("칩이 pos 를 세팅한다 — 비율 리터럴을 다시 만들지 않는다", () => {
+    const at = src.indexOf("POSITION_PRESETS");
+    expect(at, "빠른 위치 프리셋이 없다").toBeGreaterThan(-1);
+    const block = src.slice(at, src.indexOf(";", src.indexOf("=", at)));
+    expect(block, "프리셋 자리가 posFromLegacyPosition 에서 오지 않는다").toContain("posFromLegacyPosition");
+    expect(block, "위치 목록을 화면이 손으로 적었다").toContain("SUBTITLE_POSITIONS");
+    expect(src).toMatch(/setSub\(\(s\) => \(\{ \.\.\.s, pos: clampPos\(p\.pos\) \}\)\)/);
+  });
+
+  it("켜진 칩을 pos 에서 거꾸로 판정한다 — subtitle_position 을 읽지 않는다", () => {
+    expect(src).toMatch(/samePos\(sub\.pos, p\.pos\)/);
+    // settings.subtitle_position 은 이제 옛 프로젝트의 씨앗일 뿐이다. 그 밖에서 읽으면
+    // 드래그로 옮긴 뒤에도 칩이 켜진 채라 화면이 거짓말을 한다.
+    const chipIdx = src.indexOf("POSITION_PRESETS.map");
+    expect(chipIdx, "칩을 프리셋 표에서 그리지 않는다").toBeGreaterThan(-1);
+    const chipBlock = src.slice(chipIdx, src.indexOf("</div>", chipIdx));
+    expect(chipBlock, "칩 켜짐을 subtitle_position 으로 판정한다").not.toContain("subtitle_position");
+    expect(src, "옛 위치를 다시 저장하지 않는다").not.toContain("subtitle_position:");
   });
 });
 
