@@ -5,6 +5,7 @@ import {
   assertCanAfford, chargeRegen, refundRegen, requireVideoCharge, NoCredits,
 } from "../../../../../../../lib/charges.js";
 import { regenPrice, MAX_REGEN_PER_CUT } from "../../../../../../../lib/pricing.js";
+import { BudgetExceeded } from "../../../../../../../lib/costs.js";
 import { fakeFal } from "../../../../../../../lib/fake";
 
 export const POST = withUser(async (req, { params }, user) => {
@@ -75,6 +76,10 @@ export const POST = withUser(async (req, { params }, user) => {
       await refundRegen({ projectId: id, kind: "clip", idx: Number(idx), priorCount: charged })
         .catch((err) => console.error("재생성 환불 실패:", err?.message));
     }
+    // ★ 예산 오류는 400 이 아니다 — 여기서 잡아 버리면 withUser 의 402·503 이 도달하지
+    // 못하고, 프로젝트 상한에 닿은 재생성이 "만들지 못했어요"로 보인다(사장님은 계속
+    // 다시 누른다). 환불은 위에서 이미 했으니 값은 안 남는다.
+    if (e instanceof BudgetExceeded) throw e;
     return Response.json({ error: e.message }, { status: 400 });
   }
 });
