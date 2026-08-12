@@ -7,6 +7,7 @@ import { isSpeed } from "../../../../lib/speeds";
 import { ownedPhotoKeys } from "../../../../lib/refs-io.js";
 import { withUser } from "../../../../lib/auth/require-user.js";
 import { alreadyChargedVideo } from "../../../../lib/charges.js";
+import { TARGET_CHOICES } from "../../../../lib/script";
 
 export const GET = withUser(async (req, { params }, user) => {
   const { id } = await params;
@@ -38,6 +39,29 @@ export const PATCH = withUser(async (req, { params }, user) => {
   // 그 안에서 던지면 잘못된 값이 없는 프로젝트로 보고된다.
   if (body.settings?.aspect_ratio !== undefined && !isAspect(body.settings.aspect_ratio)) {
     return Response.json({ error: "그 사이즈는 몰라요" }, { status: 400 });
+  }
+
+  // ★ 길이는 정가를 정한다(lib/pricing.js 의 VIDEO_PRICE). 만들 때는 검증하는데
+  // (app/api/projects/route.js) 고칠 때는 안 봐서, 15초로 25크레딧 낸 뒤 60초로 고치면
+  // 추가 청구가 0 이었다. 두 겹으로 막는다 — 아는 값인가, 그리고 이미 팔았는가.
+  if (body.settings?.target_seconds !== undefined) {
+    if (!TARGET_CHOICES.includes(body.settings.target_seconds)) {
+      return Response.json({ error: "그 길이는 몰라요" }, { status: 400 });
+    }
+    // 정가를 낸 뒤 길이를 바꾸면 낸 값과 만드는 값이 어긋난다. 차액 청구는 만들지 않았다
+    // (청구 장부가 회차·멱등키 기반이라 차액 개념이 없다) — 그래서 못 바꾸게 한다.
+    // 같은 값을 다시 보내는 것은 막지 않는다: 다른 설정을 고치는 정상 저장이다.
+    const project = await getProject(id, user.id);
+    if (
+      project &&
+      body.settings.target_seconds !== project.settings?.target_seconds &&
+      (await alreadyChargedVideo(id))
+    ) {
+      return Response.json(
+        { error: "이미 결제된 영상은 길이를 바꿀 수 없어요 — 새로 만들어 주세요" },
+        { status: 400 }
+      );
+    }
   }
 
   let style;
