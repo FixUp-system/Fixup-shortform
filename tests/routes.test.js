@@ -297,6 +297,21 @@ describe("PATCH /api/projects/[id] — 브리핑 버전은 내용 변경에 묶�
   });
 });
 
+describe("PATCH /api/projects/[id] — 자막 위치는 닫힌 목록이다", () => {
+  it("자막 위치는 아는 값만 받는다", async () => {
+    const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "가", photos: [] } });
+    const res = await PATCH(patchReq({ settings: { subtitle_position: "가운데" } }), ctx(p.id));
+    expect(res.status).toBe(400);
+  });
+
+  it("아는 값이면 저장된다", async () => {
+    const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "가", photos: [] } });
+    const res = await PATCH(patchReq({ settings: { subtitle_position: "top" } }), ctx(p.id));
+    expect(res.status).toBe(200);
+    expect((await getProject(p.id, OWNER)).settings.subtitle_position).toBe("top");
+  });
+});
+
 describe("PATCH script_text — 원고 손편집", () => {
   it("원고를 고쳐 저장한다", async () => {
     const p = await projectWithScript();

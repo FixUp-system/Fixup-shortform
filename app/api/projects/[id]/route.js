@@ -8,6 +8,7 @@ import { ownedPhotoKeys } from "../../../../lib/refs-io.js";
 import { withUser } from "../../../../lib/auth/require-user.js";
 import { alreadyChargedVideo } from "../../../../lib/charges.js";
 import { TARGET_CHOICES } from "../../../../lib/script";
+import { SUBTITLE_POSITIONS } from "../../../../lib/subtitles.js";
 
 export const GET = withUser(async (req, { params }, user) => {
   const { id } = await params;
@@ -39,6 +40,15 @@ export const PATCH = withUser(async (req, { params }, user) => {
   // 그 안에서 던지면 잘못된 값이 없는 프로젝트로 보고된다.
   if (body.settings?.aspect_ratio !== undefined && !isAspect(body.settings.aspect_ratio)) {
     return Response.json({ error: "그 사이즈는 몰라요" }, { status: 400 });
+  }
+
+  // 자막 위치도 닫힌 목록이다. 모르는 값이 들어가면 합성이 조용히 아래로 떨어뜨리는데
+  // (lib/subtitles.js), 고른 것과 만들어지는 것이 달라지면 아무도 못 알아본다.
+  if (
+    body.settings?.subtitle_position !== undefined &&
+    !SUBTITLE_POSITIONS.includes(body.settings.subtitle_position)
+  ) {
+    return Response.json({ error: "그 자막 위치는 몰라요" }, { status: 400 });
   }
 
   // ★ 길이는 정가를 정한다(lib/pricing.js 의 VIDEO_PRICE). 만들 때는 검증하는데
