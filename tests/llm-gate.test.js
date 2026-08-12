@@ -1,12 +1,22 @@
 // LLM 이 예산 그물 밖에 있었다 — 기록은 남기는데(addRecord) 한도를 안 봤다.
 // 그래서 [대본 다시 쓰기] 를 계속 눌러도 청구가 0 이었다.
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { memoryStore, resetMemoryStore } from "../lib/store/memory.js";
 import { runWithActor } from "../lib/actor.js";
-import { callJson } from "../lib/llm.js";
-import { extractBriefing } from "../lib/briefing-extract.js";
-import { BudgetExceeded } from "../lib/costs.js";
-import { FREE_TRIAL_USD } from "../lib/pricing.js";
+
+// ★ assertBudget 을 **감싸서** 본다 — 진짜 판정은 그대로 돌리고 "불렸는가"만 잰다.
+// 가짜 모드 절이 재려는 것은 결과가 아니라 **순서**다(가짜 판정이 게이트보다 먼저인가).
+const costsMock = vi.hoisted(() => ({ assertBudget: vi.fn() }));
+vi.mock("../lib/costs.js", async (importOriginal) => {
+  const actual = await importOriginal();
+  costsMock.assertBudget.mockImplementation(actual.assertBudget);
+  return { ...actual, assertBudget: (...a) => costsMock.assertBudget(...a) };
+});
+
+const { callJson } = await import("../lib/llm.js");
+const { extractBriefing } = await import("../lib/briefing-extract.js");
+const { BudgetExceeded, assertBudget } = await import("../lib/costs.js");
+const { FREE_TRIAL_USD } = await import("../lib/pricing.js");
 
 const A = "00000000-0000-4000-8000-00000000000a";
 
@@ -35,7 +45,8 @@ const call = (fetchImpl) =>
   );
 
 describe("callJson 이 한도를 본다", () => {
-  beforeEach(() => resetMemoryStore());
+  beforeEach(() => { resetMemoryStore(); costsMock.assertBudget.mockClear(); });
+  afterEach(() => vi.unstubAllEnvs());
 
   it("한도 아래면 부른다", async () => {
     const f = okFetch();
@@ -51,13 +62,61 @@ describe("callJson 이 한도를 본다", () => {
     expect(f).not.toHaveBeenCalled();
   });
 
-  it("가짜 모드는 한도와 무관하게 돈다 — 0 원이라 잴 것이 없다", async () => {
+  // ★ 여기서 재는 것은 "돌아간다"가 아니라 **순서**다 — 가짜 판정이 게이트보다 앞이라
+  // 게이트를 **아예 안 부른다**. 결과만 보면 게이트를 지워도, 게이트를 앞으로 옮겨도
+  // 똑같이 초록이라 아무것도 못 잡는다.
+  it("SHOTFORM_FAKE=all 이면 게이트를 부르지도 않는다 — 0 원이라 잴 것이 없다", async () => {
     await spend(FREE_TRIAL_USD * 10);
     vi.stubEnv("SHOTFORM_FAKE", "all");
     const f = okFetch();
     await expect(call(f)).resolves.toBeTruthy();
-    expect(f).not.toHaveBeenCalled();   // 가짜 응답이라 fetch 자체가 없다
-    vi.unstubAllEnvs();
+    expect(f).not.toHaveBeenCalled();                     // 가짜 응답이라 fetch 자체가 없다
+    expect(costsMock.assertBudget).not.toHaveBeenCalled(); // 가짜 판정이 게이트보다 먼저다
+  });
+
+  // ★★ 하필 이 모드가 이 저장소가 "비용 배선을 검증하려면" 이라고 지정한 모드다(CLAUDE.md).
+  // fal 만 가짜이고 **OpenAI 는 진짜로 나간다** — 그러니 게이트도 진짜로 살아 있어야 한다.
+  // 예전 `assertBudget` 첫 줄 `if (fakeFal()) return;` 은 이 모드에서 게이트를 통째로 껐다.
+  it("SHOTFORM_FAKE=fal 이면 LLM 게이트는 **살아 있다** — OpenAI 는 진짜로 나간다", async () => {
+    await spend(FREE_TRIAL_USD + 0.01);
+    vi.stubEnv("SHOTFORM_FAKE", "fal");
+    const f = okFetch();
+    await expect(call(f)).rejects.toThrow(BudgetExceeded);
+    expect(f).not.toHaveBeenCalled();
+  });
+});
+
+// 가짜 판정의 축이 둘이다 — 어느 공급자로 나가는가에 따라 물어야 할 것이 다르다.
+describe("assertBudget 의 가짜 판정은 엔드포인트로 갈린다", () => {
+  beforeEach(() => resetMemoryStore());
+  afterEach(() => vi.unstubAllEnvs());
+
+  const guard = (endpoint, amount) =>
+    runWithActor(A, () => assertBudget({ endpoint, amount }));
+
+  it("fal 모드에서 fal 경로는 그대로 건너뛴다 — 진짜 0 원이다", async () => {
+    await spend(FREE_TRIAL_USD * 10);
+    vi.stubEnv("SHOTFORM_FAKE", "fal");
+    await expect(guard("fal-ai/nano-banana-2", 1)).resolves.toBeUndefined();
+  });
+
+  it("fal 모드에서 openai 경로는 막는다", async () => {
+    await spend(FREE_TRIAL_USD + 0.01);
+    vi.stubEnv("SHOTFORM_FAKE", "fal");
+    await expect(guard("openai/gpt-4o", 0)).rejects.toThrow(BudgetExceeded);
+  });
+
+  it("all 모드에서는 둘 다 건너뛴다", async () => {
+    await spend(FREE_TRIAL_USD * 10);
+    vi.stubEnv("SHOTFORM_FAKE", "all");
+    await expect(guard("fal-ai/nano-banana-2", 1)).resolves.toBeUndefined();
+    await expect(guard("openai/gpt-4o", 0)).resolves.toBeUndefined();
+  });
+
+  it("가짜 모드가 아니면 둘 다 막는다", async () => {
+    await spend(FREE_TRIAL_USD + 0.01);
+    await expect(guard("fal-ai/nano-banana-2", 1)).rejects.toThrow(BudgetExceeded);
+    await expect(guard("openai/gpt-4o", 0)).rejects.toThrow(BudgetExceeded);
   });
 });
 
