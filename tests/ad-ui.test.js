@@ -172,3 +172,52 @@ describe("보관함 카드", () => {
     expect(cardsSrc).toContain("STATUS_LABEL[p.status]");
   });
 });
+
+describe("/ads/[id] 화면 — 모르는 status 에도 화면이 비지 않는다", () => {
+  // 리뷰 지적: status===draft/scenario/rendering/(done&&video) 넷으로만 분기하면,
+  // 다섯째 값이 생기거나 done인데 video가 없을 때 <h1>과 오류 배너만 남고 사장님이
+  // 할 수 있는 게 없다. 기본(catch-all) 갈래가 있고, 그걸 지우면 이 테스트가 실패해야 한다.
+
+  it("네 상태 판정이 draft·scenario·rendering·done+video 를 전부 부정해야 기본 갈래로 떨어진다", () => {
+    // "handled" 라는 이름 자체가 아니라, 그 판정식이 실제로 네 상태를 전부 포함하는지가
+    // 증거다 — 판정식에서 하나라도 빠지면 그 상태가 조용히 빈 화면으로 샌다.
+    const handledIdx = detailSrc.search(/const\s+handled\s*=/);
+    expect(handledIdx, "'handled' 판정식이 없다 — 기본 갈래를 무엇이 트리거하는지 알 수 없다").toBeGreaterThan(-1);
+    const semiIdx = detailSrc.indexOf(";", handledIdx);
+    const handledExpr = detailSrc.slice(handledIdx, semiIdx + 1);
+    for (const s of ["draft", "scenario", "rendering", "done"]) {
+      expect(handledExpr, `handled 판정에 "${s}" 가 없다 — 그 상태가 기본 갈래로 새는지 못 막는다`).toContain(s);
+    }
+    // 리뷰가 짚은 두 번째 함정: status==="done" 인데 video 가 없는 경우도 기본 갈래로 가야 한다.
+    expect(handledExpr, "done 판정이 video 유무를 안 본다 — done인데 video 없으면 여전히 빈 화면이다")
+      .toMatch(/video/);
+  });
+
+  it("기본 갈래(!handled)가 실제로 존재하고, 네 상태 블록보다 뒤에 있다", () => {
+    // "!handled" 문자열은 이 파일에서 기본 갈래 렌더링 한 곳에서만 쓰인다 — 지우면 실패한다.
+    const fallbackIdx = detailSrc.indexOf("!handled");
+    expect(fallbackIdx, "!handled 로 그리는 기본 갈래가 없다").toBeGreaterThan(-1);
+    // done 블록(JSX)의 조건은 "status === \"done\" && video"(느낌표 없이) — handled 판정식의
+    // "&& !!video"와는 다른 문자열이라 서로 안 헷갈린다. 기본 갈래가 그보다 뒤에 있어야
+    // "네 블록을 다 지나온 다음의 catch-all"이라는 구조가 성립한다.
+    const doneBlockIdx = detailSrc.indexOf('status === "done" && video');
+    expect(doneBlockIdx, "done 블록의 JSX 조건을 못 찾았다").toBeGreaterThan(-1);
+    expect(fallbackIdx).toBeGreaterThan(doneBlockIdx);
+  });
+
+  it("기본 갈래에 누를 것이 하나는 있다 — 최소한 보관함으로 나갈 수 있다", () => {
+    const fallbackIdx = detailSrc.indexOf("!handled");
+    expect(fallbackIdx).toBeGreaterThan(-1);
+    const fallbackBlock = detailSrc.slice(fallbackIdx);
+    // 버튼이나 링크가 하나도 없으면 "화면이 안 비지만 누를 게 없다"는 반쪽짜리 수정이다.
+    expect(fallbackBlock, "기본 갈래에 버튼도 링크도 없다").toMatch(/<button\b|<Link\b|<a\b/);
+    // 그중 하나는 보관함으로 돌아가는 길이어야 한다 — 막다른 골목이면 안 된다.
+    expect(fallbackBlock, "보관함으로 돌아가는 길이 없다").toMatch(/\/archive/);
+  });
+
+  it("기본 갈래도 지금 상태를 사장님이 알아볼 말로 보여준다", () => {
+    const fallbackIdx = detailSrc.indexOf("!handled");
+    const fallbackBlock = detailSrc.slice(fallbackIdx, fallbackIdx + 400);
+    expect(fallbackBlock).toMatch(/status/);
+  });
+});

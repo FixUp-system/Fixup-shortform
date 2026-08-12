@@ -8,6 +8,7 @@
 // 에서 읽는다. 숫자를 여기 박으면 /ads/new · 이 화면 · 서버가 각자 다른 값을 말하게 된다.
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import { priceLabel, adVideoPrice } from "../../../lib/pricing";
 
 // 폴링 주기 — 기존 단계 화면들(app/create/[id]/*/page.js)과 같다.
@@ -120,6 +121,16 @@ export default function AdDetailPage() {
   // 이 프로젝트 길이의 정가 — 숫자는 여기서 만들지 않는다, pricing.js 가 만든다.
   const price = priceLabel(adVideoPrice(settings?.seconds));
 
+  // 아래 네 갈래(draft·scenario·rendering·done+video) 중 어디에도 안 걸리는 경우 —
+  // 모르는 status 이거나(나중에 상태가 하나 늘 수 있다), status 는 "done"인데 videos 가
+  // 비어 있는 저장 어긋남이다. 둘 다 지금 파이프라인에서는 안 생기지만, 안 생긴다는 것과
+  // 화면이 그 경우를 다룰 수 있다는 것은 다른 얘기다 — 막히면 이 화면에는 비개발자만 있다.
+  const handled =
+    status === "draft" ||
+    status === "scenario" ||
+    status === "rendering" ||
+    (status === "done" && !!video);
+
   return (
     <>
       <h1 className="pgtitle">광고 영상</h1>
@@ -196,6 +207,25 @@ export default function AdDetailPage() {
               <a className="cta" href={video.url} download>
                 내려받기
               </a>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* 기본 갈래 — 위 넷 중 어디에도 안 걸렸을 때. 화면이 비면 안 되고, 누를 것이 하나는
+          있어야 한다(리뷰 지적). 시나리오가 있으면 다시 쓰게, 없으면 새로 쓰게 하고,
+          그것도 못 미더우면 최소한 보관함으로는 나갈 수 있게 한다. */}
+      {!handled && (
+        <section className="panel panel--wide">
+          <p className="pgsub warn">
+            지금 상태({status || "알 수 없음"})를 이 화면이 몰라요 — 그래도 나갈 길은 있어요.
+          </p>
+          <div className="step-actions">
+            <button className="mini" disabled={busy} onClick={makeScenario}>
+              {busy ? "쓰는 중…" : scenario?.text ? "다시 쓰기 · 무료" : "시나리오 만들기 · 무료"}
+            </button>
+            <div className="fwd">
+              <Link href="/archive" className="cta">보관함으로</Link>
             </div>
           </div>
         </section>
