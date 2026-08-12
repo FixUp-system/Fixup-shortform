@@ -2,8 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   STEPS, currentStepKey, isReachable, areCutsStale, stepFromPathname, stepHref,
   clipKey, renderKey, isAudioStale, isImageStale, isClipStale, isRenderStale,
-  isSubtitlePositionOnlyStale,
+  isSubtitlePositionOnlyStale, isSubtitleOnlyStale,
 } from "../lib/steps.js";
+import { DEFAULT_SUBTITLE } from "../lib/subtitles.js";
 
 describe("단계 정의", () => {
   it("구성이 빠져 6단계다 — 원고가 곧 설계다", () => {
@@ -484,5 +485,59 @@ describe("isSubtitlePositionOnlyStale — 낡음의 원인을 갈라 말한다",
   it("완성본이 없거나 각인이 없으면 거짓이다", () => {
     expect(isSubtitlePositionOnlyStale(fresh())).toBe(false);
     expect(isSubtitlePositionOnlyStale(null)).toBe(false);
+  });
+});
+
+describe("renderKey — 자막 설정", () => {
+  const base = { cuts: [{ audio: { url: "a" }, video: { url: "v" }, sentence: "가" }] };
+
+  // ★★ 기본 설정이면 머리를 안 붙인다 — 붙이면 이미 만든 완성본이 전부 낡는다
+  it("기본 설정이면 각인이 지금과 글자 그대로 같다", () => {
+    expect(renderKey(base)).toBe("a|v|가");
+    expect(renderKey({ ...base, settings: { subtitle: { ...DEFAULT_SUBTITLE } } })).toBe("a|v|가");
+  });
+
+  it("옛 각인(위치 낱말 머리)도 계속 읽힌다", () => {
+    const old = { ...base, settings: { subtitle_position: "top" } };
+    expect(renderKey(old)).toBe("top\na|v|가");
+  });
+
+  it("설정을 바꾸면 각인이 달라진다", () => {
+    const k = renderKey({ ...base, settings: { subtitle: { ...DEFAULT_SUBTITLE, color: "#FF0000" } } });
+    expect(k).not.toBe("a|v|가");
+    expect(k).toContain("subtitle:");
+    expect(k.endsWith("a|v|가")).toBe(true);   // 몸통은 그대로
+  });
+});
+
+describe("isSubtitleOnlyStale — 자막만 바뀌었는가", () => {
+  const project = (settings, of) => ({
+    settings,
+    // 클립·그림은 각인과 맞는 상태로 둔다 — 그쪽이 낡으면 판정이 안 갈린다.
+    // video.of 는 clipKey(이 컷)와 **글자 그대로** 같아야 한다(image.url|seconds|motion).
+    cuts: [{ audio: { url: "a" }, video: { url: "v", of: "img|3|천천히" }, sentence: "가",
+             image: { url: "img" }, seconds: 3, motion: "천천히" }],
+    render: { of },
+  });
+
+  it("자막 설정만 바뀌었으면 참이다 — 클립을 다시 사지 않는다", () => {
+    const p = project({ subtitle: { ...DEFAULT_SUBTITLE, size: 1.4 } }, "a|v|가");
+    expect(isRenderStale(p)).toBe(true);
+    expect(isSubtitleOnlyStale(p)).toBe(true);
+  });
+
+  it("문장이 바뀌었으면 거짓이다 — 더 큰 사실이 있다", () => {
+    const p = project({ subtitle: { ...DEFAULT_SUBTITLE } }, "a|v|옛문장");
+    expect(isSubtitleOnlyStale(p)).toBe(false);
+  });
+
+  it("낡지 않았으면 거짓이다", () => {
+    const p = project({ subtitle: { ...DEFAULT_SUBTITLE } }, "a|v|가");
+    expect(isSubtitleOnlyStale(p)).toBe(false);
+  });
+
+  // ★ 옛 이름은 별칭으로 남는다 — 호출처(app/create/[id]/done/page.js)를 한 번에 못 고친다
+  it("옛 이름도 같은 함수를 가리킨다", () => {
+    expect(isSubtitlePositionOnlyStale).toBe(isSubtitleOnlyStale);
   });
 });
