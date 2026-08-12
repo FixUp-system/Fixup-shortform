@@ -333,6 +333,22 @@ describe("clipKey — 속도가 바뀌면 클립이 낡는다", () => {
   });
 });
 
+describe("clipKey — 말하는 컷", () => {
+  it("옛 컷의 각인은 한 글자도 안 바뀐다", () => {
+    const cut = { image: { url: "u" }, seconds: 5, motion: "천천히" };
+    expect(clipKey(cut)).toBe("u|5|천천히");
+    expect(clipKey({ ...cut, speed: "fast" })).toBe("u|5|천천히|fast");
+  });
+
+  it("대사·목소리가 바뀌면 클립이 낡는다", () => {
+    const cut = { image: { url: "u" }, seconds: 5, motion: "천천히" };
+    const a = clipKey({ ...cut, spoken_of: "안녕하세요|중저음|20대 남성" });
+    const b = clipKey({ ...cut, spoken_of: "안녕하세요|높은 톤|20대 남성" });
+    expect(a).not.toBe(b);
+    expect(a).not.toBe(clipKey(cut));
+  });
+});
+
 describe("자막 위치와 완성본 각인", () => {
   const withCuts = (settings) => ({
     settings,

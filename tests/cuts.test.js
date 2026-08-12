@@ -469,6 +469,63 @@ describe("buildClipPrompt — 이 그림이 어떻게 움직이는가", () => {
   it("말하는 얼굴을 막는다 — 지금 기술로는 뭉개진다", () => {
     expect(buildClipPrompt({ motion: "인물이 웃는다" })).toMatch(/lip sync/i);
   });
+
+  // ★ 말하지 않는 모델에서는 지금 동작 그대로여야 한다 — 옛 각인이 통째로 낡으면
+  // 이미 값을 치른 클립을 다시 사게 된다
+  it("project 를 안 넘기면 예전과 같다 — 립싱크를 금지한다", () => {
+    const p = buildClipPrompt({ motion: "카메라가 천천히 뒤로 물러난다" });
+    expect(p).toContain("No talking faces or lip sync");
+    expect(p).not.toContain("says");
+  });
+
+  it("말하지 않는 모델(Kling)에서도 예전과 같다", () => {
+    const kling = { settings: { i2v_model: "kling-v3" }, cast: [{ id: "c1", who: "20대 남성", voice: "중저음", cuts: [0] }] };
+    const p = buildClipPrompt({ idx: 0, motion: "천천히", sentence: "안녕하세요" }, kling);
+    expect(p).toContain("No talking faces or lip sync");
+  });
+
+  describe("말하는 모델(Seedance)", () => {
+    // projectSpeaks 는 "모든 컷에 말할 사람과 대사가 있는가"를 보므로 cuts 도 있어야 한다
+    const project = {
+      settings: { i2v_model: "seedance-2.0" },
+      cuts: [{ idx: 0, sentence: "안녕하세요" }],
+      cast: [{ id: "c1", who: "20대 동양인 남성 농구 선수", voice: "중저음, 차분하고 단단한 톤", cuts: [0] }],
+    };
+
+    it("대사를 원문 그대로 싣는다", () => {
+      const p = buildClipPrompt({ idx: 0, sentence: "검정에 빨강. 이 배색이 제일 오래 사랑받았다.", motion: "천천히" }, project);
+      expect(p).toContain("검정에 빨강. 이 배색이 제일 오래 사랑받았다.");
+    });
+
+    it("목소리와 인물을 함께 싣는다", () => {
+      const p = buildClipPrompt({ idx: 0, sentence: "안녕하세요", motion: "천천히" }, project);
+      expect(p).toContain("중저음, 차분하고 단단한 톤");
+      expect(p).toContain("20대 동양인 남성 농구 선수");
+    });
+
+    // ★★ 립싱크 금지가 남아 있으면 모델에게 반대되는 지시를 함께 준다
+    it("립싱크 금지를 빼고 말하라고 한다", () => {
+      const p = buildClipPrompt({ idx: 0, sentence: "안녕하세요", motion: "천천히" }, project);
+      expect(p).not.toContain("No talking faces");
+      expect(p).not.toContain("no lip sync");
+    });
+
+    // ★ 자막은 우리가 태운다 — 클립에 글자를 요구하지 않는다(한글이 변형된다)
+    it("글자 금지는 그대로 남는다", () => {
+      const p = buildClipPrompt({ idx: 0, sentence: "안녕하세요", motion: "천천히" }, project);
+      expect(p).toContain("No text or letters");
+    });
+
+    it("이 컷에 인물이 없으면 말하지 않는다", () => {
+      const p = buildClipPrompt({ idx: 5, sentence: "안녕하세요", motion: "천천히" }, project);
+      expect(p).toContain("No talking faces or lip sync");
+    });
+
+    it("문장이 없으면 말하지 않는다", () => {
+      const p = buildClipPrompt({ idx: 0, motion: "천천히" }, project);
+      expect(p).toContain("No talking faces or lip sync");
+    });
+  });
 });
 
 describe("explodeLongRanges — 8초를 넘고 두 조각 이상이면 푼다", () => {
