@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 import BackButton from "../../../../components/BackButton";
-import { I2V_MAX_SECONDS } from "../../../../lib/clip-limits";
+import { I2V_MAX_SECONDS, modelIdForProject } from "../../../../lib/clip-limits";
 import { isClipStale } from "../../../../lib/steps";
 // 상한과 값은 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다).
 import { MAX_REGEN_PER_CUT, priceLabel, regenPrice } from "../../../../lib/pricing";
@@ -170,7 +170,7 @@ export default function VideoStepPage() {
                             누르기 전에 보여 준다. */}
                         {regening === c.idx
                           ? "만드는 중…"
-                          : `다시 만들기 · ${priceLabel(regenPrice("clip", c.clip_regen_count || 0))}`}
+                          : `다시 만들기 · ${priceLabel(regenPrice("clip", c.clip_regen_count || 0, modelIdForProject(project)))}`}
                       </button>
                     </>
                   )}

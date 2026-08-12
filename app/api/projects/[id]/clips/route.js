@@ -4,6 +4,7 @@ import { isClipStale } from "../../../../../lib/steps";
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { requireVideoCharge, NoCredits } from "../../../../../lib/charges.js";
 import { fakeFal } from "../../../../../lib/fake";
+import { modelIdForProject } from "../../../../../lib/clip-limits.js";
 
 // 이 라우트는 **살아 있는 청구를 요구한다**(requireVideoCharge). 클립은 영상 정가에
 // 포함이라 정상 흐름에서는 그냥 지나가지만, 정가를 안 낸(또는 환불받은) 프로젝트로
@@ -57,6 +58,7 @@ export const POST = withUser(async (req, { params }, user) => {
     try {
       await requireVideoCharge({
         userId: user.id, projectId: id, seconds: project.settings?.target_seconds,
+        model: modelIdForProject(project),
       });
     } catch (e) {
       if (e instanceof NoCredits) return Response.json({ error: e.message }, { status: 402 });

@@ -7,6 +7,7 @@ import {
 import { regenPrice, MAX_REGEN_PER_CUT } from "../../../../../../../lib/pricing.js";
 import { BudgetExceeded } from "../../../../../../../lib/costs.js";
 import { fakeFal } from "../../../../../../../lib/fake";
+import { modelIdForProject } from "../../../../../../../lib/clip-limits.js";
 
 export const POST = withUser(async (req, { params }, user) => {
   const { id, idx } = await params;
@@ -44,6 +45,7 @@ export const POST = withUser(async (req, { params }, user) => {
       try {
         await requireVideoCharge({
           userId: user.id, projectId: id, seconds: project.settings?.target_seconds,
+          model: modelIdForProject(project),
         });
       } catch (e) {
         if (e instanceof NoCredits) return Response.json({ error: e.message }, { status: 402 });
@@ -51,7 +53,7 @@ export const POST = withUser(async (req, { params }, user) => {
       }
     }
 
-    const price = regenPrice("image", prior);
+    const price = regenPrice("image", prior, modelIdForProject(project));
     if (price > 0) {
       try {
         await assertCanAfford(user.id, price);
@@ -61,6 +63,7 @@ export const POST = withUser(async (req, { params }, user) => {
       }
       await chargeRegen({
         userId: user.id, projectId: id, kind: "image", idx: Number(idx), priorCount: prior,
+        model: modelIdForProject(project),
       });
       charged = prior;   // 실패하면 이 회차를 되돌린다
     }

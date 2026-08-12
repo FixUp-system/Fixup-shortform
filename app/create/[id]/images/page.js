@@ -11,6 +11,7 @@ import BackButton from "../../../../components/BackButton";
 import { isImageStale } from "../../../../lib/steps";
 // 상한과 값은 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다).
 import { MAX_REGEN_PER_CUT, priceLabel, regenPrice, videoPrice } from "../../../../lib/pricing";
+import { modelIdForProject } from "../../../../lib/clip-limits";
 
 // 그림이 아직 없는 자리에 뭐라고 쓸지.
 // "생성 중…"은 **실제로 도는 동안에만** 쓴다 — 누르기 전에도 그렇게 적혀 있으면
@@ -220,7 +221,7 @@ export default function ImagesStepPage() {
                       ? "그리는 중…"
                       : project.charged
                         ? "이미지 만들기"
-                        : `이미지 만들기 · ${videoPrice(project.settings?.target_seconds)} 크레딧`}
+                        : `이미지 만들기 · ${videoPrice(project.settings?.target_seconds, modelIdForProject(project))} 크레딧`}
                   </button>
                 </>
               ) : (
@@ -280,6 +281,9 @@ function PreviewPane({ cut, url, photoName, aspect, hasSynopsis, stalled, onRege
   const busyCut = !stalled && cut.state === "generating";
   const atLimit = cut.regen_count >= MAX_REGEN_PER_CUT;
   // 컷마다 첫 회는 공짜, 둘째부터 값을 치른다 — 누르기 전에 보여 준다.
+  // ★ 모델을 안 넘긴다 — 이미지 재생성 값은 영상 모델과 무관하다(REGEN_PRICE.image 는 표가
+  //   아니라 숫자 하나다). 넘기려면 project 를 이 컴포넌트까지 끌고 와야 하는데, 값이 갈릴
+  //   일이 없는 자리에 배선을 늘리지 않는다. 갈리게 되는 날 표가 먼저 바뀐다.
   const regenLabel = priceLabel(regenPrice("image", cut.regen_count || 0));
 
   return (

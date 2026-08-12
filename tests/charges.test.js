@@ -4,8 +4,8 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { resetMemoryStore } from "../lib/store/memory.js";
 import { getStore } from "../lib/store/index.js";
 import {
-  balanceFor, chargeVideo, chargeRegen, refundVideo,
-  assertCanAfford, alreadyChargedVideo, NoCredits,
+  balanceFor, chargeVideo, chargeRegen, refundVideo, refundRegen,
+  assertCanAfford, alreadyChargedVideo, NoCredits, requireVideoCharge,
 } from "../lib/charges.js";
 // 정가는 길이 × 모델로 갈린다. 이 장부 함수들은 모델을 안 넘기므로
 // 레거시(Kling) 표를 읽는다 — lib/pricing.js 의 폴백이 가리키는 그 표다.
@@ -209,5 +209,70 @@ describe("청구", () => {
   it("정확히 맞으면 통과한다", async () => {
     await grant(VIDEO_PRICE["kling-v3"][30]);
     await expect(assertCanAfford(A, VIDEO_PRICE["kling-v3"][30])).resolves.toBeUndefined();
+  });
+});
+
+// ★ 장부가 실제로 받아 가는 크레딧을 잰다 — 목 호출 횟수가 아니라 잔액을 읽는다.
+describe("청구가 모델을 탄다", () => {
+  beforeEach(() => resetMemoryStore());
+
+  const 충전 = () =>
+    getStore().insertGrant({ user_id: A, amount_credits: 500, reason: "테스트", granted_by: ADMIN });
+
+  it("Seedance 프로젝트는 정가가 세 배다", async () => {
+    await 충전();
+    await chargeVideo({ userId: A, projectId: P, seconds: 30, model: "seedance-2.0" });
+    expect(await balanceFor(A)).toBe(500 - 160);
+  });
+
+  // ★★ 모델을 안 넘기면 조용히 싼 값이 청구된다 — 이것이 이 태스크의 유일한 실패 방식이다
+  it("모델을 안 넘기면 Kling 정가다", async () => {
+    await 충전();
+    await chargeVideo({ userId: A, projectId: P, seconds: 30 });
+    expect(await balanceFor(A)).toBe(500 - 50);
+  });
+
+  it("클립 재생성도 모델을 탄다 — Seedance 25, Kling 8", async () => {
+    await 충전();
+    await chargeRegen({ userId: A, projectId: P, kind: "clip", idx: 0, priorCount: 1, model: "seedance-2.0" });
+    expect(await balanceFor(A)).toBe(500 - 25);
+    await chargeRegen({ userId: A, projectId: P, kind: "clip", idx: 1, priorCount: 1, model: "kling-v3" });
+    expect(await balanceFor(A)).toBe(500 - 25 - 8);
+  });
+
+  it("이미지·목소리 재생성은 모델과 무관하다", async () => {
+    await 충전();
+    await chargeRegen({ userId: A, projectId: P, kind: "image", idx: 0, priorCount: 1, model: "seedance-2.0" });
+    expect(await balanceFor(A)).toBe(500 - 2);
+  });
+
+  it("컷마다 첫 회는 여전히 무료다", async () => {
+    await 충전();
+    await chargeRegen({ userId: A, projectId: P, kind: "clip", idx: 0, priorCount: 0, model: "seedance-2.0" });
+    expect(await balanceFor(A)).toBe(500);
+  });
+
+  // ⚠️ 청구는 25 를 받고 환불이 8 을 돌려주면 사장님이 17 크레딧을 잃는다.
+  it("환불은 청구와 같은 값을 돌려준다", async () => {
+    await 충전();
+    await chargeRegen({ userId: A, projectId: P, kind: "clip", idx: 0, priorCount: 1, model: "seedance-2.0" });
+    await refundRegen({ projectId: P, kind: "clip", idx: 0, priorCount: 1, model: "seedance-2.0" });
+    expect(await balanceFor(A)).toBe(500);
+  });
+
+  it("requireVideoCharge 도 모델을 탄다", async () => {
+    await 충전();
+    await requireVideoCharge({ userId: A, projectId: P, seconds: 30, model: "seedance-2.0" });
+    expect(await balanceFor(A)).toBe(500 - 160);
+  });
+
+  // 잔액이 Kling 값(50)은 넘지만 Seedance 값(160)에는 못 미치는 자리 —
+  // 모델을 안 태우면 여기서 통과해 버리고 fal 이 나간다.
+  it("잔액이 Seedance 정가에 못 미치면 402 로 막힌다", async () => {
+    await getStore().insertGrant({ user_id: A, amount_credits: 100, reason: "테스트", granted_by: ADMIN });
+    await expect(
+      requireVideoCharge({ userId: A, projectId: P, seconds: 30, model: "seedance-2.0" }),
+    ).rejects.toBeInstanceOf(NoCredits);
+    expect(await balanceFor(A)).toBe(100);
   });
 });

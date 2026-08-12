@@ -14,6 +14,7 @@ import { VOICES } from "../../../../lib/voices";
 import { isAudioStale } from "../../../../lib/steps";
 // 상한과 정가는 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다).
 import { MAX_REGEN_PER_CUT, priceLabel, regenPrice, videoPrice } from "../../../../lib/pricing";
+import { modelIdForProject } from "../../../../lib/clip-limits";
 
 export default function VoiceStepPage() {
   const { id } = useParams();
@@ -142,7 +143,7 @@ export default function VoiceStepPage() {
   // 문장을 고친 뒤 옛 문장을 읽은 소리가 남아 있으면 다음으로 보내지 않는다
   const staleCount = cuts.filter(isAudioStale).length;
   // 이 영상의 정가 — 길이마다 다르다. 목소리 시작이 이 값을 받는 자리다.
-  const price = videoPrice(project?.settings?.target_seconds);
+  const price = videoPrice(project?.settings?.target_seconds, modelIdForProject(project));
 
   // 대본 승인 직후 이 화면에 도착하면 컷이 아직 없다 — 분할이 도는 중이다.
   // 분할은 대본 승인이 띄우고(POST /cuts), 여기서는 컷이 생기기를 기다리기만 한다.
@@ -216,7 +217,9 @@ export default function VoiceStepPage() {
                       </span>
                     )}
                     {/* 남은 횟수는 항상 보인다 — 상한에 언제 닿는지 누르기 전에 알아야 한다.
-                        값도 함께 적는다: 컷마다 첫 회는 공짜고 둘째부터 크레딧이 나간다 */}
+                        값도 함께 적는다: 컷마다 첫 회는 공짜고 둘째부터 크레딧이 나간다.
+                        ★ 아래 값에 모델을 안 넘긴다 — 목소리 재생성 값은 영상 모델과 무관하다
+                        (REGEN_PRICE.voice 는 표가 아니라 숫자 하나다). 클립만 모델을 탄다 */}
                     <span className="badge ai">
                       다시 읽음 {c.voice_regen_count || 0}/{MAX_REGEN_PER_CUT}
                     </span>

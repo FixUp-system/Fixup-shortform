@@ -4,6 +4,7 @@ import { VOICES } from "../../../../../lib/voices";
 import { fakeFal } from "../../../../../lib/fake";
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { requireVideoCharge, NoCredits } from "../../../../../lib/charges.js";
+import { modelIdForProject } from "../../../../../lib/clip-limits.js";
 
 export const POST = withUser(async (req, { params }, user) => {
   const { id } = await params;
@@ -45,6 +46,7 @@ export const POST = withUser(async (req, { params }, user) => {
     try {
       await requireVideoCharge({
         userId: user.id, projectId: id, seconds: project.settings?.target_seconds,
+        model: modelIdForProject(project),
       });
     } catch (e) {
       if (e instanceof NoCredits) return Response.json({ error: e.message }, { status: 402 });
