@@ -16,8 +16,17 @@ import { runWithActor } from "../lib/actor.js";
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
 
 import { GET as getProjectRoute, PATCH as patchProjectRoute } from "../app/api/projects/[id]/route.js";
+import { POST as autoPOST } from "../app/api/projects/[id]/auto/route.js";
+import { POST as briefingPOST } from "../app/api/projects/[id]/briefing/route.js";
 import { POST as scriptPOST } from "../app/api/projects/[id]/script/route.js";
+import { POST as cutsPOST } from "../app/api/projects/[id]/cuts/route.js";
 import { POST as cutRegenPOST } from "../app/api/projects/[id]/cuts/[idx]/regen/route.js";
+import { POST as voicePOST } from "../app/api/projects/[id]/voice/route.js";
+import { POST as voiceRegenPOST } from "../app/api/projects/[id]/voice/[idx]/regen/route.js";
+import { POST as imagesPOST } from "../app/api/projects/[id]/images/route.js";
+import { POST as clipsPOST } from "../app/api/projects/[id]/clips/route.js";
+import { POST as clipRegenPOST } from "../app/api/projects/[id]/clips/[idx]/regen/route.js";
+import { POST as renderPOST } from "../app/api/projects/[id]/render/route.js";
 import { GET as statusGET } from "../app/api/projects/[id]/status/route.js";
 import { GET as cutsStatusGET } from "../app/api/projects/[id]/cuts/status/route.js";
 import { GET as voiceStatusGET } from "../app/api/projects/[id]/voice/status/route.js";
@@ -90,6 +99,76 @@ describe("기존 라우트는 광고 문서를 모른다 — A 그룹(getProject
     const p = await makeAd();
     const res = await cutRegenPOST(jsonReqAs(U, {}), idxCtx(p.id, 0));
     expect(res.status).toBe(404);
+  });
+
+  // ★ 회귀 안전망(리뷰 Important 2) — 위에서 이미 잰 route.js·script·cuts regen 넷을 뺀
+  // 나머지 9개도 가드는 이미 옳게 들어가 있었지만 테스트가 없었다. 가드는 항상 getProject
+  // 호출 바로 뒤(또는 그 자리)에 있으므로 본문·idx 는 최소로 채우고 상태 코드만 본다 —
+  // 가드가 다른 판정(자료 없음 400·컷 없음 400 등)보다 먼저 걸리는지가 요지다.
+  it.each([
+    ["auto", autoPOST],
+    ["briefing", briefingPOST],
+    ["cuts", cutsPOST],
+    ["images", imagesPOST],
+    ["voice", voicePOST],
+    ["clips", clipsPOST],
+    ["render", renderPOST],
+  ])("POST /api/projects/[id]/%s — 광고 문서는 404", async (_name, handler) => {
+    const p = await makeAd();
+    const res = await handler(jsonReqAs(U, {}), ctx(p.id));
+    expect(res.status).toBe(404);
+  });
+
+  it.each([
+    ["voice/[idx]/regen", voiceRegenPOST],
+    ["clips/[idx]/regen", clipRegenPOST],
+  ])("POST /api/projects/[id]/%s — 광고 문서는 404", async (_name, handler) => {
+    const p = await makeAd();
+    const res = await handler(jsonReqAs(U, {}), idxCtx(p.id, 0));
+    expect(res.status).toBe(404);
+  });
+});
+
+// ★ 리뷰 Important 1 — regen 3형제의 kind 가드는 원래 `if (!fakeFal())` 블록 **안**에만
+// 있었다. SHOTFORM_FAKE=fal·all(이 저장소가 CLAUDE.md 에서 권장하는 정상 개발 방식)이면
+// 그 블록을 통째로 건너뛰어 곧장 lib/pipeline.js 의 regenCut/regenVoice/regenClip 으로
+// 가므로, 광고 문서가 가짜 모드에서는 안 걸렸다. 가드를 블록 밖으로 옮긴 뒤 이 자리를 잰다.
+describe("기존 라우트는 광고 문서를 모른다 — 가짜 모드에서도 regen 셋은 404", () => {
+  beforeEach(() => resetMemoryStore());
+
+  const withFakeFal = async (level, fn) => {
+    const prev = process.env.SHOTFORM_FAKE;
+    process.env.SHOTFORM_FAKE = level;
+    try {
+      await fn();
+    } finally {
+      if (prev === undefined) delete process.env.SHOTFORM_FAKE;
+      else process.env.SHOTFORM_FAKE = prev;
+    }
+  };
+
+  it.each([
+    ["cuts/[idx]/regen", cutRegenPOST],
+    ["voice/[idx]/regen", voiceRegenPOST],
+    ["clips/[idx]/regen", clipRegenPOST],
+  ])("%s — SHOTFORM_FAKE=fal 이어도 광고 문서는 404", async (_name, handler) => {
+    const p = await makeAd();
+    await withFakeFal("fal", async () => {
+      const res = await handler(jsonReqAs(U, {}), idxCtx(p.id, 0));
+      expect(res.status).toBe(404);
+    });
+  });
+
+  it.each([
+    ["cuts/[idx]/regen", cutRegenPOST],
+    ["voice/[idx]/regen", voiceRegenPOST],
+    ["clips/[idx]/regen", clipRegenPOST],
+  ])("%s — SHOTFORM_FAKE=all 이어도 광고 문서는 404", async (_name, handler) => {
+    const p = await makeAd();
+    await withFakeFal("all", async () => {
+      const res = await handler(jsonReqAs(U, {}), idxCtx(p.id, 0));
+      expect(res.status).toBe(404);
+    });
   });
 });
 
