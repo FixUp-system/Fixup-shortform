@@ -19,9 +19,10 @@ for (const line of readFileSync(".env.local", "utf8").split(/\r?\n/)) {
 const { getStore } = await import("../lib/store/index.js");
 const store = getStore();
 
-// compose.js 와 같은 규칙으로 경로를 잡는다
-const base = process.env.SHOTFORM_DATA_DIR || path.join(process.cwd(), "data");
-const dir = path.join(base, "renders");
+// compose.js 의 rendersDir() 를 그대로 쓴다 — 경로 규칙을 복제하면 한쪽만 고치고
+// 잊는 사고가 난다(이 스크립트가 규칙을 복제했던 것이 실제로 그 사고였다).
+const { rendersDir } = await import("../lib/compose.js");
+const dir = rendersDir();
 if (!existsSync(dir)) {
   console.log(`${dir} 가 없습니다 — 옮길 것이 없습니다.`);
   process.exit(0);

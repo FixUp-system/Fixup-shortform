@@ -23,16 +23,25 @@ beforeEach(() => resetMemoryStore());
 // 실제로 이 줄을 빼고 전체 테스트를 한 번 돌렸더니 data/costs.json 에 0원짜리 15건이
 // 다시 쌓였다 — 예전과 똑같은 오염이다.
 //
-// ★ 지우는 조건: **렌더 산출물이 로컬 파일로 남아 있는 한 지우지 않는다.**
-// "비용 원장이 store 로 가면"이 아니다. 이 env 에 아직 기대는 곳(2026-07-31 실측):
-//   - lib/compose.js                  (data/renders/ 아래 mp4)
-//   - app/api/renders/[name]/route.js (그 mp4 를 되읽는 라우트)
-// 이관으로 손을 뗀 곳(예전 근거였다가 이제 아닌 것): lib/costs.js 는 store 로 갔고,
-// lib/pipeline.js 는 업로드가 Storage 로 가면서 이 env 를 더는 읽지 않는다.
-// 그래도 결론은 그대로다 — 렌더 mp4 가 로컬이라, 이 줄을 지우면 이번엔 12MB 짜리
-// mp4 가 저장소 data/renders/ 에 쌓이는 모양으로 같은 오염이 재발한다.
-// (이 줄은 이미 한 번 "근거가 사라졌다"는 이유로 지워졌다가 실제 원장을 오염시켰다.
-//  근거 목록이 낡았으면 목록을 고칠 일이지 줄을 지울 일이 아니다.)
+// ★ 지우는 조건: 아래 근거 목록이 전부 비면 지워도 된다. 목록이 낡았으면
+// 목록을 고칠 일이지 줄을 지울 일이 아니다(이 줄은 이미 한 번 "근거가 사라졌다"는
+// 이유로 지워졌다가 실제 원장을 오염시켰다).
+//
+// 2026-08-12 갱신(`grep -rn "SHOTFORM_DATA_DIR" lib/ app/ scripts/` 실측) — 렌더 산출물
+// Storage 이관으로 lib/compose.js 와 app/api/renders/[name]/route.js 는 이 env 를 더는
+// 읽지 않는다(합성은 임시 폴더를 쓰고 finally 에서 지우며, 라우트는 Storage 에서 읽는다).
+// 그런데도 이 줄이 필요한 건 아래가 아직 SHOTFORM_DATA_DIR 을 읽어서다:
+//   - scripts/migrate-renders-to-storage.mjs (구 로컬 data/renders/ 를 읽어 Storage 로 올리는
+//     1회성 이관 스크립트 — 테스트가 이 스크립트를 직접 부르지는 않지만, 이 env 를 실수로
+//     저장소 data/ 로 흘리면 이관 스크립트가 그 자리를 읽어 갈 수 있다)
+//   - scripts/measure/compare-clip-models.mjs · compare-image-models.mjs ·
+//     compare-style-presets.mjs · subtitle-split.mjs (측정 스크립트 — 테스트가 부르지 않음)
+//   - scripts/migrate-to-supabase.mjs (구 이관 스크립트, 1회성)
+// 즉 지금 남은 근거는 "테스트 스위트가 이 스크립트들을 부른다"가 아니라 "이 env 이름이
+// 살아 있는 한, 세워 두지 않으면 실수로 실행됐을 때 저장소 data/ 를 겨냥한다"는 방어선이다.
+// 세워 두지 않고 전체 테스트를 돌렸을 때 실제로 data/costs.json 이 오염된 전례가 있다
+// (아래 문단). 근거가 완전히 없어지면(위 스크립트들이 전부 지워지거나 이 env 를 놓으면)
+// 이 줄도 지운다.
 process.env.SHOTFORM_DATA_DIR = mkdtempSync(path.join(tmpdir(), "shotform-test-"));
 
 // 클립 모델 env 는 테스트에서 지운다 — .env.local 을 Kling 으로 바꿔 두면 눈금 기대값이

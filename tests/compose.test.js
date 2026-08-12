@@ -139,6 +139,26 @@ describe("composeVideo", () => {
     expect(put).toEqual([{ bucket: "renders", key: "p1.mp4", ct: "video/mp4" }]);
   });
 
+  // ★ 기본 배선을 그대로 관통시킨다 — putObjectImpl 을 주입하지 않는다.
+  //    다른 테스트가 전부 그것을 목으로 갈아끼워서, 버킷 이름 오타나 인자 순서가
+  //    바뀌어도 전부 그린인 구멍이 있었다. 여기가 그 구멍을 막는다.
+  it("주입 없이 부르면 실제로 renders 버킷에 들어간다", async () => {
+    const { memoryStore, resetMemoryStore } = await import("../lib/store/memory.js");
+    resetMemoryStore();
+    await composeVideo({
+      projectId: "p1", cuts: CUTS, aspect_ratio: "9:16",
+      runFfmpeg: async () => {},
+      downloadImpl: async (_url, dest) => dest,
+      writeFileImpl: async () => {},
+      mkdirImpl: async () => {},
+      mkdtempImpl: async () => "/tmp/x",
+      rmImpl: async () => {},
+      readFileImpl: async () => Buffer.from("진짜-mp4-바이트"),
+      // putObjectImpl 은 일부러 안 넘긴다 — 기본값이 store 로 가는지가 이 테스트의 전부다
+    });
+    expect((await memoryStore.getObject("renders", "p1.mp4")).toString()).toBe("진짜-mp4-바이트");
+  });
+
   it("합성이 실패해도 임시 폴더를 치운다", async () => {
     const removed = [];
     await expect(composeVideo({

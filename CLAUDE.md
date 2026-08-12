@@ -106,7 +106,7 @@ node scripts/measure/ab-briefing.mjs setup|b        # 프롬프트 A/B
 | 프로젝트 문서 | Postgres `projects.doc` (jsonb 통짜) + `version`(낙관적 락) |
 | 비용 원장 | Postgres `cost_records` (행, `request_id`가 기본키=멱등키) |
 | 업로드 사진 | Supabase Storage 비공개 버킷 `uploads`. URL은 `/api/uploads/<name>` 그대로 |
-| **렌더 산출물** | **로컬 `data/renders/`** — ffmpeg가 로컬 경로와 자식 프로세스를 요구한다 |
+| **렌더 산출물** | **Supabase Storage 비공개 버킷 `renders`**. URL은 `/api/renders/<id>.mp4` 그대로(2026-08-12 이관) |
 
 스키마는 `db/schema.sql` 하나다. **통째로 다시 올려도 안전하다**(`if not exists`·`or replace`).
 합계는 `sum_costs()` SQL 함수가 낸다 — 앱에서 행을 받아 더하면 PostgREST 행 상한(기본 1000)에
@@ -119,10 +119,13 @@ RLS는 켜져 있고 정책은 0개다(=전부 거부). 앱은 `service_role`로
 
 > ⚠️ 무료 플랜은 요청이 며칠 없으면 프로젝트가 **일시정지**된다. 갑자기 안 되면 대시보드에서 재개.
 
-### fal 산출물은 우리 것이 아니다 (2026-07-31 확인)
-`image.url`·`video.url`·`audio.url` 이 전부 fal CDN 외부 URL 이다. 합성한 프로젝트만 클립·소리
-사본이 `data/renders/` 에 남고 **이미지는 한 번도 안 내려받는다**(`lib/i2v.js:36` 이 `image_url` 로
-URL 을 그대로 넘긴다).
+### fal 산출물은 우리 것이 아니다 (2026-07-31 확인, 08-12 렌더 이관 반영)
+`image.url`·`video.url`·`audio.url` 이 전부 fal CDN 외부 URL 이다. 합성은 클립·소리·자막을
+**임시 폴더**에 만들고(`lib/compose.js`) `finally`에서 지운다 — 예전에는 `data/renders/`에
+그대로 쌓였다(실측 71개 215MB 중 65개가 중간물). 완성본(mp4)만 `renders` 버킷에 올라가고
+로컬에는 남지 않는다. **이미지는 여전히 한 번도 안 내려받는다**(`lib/i2v.js:36` 이 `image_url`
+로 URL 을 그대로 넘긴다). ffmpeg 는 여전히 로컬 파일에 쓴다 — 자식 프로세스라 스트림을
+못 받아서다("만들고 나서 올린다"가 유일한 순서).
 
 보관은 걱정 안 해도 된다 — `X-Fal-Object-Lifecycle-Preference` 기본값이 **"forever and publicly
 readable if not configured"** 이고 보관 기간 과금도 문서에 없다. 실측으로도 3일 된 URL 이 200 이고
