@@ -169,6 +169,33 @@ describe("그림 낡음 판정에 프로젝트를 넘긴다 — 화풍이 컷 �
   }
 });
 
+// isClipStale 도 같은 이유로 project 를 함께 받는다 — 말하는 모델에서는 대사·목소리가
+// 클립 프롬프트에 실리는데, 그 둘은 컷이 아니라 **캐스팅(project.cast)** 에 있다.
+// 함수를 그대로 넘기면 배열 번호가 project 자리에 들어가 그 판정이 조용히 죽는다.
+describe("클립 낡음 판정에 프로젝트를 넘긴다 — 대사·목소리가 컷 밖에 있기 때문이다", () => {
+  const CALLERS = [
+    { step: "⑤ 영상", path: "app/create/[id]/video/page.js" },
+    { step: "⑥ 완성", path: "app/create/[id]/done/page.js" },
+  ];
+
+  for (const { step, path } of CALLERS) {
+    it(`${step} 화면이 isClipStale 을 포인트프리로 넘기지 않는다`, () => {
+      const src = read(path);
+      expect(src, `${path} 가 isClipStale 을 그대로 넘긴다 — 배열 번호가 project 자리로 간다`)
+        .not.toMatch(/\.(filter|some|every|map)\(\s*isClipStale\s*\)/);
+    });
+
+    it(`${step} 화면의 isClipStale 호출이 전부 프로젝트를 넘긴다`, () => {
+      const src = read(path);
+      const calls = [...src.matchAll(/isClipStale\(([^)]*)\)/g)].map((m) => m[1]);
+      expect(calls.length, `${path} 에 isClipStale 호출이 없다`).toBeGreaterThan(0);
+      for (const args of calls) {
+        expect(args, `${path} 의 isClipStale(${args}) 이 프로젝트를 안 넘긴다`).toContain("project");
+      }
+    });
+  }
+});
+
 // 영상 컨셉을 고르는 자리는 **자료 쪽**이다: 자료를 넣는 화면(/create)에서 처음 고르고,
 // ①자료 화면에서 되돌아와 바꾼다. ②대본에는 두지 않는다.
 describe("영상 컨셉은 자료 쪽에서 고른다", () => {

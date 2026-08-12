@@ -333,19 +333,45 @@ describe("clipKey — 속도가 바뀌면 클립이 낡는다", () => {
   });
 });
 
-describe("clipKey — 말하는 컷", () => {
+// 대사·목소리는 컷에 저장된 필드가 아니라 **프로젝트에서 파생**된다. 그래서 각인도
+// project 를 함께 받아 그 자리에서 파생시킨다 — 저장할 때와 잴 때가 다른 출처면
+// 영원히 불일치가 되어 살아 있는 클립을 매번 다시 산다.
+describe("clipKey — 말하는 컷은 대사·목소리에서 파생된다", () => {
+  const cut = { idx: 0, sentence: "안녕하세요", image: { url: "u" }, seconds: 5, motion: "천천히" };
+  const speaking = {
+    settings: { i2v_model: "seedance-2.0" },
+    cuts: [{ idx: 0, sentence: "안녕하세요" }],
+    cast: [{ id: "c1", who: "20대 남성", voice: "중저음", cuts: [0] }],
+  };
+  const withVoice = (voice) => ({ ...speaking, cast: [{ ...speaking.cast[0], voice }] });
+
   it("옛 컷의 각인은 한 글자도 안 바뀐다", () => {
-    const cut = { image: { url: "u" }, seconds: 5, motion: "천천히" };
+    const old = { image: { url: "u" }, seconds: 5, motion: "천천히" };
+    expect(clipKey(old)).toBe("u|5|천천히");
+    expect(clipKey({ ...old, speed: "fast" })).toBe("u|5|천천히|fast");
+    // 말하지 않는 프로젝트를 넘겨도 그대로다
+    expect(clipKey(cut, { ...speaking, settings: { i2v_model: "kling-v3" } })).toBe("u|5|천천히");
+  });
+
+  it("project 를 안 넘기면 예전과 같다", () => {
     expect(clipKey(cut)).toBe("u|5|천천히");
-    expect(clipKey({ ...cut, speed: "fast" })).toBe("u|5|천천히|fast");
   });
 
   it("대사·목소리가 바뀌면 클립이 낡는다", () => {
-    const cut = { image: { url: "u" }, seconds: 5, motion: "천천히" };
-    const a = clipKey({ ...cut, spoken_of: "안녕하세요|중저음|20대 남성" });
-    const b = clipKey({ ...cut, spoken_of: "안녕하세요|높은 톤|20대 남성" });
+    const a = clipKey(cut, speaking);
+    const b = clipKey(cut, withVoice("높은 톤"));
     expect(a).not.toBe(b);
     expect(a).not.toBe(clipKey(cut));
+    expect(clipKey({ ...cut, sentence: "다른 말" }, { ...speaking, cuts: [{ idx: 0, sentence: "다른 말" }] }))
+      .not.toBe(a);
+  });
+
+  // ★★ 저장(clipKey)과 판정(isClipStale)이 같은 출처에서 나와야 한다. 안 그러면
+  //    저장된 컷에 대사·목소리가 없어 매번 낡음으로 읽히고, 클립을 통째로 다시 산다.
+  it("저장된 컷에 대사 필드가 없어도 안 낡는다 — 양쪽이 같은 함수에서 파생된다", () => {
+    const saved = { ...cut, video: { url: "v", of: clipKey(cut, speaking) } };
+    expect(isClipStale(saved, speaking)).toBe(false);
+    expect(isClipStale(saved, withVoice("높은 톤"))).toBe(true);
   });
 });
 

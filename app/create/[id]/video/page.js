@@ -103,11 +103,12 @@ export default function VideoStepPage() {
   // 활성 모델의 클립 상한. 서버가 실어 보낸다 — 없으면(옛 응답) 기본 프로필 값으로 떨어진다
   const clipMax = project?.clip_limits?.max ?? I2V_MAX_SECONDS;
   // 남은 컷 = 클립이 없거나 낡은 컷. runVideoPipeline 의 건너뛰기 조건의 정확한 반대다.
-  const remainingCount = cuts.filter((c) => !c.video?.url || isClipStale(c)).length;
+  const remainingCount = cuts.filter((c) => !c.video?.url || isClipStale(c, project)).length;
   const doneCount = cuts.filter((c) => c.video).length;
   const truncatedCount = cuts.filter((c) => c.video?.truncated).length;
   // 그림이나 낭독이 바뀐 뒤 옛것으로 만든 클립이 남아 있으면 합치러 보내지 않는다
-  const staleCount = cuts.filter(isClipStale).length;
+  // ⚠️ 포인트프리로 넘기면 배열 번호가 project 자리에 들어가 말하는 축 판정이 죽는다
+  const staleCount = cuts.filter((c) => isClipStale(c, project)).length;
   const selected = cuts.find((c) => c.idx === selectedIdx) || cuts.find((c) => c.video) || cuts[0];
 
   if (!cuts.length) return <p className="pgsub">대본을 먼저 만들어 주세요.</p>;
@@ -154,7 +155,7 @@ export default function VideoStepPage() {
                   {c.video?.truncated && (
                     <span className="badge warn">{clipMax}초까지만 움직이고 나머지는 멈춰 있어요</span>
                   )}
-                  {isClipStale(c) && (
+                  {isClipStale(c, project) && (
                     <span className="badge warn">
                       그림이나 낭독이 바뀐 뒤라 클립이 옛것이에요 — 다시 만들면 됩니다
                     </span>

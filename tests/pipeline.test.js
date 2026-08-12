@@ -627,6 +627,60 @@ describe("runVideoPipeline — 이미지를 클립으로", () => {
     expect(called).toEqual([]);
     expect((await projects.getProject(p.id, OWNER)).cuts[0].video.url).toBe("https://fal/nostamp.mp4");
   });
+
+  // ★ 말하는 모델에서는 대사·목소리가 프롬프트에 실리므로 각인에도 들어간다. 그런데 각인을
+  //   **남길 때와 잴 때가 다른 출처**면 영원히 불일치가 되어, [영상 만들기]를 누를 때마다
+  //   살아 있는 클립을 전부 다시 산다(Seedance 30초 한 편이 회당 ~$9다).
+  //   그래서 손으로 꽂은 필드가 아니라 **파이프라인을 두 번 돌려** 재구매를 잰다.
+  describe("말하는 모델의 각인 — 다시 돌려도 다시 사지 않는다", () => {
+    async function speaking(voice = "중저음, 차분한 톤") {
+      const p = await makeProject();
+      await projects.updateProject(p.id, OWNER, (proj) => ({
+        ...proj,
+        status: "voice",
+        settings: { ...proj.settings, i2v_model: "seedance-2.0" },
+        cast: [{ id: "c1", who: "20대 남성", voice, cuts: [0] }],
+        cuts: [{ idx: 0, sentence: "안녕하세요", seconds: 4, image: { url: "i0" }, audio: { url: "a0", seconds: 4 } }],
+      }));
+      return p;
+    }
+    const counting = (called) => ({
+      clip: async () => { called.push(1); return { url: "v", seconds: 4, truncated: false }; },
+    });
+
+    it("두 번 돌려도 두 번 사지 않는다", async () => {
+      const p = await speaking();
+      const called = [];
+      await pipeline.runVideoPipeline(p.id, OWNER, counting(called));
+      expect(called.length).toBe(1);
+      await pipeline.runVideoPipeline(p.id, OWNER, counting(called));
+      expect(called.length, "살아 있는 말하는 클립을 다시 샀다").toBe(1);
+    });
+
+    it("목소리를 바꾸면 그때 다시 산다", async () => {
+      const p = await speaking();
+      const called = [];
+      await pipeline.runVideoPipeline(p.id, OWNER, counting(called));
+      await projects.updateProject(p.id, OWNER, (proj) => ({
+        ...proj,
+        cast: [{ ...proj.cast[0], voice: "높고 밝은 톤" }],
+      }));
+      await pipeline.runVideoPipeline(p.id, OWNER, counting(called));
+      expect(called.length, "목소리를 바꿨는데 옛 클립을 그대로 뒀다").toBe(2);
+    });
+
+    it("대사를 바꾸면 그때 다시 산다", async () => {
+      const p = await speaking();
+      const called = [];
+      await pipeline.runVideoPipeline(p.id, OWNER, counting(called));
+      await projects.updateProject(p.id, OWNER, (proj) => ({
+        ...proj,
+        cuts: proj.cuts.map((c) => ({ ...c, sentence: "다른 말을 합니다" })),
+      }));
+      await pipeline.runVideoPipeline(p.id, OWNER, counting(called));
+      expect(called.length).toBe(2);
+    });
+  });
 });
 
 describe("runRenderPipeline — 하나로 합친다", () => {

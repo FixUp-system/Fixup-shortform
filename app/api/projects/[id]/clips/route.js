@@ -44,7 +44,7 @@ export const POST = withUser(async (req, { params }, user) => {
   // 함께 지킨다 — 살아 있는 클립은 애초에 remaining 에 안 들어가고, 설령 들어가 다시 불려도
   // 파이프라인이 손대지 않는다. status 를 더 보는 건 같은 것을 두 규칙으로 지키는 것이라
   // 언젠가 어긋난다("할 일이 있는가" 하나로 충분하다).
-  const remaining = cuts.filter((c) => !c.video?.url || isClipStale(c));
+  const remaining = cuts.filter((c) => !c.video?.url || isClipStale(c, project));
   if (!remaining.length) {
     return Response.json(
       { error: "이미 만든 영상이 있어요 — 컷별로 다시 만들 수 있어요" },

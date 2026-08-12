@@ -478,8 +478,14 @@ describe("buildClipPrompt — 이 그림이 어떻게 움직이는가", () => {
     expect(p).not.toContain("says");
   });
 
+  // 픽스처는 Seedance 쪽과 **모델만** 다르다 — cuts 를 빼면 "프로필이 말하지 않아서"와
+  // "컷이 없어서"가 섞여, 프로필이 speaks:true 로 잘못 뒤집혀도 이 테스트가 통과한다
   it("말하지 않는 모델(Kling)에서도 예전과 같다", () => {
-    const kling = { settings: { i2v_model: "kling-v3" }, cast: [{ id: "c1", who: "20대 남성", voice: "중저음", cuts: [0] }] };
+    const kling = {
+      settings: { i2v_model: "kling-v3" },
+      cuts: [{ idx: 0, sentence: "안녕하세요" }],
+      cast: [{ id: "c1", who: "20대 남성", voice: "중저음", cuts: [0] }],
+    };
     const p = buildClipPrompt({ idx: 0, motion: "천천히", sentence: "안녕하세요" }, kling);
     expect(p).toContain("No talking faces or lip sync");
   });
