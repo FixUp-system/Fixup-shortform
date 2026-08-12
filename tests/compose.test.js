@@ -355,17 +355,25 @@ describe("composeVideo — 말하는 프로젝트는 소리 파일을 안 받는
     ];
     const got = [];
     let args = null;
-    await composeVideo({
+    let ass = "";
+    const r = await composeVideo({
       projectId: "p1", cuts: mixed, project: { ...PROJECT, cuts: mixed }, aspect_ratio: "9:16",
       ...wiring({
         downloadImpl: async (url, dest) => { got.push(url); return dest; },
         runFfmpeg: async (a) => { args = a; },
+        writeFileImpl: async (_p, body) => { ass = body; },
       }),
     });
     expect(got).toEqual(["https://f/v0.mp4", "https://f/a0.mp3", "https://f/v1.mp4"]);
     const graph = args[args.indexOf("-filter_complex") + 1];
     expect(graph).toContain("[1:a]anull[a0]");   // 옛 컷은 소리 파일에서
     expect(graph).toContain("[2:a]anull[a1]");   // 말하는 컷은 클립 자신에게서
+    // ★ 옛 컷은 낭독(3초)으로 **잘린다** — 그러면 길이 보고와 자막도 3초를 봐야 한다.
+    //   판정이 두 층에서 갈리면 여기서 4+4=8 이 나오고 자막이 컷마다 뒤로 밀린다.
+    expect(graph).toContain("trim=duration=3.00");
+    expect(r.seconds).toBe(7);   // 3(잘린 옛 컷) + 4(안 잘리는 말하는 컷)
+    // 둘째 자막은 첫 컷의 실제 점유(3초)에서 시작한다
+    expect(ass).toContain("0:00:03.00");
   });
 });
 

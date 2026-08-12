@@ -90,9 +90,10 @@ export default function DoneStepPage() {
   const clipCount = cuts.filter((c) => c.video?.url).length;
   // 완성본 길이는 컷마다 낭독·클립 중 긴 쪽을 더한 값이다 — 낭독 합으로 예고하면
   // 만든 뒤에 다른 초가 나온다(눈금 올림 때문에 클립이 거의 항상 더 길다)
-  // ★ project 를 넘긴다 — 말하는 모델(Seedance)은 소리가 클립 안에 있어 자를 수 없고,
-  // 그래서 컷 길이가 받은 클립 길이다. 안 넘기면 화면이 예고하는 초가 합성 결과와 갈린다.
-  const totalSeconds = cuts.reduce((s, c) => s + cutSeconds(c, project), 0);
+  // ★ cutSeconds 가 컷만 보고 판정한다 — 소리 파일이 있으면 합성이 낭독 길이로 자르고,
+  // 없으면(클립이 스스로 말한다) 못 자르니 받은 클립 길이다. 화면이 예고하는 초가
+  // 합성 결과와 같은 자를 쓴다.
+  const totalSeconds = cuts.reduce((s, c) => s + cutSeconds(c), 0);
   // 컷을 고친 뒤라면 이 완성본은 옛 소리·옛 그림으로 만든 것이다.
   // 합성은 0원이라 막을 게 아니라 바로 다시 만들게 하는 것이 맞다.
   //

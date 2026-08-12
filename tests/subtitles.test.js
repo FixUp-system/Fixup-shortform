@@ -115,9 +115,9 @@ describe("buildCues", () => {
     // 차이를 무음으로 채워 클립 경계에서 다음 말이 시작됐지만, 이제 합성이 남는
     // 클립을 잘라내므로(lib/compose.js) 자막도 낭독 길이로만 누적하면 맞는다.
     const cues = buildCues([
-      { sentence: "첫", seconds: 9, video: { seconds: 10 } },
-      { sentence: "둘", seconds: 5, video: { seconds: 6 } },
-      { sentence: "셋", seconds: 9, video: { seconds: 10 } },
+      { sentence: "첫", seconds: 9, audio: { url: "a0" }, video: { seconds: 10 } },
+      { sentence: "둘", seconds: 5, audio: { url: "a1" }, video: { seconds: 6 } },
+      { sentence: "셋", seconds: 9, audio: { url: "a2" }, video: { seconds: 10 } },
     ]);
     expect(cues).toEqual([
       { start: 0, end: 9, text: "첫" },
@@ -128,8 +128,8 @@ describe("buildCues", () => {
 
   it("클립이 낭독보다 짧으면 낭독을 따른다 — 그 자리는 마지막 프레임을 늘려 메운다", () => {
     const cues = buildCues([
-      { sentence: "첫", seconds: 13, video: { seconds: 10 } },
-      { sentence: "둘", seconds: 4, video: { seconds: 6 } },
+      { sentence: "첫", seconds: 13, audio: { url: "a0" }, video: { seconds: 10 } },
+      { sentence: "둘", seconds: 4, audio: { url: "a1" }, video: { seconds: 6 } },
     ]);
     expect(cues).toEqual([
       { start: 0, end: 13, text: "첫" },
@@ -190,11 +190,11 @@ describe("cutSeconds — 한 컷이 완성본에서 차지하는 시간", () => 
   it("낭독이 있으면 낭독 길이다 — 클립이 길어도 잘라 쓴다", () => {
     // 눈금 올림 때문에 클립이 낭독보다 긴 것이 보통이다(낭독 3초 → 클립 6초).
     // 예전에는 긴 쪽을 써서 3초가 무음이 됐다.
-    expect(cutSeconds({ seconds: 3, video: { seconds: 6 } })).toBe(3);
+    expect(cutSeconds({ seconds: 3, audio: { url: "a0" }, video: { seconds: 6 } })).toBe(3);
   });
 
   it("낭독이 클립보다 길면 낭독이다 — 상한을 넘어 잘린 클립은 늘려서 맞춘다", () => {
-    expect(cutSeconds({ seconds: 25, video: { seconds: 20 } })).toBe(25);
+    expect(cutSeconds({ seconds: 25, audio: { url: "a0" }, video: { seconds: 20 } })).toBe(25);
   });
 
   it("낭독이 없으면 클립 길이로 떨어진다 — 목소리가 실패해도 합성은 돌아야 한다", () => {
@@ -208,30 +208,29 @@ describe("cutSeconds — 한 컷이 완성본에서 차지하는 시간", () => 
   });
 });
 
-describe("cutSeconds — 말하는 경로는 받은 클립 길이가 기준이다", () => {
-  const speaking = {
-    settings: { i2v_model: "seedance-2.0" },
-    cast: [{ id: "c1", who: "20대 남성", cuts: [0] }],
-    cuts: [{ idx: 0, sentence: "안녕하세요" }],
-  };
-
-  it("project 를 안 넘기면 예전과 같다 — 낭독이 기준이다", () => {
-    expect(cutSeconds({ seconds: 3, video: { seconds: 5 } })).toBe(3);
-  });
-
-  it("말하지 않는 프로젝트도 낭독이 기준이다", () => {
-    const kling = { settings: { i2v_model: "kling-v3" }, cast: [], cuts: [] };
-    expect(cutSeconds({ seconds: 3, video: { seconds: 5 } }, kling)).toBe(3);
+describe("cutSeconds — 말하는 컷은 받은 클립 길이가 기준이다", () => {
+  it("소리 파일이 있으면 낭독이 기준이다 — 합성이 클립을 거기 맞춰 자른다", () => {
+    expect(cutSeconds({ seconds: 3, audio: { url: "a0" }, video: { seconds: 5 } })).toBe(3);
   });
 
   // ★ 주문한 초(3)가 아니라 받은 초(4)가 기준이다 — Seedance 하한이 4초라 반드시 벌어진다.
   //   주문한 초로 자막을 깔면 컷마다 1초씩 밀린다.
-  it("말하는 프로젝트는 받은 클립 길이가 기준이다", () => {
-    expect(cutSeconds({ idx: 0, seconds: 3, video: { seconds: 4 } }, speaking)).toBe(4);
+  it("소리 파일이 없으면 받은 클립 길이가 기준이다 — 자를 수 없다", () => {
+    expect(cutSeconds({ idx: 0, seconds: 3, video: { seconds: 4 } })).toBe(4);
   });
 
   it("클립이 아직 없으면 추정으로 떨어진다 — 화면이 그래도 뭔가 보여야 한다", () => {
-    expect(cutSeconds({ idx: 0, seconds: 3 }, speaking)).toBe(3);
+    expect(cutSeconds({ idx: 0, seconds: 3 })).toBe(3);
+  });
+
+  // ★★ 판정이 **컷마다** 따로여야 한다. 모델만 Seedance 로 바꿔도 옛 Kling 클립은 남는다
+  //    (clipKey 에 모델 id 가 없다). 프로젝트 한 번으로 정하면 합성(buildFfmpegArgs 의 fit)
+  //    과 자를 달리 써서 그 컷들이 통째로 어긋난다.
+  it("한 프로젝트 안에서도 컷마다 기준이 갈린다", () => {
+    const 옛컷 = { idx: 0, seconds: 3, audio: { url: "a0" }, video: { seconds: 4 } };
+    const 말하는컷 = { idx: 1, seconds: 3, video: { seconds: 4 } };
+    expect(cutSeconds(옛컷)).toBe(3);       // 합성이 3초로 자른다
+    expect(cutSeconds(말하는컷)).toBe(4);   // 합성이 안 자른다
   });
 });
 
@@ -239,41 +238,40 @@ describe("buildCues — 자막 자리가 낭독 합과 맞는다", () => {
   it("무음이 사라져 자막 누적이 낭독 합과 같다", () => {
     // 예전에는 뜨는 자리를 max(낭독,클립)로 누적해 자막이 갈수록 밀렸다.
     const cuts = [
-      { seconds: 3, video: { seconds: 6 }, sentence: "첫 문장." },
-      { seconds: 4, video: { seconds: 6 }, sentence: "둘째 문장." },
+      { seconds: 3, audio: { url: "a0" }, video: { seconds: 6 }, sentence: "첫 문장." },
+      { seconds: 4, audio: { url: "a1" }, video: { seconds: 6 }, sentence: "둘째 문장." },
     ];
     const cues = buildCues(cuts);
     expect(cues[0]).toEqual({ start: 0, end: 3, text: "첫 문장." });
     expect(cues[1]).toEqual({ start: 3, end: 7, text: "둘째 문장." });
   });
 
-  // ★ 말하는 경로에서는 자막이 **받은 클립 길이**로 흘러야 한다.
+  // ★ 말하는 컷에서는 자막이 **받은 클립 길이**로 흘러야 한다.
   // 합성이 말하는 클립을 자르지 않으므로(소리가 그 안에 있다) 컷 하나가 실제로 차지하는
   // 시간은 클립 길이다. 낭독 추정으로 누적하면 컷마다 그 차이만큼 자막이 앞선다 —
   // Seedance 하한이 4초라 3초짜리 컷에서 반드시 1초씩 벌어지고, 컷 8개면 마지막에 7초다.
-  describe("말하는 프로젝트 — 자막도 받은 클립 길이로 흐른다", () => {
-    const CUTS = [
-      { idx: 0, seconds: 3, video: { seconds: 4 }, sentence: "첫 문장." },
-      { idx: 1, seconds: 3, video: { seconds: 4 }, sentence: "둘째 문장." },
-    ];
-    const speaking = {
-      settings: { i2v_model: "seedance-2.0" },
-      cast: [{ id: "c1", who: "20대 남성", cuts: [0, 1] }],
-      cuts: CUTS,
-    };
-
-    it("project 를 안 넘기면 예전과 같다 — 낭독으로 흐른다", () => {
-      const cues = buildCues(CUTS);
-      expect(cues[0]).toEqual({ start: 0, end: 3, text: "첫 문장." });
-      expect(cues[1]).toEqual({ start: 3, end: 6, text: "둘째 문장." });
-    });
-
-    it("말하는 프로젝트는 컷 길이도 자막 길이도 클립 길이다", () => {
-      const cues = buildCues(CUTS, undefined, speaking);
+  describe("말하는 컷 — 자막도 받은 클립 길이로 흐른다", () => {
+    it("소리 파일이 없는 컷은 컷 길이도 자막 길이도 클립 길이다", () => {
+      const cues = buildCues([
+        { idx: 0, seconds: 3, video: { seconds: 4 }, sentence: "첫 문장." },
+        { idx: 1, seconds: 3, video: { seconds: 4 }, sentence: "둘째 문장." },
+      ]);
       // ★ 뜨는 자리(start)만이 아니라 머무는 시간(end)도 클립 길이여야 한다 —
       //   span 이 낭독이면 컷 안에서 자막이 1초 일찍 사라진다.
       expect(cues[0]).toEqual({ start: 0, end: 4, text: "첫 문장." });
       expect(cues[1]).toEqual({ start: 4, end: 8, text: "둘째 문장." });
+    });
+
+    // ★★ 혼합 프로젝트 — 소리 파일이 있는 옛 컷은 합성이 낭독(3초)으로 자른다.
+    //    자막이 클립 길이(4초)로 흐르면 둘째 컷부터 1초씩 **뒤로** 밀린다.
+    it("소리 파일이 있는 옛 컷이 섞이면 그 컷만 낭독으로 흐른다", () => {
+      const cues = buildCues([
+        { idx: 0, seconds: 3, audio: { url: "a0" }, video: { seconds: 4 }, sentence: "첫 문장." },
+        { idx: 1, seconds: 3, video: { seconds: 4 }, sentence: "둘째 문장." },
+      ]);
+      expect(cues[0]).toEqual({ start: 0, end: 3, text: "첫 문장." });
+      // 둘째 컷은 첫 컷의 **실제 점유**(3초)에서 시작한다 — 4초에서 시작하면 밀린 것이다
+      expect(cues[1]).toEqual({ start: 3, end: 7, text: "둘째 문장." });
     });
   });
 });
