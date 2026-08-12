@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { memoryStore, resetMemoryStore } from "../lib/store/memory.js";
 import { listRecords } from "../lib/costs.js";
+import { balanceFor } from "../lib/charges.js";
+import { SIGNUP_GRANT } from "../lib/pricing.js";
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
 import { loadCostsRecords } from "../lib/costs-client.js";
 
@@ -240,5 +242,81 @@ describe("PATCH /api/admin/users/[id]", () => {
     };
     const res = await adminPatchUser(userReq, ctx(A));
     expect(res.status).toBe(403);
+  });
+});
+
+// 가입 기본 지급 — 운영자가 **처음 승인할 때** 500 크레딧이 자동으로 들어간다.
+//
+// 왜 가입 시점이 아니라 승인 시점인가: 승인 전에는 어차피 아무것도 못 쓰므로 사장님
+// 입장에서는 "가입하니 크레딧이 있다"와 똑같이 보이고, 공개 주소로 무작위 가입이
+// 들어와도 장부에 지급 행이 안 쌓인다.
+describe("승인하면 가입 기본 크레딧이 들어간다", () => {
+  beforeEach(() => {
+    resetMemoryStore();
+    updateUserById.mockReset().mockResolvedValue({ error: null });
+    signOut.mockReset().mockResolvedValue({ error: null });
+  });
+
+  const admin = () => ({
+    [USER_HEADER]: "op-1",
+    [STATUS_HEADER]: "approved",
+    [ROLE_HEADER]: "admin",
+  });
+  const ctx = (id) => ({ params: Promise.resolve({ id }) });
+  const patchReq = (body) => ({ json: async () => body, headers: new Headers(admin()) });
+
+  it("처음 승인하면 500 이 들어간다", async () => {
+    await memoryStore.insertProfile({ id: A, email: "a@x.com", status: "pending", role: "user" });
+
+    await adminPatchUser(patchReq({ status: "approved" }), ctx(A));
+
+    expect(await balanceFor(A)).toBe(SIGNUP_GRANT);
+    const [grant] = await memoryStore.listGrants(A);
+    expect(grant.amount_credits).toBe(SIGNUP_GRANT);
+    // 누가 승인했는지가 장부에 남아야 한다 — 자동 지급도 사람이 누른 결과다
+    expect(grant.granted_by).toBe("op-1");
+  });
+
+  // ★★ credit_grants 에는 멱등키가 없다. 이 단정이 없으면 approved→pending→approved
+  //    토글 한 번에 500 이 또 들어간다.
+  it("승인을 껐다 켜도 두 번 주지 않는다", async () => {
+    await memoryStore.insertProfile({ id: A, email: "a@x.com", status: "pending", role: "user" });
+
+    await adminPatchUser(patchReq({ status: "approved" }), ctx(A));
+    await adminPatchUser(patchReq({ status: "pending" }), ctx(A));
+    await adminPatchUser(patchReq({ status: "approved" }), ctx(A));
+
+    expect(await balanceFor(A)).toBe(SIGNUP_GRANT);
+    expect((await memoryStore.listGrants(A)).length).toBe(1);
+  });
+
+  it("승인이 아닌 변경(차단·역할)에는 주지 않는다", async () => {
+    await memoryStore.insertProfile({ id: A, email: "a@x.com", status: "pending", role: "user" });
+
+    await adminPatchUser(patchReq({ status: "blocked" }), ctx(A));
+    await adminPatchUser(patchReq({ role: "admin" }), ctx(A));
+
+    expect(await balanceFor(A)).toBe(0);
+  });
+
+  // 이미 운영자가 손으로 넣어 준 사람도 가입 지급은 따로 한 번 받는다 — 두 지급은
+  // 사유가 다르고, 손으로 준 것을 자동 지급으로 갈음하면 운영자 의도가 지워진다.
+  it("이미 크레딧이 있어도 첫 승인이면 준다", async () => {
+    await memoryStore.insertProfile({ id: A, email: "a@x.com", status: "pending", role: "user" });
+    await memoryStore.insertGrant({ user_id: A, amount_credits: 100, reason: "운영자 선지급", granted_by: "op-1" });
+
+    await adminPatchUser(patchReq({ status: "approved" }), ctx(A));
+
+    expect(await balanceFor(A)).toBe(100 + SIGNUP_GRANT);
+  });
+
+  // 게이트(app_metadata)가 실패하면 승인 자체가 안 된 것이므로 크레딧도 없어야 한다.
+  it("app_metadata 갱신이 실패하면 크레딧도 안 준다", async () => {
+    await memoryStore.insertProfile({ id: A, email: "a@x.com", status: "pending", role: "user" });
+    updateUserById.mockResolvedValue({ error: { message: "boom" } });
+
+    await adminPatchUser(patchReq({ status: "approved" }), ctx(A));
+
+    expect(await balanceFor(A)).toBe(0);
   });
 });

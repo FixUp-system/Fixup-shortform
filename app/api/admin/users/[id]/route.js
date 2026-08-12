@@ -1,6 +1,26 @@
 import { createClient } from "@supabase/supabase-js";
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { getStore } from "../../../../../lib/store/index.js";
+import { SIGNUP_GRANT, SIGNUP_GRANT_REASON } from "../../../../../lib/pricing.js";
+
+// 가입 기본 지급 — **처음 승인될 때 한 번**만 들어간다.
+//
+// 왜 가입 시점이 아니라 여기인가: 승인 전에는 어차피 아무것도 못 쓰므로 사장님 입장에서는
+// "가입하니 크레딧이 있다"와 똑같이 보이고, 공개 주소로 무작위 가입이 들어와도 장부에
+// 지급 행이 안 쌓인다. 그리고 지급이 **사람이 누른 결과**로 남는다(granted_by).
+//
+// ★ credit_grants 에는 멱등키가 없다. approved→pending→approved 토글 한 번에 500 이
+// 또 들어가므로, 지급 전에 같은 사유의 행이 이미 있는지 본다. 사유 문구가 곧 그 열쇠다.
+async function grantSignupCreditsOnce(store, userId, grantedBy) {
+  const grants = await store.listGrants(userId);
+  if (grants.some((g) => g.reason === SIGNUP_GRANT_REASON)) return;
+  await store.insertGrant({
+    user_id: userId,
+    amount_credits: SIGNUP_GRANT,
+    reason: SIGNUP_GRANT_REASON,
+    granted_by: grantedBy,
+  });
+}
 
 const ALLOWED_STATUS = new Set(["approved", "blocked", "pending"]);
 const ALLOWED_ROLE = new Set(["user", "admin"]);
@@ -17,7 +37,7 @@ const ALLOWED_ROLE = new Set(["user", "admin"]);
 // 읽는데, profiles.role 만 바꾸면 화면(관리자 판정)과 게이트가 서로 다른 role 을 본다.
 // 그래서 role 을 안 바꾸는 요청(승인·차단)에도 **현재 role 을 함께 실어** metadata 가
 // profiles 와 항상 같은 값을 보게 한다.
-export const PATCH = withUser(async (req, { params }) => {
+export const PATCH = withUser(async (req, { params }, user) => {
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
   const { status, role } = body || {};
@@ -61,6 +81,16 @@ export const PATCH = withUser(async (req, { params }) => {
     } : {}),
     ...(role !== undefined ? { role } : {}),
   });
+
+  // ★ 게이트·원장이 둘 다 성공한 **뒤에** 준다. 앞에 두면 게이트 실패로 502 를 돌려주면서
+  // 크레딧만 나간다. 그리고 지급이 실패해도 **승인을 되돌리지 않는다** — 승인은 이미
+  // 이중 쓰기라 되돌리면 중간 상태가 더 나빠진다. 운영자가 /admin 에서 손으로 넣으면 되고,
+  // 그 사실이 로그에 남아야 한다.
+  if (status === "approved") {
+    await grantSignupCreditsOnce(store, id, user.id).catch((e) => {
+      console.error(`가입 기본 지급 실패 — user=${id}:`, e?.message || e);
+    });
+  }
 
   // ★ 세션을 따로 끊지 않는다 — middleware.js 가 매 요청 getUser() 로 Auth 서버에서
   // fresh app_metadata 를 받으므로 차단은 다음 요청에 이미 걸린다. (auth-js 의
