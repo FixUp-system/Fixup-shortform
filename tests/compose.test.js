@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { composeVideo, buildFfmpegArgs } from "../lib/compose";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { composeVideo, buildFfmpegArgs, burnArgs, burnSubtitles } from "../lib/compose";
 import { runWithActor } from "../lib/actor.js";
 
 import { mkdtempSync } from "fs";
@@ -135,8 +135,11 @@ describe("composeVideo", () => {
       readFileImpl: async () => Buffer.from("mp4"),
       putObjectImpl: async (bucket, key, bytes, ct) => put.push({ bucket, key, ct }),
     });
-    // 올린 것은 하나뿐이고 최종본이다 — 클립(p1-0.mp4)·소리(p1-0.m4a)·자막(p1.ass)은 아니다
-    expect(put).toEqual([{ bucket: "renders", key: "p1.mp4", ct: "video/mp4" }]);
+    // 올린 것은 원본과 완성본 둘뿐이다 — 클립(p1-0.mp4)·소리(p1-0.m4a)·자막(p1.ass)은 아니다
+    expect(put).toEqual([
+      { bucket: "renders", key: "p1-raw.mp4", ct: "video/mp4" },
+      { bucket: "renders", key: "p1.mp4", ct: "video/mp4" },
+    ]);
   });
 
   // ★ 기본 배선을 그대로 관통시킨다 — putObjectImpl 을 주입하지 않는다.
@@ -355,7 +358,8 @@ describe("composeVideo — 말하는 프로젝트는 소리 파일을 안 받는
       projectId: "p1", cuts: mixed, aspect_ratio: "9:16",
       ...wiring({
         downloadImpl: async (url, dest) => { got.push(url); return dest; },
-        runFfmpeg: async (a) => { args = a; },
+        // 첫 호출이 원본 조립이다(두 번째는 자막 굽기) — 여기서 재는 것은 조립 쪽이다
+        runFfmpeg: async (a) => { args ??= a; },
         writeFileImpl: async (_p, body) => { ass = body; },
       }),
     });
@@ -420,5 +424,88 @@ describe("말하는 클립 — 소리가 영상 안에 있다", () => {
     expect(s).toContain("[0:a]anull[a0]");
     expect(s).toContain("[1:v]");
     expect(s).toContain("[1:a]anull[a1]");
+  });
+});
+
+// ★ 원본(자막 없음)과 완성본(자막 구움)을 나눈다.
+//
+// 완성본에는 자막이 이미 구워져 있어, 사장님이 ⑥완성에서 자막을 고칠 때 그 위에
+// 미리보기를 얹으면 옛 자막과 새 자막이 둘 다 보인다. 원본이 있으면 자막을 몇 번을
+// 고쳐도 클립을 다시 안 받는다.
+describe("원본과 완성본을 나눈다", () => {
+  const deps = {
+    aspect_ratio: "9:16",
+    runFfmpeg: async () => {},
+    downloadImpl: async (_url, dest) => dest,
+    writeFileImpl: async () => {},
+    mkdirImpl: async () => {},
+    mkdtempImpl: async () => "/tmp/x",
+    rmImpl: async () => {},
+    readFileImpl: async () => Buffer.from("mp4"),
+  };
+
+  it("자막 없는 원본도 함께 올린다", async () => {
+    const put = vi.fn(async () => {});
+    const r = await composeVideo({ ...deps, projectId: "p1", cuts: CUTS, putObjectImpl: put });
+    const keys = put.mock.calls.map((c) => c[1]);
+    expect(keys).toContain("p1.mp4");
+    expect(keys).toContain("p1-raw.mp4");
+    expect(r.rawUrl).toBe("/api/renders/p1-raw.mp4");
+    expect(r.url).toBe("/api/renders/p1.mp4");   // ★ 완성본 URL 은 안 바뀐다
+  });
+
+  it("원본에는 자막 필터가 안 걸린다", async () => {
+    const graphs = [];
+    await composeVideo({
+      ...deps, projectId: "p1", cuts: CUTS, putObjectImpl: async () => {},
+      runFfmpeg: async (a) => { graphs.push(a.join(" ")); },
+    });
+    // 첫 번째가 원본(자막 없음), 두 번째가 자막 굽기
+    expect(graphs).toHaveLength(2);
+    expect(graphs[0]).not.toContain("subtitles");
+    expect(graphs[0]).toContain("concat=n=2");
+    expect(graphs[1]).toContain("subtitles");
+    expect(graphs[1]).not.toContain("concat");
+  });
+
+  it("자막만 다시 굽는다 — 클립을 안 받는다", async () => {
+    const download = vi.fn(async (url, p) => p);
+    const put = vi.fn(async () => {});
+    await burnSubtitles({
+      ...deps, projectId: "p1", cuts: CUTS, subtitle: { color: "#FF0000" },
+      downloadImpl: download, putObjectImpl: put,
+    });
+    // 원본 하나만 받는다(클립·소리를 다시 안 받는다)
+    expect(download).toHaveBeenCalledTimes(1);
+    expect(download.mock.calls[0][0]).toContain("p1-raw.mp4");
+    expect(put.mock.calls.map((c) => c[1])).toEqual(["p1.mp4"]);
+  });
+
+  it("고른 자막 설정이 ASS 에 실린다", async () => {
+    let ass = "";
+    const r = await burnSubtitles({
+      ...deps, projectId: "p1", cuts: CUTS,
+      subtitle: { color: "#FF0000", font: "impact" },
+      writeFileImpl: async (_p, body) => { ass = body; },
+      putObjectImpl: async () => {},
+    });
+    const style = ass.split("\n").find((l) => l.startsWith("Style: Main"));
+    expect(style).toContain("Black Han Sans");
+    expect(style).toContain("&H000000FF");   // 빨강
+    expect(r.url).toBe("/api/renders/p1.mp4");
+    expect(r.seconds).toBe(17);
+  });
+
+  it("자막만 굽는 args 는 원본 하나만 입력으로 받는다", () => {
+    const args = burnArgs({ raw: "/t/raw.mp4", assPath: "/t/s.ass", out: "/t/o.mp4" });
+    expect(args.filter((a, i) => args[i - 1] === "-i")).toEqual(["/t/raw.mp4"]);
+    expect(args.join(" ")).toContain("subtitles='/t/s.ass'");
+    expect(args).toContain("copy");   // 소리는 다시 인코딩하지 않는다
+  });
+
+  it("자막만 굽는 args 도 Windows 경로를 손본다", () => {
+    const s = burnArgs({ raw: "C:\\t\\raw.mp4", assPath: "C:\\t\\s.ass", out: "C:\\t\\o.mp4" }).join(" ");
+    expect(s).toContain("C\\:/t/s.ass");
+    expect(s).not.toMatch(/subtitles='[A-Z]:/);
   });
 });
