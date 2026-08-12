@@ -1,7 +1,7 @@
 // 자동 배치 — 값이 나가는 판정이라 LLM 에 통째로 안 맡긴다.
 // 코드가 먼저 좁히고, 남는 결정 지점은 "사진 1장" 하나다.
 import { describe, it, expect } from "vitest";
-import { pickEndpointKind, buildScenarioMessages, validateScenario } from "../lib/ad/scenario.js";
+import { pickEndpointKind, buildScenarioMessages, validateScenario, generateScenario } from "../lib/ad/scenario.js";
 
 const settings = {
   seconds: 15, aspect_ratio: "9:16", narration_lang: "ko",
@@ -45,6 +45,65 @@ describe("시나리오 프롬프트", () => {
     expect(all).toMatch(/제품이 주인공/);
     expect(all).toMatch(/premium and restrained/);
     expect(all).toMatch(/live-action cinematic/);
+  });
+});
+
+describe("옵션 검증 — 넷 다 같은 방식으로 실패한다", () => {
+  // ★ 리뷰 지적: format·mood·narration_lang 은 못 찾으면 .label 접근에서 시끄럽게
+  // 죽는데, style 만 AD_STYLE_LINES[style] 로 조회해 못 찾아도 undefined 로 조용히
+  // 흘러갔다("화풍: undefined" 가 그대로 프롬프트에 실려 $3.63 이 나간다). 넷 다
+  // 같은 방식(던진다)으로 맞춘다.
+  const material = { text: "가", photos: [] };
+
+  it("목록 밖 format 이면 던진다", () => {
+    expect(() => buildScenarioMessages({ settings: { ...settings, format: "없는값" }, material })).toThrow();
+  });
+
+  it("목록 밖 mood 면 던진다", () => {
+    expect(() => buildScenarioMessages({ settings: { ...settings, mood: "없는값" }, material })).toThrow();
+  });
+
+  it("목록 밖 narration_lang 이면 던진다", () => {
+    expect(() => buildScenarioMessages({ settings: { ...settings, narration_lang: "없는값" }, material })).toThrow();
+  });
+
+  it("목록 밖 style 이면 던진다 — 조용히 undefined 로 흘러가지 않는다", () => {
+    expect(() => buildScenarioMessages({ settings: { ...settings, style: "없는값" }, material })).toThrow();
+  });
+
+  it("★ style 이 프로토타입 키여도 던진다 — 자기 소유 키만 인정한다", () => {
+    expect(() => buildScenarioMessages({ settings: { ...settings, style: "constructor" }, material })).toThrow();
+    expect(() => buildScenarioMessages({ settings: { ...settings, style: "__proto__" }, material })).toThrow();
+    expect(() => buildScenarioMessages({ settings: { ...settings, style: "toString" }, material })).toThrow();
+    expect(() => buildScenarioMessages({ settings: { ...settings, style: "hasOwnProperty" }, material })).toThrow();
+  });
+});
+
+describe("generateScenario — 주입한 callJson 으로 합성 전체를 돈 없이 잰다", () => {
+  it("주입한 callJson 으로 돌고, stage·projectId 를 실어 보낸다", async () => {
+    let seen;
+    const out = await generateScenario({
+      project: { id: "p1", settings, material: { text: "가", photos: [] } },
+      deps: {
+        callJson: async (args) => {
+          seen = args;
+          return { text: "P", shots: [{ beat: "가" }] };
+        },
+      },
+    });
+    expect(seen.stage).toBeTruthy();
+    expect(seen.projectId).toBe("p1");
+    // 사진 0장이라 t2v 로 고정 — pickEndpointKind 를 실제로 통과했다는 증거
+    expect(out.endpoint).toBe("t2v");
+  });
+
+  it("LLM 답이 쓸 수 없으면(장면 없음) 던진다", async () => {
+    await expect(
+      generateScenario({
+        project: { id: "p1", settings, material: { text: "가", photos: [] } },
+        deps: { callJson: async () => ({ shots: [] }) },
+      })
+    ).rejects.toThrow();
   });
 });
 
