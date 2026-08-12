@@ -318,11 +318,6 @@ describe("composeVideo — 말하는 프로젝트는 소리 파일을 안 받는
     { idx: 0, sentence: "첫", seconds: 3, video: { url: "https://f/v0.mp4", seconds: 4 } },
     { idx: 1, sentence: "둘", seconds: 3, video: { url: "https://f/v1.mp4", seconds: 4 } },
   ];
-  const PROJECT = {
-    settings: { i2v_model: "seedance-2.0" },
-    cast: [{ id: "c1", who: "20대 남성", cuts: [0, 1] }],
-    cuts: SPEAKING_CUTS,
-  };
   const wiring = (extra) => ({
     runFfmpeg: async () => {},
     writeFileImpl: async () => {},
@@ -337,7 +332,7 @@ describe("composeVideo — 말하는 프로젝트는 소리 파일을 안 받는
   it("클립만 내려받는다 — c.audio.url 을 읽으면 그대로 죽던 자리다", async () => {
     const got = [];
     const r = await composeVideo({
-      projectId: "p1", cuts: SPEAKING_CUTS, project: PROJECT, aspect_ratio: "9:16",
+      projectId: "p1", cuts: SPEAKING_CUTS, aspect_ratio: "9:16",
       ...wiring({ downloadImpl: async (url, dest) => { got.push(url); return dest; } }),
     });
     expect(got).toEqual(["https://f/v0.mp4", "https://f/v1.mp4"]);
@@ -357,7 +352,7 @@ describe("composeVideo — 말하는 프로젝트는 소리 파일을 안 받는
     let args = null;
     let ass = "";
     const r = await composeVideo({
-      projectId: "p1", cuts: mixed, project: { ...PROJECT, cuts: mixed }, aspect_ratio: "9:16",
+      projectId: "p1", cuts: mixed, aspect_ratio: "9:16",
       ...wiring({
         downloadImpl: async (url, dest) => { got.push(url); return dest; },
         runFfmpeg: async (a) => { args = a; },

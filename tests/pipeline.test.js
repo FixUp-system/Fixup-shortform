@@ -680,7 +680,9 @@ describe("runVideoPipeline — 이미지를 클립으로", () => {
         status: "voice",
         settings: { ...proj.settings, i2v_model: "seedance-2.0" },
         cast: [{ id: "c1", who: "20대 남성", voice, cuts: [0] }],
-        cuts: [{ idx: 0, sentence: "안녕하세요", seconds: 4, image: { url: "i0" }, audio: { url: "a0", seconds: 4 } }],
+        // ★ audio 가 없는 것이 말하는 프로젝트의 실제 모습이다 — ③목소리가 TTS 를 아예 안
+        //   만든다(runVoicePipeline). 소리 파일이 있으면 projectSpeaks 가 false 로 떨어진다.
+        cuts: [{ idx: 0, sentence: "안녕하세요", seconds: 4, image: { url: "i0" } }],
       }));
       return p;
     }
@@ -771,27 +773,6 @@ describe("runRenderPipeline — 하나로 합친다", () => {
     });
     expect(got.aspect_ratio).toBe("1:1");
     expect(got.cuts).toHaveLength(1);
-  });
-
-  // ★ 합성은 "클립이 스스로 말하는가"를 프로젝트에서 판정한다(모델·캐스팅·대사를 함께 본다).
-  //   이 배선이 빠지면 라이브에서 조용히 옛 경로로 돌아가 c.audio.url 에서 죽는데,
-  //   compose 를 목으로 갈아끼운 단위 테스트는 전부 그린인 채다.
-  it("프로젝트를 통째로 넘긴다 — 합성이 말하는 클립을 알아보려면 필요하다", async () => {
-    const p = await makeProject();
-    await projects.updateProject(p.id, OWNER, (proj) => ({
-      ...proj, status: "video", settings: { ...proj.settings, i2v_model: "seedance-2.0" },
-      cast: [{ id: "c1", who: "20대 남성", cuts: [0] }],
-      cuts: [{ idx: 0, sentence: "문장", seconds: 4, video: { url: "v0", seconds: 4 } }],
-    }));
-
-    let got;
-    await pipeline.runRenderPipeline(p.id, OWNER, {
-      compose: async (args) => { got = args; return { url: "u", seconds: 4 }; },
-    });
-    expect(got.project).toBeTruthy();
-    expect(got.project.settings.i2v_model).toBe("seedance-2.0");
-    expect(got.project.cast).toHaveLength(1);
-    expect(got.project.cuts).toHaveLength(1);
   });
 
   it("완성본에 컷별 소리·클립·문장을 각인한다 — 컷을 고치면 낡는다", async () => {

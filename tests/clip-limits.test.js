@@ -261,6 +261,27 @@ describe("음성을 누가 만드는가 — 모델이 정한다", () => {
       expect(projectSpeaks(seed(person([0, 1]), []))).toBe(false);
     });
 
+    // ★ 교차 상태 — Kling 으로 낭독까지 만든 뒤 클립에서 실패해 자동 환불되면 모델 잠금이
+    //   풀려 Seedance 로 갈아탈 수 있다. 그때 컷에 남은 TTS 를 그대로 두고 말하게 하면
+    //   한 편 안에서 소리의 출처가 갈린다.
+    it("컷에 소리 파일이 하나라도 있으면 말하지 않는다", () => {
+      const withAudio = [
+        { idx: 0, sentence: "가", audio: { url: "https://f/a0.mp3", seconds: 3 } },
+        { idx: 1, sentence: "나" },
+      ];
+      expect(projectSpeaks(seed(person([0, 1]), withAudio))).toBe(false);
+      // 전부 TTS 인 경우도 마찬가지다 — 말하는 클립이 낭독 길이로 잘려 문장 끝이 사라진다
+      const allAudio = cuts2.map((c) => ({ ...c, audio: { url: `https://f/a${c.idx}.mp3`, seconds: 3 } }));
+      expect(projectSpeaks(seed(person([0, 1]), allAudio))).toBe(false);
+    });
+
+    it("소리 파일이 없으면 지금처럼 말한다", () => {
+      // audio 키가 있어도 url 이 없으면(실패 흔적) 소리 파일이 아니다
+      const noUrl = cuts2.map((c) => ({ ...c, audio: null }));
+      expect(projectSpeaks(seed(person([0, 1]), noUrl))).toBe(true);
+      expect(projectSpeaks(seed(person([0, 1]), cuts2))).toBe(true);
+    });
+
     it("모델이 Kling 이면 인물이 다 있어도 말하지 않는다", () => {
       expect(projectSpeaks({ settings: { i2v_model: "kling-v3" }, cast: person([0, 1]), cuts: cuts2 })).toBe(false);
     });
