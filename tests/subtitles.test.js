@@ -208,6 +208,33 @@ describe("cutSeconds — 한 컷이 완성본에서 차지하는 시간", () => 
   });
 });
 
+describe("cutSeconds — 말하는 경로는 받은 클립 길이가 기준이다", () => {
+  const speaking = {
+    settings: { i2v_model: "seedance-2.0" },
+    cast: [{ id: "c1", who: "20대 남성", cuts: [0] }],
+    cuts: [{ idx: 0, sentence: "안녕하세요" }],
+  };
+
+  it("project 를 안 넘기면 예전과 같다 — 낭독이 기준이다", () => {
+    expect(cutSeconds({ seconds: 3, video: { seconds: 5 } })).toBe(3);
+  });
+
+  it("말하지 않는 프로젝트도 낭독이 기준이다", () => {
+    const kling = { settings: { i2v_model: "kling-v3" }, cast: [], cuts: [] };
+    expect(cutSeconds({ seconds: 3, video: { seconds: 5 } }, kling)).toBe(3);
+  });
+
+  // ★ 주문한 초(3)가 아니라 받은 초(4)가 기준이다 — Seedance 하한이 4초라 반드시 벌어진다.
+  //   주문한 초로 자막을 깔면 컷마다 1초씩 밀린다.
+  it("말하는 프로젝트는 받은 클립 길이가 기준이다", () => {
+    expect(cutSeconds({ idx: 0, seconds: 3, video: { seconds: 4 } }, speaking)).toBe(4);
+  });
+
+  it("클립이 아직 없으면 추정으로 떨어진다 — 화면이 그래도 뭔가 보여야 한다", () => {
+    expect(cutSeconds({ idx: 0, seconds: 3 }, speaking)).toBe(3);
+  });
+});
+
 describe("buildCues — 자막 자리가 낭독 합과 맞는다", () => {
   it("무음이 사라져 자막 누적이 낭독 합과 같다", () => {
     // 예전에는 뜨는 자리를 max(낭독,클립)로 누적해 자막이 갈수록 밀렸다.

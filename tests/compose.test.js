@@ -309,3 +309,54 @@ describe("buildFfmpegArgs", () => {
     expect(filter).not.toContain("tpad");
   });
 });
+
+describe("말하는 클립 — 소리가 영상 안에 있다", () => {
+  const base = { assPath: "/t/x.ass", out: "/t/o.mp4", width: 1080, height: 1920 };
+
+  it("소리 파일이 있으면 지금 그대로다 — 짝으로 넣고 낭독 길이에 맞춘다", () => {
+    const args = buildFfmpegArgs({
+      ...base,
+      local: [{ video: "/t/0.mp4", audio: "/t/0.m4a", wantSeconds: 3, haveSeconds: 5 }],
+    });
+    const s = args.join(" ");
+    expect(s).toContain("-i /t/0.mp4");
+    expect(s).toContain("-i /t/0.m4a");
+    expect(s).toContain("trim=duration=3.00");
+    expect(s).toContain("[1:a]anull[a0]");   // 짝수=영상, 홀수=소리
+  });
+
+  // ★ 말하는 프로젝트에는 c.audio 가 아예 없다. 소리는 클립 안에 있다.
+  it("소리 파일이 없으면 클립의 오디오 스트림을 쓴다", () => {
+    const args = buildFfmpegArgs({
+      ...base,
+      local: [{ video: "/t/0.mp4", wantSeconds: 3, haveSeconds: 4 }],
+    });
+    const s = args.join(" ");
+    expect(s).toContain("-i /t/0.mp4");
+    expect(s).not.toContain(".m4a");
+    expect(s).toContain("[0:a]anull[a0]");   // 영상과 같은 입력에서 소리를 꺼낸다
+  });
+
+  // ★ 자르면 문장 끝이 사라지고, 늘리면 소리 없는 정지 화면이 붙는다
+  it("소리 파일이 없으면 자르지도 늘리지도 않는다", () => {
+    const s = buildFfmpegArgs({
+      ...base,
+      local: [{ video: "/t/0.mp4", wantSeconds: 3, haveSeconds: 4 }],
+    }).join(" ");
+    expect(s).not.toContain("trim=duration");
+    expect(s).not.toContain("tpad");
+  });
+
+  it("컷이 여럿이어도 입력 번호가 어긋나지 않는다", () => {
+    const s = buildFfmpegArgs({
+      ...base,
+      local: [
+        { video: "/t/0.mp4", wantSeconds: 3, haveSeconds: 4 },
+        { video: "/t/1.mp4", wantSeconds: 3, haveSeconds: 4 },
+      ],
+    }).join(" ");
+    expect(s).toContain("[0:a]anull[a0]");
+    expect(s).toContain("[1:v]");
+    expect(s).toContain("[1:a]anull[a1]");
+  });
+});
