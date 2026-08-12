@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { isAudioStale, isImageStale, isClipStale, isRenderStale } from "../lib/steps.js";
+import { isAudioStale, isImageStale, isClipStale, isRenderStale, renderKey } from "../lib/steps.js";
 import { splitUnits } from "../lib/cuts.js";
 
 const llmMock = vi.hoisted(() => ({ callJson: vi.fn() }));
@@ -824,6 +824,68 @@ describe("runRenderPipeline — 하나로 합친다", () => {
     expect(isRenderStale(saved)).toBe(false);
     const edited = { ...saved, cuts: [{ ...saved.cuts[0], sentence: "고친 문장" }, ...saved.cuts.slice(1)] };
     expect(isRenderStale(edited)).toBe(true);
+  });
+});
+
+// ★★ 자막만 다시 굽는 길은 **옛 원본**(컷을 고치기 전에 만든 것)에 자막만 얹는다.
+// 그런데 각인을 지금 컷 기준으로 통째로 덮으면 낡음 경고가 사라지고 [내려받기]가 열려,
+// 사장님이 **옛 클립·옛 소리**짜리 mp4 를 최신인 줄 알고 받아 간다.
+describe("runSubtitlePipeline — 각인의 머리만 갈아 끼운다", () => {
+  async function projectWithRender({ subtitle } = {}) {
+    const p = await makeProject();
+    await projects.updateProject(p.id, OWNER, (proj) => ({
+      ...proj, status: "video",
+      cuts: [{ idx: 0, sentence: "문장", seconds: 4, video: { url: "v0" }, audio: { url: "a0", seconds: 4 } }],
+      ...(subtitle ? { settings: { ...proj.settings, subtitle } } : {}),
+    }));
+    await pipeline.runRenderPipeline(p.id, OWNER, {
+      compose: async () => ({ url: "/api/renders/x.mp4", rawUrl: "/api/renders/x-raw.mp4", seconds: 4 }),
+    });
+    return p;
+  }
+
+  const burn = async () => ({ url: "/api/renders/x.mp4", seconds: 4 });
+
+  it("낡은 프로젝트는 자막만 다시 구워도 여전히 낡음이다 — 몸통을 보존한다", async () => {
+    const p = await projectWithRender();
+    // 완성본을 만든 뒤 컷을 고친다 → 옛 소리·옛 그림으로 만든 완성본이 된다
+    await projects.updateProject(p.id, OWNER, (proj) => ({
+      ...proj,
+      cuts: proj.cuts.map((c) => ({ ...c, sentence: "고친 문장" })),
+      settings: { ...proj.settings, subtitle: { color: "#FF0000" } },
+    }));
+    expect(isRenderStale(await projects.getProject(p.id, OWNER))).toBe(true);
+
+    await pipeline.runSubtitlePipeline(p.id, OWNER, { burn });
+
+    const saved = await projects.getProject(p.id, OWNER);
+    expect(isRenderStale(saved), "낡은 원본에 자막만 얹고 '최신'으로 찍혔다").toBe(true);
+  });
+
+  it("안 낡은 프로젝트는 각인이 renderKey 와 같다", async () => {
+    const p = await projectWithRender();
+    await projects.updateProject(p.id, OWNER, (proj) => ({
+      ...proj, settings: { ...proj.settings, subtitle: { color: "#FF0000" } },
+    }));
+
+    await pipeline.runSubtitlePipeline(p.id, OWNER, { burn });
+
+    const saved = await projects.getProject(p.id, OWNER);
+    expect(saved.render.of).toBe(renderKey(saved));
+    expect(isRenderStale(saved)).toBe(false);
+  });
+
+  it("옛 위치 필드도 함께 태운다 — settings.subtitle 이 없는 프로젝트", async () => {
+    const p = await projectWithRender();
+    await projects.updateProject(p.id, OWNER, (proj) => ({
+      ...proj, settings: { ...proj.settings, subtitle_position: "top" },
+    }));
+
+    let got;
+    await pipeline.runSubtitlePipeline(p.id, OWNER, {
+      burn: async (args) => { got = args; return { url: "/api/renders/x.mp4", seconds: 4 }; },
+    });
+    expect(got.subtitlePosition).toBe("top");
   });
 });
 

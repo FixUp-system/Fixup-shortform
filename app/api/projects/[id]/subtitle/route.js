@@ -11,6 +11,10 @@ import { withUser } from "../../../../../lib/auth/require-user.js";
 // 클립을 다시 받는 전체 합성보다 훨씬 짧고, 화면([적용] 버튼)이 이 응답을 받은 뒤
 // 곧바로 프로젝트를 다시 읽는다 — 백그라운드로 돌리면 사장님이 새로고침해야 자막이
 // 바뀐 것으로 보인다(⑥완성 화면에는 자막용 폴링이 없다).
+// ★ 이 저장소에서 **기다렸다가 답하는 유일한 라우트**이고, 영상 전 구간을 다시 인코딩한다.
+// 배포 기본 타임아웃(10초대)에 잘리면 사장님에게는 그냥 500 이다.
+export const maxDuration = 300;
+
 export const POST = withUser(async (req, { params }, user) => {
   const { id } = await params;
   const project = await getProject(id, user.id);

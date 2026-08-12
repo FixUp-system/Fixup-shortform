@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { existsSync, statSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { SUBTITLE_FONTS } from "../lib/subtitles.js";
 
 // 폰트 파일의 `name` 테이블에서 family(nameID 1)를 읽는다.
@@ -50,6 +51,12 @@ describe("자막 폰트 파일", () => {
     impact: "assets/subtitle-impact.ttf",
     soft: "assets/subtitle-soft.ttf",
   };
+  // 브라우저 미리보기가 읽는 사본(app/globals.css 의 @font-face)
+  const WEB_FILES = {
+    basic: "public/fonts/subtitle-basic.otf",
+    impact: "public/fonts/subtitle-impact.ttf",
+    soft: "public/fonts/subtitle-soft.ttf",
+  };
 
   for (const f of SUBTITLE_FONTS) {
     it(`${f.id}(${f.label}) 파일이 있다`, () => {
@@ -63,6 +70,14 @@ describe("자막 폰트 파일", () => {
     // ★ 파일이 있는 것으로는 모자란다 — 이름이 어긋나면 ffmpeg 가 조용히 기본 폰트로 그린다
     it(`${f.id} 의 내부 이름이 목록의 family 와 같다`, () => {
       expect(familyOf(FILES[f.id])).toBe(f.family);
+    });
+
+    // ★ 같은 폰트가 두 곳에 있다 — ffmpeg 는 assets/ 를, 브라우저 미리보기는 public/fonts/ 를
+    // 읽는다. 나중에 한쪽만 바꾸면 오류 하나 없이 미리보기와 완성본의 글꼴이 갈린다
+    // (이 기능이 막으려던 실패 모드 그 자체다). 바이트로 묶어 둔다.
+    it(`${f.id} 의 assets/ 와 public/fonts/ 가 같은 파일이다`, () => {
+      const sha = (p) => createHash("sha1").update(readFileSync(p)).digest("hex");
+      expect(sha(WEB_FILES[f.id]), `${WEB_FILES[f.id]} 가 ${FILES[f.id]} 와 다르다`).toBe(sha(FILES[f.id]));
     });
   }
 });

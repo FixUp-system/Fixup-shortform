@@ -224,3 +224,17 @@ describe("⑥완성 — 원본이 없는 옛 프로젝트", () => {
     expect(src).toContain("src={rawUrl || render.url}");
   });
 });
+
+describe("⑥완성 — 자막만 낡았을 때는 있던 완성본을 받을 수 있다", () => {
+  // 자막 재굽기가 실패해도 설정 PATCH 는 이미 저장돼 낡음으로 잡힌다. 그때 [내려받기]까지
+  // 치우면, 색만 바꿔 보려던 사장님이 **멀쩡한 옛 완성본조차** 못 받는다(옛 자막이 구워져
+  // 있을 뿐 클립·소리는 지금 것이다). 경고는 그대로 띄우고 버튼만 남긴다.
+  it("낡음이 자막뿐이면 내려받기가 남는다", () => {
+    expect(src).toContain("(!stale || subtitleOnlyStale)");
+  });
+
+  // 라우트가 render_error 에 사유를 남기는데 읽는 화면이 없으면 그 필드는 거짓말이다.
+  it("지난 실패 사유(render_error)를 화면이 읽는다", () => {
+    expect(src).toContain("project?.render_error");
+  });
+});

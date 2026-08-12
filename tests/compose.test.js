@@ -135,11 +135,33 @@ describe("composeVideo", () => {
       readFileImpl: async () => Buffer.from("mp4"),
       putObjectImpl: async (bucket, key, bytes, ct) => put.push({ bucket, key, ct }),
     });
-    // 올린 것은 원본과 완성본 둘뿐이다 — 클립(p1-0.mp4)·소리(p1-0.m4a)·자막(p1.ass)은 아니다
+    // 올린 것은 완성본과 원본 둘뿐이다 — 클립(p1-0.mp4)·소리(p1-0.m4a)·자막(p1.ass)은 아니다.
+    // ★ 순서가 뜻을 갖는다: **완성본이 먼저**다. 원본을 앞에 두면 스토리지가 한 번 딸꾹할 때
+    // 나왔을 완성본이 통째로 실패하고, /render 가 이미 render 를 비워 놔서 옛 완성본까지 잃는다.
     expect(put).toEqual([
-      { bucket: "renders", key: "p1-raw.mp4", ct: "video/mp4" },
       { bucket: "renders", key: "p1.mp4", ct: "video/mp4" },
+      { bucket: "renders", key: "p1-raw.mp4", ct: "video/mp4" },
     ]);
+  });
+
+  // ★ 원본은 조절 UI 를 여는 편의물이지 완성본의 전제가 아니다 — 원본 업로드가 실패해도
+  // 완성본은 나와야 하고, 그때는 rawUrl 을 안 준다(화면이 rawUrl 유무로 갈라져 있다).
+  it("원본 업로드가 실패해도 완성본은 나온다 — rawUrl 만 빠진다", async () => {
+    const r = await composeVideo({
+      projectId: "p1", cuts: CUTS, aspect_ratio: "9:16",
+      runFfmpeg: async () => {},
+      downloadImpl: async (_url, dest) => dest,
+      writeFileImpl: async () => {},
+      mkdirImpl: async () => {},
+      mkdtempImpl: async () => "/tmp/x",
+      rmImpl: async () => {},
+      readFileImpl: async () => Buffer.from("mp4"),
+      putObjectImpl: async (_bucket, key) => {
+        if (key.endsWith("-raw.mp4")) throw new Error("스토리지가 딸꾹했다");
+      },
+    });
+    expect(r.url).toBe("/api/renders/p1.mp4");
+    expect(r.rawUrl).toBeUndefined();
   });
 
   // ★ 기본 배선을 그대로 관통시킨다 — putObjectImpl 을 주입하지 않는다.

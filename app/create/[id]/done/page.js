@@ -248,7 +248,11 @@ export default function DoneStepPage() {
   const stale = isRenderStale(project) || cuts.some((c) => isClipStale(c, project)) || cuts.some((c) => isImageStale(c, project));
   // 낡음의 원인을 갈라 말한다 — 자막 위치만 바꾼 것을 "옛 소리·옛 그림" 이라 하면
   // 사장님이 자기가 무엇을 망가뜨렸나로 읽는다. 갈래는 둘이면 충분하다.
-  const staleMessage = isSubtitleOnlyStale(project)
+  // 낡음이 **자막 설정뿐**이면 이미 있는 완성본은 멀쩡하다 — 옛 자막이 구워져 있을 뿐이다.
+  // 그때까지 [내려받기]를 치우면, 색만 바꿔 보려다 재굽기가 실패한 사장님이 **있던 파일마저**
+  // 못 받는다(재굽기 실패해도 설정 PATCH 는 이미 저장돼 낡음으로 잡힌다). 경고는 그대로 띄운다.
+  const subtitleOnlyStale = isSubtitleOnlyStale(project);
+  const staleMessage = subtitleOnlyStale
     ? "자막을 바꿨어요 — 다시 합치면 새 자막으로 나와요"
     : "컷을 고친 뒤라 이 영상은 옛 소리·옛 그림으로 만든 것이에요 — 다시 합쳐 주세요";
 
@@ -312,6 +316,10 @@ export default function DoneStepPage() {
     <section className="panel panel--narrow">
       <h2>완성본을 내려받습니다 <span className="badge vlm">완성</span></h2>
       {err && <p className="pgsub warn">{err}</p>}
+      {/* 지난번 시도가 왜 실패했는지 — 라우트가 render_error 에 남겨 둔다. 진입·새로고침으로
+          err(이번 화면의 오류)이 비어 있어도 사유가 보여야 사장님이 다시 누를지 판단한다.
+          err 이 있으면 같은 말이 두 번 나오므로 그때는 안 띄운다. 성공하면 null 로 지워진다. */}
+      {!err && project?.render_error && <p className="pgsub warn">{project.render_error}</p>}
 
       {!render ? (
         <>
@@ -456,7 +464,7 @@ export default function DoneStepPage() {
         {/* 완성본이 있으면 사장님이 하고 싶은 일은 내려받기다 — 그것을 주 버튼으로 둔다.
             다시 합치기는 컷을 고쳤을 때만 쓰는 보조 동작이다. */}
         <div className="fwd">
-          {render && !render.fake && render.url && !stale ? (
+          {render && !render.fake && render.url && (!stale || subtitleOnlyStale) ? (
             <>
               <button className="mini" disabled={busy} onClick={start}>
                 {busy ? "합치는 중…" : "다시 합치기"}
