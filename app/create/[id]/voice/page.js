@@ -68,10 +68,16 @@ export default function VoiceStepPage() {
     }, 2000);
   }
 
-  // 진입·새로고침 복원 — 아직 읽지 않은 컷이 남아 있으면 폴링을 잇는다
+  // 진입·새로고침 복원 — 아직 읽지 않은 컷이 남아 있으면 폴링을 잇는다.
+  //
+  // ★ 말하는 프로젝트는 폴링할 것이 없다 — 소리를 아예 안 만들기 때문이다(클립이 만든다).
+  // 그 프로젝트는 스킵을 마치면 status 는 "voice" 인데 컷에 audio 도 voice_error 도 없어
+  // 아래 조건이 전부 참이 된다: busy 가 서서 아래 갈래의 유일한 전진 버튼이 잠기고,
+  // 오지 않을 소리를 5분 동안 헛폴링하다 "오래 걸리고 있어요"라는 거짓 오류를 띄운다.
   useEffect(() => {
     const cuts = project?.cuts || [];
-    const waiting = cuts.length > 0 && cuts.some((c) => !c.audio && !c.voice_error);
+    const waiting =
+      !projectSpeaks(project) && cuts.length > 0 && cuts.some((c) => !c.audio && !c.voice_error);
     if (project?.status === "voice" && !pollRef.current && !pollTimedOut && waiting) {
       setBusy(true);
       startPolling();

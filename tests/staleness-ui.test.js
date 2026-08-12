@@ -13,14 +13,15 @@ const read = (p) => readFileSync(p, "utf8");
 // 잠그는 게 아니라 갈래 자체가 다르다). 완성 버튼의 disabled 에 staleCount 를 남기면 그
 // 조건은 항상 이미 remainingCount === 0 인 자리에서만 평가되므로 아무도 못 알아보는 죽은
 // 코드가 된다 — 그래서 여기서만 검사 방식을 remainingCount 쪽으로 바꾼다.
+// next 는 그 화면의 [다음 단계] 버튼이 보내는 경로다 — 잠금 검사가 그 push 를 겨냥한다.
 const PAGES = [
-  { step: "③ 목소리", path: "app/create/[id]/voice/page.js", fn: "isAudioStale", lock: "staleCount" },
-  { step: "④ 이미지", path: "app/create/[id]/images/page.js", fn: "isImageStale", lock: "staleCount" },
-  { step: "⑤ 영상", path: "app/create/[id]/video/page.js", fn: "isClipStale", lock: "remaining" },
+  { step: "③ 목소리", path: "app/create/[id]/voice/page.js", fn: "isAudioStale", lock: "staleCount", next: "images" },
+  { step: "④ 이미지", path: "app/create/[id]/images/page.js", fn: "isImageStale", lock: "staleCount", next: "video" },
+  { step: "⑤ 영상", path: "app/create/[id]/video/page.js", fn: "isClipStale", lock: "remaining", next: "done" },
 ];
 
 describe("낡은 것이 있으면 다음 단계로 못 간다", () => {
-  for (const { step, path, fn, lock } of PAGES) {
+  for (const { step, path, fn, lock, next } of PAGES) {
     it(`${step} 화면이 ${fn} 로 판정한다`, () => {
       const src = read(path);
       expect(src).toContain(fn);
@@ -34,10 +35,13 @@ describe("낡은 것이 있으면 다음 단계로 못 간다", () => {
         // 좁혀서 봐야 잠금 조건 자체가 지워지는 회귀를 잡을 수 있다.
         const src = read(path);
         expect(src).toContain("staleCount");
-        // ★ 마지막 router.push 를 본다. ③목소리 화면에는 넘김이 둘이 됐다 — 말하는 모델
-        // (클립이 직접 말한다)에서는 만든 소리가 없어 낡을 것도 없고, 그 갈래는 화면 위쪽에서
-        // 먼저 return 된다. 잠겨야 하는 것은 소리를 만든 뒤의 버튼이고 그것이 파일 끝의 것이다.
-        const pushIdx = src.lastIndexOf("router.push");
+        // ★ **다음 단계로 보내는** push 를 겨냥한다(아무 push 나 첫 것을 잡으면 안 된다).
+        // ③목소리 화면에는 그 경로로 가는 넘김이 둘이다 — 말하는 모델(클립이 직접 말한다)에는
+        // 만든 소리가 없어 낡을 것도 없고, 그 갈래는 화면 위쪽에서 먼저 return 된다.
+        // 잠겨야 하는 것은 소리를 만든 뒤의 버튼이고 그것이 아래쪽(마지막) 것이다.
+        const target = "router.push(`/create/${id}/" + next + "`)";
+        const pushIdx = src.lastIndexOf(target);
+        expect(pushIdx, `${path} 에 ${next} 로 보내는 router.push 가 없다`).toBeGreaterThan(-1);
         const buttonStart = src.lastIndexOf("<button", pushIdx);
         const button = src.slice(buttonStart, pushIdx);
         const disabledMatch = button.match(/disabled=\{([^}]*)\}/);

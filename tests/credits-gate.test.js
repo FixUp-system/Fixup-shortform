@@ -234,6 +234,32 @@ describe("시작 게이트 — 단계별", () => {
     expect(pipelineMock.run).not.toHaveBeenCalled();
   });
 
+  // ★ 말하는 프로젝트(Seedance)의 돈 계약. ③목소리는 아무것도 사지 않으므로 문을 그냥 열고
+  // (클립이 목소리를 만든다), 정가는 다음 문인 ④이미지가 받는다. 이 계약이 깨지는 두 방향을
+  // 한 자리에서 잠근다: 안 사는 자리에서 받거나, 받는 자리를 열어 주거나.
+  it("말하는 프로젝트 — /voice 는 잔액 0 에서도 200 이고 정가는 /images 가 받는다", async () => {
+    const p = await makeProject();
+    await projects.updateProject(p.id, A, (proj) => ({
+      ...proj, status: "cuts",
+      settings: { ...proj.settings, i2v_model: "seedance-2.0" },
+      cast: [{ id: "c1", who: "20대 남성", voice: "중저음", cuts: [0] }],
+      cuts: [{ idx: 0, sentence: "안녕하세요", seconds: 3 }],
+    }));
+
+    // 잔액 0 인데도 열린다 — 여기서 사는 것이 없다. 파이프라인도 안 돈다.
+    expect((await voicePOST(post("http://localhost/v"), ctx(p.id))).status).toBe(200);
+    expect(pipelineMock.run).not.toHaveBeenCalled();
+
+    // 정가는 이 문이 받는다 — 모자라면 402(Seedance 30초 = 160 크레딧)
+    await grantTo(A, VIDEO_PRICE["seedance-2.0"][30] - 1);
+    expect((await imagesPOST(post("http://localhost/i"), ctx(p.id))).status).toBe(402);
+    expect(pipelineMock.run).not.toHaveBeenCalled();
+
+    // 정가가 차면 통과한다 — 목소리를 건너뛴 것이 흐름을 막지 않는다
+    await grantTo(A, 1);
+    expect((await imagesPOST(post("http://localhost/i"), ctx(p.id))).status).toBe(200);
+  });
+
   it("정가가 있으면 목소리·클립 시작이 200 이다", async () => {
     await grantTo(A, 500);
     const p = await projectWithAudio({ audio: null });
