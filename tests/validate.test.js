@@ -338,6 +338,31 @@ describe("validateCast", () => {
   });
 });
 
+describe("캐스팅이 목소리를 정한다", () => {
+  const raw = (extra) => ({ cast: [{ who: "20대 동양인 남성", cuts: [1], ...extra }] });
+
+  it("voice 를 그대로 싣는다", () => {
+    const out = validateCast(raw({ voice: "중저음, 차분하고 단단한 톤" }), [], 1);
+    expect(out[0].voice).toBe("중저음, 차분하고 단단한 톤");
+  });
+
+  it("앞뒤 공백을 턴다", () => {
+    expect(validateCast(raw({ voice: "  높고 밝은 톤  " }), [], 1)[0].voice).toBe("높고 밝은 톤");
+  });
+
+  // ★ look 과 같은 규칙 — 없어도 인물을 버리지 않는다
+  it("voice 가 없어도 인물은 남는다", () => {
+    const out = validateCast(raw({ look: "짧은 검은 머리" }), [], 1);
+    expect(out).toHaveLength(1);
+    expect(out[0].voice).toBeUndefined();
+  });
+
+  it("빈 문자열은 싣지 않는다 — 빈 지시가 프롬프트에 들어가면 안 된다", () => {
+    expect(validateCast(raw({ voice: "   " }), [], 1)[0].voice).toBeUndefined();
+    expect(validateCast(raw({ voice: 42 }), [], 1)[0].voice).toBeUndefined();
+  });
+});
+
 describe("validateProps — 사물이 보이는 컷", () => {
   it("사진과 컷 번호를 받는다 — 1부터 세는 번호를 0부터로 바꾼다", () => {
     const got = validateProps({ props: [{ photo_id: "p1", cuts: [1, 3] }] }, ["p1"], 4);
