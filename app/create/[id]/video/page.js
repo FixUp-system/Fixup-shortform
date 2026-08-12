@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 import BackButton from "../../../../components/BackButton";
-import { I2V_MAX_SECONDS, I2V_MODELS, modelIdForProject } from "../../../../lib/clip-limits";
+import { I2V_MAX_SECONDS, I2V_MODELS, modelIdForProject, projectSpeaks } from "../../../../lib/clip-limits";
 import { isClipStale } from "../../../../lib/steps";
 // 상한과 값은 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다).
 import { MAX_REGEN_PER_CUT, priceLabel, regenPrice } from "../../../../lib/pricing";
@@ -112,7 +112,10 @@ export default function VideoStepPage() {
   const selected = cuts.find((c) => c.idx === selectedIdx) || cuts.find((c) => c.video) || cuts[0];
 
   if (!cuts.length) return <p className="pgsub">대본을 먼저 만들어 주세요.</p>;
-  if (!cuts.some((c) => c.audio)) return <p className="pgsub">목소리를 먼저 만들어 주세요.</p>;
+  // ★ 말하는 모델은 예외다 — 목소리를 클립이 만드니 낭독이 아예 없다.
+  //   컷 길이는 분할 때 잡은 추정 초가 그대로 최종값이다(lib/subtitles.js 의 cutSeconds).
+  if (!projectSpeaks(project) && !cuts.some((c) => c.audio))
+    return <p className="pgsub">목소리를 먼저 만들어 주세요.</p>;
   if (!cuts.some((c) => c.image || c.source === "photo"))
     return <p className="pgsub">이미지를 먼저 만들어 주세요.</p>;
 

@@ -4,7 +4,7 @@ import { isClipStale } from "../../../../../lib/steps";
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { requireVideoCharge, NoCredits } from "../../../../../lib/charges.js";
 import { fakeFal } from "../../../../../lib/fake";
-import { modelIdForProject } from "../../../../../lib/clip-limits.js";
+import { modelIdForProject, projectSpeaks } from "../../../../../lib/clip-limits.js";
 
 // 이 라우트는 **살아 있는 청구를 요구한다**(requireVideoCharge). 클립은 영상 정가에
 // 포함이라 정상 흐름에서는 그냥 지나가지만, 정가를 안 낸(또는 환불받은) 프로젝트로
@@ -24,8 +24,10 @@ export const POST = withUser(async (req, { params }, user) => {
 
   const cuts = project.cuts || [];
   if (!cuts.length) return Response.json({ error: "대본을 먼저 만들어 주세요" }, { status: 400 });
-  // 클립 길이는 낭독 길이에서 나온다 — 소리가 없으면 몇 초를 만들지 알 수 없다
-  if (!cuts.some((c) => c.audio)) {
+  // 클립 길이는 낭독 길이에서 나온다 — 소리가 없으면 몇 초를 만들지 알 수 없다.
+  // ★ 말하는 모델은 예외다 — 목소리를 클립이 만드니 낭독이 없고, 컷 길이는 분할 때 잡은
+  //   추정 초가 그대로 최종값이다(lib/subtitles.js 의 cutSeconds).
+  if (!projectSpeaks(project) && !cuts.some((c) => c.audio)) {
     return Response.json({ error: "목소리를 먼저 만들어 주세요" }, { status: 400 });
   }
 

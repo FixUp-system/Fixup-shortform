@@ -3,7 +3,7 @@ import { runImagesPipeline } from "../../../../../lib/pipeline";
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { requireVideoCharge, NoCredits } from "../../../../../lib/charges.js";
 import { fakeFal } from "../../../../../lib/fake";
-import { modelIdForProject } from "../../../../../lib/clip-limits.js";
+import { modelIdForProject, projectSpeaks } from "../../../../../lib/clip-limits.js";
 
 export const POST = withUser(async (req, { params }, user) => {
   const { id } = await params;
@@ -16,7 +16,9 @@ export const POST = withUser(async (req, { params }, user) => {
 
   // 낭독이 있어야 컷 길이가 확정된다. 길이를 모르는 채로 그리면
   // 10초를 넘는 컷을 뒤늦게 알고 그림 값을 두 번 치른다.
-  if (!cuts.some((c) => c.audio)) {
+  // ★ 말하는 모델은 예외다 — 목소리를 클립이 만들므로 낭독이 아예 없고,
+  //   컷 길이는 분할 때 잡은 추정 초가 그대로 최종값이다(lib/subtitles.js 의 cutSeconds).
+  if (!projectSpeaks(project) && !cuts.some((c) => c.audio)) {
     return Response.json({ error: "목소리를 먼저 만들어 주세요" }, { status: 400 });
   }
 

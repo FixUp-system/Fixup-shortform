@@ -1005,3 +1005,49 @@ describe("POST /voice — 말하는 프로젝트는 소리를 사지 않는다",
     expect((await getProject(p.id, OWNER)).status).toBe("voice");
   });
 });
+
+// 낭독이 있어야 컷 길이가 확정되므로 ④이미지·⑤클립은 소리를 먼저 요구한다.
+// 말하는 모델에는 그 소리가 아예 없다(클립이 만든다) — 그 자리에서 흐름이 갇혔다.
+describe("말하는 프로젝트는 목소리 없이도 다음 단계로 간다", () => {
+  const CAST = [{ id: "c1", who: "20대 남성", voice: "중저음", cuts: [0] }];
+  const CUTS = [{ idx: 0, sentence: "안녕하세요", seconds: 3, state: "done" }];
+
+  async function make(model, extra = {}) {
+    const p = await createProject({
+      ownerId: OWNER, settings: { i2v_model: model }, material: { text: "가", photos: [] },
+    });
+    await grant();
+    return updateProject(p.id, OWNER, (proj) => ({
+      ...proj, status: "voice", cast: CAST, cuts: CUTS, ...extra,
+    }));
+  }
+
+  it("④이미지 — 말하는 프로젝트는 통과한다", async () => {
+    const p = await make("seedance-2.0");
+    expect((await imagesPOST(patchReq({}), ctx(p.id))).status).toBe(200);
+  });
+
+  // ★ Kling 은 그대로다 — 소리 없이 그림 값을 치르면 안 된다
+  it("④이미지 — 말하지 않는 프로젝트는 여전히 400 이다", async () => {
+    const p = await make("kling-v3");
+    const res = await imagesPOST(patchReq({}), ctx(p.id));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/목소리/);
+  });
+
+  it("⑤클립 — 말하는 프로젝트는 통과한다", async () => {
+    const p = await make("seedance-2.0", {
+      cuts: CUTS.map((c) => ({ ...c, image: { url: "http://img/1" } })),
+    });
+    expect((await clipsPOST(patchReq({}), ctx(p.id))).status).toBe(200);
+  });
+
+  it("⑤클립 — 말하지 않는 프로젝트는 여전히 400 이다", async () => {
+    const p = await make("kling-v3", {
+      cuts: CUTS.map((c) => ({ ...c, image: { url: "http://img/1" } })),
+    });
+    const res = await clipsPOST(patchReq({}), ctx(p.id));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/목소리/);
+  });
+});
