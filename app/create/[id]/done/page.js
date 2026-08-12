@@ -17,6 +17,40 @@ import {
 } from "../../../../lib/subtitles";
 import { isRenderStale, isClipStale, isImageStale, isSubtitlePositionOnlyStale } from "../../../../lib/steps";
 
+// 옛 프로젝트가 쥔 자막 위치(위·중간·아래)를 자유 위치 비율로 옮긴다.
+//
+// ★ settings.subtitle 이 생기는 순간 subtitleHead·toAss 는 옛 subtitle_position 을 통째로
+// 무시한다. 그래서 화면이 기본값으로 씨를 뿌리면 "위"에 두었던 자막이 사장님 몰래 아래로
+// 내려간다 — 각인이 바뀌니 낡음으로 잡히긴 하지만, 옮긴 적 없는 사람에게는 사고다.
+//
+// ⚠️ 비율(0.12·0.18)을 여기 적지 않는다. lib 의 POSITIONS 표는 export 되지 않지만
+// subtitleStyle 이 그 표에서 marginV·alignment 를 내주므로 거기서 되뽑는다 —
+// 표가 바뀌면 이 값도 따라온다. 1000 은 비율을 읽어내려는 눈금일 뿐이다.
+//
+// 세로 뜻은 자리마다 다르다: 아래는 "바닥에서 띄운 만큼", 위는 "천장에서 내린 만큼",
+// 중간은 여백이 뜻을 잃어 정가운데다.
+function posFromLegacyPosition(position) {
+  const H = 1000;
+  const { marginV, alignment } = subtitleStyle({ width: H, height: H, position });
+  const ratio = marginV / H;
+  const [x] = DEFAULT_SUBTITLE.pos;
+  if (alignment === 8) return [x, ratio];
+  if (alignment === 5) return [x, 0.5];
+  // 아래(2). 이 갈래가 DEFAULT_SUBTITLE.pos 와 같은 값을 낸다 — 기본끼리 어긋나지 않는다.
+  return [x, 1 - ratio];
+}
+
+// 화면이 쥘 초기값. settings.subtitle 이 있으면 그것이 진실이고, 없는 옛 프로젝트는
+// 옛 위치를 이어받는다. 되돌리기·범위 판정은 늘 lib 의 normalizeSubtitle 을 지난다.
+function seedSubtitle(project) {
+  const saved = project?.settings?.subtitle;
+  if (saved) return normalizeSubtitle(saved);
+  return normalizeSubtitle({
+    ...DEFAULT_SUBTITLE,
+    pos: posFromLegacyPosition(project?.settings?.subtitle_position),
+  });
+}
+
 export default function DoneStepPage() {
   const { id } = useParams();
   const { project, setProject, load } = useProject();
@@ -35,22 +69,29 @@ export default function DoneStepPage() {
 
   // 사장님이 고른 자막 설정. 화면이 값을 새로 정하지 않는다 — 기본값·되돌리기·범위는
   // lib/subtitles.js 하나가 쥔다(두 벌이 되면 언젠가 갈린다).
-  const [sub, setSub] = useState(() => normalizeSubtitle(project?.settings?.subtitle));
+  const [sub, setSub] = useState(() => seedSubtitle(project));
   // 미리보기 상자의 실제 크기(px). 글자 크기를 완성본과 **같은 함수**로 재려면 화면에서의
   // 치수가 필요하다 — subtitleStyle 이 치수에서 비례로 뽑으므로 상자 치수를 그대로 넣으면 된다.
   const [box, setBox] = useState({ width: 0, height: 0 });
   const [applying, setApplying] = useState(false);
   const stageRef = useRef(null);
-  const dragRef = useRef(false);
+  // 드래그 중에 잡은 지점과 자막 자리의 차이. null 이면 드래그 중이 아니다.
+  const dragRef = useRef(null);
 
   useEffect(() => () => { clearInterval(pollRef.current); pollRef.current = null; }, []);
 
   // 서버가 준 설정이 바뀌면 따라간다(불러오기·저장 뒤). 문자열로 비교하는 이유는 객체가
   // 매 렌더 새로 오기 때문이다 — 참조로 걸면 사장님이 만지는 중에도 계속 덮어쓴다.
-  const savedSubtitle = JSON.stringify(project?.settings?.subtitle ?? null);
+  //
+  // 옛 위치(subtitle_position)도 함께 본다 — settings.subtitle 이 아직 없는 프로젝트에서는
+  // 그 값이 초기 자리를 정하므로, 칩으로 위치를 바꾸면 미리보기도 따라와야 한다.
+  const savedSubtitle = JSON.stringify([
+    project?.settings?.subtitle ?? null,
+    project?.settings?.subtitle_position ?? null,
+  ]);
   useEffect(() => {
     if (dragRef.current) return;
-    setSub(normalizeSubtitle(project?.settings?.subtitle));
+    setSub(seedSubtitle(project));
   }, [savedSubtitle]);
 
   // 상자 크기는 창 너비·비율에 따라 바뀐다. 한 번만 재면 창을 줄였을 때 글자만 안 따라온다.
@@ -66,19 +107,32 @@ export default function DoneStepPage() {
   }, [rawUrl]);
 
   // 드래그 — 상자 안에서의 비율로 옮기고, 화면 밖은 lib 의 clampPos 가 되돌린다.
+  //
+  // 잡은 지점과 자막 자리의 차이(grab)를 쥐고 간다. 커서 자리를 그대로 pos 로 삼으면
+  // 누르는 순간 자막이 튄다 — pos 는 글자 블록의 아랫변이라, 한가운데를 잡아도 블록이
+  // 제 높이의 절반만큼 위로 솟는다.
   function moveTo(e) {
     const el = stageRef.current;
-    if (!el) return;
+    const grab = dragRef.current;
+    if (!el || !grab) return;
     const r = el.getBoundingClientRect();
     if (!r.width || !r.height) return;
     setSub((s) => ({
       ...s,
-      pos: clampPos([(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height]),
+      pos: clampPos([
+        (e.clientX - r.left) / r.width + grab.dx,
+        (e.clientY - r.top) / r.height + grab.dy,
+      ]),
     }));
   }
   function onPointerDown(e) {
     if (!rawUrl || applying) return;
-    dragRef.current = true;
+    const r = stageRef.current?.getBoundingClientRect();
+    if (!r?.width || !r?.height) return;
+    dragRef.current = {
+      dx: sub.pos[0] - (e.clientX - r.left) / r.width,
+      dy: sub.pos[1] - (e.clientY - r.top) / r.height,
+    };
     // 포인터를 붙잡아 둔다 — 안 그러면 빨리 끌 때 커서가 자막 밖으로 나가며 드래그가 끊긴다
     e.currentTarget.setPointerCapture?.(e.pointerId);
     e.preventDefault();
@@ -89,7 +143,7 @@ export default function DoneStepPage() {
   }
   function onPointerUp(e) {
     if (!dragRef.current) return;
-    dragRef.current = false;
+    dragRef.current = null;
     e.currentTarget.releasePointerCapture?.(e.pointerId);
   }
 
@@ -230,7 +284,9 @@ export default function DoneStepPage() {
     position: "absolute",
     left: `${sub.pos[0] * 100}%`,
     top: `${sub.pos[1] * 100}%`,
-    transform: "translate(-50%, -50%)",
+    // ★ pos 는 글자 블록의 **아랫변** 기준이다 — ffmpeg 의 \pos + Alignment 2 와 같은 뜻.
+    // 기준이 갈리면 미리보기와 완성본의 자막 높이가 어긋나고, 두 줄이 되면 덜컹거린다.
+    transform: "translate(-50%, -100%)",
     maxWidth: "84%",
     textAlign: "center",
     whiteSpace: "pre-line",

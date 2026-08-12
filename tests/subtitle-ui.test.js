@@ -57,6 +57,38 @@ describe("⑥완성 — 두 벌이 되지 않게", () => {
   });
 });
 
+// settings.subtitle 이 생기는 순간 subtitleHead·toAss 는 옛 subtitle_position 을 통째로
+// 무시한다. 그래서 화면이 기본값으로 씨를 뿌리면 "위"에 두었던 자막이 사장님 몰래 아래로
+// 내려간다 — 옮긴 적 없는 사람에게는 사고다.
+describe("⑥완성 — 옛 위치를 이어받는다", () => {
+  it("settings.subtitle 이 없으면 옛 subtitle_position 에서 씨를 뿌린다", () => {
+    expect(src).toContain("subtitle_position");
+    const at = src.indexOf("function seedSubtitle");
+    expect(at, "seedSubtitle 이 없다").toBeGreaterThan(-1);
+    const fn = src.slice(at, src.indexOf("\n}", at));
+    expect(fn, "씨를 뿌릴 때 옛 위치를 안 본다").toMatch(/posFromLegacyPosition/);
+    expect(fn, "초기값도 lib 의 정규화를 지나야 한다").toContain("normalizeSubtitle");
+  });
+
+  // 비율(0.12·0.18)은 lib 의 POSITIONS 표에 있다. 화면이 손으로 적으면 표가 바뀔 때 갈린다.
+  it("위치 비율을 화면에 박지 않는다 — subtitleStyle 에서 되뽑는다", () => {
+    const at = src.indexOf("function posFromLegacyPosition");
+    expect(at, "posFromLegacyPosition 이 없다").toBeGreaterThan(-1);
+    const fn = src.slice(at, src.indexOf("\n}", at));
+    expect(fn, "표에서 파생시키지 않는다").toContain("subtitleStyle");
+    expect(fn, "여백 비율을 손으로 적었다").not.toMatch(/0\.12|0\.18|0\.82/);
+  });
+});
+
+describe("⑥완성 — 미리보기 기준점", () => {
+  // toAss 는 \pos 를 Alignment 2(하단) 기준으로 쓴다. 화면이 가운데 기준으로 그리면
+  // 미리보기와 완성본의 자막 높이가 어긋나고, 줄 수가 바뀔 때마다 덜컹거린다.
+  it("pos 는 글자 블록의 아랫변이다", () => {
+    expect(src).toContain("translate(-50%, -100%)");
+    expect(src, "가운데 기준으로 그리면 완성본과 어긋난다").not.toContain("translate(-50%, -50%)");
+  });
+});
+
 describe("⑥완성 — 원본이 없는 옛 프로젝트", () => {
   // 자막이 구워진 완성본 위에 미리보기를 얹으면 자막이 둘로 보인다.
   // 그래서 원본이 없으면 조절 UI 자체가 없어야 한다.
