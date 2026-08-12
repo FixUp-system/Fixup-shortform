@@ -415,6 +415,8 @@ describe("자막 위치", () => {
 
   it("모르는 값은 조용히 아래로 떨어진다 — 자막이 안 나오는 것보다 낫다", () => {
     expect(subtitleStyle({ ...size, position: "뒤죽박죽" }).alignment).toBe(2);
+    // 프로토타입에서 물려받은 이름도 "모르는 값"이다 — 표에 없으면 아래다
+    expect(subtitleStyle({ ...size, position: "constructor" }).alignment).toBe(2);
   });
 
   it("글자 크기와 가로 여백은 위치와 무관하다", () => {
