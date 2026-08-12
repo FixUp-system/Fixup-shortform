@@ -14,7 +14,7 @@ npm run dev
 - `OPENAI_API_KEY` — 대화 수집 (gpt-4o)
 - `FAL_KEY` — 영상 생성 (fal.ai)
 - `FAL_IMAGE_ENDPOINT` — 컷 이미지 모델 (기본: fal-ai/nano-banana, $0.04/장)
-- `FAL_I2V_ENDPOINT` — 컷 클립 모델 (image-to-video). 빠른 생성도 단계별 파이프라인을 그대로 관통하므로 영상은 전부 이 값이 만든다
+- 영상 모델은 env 가 아니라 프로젝트가 정한다(⑤영상에서 고른다, `lib/clip-limits.js`의 `I2V_MODELS`)
 
 ## 구조
 

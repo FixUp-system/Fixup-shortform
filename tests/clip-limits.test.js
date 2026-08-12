@@ -1,12 +1,11 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
-  CLIP_PROFILES, DEFAULT_CLIP_PROFILE, DEFAULT_I2V_ENDPOINT,
-  profileFor, activeClipProfile, activeI2vEndpoint,
-  fitDurationFor, minSecondsFor, maxSecondsFor,
-  I2V_STEPS, I2V_MAX_SECONDS, fitDuration, activeClipLimits,
+  CLIP_PROFILES, DEFAULT_CLIP_PROFILE,
+  I2V_MODELS, I2V_MODEL_IDS, DEFAULT_I2V_MODEL, LEGACY_I2V_MODEL,
+  modelIdForProject, endpointForProject, clipProfileForProject, clipLimitsForProject,
+  profileFor, fitDurationFor, minSecondsFor, maxSecondsFor,
+  I2V_STEPS, I2V_MAX_SECONDS, fitDuration,
 } from "../lib/clip-limits";
-
-afterEach(() => { delete process.env.FAL_I2V_ENDPOINT; });
 
 describe("profileFor — prefix 순서가 곧 로직이다", () => {
   it("Kling v3 을 고른다", () => {
@@ -90,38 +89,36 @@ describe("fitDurationFor — 눈금 종류마다 다르게 올린다", () => {
   });
 });
 
-// ⚠️ "기본 프로필"과 "기본 엔드포인트"는 다른 것이다.
-//   DEFAULT_CLIP_PROFILE  = **모르는 모델**이 떨어질 자리(LTX·열거 — 범위 모델에서도 유효한 값)
-//   DEFAULT_I2V_ENDPOINT  = env 가 없을 때 **실제로 부를 모델**(Kling v3)
-describe("activeClipProfile — env 가 정한다", () => {
-  it("env 를 비우면 기본 엔드포인트(Kling)의 프로필이다 — 모르는 모델의 폴백이 아니다", () => {
-    expect(activeClipProfile()).toBe(profileFor(DEFAULT_I2V_ENDPOINT));
-    expect(maxSecondsFor(activeClipProfile())).toBe(15);
-    expect(activeClipProfile()).not.toBe(DEFAULT_CLIP_PROFILE);
+// ⚠️ "기본 프로필"과 "이 프로젝트의 모델"은 다른 것이다.
+//   DEFAULT_CLIP_PROFILE = **모르는 모델**이 떨어질 자리(LTX·열거 — 범위 모델에서도 유효한 값)
+//   endpointForProject   = 이 프로젝트에서 **실제로 부를 모델**
+describe("clipProfileForProject — 프로젝트가 정한다", () => {
+  it("옛 프로젝트는 Kling 의 프로필이다 — 모르는 모델의 폴백이 아니다", () => {
+    const old = { settings: {} };
+    expect(clipProfileForProject(old)).toBe(profileFor("fal-ai/kling-video/v3/standard/image-to-video"));
+    expect(maxSecondsFor(clipProfileForProject(old))).toBe(15);
+    expect(clipProfileForProject(old)).not.toBe(DEFAULT_CLIP_PROFILE);
+    expect(clipLimitsForProject(old)).toEqual({ min: 3, max: 15 });
   });
 
-  // 기본값이 두 군데 있으면 갈린다 — 갈리는 순간 Kling 을 부르면서 LTX 프로필을 쓰고,
+  // 엔드포인트가 두 군데 있으면 갈린다 — 갈리는 순간 Kling 을 부르면서 LTX 프로필을 쓰고,
   // `generate_audio:false` 가 빠져 오디오가 켜진 채 청구된다($0.084→$0.126).
   it("엔드포인트와 프로필이 같은 곳에서 나온다", () => {
-    expect(activeI2vEndpoint()).toBe(DEFAULT_I2V_ENDPOINT);
-    process.env.FAL_I2V_ENDPOINT = "fal-ai/ltx-2.3/image-to-video/fast";
-    expect(activeI2vEndpoint()).toBe("fal-ai/ltx-2.3/image-to-video/fast");
-    expect(activeClipProfile()).toBe(profileFor(activeI2vEndpoint()));
-  });
-
-  it("env 를 바꾸면 그 모델의 프로필이다", () => {
-    process.env.FAL_I2V_ENDPOINT = "fal-ai/kling-video/v3/standard/image-to-video";
-    expect(maxSecondsFor(activeClipProfile())).toBe(15);
+    for (const p of [{ settings: {} }, { settings: { i2v_model: "seedance-2.0" } }]) {
+      expect(clipProfileForProject(p)).toBe(profileFor(endpointForProject(p)));
+    }
   });
 });
 
 // 화면(script·video 페이지)이 이 세 이름을 import 한다. 없애면 빌드가 깨진다.
 //
-// 이 값들은 **기본 엔드포인트의 프로필**에서 나온다. 폴백 프로필(LTX)이 아니다 —
+// 이 값들은 **기본 모델의 프로필**에서 나온다. 폴백 프로필(LTX)이 아니다 —
 // 그러면 화면이 상한 20 을 말하고 서버는 15 로 자른다(2026-07-30).
-describe("하위호환 — 화면이 쓰는 이름은 기본 엔드포인트의 값이다", () => {
-  it("상한이 기본 엔드포인트(Kling)의 것이다", () => {
-    expect(I2V_MAX_SECONDS).toBe(maxSecondsFor(profileFor(DEFAULT_I2V_ENDPOINT)));
+describe("하위호환 — 화면이 쓰는 이름은 기본 모델의 값이다", () => {
+  const defaultEndpoint = I2V_MODELS.find((m) => m.id === DEFAULT_I2V_MODEL).endpoint;
+
+  it("상한이 기본 모델(Seedance)의 것이다", () => {
+    expect(I2V_MAX_SECONDS).toBe(maxSecondsFor(profileFor(defaultEndpoint)));
     expect(I2V_MAX_SECONDS).toBe(15);
   });
 
@@ -131,24 +128,83 @@ describe("하위호환 — 화면이 쓰는 이름은 기본 엔드포인트의 
     expect(I2V_STEPS).toBe(null);
   });
 
-  it("fitDuration 은 env 와 무관하게 기본 엔드포인트로 푼다", () => {
-    process.env.FAL_I2V_ENDPOINT = "fal-ai/ltx-2.3/image-to-video/fast";
-    expect(fitDuration(7)).toBe(7); // 활성(LTX) 이면 8 이지만, 이 함수는 상수여야 한다
+  // 프로젝트가 무엇을 골랐든 이 함수는 기본 모델로 푼다 — 화면 폴백이라 상수여야 한다.
+  it("fitDuration 은 기본 모델로 푼다", () => {
+    expect(fitDuration(7)).toBe(7);
+    expect(fitDuration(2)).toBe(minSecondsFor(profileFor(defaultEndpoint)));
   });
 });
 
-describe("activeClipLimits — 화면에 실어 보낼 값", () => {
-  it("env 를 비우면 기본 엔드포인트(Kling)의 하한·상한이다", () => {
-    expect(activeClipLimits()).toEqual({ min: 3, max: 15 });
+describe("영상 모델 표", () => {
+  it("고를 수 있는 것은 둘이고 기본은 Seedance 다", () => {
+    expect(I2V_MODEL_IDS).toEqual(["seedance-2.0", "kling-v3"]);
+    expect(DEFAULT_I2V_MODEL).toBe("seedance-2.0");
+    expect(LEGACY_I2V_MODEL).toBe("kling-v3");
   });
 
-  it("모르는 모델이면 폴백 프로필(LTX)의 하한·상한이다", () => {
-    process.env.FAL_I2V_ENDPOINT = "fal-ai/무엇인지-모르는-모델";
-    expect(activeClipLimits()).toEqual({ min: 6, max: 20 });
+  it("표의 모든 항목이 사장님에게 보일 말과 엔드포인트를 가진다", () => {
+    for (const m of I2V_MODELS) {
+      expect(I2V_MODEL_IDS).toContain(m.id);
+      expect(m.endpoint).toMatch(/\S/);
+      expect(m.label).toMatch(/\S/);
+      expect(m.hint).toMatch(/\S/);
+    }
   });
 
-  it("env 를 바꾸면 그 모델의 값이다", () => {
-    process.env.FAL_I2V_ENDPOINT = "fal-ai/kling-video/v3/standard/image-to-video";
-    expect(activeClipLimits()).toEqual({ min: 3, max: 15 });
+  // ★★ 이 단정이 이 태스크의 전부다 — 옛 프로젝트가 조용히 모델을 갈아타면 안 된다
+  it("i2v_model 이 없는 옛 프로젝트는 Kling 이다", () => {
+    expect(modelIdForProject(undefined)).toBe("kling-v3");
+    expect(modelIdForProject({})).toBe("kling-v3");
+    expect(modelIdForProject({ settings: {} })).toBe("kling-v3");
+    expect(endpointForProject({ settings: {} })).toBe(
+      "fal-ai/kling-video/v3/standard/image-to-video"
+    );
+  });
+
+  it("모르는 값도 Kling 으로 떨어진다 — 새 모델로 조용히 갈아타는 것보다 낫다", () => {
+    expect(modelIdForProject({ settings: { i2v_model: "뒤죽박죽" } })).toBe("kling-v3");
+    expect(modelIdForProject({ settings: { i2v_model: "constructor" } })).toBe("kling-v3");
+  });
+
+  it("고른 모델이 엔드포인트와 프로필을 정한다", () => {
+    const p = { settings: { i2v_model: "seedance-2.0" } };
+    expect(endpointForProject(p)).toBe("bytedance/seedance-2.0/image-to-video");
+    expect(clipProfileForProject(p).min).toBe(4);
+    expect(clipProfileForProject(p).max).toBe(15);
+    expect(clipLimitsForProject(p)).toEqual({ min: 4, max: 15 });
+  });
+
+  it("Seedance 는 오디오를 끈다 — 클립 소리가 우리 낭독과 두 겹이 되면 안 된다", () => {
+    const profile = profileFor("bytedance/seedance-2.0/image-to-video");
+    expect(profile.extra.generate_audio).toBe(false);
+  });
+
+  it("Seedance 는 4~15 정수를 받는다 — 눈금이 아니다", () => {
+    const profile = profileFor("bytedance/seedance-2.0/image-to-video");
+    expect(profile.steps).toBe(null);
+    expect(fitDurationFor(profile, 2)).toBe(4);    // 바닥에 묶인다
+    expect(fitDurationFor(profile, 7.2)).toBe(8);  // 올린다
+    expect(fitDurationFor(profile, 99)).toBe(15);  // 상한에 묶인다
+  });
+
+  it("Kling 프로필은 그대로다 — 옛 영상이 달라지면 안 된다", () => {
+    const profile = profileFor("fal-ai/kling-video/v3/standard/image-to-video");
+    expect(profile.min).toBe(3);
+    expect(profile.max).toBe(15);
+    expect(profile.extra.generate_audio).toBe(false);
+  });
+
+  it("env 로는 모델이 바뀌지 않는다 — 원천은 프로젝트 하나다", () => {
+    process.env.FAL_I2V_ENDPOINT = "fal-ai/ltx-2";
+    try {
+      expect(endpointForProject({ settings: { i2v_model: "seedance-2.0" } })).toBe(
+        "bytedance/seedance-2.0/image-to-video"
+      );
+      expect(endpointForProject({ settings: {} })).toBe(
+        "fal-ai/kling-video/v3/standard/image-to-video"
+      );
+    } finally {
+      delete process.env.FAL_I2V_ENDPOINT;
+    }
   });
 });

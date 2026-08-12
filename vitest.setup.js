@@ -43,7 +43,3 @@ beforeEach(() => resetMemoryStore());
 // (아래 문단). 근거가 완전히 없어지면(위 스크립트들이 전부 지워지거나 이 env 를 놓으면)
 // 이 줄도 지운다.
 process.env.SHOTFORM_DATA_DIR = mkdtempSync(path.join(tmpdir(), "shotform-test-"));
-
-// 클립 모델 env 는 테스트에서 지운다 — .env.local 을 Kling 으로 바꿔 두면 눈금 기대값이
-// 머신마다 달라진다. 활성 프로필을 재는 테스트는 자기 안에서 직접 세운다.
-delete process.env.FAL_I2V_ENDPOINT;
