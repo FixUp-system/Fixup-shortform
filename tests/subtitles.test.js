@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { buildCues, toAss, cutSeconds, subtitleStyle, lineWidthUnits, textUnits, MAX_SUBTITLE_LINES, splitSubtitleText, breakTwoLines } from "../lib/subtitles";
+import {
+  SUBTITLE_FONTS, DEFAULT_SUBTITLE, normalizeSubtitle, outlineFor, clampPos, SIZE_MIN, SIZE_MAX,
+} from "../lib/subtitles.js";
 
 describe("자막을 절 경계에서 고르게 나눈다", () => {
   // 한 줄 11.21 · 두 줄 22.42 (1080×1920). 숫자를 박지 않고 같은 식에서 뽑는다.
@@ -501,10 +504,6 @@ describe("자막 위치", () => {
   });
 });
 
-import {
-  SUBTITLE_FONTS, DEFAULT_SUBTITLE, normalizeSubtitle, outlineFor, clampPos,
-} from "../lib/subtitles.js";
-
 describe("자막 설정 — 자유롭되 코드가 막는다", () => {
   it("기본값이 있다", () => {
     expect(DEFAULT_SUBTITLE).toEqual({ pos: [0.5, 0.82], font: "basic", color: "#FFFFFF", size: 1 });
@@ -529,10 +528,35 @@ describe("자막 설정 — 자유롭되 코드가 막는다", () => {
   });
 
   it("크기는 0.7~1.6 안으로 되돌린다", () => {
-    expect(normalizeSubtitle({ size: 0.1 }).size).toBe(0.7);
-    expect(normalizeSubtitle({ size: 9 }).size).toBe(1.6);
+    expect(normalizeSubtitle({ size: 0.1 }).size).toBe(SIZE_MIN);
+    expect(normalizeSubtitle({ size: 9 }).size).toBe(SIZE_MAX);
     expect(normalizeSubtitle({ size: 1.2 }).size).toBe(1.2);
     expect(normalizeSubtitle({ size: "크게" }).size).toBe(1);
+  });
+
+  // 화면 슬라이더가 이 상수를 그대로 쓴다 — 두 벌로 적히면 슬라이더 끝과 저장값이 갈린다
+  it("크기 한계를 화면이 쓸 수 있게 내놓는다", () => {
+    expect([SIZE_MIN, SIZE_MAX]).toEqual([0.7, 1.6]);
+  });
+
+  // 빈칸은 "안 골랐다"지 0 이 아니다 — Number("") 가 0 이라 최소 크기로 튀던 자리
+  it("빈칸·null 은 최소가 아니라 기본 크기다", () => {
+    expect(normalizeSubtitle({ size: "" }).size).toBe(1);
+    expect(normalizeSubtitle({ size: null }).size).toBe(1);
+  });
+
+  // ★ 이 저장소는 프로토타입 이름으로 두 번 데었다(subtitleStyle 의 hasOwn). 단정으로 잠근다 —
+  // 누가 SUBTITLE_FONTS 를 객체 맵으로 바꾸는 순간 조용히 되살아난다.
+  it("프로토타입에서 물려받은 이름은 폰트가 아니다", () => {
+    for (const k of ["toString", "constructor", "hasOwnProperty", "__proto__"]) {
+      expect(normalizeSubtitle({ font: k }).font).toBe("basic");
+    }
+  });
+
+  // 드래그가 만든 0.5000001 이 그대로 저장되면 각인이 달라져 눈에 안 보이는 재굽기가 뜬다
+  it("위치·크기를 양자화한다 — 보이지 않는 재굽기를 막는다", () => {
+    expect(normalizeSubtitle({ pos: [0.5000001, 0.8199999] }).pos).toEqual([0.5, 0.82]);
+    expect(normalizeSubtitle({ size: 1.2000001 }).size).toBe(1.2);
   });
 
   // ★ 화면 밖으로 나가면 자막이 안 보인다 — 안전 여백 6%
@@ -561,11 +585,34 @@ describe("toAss — 자막 설정을 싣는다", () => {
   const cues = [{ start: 0, end: 2, text: "안녕하세요" }];
   const size = { width: 1080, height: 1920 };
 
+  const styleOf = (ass) => ass.split("\n").find((l) => l.startsWith("Style: Main")).split(",");
+
   it("설정을 안 주면 지금과 같다 — 옛 완성본이 낡지 않는다", () => {
-    const ass = toAss(cues, { ...size });
-    expect(ass).toContain("Pretendard");
-    expect(ass).toContain("&H00FFFFFF");   // 흰 글자
-    expect(ass).toContain("Alignment"); // 헤더가 그대로다
+    const f = styleOf(toAss(cues, { ...size }));
+    expect(f[1]).toBe("Pretendard");
+    expect(f[2]).toBe("81");            // 1920 * 0.042
+    expect(f[3]).toBe("&H00FFFFFF");    // 흰 글자
+    expect(f[4]).toBe("&H00000000");    // 검정 외곽
+    expect(f[10]).toBe("2");            // 하단 중앙 — 값을 잰다("Alignment" 낱말은 헤더에 늘 있다)
+    expect(f[13]).toBe("346");          // 1920 * 0.18
+  });
+
+  // ★★ 정작 위험한 건 undefined 가 아니라 **기본값을 명시로 넘긴 경우**다.
+  // 뒤 태스크가 subtitle 을 항상 넘기기 시작하면, 여기가 어긋난 순간 모든 기본 프로젝트의
+  // 자막이 조용히 이동한다 — 각인은 기본값이면 머리를 안 붙이니 "안 낡음"이라 아무도 못 본다.
+  it("기본값을 명시로 넘겨도 오늘과 같은 자리다 — 픽셀 동일", () => {
+    const old = styleOf(toAss(cues, { ...size }));
+    const now = styleOf(toAss(cues, { ...size, subtitle: DEFAULT_SUBTITLE }));
+    expect(now[1]).toBe(old[1]);        // 폰트
+    expect(now[2]).toBe(old[2]);        // 글자 크기
+    expect(now[3]).toBe(old[3]);        // 글자색
+    expect(now[4]).toBe(old[4]);        // 외곽선
+    // \pos 를 쓰면 Alignment 는 기준점이다. 2(하단)여야 pos.y 가 **글자 블록의 아랫변**이 된다 —
+    // 5(가운데)면 같은 좌표라도 블록 중심이 와서 줄 수만큼 아래로 내려간다.
+    expect(now[10]).toBe("2");
+    // 아랫변이 오늘의 세이프존과 같은 자리다: 1920 - 346 = 1574 = 0.82 * 1920
+    expect(toAss(cues, { ...size, subtitle: DEFAULT_SUBTITLE })).toContain("\\pos(540,1574)");
+    expect(1920 - Number(old[13])).toBe(Math.round(1920 * 0.82));
   });
 
   it("폰트를 실는다", () => {
@@ -596,15 +643,51 @@ describe("toAss — 자막 설정을 싣는다", () => {
     expect(num(big)).toBe(Math.round(num(base) * 1.5));
   });
 
-  // ★ 자유 위치는 \pos 로 절대 좌표를 준다 — Alignment 만으로는 아홉 칸뿐이다
-  it("위치를 \\pos 로 싣고 정렬을 가운데로 잡는다", () => {
+  // ★ 자유 위치는 \pos 로 절대 좌표를 준다 — Alignment 만으로는 아홉 칸뿐이다.
+  // 그 좌표의 뜻은 **글자 블록의 아랫변**이고, 그래서 기준점(Alignment)은 2(하단)다.
+  it("위치를 \\pos 로 싣고 기준점을 하단으로 잡는다", () => {
     const ass = toAss(cues, { ...size, subtitle: { pos: [0.5, 0.5] } });
     expect(ass).toContain("\\pos(540,960)");
-    expect(ass).toMatch(/Style: Main,.*,5,/);   // Alignment 5 = 가운데
+    expect(styleOf(ass)[10]).toBe("2");
+  });
+
+  // 옛 position 은 subtitle 을 주는 순간 자리를 내준다 — 기준점이 둘이면 좌표의 뜻이 갈린다
+  it("설정을 주면 옛 position 이 기준점을 흔들지 못한다", () => {
+    const ass = toAss(cues, { ...size, position: "top", subtitle: DEFAULT_SUBTITLE });
+    expect(styleOf(ass)[10]).toBe("2");
   });
 
   it("화면 밖 위치는 되돌아온 자리에 실린다", () => {
     const ass = toAss(cues, { ...size, subtitle: { pos: [9, 9] } });
     expect(ass).toContain(`\\pos(${Math.round(1080 * 0.94)},${Math.round(1920 * 0.94)})`);
+  });
+});
+
+// ★★ 크기 배율이 글자를 키우면 한 줄에 들어가는 칸도 그만큼 줄어야 한다.
+// 안 그러면 buildCues 가 11칸 기준으로 끊어 놓고 실제로는 7칸만 들어가, libass 가 마진에서
+// 다시 접어 세 줄이 된다 — 실측으로 세운 두 줄 한계(MAX_SUBTITLE_LINES)가 조용히 무너진다.
+describe("줄바꿈이 크기 배율을 안다", () => {
+  const size = { width: 1080, height: 1920 };
+
+  it("크기를 키우면 한 줄 칸 수가 그만큼 준다", () => {
+    const base = lineWidthUnits(size);
+    const big = lineWidthUnits({ ...size, subtitle: { size: 1.6 } });
+    // 글자 크기가 반올림되므로 정확히 1/1.6 은 아니다 — 한 칸 안쪽이면 같은 값이다
+    expect(big).toBeCloseTo(base / 1.6, 1);
+    expect(big).toBeLessThan(base);
+  });
+
+  it("설정을 안 주면 지금 그대로다", () => {
+    expect(lineWidthUnits({ ...size, subtitle: DEFAULT_SUBTITLE })).toBe(lineWidthUnits(size));
+  });
+
+  it("큰 글자면 자막이 더 잘게 나뉜다", () => {
+    const cut = [{ sentence: "전문적인 장비와 세제를 써서 묵은 때까지 말끔하게 지워 드립니다.", seconds: 6 }];
+    const base = buildCues(cut, size);
+    const big = buildCues(cut, { ...size, subtitle: { size: 1.6 } });
+    expect(big.length).toBeGreaterThan(base.length);
+    // 나뉘어도 원고는 글자 그대로다
+    expect(big.map((c) => c.text.replace(/\n/g, " ")).join(" ").replace(/\s+/g, ""))
+      .toBe(cut[0].sentence.replace(/\s+/g, ""));
   });
 });
