@@ -500,3 +500,59 @@ describe("자막 위치", () => {
     expect(f[13]).toBe(String(Math.round(1920 * 0.18)));
   });
 });
+
+import {
+  SUBTITLE_FONTS, DEFAULT_SUBTITLE, normalizeSubtitle, outlineFor, clampPos,
+} from "../lib/subtitles.js";
+
+describe("자막 설정 — 자유롭되 코드가 막는다", () => {
+  it("기본값이 있다", () => {
+    expect(DEFAULT_SUBTITLE).toEqual({ pos: [0.5, 0.82], font: "basic", color: "#FFFFFF", size: 1 });
+  });
+
+  it("폰트는 셋이고 basic 이 기본이다", () => {
+    expect(SUBTITLE_FONTS.map((f) => f.id)).toEqual(["basic", "impact", "soft"]);
+    expect(SUBTITLE_FONTS.every((f) => f.label && f.family)).toBe(true);
+  });
+
+  // ★ 목록 밖 값은 조용히 기본으로 — 자막 하나 때문에 합성이 죽으면 안 된다
+  it("모르는 폰트·잘못된 색은 기본으로 떨어진다", () => {
+    expect(normalizeSubtitle({ font: "코믹산스" }).font).toBe("basic");
+    expect(normalizeSubtitle({ color: "빨강" }).color).toBe("#FFFFFF");
+    expect(normalizeSubtitle({ color: "#GGG" }).color).toBe("#FFFFFF");
+    expect(normalizeSubtitle(null)).toEqual(DEFAULT_SUBTITLE);
+    expect(normalizeSubtitle("문자열")).toEqual(DEFAULT_SUBTITLE);
+  });
+
+  it("색은 대소문자를 가리지 않고 #RRGGBB 로 정규화한다", () => {
+    expect(normalizeSubtitle({ color: "#ffcc00" }).color).toBe("#FFCC00");
+  });
+
+  it("크기는 0.7~1.6 안으로 되돌린다", () => {
+    expect(normalizeSubtitle({ size: 0.1 }).size).toBe(0.7);
+    expect(normalizeSubtitle({ size: 9 }).size).toBe(1.6);
+    expect(normalizeSubtitle({ size: 1.2 }).size).toBe(1.2);
+    expect(normalizeSubtitle({ size: "크게" }).size).toBe(1);
+  });
+
+  // ★ 화면 밖으로 나가면 자막이 안 보인다 — 안전 여백 6%
+  it("위치는 안전 여백 안으로 되돌린다", () => {
+    expect(clampPos([0.5, 0.82])).toEqual([0.5, 0.82]);
+    expect(clampPos([-1, 2])).toEqual([0.06, 0.94]);
+    expect(clampPos([0.02, 0.01])).toEqual([0.06, 0.06]);
+    expect(clampPos(["가", null])).toEqual([0.5, 0.82]);
+    expect(clampPos(undefined)).toEqual([0.5, 0.82]);
+  });
+
+  // ★ 배경을 분석하지 않는다 — 글자색의 반대 명도로 외곽선을 정하면 어디서든 읽힌다
+  it("밝은 글자는 검정 외곽, 어두운 글자는 흰 외곽", () => {
+    expect(outlineFor("#FFFFFF")).toBe("#000000");
+    expect(outlineFor("#FFCC00")).toBe("#000000");
+    expect(outlineFor("#000000")).toBe("#FFFFFF");
+    expect(outlineFor("#203040")).toBe("#FFFFFF");
+  });
+
+  it("normalizeSubtitle 은 위치도 함께 되돌린다", () => {
+    expect(normalizeSubtitle({ pos: [5, 5] }).pos).toEqual([0.94, 0.94]);
+  });
+});
