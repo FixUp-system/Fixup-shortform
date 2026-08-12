@@ -370,9 +370,14 @@ A(`nano-banana`)와 B(`nano-banana-2`)를 컷당 한 장씩. 8장 전부 성공(
 마지막 방어선이고 프로젝트는 폭주 방어이지, **요금 상한이 아니다** — 요금은 크레딧이 맡는다.)
 
 유료 호출 **직전에** 이번 호출의 예상 비용을 더해 재고, 넘으면 부르지 않는다.
-fal 셋(이미지·목소리·영상)에 더해 **LLM 도 그물 안**이다(`lib/llm.js` · `/api/chat` ·
-`lib/vlm.js` 의 비전 호출 둘). 합성은 $0이라 걸지 않는다 — 거기서 막히면 이미 치른
-클립 값이 결과물 없이 버려진다.
+fal 셋(이미지·목소리·영상)에 더해 **LLM 도 그물 안**이다 — `lib/llm.js` · `/api/chat` ·
+`lib/vlm.js` 의 **`describePhoto` 하나**. 합성은 $0이라 걸지 않는다 — 거기서 막히면 이미
+치른 클립 값이 결과물 없이 버려진다.
+
+> ⚠️ `lib/vlm.js` 의 **`selectCandidate` 는 아직 그물 밖**이다(Minor 로 남겼다).
+> `processCut` 에서만 불리고 그 앞이 `requireVideoCharge` 이며 컷마다 `imagegen` 의 게이트가
+> 먼저 지나서다. **`describePhoto` 만 막은 이유**는 그쪽이 `POST /cuts`(=`requireVideoCharge`
+> **앞**)에서 불려 **크레딧 0 인 체험 사장님이 밟는** 자리이기 때문이다.
 
 축은 셋이다: **전역 · 프로젝트 · 체험 한도**(`FREE_TRIAL_USD`, `lib/pricing.js`).
 체험 한도는 **결제 이력도 크레딧 잔액도 없는 사람**(`charged <= 0 && balance <= 0`)에게만
