@@ -65,9 +65,35 @@ describe("POST /api/chat", () => {
     expect(f).not.toHaveBeenCalled();
   });
 
+  // ★ 파싱 앞에서 기록한다 — 이 태스크의 불변식이다.
+  //
+  // 응답이 스키마에 안 맞으면 라우트는 한 번 더 부른다(`route.js` 의 attempt 루프).
+  // 기록이 파싱 **뒤**로 가면 그 재시도 경로에서 **이미 치른 첫 호출이 원장에서 사라진다** —
+  // 이 태스크가 없애려던 "보이지 않는 지출"이 하필 두 배로 쓴 경로에서만 부활한다.
+  // 그래서 재는 것은 결과가 아니라 **순서**다: 두 번 부르면 두 줄이다.
+  it("파싱에 실패해 두 번 불러도 두 줄 다 남는다 — 부른 값은 치렀다", async () => {
+    const f = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ ...okBody, choices: [{ message: { content: "JSON 아님" } }] }),
+    }));
+    vi.stubGlobal("fetch", f);
+    const res = await POST(req(), {});
+    expect(res.status).toBe(502);          // 두 번 다 해석 실패
+    expect(f).toHaveBeenCalledTimes(2);    // 두 번 부르고 두 번 다 돈이 나갔다
+    const mine = (await memoryStore.allCosts()).filter((r) => r.actor === A);
+    expect(mine).toHaveLength(2);
+    expect(mine.every((r) => r.est_cost_usd > 0)).toBe(true);
+  });
+
   // ★★ 이 라우트는 raw fetch 라 **가짜 모드가 안 먹는다** — `SHOTFORM_FAKE=fal` 로 띄워도
   // 대화는 진짜 OpenAI 로 나가 진짜 돈이 든다. 그러니 그 모드에서 게이트가 꺼지면 안 된다.
-  // 우리가 넘기는 "openai/gpt-4o" 가 LLM 축으로 제대로 떨어지는지를 여기서 못 박는다.
+  //
+  // ⚠️ 솔직히 적어 둔다: 이 절은 바로 위 402 테스트와 **거의 중복**이다. 지금 축
+  // (`fal-ai/` 인가)에서는 엔드포인트 문자열을 어떻게 바꿔도 LLM 축으로 떨어져 결과가 같다.
+  // 축을 옛것(`openai/` 인가)으로 되돌려도 이 절은 그냥 통과한다 — **축을 무는 진짜 못은
+  // `tests/llm-gate.test.js` 의 "fal 모드에서 모르는 엔드포인트는 막는다"** 쪽이다.
+  // 그래도 남겨 둔다: 이 라우트만은 그 모드에서 진짜 돈이 나가는 유일한 자리라, 이 경로가
+  // fal 모드에서 막힌다는 사실 자체를 눈에 보이게 두는 값이 있다.
   it("SHOTFORM_FAKE=fal 이어도 게이트는 살아 있다 — 대화는 진짜로 나간다", async () => {
     await spend(FREE_TRIAL_USD + 0.01);
     vi.stubEnv("SHOTFORM_FAKE", "fal");
