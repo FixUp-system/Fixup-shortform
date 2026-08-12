@@ -556,3 +556,55 @@ describe("자막 설정 — 자유롭되 코드가 막는다", () => {
     expect(normalizeSubtitle({ pos: [5, 5] }).pos).toEqual([0.94, 0.94]);
   });
 });
+
+describe("toAss — 자막 설정을 싣는다", () => {
+  const cues = [{ start: 0, end: 2, text: "안녕하세요" }];
+  const size = { width: 1080, height: 1920 };
+
+  it("설정을 안 주면 지금과 같다 — 옛 완성본이 낡지 않는다", () => {
+    const ass = toAss(cues, { ...size });
+    expect(ass).toContain("Pretendard");
+    expect(ass).toContain("&H00FFFFFF");   // 흰 글자
+    expect(ass).toContain("Alignment"); // 헤더가 그대로다
+  });
+
+  it("폰트를 실는다", () => {
+    const ass = toAss(cues, { ...size, subtitle: { font: "impact" } });
+    expect(ass).toContain("Black Han Sans");
+  });
+
+  // ★ ASS 색은 &HAABBGGRR — RGB 가 아니라 **BGR 역순**이다. 뒤집으면 빨강이 파랑이 된다.
+  it("색을 BGR 로 뒤집어 싣는다", () => {
+    const ass = toAss(cues, { ...size, subtitle: { color: "#FF0000" } });
+    expect(ass).toContain("&H000000FF");   // 빨강 = BGR 00 00 FF
+  });
+
+  it("외곽선은 코드가 정한다 — 밝은 글자면 검정", () => {
+    const ass = toAss(cues, { ...size, subtitle: { color: "#FFCC00" } });
+    expect(ass).toContain("&H00000000");   // 검정 외곽
+  });
+
+  it("어두운 글자면 흰 외곽", () => {
+    const ass = toAss(cues, { ...size, subtitle: { color: "#101010" } });
+    expect(ass).toContain("&H00FFFFFF");
+  });
+
+  it("크기 배율이 글자 크기에 곱해진다", () => {
+    const base = toAss(cues, { ...size });
+    const big = toAss(cues, { ...size, subtitle: { size: 1.5 } });
+    const num = (s) => Number(s.match(/Style: Main,[^,]+,(\d+)/)[1]);
+    expect(num(big)).toBe(Math.round(num(base) * 1.5));
+  });
+
+  // ★ 자유 위치는 \pos 로 절대 좌표를 준다 — Alignment 만으로는 아홉 칸뿐이다
+  it("위치를 \\pos 로 싣고 정렬을 가운데로 잡는다", () => {
+    const ass = toAss(cues, { ...size, subtitle: { pos: [0.5, 0.5] } });
+    expect(ass).toContain("\\pos(540,960)");
+    expect(ass).toMatch(/Style: Main,.*,5,/);   // Alignment 5 = 가운데
+  });
+
+  it("화면 밖 위치는 되돌아온 자리에 실린다", () => {
+    const ass = toAss(cues, { ...size, subtitle: { pos: [9, 9] } });
+    expect(ass).toContain(`\\pos(${Math.round(1080 * 0.94)},${Math.round(1920 * 0.94)})`);
+  });
+});
