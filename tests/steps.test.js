@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   STEPS, currentStepKey, isReachable, areCutsStale, stepFromPathname, stepHref,
   clipKey, renderKey, isAudioStale, isImageStale, isClipStale, isRenderStale,
+  isSubtitlePositionOnlyStale,
 } from "../lib/steps.js";
 
 describe("단계 정의", () => {
@@ -351,12 +352,21 @@ describe("자막 위치와 완성본 각인", () => {
     expect(빈설정).toBe(옛것);
   });
 
-  it("기본값(bottom)을 명시해도 각인이 달라진다 — 그것이 고른 것이다", () => {
-    // 사장님이 실제로 '아래'를 눌러 저장한 상태다. 옛것과 구별되어야
-    // 그 뒤에 '위'로 바꿨을 때도 정상적으로 낡는다.
-    expect(renderKey(withCuts({ subtitle_position: "bottom" }))).not.toBe(
+  it("기본값을 명시해도 각인은 옛것과 같다 — 아래는 원래 모습이라 적을 것이 없다", () => {
+    // 각인은 "무엇을 눌렀는가"가 아니라 "완성본이 어떻게 보이는가"의 지문이다.
+    // 이미 켜져 있는 '아래' 칩을 한 번 눌러 명시 저장되는 것만으로 완성본이 낡으면
+    // 픽셀이 같은 mp4 를 다시 만들게 시킨다(거짓 낡음).
+    // 구별해서 얻는 것도 없다 — '위'로 바꾸면 "top\n" 이 붙어 어차피 달라진다.
+    expect(renderKey(withCuts({ subtitle_position: "bottom" }))).toBe(
       renderKey(withCuts(undefined))
     );
+  });
+
+  it("완성본이 있는 프로젝트에서 기본값을 명시 저장해도 낡지 않는다", () => {
+    const p = withCuts(undefined);
+    p.render = { url: "/api/renders/x.mp4", of: renderKey(p) };
+    p.settings = { subtitle_position: "bottom" };
+    expect(isRenderStale(p)).toBe(false);
   });
 
   it("위치를 바꾸면 각인이 바뀐다", () => {
@@ -379,5 +389,58 @@ describe("자막 위치와 완성본 각인", () => {
     const before = clipKey(cut);
     // 자막 위치는 컷에 없다 — clipKey 의 입력이 아니다
     expect(clipKey(cut)).toBe(before);
+  });
+});
+
+describe("isSubtitlePositionOnlyStale — 낡음의 원인을 갈라 말한다", () => {
+  // 컷·그림·소리는 전부 각인과 맞는 상태로 둔다(그쪽 낡음이 섞이면 판정이 안 갈린다)
+  const fresh = () => {
+    const cuts = [
+      { image: { url: "i0", of: "장면0" }, shows: "장면0", seconds: 3, motion: "m", audio: { url: "a0" }, sentence: "첫 문장" },
+      { image: { url: "i1", of: "장면1" }, shows: "장면1", seconds: 3, motion: "m", audio: { url: "a1" }, sentence: "둘째 문장" },
+    ];
+    for (const c of cuts) c.video = { url: `v${cuts.indexOf(c)}`, of: clipKey(c) };
+    return { cuts, settings: {} };
+  };
+
+  it("위치만 바뀌었으면 참이다", () => {
+    const p = fresh();
+    p.render = { url: "/api/renders/x.mp4", of: renderKey(p) };
+    p.settings.subtitle_position = "top";
+    expect(isRenderStale(p)).toBe(true);
+    expect(isSubtitlePositionOnlyStale(p)).toBe(true);
+  });
+
+  it("위치를 옛것으로 되돌린 경우처럼 안 낡았으면 거짓이다", () => {
+    const p = fresh();
+    p.render = { url: "/api/renders/x.mp4", of: renderKey(p) };
+    expect(isSubtitlePositionOnlyStale(p)).toBe(false);
+  });
+
+  it("문장까지 고쳤으면 거짓이다 — 그쪽이 더 큰 사실이다", () => {
+    const p = fresh();
+    p.render = { url: "/api/renders/x.mp4", of: renderKey(p) };
+    p.settings.subtitle_position = "top";
+    p.cuts[0].sentence = "고친 문장";
+    expect(isSubtitlePositionOnlyStale(p)).toBe(false);
+  });
+
+  it("그림·클립이 함께 낡았으면 거짓이다", () => {
+    const 그림 = fresh();
+    그림.render = { url: "/api/renders/x.mp4", of: renderKey(그림) };
+    그림.settings.subtitle_position = "middle";
+    그림.cuts[0].shows = "다른 장면";
+    expect(isSubtitlePositionOnlyStale(그림)).toBe(false);
+
+    const 클립 = fresh();
+    클립.render = { url: "/api/renders/x.mp4", of: renderKey(클립) };
+    클립.settings.subtitle_position = "middle";
+    클립.cuts[0].video.of = "옛 클립 각인";
+    expect(isSubtitlePositionOnlyStale(클립)).toBe(false);
+  });
+
+  it("완성본이 없거나 각인이 없으면 거짓이다", () => {
+    expect(isSubtitlePositionOnlyStale(fresh())).toBe(false);
+    expect(isSubtitlePositionOnlyStale(null)).toBe(false);
   });
 });

@@ -5,8 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 import BackButton from "../../../../components/BackButton";
-import { cutSeconds } from "../../../../lib/subtitles";
-import { isRenderStale, isClipStale, isImageStale } from "../../../../lib/steps";
+import { cutSeconds, DEFAULT_SUBTITLE_POSITION } from "../../../../lib/subtitles";
+import { isRenderStale, isClipStale, isImageStale, isSubtitlePositionOnlyStale } from "../../../../lib/steps";
 
 export default function DoneStepPage() {
   const { id } = useParams();
@@ -70,6 +70,8 @@ export default function DoneStepPage() {
   // 자막 위치는 합성에만 쓰인다 — 클립·그림·소리는 그대로다. 그래서 바꿔도 값이 안 든다.
   async function saveSubtitlePosition(position) {
     if (busy) return;
+    // 이미 켜진 칩을 눌러도 헛 PATCH 가 안 나가게 — 연타 레이스도 함께 줄어든다
+    if ((project?.settings?.subtitle_position || DEFAULT_SUBTITLE_POSITION) === position) return;
     setErr("");
     const res = await fetch(`/api/projects/${id}`, {
       method: "PATCH",
@@ -100,6 +102,11 @@ export default function DoneStepPage() {
   // 거기서 [다시 합치기]를 눌러도 옛 클립으로 다시 합쳐져 "안 낡음"으로 굳는다.
   // ⚠️ some(isImageStale) 로 넘기면 배열 번호가 project 자리에 들어가 화풍 판정이 죽는다.
   const stale = isRenderStale(project) || cuts.some(isClipStale) || cuts.some((c) => isImageStale(c, project));
+  // 낡음의 원인을 갈라 말한다 — 자막 위치만 바꾼 것을 "옛 소리·옛 그림" 이라 하면
+  // 사장님이 자기가 무엇을 망가뜨렸나로 읽는다. 갈래는 둘이면 충분하다.
+  const staleMessage = isSubtitlePositionOnlyStale(project)
+    ? "자막 위치를 바꿨어요 — 다시 합치면 새 위치로 나와요"
+    : "컷을 고친 뒤라 이 영상은 옛 소리·옛 그림으로 만든 것이에요 — 다시 합쳐 주세요";
 
   if (!clipCount) return <p className="pgsub">영상을 먼저 만들어 주세요.</p>;
 
@@ -137,9 +144,7 @@ export default function DoneStepPage() {
         <>
           <p className="pgsub">완성했어요 — 약 {Math.round(render.seconds || 0)}초.</p>
           {stale && (
-            <div className="script-src warn">
-              컷을 고친 뒤라 이 영상은 옛 소리·옛 그림으로 만든 것이에요 — 다시 합쳐 주세요
-            </div>
+            <div className="script-src warn">{staleMessage}</div>
           )}
           {render.noSubtitles && (
             <div className="script-src warn">
@@ -162,7 +167,7 @@ export default function DoneStepPage() {
         {[["top", "위"], ["middle", "중간"], ["bottom", "아래"]].map(([value, label]) => (
           <button
             key={value}
-            className={`chip${(project?.settings?.subtitle_position || "bottom") === value ? " on" : ""}`}
+            className={`chip${(project?.settings?.subtitle_position || DEFAULT_SUBTITLE_POSITION) === value ? " on" : ""}`}
             disabled={busy}
             onClick={() => saveSubtitlePosition(value)}
           >
