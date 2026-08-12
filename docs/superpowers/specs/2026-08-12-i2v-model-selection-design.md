@@ -80,14 +80,20 @@
 
 모델 id 가 `bytedance/…` 라 `fal-ai/` 로 시작하지 않는다. 셋 다 접두사로 판정한다.
 
-**(a) 가짜 모드 — 가장 위험하다.** `lib/costs.js` 의 `fakeFor(endpoint)` 가
+**(a) 가짜 모드 — 가장 위험하다.** `lib/costs.js` 의 `isFakeFor(endpoint)` 가
 `startsWith("fal-ai/")` 면 `fakeFal()`, **나머지는 전부 `fakeLlm()`** 으로 본다.
 그대로 두면 Seedance 는 "LLM" 으로 분류되어 **`SHOTFORM_FAKE=fal` 에서 진짜 호출이 나간다**
 — 0원인 줄 알고 돌린 테스트가 클립당 $1.5 를 쓴다.
 
-→ `isFalEndpoint(endpoint)` 하나로 판정을 모은다. 판정을 **뒤집어** `openai/` 로 시작하는
-것만 LLM 으로 보고 **나머지는 fal 로 본다.** 모르는 엔드포인트가 fal 로 분류되면 가짜 모드에서
-호출이 막히고(안전), LLM 으로 분류되면 돈이 나간다(위험) — 기본값은 안전한 쪽이어야 한다.
+→ **fal 접두사를 열거하는 쪽으로 고친다.** `lib/costs.js` 에
+`const FAL_PREFIXES = ["fal-ai/", "bytedance/"]` 를 두고 `isFakeFor` 가 그 목록으로 판정한다.
+
+⚠️ **판정 방향을 뒤집으면 안 된다**(`openai/` 만 LLM 으로 보고 나머지를 fal 로 보는 것).
+`isFakeFor` 위 주석이 그 이유를 이미 적고 있다 — 방향을 뒤집으면 **모르는 엔드포인트가 fal
+축으로 떨어져 `SHOTFORM_FAKE=fal` 에서 `assertBudget` 게이트가 통째로 꺼진다.**
+접두사를 안 붙인 새 LLM 호출부 하나면 예전에 메운 구멍이 되돌아온다. 지금 방향은
+"모르는 것은 게이트를 통과시키지 않는 쪽(fail-closed)" 이고, 그것이 옳다.
+이번 문제는 방향이 아니라 **Seedance 가 목록에 없다**는 것이므로, 목록만 넓힌다.
 
 **(b) 원가표.** `lib/costs.js` `PRICE_TABLE` 에 `bytedance/seedance-2.0` `perSec: 0.3024`.
 없으면 원가가 조용히 $0 으로 기록되어 원장과 전역 상한이 함께 무력해진다.
@@ -129,10 +135,9 @@
   잠긴 경우는 "이미 영상을 만들기 시작해서 모델을 바꿀 수 없어요"
 
 `POST /api/projects`(생성)의 settings 화이트리스트에 `i2v_model` 을 더하고, 없으면
-기본값을 **명시 저장**한다(3번). ★ 빠른 생성(`lib/auto.js` · `components/QuickCreate.jsx`)도
-같은 생성 라우트를 타는지 확인하고, 다른 경로로 프로젝트를 만든다면 그쪽에도 같은 명시
-저장이 있어야 한다 — 한 경로만 빠지면 그 프로젝트들이 "옛 프로젝트"로 오인되어 Kling 으로
-돈다.
+기본값을 **명시 저장**한다(3번). 생성 경로는 **이 라우트 하나뿐임을 확인했다** —
+`createProject()` 호출처가 여기 한 곳이고, 빠른 생성(`components/QuickCreate.jsx`)도
+`POST /api/projects` 를 거쳐 간다. 그래서 명시 저장 자리도 하나다.
 
 `settings.i2v_model` 에 저장하는 값은 **`I2V_MODELS` 의 `id`**(예: `"seedance-2.0"`)이지
 엔드포인트 문자열이 아니다. 엔드포인트는 표가 쥔다.
