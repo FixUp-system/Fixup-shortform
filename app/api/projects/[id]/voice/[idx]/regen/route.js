@@ -7,10 +7,21 @@ import {
 import { regenPrice, MAX_REGEN_PER_CUT } from "../../../../../../../lib/pricing.js";
 import { BudgetExceeded } from "../../../../../../../lib/costs.js";
 import { fakeFal } from "../../../../../../../lib/fake";
-import { modelIdForProject } from "../../../../../../../lib/clip-limits.js";
+import { modelIdForProject, projectSpeaks } from "../../../../../../../lib/clip-limits.js";
 
 export const POST = withUser(async (req, { params }, user) => {
   const { id, idx } = await params;
+
+  // ★ 말하는 모델에서는 목소리가 클립과 한 몸이라 따로 다시 만들 수 없다.
+  // 어떤 청구보다도 앞이다 — 못 줄 것에 값을 받지 않는다. 가짜 모드에서도 같은 답이어야
+  // 화면이 두 모드에서 같게 굴러간다.
+  const project = await getProject(id, user.id);
+  if (project && projectSpeaks(project)) {
+    return Response.json(
+      { error: "이 영상은 목소리가 영상에 함께 만들어져요 — 영상을 다시 만들어 주세요" },
+      { status: 400 }
+    );
+  }
 
   // 컷당 첫 재생성은 공짜, 둘째부터 정가. 회차는 그 컷이 이미 쓴 횟수다.
   //
@@ -21,7 +32,7 @@ export const POST = withUser(async (req, { params }, user) => {
   // 가짜 모드는 건너뛴다 — 0원이라 받을 것이 없다(assertBudget 과 같은 규칙).
   let charged = null;
   if (!fakeFal()) {
-    const project = await getProject(id, user.id);
+    // project 는 위에서 한 번 읽었다(말하는 프로젝트 판정) — 여기서 다시 읽지 않는다
     const cut = (project?.cuts || []).find((c) => c.idx === Number(idx));
     const prior = Number(cut?.voice_regen_count) || 0;
 

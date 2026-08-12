@@ -4,7 +4,7 @@ import { VOICES } from "../../../../../lib/voices";
 import { fakeFal } from "../../../../../lib/fake";
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { requireVideoCharge, NoCredits } from "../../../../../lib/charges.js";
-import { modelIdForProject } from "../../../../../lib/clip-limits.js";
+import { modelIdForProject, projectSpeaks } from "../../../../../lib/clip-limits.js";
 
 export const POST = withUser(async (req, { params }, user) => {
   const { id } = await params;
@@ -15,6 +15,16 @@ export const POST = withUser(async (req, { params }, user) => {
   // 컷은 대본 승인이 나눈다(POST /cuts).
   if (!(project.cuts || []).length) {
     return Response.json({ error: "대본을 먼저 만들어 주세요" }, { status: 400 });
+  }
+
+  // ★ 말하는 모델에서는 클립이 목소리를 만든다 — 여기서 살 것이 없다.
+  // 고른 목소리(voice_id)도 필요 없다: 대사와 목소리는 캐스팅(project.cast)에 있고
+  // 클립 프롬프트가 그것을 싣는다.
+  // 단계를 없애지 않는 이유는 Kling 경로가 그대로 쓰기 때문이다 — status 만 넘긴다.
+  // 정가는 다음 문(/images)이 받는다. 아무것도 안 사는 자리에서 값을 물리지 않는다.
+  if (projectSpeaks(project)) {
+    await updateProject(id, user.id, (proj) => ({ ...proj, status: "voice", voice_error: null }));
+    return Response.json({ skipped: true });
   }
 
   const body = await req.json().catch(() => ({}));

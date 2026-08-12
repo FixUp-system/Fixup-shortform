@@ -448,6 +448,46 @@ describe("runVoicePipeline — 컷마다 따로 읽힌다", () => {
     expect(isAudioStale({ ...cut, sentence: "고친 문장" })).toBe(true);
   });
 
+  // ★ 말하는 모델(Seedance)에서는 클립이 직접 말한다. 여기서 TTS 까지 만들면 소리가
+  // 두 겹이 되고, 합성이 컷의 audio 를 우선하므로 화면은 클립 입모양인데 들리는 소리는
+  // TTS 가 된다(립싱크가 어긋난다).
+  describe("말하는 프로젝트는 목소리를 만들지 않는다", () => {
+    // projectSpeaks 는 모델·cast·cuts 를 함께 본다 — 셋이 다 있어야 true 다
+    async function speaking(model) {
+      const p = await projects.createProject({ ownerId: OWNER,
+        settings: { aspect_ratio: "9:16", i2v_model: model },
+        material: { text: "자료", photos: [] },
+      });
+      await projects.updateProject(p.id, OWNER, (proj) => ({
+        ...proj, status: "cuts", voice_id: "v1",
+        cast: [{ id: "c1", who: "20대 남성", voice: "중저음", cuts: [0] }],
+        cuts: [{ idx: 0, sentence: "안녕하세요", seconds: 3 }],
+      }));
+      return p;
+    }
+
+    it("TTS 를 한 번도 부르지 않는다", async () => {
+      const speak = vi.fn(async () => ({ url: "a.mp3", seconds: 3 }));
+      const p = await speaking("seedance-2.0");
+      await pipeline.runVoicePipeline(p.id, OWNER, { speak });
+      expect(speak).not.toHaveBeenCalled();
+      const saved = await projects.getProject(p.id, OWNER);
+      expect(saved.cuts[0].audio, "소리가 없어야 합성이 클립 소리를 쓴다").toBeUndefined();
+      // 단계는 넘어간다 — status 가 다음 화면을 여는 유일한 신호다(lib/steps.js)
+      expect(saved.status).toBe("voice");
+    });
+
+    // ★ Kling 은 그대로다 — 이 태스크가 깨면 안 되는 것
+    it("말하지 않는 프로젝트는 지금처럼 만든다", async () => {
+      const speak = vi.fn(async () => ({ url: "a.mp3", seconds: 3 }));
+      const p = await speaking("kling-v3");
+      await pipeline.runVoicePipeline(p.id, OWNER, { speak });
+      expect(speak).toHaveBeenCalled();
+      const saved = await projects.getProject(p.id, OWNER);
+      expect(saved.cuts[0].audio.url).toBe("a.mp3");
+    });
+  });
+
   it("실측이 8초를 넘으면 추정과 나란히 로그로 남긴다 — 흐름은 막지 않는다", async () => {
     const p = await makeProject();
     await runBoth(p.id, deps());

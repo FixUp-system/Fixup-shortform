@@ -58,6 +58,7 @@ const { GET: renderFileGET } = await import("../app/api/renders/[name]/route.js"
 const { POST: projectsPOST } = await import("../app/api/projects/route.js");
 const { POST: cutRegenPOST } = await import("../app/api/projects/[id]/cuts/[idx]/regen/route.js");
 const { POST: voiceRegenPOST } = await import("../app/api/projects/[id]/voice/[idx]/regen/route.js");
+const { POST: voicePOST } = await import("../app/api/projects/[id]/voice/route.js");
 const { POST: clipRegenPOST } = await import("../app/api/projects/[id]/clips/[idx]/regen/route.js");
 
 const ctx = (id) => ({ params: Promise.resolve({ id }) });
@@ -954,11 +955,53 @@ describe("POST regen 라우트 — id·ownerId·idx 가 밀리지 않는다", ()
     expect(pipelineMock.regen).toHaveBeenCalledWith(p.id, OWNER, 1);
   });
 
+  // 말하는 모델에서는 목소리가 클립과 한 몸이라 따로 다시 만들 수 없다.
+  // 그 말을 화면에 해 주는 자리가 여기다 — 눌러도 아무 일이 없으면 계속 누른다.
+  it("말하는 프로젝트에서 목소리 재생성은 400 이다", async () => {
+    const p = await createProject({
+      ownerId: OWNER,
+      settings: { i2v_model: "seedance-2.0" },
+      material: { text: "가", photos: [] },
+    });
+    await grant();
+    await updateProject(p.id, OWNER, (proj) => ({
+      ...proj,
+      cast: [{ id: "c1", who: "20대 남성", voice: "중저음", cuts: [0] }],
+      cuts: [{ idx: 0, sentence: "안녕하세요", seconds: 3 }],
+    }));
+    const res = await voiceRegenPOST(patchReq({}), idxCtx(p.id, 0));
+    expect(res.status).toBe(400);
+    expect(pipelineMock.regen).not.toHaveBeenCalled();
+  });
+
   it("클립 재생성 — id·ownerId·idx 순서로 넘긴다", async () => {
     const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
     await grant();
     const res = await clipRegenPOST(patchReq({}), idxCtx(p.id, 2));
     expect(res.status).toBe(200);
     expect(pipelineMock.regen).toHaveBeenCalledWith(p.id, OWNER, 2);
+  });
+});
+
+// ③목소리 화면의 시작 버튼 — 말하는 프로젝트에서는 살 것이 없다.
+// 단계 자체를 없애지는 않는다(Kling 경로가 그대로 쓴다). 여기서는 status 만 넘긴다.
+describe("POST /voice — 말하는 프로젝트는 소리를 사지 않는다", () => {
+  it("파이프라인을 부르지 않고 status 만 voice 로 넘긴다", async () => {
+    const p = await createProject({
+      ownerId: OWNER,
+      settings: { i2v_model: "seedance-2.0" },
+      material: { text: "가", photos: [] },
+    });
+    await grant();
+    await updateProject(p.id, OWNER, (proj) => ({
+      ...proj, status: "cuts",
+      cast: [{ id: "c1", who: "20대 남성", voice: "중저음", cuts: [0] }],
+      cuts: [{ idx: 0, sentence: "안녕하세요", seconds: 3 }],
+    }));
+    const res = await voicePOST(patchReq({}), ctx(p.id));
+    expect(res.status).toBe(200);
+    expect(pipelineMock.run).not.toHaveBeenCalled();
+    // 다음 화면(④이미지)이 열리는 유일한 신호다(lib/steps.js currentStepKey)
+    expect((await getProject(p.id, OWNER)).status).toBe("voice");
   });
 });

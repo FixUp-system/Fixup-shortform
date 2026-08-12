@@ -34,7 +34,10 @@ describe("낡은 것이 있으면 다음 단계로 못 간다", () => {
         // 좁혀서 봐야 잠금 조건 자체가 지워지는 회귀를 잡을 수 있다.
         const src = read(path);
         expect(src).toContain("staleCount");
-        const pushIdx = src.indexOf("router.push");
+        // ★ 마지막 router.push 를 본다. ③목소리 화면에는 넘김이 둘이 됐다 — 말하는 모델
+        // (클립이 직접 말한다)에서는 만든 소리가 없어 낡을 것도 없고, 그 갈래는 화면 위쪽에서
+        // 먼저 return 된다. 잠겨야 하는 것은 소리를 만든 뒤의 버튼이고 그것이 파일 끝의 것이다.
+        const pushIdx = src.lastIndexOf("router.push");
         const buttonStart = src.lastIndexOf("<button", pushIdx);
         const button = src.slice(buttonStart, pushIdx);
         const disabledMatch = button.match(/disabled=\{([^}]*)\}/);

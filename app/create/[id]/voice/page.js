@@ -14,7 +14,7 @@ import { VOICES } from "../../../../lib/voices";
 import { isAudioStale } from "../../../../lib/steps";
 // 상한과 정가는 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다).
 import { MAX_REGEN_PER_CUT, priceLabel, regenPrice, videoPrice } from "../../../../lib/pricing";
-import { modelIdForProject } from "../../../../lib/clip-limits";
+import { modelIdForProject, projectSpeaks } from "../../../../lib/clip-limits";
 
 export default function VoiceStepPage() {
   const { id } = useParams();
@@ -120,6 +120,20 @@ export default function VoiceStepPage() {
     startPolling();
   }
 
+  // 말하는 모델에서는 만들 소리가 없다 — 단계만 넘긴다(서버가 status 를 세운다).
+  // 화면에서 바로 다음 주소로 밀면 안 된다: 가드가 status 를 보고 되돌려보낸다(lib/steps.js).
+  async function skipVoice() {
+    setBusy(true); setErr("");
+    const res = await fetch(`/api/projects/${id}/voice`, { method: "POST" });
+    if (!res.ok) {
+      setErr((await res.json().catch(() => ({}))).error || "다음으로 넘어가지 못했어요");
+      setBusy(false);
+      return;
+    }
+    await load(id).catch(() => {});
+    router.push(`/create/${id}/images`);
+  }
+
   // 다시 읽는 동안 잠근다 — 표시가 없으면 눌러도 아무 일이 없어 보여 한 번 더 누르게 된다
   async function regen(idx) {
     if (regening !== null) return;
@@ -162,6 +176,29 @@ export default function VoiceStepPage() {
           {project.cuts_error || "컷을 나누지 못했어요"}{" "}
           <button className="mini" onClick={retrySplit} disabled={busy}>다시 시도</button>
         </p>
+      </section>
+    );
+  }
+
+  // ★ 말하는 모델(Seedance)에서는 클립이 대사를 직접 말한다(입모양까지) — 여기서 TTS 를
+  // 만들면 소리가 두 겹이 되고 립싱크가 어긋난다. 그래서 이 화면에서는 아무것도 안 산다.
+  // 단계 자체를 없애지 않는 이유는 Kling 경로가 이 화면을 그대로 쓰기 때문이다.
+  if (projectSpeaks(project)) {
+    return (
+      <section className="panel panel--narrow">
+        <h2>목소리는 영상이 함께 만들어요 <span className="badge vlm">목소리</span></h2>
+        {err && <p className="pgsub warn">{err}</p>}
+        <p className="pgsub">
+          이 영상은 목소리가 영상에 함께 만들어져요 — 다음 단계로 넘어가세요.
+        </p>
+        <div className="step-actions">
+          <BackButton stepKey="voice" />
+          <div className="fwd">
+            <button className="cta" disabled={busy} onClick={skipVoice}>
+              이미지 만들러 가기 →
+            </button>
+          </div>
+        </div>
       </section>
     );
   }
