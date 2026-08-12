@@ -4,6 +4,7 @@ import {
   I2V_MODELS, I2V_MODEL_IDS, DEFAULT_I2V_MODEL, LEGACY_I2V_MODEL,
   modelIdForProject, endpointForProject, clipProfileForProject, clipLimitsForProject,
   profileFor, fitDurationFor, minSecondsFor, maxSecondsFor,
+  speaksFor, projectSpeaks,
   I2V_STEPS, I2V_MAX_SECONDS, fitDuration,
 } from "../lib/clip-limits";
 
@@ -174,9 +175,11 @@ describe("영상 모델 표", () => {
     expect(clipLimitsForProject(p)).toEqual({ min: 4, max: 15 });
   });
 
-  it("Seedance 는 오디오를 끈다 — 클립 소리가 우리 낭독과 두 겹이 되면 안 된다", () => {
+  // ★ 뒤집혔다 — 이 모델은 클립이 직접 말한다. 대신 우리 TTS 를 만들지 않는다
+  //   (둘 다 만들면 소리가 두 겹이 된다). 판정은 speaksFor 가 쥔다.
+  it("Seedance 는 오디오를 켠다 — 클립이 직접 말한다", () => {
     const profile = profileFor("bytedance/seedance-2.0/image-to-video");
-    expect(profile.extra.generate_audio).toBe(false);
+    expect(profile.extra.generate_audio).toBe(true);
   });
 
   it("Seedance 는 4~15 정수를 받는다 — 눈금이 아니다", () => {
@@ -206,5 +209,60 @@ describe("영상 모델 표", () => {
     } finally {
       delete process.env.FAL_I2V_ENDPOINT;
     }
+  });
+});
+
+describe("음성을 누가 만드는가 — 모델이 정한다", () => {
+  it("Seedance 는 클립이 말한다", () => {
+    expect(speaksFor(profileFor("bytedance/seedance-2.0/image-to-video"))).toBe(true);
+  });
+
+  // ★ Kling 은 오디오를 켜면 단가가 $0.084 → $0.126 이고 립싱크가 미검증이다
+  it("Kling 은 말하지 않는다 — TTS 낭독 그대로다", () => {
+    expect(speaksFor(profileFor("fal-ai/kling-video/v3/standard/image-to-video"))).toBe(false);
+  });
+
+  it("모르는 모델은 말하지 않는 쪽으로 떨어진다", () => {
+    expect(speaksFor(profileFor("어디회사/새모델"))).toBe(false);
+  });
+
+  // ★ 오디오를 켜는 것과 말하는 것은 같은 스위치다 — 갈리면 무음 클립에 대사를 넣거나
+  //    소리 나는 클립 위에 TTS 를 덧씌운다
+  it("말하는 모델만 generate_audio 가 켜져 있다", () => {
+    expect(profileFor("bytedance/seedance-2.0/image-to-video").extra.generate_audio).toBe(true);
+    expect(profileFor("fal-ai/kling-video/v3/standard/image-to-video").extra.generate_audio).toBe(false);
+  });
+
+  // ★★ 모든 컷에 말할 사람과 대사가 있어야 한다 — 하나라도 비면 그 컷만 무음이 되어
+  // 한 편 안에서 원고 일부가 안 들린다. 섞지 않는다.
+  describe("projectSpeaks — 한 편 안에서 소리의 출처가 갈리지 않는다", () => {
+    const seed = (cast, cuts) => ({ settings: { i2v_model: "seedance-2.0" }, cast, cuts });
+    const person = (cuts) => [{ id: "c1", who: "20대 남성", voice: "중저음", cuts }];
+    const cuts2 = [{ idx: 0, sentence: "가" }, { idx: 1, sentence: "나" }];
+
+    it("모든 컷에 인물이 있으면 말한다", () => {
+      expect(projectSpeaks(seed(person([0, 1]), cuts2))).toBe(true);
+    });
+
+    it("한 컷이라도 인물이 없으면 전체가 말하지 않는다", () => {
+      expect(projectSpeaks(seed(person([0]), cuts2))).toBe(false);
+    });
+
+    it("한 컷이라도 대사가 비면 말하지 않는다", () => {
+      expect(projectSpeaks(seed(person([0, 1]), [{ idx: 0, sentence: "가" }, { idx: 1, sentence: "  " }]))).toBe(false);
+    });
+
+    it("인물이 아예 없으면 말하지 않는다", () => {
+      expect(projectSpeaks(seed([], cuts2))).toBe(false);
+      expect(projectSpeaks({ settings: { i2v_model: "seedance-2.0" }, cuts: cuts2 })).toBe(false);
+    });
+
+    it("컷이 없으면 말하지 않는다", () => {
+      expect(projectSpeaks(seed(person([0, 1]), []))).toBe(false);
+    });
+
+    it("모델이 Kling 이면 인물이 다 있어도 말하지 않는다", () => {
+      expect(projectSpeaks({ settings: { i2v_model: "kling-v3" }, cast: person([0, 1]), cuts: cuts2 })).toBe(false);
+    });
   });
 });
