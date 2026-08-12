@@ -507,6 +507,23 @@ describe("runVideoPipeline — 이미지를 클립으로", () => {
     expect(got.aspect_ratio).toBe("9:16");
   });
 
+  // 어느 모델로 만들지는 프로젝트가 정한다(lib/clip-limits.js). 파이프라인이 그 문서를
+  // 안 넘기면 클립이 조용히 레거시(Kling)로 돌아 한 편 안에 두 모델이 섞인다.
+  it("프로젝트 문서를 그대로 넘긴다 — 모델은 프로젝트가 정한다", async () => {
+    const p = await withCuts([
+      { idx: 0, sentence: "문장", seconds: 3, image: { url: "i0" }, audio: { url: "a", seconds: 3 } },
+    ]);
+    await projects.updateProject(p.id, OWNER, (proj) => ({
+      ...proj,
+      settings: { ...proj.settings, i2v_model: "seedance-2.0" },
+    }));
+    let got;
+    await pipeline.runVideoPipeline(p.id, OWNER, {
+      clip: async (args) => { got = args; return { url: "v", seconds: 3, truncated: false }; },
+    });
+    expect(got.project?.settings?.i2v_model).toBe("seedance-2.0");
+  });
+
   it("한 컷이 실패해도 나머지는 살아남는다", async () => {
     const p = await withCuts([
       { idx: 0, sentence: "실패", seconds: 3, image: { url: "i0" }, audio: { url: "a0", seconds: 3 } },
@@ -967,6 +984,21 @@ describe("재생성 상한 판정이 낙관적 락 재시도를 견딘다", () =
     // 버려진 시도는 세지 않는다 — 0 에서 한 번 올라 1이어야 한다
     expect(cut.voice_regen_count).toBe(1);
     expect(cut.audio?.url).toBe("http://a.mp3");
+  });
+
+  // ★ 재생성도 같은 모델로 돌아야 한다 — 여기를 빠뜨리면 재생성만 레거시(Kling)가 되어
+  // 한 편 안에 두 모델이 섞인다.
+  it("regenClip — 프로젝트 문서를 그대로 넘긴다", async () => {
+    const p = await projectWithCut({ image: { url: "http://img/a", of: "" } });
+    await projects.updateProject(p.id, OWNER, (proj) => ({
+      ...proj,
+      settings: { ...proj.settings, i2v_model: "seedance-2.0" },
+    }));
+    let got;
+    await pipeline.regenClip(p.id, OWNER, 0, {
+      clip: async (args) => { got = args; return { url: "http://v.mp4", seconds: 5 }; },
+    });
+    expect(got.project?.settings?.i2v_model).toBe("seedance-2.0");
   });
 
   it("regenClip — 버려진 시도가 본 상한이 재시도까지 살아남지 않는다", async () => {

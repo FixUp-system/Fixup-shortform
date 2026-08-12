@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { generateClip, fitDuration, I2V_MAX_SECONDS } from "../lib/i2v";
-import { profileFor, fitDurationFor, maxSecondsFor } from "../lib/clip-limits";
+import { profileFor, fitDurationFor, maxSecondsFor, clipProfileForProject } from "../lib/clip-limits";
 import { runWithActor } from "../lib/actor.js";
 import { memoryStore } from "../lib/store/memory.js";
 
@@ -23,24 +23,22 @@ import path from "path";
 // 이 테스트들은 addRecord 가 실제로 도는 경로를 지난다.
 process.env.SHOTFORM_DATA_DIR = mkdtempSync(path.join(tmpdir(), "shotform-t-"));
 
-afterEach(() => { delete process.env.SHOTFORM_FAKE; delete process.env.FAL_I2V_ENDPOINT; });
+afterEach(() => { delete process.env.SHOTFORM_FAKE; });
 
-// 이 묶음은 **LTX 눈금(열거)**을 전제로 쓰여 있다. 예전에는 env 를 비우는 것이 곧 LTX 였지만
-// 2026-07-30 에 기본 엔드포인트가 Kling v3(범위)로 바뀌었다 — 비워 두면 3~15 를 자유롭게 받아
-// "6초로 올라간다"가 성립하지 않는다. 그래서 뜻하는 모델을 명시한다.
+// 모델은 이제 **프로젝트**가 정한다(env 는 폐지됐다). 이 묶음은 프로젝트를 안 넘긴 호출,
+// 즉 레거시(Kling v3, 3~15초 범위)를 전제로 쓰여 있다.
+// 열거 눈금(LTX)의 올림은 순수 함수(fitDurationFor)로만 확인한다 — 고를 수 있는 모델이 아니다.
 describe("generateClip", () => {
-  beforeEach(() => { process.env.FAL_I2V_ENDPOINT = "fal-ai/ltx-2.3/image-to-video/fast"; });
-
   it("가짜 모드에서는 이미지 URL을 그대로 클립으로 돌려준다", async () => {
     process.env.SHOTFORM_FAKE = "1";
     let called = false;
     const r = await generateClip({
-      imageUrl: "data:image/svg+xml;base64,AAA", seconds: 4, aspect_ratio: "9:16",
+      imageUrl: "data:image/svg+xml;base64,AAA", seconds: 2, aspect_ratio: "9:16",
       fetchImpl: () => { called = true; },
     });
     expect(called).toBe(false);
-    // 4초는 눈금(6·8·10…)에 없어 6초로 올라간다 — 가짜 모드도 진짜와 같은 값을 돌려줘야 한다
-    expect(r).toEqual({ url: "data:image/svg+xml;base64,AAA", seconds: 6, truncated: false });
+    // 2초는 Kling 하한(3초)보다 짧아 3초로 올라간다 — 가짜 모드도 진짜와 같은 값을 돌려줘야 한다
+    expect(r).toEqual({ url: "data:image/svg+xml;base64,AAA", seconds: 3, truncated: false });
   });
 
   // 관통에서 낭독 실측(9초·5초)을 그대로 보냈다가 네 컷 전부 422 로 거절당했다:
@@ -70,20 +68,20 @@ describe("generateClip", () => {
       return { ok: true, json: async () => ({ video: { url: "https://fal.media/v.mp4" } }) };
     };
     const r = await runWithActor("t-user", () => generateClip({ imageUrl: "i", seconds: 25, aspect_ratio: "9:16", fetchImpl }));
-    const ltxMax = maxSecondsFor(profileFor(LTX));
-    expect(sent.duration).toBe(ltxMax);
-    expect(r.seconds).toBe(ltxMax);
+    const klingMax = maxSecondsFor(clipProfileForProject());
+    expect(sent.duration).toBe(klingMax);
+    expect(r.seconds).toBe(klingMax);
     expect(r.truncated).toBe(true);
   });
 
-  it("눈금에 맞춰 올린 것은 잘린 것이 아니다", async () => {
+  it("하한에 맞춰 올린 것은 잘린 것이 아니다", async () => {
     let sent;
     const fetchImpl = async (_url, opts) => {
       sent = JSON.parse(opts.body);
       return { ok: true, json: async () => ({ video: { url: "v" } }) };
     };
-    const r = await runWithActor("t-user", () => generateClip({ imageUrl: "i", seconds: 4.3, aspect_ratio: "9:16", fetchImpl }));
-    expect(sent.duration).toBe(6);
+    const r = await runWithActor("t-user", () => generateClip({ imageUrl: "i", seconds: 2.3, aspect_ratio: "9:16", fetchImpl }));
+    expect(sent.duration).toBe(3);
     expect(r.truncated).toBe(false);
   });
 
@@ -120,7 +118,7 @@ describe("generateClip", () => {
       return { ok: true, json: async () => ({ video: { url: "v" } }) };
     };
     await runWithActor("t-user", () => generateClip({ imageUrl: "i", seconds: 0, aspect_ratio: "9:16", fetchImpl }));
-    expect(sent.duration).toBe(6);
+    expect(sent.duration).toBe(3);
   });
 
   it("결과가 비면 던진다", async () => {
@@ -144,8 +142,10 @@ describe("generateClip", () => {
 
 // 모델을 바꾸면 눈금과 body 가 함께 따라와야 한다 — 눈금만 따라오면 오디오가 켜진 채로
 // 청구되고(단가 $0.084 → $0.126) 클립에 소리가 실려 낭독과 두 겹이 된다.
-describe("generateClip — 활성 프로필이 요청을 정한다", () => {
+describe("generateClip — 프로젝트의 프로필이 요청을 정한다", () => {
   const KLING = "fal-ai/kling-video/v3/standard/image-to-video";
+  const klingProject = { settings: { i2v_model: "kling-v3" } };
+  const seedanceProject = { settings: { i2v_model: "seedance-2.0" } };
   const sender = () => {
     const box = {};
     return {
@@ -158,10 +158,10 @@ describe("generateClip — 활성 프로필이 요청을 정한다", () => {
     };
   };
 
-  // env 를 안 옮긴 환경(배포·CI·새 클론)이 여기로 온다. 기본 엔드포인트와 기본 프로필이
-  // 갈려 있으면 Kling 을 부르면서 LTX 프로필을 써서 `generate_audio` 가 빠지고,
+  // 모델 정보가 없는 호출(옛 호출부·프로젝트를 못 쥔 자리)이 여기로 온다. 부르는 모델과
+  // 프로필이 갈려 있으면 Kling 을 부르면서 다른 프로필을 써서 `generate_audio` 가 빠지고,
   // 오디오가 켜진 채 청구되며($0.084→$0.126) 클립 소리가 낭독과 두 겹이 된다.
-  it("env 가 없어도 부르는 모델과 프로필이 같다", async () => {
+  it("project 가 없어도 부르는 모델과 프로필이 같다", async () => {
     const { box, fetchImpl } = sender();
     await runWithActor("t-user", () => generateClip({ imageUrl: "i", seconds: 7, aspect_ratio: "9:16", fetchImpl }));
     expect(box.url).toContain(KLING);
@@ -170,33 +170,44 @@ describe("generateClip — 활성 프로필이 요청을 정한다", () => {
   });
 
   it("Kling 에서는 낭독 초를 그대로 산다 — 올림 손실이 사라진다", async () => {
-    process.env.FAL_I2V_ENDPOINT = KLING;
     const { box, fetchImpl } = sender();
-    const r = await runWithActor("t-user", () => generateClip({ imageUrl: "i", seconds: 7, aspect_ratio: "9:16", fetchImpl }));
+    const r = await runWithActor("t-user", () =>
+      generateClip({ imageUrl: "i", seconds: 7, aspect_ratio: "9:16", project: klingProject, fetchImpl })
+    );
     expect(box.sent.duration).toBe(7);
     expect(r.seconds).toBe(7);
     expect(box.url).toContain(KLING);
   });
 
   it("Kling 에서는 오디오를 끈다", async () => {
-    process.env.FAL_I2V_ENDPOINT = KLING;
     const { box, fetchImpl } = sender();
-    await runWithActor("t-user", () => generateClip({ imageUrl: "i", seconds: 5, aspect_ratio: "9:16", fetchImpl }));
+    await runWithActor("t-user", () =>
+      generateClip({ imageUrl: "i", seconds: 5, aspect_ratio: "9:16", project: klingProject, fetchImpl })
+    );
     expect(box.sent.generate_audio).toBe(false);
   });
 
-  it("LTX 에는 그 필드를 보내지 않는다 — 모르는 필드는 거절될 수 있다", async () => {
-    process.env.FAL_I2V_ENDPOINT = "fal-ai/ltx-2.3/image-to-video/fast";
-    const { box, fetchImpl } = sender();
-    await runWithActor("t-user", () => generateClip({ imageUrl: "i", seconds: 5, aspect_ratio: "9:16", fetchImpl }));
-    expect("generate_audio" in box.sent).toBe(false);
-    expect(box.sent.duration).toBe(6);
+  // 모델마다 body 가 다르다 — Seedance 는 해상도를 받고 Kling 은 모른다.
+  // 모르는 필드를 보내면 거절될 수 있어 프로필이 그 차이를 쥔다.
+  it("모델별 필드는 그 모델에만 실린다", async () => {
+    const seed = sender();
+    await runWithActor("t-user", () =>
+      generateClip({ imageUrl: "i", seconds: 5, aspect_ratio: "9:16", project: seedanceProject, fetchImpl: seed.fetchImpl })
+    );
+    expect(seed.box.sent.resolution).toBe("720p");
+
+    const kl = sender();
+    await runWithActor("t-user", () =>
+      generateClip({ imageUrl: "i", seconds: 5, aspect_ratio: "9:16", project: klingProject, fetchImpl: kl.fetchImpl })
+    );
+    expect("resolution" in kl.box.sent).toBe(false);
   });
 
-  it("잘림 판정도 활성 프로필의 상한으로 한다", async () => {
-    process.env.FAL_I2V_ENDPOINT = KLING;
+  it("잘림 판정도 그 프로젝트 프로필의 상한으로 한다", async () => {
     const { box, fetchImpl } = sender();
-    const r = await runWithActor("t-user", () => generateClip({ imageUrl: "i", seconds: 16, aspect_ratio: "9:16", fetchImpl }));
+    const r = await runWithActor("t-user", () =>
+      generateClip({ imageUrl: "i", seconds: 16, aspect_ratio: "9:16", project: klingProject, fetchImpl })
+    );
     expect(box.sent.duration).toBe(15);
     expect(r.truncated).toBe(true);
     // LTX 상한(20)으로 재면 16초가 잘리지 않은 것으로 나온다 — 그 실수를 여기서 막는다
@@ -205,10 +216,87 @@ describe("generateClip — 활성 프로필이 요청을 정한다", () => {
     expect(I2V_MAX_SECONDS).toBe(15);
   });
 
-  it("가짜 모드도 활성 프로필의 초를 돌려준다", async () => {
-    process.env.FAL_I2V_ENDPOINT = KLING;
+  it("가짜 모드도 그 프로젝트 프로필의 초를 돌려준다", async () => {
     process.env.SHOTFORM_FAKE = "1";
-    const r = await generateClip({ imageUrl: "img", seconds: 7, aspect_ratio: "9:16" });
-    expect(r.seconds).toBe(7);
+    // Seedance 하한은 4초라 2초 요청이 4초로 올라간다 — 가짜 모드도 같은 값을 돌려줘야
+    // 화면·합성이 진짜와 다른 길이를 보지 않는다
+    const r = await generateClip({ imageUrl: "img", seconds: 2, aspect_ratio: "9:16", project: seedanceProject });
+    expect(r.seconds).toBe(4);
+    const legacy = await generateClip({ imageUrl: "img", seconds: 2, aspect_ratio: "9:16" });
+    expect(legacy.seconds).toBe(3);
+  });
+});
+
+// 모델은 이제 env 가 아니라 **프로젝트**가 정한다. 여기서 재는 것은 목 호출 횟수가 아니라
+// 실제로 나가는 URL 과 body 다 — 배선의 오타는 그 둘에서만 드러난다.
+describe("클립이 프로젝트의 모델로 나간다", () => {
+  const SEEDANCE = "https://fal.run/bytedance/seedance-2.0/image-to-video";
+  const KLING_URL = "https://fal.run/fal-ai/kling-video/v3/standard/image-to-video";
+
+  // 가짜 모드가 켜져 있으면 generateClip 이 조기 반환해 요청이 안 나간다 — 여기서는 꺼 둔다.
+  beforeEach(() => { process.env.SHOTFORM_FAKE = "off"; });
+
+  const captor = () => {
+    const calls = [];
+    return {
+      calls,
+      fetchImpl: async (url, init) => {
+        calls.push({ url, body: JSON.parse(init.body) });
+        return { ok: true, json: async () => ({ video: { url: "https://x/v.mp4" } }) };
+      },
+    };
+  };
+
+  const base = { imageUrl: "https://x/i.png", seconds: 5, aspect_ratio: "9:16", prompt: "움직인다", projectId: "p1" };
+
+  it("Seedance 프로젝트는 Seedance 로 나가고 오디오가 꺼져 있다", async () => {
+    const { calls, fetchImpl } = captor();
+    await runWithActor("t-user", () =>
+      generateClip({ ...base, project: { settings: { i2v_model: "seedance-2.0" } }, fetchImpl })
+    );
+    expect(calls[0].url).toBe(SEEDANCE);
+    expect(calls[0].body.generate_audio).toBe(false);
+    expect(calls[0].body.duration).toBe(5);
+  });
+
+  // ★★ 옛 프로젝트가 조용히 모델을 갈아타면 안 된다
+  it("i2v_model 이 없는 프로젝트는 Kling 으로 나간다", async () => {
+    const { calls, fetchImpl } = captor();
+    await runWithActor("t-user", () => generateClip({ ...base, project: { settings: {} }, fetchImpl }));
+    expect(calls[0].url).toBe(KLING_URL);
+  });
+
+  it("모르는 모델 이름도 Kling 으로 떨어진다", async () => {
+    const { calls, fetchImpl } = captor();
+    await runWithActor("t-user", () =>
+      generateClip({ ...base, project: { settings: { i2v_model: "veo-9" } }, fetchImpl })
+    );
+    expect(calls[0].url).toBe(KLING_URL);
+  });
+
+  it("project 를 안 넘겨도 Kling 으로 나간다 — 옛 호출부가 조용히 비싸지면 안 된다", async () => {
+    const { calls, fetchImpl } = captor();
+    await runWithActor("t-user", () => generateClip({ ...base, fetchImpl }));
+    expect(calls[0].url).toBe(KLING_URL);
+  });
+
+  it("모델의 길이 눈금이 실제 요청에 실린다", async () => {
+    const { calls, fetchImpl } = captor();
+    await runWithActor("t-user", () =>
+      generateClip({ ...base, seconds: 2, project: { settings: { i2v_model: "seedance-2.0" } }, fetchImpl })
+    );
+    // Seedance 바닥은 4 초다(Kling 은 3 초)
+    expect(calls[0].body.duration).toBe(4);
+  });
+
+  it("원장에 남는 endpoint 도 그 프로젝트의 모델이다 — 무엇으로 만들었는지가 기록으로 남는다", async () => {
+    const { fetchImpl } = captor();
+    await runWithActor("t-user", () =>
+      generateClip({ ...base, projectId: "p-seed", project: { settings: { i2v_model: "seedance-2.0" } }, fetchImpl })
+    );
+    const rows = await memoryStore.allCosts();
+    const mine = rows.filter((r) => r.project_id === "p-seed");
+    expect(mine).toHaveLength(1);
+    expect(mine[0].endpoint).toBe("bytedance/seedance-2.0/image-to-video");
   });
 });

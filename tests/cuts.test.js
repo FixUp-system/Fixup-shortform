@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { splitSentences, splitUnits, explodeLongRanges, buildSplitMessages, buildShowsMessages, buildImagePrompt, buildClipPrompt, stillOnly, clauseBoundaries } from "../lib/cuts.js";
-import { activeClipProfile, minSecondsFor, maxSecondsFor } from "../lib/clip-limits.js";
+import { clipProfileForProject, minSecondsFor, maxSecondsFor } from "../lib/clip-limits.js";
 import { STYLE_PRESETS } from "../lib/styles.js";
 
 const project = {
@@ -112,12 +112,14 @@ describe("buildSplitMessages", () => {
     expect(system).toContain("조각을 고쳐 쓰지 않는다");
   });
 
-  it("모델이 만들 수 있는 길이를 사실로 알려 준다 — 활성 프로필에서 읽는다", () => {
-    const { system } = buildSplitMessages(["한 문장."]);
-    // **지금 도는 모델**의 하한·상한이어야 한다. 숫자를 프롬프트에 박으면 모델을 바꿀 때
-    // 지시가 어긋난다. 이 테스트도 한때 LTX 상수(6·20)를 읽고 있었는데, 기본 엔드포인트가
-    // Kling(3~15)으로 바뀌자 코드는 맞고 테스트만 틀렸다 — 읽는 곳을 코드와 같게 둔다.
-    const profile = activeClipProfile();
+  it("모델이 만들 수 있는 길이를 사실로 알려 준다 — 그 프로젝트의 프로필에서 읽는다", () => {
+    const seedance = { settings: { i2v_model: "seedance-2.0" } };
+    const { system } = buildSplitMessages(["한 문장."], seedance);
+    // **그 프로젝트가 쓰는 모델**의 하한·상한이어야 한다. 숫자를 프롬프트에 박으면 모델을
+    // 바꿀 때 지시가 어긋난다. 이 테스트도 한때 LTX 상수(6·20)를 읽고 있었는데, 기본
+    // 엔드포인트가 Kling(3~15)으로 바뀌자 코드는 맞고 테스트만 틀렸다 —
+    // 읽는 곳을 코드와 같게 둔다.
+    const profile = clipProfileForProject(seedance);
     expect(system).toContain(String(minSecondsFor(profile)));
     expect(system).toContain(String(maxSecondsFor(profile)));
   });
@@ -131,17 +133,21 @@ describe("buildSplitMessages", () => {
     expect(buildSplitMessages(["한 문장."]).system).toContain("화면이 바뀔 자리");
   });
 
-  // 대본은 모델을 모르고 컷 분할부터 안다. 모델을 바꾸면 이 문장이 따라 움직여야 한다 —
-  // Kling 은 하한이 3초라 짧은 컷을 만드는 데 주저할 이유가 없다(LTX 하한 6초에서는 손실이었다).
-  it("모델을 바꾸면 알려 주는 길이도 바뀐다", () => {
-    process.env.FAL_I2V_ENDPOINT = "fal-ai/kling-video/v3/standard/image-to-video";
-    try {
-      const { system } = buildSplitMessages(["한 조각."]);
-      expect(system).toContain("3~15초");
-      expect(system).not.toContain("6~20초");
-    } finally {
-      delete process.env.FAL_I2V_ENDPOINT;
-    }
+  // 대본은 모델을 모르고 컷 분할부터 안다. 프로젝트가 모델을 바꾸면 이 문장이 따라 움직여야
+  // 한다 — Kling 하한은 3초, Seedance 하한은 4초라 실제로 달라지는 문장이다.
+  it("프로젝트의 모델에 따라 알려 주는 길이가 바뀐다", () => {
+    const seedance = buildSplitMessages(["한 조각."], { settings: { i2v_model: "seedance-2.0" } }).system;
+    expect(seedance).toContain("4~15초");
+
+    const kling = buildSplitMessages(["한 조각."], { settings: { i2v_model: "kling-v3" } }).system;
+    expect(kling).toContain("3~15초");
+  });
+
+  // ★★ project 를 안 넘긴 호출은 레거시(Kling)로 떨어진다 — generateClip 과 같은 규칙이다.
+  // 옛 프로젝트가 조용히 다른 모델의 눈금으로 분할되면 안 된다.
+  it("project 가 없으면 레거시(Kling) 눈금으로 알려 준다", () => {
+    expect(buildSplitMessages(["한 조각."]).system).toContain("3~15초");
+    expect(buildSplitMessages(["한 조각."], { settings: {} }).system).toContain("3~15초");
   });
 });
 
