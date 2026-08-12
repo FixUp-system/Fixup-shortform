@@ -110,7 +110,9 @@ node scripts/measure/ab-briefing.mjs setup|b        # 프롬프트 A/B
 
 스키마는 `db/schema.sql` 하나다. **통째로 다시 올려도 안전하다**(`if not exists`·`or replace`).
 합계는 `sum_costs()` SQL 함수가 낸다 — 앱에서 행을 받아 더하면 PostgREST 행 상한(기본 1000)에
-걸려 **말없이 일부만** 더해지고, 그러면 `assertBudget`의 $20 상한이 조용히 사라진다.
+걸려 **말없이 일부만** 더해지고, 그러면 `assertBudget`의 전역 상한(**$300**, 프로젝트는 $30)이
+조용히 사라진다. (옛 문구는 "$20 상한"이었다 — 코드 기본값이 300/30 으로 올라간 뒤 낡았다.
+값은 `lib/costs.js` 의 `limitTotal`·`limitProject` 가 정한다.)
 
 RLS는 켜져 있고 정책은 0개다(=전부 거부). 앱은 `service_role`로 붙어 우회한다. 인증이 붙으면
 사용자 토큰 클라이언트로 갈아탄 뒤 `owner_id = auth.uid()` 정책을 얹는다.

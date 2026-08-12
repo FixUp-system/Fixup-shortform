@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { selectCandidate, describePhoto } from "../lib/vlm.js";
 import { runWithActor } from "../lib/actor.js";
+import { memoryStore, resetMemoryStore } from "../lib/store/memory.js";
+import { BudgetExceeded } from "../lib/costs.js";
+import { FREE_TRIAL_USD } from "../lib/pricing.js";
 
 // 프롬프트 첫 텍스트 블록만 붙잡는 가짜 OpenAI
 function capturingFetch(store) {
@@ -188,5 +191,59 @@ describe("describePhoto — 올린 사진에 무엇이 담겼나", () => {
     });
     expect(called).toBe(false);
     delete process.env.SHOTFORM_FAKE;
+  });
+});
+
+// ★ 사진 판정도 예산 그물 안이다.
+//
+// 이 자리는 `requireVideoCharge` **앞**(③목소리 전)이라 크레딧 0 인 체험 사장님이 밟는다.
+// 같은 요청의 앞선 컷 분할 `callJson` 이 한 번 막지만, 그 한 번을 지난 뒤의 비전 호출 수는
+// **올린 사진 장수만큼**이다 — 사진 장수를 자르는 곳이 없어 그물 밖 지출이 된다.
+describe("describePhoto 가 한도를 본다", () => {
+  const B = "00000000-0000-4000-8000-00000000000b";
+
+  const reply = (obj, onCall) => async () => {
+    onCall?.();
+    return {
+      ok: true,
+      json: async () => ({ model: "gpt-4o", usage: { prompt_tokens: 10, completion_tokens: 5 },
+        choices: [{ message: { content: JSON.stringify(obj) } }] }),
+    };
+  };
+
+  async function spend(usd) {
+    await memoryStore.insertCost({
+      request_id: `r-${Date.now()}-${Math.random()}`, ts: Date.now(),
+      endpoint: "openai/gpt-4o", stage: "사진 판정", user: B, project_id: null,
+      est_cost_usd: usd, status: "done",
+    });
+  }
+
+  beforeEach(() => resetMemoryStore());
+  afterEach(() => resetMemoryStore());
+
+  it("한도 아래면 부른다", async () => {
+    let called = false;
+    const got = await runWithActor(B, () => describePhoto({
+      photoBytes: null, projectId: "p1", apiKey: "k",
+      fetchImpl: reply({ person: true, what: "작업복 남성", who: "50대 남성" }, () => { called = true; }),
+    }));
+    expect(called).toBe(true);
+    expect(got.person).toBe(true);
+  });
+
+  // ★★ 게이트가 fail-open catch **바깥**에 있어야만 초록이다. try 안으로 옮기면
+  // catch 가 BudgetExceeded 를 삼켜 "사물"({person:false})로 조용히 오판정한다 —
+  // 이 브랜치가 여섯 자리에서 고친 바로 그 실수다.
+  it("한도를 넘으면 OpenAI 를 **안 부르고** 삼키지도 않는다", async () => {
+    await spend(FREE_TRIAL_USD + 0.01);
+    let called = false;
+    await expect(
+      runWithActor(B, () => describePhoto({
+        photoBytes: null, projectId: "p1", apiKey: "k",
+        fetchImpl: reply({ person: true, what: "작업복 남성", who: "50대 남성" }, () => { called = true; }),
+      }))
+    ).rejects.toThrow(BudgetExceeded);
+    expect(called, "한도를 넘었는데 OpenAI 로 나갔다").toBe(false);
   });
 });
