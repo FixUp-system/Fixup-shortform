@@ -3,11 +3,15 @@ import { resetMemoryStore } from "../lib/store/memory.js";
 
 // LLM 경계만 가짜로 막는다 — 라우트·파이프라인·시나리오 검증은 **진짜로** 돈다.
 // 이 저장소의 기존 방식과 같다(tests/auto-route.test.js:9 참고).
+// ★ endpoint 를 일부러 "i2v"로 둔다(강제값 "t2v"와 다르게) — 같았으면 pickEndpointKind 를
+// 건너뛰고 raw.endpoint 를 그대로 써도 "만들면...200" 테스트의 endpoint 단정이 우연히
+// 통과했다(사진 0장이면 코드가 t2v 로 강제해야 하는데, 그 강제를 실제로 테스트가 미는지
+// 이걸로 확인한다).
 vi.mock("../lib/llm.js", () => ({
   callJson: vi.fn(async () => ({
     text: "Vertical commercial. Slow push-in on the product, then a hand lifts it.",
     shots: [{ beat: "제품 등장", camera: "slow push-in", action: "병이 놓인다", line: "매일 아침" }],
-    endpoint: "t2v",
+    endpoint: "i2v",
   })),
 }));
 
@@ -168,6 +172,23 @@ describe("광고 라우트 — 시나리오", () => {
     expect(doc.status).toBe("scenario");
     // 사진 0장이므로 코드가 t2v 로 고정한다 — LLM 이 무엇을 말했든
     expect(doc.scenario.endpoint).toBe("t2v");
+  });
+
+  // Important — 리뷰가 지목한 공백. 라우트의 "굽는 중(rendering)에는 다시 안 만든다"
+  // 세 줄(app/api/ads/[id]/scenario/route.js:12-14)을 그 갈래를 밟는 테스트가 없어
+  // 지워도 전체 스위트가 그대로 초록이었다. Task 11 이 형제 라우트(PATCH)에서 잡은 것과
+  // 같은 결함이라 같은 자리(store 직접 조작으로 status:"rendering" 세우기)를 그대로 쓴다.
+  it("★ 굽는 중(rendering)에는 시나리오를 다시 만들지 않는다 — 400", async () => {
+    const { POST: makeScenario } = await import("../app/api/ads/[id]/scenario/route.js");
+    const made = await (await createAd(post(OK))).json();
+    const { getStore } = await import("../lib/store/index.js");
+    const row = await getStore().selectProject(made.id, U);
+    await getStore().updateProjectRow(made.id, U, row.version, { ...row.doc, status: "rendering" });
+    const res = await makeScenario(
+      new Request("http://x", { method: "POST", headers: H }),
+      { params: Promise.resolve({ id: made.id }) }
+    );
+    expect(res.status).toBe(400);
   });
 
   it("다시 쓰면 회차가 는다", async () => {
