@@ -246,6 +246,36 @@ describe("buildCues — 자막 자리가 낭독 합과 맞는다", () => {
     expect(cues[0]).toEqual({ start: 0, end: 3, text: "첫 문장." });
     expect(cues[1]).toEqual({ start: 3, end: 7, text: "둘째 문장." });
   });
+
+  // ★ 말하는 경로에서는 자막이 **받은 클립 길이**로 흘러야 한다.
+  // 합성이 말하는 클립을 자르지 않으므로(소리가 그 안에 있다) 컷 하나가 실제로 차지하는
+  // 시간은 클립 길이다. 낭독 추정으로 누적하면 컷마다 그 차이만큼 자막이 앞선다 —
+  // Seedance 하한이 4초라 3초짜리 컷에서 반드시 1초씩 벌어지고, 컷 8개면 마지막에 7초다.
+  describe("말하는 프로젝트 — 자막도 받은 클립 길이로 흐른다", () => {
+    const CUTS = [
+      { idx: 0, seconds: 3, video: { seconds: 4 }, sentence: "첫 문장." },
+      { idx: 1, seconds: 3, video: { seconds: 4 }, sentence: "둘째 문장." },
+    ];
+    const speaking = {
+      settings: { i2v_model: "seedance-2.0" },
+      cast: [{ id: "c1", who: "20대 남성", cuts: [0, 1] }],
+      cuts: CUTS,
+    };
+
+    it("project 를 안 넘기면 예전과 같다 — 낭독으로 흐른다", () => {
+      const cues = buildCues(CUTS);
+      expect(cues[0]).toEqual({ start: 0, end: 3, text: "첫 문장." });
+      expect(cues[1]).toEqual({ start: 3, end: 6, text: "둘째 문장." });
+    });
+
+    it("말하는 프로젝트는 컷 길이도 자막 길이도 클립 길이다", () => {
+      const cues = buildCues(CUTS, undefined, speaking);
+      // ★ 뜨는 자리(start)만이 아니라 머무는 시간(end)도 클립 길이여야 한다 —
+      //   span 이 낭독이면 컷 안에서 자막이 1초 일찍 사라진다.
+      expect(cues[0]).toEqual({ start: 0, end: 4, text: "첫 문장." });
+      expect(cues[1]).toEqual({ start: 4, end: 8, text: "둘째 문장." });
+    });
+  });
 });
 
 describe("폭 재기 — 자막이 몇 자에서 넘치는가", () => {

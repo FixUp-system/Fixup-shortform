@@ -310,6 +310,65 @@ describe("buildFfmpegArgs", () => {
   });
 });
 
+// ★ 순수 함수(buildFfmpegArgs) 밖의 자리 — composeVideo 가 실제로 소리를 안 받는가.
+//   원래 결함이 "c.audio.url 에서 그대로 죽는다"였으므로 그 경로를 직접 통과시킨다.
+describe("composeVideo — 말하는 프로젝트는 소리 파일을 안 받는다", () => {
+  // 소리가 클립 안에 있는 컷 = c.audio 가 아예 없다
+  const SPEAKING_CUTS = [
+    { idx: 0, sentence: "첫", seconds: 3, video: { url: "https://f/v0.mp4", seconds: 4 } },
+    { idx: 1, sentence: "둘", seconds: 3, video: { url: "https://f/v1.mp4", seconds: 4 } },
+  ];
+  const PROJECT = {
+    settings: { i2v_model: "seedance-2.0" },
+    cast: [{ id: "c1", who: "20대 남성", cuts: [0, 1] }],
+    cuts: SPEAKING_CUTS,
+  };
+  const wiring = (extra) => ({
+    runFfmpeg: async () => {},
+    writeFileImpl: async () => {},
+    mkdirImpl: async () => {},
+    mkdtempImpl: async () => "/tmp/x",
+    rmImpl: async () => {},
+    readFileImpl: async () => Buffer.from("mp4"),
+    putObjectImpl: async () => {},
+    ...extra,
+  });
+
+  it("클립만 내려받는다 — c.audio.url 을 읽으면 그대로 죽던 자리다", async () => {
+    const got = [];
+    const r = await composeVideo({
+      projectId: "p1", cuts: SPEAKING_CUTS, project: PROJECT, aspect_ratio: "9:16",
+      ...wiring({ downloadImpl: async (url, dest) => { got.push(url); return dest; } }),
+    });
+    expect(got).toEqual(["https://f/v0.mp4", "https://f/v1.mp4"]);
+    // 컷 길이가 받은 클립 길이라 4+4 다 — 주문한 3초로 세면 6이 나온다
+    expect(r.seconds).toBe(8);
+  });
+
+  // ★ 모델을 Seedance 로 바꿔도 옛 Kling 클립은 남는다(clipKey 에 모델 id 가 없다).
+  //   Kling 클립에는 오디오 스트림이 아예 없어, 프로젝트 한 번으로 정하면 그 컷의 소리를
+  //   안 받고 [i:a] 가 매치에 실패해 ffmpeg 가 통째로 죽는다.
+  it("소리를 가진 옛 컷이 섞여 있으면 그 컷의 소리는 받는다", async () => {
+    const mixed = [
+      { ...SPEAKING_CUTS[0], audio: { url: "https://f/a0.mp3", seconds: 3 } },
+      SPEAKING_CUTS[1],
+    ];
+    const got = [];
+    let args = null;
+    await composeVideo({
+      projectId: "p1", cuts: mixed, project: { ...PROJECT, cuts: mixed }, aspect_ratio: "9:16",
+      ...wiring({
+        downloadImpl: async (url, dest) => { got.push(url); return dest; },
+        runFfmpeg: async (a) => { args = a; },
+      }),
+    });
+    expect(got).toEqual(["https://f/v0.mp4", "https://f/a0.mp3", "https://f/v1.mp4"]);
+    const graph = args[args.indexOf("-filter_complex") + 1];
+    expect(graph).toContain("[1:a]anull[a0]");   // 옛 컷은 소리 파일에서
+    expect(graph).toContain("[2:a]anull[a1]");   // 말하는 컷은 클립 자신에게서
+  });
+});
+
 describe("말하는 클립 — 소리가 영상 안에 있다", () => {
   const base = { assPath: "/t/x.ass", out: "/t/o.mp4", width: 1080, height: 1920 };
 

@@ -733,6 +733,27 @@ describe("runRenderPipeline — 하나로 합친다", () => {
     expect(got.cuts).toHaveLength(1);
   });
 
+  // ★ 합성은 "클립이 스스로 말하는가"를 프로젝트에서 판정한다(모델·캐스팅·대사를 함께 본다).
+  //   이 배선이 빠지면 라이브에서 조용히 옛 경로로 돌아가 c.audio.url 에서 죽는데,
+  //   compose 를 목으로 갈아끼운 단위 테스트는 전부 그린인 채다.
+  it("프로젝트를 통째로 넘긴다 — 합성이 말하는 클립을 알아보려면 필요하다", async () => {
+    const p = await makeProject();
+    await projects.updateProject(p.id, OWNER, (proj) => ({
+      ...proj, status: "video", settings: { ...proj.settings, i2v_model: "seedance-2.0" },
+      cast: [{ id: "c1", who: "20대 남성", cuts: [0] }],
+      cuts: [{ idx: 0, sentence: "문장", seconds: 4, video: { url: "v0", seconds: 4 } }],
+    }));
+
+    let got;
+    await pipeline.runRenderPipeline(p.id, OWNER, {
+      compose: async (args) => { got = args; return { url: "u", seconds: 4 }; },
+    });
+    expect(got.project).toBeTruthy();
+    expect(got.project.settings.i2v_model).toBe("seedance-2.0");
+    expect(got.project.cast).toHaveLength(1);
+    expect(got.project.cuts).toHaveLength(1);
+  });
+
   it("완성본에 컷별 소리·클립·문장을 각인한다 — 컷을 고치면 낡는다", async () => {
     const p = await makeProject();
     await pipeline.runSplitPipeline(p.id, OWNER, deps());
