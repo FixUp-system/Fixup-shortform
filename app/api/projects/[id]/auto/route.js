@@ -9,7 +9,9 @@ import { fakeFal } from "../../../../../lib/fake";
 export const POST = withUser(async (req, { params }, user) => {
   const { id } = await params;
   const project = await getProject(id, user.id);
-  if (!project) return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
+  // ★ 광고 문서(kind:"ad")는 이 경로가 다루지 않는다 — /api/ads/* 가 다룬다.
+  // 없는 것과 같이 404 다: 남의 것이 아니라 "이 문 뒤에 없는 것"이라서다.
+  if (!project || project.kind === "ad") return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
   if (!project.material?.text?.trim()) {
     return Response.json({ error: "자료가 없어요" }, { status: 400 });
   }

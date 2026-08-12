@@ -7,7 +7,9 @@ import { withUser } from "../../../../../lib/auth/require-user.js";
 export const POST = withUser(async (req, { params }, user) => {
   const { id } = await params;
   const project = await getProject(id, user.id);
-  if (!project) return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
+  // ★ 광고 문서(kind:"ad")는 이 경로가 다루지 않는다 — /api/ads/* 가 다룬다.
+  // 없는 것과 같이 404 다: 남의 것이 아니라 "이 문 뒤에 없는 것"이라서다.
+  if (!project || project.kind === "ad") return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
   // 컷은 원고를 잘라서 만든다 — 원고가 없으면 자를 것도, 그릴 근거도 없다.
   // 구성 시절 프로젝트(paragraphs만 있는)도 여기서 걸린다: 대본을 다시 쓰면 원고가 생긴다.
   if (!project.script?.text) {

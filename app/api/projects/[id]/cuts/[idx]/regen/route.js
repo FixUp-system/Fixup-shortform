@@ -22,6 +22,11 @@ export const POST = withUser(async (req, { params }, user) => {
   let charged = null;
   if (!fakeFal()) {
     const project = await getProject(id, user.id);
+    // ★ 광고 문서(kind:"ad")는 이 경로가 다루지 않는다 — /api/ads/* 가 다룬다.
+    // 없는 것과 같이 404 다: 남의 것이 아니라 "이 문 뒤에 없는 것"이라서다.
+    if (project?.kind === "ad") {
+      return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
+    }
     const cut = (project?.cuts || []).find((c) => c.idx === Number(idx));
     const prior = Number(cut?.regen_count) || 0;
 

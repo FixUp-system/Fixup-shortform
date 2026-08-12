@@ -13,7 +13,9 @@ import { SUBTITLE_POSITIONS } from "../../../../lib/subtitles.js";
 export const GET = withUser(async (req, { params }, user) => {
   const { id } = await params;
   const project = await getProject(id, user.id);
-  if (!project) return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
+  // ★ 광고 문서(kind:"ad")는 이 경로가 다루지 않는다 — /api/ads/* 가 다룬다.
+  // 없는 것과 같이 404 다: 남의 것이 아니라 "이 문 뒤에 없는 것"이라서다.
+  if (!project || project.kind === "ad") return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
   // 활성 모델의 클립 상한을 함께 실어 보낸다 — 저장하지 않고 요청마다 지금 env 로 푼다.
   // 화면은 서버 env 를 볼 수 없어서, 이 값 없이는 기본 프로필(20초)로 판정한다.
   //
@@ -62,6 +64,12 @@ export const PATCH = withUser(async (req, { params }, user) => {
     // (청구 장부가 회차·멱등키 기반이라 차액 개념이 없다) — 그래서 못 바꾸게 한다.
     // 같은 값을 다시 보내는 것은 막지 않는다: 다른 설정을 고치는 정상 저장이다.
     const project = await getProject(id, user.id);
+    // ★ 광고 문서는 이 경로가 다루지 않는다 — /api/ads/* 가 다룬다. 여기서 먼저 막지 않으면
+    // 아래 alreadyChargedVideo 판정(기존 종류의 청구 장부)이 광고 문서에 얹혀 404 대신
+    // 다른 상태 코드가 나갈 수 있다.
+    if (project?.kind === "ad") {
+      return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
+    }
     if (
       project &&
       body.settings.target_seconds !== project.settings?.target_seconds &&
@@ -91,6 +99,10 @@ export const PATCH = withUser(async (req, { params }, user) => {
 
   try {
     const project = await updateProject(id, user.id, (proj) => {
+      // ★ 광고 문서는 이 경로가 다루지 않는다 — target_seconds 가 없는 본문(예: material 만
+      // 고치는 요청)은 위 getProject 가드를 안 거치므로 여기서 다시 막는다. 여기서 던지면
+      // 아래 catch 가 기존 문구 그대로 404 로 감싼다 — 없는 것과 같은 취급이다.
+      if (proj.kind === "ad") throw new Error("프로젝트를 찾을 수 없어요");
       const next = { ...proj };
       if (body.material) next.material = { ...proj.material, ...body.material };
       if (body.settings) {
