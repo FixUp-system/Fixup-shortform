@@ -227,8 +227,9 @@ describe("폭 재기 — 자막이 몇 자에서 넘치는가", () => {
 
   it("스타일 값이 지금 toAss 가 쓰던 것과 같다", () => {
     // 이 함수는 새 규칙이 아니라 toAss 안에 있던 셈을 꺼낸 것이다 — 값이 달라지면 안 된다
-    expect(subtitleStyle(V)).toEqual({ fontSize: 81, marginH: 86, marginV: 346 });
-    expect(subtitleStyle(H)).toEqual({ fontSize: 45, marginH: 154, marginV: 194 });
+    // (alignment 는 나중에 붙은 위치 키다 — 기본값 2 = 하단 중앙이라 그림은 그대로다)
+    expect(subtitleStyle(V)).toEqual({ fontSize: 81, marginH: 86, marginV: 346, alignment: 2 });
+    expect(subtitleStyle(H)).toEqual({ fontSize: 45, marginH: 154, marginV: 194, alignment: 2 });
   });
 
   it("한 줄에 들어가는 한글은 9:16 에서 열한 자 남짓이다", () => {
@@ -386,5 +387,59 @@ describe("buildCues — 컷 하나가 자막 여러 개를 낸다", () => {
     const cues = buildCues([{ sentence: LONG, video: { seconds: 6 } }], V);
     expect(cues.length).toBeGreaterThan(1);
     expect(cues[cues.length - 1].end).toBe(6);
+  });
+});
+
+describe("자막 위치", () => {
+  const size = { width: 1080, height: 1920 };
+
+  it("기본은 아래다 — 지금 동작과 픽셀 단위로 같다", () => {
+    const s = subtitleStyle(size);
+    expect(s.alignment).toBe(2);              // ASS 숫자패드: 2 = 하단 중앙
+    expect(s.marginV).toBe(Math.round(1920 * 0.18));
+    // position 을 명시해도 같아야 한다
+    expect(subtitleStyle({ ...size, position: "bottom" })).toEqual(s);
+  });
+
+  it("중간은 세로 여백이 0 이다 — 중앙 정렬이라 무의미하다", () => {
+    const s = subtitleStyle({ ...size, position: "middle" });
+    expect(s.alignment).toBe(5);              // 5 = 중간 중앙
+    expect(s.marginV).toBe(0);
+  });
+
+  it("위는 상단 UI 를 피한다", () => {
+    const s = subtitleStyle({ ...size, position: "top" });
+    expect(s.alignment).toBe(8);              // 8 = 상단 중앙
+    expect(s.marginV).toBe(Math.round(1920 * 0.12));
+  });
+
+  it("모르는 값은 조용히 아래로 떨어진다 — 자막이 안 나오는 것보다 낫다", () => {
+    expect(subtitleStyle({ ...size, position: "뒤죽박죽" }).alignment).toBe(2);
+  });
+
+  it("글자 크기와 가로 여백은 위치와 무관하다", () => {
+    const b = subtitleStyle({ ...size, position: "bottom" });
+    for (const p of ["middle", "top"]) {
+      const s = subtitleStyle({ ...size, position: p });
+      expect(s.fontSize).toBe(b.fontSize);
+      expect(s.marginH).toBe(b.marginH);
+    }
+  });
+
+  it("ASS 스타일 줄에 고른 정렬과 여백이 실린다", () => {
+    const ass = toAss([{ start: 0, end: 1, text: "가" }], { ...size, position: "top" });
+    const style = ass.split("\n").find((l) => l.startsWith("Style: Main"));
+    const f = style.split(",");
+    // Format: Name,Fontname,Fontsize,Primary,Outline,Back,Bold,BorderStyle,Outline,Shadow,
+    //         Alignment,MarginL,MarginR,MarginV,Encoding
+    expect(f[10]).toBe("8");                                    // Alignment
+    expect(f[13]).toBe(String(Math.round(1920 * 0.12)));        // MarginV
+  });
+
+  it("position 을 안 주면 ASS 도 지금과 같다", () => {
+    const ass = toAss([{ start: 0, end: 1, text: "가" }], size);
+    const f = ass.split("\n").find((l) => l.startsWith("Style: Main")).split(",");
+    expect(f[10]).toBe("2");
+    expect(f[13]).toBe(String(Math.round(1920 * 0.18)));
   });
 });
