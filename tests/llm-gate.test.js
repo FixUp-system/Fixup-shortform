@@ -113,6 +113,16 @@ describe("assertBudget 의 가짜 판정은 엔드포인트로 갈린다", () =>
     await expect(guard("openai/gpt-4o", 0)).resolves.toBeUndefined();
   });
 
+  // ★ 방향이 중요하다 — 모르는 엔드포인트는 **막는 쪽**으로 떨어져야 한다.
+  // "openai/ 인가"로 갈랐을 때는 접두사를 안 붙인 새 LLM 호출부가 fal 축으로 떨어져
+  // `SHOTFORM_FAKE=fal` 에서 게이트가 통째로 꺼졌다(fal 모드는 OpenAI 가 진짜로 나간다).
+  it("fal 모드에서 모르는 엔드포인트는 막는다 — fail-closed", async () => {
+    await spend(FREE_TRIAL_USD + 0.01);
+    vi.stubEnv("SHOTFORM_FAKE", "fal");
+    await expect(guard("anthropic/claude", 0)).rejects.toThrow(BudgetExceeded);
+    await expect(guard("", 0)).rejects.toThrow(BudgetExceeded);
+  });
+
   it("가짜 모드가 아니면 둘 다 막는다", async () => {
     await spend(FREE_TRIAL_USD + 0.01);
     await expect(guard("fal-ai/nano-banana-2", 1)).rejects.toThrow(BudgetExceeded);
