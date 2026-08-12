@@ -7,10 +7,10 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 import BackButton from "../../../../components/BackButton";
-import { I2V_MAX_SECONDS, modelIdForProject } from "../../../../lib/clip-limits";
+import { I2V_MAX_SECONDS, I2V_MODELS, modelIdForProject } from "../../../../lib/clip-limits";
 import { isClipStale } from "../../../../lib/steps";
 // 상한과 값은 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다).
-import { MAX_REGEN_PER_CUT, priceLabel, regenPrice } from "../../../../lib/pricing";
+import { MAX_REGEN_PER_CUT, priceLabel, regenPrice, videoPrice } from "../../../../lib/pricing";
 
 export default function VideoStepPage() {
   const { id } = useParams();
@@ -79,6 +79,24 @@ export default function VideoStepPage() {
     startPolling();
   }
 
+  // 모델은 첫 클립을 만들기 전까지만 바꿀 수 있다 — 클립이 한 편에서 가장 비싸서,
+  // 중간에 바꾸면 두 모델이 섞이거나 이미 낸 돈을 버려야 한다.
+  // 판정 기준(cuts[].video.url)은 서버(PATCH /api/projects/[id])와 같아야 한다.
+  async function saveModel(modelId) {
+    if (busy || modelLocked || modelId === chosenModel) return;
+    setErr("");
+    const res = await fetch(`/api/projects/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings: { i2v_model: modelId } }),
+    });
+    if (!res.ok) {
+      setErr((await res.json().catch(() => ({}))).error || "영상 모델을 저장하지 못했어요");
+      return;
+    }
+    await load(id).catch(() => {});
+  }
+
   // 다시 만드는 동안 그 컷을 잠근다.
   // 표시가 없던 때는 눌러도 아무 일이 없어 보여 한 번 더 누르게 됐고, 그만큼 돈이 더 나갔다.
   async function regen(idx) {
@@ -97,6 +115,10 @@ export default function VideoStepPage() {
   }
 
   const cuts = project?.cuts || [];
+  const chosenModel = modelIdForProject(project);
+  // label·hint 는 화면이 적지 않는다 — lib/clip-limits.js 의 표에서 그대로 온다
+  const chosenModelInfo = I2V_MODELS.find((m) => m.id === chosenModel);
+  const modelLocked = cuts.some((c) => c.video?.url);
   // 활성 모델의 클립 상한. 서버가 실어 보낸다 — 없으면(옛 응답) 기본 프로필 값으로 떨어진다
   const clipMax = project?.clip_limits?.max ?? I2V_MAX_SECONDS;
   // 남은 컷 = 클립이 없거나 낡은 컷. runVideoPipeline 의 건너뛰기 조건의 정확한 반대다.
@@ -199,6 +221,29 @@ export default function VideoStepPage() {
           {selected && <p className="preview-note">컷 {selected.idx + 1} · {selected.sentence}</p>}
         </div>
       </div>
+
+      <div className="eyebrow mt-lg">영상 모델</div>
+      {modelLocked ? (
+        <p className="pgsub">이 영상은 {chosenModelInfo?.label} 으로 만들고 있어요.</p>
+      ) : (
+        <>
+          <div className="chips">
+            {I2V_MODELS.map((m) => (
+              <button
+                key={m.id}
+                className={`chip${m.id === chosenModel ? " on" : ""}`}
+                disabled={busy}
+                onClick={() => saveModel(m.id)}
+              >
+                {m.label} · {videoPrice(project?.settings?.target_seconds, m.id)} 크레딧
+              </button>
+            ))}
+          </div>
+          <p className="pgsub">
+            {chosenModelInfo?.hint} · 영상을 만들기 시작하면 바꿀 수 없어요.
+          </p>
+        </>
+      )}
 
       <div className="step-actions">
         <BackButton stepKey="video" />
