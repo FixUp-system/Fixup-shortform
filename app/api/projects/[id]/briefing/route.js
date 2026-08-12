@@ -5,6 +5,7 @@ import { buildDevelopMessages, mergeAsked, briefingContentChanged } from "../../
 import { extractBriefing } from "../../../../../lib/briefing-extract";
 import { estimateSeconds, targetChars, CHARS_PER_SEC } from "../../../../../lib/script";
 import { withUser } from "../../../../../lib/auth/require-user.js";
+import { BudgetExceeded } from "../../../../../lib/costs.js";
 
 export const POST = withUser(async (req, { params }, user) => {
   const { id } = await params;
@@ -26,6 +27,9 @@ export const POST = withUser(async (req, { params }, user) => {
       try {
         questions = validateDevelopQuestions(await callJson({ system: msg.system, messages: msg.messages, stage: "브리핑", projectId: id }));
       } catch (e) {
+        // 예산 오류는 삼키지 않는다 — 아래 502 로 나가면 한도에 걸린 사장님이
+        // 고장으로 읽는다. withUser 까지 올라가야 402 가 된다(추출 루프와 같은 처방).
+        if (e instanceof BudgetExceeded) throw e;
         console.error("소재 질문 생성 실패:", e);
       }
     }

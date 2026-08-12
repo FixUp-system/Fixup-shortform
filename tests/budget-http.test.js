@@ -28,6 +28,7 @@ const { POST: cutRegenPOST } = await import("../app/api/projects/[id]/cuts/[idx]
 const { POST: voiceRegenPOST } = await import("../app/api/projects/[id]/voice/[idx]/regen/route.js");
 const { POST: clipRegenPOST } = await import("../app/api/projects/[id]/clips/[idx]/regen/route.js");
 const { POST: scriptPOST } = await import("../app/api/projects/[id]/script/route.js");
+const { POST: briefingPOST } = await import("../app/api/projects/[id]/briefing/route.js");
 
 const req = () =>
   new Request("http://localhost/api/x", {
@@ -199,6 +200,50 @@ describe("대본 생성 — 예산 오류는 삼키지 않는다", () => {
   it("라우트의 502 계약은 예산과 무관한 실패에서 그대로다", async () => {
     llmMock.call.mockImplementation(() => { throw new Error("일시적 실패"); });
     const res = await scriptPOST(post(`http://localhost/api/projects/${project.id}/script`), ctx(project.id));
+    expect(res.status).toBe(502);
+  });
+});
+
+// ★ 브리핑이 대본보다 **먼저**다 — 체험 사장님이 밟는 첫 LLM 호출이라, 여기서 502 가
+// 나오면 한도 안내(402)를 **아무도 못 본다**. 추출 루프(lib/briefing-extract.js)와
+// 소재 질문 루프(이 라우트 안)가 같은 모양의 삼키는 catch 였다.
+describe("브리핑 — 예산 오류는 502 가 아니다", () => {
+  const budget = () => new BudgetExceeded(1, 1, "trial");
+  const postJson = (url, body) =>
+    new Request(url, { method: "POST", headers: headers(), body: JSON.stringify(body) });
+  let project;
+
+  beforeEach(async () => {
+    resetMemoryStore();
+    vi.clearAllMocks();
+    project = await projects.createProject({
+      ownerId: A,
+      settings: { aspect_ratio: "9:16", target_seconds: 30 },
+      material: { text: "성수동 수선집. 신메뉴 출시.", photos: [] },
+    });
+    await grant(500);
+  });
+
+  it("자료 정리에서 나면 402 다", async () => {
+    llmMock.call.mockImplementation(() => { throw budget(); });
+    const res = await briefingPOST(post(`http://localhost/api/projects/${project.id}/briefing`), ctx(project.id));
+    expect(res.status).toBe(402);
+    expect((await res.json()).error).toMatch(/체험/);
+  });
+
+  it("소재 질문에서 나도 402 다", async () => {
+    llmMock.call.mockImplementation(() => { throw budget(); });
+    const res = await briefingPOST(
+      postJson(`http://localhost/api/projects/${project.id}/briefing`, { kind: "develop" }),
+      ctx(project.id)
+    );
+    expect(res.status).toBe(402);
+  });
+
+  // 502 계약은 그대로 둔다 — 일시적 호출 실패까지 402 로 만들면 안 된다.
+  it("예산과 무관한 실패는 여전히 502 다", async () => {
+    llmMock.call.mockImplementation(() => { throw new Error("일시적 실패"); });
+    const res = await briefingPOST(post(`http://localhost/api/projects/${project.id}/briefing`), ctx(project.id));
     expect(res.status).toBe(502);
   });
 });

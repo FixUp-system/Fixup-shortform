@@ -33,9 +33,12 @@ describe("callJson", () => {
     expect(out.b).toBe(2);
   });
   it("두 번 다 실패하면 throw", async () => {
+    // ★ runWithActor 로 감싼다 — 감싸지 않으면 예산 게이트(costActor)가 먼저 던져,
+    // "해석 실패"를 재는 이 테스트가 엉뚱한 이유로 통과한다.
     await expect(
-      callJson({ system: "s", messages: [], fetchImpl: fakeFetch([{ content: "x" }]), apiKey: "test" })
-    ).rejects.toThrow();
+      runWithActor("t-user", () =>
+        callJson({ system: "s", messages: [], fetchImpl: fakeFetch([{ content: "x" }]), apiKey: "test" }))
+    ).rejects.toThrow("LLM 응답 해석 실패");
   });
 });
 
