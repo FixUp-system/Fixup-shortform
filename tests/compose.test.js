@@ -190,6 +190,40 @@ describe("composeVideo", () => {
     });
     expect(r.url).toBe("/api/renders/p1.mp4");
   });
+
+  it("고른 자막 위치가 ASS 에 실린다", async () => {
+    let ass = "";
+    await composeVideo({
+      projectId: "p1", cuts: CUTS, aspect_ratio: "9:16",
+      subtitlePosition: "top",
+      runFfmpeg: async () => {},
+      downloadImpl: async (_url, dest) => dest,
+      writeFileImpl: async (_path, content) => { ass = content; },
+      mkdirImpl: async () => {},
+      mkdtempImpl: async () => "/tmp/x",
+      rmImpl: async () => {},
+      readFileImpl: async () => Buffer.from("mp4"),
+      putObjectImpl: async () => {},
+    });
+    const style = ass.split("\n").find((l) => l.startsWith("Style: Main"));
+    expect(style.split(",")[10]).toBe("8"); // Alignment = 상단 중앙
+  });
+
+  it("위치를 안 주면 지금과 같다 — 아래", async () => {
+    let ass = "";
+    await composeVideo({
+      projectId: "p1", cuts: CUTS, aspect_ratio: "9:16",
+      runFfmpeg: async () => {},
+      downloadImpl: async (_url, dest) => dest,
+      writeFileImpl: async (_path, content) => { ass = content; },
+      mkdirImpl: async () => {},
+      mkdtempImpl: async () => "/tmp/x",
+      rmImpl: async () => {},
+      readFileImpl: async () => Buffer.from("mp4"),
+      putObjectImpl: async () => {},
+    });
+    expect(ass.split("\n").find((l) => l.startsWith("Style: Main")).split(",")[10]).toBe("2");
+  });
 });
 
 describe("buildFfmpegArgs", () => {
