@@ -1,5 +1,16 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { resetMemoryStore } from "../lib/store/memory.js";
+
+// LLM 경계만 가짜로 막는다 — 라우트·파이프라인·시나리오 검증은 **진짜로** 돈다.
+// 이 저장소의 기존 방식과 같다(tests/auto-route.test.js:9 참고).
+vi.mock("../lib/llm.js", () => ({
+  callJson: vi.fn(async () => ({
+    text: "Vertical commercial. Slow push-in on the product, then a hand lifts it.",
+    shots: [{ beat: "제품 등장", camera: "slow push-in", action: "병이 놓인다", line: "매일 아침" }],
+    endpoint: "t2v",
+  })),
+}));
+
 import { POST as createAd } from "../app/api/ads/route.js";
 import { GET as getAd, PATCH as patchAd } from "../app/api/ads/[id]/route.js";
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
@@ -137,5 +148,63 @@ describe("광고 라우트 — 문서", () => {
     expect(doc.settings.seconds).toBe(15);
     expect(doc.settings.aspect_ratio).toBe("9:16");
     expect(doc.settings.model).toBe(DEFAULT_AD_MODEL);
+  });
+});
+
+describe("광고 라우트 — 시나리오", () => {
+  beforeEach(() => resetMemoryStore());
+
+  it("만들면 시나리오가 문서에 남고 200", async () => {
+    const { POST: makeScenario } = await import("../app/api/ads/[id]/scenario/route.js");
+    const made = await (await createAd(post(OK))).json();
+    const res = await makeScenario(
+      new Request("http://x", { method: "POST", headers: H }),
+      { params: Promise.resolve({ id: made.id }) }
+    );
+    expect(res.status).toBe(200);
+    const doc = await res.json();
+    expect(doc.scenario.shots.length).toBeGreaterThan(0);
+    expect(doc.scenario.tries).toBe(1);
+    expect(doc.status).toBe("scenario");
+    // 사진 0장이므로 코드가 t2v 로 고정한다 — LLM 이 무엇을 말했든
+    expect(doc.scenario.endpoint).toBe("t2v");
+  });
+
+  it("다시 쓰면 회차가 는다", async () => {
+    const { POST: makeScenario } = await import("../app/api/ads/[id]/scenario/route.js");
+    const made = await (await createAd(post(OK))).json();
+    const ctx = { params: Promise.resolve({ id: made.id }) };
+    await makeScenario(new Request("http://x", { method: "POST", headers: H }), ctx);
+    const res = await makeScenario(
+      new Request("http://x", { method: "POST", headers: H }),
+      { params: Promise.resolve({ id: made.id }) }
+    );
+    expect((await res.json()).scenario.tries).toBe(2);
+  });
+
+  it("상한을 넘으면 400 — 사장님이 할 일이 있는 실패다", async () => {
+    const { POST: makeScenario } = await import("../app/api/ads/[id]/scenario/route.js");
+    const { MAX_SCENARIO_TRIES } = await import("../lib/pricing.js");
+    const { getStore } = await import("../lib/store/index.js");
+    const made = await (await createAd(post(OK))).json();
+    const row = await getStore().selectProject(made.id, U);
+    await getStore().updateProjectRow(made.id, U, row.version, {
+      ...row.doc, scenario: { text: "P", shots: [{}], tries: MAX_SCENARIO_TRIES },
+    });
+    const res = await makeScenario(
+      new Request("http://x", { method: "POST", headers: H }),
+      { params: Promise.resolve({ id: made.id }) }
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("기존 문서면 404", async () => {
+    const { POST: makeScenario } = await import("../app/api/ads/[id]/scenario/route.js");
+    const p = await runWithActor(U, () => createProject({ material: { text: "옛것" }, ownerId: U }));
+    const res = await makeScenario(
+      new Request("http://x", { method: "POST", headers: H }),
+      { params: Promise.resolve({ id: p.id }) }
+    );
+    expect(res.status).toBe(404);
   });
 });
