@@ -1,18 +1,32 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { callJson } from "../lib/llm.js";
 import { runWithActor } from "../lib/actor.js";
+import { memoryStore, resetMemoryStore } from "../lib/store/memory.js";
 
+// Anthropic Messages API 응답 모양. content 는 블록 배열이고 텍스트는 .text 에 있다.
 function fakeFetch(responses) {
   let i = 0;
-  return async () => {
+  const calls = [];
+  const impl = async (url, init) => {
+    calls.push({ url: String(url), body: JSON.parse(init?.body ?? "{}"), init });
     const r = responses[Math.min(i++, responses.length - 1)];
+    const payload = {
+      id: "msg_test", type: "message", role: "assistant",
+      model: "claude-opus-5",
+      content: [{ type: "text", text: r.content ?? "" }],
+      stop_reason: r.stop_reason ?? "end_turn",
+      usage: { input_tokens: 100, output_tokens: 50 },
+    };
     return {
       ok: r.ok !== false,
       status: r.status || 200,
-      json: async () => ({ choices: [{ message: { content: r.content } }] }),
-      text: async () => r.content || "",
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => payload,
+      text: async () => JSON.stringify(payload),
     };
   };
+  impl.calls = calls;
+  return impl;
 }
 
 describe("callJson", () => {
@@ -67,5 +81,94 @@ describe("SHOTFORM_FAKE=all", () => {
     expect(out.script.replace(/\s/g, "").length).toBeGreaterThanOrEqual(20);
     expect(Array.isArray(out.cuts)).toBe(true);   // 빈 배열 → 문장당 한 컷 폴백
     expect(Array.isArray(out.shots)).toBe(true);  // 빈 배열 → 화면 설계 없이 진행
+  });
+});
+
+describe("Claude 로 나간다", () => {
+  it("Anthropic 메시지 엔드포인트로 가고 모델이 claude-opus-5 다", async () => {
+    const f = fakeFetch([{ content: '{"a":1}' }]);
+    await runWithActor("t-user", () => callJson({
+      system: "s", messages: [{ role: "user", content: "u" }], fetchImpl: f, apiKey: "test",
+    }));
+    expect(f.calls[0].url).toContain("api.anthropic.com");
+    expect(f.calls[0].body.model).toBe("claude-opus-5");
+  });
+
+  // ★★ temperature 를 보내면 Claude Opus 5 는 400 이다
+  it("temperature 를 보내지 않는다", async () => {
+    const f = fakeFetch([{ content: "{}" }]);
+    await runWithActor("t-user", () => callJson({ system: "s", messages: [], fetchImpl: f, apiKey: "test" }));
+    expect(f.calls[0].body.temperature).toBeUndefined();
+    expect(f.calls[0].body.top_p).toBeUndefined();
+    expect(f.calls[0].body.top_k).toBeUndefined();
+  });
+
+  it("system 은 messages 가 아니라 별도 필드다", async () => {
+    const f = fakeFetch([{ content: "{}" }]);
+    await runWithActor("t-user", () => callJson({
+      system: "너는 편집자다", messages: [{ role: "user", content: "u" }], fetchImpl: f, apiKey: "test",
+    }));
+    expect(f.calls[0].body.system).toBe("너는 편집자다");
+    expect(f.calls[0].body.messages).toHaveLength(1);
+    expect(f.calls[0].body.messages[0].role).toBe("user");
+  });
+
+  // ★ Opus 5 는 사고가 기본으로 켜져 있고 max_tokens 가 사고+본문의 합계 상한이다
+  it("max_tokens 를 넉넉히 준다 — 낮으면 대본이 중간에 잘린다", async () => {
+    const f = fakeFetch([{ content: "{}" }]);
+    await runWithActor("t-user", () => callJson({ system: "s", messages: [], fetchImpl: f, apiKey: "test" }));
+    expect(f.calls[0].body.max_tokens).toBe(16000);
+  });
+
+  it("키는 CLAUDE_API_KEY 를 먼저 본다", async () => {
+    const before = { c: process.env.CLAUDE_API_KEY, a: process.env.ANTHROPIC_API_KEY };
+    process.env.CLAUDE_API_KEY = "claude-key";
+    delete process.env.ANTHROPIC_API_KEY;
+    try {
+      const f = fakeFetch([{ content: "{}" }]);
+      await runWithActor("t-user", () => callJson({ system: "s", messages: [], fetchImpl: f }));
+      expect(f.calls.length).toBe(1); // 키가 없다고 던지지 않았다
+    } finally {
+      if (before.c === undefined) delete process.env.CLAUDE_API_KEY; else process.env.CLAUDE_API_KEY = before.c;
+      if (before.a === undefined) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = before.a;
+    }
+  });
+
+  it("키가 아예 없으면 CLAUDE_API_KEY 를 말하며 던진다", async () => {
+    const before = { c: process.env.CLAUDE_API_KEY, a: process.env.ANTHROPIC_API_KEY };
+    delete process.env.CLAUDE_API_KEY;
+    delete process.env.ANTHROPIC_API_KEY;
+    try {
+      await expect(
+        runWithActor("t-user", () => callJson({ system: "s", messages: [], fetchImpl: fakeFetch([{ content: "{}" }]) }))
+      ).rejects.toThrow(/CLAUDE_API_KEY/);
+    } finally {
+      if (before.c !== undefined) process.env.CLAUDE_API_KEY = before.c;
+      if (before.a !== undefined) process.env.ANTHROPIC_API_KEY = before.a;
+    }
+  });
+
+  it("원장에 anthropic/claude-opus-5 로 남고 원가가 0 이 아니다", async () => {
+    resetMemoryStore();
+    await runWithActor("t-user", () => callJson({
+      system: "s", messages: [], fetchImpl: fakeFetch([{ content: "{}" }]), apiKey: "test",
+    }));
+    const rows = await memoryStore.allCosts();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].endpoint).toBe("anthropic/claude-opus-5");
+    // usage 가 input 100 · output 50 이므로 100*5/1e6 + 50*25/1e6 = 0.00175
+    expect(rows[0].est_cost_usd).toBeCloseTo(0.00175, 6);
+    expect(rows[0].stage).toBe("대본");
+  });
+
+  // ★ 파싱에 실패해 재시도해도 부른 값은 치렀다 — 기록이 두 줄이어야 한다
+  it("파싱 실패로 재시도해도 매 호출이 원장에 남는다", async () => {
+    resetMemoryStore();
+    await runWithActor("t-user", () => callJson({
+      system: "s", messages: [],
+      fetchImpl: fakeFetch([{ content: "깨짐{" }, { content: '{"b":2}' }]),
+      apiKey: "test",
+    }));
+    expect(await memoryStore.allCosts()).toHaveLength(2);
   });
 });
