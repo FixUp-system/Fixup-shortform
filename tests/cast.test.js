@@ -55,6 +55,12 @@ describe("buildCastMessages", () => {
   it("그 사람을 빠뜨리지 말라고 지시한다", () => {
     expect(buildCastMessages(cuts, AVATARS, "x").system).toContain("따라가는 사람");
   });
+
+  it("목소리를 정하라고 지시한다 — validateCast 가 받는 키와 같은 이름이어야 한다", () => {
+    const { system } = buildCastMessages(cuts, AVATARS);
+    expect(system).toContain('"voice"');   // JSON 스키마 줄
+    expect(system).toContain("voice 는 그 인물의 목소리다"); // 규칙 줄
+  });
 });
 
 import { resolveCastRefs, resolveCutRefs } from "../lib/cast.js";
