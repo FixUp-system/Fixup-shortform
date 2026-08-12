@@ -73,7 +73,31 @@ export const POST = withUser(async (req) => {
     return Response.json({ error: "메시지가 비어 있어요" }, { status: 400 });
   }
 
-  const client = new Anthropic({ apiKey });
+  // ★★ 첫 메시지는 반드시 user 여야 한다 — 아니면 Anthropic 이 400 이고, 그 400 은
+  // 아래 catch 에서 502 가 되어 사장님 화면에 "문제가 생겼어요" 로 뜬다.
+  //
+  // 홈 챗은 우리가 박아 둔 인사말이 이미 떠 있는 상태로 시작하고(components/QuickCreate.jsx),
+  // 사장님이 첫 마디를 치면 그 인사말까지 함께 올라온다. OpenAI 는 그것을 받아 줬다.
+  // 그래서 이 잘라내기가 없으면 **홈에서 첫 마디를 던지는 모든 사장님**이 막힌다.
+  //
+  // 빈 텍스트도 같은 이유로 거른다(빈 content 역시 400 사유다).
+  const turns = messages
+    .map((m) => ({ role: m.role === "me" ? "user" : "assistant", content: m.text }))
+    .filter((m) => typeof m.content === "string" && m.content.trim() !== "");
+  while (turns.length && turns[0].role === "assistant") turns.shift();
+  if (turns.length === 0) {
+    return Response.json({ error: "메시지가 비어 있어요" }, { status: 400 });
+  }
+
+  // ★ SDK 의 기본 재시도(2회)·기본 타임아웃(10분)을 명시해 덮는다.
+  //
+  // 기본값을 두면 한 논리 호출이 최대 6번 나갈 수 있다 — SDK 가 429·5xx 를 3번까지
+  // 부르고, 200 을 받았는데 JSON 파싱이 깨지면 아래 루프가 한 번 더 돌아 또 3번이다.
+  // 게다가 타임아웃으로 우리가 끊은 요청도 서버는 이미 생성을 마쳤을 수 있는데, 그
+  // 토큰은 usage 로 안 돌아와 **원장에 한 줄도 안 남는다** — 이 저장소가 못 박은
+  // "원가가 0 이 되는 경로는 예산 가드가 못 보는 값" 이 그대로 재현되는 모양이다.
+  // 옛 raw fetch 에는 내부 재시도가 없었으니 이것은 SDK 를 들이며 새로 생긴 구멍이다.
+  const client = new Anthropic({ apiKey, maxRetries: 1, timeout: 120_000 });
 
   // 1회 재시도 포함 — JSON 파싱 실패 방어
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -85,10 +109,7 @@ export const POST = withUser(async (req) => {
         // ★ system 은 messages 가 아니라 별도 필드다. temperature 는 보내지 않는다 —
         //   Opus 5 는 받으면 400 이다.
         system: SYSTEM_PROMPT,
-        messages: messages.map((m) => ({
-          role: m.role === "me" ? "user" : "assistant",
-          content: m.text,
-        })),
+        messages: turns,
       });
     } catch (e) {
       // SDK 가 상태코드를 예외로 바꾼다 — 기존 !res.ok 자리와 같은 역할이다

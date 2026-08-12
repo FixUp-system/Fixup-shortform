@@ -139,3 +139,19 @@ describe("LLM 원가 — 두 공급자의 usage 모양", () => {
     expect(estimateLlmCost("claude-opus-5", { input_tokens: 1, output_tokens: 0 })).toBe(0.000005);
   });
 });
+
+// ★ 응답이 돌려주는 model 이 별칭이 아니라 날짜판일 수 있다(claude-opus-5-20260812).
+// 완전 일치로 찾으면 그날 Claude 원가가 **기본 단가(gpt-4o 값)로 반값** 기록된다 —
+// 원가를 내려 잡으면 예산 가드가 한도를 넘기고도 통과시킨다. 그래서 접두사로 찾는다
+// (estimateCost 의 PRICE_TABLE 이 이미 쓰는 방식이다).
+describe("LLM 단가는 접두사로 찾는다 — 날짜판 모델명", () => {
+  it("claude-opus-5-20260812 도 claude-opus-5 단가다", () => {
+    expect(estimateLlmCost("claude-opus-5-20260812", { input_tokens: 1000, output_tokens: 500 }))
+      .toBeCloseTo(0.0175, 6);
+  });
+
+  it("gpt-4o-2024-08-06 도 gpt-4o 단가다", () => {
+    expect(estimateLlmCost("gpt-4o-2024-08-06", { prompt_tokens: 1000, completion_tokens: 500 }))
+      .toBeCloseTo(0.0075, 6);
+  });
+});
