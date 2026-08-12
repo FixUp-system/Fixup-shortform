@@ -500,7 +500,11 @@ export function normalizeAdOptions(input) {
     return v;
   };
   const style = src.style === undefined || src.style === null ? DEFAULT_AD_OPTIONS.style : src.style;
-  if (!AD_STYLE_LINES[style]) throw new Error(`모르는 style 예요: ${style}`);
+  // ★ 대괄호 접근으로 판정하지 마라. AD_STYLE_LINES 는 평범한 객체라 Object.prototype 을
+  //   상속한다 — `AD_STYLE_LINES["constructor"]` 가 함수라서 truthy 가 되고, `style:"constructor"`
+  //   가 검증을 통과한다. 그 값이 저장되면 나중에 프롬프트 자리에 **문자열이 아니라 함수**가
+  //   잡혀 $3.63 짜리 호출이 쓰레기 지시문으로 나간다. 자기 소유 키만 인정한다.
+  if (!Object.keys(AD_STYLE_LINES).includes(style)) throw new Error(`모르는 style 예요: ${style}`);
   return {
     format: pick(AD_FORMATS, "format", DEFAULT_AD_OPTIONS.format),
     mood: pick(AD_MOODS, "mood", DEFAULT_AD_OPTIONS.mood),
@@ -978,8 +982,9 @@ describe("kind — 두 종류를 가른다", () => {
     await run(() => createProject({ material: { text: "옛것" }, ownerId: U }));
     await run(() => createProject({ material: { text: "광고" }, ownerId: U, kind: "ad" }));
     const list = await listProjects(U);
+    // ⚠️ 기본 .sort() 는 값을 **문자열로 바꿔** 비교한다 — "ad" < "null" 이라 결과는 ["ad", null] 이다.
     const kinds = list.map((p) => p.kind).sort();
-    expect(kinds).toEqual([null, "ad"]);
+    expect(kinds).toEqual(["ad", null]);
   });
 
   it("목록 썸네일이 종류에 맞는 자리를 본다", async () => {
@@ -2054,7 +2059,8 @@ export const PATCH = withUser(async (req, { params }, user) => {
 });
 ```
 
-⚠️ `updateProject` 가 갱신된 문서를 돌려주는지 `lib/projects.js` 에서 확인한다. 안 돌려주면 갱신 뒤 `getProject` 로 다시 읽어 돌려준다.
+✅ **확인됨(2026-08-12 실측):** `updateProject(id, ownerId, patchFn)` 은 갱신된 문서를 돌려준다
+(`lib/projects.js:151` 의 `return next`). 다시 읽을 필요가 없다.
 
 - [ ] **Step 5: `app/api/ads/[id]/status/route.js` 를 쓴다**
 
@@ -2104,21 +2110,70 @@ git commit -m "feat(ad): 문서 라우트 — 옵션은 닫힌 목록, 고치면
 
 `tests/ad-routes.test.js` 에 덧붙인다:
 
+⚠️ **`SHOTFORM_FAKE=all` 로는 200 을 만들 수 없다.** `lib/llm.js` 의 `fakeResponse` 는 `shots`
+가 빈 배열이라 `validateScenario` 가 `null` 을 주고 라우트가 500 을 낸다. 그렇다고
+`fakeResponse` 를 고치면 **기존 파이프라인 검증기들이 그 모양에 기대고 있어** 깨진다.
+
+그래서 **LLM 경계만 갈아끼운다.** 파일 맨 위(다른 import 앞)에 둔다 — `vi.mock` 은 끌어올려진다:
+
+```js
+// LLM 경계만 가짜로 막는다 — 라우트·파이프라인·시나리오 검증은 **진짜로** 돈다.
+// 이 저장소의 기존 방식과 같다(tests/auto-route.test.js:9 참고).
+vi.mock("../lib/llm.js", () => ({
+  callJson: vi.fn(async () => ({
+    text: "Vertical commercial. Slow push-in on the product, then a hand lifts it.",
+    shots: [{ beat: "제품 등장", camera: "slow push-in", action: "병이 놓인다", line: "매일 아침" }],
+    endpoint: "t2v",
+  })),
+}));
+```
+
 ```js
 describe("광고 라우트 — 시나리오", () => {
   beforeEach(() => resetMemoryStore());
 
-  it("만들면 문서에 남고 200", async () => {
-    process.env.SHOTFORM_FAKE = "all";           // LLM 을 가짜로
+  it("만들면 시나리오가 문서에 남고 200", async () => {
     const { POST: makeScenario } = await import("../app/api/ads/[id]/scenario/route.js");
     const made = await (await createAd(post(OK))).json();
     const res = await makeScenario(
       new Request("http://x", { method: "POST", headers: H }),
       { params: Promise.resolve({ id: made.id }) }
     );
-    // 가짜 LLM 응답에는 shots 가 없으므로 500 이 정상이다 — 배선만 확인한다
-    expect([200, 500]).toContain(res.status);
-    delete process.env.SHOTFORM_FAKE;
+    expect(res.status).toBe(200);
+    const doc = await res.json();
+    expect(doc.scenario.shots.length).toBeGreaterThan(0);
+    expect(doc.scenario.tries).toBe(1);
+    expect(doc.status).toBe("scenario");
+    // 사진 0장이므로 코드가 t2v 로 고정한다 — LLM 이 무엇을 말했든
+    expect(doc.scenario.endpoint).toBe("t2v");
+  });
+
+  it("다시 쓰면 회차가 는다", async () => {
+    const { POST: makeScenario } = await import("../app/api/ads/[id]/scenario/route.js");
+    const made = await (await createAd(post(OK))).json();
+    const ctx = { params: Promise.resolve({ id: made.id }) };
+    await makeScenario(new Request("http://x", { method: "POST", headers: H }), ctx);
+    const res = await makeScenario(
+      new Request("http://x", { method: "POST", headers: H }),
+      { params: Promise.resolve({ id: made.id }) }
+    );
+    expect((await res.json()).scenario.tries).toBe(2);
+  });
+
+  it("상한을 넘으면 400 — 사장님이 할 일이 있는 실패다", async () => {
+    const { POST: makeScenario } = await import("../app/api/ads/[id]/scenario/route.js");
+    const { MAX_SCENARIO_TRIES } = await import("../lib/pricing.js");
+    const { getStore } = await import("../lib/store/index.js");
+    const made = await (await createAd(post(OK))).json();
+    const row = await getStore().selectProject(made.id, U);
+    await getStore().updateProjectRow(made.id, U, row.version, {
+      ...row.doc, scenario: { text: "P", shots: [{}], tries: MAX_SCENARIO_TRIES },
+    });
+    const res = await makeScenario(
+      new Request("http://x", { method: "POST", headers: H }),
+      { params: Promise.resolve({ id: made.id }) }
+    );
+    expect(res.status).toBe(400);
   });
 
   it("기존 문서면 404", async () => {
