@@ -1748,11 +1748,18 @@ const RENDERS_BUCKET = "renders";
 
 // fal 산출물은 기본이 publicly readable 이다 — 우리 비공개 버킷으로 옮긴다.
 // 미공개 캠페인 영상이면 URL 이 새는 것만으로 사고다.
-async function storeVideoDefault(url, fetchImpl = fetch) {
+//
+// ★★ 파일명이 곧 프로젝트 id 다. 무작위 이름을 쓰지 마라 —
+//    app/api/renders/[name]/route.js 가 **파일명에서 프로젝트 id 를 되찾아** 소유자를
+//    검사한다(그 라우트 상단 주석이 그 규약을 적고 있다). 무작위 uuid 로 지으면
+//    getProject(<무작위>, ownerId) 가 null 을 주고 **모든 완성본이 404 가 된다** —
+//    65 크레딧을 내고 만든 영상을 사장님이 영영 못 연다.
+//    기존 lib/compose.js 도 `${projectId}.mp4` 로 짓는다. 다시 만들면 덮어쓰는 것이 규약이다.
+async function storeVideoDefault(url, projectId, fetchImpl = fetch) {
   const res = await fetchImpl(url);
   if (!res.ok) throw new Error(`완성본을 내려받지 못했어요 (${res.status})`);
   const bytes = Buffer.from(await res.arrayBuffer());
-  const name = `${randomUUID()}.mp4`;
+  const name = `${projectId}.mp4`;
   await getStore().putObject(RENDERS_BUCKET, name, bytes, "video/mp4");
   return `/api/renders/${name}`;
 }
@@ -1796,7 +1803,7 @@ export async function runAdRenderPipeline(projectId, ownerId, deps = {}) {
       if (bytes) refs.push({ key, bytes });
     }
     const out = await make({ project, scenario: project.scenario, refs });
-    const url = await store(out.url);
+    const url = await store(out.url, projectId);
     await updateProject(projectId, ownerId, (p) => ({
       ...p, videos: [{ url, seconds: out.seconds }], status: "done", video_error: null,
     }));
