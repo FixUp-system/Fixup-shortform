@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { resetMemoryStore } from "../lib/store/memory.js";
 import { getStore } from "../lib/store/index.js";
-import { assertBudget } from "../lib/costs.js";
+import { assertBudget, addRecord, spentForProject } from "../lib/costs.js";
 import { runWithActor } from "../lib/actor.js";
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
 import * as projects from "../lib/projects.js";
@@ -65,15 +65,13 @@ const chargeTo = (user, n, key) =>
 describe("호출 게이트 — 사용자 축은 잔액이다", () => {
   beforeEach(() => {
     resetMemoryStore();
-    // 전역·프로젝트 상한은 이 테스트의 관심사가 아니다 — 넉넉히 열어 둔다
+    // 전역 상한은 이 테스트의 관심사가 아니다 — 넉넉히 열어 둔다
     process.env.SHOTFORM_BUDGET_TOTAL_USD = "1000";
-    process.env.SHOTFORM_BUDGET_PROJECT_USD = "1000";
     delete process.env.SHOTFORM_FAKE;
     delete process.env.SHOTFORM_FAKE_IMAGES;
   });
   afterEach(() => {
     restore("SHOTFORM_BUDGET_TOTAL_USD");
-    restore("SHOTFORM_BUDGET_PROJECT_USD");
     restore("SHOTFORM_FAKE");
     restore("SHOTFORM_FAKE_IMAGES");
   });
@@ -112,12 +110,23 @@ describe("호출 게이트 — 사용자 축은 잔액이다", () => {
     });
   });
 
-  it("프로젝트 상한도 그대로 안전핀이다", async () => {
-    process.env.SHOTFORM_BUDGET_PROJECT_USD = "0.01";
+  // ★ 프로젝트 축은 걷어냈다(2026-08-12) — 요금 상한처럼 굴어 정상 사용을 막았다.
+  // 한 프로젝트가 아무리 써도 전역 안이면 지나가야 한다.
+  it("프로젝트 축은 없다 — 한 프로젝트가 많이 써도 전역 안이면 지나간다", async () => {
     await grantTo(A, 1000);
     await runWithActor(A, async () => {
+      // 같은 프로젝트로 여러 번 불러 누적을 옛 상한($30) 위로 올린다
+      for (let i = 0; i < 80; i++) {
+        await assertBudget({ projectId: "p1", endpoint: KLING, amount: 15 });
+        await addRecord({
+          request_id: `p1-${i}`, ts: Date.now(), endpoint: KLING, stage: "영상",
+          user: A, project_id: "p1", prompt: "-", duration: "15", aspect_ratio: "-",
+          est_cost_usd: 1.26, status: "done", video_url: "u",
+        });
+      }
+      expect(await spentForProject("p1")).toBeGreaterThan(30);
       await expect(assertBudget({ projectId: "p1", endpoint: KLING, amount: 5 }))
-        .rejects.toMatchObject({ name: "BudgetExceeded", scope: "project" });
+        .resolves.toBeUndefined();
     });
   });
 });

@@ -364,10 +364,11 @@ A(`nano-banana`)와 B(`nano-banana-2`)를 컷당 한 장씩. 8장 전부 성공(
 
 ## 6. 예산 가드
 
-`SHOTFORM_BUDGET_TOTAL_USD` / `SHOTFORM_BUDGET_PROJECT_USD`. 없으면 코드 기본값
-**전역 300 / 프로젝트 30**(`lib/costs.js` 의 `limitTotal`·`limitProject`)이다.
-(옛 문구는 `=25`/`=5` 였다 — 개발용 안전핀 시절 값이라 낡았다. 지금 전역은 우리 지갑의
-마지막 방어선이고 프로젝트는 폭주 방어이지, **요금 상한이 아니다** — 요금은 크레딧이 맡는다.)
+`SHOTFORM_BUDGET_TOTAL_USD`. 없으면 코드 기본값 **전역 300**(`lib/costs.js` 의 `limitTotal`)이다.
+축은 이것 하나다 — 요금은 크레딧이, 체험은 `FREE_TRIAL_USD` 가 맡는다.
+(**프로젝트 축(`SHOTFORM_BUDGET_PROJECT_USD`·`limitProject`)은 2026-08-12 에 걷어냈다.**
+요금 상한처럼 굴어 정상 사용을 막았다 — Seedance 60초 한 편이 원가 $19.2 라 재생성 몇 번이면
+옛 상한 $30 에 닿아, 크레딧을 내고 산 영상이 중간에 죽었다.)
 
 유료 호출 **직전에** 이번 호출의 예상 비용을 더해 재고, 넘으면 부르지 않는다.
 fal 셋(이미지·목소리·영상)에 더해 **LLM 도 그물 안**이다 — `lib/llm.js` · `/api/chat` ·

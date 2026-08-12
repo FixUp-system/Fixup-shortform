@@ -53,10 +53,9 @@ describe("withUser 가 예산 오류를 옮긴다", () => {
     expect((await throwing("user")(req(), {})).status).toBe(402);
   });
 
-  // 전역·프로젝트 상한은 우리 안전핀이다 — 사장님 잘못이 아니니 402 로 말하면 안 된다.
+  // 전역 상한은 우리 안전핀이다 — 사장님 잘못이 아니니 402 로 말하면 안 된다.
   it("우리 안전핀은 503 이다", async () => {
     expect((await throwing("total")(req(), {})).status).toBe(503);
-    expect((await throwing("project")(req(), {})).status).toBe(503);
   });
 
   it("예산과 무관한 오류는 그대로 던진다 — 조용히 402 로 뭉개지 않는다", async () => {
@@ -116,12 +115,12 @@ describe("재생성 3종 — 예산 오류는 400 이 아니다", () => {
     ["클립", clipRegenPOST, "clips/0/regen"],
   ];
 
-  // 프로젝트 상한은 우리 안전핀이다 — 400 "만들지 못했어요"로 나가면 사장님은
+  // 전역 상한은 우리 안전핀이다 — 400 "만들지 못했어요"로 나가면 사장님은
   // 몇 번이고 다시 누른다. withUser 까지 올라가 503 이 돼야 한다.
   for (const [name, POST, path] of routes) {
     it(`${name} 재생성 — 예산 오류는 503 이다`, async () => {
       const p = await projectWithCut();
-      pipelineMock.regen.mockRejectedValue(new BudgetExceeded(31, 30, "project"));
+      pipelineMock.regen.mockRejectedValue(new BudgetExceeded(301, 300, "total"));
       const res = await POST(post(`http://localhost/api/projects/${p.id}/${path}`), idxCtx(p.id));
       expect(res.status).toBe(503);
     });

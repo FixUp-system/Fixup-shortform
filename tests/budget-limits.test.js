@@ -6,22 +6,30 @@
 //   서로 모르는 것을 잡자던 테스트가 자기도 단가를 모르는 셈이 된다.
 //   실물(PRICE_TABLE·활성 엔드포인트·클립 프로필)을 통해 잰다.
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { FREE_TRIAL_USD, VIDEO_PRICE, MAX_REGEN_PER_CUT } from "../lib/pricing.js";
+import { FREE_TRIAL_USD } from "../lib/pricing.js";
 import { estimateCost } from "../lib/costs.js";
-import { activeI2vEndpoint, activeClipProfile, minSecondsFor } from "../lib/clip-limits.js";
+import { endpointForProject, clipProfileForProject, minSecondsFor } from "../lib/clip-limits.js";
 import { activeImageEndpoint } from "../lib/imagegen.js";
 
 // LLM 만 손으로 든다 — 토큰 과금이라 PRICE_TABLE(단일 단가)에 없다. 편당 실측 ~$0.06.
 const LLM_PER_VIDEO = 0.06;
 
+// ★ 모델이 **프로젝트마다** 다르다(i2v_model). 전역 "활성 엔드포인트"는 더 이상 없다.
+// 여기서 재는 것은 **모델을 안 고른 프로젝트**, 즉 옛 프로젝트가 떨어지는 자리(Kling v3)다
+// — 이 파일의 원래 사건(60초 한 편이 안전핀을 넘김)이 그 모델에서 났다.
+const LEGACY_PROJECT = {}; // settings.i2v_model 없음 → LEGACY_I2V_MODEL(kling-v3)
+
 // 최악의 컷 수 = 모델이 받는 **최소** 길이로 잘게 쪼갠 경우.
 // 옛 가정 `seconds / 5` 는 최악을 과소평가했다 — Kling v3 는 3초까지 받아 60초가 20컷이다.
-const worstCuts = (seconds) => Math.floor(seconds / minSecondsFor(activeClipProfile()));
+const worstCuts = (seconds) =>
+  Math.floor(seconds / minSecondsFor(clipProfileForProject(LEGACY_PROJECT)));
 
 // 컷 하나의 원가 = 클립(초당) + 이미지(장당). 둘 다 실물 단가표가 답한다.
 const costPerCut = () =>
-  estimateCost(activeI2vEndpoint(), minSecondsFor(activeClipProfile())) +
-  estimateCost(activeImageEndpoint(), 1);
+  estimateCost(
+    endpointForProject(LEGACY_PROJECT),
+    minSecondsFor(clipProfileForProject(LEGACY_PROJECT))
+  ) + estimateCost(activeImageEndpoint(), 1);
 
 // 한 편의 기본 원가(최악의 컷 수 기준).
 const costFor = (seconds) => LLM_PER_VIDEO + worstCuts(seconds) * costPerCut();
@@ -41,7 +49,7 @@ describe("예산 안전핀이 가격표를 견딘다", () => {
   // 머신마다 .env.local 이 달라 눈금·단가가 갈리면 안 된다.
   const saved = {};
   beforeEach(() => {
-    for (const k of ["SHOTFORM_BUDGET_TOTAL_USD", "SHOTFORM_BUDGET_PROJECT_USD", "FAL_I2V_ENDPOINT", "FAL_IMAGE_ENDPOINT"]) {
+    for (const k of ["SHOTFORM_BUDGET_TOTAL_USD", "FAL_I2V_ENDPOINT", "FAL_IMAGE_ENDPOINT"]) {
       saved[k] = process.env[k];
       delete process.env[k];
     }
@@ -53,19 +61,16 @@ describe("예산 안전핀이 가격표를 견딘다", () => {
     }
   });
 
-  // ★ 이 단정이 이번 결함을 다시 잡는다.
-  it("가장 긴 영상의 원가가 프로젝트 상한 아래다", async () => {
-    const { limitProject } = await import("../lib/costs.js");
-    const longest = Math.max(...Object.keys(VIDEO_PRICE).map(Number));
-    expect(costFor(longest)).toBeLessThan(limitProject());
+  // ★ 프로젝트 축은 사라졌다. 옛 상한($30)은 Seedance 60초 한 편($19.2)에 재생성 몇 번이면
+  // 닿아 "돈은 있는데 못 만드는" 상태를 만들었다 — 요금은 크레딧이, 폭주 방어는 전역 상한이 맡는다.
+  it("프로젝트 축은 사라졌다 — 폭주 방어는 전역 상한이 맡는다", async () => {
+    const costs = await import("../lib/costs.js");
+    expect(costs.limitProject).toBeUndefined();
   });
 
-  it("재생성 최대치까지 얹어도 프로젝트 상한 아래다 — 재생성은 크레딧을 받고 하는 정상 사용이다", async () => {
-    const { limitProject } = await import("../lib/costs.js");
-    const longest = Math.max(...Object.keys(VIDEO_PRICE).map(Number));
-    // 컷마다 MAX_REGEN_PER_CUT 회까지 다시 만들 수 있다(클립·이미지 둘 다 다시 나간다).
-    const regenWorst = worstCuts(longest) * MAX_REGEN_PER_CUT * costPerCut();
-    expect(costFor(longest) + regenWorst).toBeLessThan(limitProject());
+  it("전역 상한은 그대로다", async () => {
+    const { limitTotal } = await import("../lib/costs.js");
+    expect(limitTotal()).toBe(300);
   });
 
   it("전역 상한이 영상 여러 편을 견딘다 — 전 사용자 합계가 몇 편에서 멎으면 안 된다", async () => {

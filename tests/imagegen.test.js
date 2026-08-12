@@ -13,7 +13,6 @@ const thing = { source: "upload", key: "thing.png", kind: "thing", bytes: Buffer
 
 beforeEach(() => {
   process.env.SHOTFORM_BUDGET_TOTAL_USD = "100";
-  process.env.SHOTFORM_BUDGET_PROJECT_USD = "100";
   delete process.env.SHOTFORM_FAKE;
   delete process.env.SHOTFORM_FAKE_IMAGES;
   // 사용자 축은 이제 고정 상한이 아니라 **잔액**(크레딧)이다 — 충전이 없으면 유료 호출이

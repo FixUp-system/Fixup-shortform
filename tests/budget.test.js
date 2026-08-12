@@ -14,9 +14,8 @@ async function fresh(env = {}) {
   process.env.SHOTFORM_FAKE = "off";
   delete process.env.SHOTFORM_FAKE_IMAGES;
   process.env.SHOTFORM_BUDGET_TOTAL_USD = env.total ?? "20";
-  process.env.SHOTFORM_BUDGET_PROJECT_USD = env.project ?? "5";
   // 사용자 축은 이제 고정 상한이 아니라 **잔액**이다(크레딧). 이 파일이 보는 것은
-  // 전역·프로젝트 축이므로, 예전에 SHOTFORM_BUDGET_USER_USD="1000" 으로 열어 두던 자리를
+  // 전역 축이므로, 예전에 SHOTFORM_BUDGET_USER_USD="1000" 으로 열어 두던 자리를
   // "넉넉한 충전"으로 바꾼다 — 충전이 없으면 사용자 축이 먼저 걸려 다른 축을 못 본다.
   for (const u of ["t-user", "local"]) {
     await memoryStore.insertGrant({ user_id: u, amount_credits: 1000, reason: "테스트", granted_by: "admin" });
@@ -56,10 +55,10 @@ describe("누적 합계", () => {
 });
 
 describe("assertBudget", () => {
-  beforeEach(() => fresh({ total: "10", project: "3" }));
+  beforeEach(() => fresh({ total: "10" }));
 
   // ★ assertBudget 이 사용자 축도 함께 보게 되면서 costActor() 를 부른다 — actor
-  // 컨텍스트 없이 부르면 던진다(lib/actor.js). 이 describe 는 total·project 축만
+  // 컨텍스트 없이 부르면 던진다(lib/actor.js). 이 describe 는 전역 축만
   // 보려는 것이므로 runWithActor 로 감싸고, 사용자 축은 fresh() 의 충전이 열어 둔다.
 
   it("여유가 있으면 통과한다", async () => {
@@ -71,23 +70,24 @@ describe("assertBudget", () => {
     ).resolves.toBeUndefined();
   });
 
-  it("이번 호출을 더해 프로젝트 상한을 넘으면 막는다", async () => {
-    await record(costs, { project_id: "p1", est_cost_usd: 2 });
-    // 2 + 2 = 4 > 3
-    await expect(
-      runWithActor("t-user", () =>
-        costs.assertBudget({ projectId: "p1", endpoint: "fal-ai/veo3.1", amount: 5 })
-      )
-    ).rejects.toThrow(/예산 상한/);
+  // ★ 프로젝트 축이 사라졌다. 요금은 크레딧이 맡고, 폭주 방어는 전역 상한이 맡는다.
+  it("한 프로젝트가 옛 상한을 한참 넘겨도 전역 안이면 안 막힌다", async () => {
+    await fresh({ total: "1000" });
+    await record(costs, { project_id: "p1", est_cost_usd: 100 });
+    await runWithActor("t-user", () =>
+      costs.assertBudget({ projectId: "p1", endpoint: "fal-ai/veo3.1", amount: 5 })
+    ); // 던지지 않으면 통과다
   });
 
-  it("다른 프로젝트가 쓴 것은 이 프로젝트 상한에 들어가지 않는다", async () => {
-    await record(costs, { project_id: "p2", est_cost_usd: 2.9 });
+  it("전역 상한은 프로젝트가 하나여도 여전히 막는다", async () => {
+    await fresh({ total: "10" });
+    await record(costs, { project_id: "p1", est_cost_usd: 9 });
+    // 9 + 2 = 11 > 10. 축을 못 박는다 — 이름 없는 toThrow 는 엉뚱한 이유로도 통과한다
     await expect(
       runWithActor("t-user", () =>
         costs.assertBudget({ projectId: "p1", endpoint: "fal-ai/veo3.1", amount: 5 })
       )
-    ).resolves.toBeUndefined();
+    ).rejects.toMatchObject({ name: "BudgetExceeded", scope: "total" });
   });
 
   it("전체 상한은 프로젝트를 가리지 않고 넘으면 막는다", async () => {
@@ -98,15 +98,6 @@ describe("assertBudget", () => {
         costs.assertBudget({ projectId: "p1", endpoint: "fal-ai/veo3.1", amount: 5 })
       )
     ).rejects.toThrow(/예산 상한/);
-  });
-
-  it("어느 상한에 걸렸는지 알려준다", async () => {
-    await record(costs, { project_id: "p1", est_cost_usd: 2 });
-    await runWithActor("t-user", () =>
-      costs.assertBudget({ projectId: "p1", endpoint: "fal-ai/veo3.1", amount: 5 })
-    )
-      .then(() => { throw new Error("막았어야 한다"); })
-      .catch((e) => { expect(e.scope).toBe("project"); });
   });
 
   it("projectId가 없으면 전체 상한만 본다", async () => {
@@ -121,7 +112,7 @@ describe("assertBudget", () => {
 
 describe("가짜 모드", () => {
   it("가짜 모드에서는 재지도 막지도 않는다 — 0원이므로", async () => {
-    await fresh({ total: "0", project: "0" });
+    await fresh({ total: "0" });
     process.env.SHOTFORM_FAKE = "all";
     const c = await import("../lib/costs.js?t=" + Date.now() + Math.random());
     await expect(
@@ -135,7 +126,7 @@ describe("가짜 모드", () => {
 const bust = () => "?t=" + Date.now() + Math.random();
 
 describe("호출부 배선 — 가드에 걸리면 fal 로 나가지 않는다", () => {
-  beforeEach(() => fresh({ total: "0.01", project: "0.01" }));
+  beforeEach(() => fresh({ total: "0.01" }));
 
   it("이미지: 상한을 넘으면 fetch 를 부르지 않는다", async () => {
     const { generateImage } = await import("../lib/imagegen.js" + bust());
@@ -169,7 +160,7 @@ describe("호출부 배선 — 가드에 걸리면 fal 로 나가지 않는다",
 });
 
 describe("비용 기록에 프로젝트가 남는다", () => {
-  beforeEach(() => fresh({ total: "100", project: "100" }));
+  beforeEach(() => fresh({ total: "100" }));
 
   it("이미지 기록에 project_id 가 들어간다", async () => {
     const { generateImage } = await import("../lib/imagegen.js" + bust());
@@ -202,7 +193,7 @@ describe("비용 기록에 프로젝트가 남는다", () => {
 // LLM 비용이 오랫동안 한 줄도 안 남았다. 비용 기록에는 fal 만 보이고,
 // 대본을 열 번 다시 써도 0원으로 보였다 — 대본 한 편에 예닐곱 번을 부르는데도.
 describe("LLM 비용도 기록한다", () => {
-  beforeEach(() => fresh({ total: "100", project: "100" }));
+  beforeEach(() => fresh({ total: "100" }));
 
   it("usage 로 값을 재어 남긴다 — 입력과 출력 단가가 다르다", async () => {
     const { estimateLlmCost } = costs;

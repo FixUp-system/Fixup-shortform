@@ -36,7 +36,8 @@
 >   **던진다** — 라우트는 `withUser` 가, 스크립트는 `runWithActor("admin", …)` 가 세운다
 > - **신원 검증은 `middleware.js` 에서 요청당 한 번**, 결과를 요청 헤더로 주입한다.
 >   라우트는 `withUser(handler, {adminOnly})` 로 읽기만 한다. **matcher 가 곧 보안 경계다**
-> - 예산 축이 셋이다: 전역 · **사용자별** · 프로젝트별
+> - 예산 축이 셋이다: 전역($300 안전핀) · **사용자별**(크레딧 잔액) · 체험(`FREE_TRIAL_USD`).
+>   프로젝트 축은 걷어냈다(2026-08-12)
 >
 > ⚠️ **백필 전에는 배포하지 마라** — `.eq("owner_id")` 는 NULL 과 안 맞아 기존 프로젝트가
 > 전부 안 보인다.
@@ -110,9 +111,9 @@ node scripts/measure/ab-briefing.mjs setup|b        # 프롬프트 A/B
 
 스키마는 `db/schema.sql` 하나다. **통째로 다시 올려도 안전하다**(`if not exists`·`or replace`).
 합계는 `sum_costs()` SQL 함수가 낸다 — 앱에서 행을 받아 더하면 PostgREST 행 상한(기본 1000)에
-걸려 **말없이 일부만** 더해지고, 그러면 `assertBudget`의 전역 상한(**$300**, 프로젝트는 $30)이
-조용히 사라진다. (옛 문구는 "$20 상한"이었다 — 코드 기본값이 300/30 으로 올라간 뒤 낡았다.
-값은 `lib/costs.js` 의 `limitTotal`·`limitProject` 가 정한다.)
+걸려 **말없이 일부만** 더해지고, 그러면 `assertBudget`의 전역 상한(**$300**)이
+조용히 사라진다. 값은 `lib/costs.js` 의 `limitTotal` 하나가 정한다
+(프로젝트 축은 2026-08-12 에 걷어냈다 — 요금 상한처럼 굴어 정상 사용을 막았다).
 
 RLS는 켜져 있고 정책은 0개다(=전부 거부). 앱은 `service_role`로 붙어 우회한다. 인증이 붙으면
 사용자 토큰 클라이언트로 갈아탄 뒤 `owner_id = auth.uid()` 정책을 얹는다.
