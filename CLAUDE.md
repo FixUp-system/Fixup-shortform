@@ -1,9 +1,43 @@
 # shotform-saas — 작업 지침
 
-> 워크트리 `C:\Users\fixup\shotform-video` · 브랜치 `feature/video-compose`
-> (2026-08-06 기준: **origin/main 에 미푸시**이고 `main` 도 뒤처져 있다(인증·크레딧 작업분).
-> 커밋 수도 테스트 수치도 적는 순간 낡으니 **세어라** — 불변인 것은 "**전부 그린**"뿐이다:
-> `git rev-list --count origin/main..HEAD` · `git rev-list --count main..HEAD` · `npx vitest run`)
+> 워크트리 `C:\Users\fixup\shotform-video` · 브랜치 **`feature/i2v-model`**
+> (2026-08-12 기준: **origin/main 에 미푸시**. 커밋 수도 테스트 수치도 적는 순간 낡으니
+> **세어라** — 불변인 것은 "**전부 그린**"뿐이다:
+> `git rev-list --count origin/main..HEAD` · `npx vitest run`)
+>
+> ⚠️ **이 저장소에는 Vercel 프로젝트가 없다** — `main` 에 푸시해도 배포되는 것이 없다.
+> ⚠️ **`next.config.mjs` 는 의도적 미커밋**이다(주석에 "커밋하지 않는다"). `git add -A` 금지.
+> ⚠️ 3737 포트에 dev 서버 + Cloudflare 터널이 붙어 있을 수 있다. 오래 켜 두면 워커가 죽어
+> `Jest worker encountered … exceeding retry limit` 이 뜬다 — **코드가 아니라 그 프로세스**이니
+> 껐다 켜면 풀린다(터널은 별도 프로세스라 URL 이 유지된다).
+
+> ## 2026-08-12 에 들어온 것 — 라이브 검증이 셋 다 안 됐다
+>
+> 네 덩이가 이 브랜치에 있다: **LLM→Claude Opus 5** · **모델 고르는 자리를 결제 앞(②대본)으로**
+> · **Seedance 네이티브 음성**(클립이 직접 말한다) · **자막 조절**(드래그·폰트·색·크기).
+>
+> **★ 아직 아무도 실물로 안 돌렸다. 셋 다 확인이 필요하고 앞의 둘은 0원이다:**
+> 1. **컷 간 목소리 일관성** — 설계가 "무너지면 구현하지 않는다"로 건 **정지 게이트**인데
+>    통과된 적이 없다. `bash scripts/measure/seedance-voice.sh`(fal 직접 $3.63) 또는
+>    이미 만들어 둔 컷 2개짜리 클립을 이어 들으면 0원.
+>    무너지면 `lib/clip-limits.js` 의 `speaks: true` → `false` **한 줄**로 전 경로가 옛 동작으로
+>    돌아온다(단 진행 중 프로젝트가 있으면 전 컷이 낡음으로 뒤집혀 재구매가 제시된다)
+> 2. **자막 ffmpeg 굽기 4회**(기본값·폰트 3종·색·크기 1.6) — 로컬 ffmpeg 라 **0원**.
+>    `soft`(Gowun Dodum) 한글 글리프는 cmap format 12 라 아무도 눈으로 못 봤다 —
+>    틀리면 **두부(□□□) 글자**가 나오는데 알려 줄 자리가 코드에 없다
+> 3. **Seedance 엔드포인트**(`bytedance/seedance-2.0/image-to-video` · `resolution:"720p"`) —
+>    틀리면 이미지까지 값을 다 치른 뒤 ⑤에서 전 컷 실패
+>
+> **후속 과제는 두 문서에 전부 적혀 있다**:
+> `docs/measurements/2026-08-12-seedance-voice.md`(음성 7건) ·
+> `docs/superpowers/specs/2026-08-12-subtitle-styling-design.md`(자막 11건).
+>
+> ⚠️ **결제를 붙이기 전에 반드시 볼 것**: 자막 원본(`-raw.mp4`) 때문에 저장이 **두 배**인데
+> (편당 ~20MB) **삭제 경로가 아예 없어 영구 누적**이다. 무료 플랜 1GB 면 50편에서 찬다.
+>
+> ★ **이 세션의 교훈**: 결함이 **태스크 경계**에 모였다(개별 리뷰는 다 통과인데 합쳐 봐야
+> 드러나는 자리에서 Critical 일곱). 계획을 파일 단위로 쪼개면 그 사이를 아무도 안 본다 —
+> **"값이 어디서 만들어져 어디까지 흐르는가"를 태스크 하나로** 세울 것.
 
 > ## 인증이 붙었고, 라이브로 관통했다 (2026-08-01 코드 · 08-04 검증)
 >
@@ -14,7 +48,7 @@
 >
 > ⚠️ **가짜 모드로는 비용 배선을 검증할 수 없다** — `llm/imagegen/i2v/tts` 넷 다 가짜 판정이
 > `addRecord` **앞**이라 `SHOTFORM_FAKE=all` 에서는 **기록 자체가 안 남는다.**
-> 검증하려면 `SHOTFORM_FAKE=fal`(OpenAI 만 진짜, 클립·이미지는 가짜)로 띄운다.
+> 검증하려면 `SHOTFORM_FAKE=fal`(LLM 만 진짜, 클립·이미지는 가짜)로 띄운다.
 >
 > **처음 켤 때는 `docs/auth-setup.md`** — 특히 첫 관리자는 `profiles`·`app_metadata` 양쪽이다.
 > 개발 중 로그인은 `.env.local` 의 **`SHOTFORM_DEV_USER`** 하나로 건너뛴다(프로덕션 빌드에서는
@@ -76,8 +110,8 @@
 
 ```bash
 npm run dev                      # localhost:3000
-SHOTFORM_FAKE=fal npm run dev    # fal(이미지·TTS·i2v·합성)만 가짜, OpenAI는 진짜
-SHOTFORM_FAKE=all npm run dev    # OpenAI까지 가짜 — 완전 0원, 배선·상태 전이만 확인
+SHOTFORM_FAKE=fal npm run dev    # fal(이미지·TTS·i2v·합성)만 가짜, LLM(Claude·gpt-4o vision)은 진짜
+SHOTFORM_FAKE=all npm run dev    # LLM까지 가짜 — 완전 0원, 배선·상태 전이만 확인
 npx vitest run                   # 테스트 — 개수는 여기서 센다(적어 두지 않는다)
 ```
 
