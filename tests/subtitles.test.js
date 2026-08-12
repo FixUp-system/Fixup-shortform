@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { buildCues, toAss, cutSeconds, subtitleStyle, lineWidthUnits, textUnits, MAX_SUBTITLE_LINES, splitSubtitleText, breakTwoLines } from "../lib/subtitles";
 import {
   SUBTITLE_FONTS, DEFAULT_SUBTITLE, normalizeSubtitle, outlineFor, clampPos, SIZE_MIN, SIZE_MAX,
+  posFromLegacyPosition, SUBTITLE_LINE_HEIGHT,
 } from "../lib/subtitles.js";
 
 describe("자막을 절 경계에서 고르게 나눈다", () => {
@@ -502,6 +503,47 @@ describe("자막 위치", () => {
     expect(f[10]).toBe("2");
     expect(f[13]).toBe(String(Math.round(1920 * 0.18)));
   });
+});
+
+// ★★ 옛 위치(위·중간·아래)를 자유 위치로 옮길 때, 두 값의 **뜻이 다르다**:
+// 새 pos.y 는 늘 글자 블록의 아랫변인데 옛 marginV 는 아래=바닥에서·위=천장에서(윗변)·
+// 중간=중심이다. 그냥 marginV 를 y 로 쓰면 "위"에 두었던 사장님이 [적용]을 누르는 순간
+// 자막이 블록 하나만큼 위로 튄다. 그래서 리터럴 금지가 아니라 **값의 뜻**을 잰다.
+describe("옛 위치 → 자유 위치", () => {
+  // 한 줄 블록의 높이(화면 비율) — 자막 크기 식(height*0.042)에 줄 높이를 곱한 값이다
+  const block = 0.042 * SUBTITLE_LINE_HEIGHT;
+
+  it("아래는 기본값과 같은 자리다 — 기본끼리 어긋나지 않는다", () => {
+    expect(posFromLegacyPosition("bottom")).toEqual(DEFAULT_SUBTITLE.pos);
+  });
+
+  it("위는 옛 윗변 여백에 블록 높이를 더한 자리다", () => {
+    const [, y] = posFromLegacyPosition("top");
+    // 옛 자리: 천장에서 12% 아래가 **윗변**이었다 → 아랫변은 그만큼 더 내려간다
+    // 저장되는 값은 소수 3자리로 양자화된다(눈에 안 보이는 재굽기를 막는 그 규칙이다)
+    expect(y).toBe(Math.round((0.12 + block) * 1000) / 1000);
+    expect(y, "여백을 그대로 아랫변으로 쓰면 블록 하나만큼 위로 튄다").toBeGreaterThan(0.12);
+  });
+
+  it("중간은 블록의 **중심**이 한가운데다", () => {
+    const [, y] = posFromLegacyPosition("middle");
+    expect(y).toBeCloseTo(0.5 + block / 2, 3);
+    expect(y, "0.5 를 그대로 쓰면 반 블록만큼 위로 튄다").toBeGreaterThan(0.5);
+  });
+
+  it("모르는 값은 기본(아래)으로 떨어진다", () => {
+    expect(posFromLegacyPosition(undefined)).toEqual(DEFAULT_SUBTITLE.pos);
+    expect(posFromLegacyPosition("constructor")).toEqual(DEFAULT_SUBTITLE.pos);
+  });
+
+  // 세 자리 모두 화면 안(SAFE 여백 안쪽)이라 clampPos 가 다시 옮기지 않는다 —
+  // 옮기면 씨앗과 저장값이 갈려 눌러 보지도 않은 재굽기가 뜬다.
+  for (const id of ["top", "middle", "bottom"]) {
+    it(`${id} 자리는 clampPos 가 손대지 않는다`, () => {
+      const p = posFromLegacyPosition(id);
+      expect(clampPos(p)).toEqual(p);
+    });
+  }
 });
 
 describe("자막 설정 — 자유롭되 코드가 막는다", () => {

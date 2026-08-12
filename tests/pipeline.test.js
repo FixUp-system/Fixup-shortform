@@ -775,6 +775,39 @@ describe("runRenderPipeline — 하나로 합친다", () => {
     expect(got.cuts).toHaveLength(1);
   });
 
+  // ★★ 각인(renderKey)에는 subtitle 이 들어간다. 합성에 설정을 안 실으면 완성본은 기본
+  // 흰 자막·옛 자리로 나오는데 각인은 "설정대로 만들었다"고 찍혀 **낡음으로도 안 잡힌다** —
+  // 사장님이 꾸민 자막이 컷을 한 번 고치는 순간 조용히 사라진다.
+  it("고른 자막 설정을 합성에 싣는다", async () => {
+    const p = await makeProject();
+    const subtitle = { pos: [0.5, 0.4], font: "impact", color: "#FF0000", size: 1.4 };
+    await projects.updateProject(p.id, OWNER, (proj) => ({
+      ...proj, status: "video", settings: { aspect_ratio: "9:16", subtitle },
+      cuts: [{ idx: 0, sentence: "문장", seconds: 4, video: { url: "v0" }, audio: { url: "a0", seconds: 4 } }],
+    }));
+
+    let got;
+    await pipeline.runRenderPipeline(p.id, OWNER, {
+      compose: async (args) => { got = args; return { url: "u", seconds: 4 }; },
+    });
+    expect(got.subtitle).toEqual(subtitle);
+  });
+
+  it("설정을 한 번도 안 고친 프로젝트는 subtitle 없이 간다 — 옛 경로 그대로", async () => {
+    const p = await makeProject();
+    await projects.updateProject(p.id, OWNER, (proj) => ({
+      ...proj, status: "video", settings: { aspect_ratio: "9:16", subtitle_position: "top" },
+      cuts: [{ idx: 0, sentence: "문장", seconds: 4, video: { url: "v0" }, audio: { url: "a0", seconds: 4 } }],
+    }));
+
+    let got;
+    await pipeline.runRenderPipeline(p.id, OWNER, {
+      compose: async (args) => { got = args; return { url: "u", seconds: 4 }; },
+    });
+    expect(got.subtitle).toBeUndefined();
+    expect(got.subtitlePosition).toBe("top");
+  });
+
   it("완성본에 컷별 소리·클립·문장을 각인한다 — 컷을 고치면 낡는다", async () => {
     const p = await makeProject();
     await pipeline.runSplitPipeline(p.id, OWNER, deps());

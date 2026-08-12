@@ -496,6 +496,44 @@ describe("원본과 완성본을 나눈다", () => {
     expect(r.seconds).toBe(17);
   });
 
+  // ★★ 전체 재합성도 설정을 실어야 한다. 안 실으면 자막을 꾸민 뒤 컷을 고쳐 [다시 합치기]를
+  // 누르는 순간 기본 흰 자막·옛 자리로 돌아가는데, 각인에는 설정이 들어 있어 낡음으로도
+  // 안 잡힌다(리뷰 C2).
+  it("전체 재합성도 고른 자막 설정을 ASS 에 싣는다", async () => {
+    let ass = "";
+    await composeVideo({
+      ...deps, projectId: "p1", cuts: CUTS,
+      subtitle: { color: "#FF0000", font: "impact", pos: [0.5, 0.4] },
+      writeFileImpl: async (_p, body) => { ass = body; },
+      putObjectImpl: async () => {},
+    });
+    const style = ass.split("\n").find((l) => l.startsWith("Style: Main"));
+    expect(style).toContain("Black Han Sans");
+    expect(style).toContain("&H000000FF");   // 빨강
+    expect(ass, "자유 위치가 안 실렸다").toContain("\\pos(540,768)");
+  });
+
+  // 설정을 안 준 옛 경로는 한 글자도 달라지면 안 된다 — 기본값이면 오늘과 픽셀 동일이다.
+  it("설정을 안 주면 옛 ASS 그대로다 — \\pos 가 안 붙는다", async () => {
+    let ass = "";
+    await composeVideo({
+      ...deps, projectId: "p1", cuts: CUTS,
+      writeFileImpl: async (_p, body) => { ass = body; },
+      putObjectImpl: async () => {},
+    });
+    expect(ass).not.toContain("\\pos(");
+    expect(ass.split("\n").find((l) => l.startsWith("Style: Main"))).toContain("Pretendard");
+  });
+
+  // getObject 는 없으면 **던진다** — `if (!bytes)` 로만 막던 때는 그 갈래에 영영 못 닿아
+  // 스토어 원문 오류("객체를 찾을 수 없어요: renders/…")가 그대로 사장님에게 갔다(리뷰 M9).
+  it("원본이 버킷에 없으면 준비한 문구가 나온다", async () => {
+    const { downloadImpl, ...noDownload } = deps;
+    await expect(
+      burnSubtitles({ ...noDownload, projectId: "aaaa", cuts: CUTS, putObjectImpl: async () => {} })
+    ).rejects.toThrow("원본 영상이 없어요");
+  });
+
   it("자막만 굽는 args 는 원본 하나만 입력으로 받는다", () => {
     const args = burnArgs({ raw: "/t/raw.mp4", assPath: "/t/s.ass", out: "/t/o.mp4" });
     expect(args.filter((a, i) => args[i - 1] === "-i")).toEqual(["/t/raw.mp4"]);

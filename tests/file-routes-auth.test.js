@@ -72,6 +72,39 @@ describe("완성본 내려받기", () => {
   });
 });
 
+// ★ 자막 없는 **원본**(-raw)도 같은 라우트로 나간다 — ⑥완성의 미리보기가 그것을 재생하고,
+// 그 위에 브라우저가 자막을 그린다. uuid 만 받던 때는 `r`·`w` 가 hex 가 아니라 400 이 나서
+// 어떤 프로젝트에서도 미리보기가 안 떴다(자막 적용은 되니 조용히 실패했다).
+describe("원본(-raw) 내려받기", () => {
+  beforeEach(() => resetMemoryStore());
+
+  const seed = async (ownerId, content = "원본-바이트") => {
+    const p = await createProject({ settings: {}, material: { text: "가", photos: [] }, ownerId });
+    await memoryStore.putObject("renders", `${p.id}-raw.mp4`, Buffer.from(content), "video/mp4");
+    return p;
+  };
+
+  it("주인이 부르면 200 이고 원본 내용이 온다", async () => {
+    const p = await seed(A);
+    const res = await getRender(as(A), { params: Promise.resolve({ name: `${p.id}-raw.mp4` }) });
+    expect(res.status).toBe(200);
+    expect(Buffer.from(await res.arrayBuffer()).toString()).toBe("원본-바이트");
+  });
+
+  it("남의 원본은 객체가 있어도 404 다 — 완성본과 같은 소유자 검사를 받는다", async () => {
+    const p = await seed(A);
+    const res = await getRender(as(B), { params: Promise.resolve({ name: `${p.id}-raw.mp4` }) });
+    expect(res.status).toBe(404);
+  });
+
+  it("-raw 를 흉내 낸 이름은 여전히 400 이다", async () => {
+    for (const name of ["hack-raw.mp4", "11111111-1111-1111-1111-111111111111-rawx.mp4"]) {
+      const res = await getRender(as(A), { params: Promise.resolve({ name }) });
+      expect(res.status, name).toBe(400);
+    }
+  });
+});
+
 // 영상은 볼 때마다 전량이 나간다(개당 8~13MB 실측). 무료 플랜은 저장(1GB)보다
 // 전송(5GB/월)이 먼저 차므로, 같은 사람이 다시 볼 때의 전송을 0 으로 만든다.
 //

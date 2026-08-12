@@ -4,11 +4,16 @@ import { getStore } from "../../../../lib/store/index.js";
 
 // 파일명이 곧 프로젝트 id 다(lib/compose.js 가 `${projectId}.mp4` 로 올린다).
 // 그래서 별도 매핑 없이 소유자를 검사할 수 있다(uploads 와 달리 upload_owners 가 필요 없다).
-const UUID_MP4 = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.mp4$/;
+//
+// ★ `-raw` 갈래도 받는다 — 완성본 말고 **자막 없는 원본**(`${projectId}-raw.mp4`)이 있고,
+// ⑥완성 화면의 미리보기가 그것을 재생한다. uuid 만 받던 때는 `r`·`w` 가 hex 가 아니라
+// 400 이 나서, 자막 적용은 되는데 미리보기만 안 보였다.
+// 소유자 검사는 어느 갈래든 **m[1](프로젝트 id)** 하나로 한다 — 원본도 같은 문을 지난다.
+const RENDER_MP4 = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(-raw)?\.mp4$/;
 
 export const GET = withUser(async (req, { params }, user) => {
   const { name } = await params;
-  const m = UUID_MP4.exec(name);
+  const m = RENDER_MP4.exec(name);
   if (!m) return new Response("잘못된 파일명", { status: 400 });
 
   const project = await getProject(m[1], user.id);

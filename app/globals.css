@@ -3,9 +3,12 @@
    굵기 400/500/800 · 크기 12/14/15/16/24 · 그라디언트 없음 ·
    액센트는 크레딧 자리에만 · 주 실행 버튼은 바탕의 반대색 */
 /* ── 자막 폰트 — ⑥완성의 자막 미리보기가 쓴다.
-   ★ font-family 이름은 lib/subtitles.js 의 SUBTITLE_FONTS[].family 와 **글자 그대로** 같다.
-   그 이름이 ffmpeg 의 ASS Fontname 이자 브라우저의 font-family 다 — 두 벌로 적으면 갈리고,
-   갈리면 브라우저가 조용히 대체 폰트로 그려 미리보기와 완성본이 달라진다.
+   ★ font-family 이름은 lib/subtitles.js 의 SUBTITLE_FONTS[].**cssFamily** 와 글자 그대로 같다
+   (ffmpeg 가 쓰는 family = 폰트 파일 내부 이름과는 **일부러 다르다**).
+   CSS 패밀리 매칭은 대소문자를 안 가려서, 파일 내부 이름 "Pretendard" 를 그대로 쓰면
+   next/font/local 이 내는 UI 폰트 'pretendard' 와 한 가족이 된다 — 어느 쪽이 이기는지가
+   빌드 산출물 순서에 달리고, 뒤집히면 전 화면이 1.5MB 자막 OTF 를 받는다.
+   이름이 한 글자라도 화면과 어긋나면 브라우저는 오류 없이 대체 폰트로 그린다.
 
    파일은 assets/ 의 것을 public/fonts/ 로 복사한 것이다(원본은 ffmpeg 가 읽으므로 그대로 둔다).
    ★ 미리 받지 않는다 — preload 도 document.fonts.load 도 쓰지 않는다. @font-face 는 선언만
@@ -14,17 +17,17 @@
 
    swap: 받는 동안 대체 폰트로 먼저 그린다 — 자막이 잠깐이라도 안 보이면 안 된다. */
 @font-face {
-  font-family: "Pretendard";
+  font-family: "Pretendard Subtitle";
   src: url("/fonts/subtitle-basic.otf") format("opentype");
   font-display: swap;
 }
 @font-face {
-  font-family: "Black Han Sans";
+  font-family: "Black Han Sans Subtitle";
   src: url("/fonts/subtitle-impact.ttf") format("truetype");
   font-display: swap;
 }
 @font-face {
-  font-family: "Gowun Dodum";
+  font-family: "Gowun Dodum Subtitle";
   src: url("/fonts/subtitle-soft.ttf") format("truetype");
   font-display: swap;
 }
@@ -871,6 +874,11 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
 
 /* 완성 화면 — 미리보기를 가운데로 */
 .done-preview { width: 100%; max-width: 360px; margin: 14px auto 0; position: static; }
+/* ★ ⑥완성의 미리보기만 contain 이다 — 여기서는 자막을 **영상 위 좌표**로 옮기므로,
+   cover 로 잘라 보여 주면 드래그한 자리가 잘린 프레임 기준이 되어 최종과 다른 자리를 가리킨다.
+   프레임 비율도 프로젝트 비율에서 나온다(app/create/[id]/done/page.js 의 frameStyle) —
+   둘이 같아야 상자 안에서 잰 비율이 곧 완성본 안에서의 비율이다. */
+.done-preview .preview-video { object-fit: contain; }
 
 /* 완성 화면의 [다시 합치기]·[내려받기] — 나란히 놓이므로 크기를 맞춘다.
    내려받기는 a 태그라(download 속성이 필요하다) 밑줄이 따라온다. 지운다. */

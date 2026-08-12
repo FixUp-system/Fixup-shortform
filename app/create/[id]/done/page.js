@@ -16,31 +16,15 @@ import {
   clampPos,
   outlineFor,
   subtitleStyle,
+  posFromLegacyPosition,
+  SUBTITLE_LINE_HEIGHT,
 } from "../../../../lib/subtitles";
-import { isRenderStale, isClipStale, isImageStale, isSubtitlePositionOnlyStale } from "../../../../lib/steps";
+import { aspectFor } from "../../../../lib/aspects";
+import { isRenderStale, isClipStale, isImageStale, isSubtitleOnlyStale } from "../../../../lib/steps";
 
-// 옛 프로젝트가 쥔 자막 위치(위·중간·아래)를 자유 위치 비율로 옮긴다.
-//
-// ★ settings.subtitle 이 생기는 순간 subtitleHead·toAss 는 옛 subtitle_position 을 통째로
-// 무시한다. 그래서 화면이 기본값으로 씨를 뿌리면 "위"에 두었던 자막이 사장님 몰래 아래로
-// 내려간다 — 각인이 바뀌니 낡음으로 잡히긴 하지만, 옮긴 적 없는 사람에게는 사고다.
-//
-// ⚠️ 비율(0.12·0.18)을 여기 적지 않는다. lib 의 POSITIONS 표는 export 되지 않지만
-// subtitleStyle 이 그 표에서 marginV·alignment 를 내주므로 거기서 되뽑는다 —
-// 표가 바뀌면 이 값도 따라온다. 1000 은 비율을 읽어내려는 눈금일 뿐이다.
-//
-// 세로 뜻은 자리마다 다르다: 아래는 "바닥에서 띄운 만큼", 위는 "천장에서 내린 만큼",
-// 중간은 여백이 뜻을 잃어 정가운데다.
-function posFromLegacyPosition(position) {
-  const H = 1000;
-  const { marginV, alignment } = subtitleStyle({ width: H, height: H, position });
-  const ratio = marginV / H;
-  const [x] = DEFAULT_SUBTITLE.pos;
-  if (alignment === 8) return [x, ratio];
-  if (alignment === 5) return [x, 0.5];
-  // 아래(2). 이 갈래가 DEFAULT_SUBTITLE.pos 와 같은 값을 낸다 — 기본끼리 어긋나지 않는다.
-  return [x, 1 - ratio];
-}
+// 옛 프로젝트가 쥔 자막 위치(위·중간·아래)를 자유 위치 비율로 옮기는 일은 lib 이 한다
+// (posFromLegacyPosition). 정렬 기준마다 marginV 의 뜻이 달라 글자 블록 높이까지 봐야 하는데,
+// 그 식은 자막 크기를 정하는 곳(subtitleStyle) 옆에 있어야 갈라지지 않는다.
 
 // 화면이 쥘 초기값. settings.subtitle 이 있으면 그것이 진실이고, 없는 옛 프로젝트는
 // 옛 위치를 이어받는다. 되돌리기·범위 판정은 늘 lib 의 normalizeSubtitle 을 지난다.
@@ -264,9 +248,23 @@ export default function DoneStepPage() {
   const stale = isRenderStale(project) || cuts.some((c) => isClipStale(c, project)) || cuts.some((c) => isImageStale(c, project));
   // 낡음의 원인을 갈라 말한다 — 자막 위치만 바꾼 것을 "옛 소리·옛 그림" 이라 하면
   // 사장님이 자기가 무엇을 망가뜨렸나로 읽는다. 갈래는 둘이면 충분하다.
-  const staleMessage = isSubtitlePositionOnlyStale(project)
-    ? "자막 위치를 바꿨어요 — 다시 합치면 새 위치로 나와요"
+  const staleMessage = isSubtitleOnlyStale(project)
+    ? "자막을 바꿨어요 — 다시 합치면 새 자막으로 나와요"
     : "컷을 고친 뒤라 이 영상은 옛 소리·옛 그림으로 만든 것이에요 — 다시 합쳐 주세요";
+
+  // ★ 미리보기 상자의 비율은 **프로젝트 비율**이다 — CSS 가 9:16 으로 고정하고 영상을
+  // object-fit: cover 로 채우던 때는, 16:9·1:1 프로젝트에서 영상이 잘려 보였다. 그러면
+  // ①드래그한 자리가 잘린 프레임 기준이라 최종과 다른 자리를 가리키고, ②글자 크기를
+  // box.height(=폭×16/9)로 재는데 ffmpeg 는 실제 높이로 재서 크기까지 어긋났다.
+  // 값은 lib/aspects 에서 가져온다 — 화면이 손으로 적으면 값이 두 벌이 된다.
+  const aspect = aspectFor(project?.settings?.aspect_ratio);
+  const frameStyle = {
+    position: "relative",
+    touchAction: "none",
+    aspectRatio: `${aspect.width} / ${aspect.height}`,
+    // 세로가 긴 비율에서 화면 밖으로 넘치지 않게 — CSS 의 9:16 고정값을 비율에서 다시 뽑는다
+    maxWidth: `calc((100vh - 210px) * ${aspect.width} / ${aspect.height})`,
+  };
 
   // 미리보기에 띄울 자막 — 첫 문장이면 충분하다(자리·크기·색을 보는 용도다)
   const sampleText = (cuts.find((c) => (c.sentence || "").trim())?.sentence || "자막 미리보기").trim();
@@ -292,12 +290,15 @@ export default function DoneStepPage() {
     textAlign: "center",
     whiteSpace: "pre-line",
     fontSize: previewFontSize,
-    lineHeight: 1.25,
+    // 줄 높이도 lib 이 쥔다 — 옛 위치를 옮길 때 쓰는 글자 블록 높이와 같은 값이어야 한다
+    lineHeight: SUBTITLE_LINE_HEIGHT,
     fontWeight: 700,
-    // 폰트 이름은 lib 의 family 그대로다 — ffmpeg 의 ASS Fontname 과 같은 이름이고,
-    // app/globals.css 의 @font-face 가 public/fonts/ 의 같은 파일을 그 이름으로 물린다.
+    // ★ 브라우저에는 **cssFamily** 를 쓴다(ffmpeg 의 family 가 아니다). CSS 패밀리 이름은
+    // 대소문자를 안 가려서, 파일 내부 이름을 그대로 쓰면 next/font/local 이 내는 UI 폰트
+    // 이름과 한 가족이 된다 — 어느 쪽이 이길지가 빌드 산출물 순서에 달린다.
+    // app/globals.css 의 @font-face 가 public/fonts/ 의 파일을 이 이름으로 물린다.
     // 뒤의 sans-serif 는 폰트를 받는 동안(font-display: swap) 대신 그릴 글씨다.
-    fontFamily: `"${font.family}", sans-serif`,
+    fontFamily: `"${font.cssFamily}", sans-serif`,
     color: sub.color,
     textShadow: outlineShadow,
     cursor: applying ? "default" : "move",
@@ -351,7 +352,7 @@ export default function DoneStepPage() {
           {/* ★ 자막 없는 원본을 재생하고 그 위에 브라우저가 자막을 그린다 — 구워진 자막 위에
               미리보기를 얹으면 자막이 둘로 보인다. 원본이 없는 옛 프로젝트는 완성본 그대로다. */}
           <div className="preview-pane done-preview">
-            <div className="preview-frame" ref={stageRef} style={{ position: "relative", touchAction: "none" }}>
+            <div className="preview-frame" ref={stageRef} style={frameStyle}>
               <video className="preview-video" controls src={rawUrl || render.url} />
               {rawUrl && (
                 <div

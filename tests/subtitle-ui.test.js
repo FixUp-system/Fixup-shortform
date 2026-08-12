@@ -78,13 +78,34 @@ describe("⑥완성 — 옛 위치를 이어받는다", () => {
     expect(fn, "초기값도 lib 의 정규화를 지나야 한다").toContain("normalizeSubtitle");
   });
 
-  // 비율(0.12·0.18)은 lib 의 POSITIONS 표에 있다. 화면이 손으로 적으면 표가 바뀔 때 갈린다.
-  it("위치 비율을 화면에 박지 않는다 — subtitleStyle 에서 되뽑는다", () => {
-    const at = src.indexOf("function posFromLegacyPosition");
-    expect(at, "posFromLegacyPosition 이 없다").toBeGreaterThan(-1);
-    const fn = src.slice(at, src.indexOf("\n}", at));
-    expect(fn, "표에서 파생시키지 않는다").toContain("subtitleStyle");
-    expect(fn, "여백 비율을 손으로 적었다").not.toMatch(/0\.12|0\.18|0\.82/);
+  // 비율(0.12·0.18)은 lib 의 POSITIONS 표에 있고, 정렬 기준까지 감안한 변환도 lib 이 한다.
+  // 화면이 손으로 적으면 표가 바뀔 때 갈린다.
+  it("위치 비율을 화면에 박지 않는다 — lib 에서 가져온다", () => {
+    expect(src, "화면이 변환을 다시 구현했다").not.toContain("function posFromLegacyPosition");
+    expect(src, "posFromLegacyPosition 을 lib 에서 안 가져온다").toContain("posFromLegacyPosition");
+    expect(src, "여백 비율을 손으로 적었다").not.toMatch(/0\.12|0\.18|0\.82/);
+  });
+});
+
+// C3 — 프로젝트 비율이 셋(9:16·1:1·16:9)이다. 미리보기 상자를 9:16 으로 고정하고 영상을
+// cover 로 채우면 16:9·1:1 에서 영상이 잘려 보여, 드래그한 자리가 **잘린 프레임 기준**이 된다.
+describe("⑥완성 — 미리보기 비율이 프로젝트를 따른다", () => {
+  const css = readFileSync("app/globals.css", "utf8");
+
+  it("상자 비율을 lib/aspects 에서 뽑는다 — 화면에 손으로 적지 않는다", () => {
+    expect(src, "lib/aspects 를 안 본다").toMatch(/from ["'][./]*lib\/aspects["']/);
+    expect(src).toContain("aspectFor");
+    const at = src.indexOf("const frameStyle");
+    expect(at, "frameStyle 이 없다").toBeGreaterThan(-1);
+    const block = src.slice(at, src.indexOf("};", at));
+    expect(block, "비율을 aspect 에서 안 뽑는다").toMatch(/aspectRatio[\s\S]*aspect\.width[\s\S]*aspect\.height/);
+    expect(block, "9:16 을 손으로 적었다").not.toMatch(/9 ?\/ ?16/);
+  });
+
+  it("영상을 잘라 보여 주지 않는다 — ⑥완성만 contain", () => {
+    const rule = css.match(/\.done-preview \.preview-video \{[^}]*\}/)?.[0];
+    expect(rule, ".done-preview .preview-video 규칙이 없다").toBeTruthy();
+    expect(rule).toContain("object-fit: contain");
   });
 });
 
@@ -121,10 +142,26 @@ describe("⑥완성 — 자막 웹폰트", () => {
   // font-family 인지 알 수 없다.
   const faces = [...css.matchAll(/@font-face\s*\{([^}]*)\}/g)].map((m) => m[1]);
 
+  // ★ 이름이 둘이다. @font-face 와 화면은 cssFamily 를, ffmpeg 는 family(폰트 파일 내부
+  // 이름)를 쓴다. 둘이 **같아지면** next/font/local 의 UI 폰트와 가족이 겹친다
+  // (CSS 패밀리 매칭은 대소문자를 안 가린다) — 어느 쪽이 이길지가 빌드 순서에 달린다.
+  it("cssFamily 는 family 와 다르다 — UI 폰트와 겹치지 않게", () => {
+    for (const f of SUBTITLE_FONTS) {
+      expect(f.cssFamily, `${f.id} 에 cssFamily 가 없다`).toBeTruthy();
+      expect(f.cssFamily.toLowerCase(), `${f.id} 의 cssFamily 가 파일 내부 이름과 같다`)
+        .not.toBe(f.family.toLowerCase());
+    }
+  });
+
+  it("화면은 cssFamily 로 그린다 — ffmpeg 의 family 가 아니다", () => {
+    expect(src).toContain("font.cssFamily");
+    expect(src, "화면이 폰트 파일 내부 이름을 쓴다").not.toMatch(/font\.family/);
+  });
+
   for (const f of SUBTITLE_FONTS) {
-    it(`${f.id}(${f.label}) 의 @font-face 가 목록의 family 와 같은 이름이다`, () => {
-      const face = faces.find((b) => b.includes(`font-family: "${f.family}"`));
-      expect(face, `"${f.family}" 를 선언한 @font-face 가 없다 — 브라우저가 대체 폰트로 그린다`)
+    it(`${f.id}(${f.label}) 의 @font-face 가 목록의 cssFamily 와 같은 이름이다`, () => {
+      const face = faces.find((b) => b.includes(`font-family: "${f.cssFamily}"`));
+      expect(face, `"${f.cssFamily}" 를 선언한 @font-face 가 없다 — 브라우저가 대체 폰트로 그린다`)
         .toBeTruthy();
       expect(face, `${f.id} 의 @font-face 가 /fonts/ 파일을 안 가리킨다`).toMatch(/url\("\/fonts\/[^"]+"\)/);
       // 받는 동안 자막이 안 보이면 안 된다
@@ -132,7 +169,7 @@ describe("⑥완성 — 자막 웹폰트", () => {
     });
 
     it(`${f.id} 의 public 폰트 파일이 실제로 있다`, () => {
-      const face = faces.find((b) => b.includes(`font-family: "${f.family}"`)) || "";
+      const face = faces.find((b) => b.includes(`font-family: "${f.cssFamily}"`)) || "";
       const url = face.match(/url\("(\/fonts\/[^"]+)"\)/)?.[1];
       expect(url, `${f.id} 의 url 을 못 찾았다`).toBeTruthy();
       const path = `public${url}`;
