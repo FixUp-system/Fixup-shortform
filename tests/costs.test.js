@@ -1,7 +1,7 @@
 // 단가표는 prefix 매칭이라 "순서"가 곧 로직이다.
 // 더 구체적인 prefix가 위에 있지 않으면 조용히 틀린 값이 기록된다 — 그걸 여기서 고정한다.
 import { describe, it, expect, beforeEach } from "vitest";
-import { estimateCost } from "../lib/costs";
+import { estimateCost, isFakeFor } from "../lib/costs";
 import { resetMemoryStore } from "../lib/store/memory.js";
 
 // 원장은 모듈 하나짜리 인메모리다 — 비우지 않으면 합계 단언이 "이 파일의 다른 테스트가
@@ -109,5 +109,49 @@ describe("이미지 모델 단가 — prefix 순서가 뒤집히면 조용히 �
     expect(estimateCost("fal-ai/nano-banana-2/edit", 1)).toBeCloseTo(
       estimateCost("fal-ai/nano-banana/edit", 2), 4
     );
+  });
+});
+
+describe("Seedance 를 안전장치가 안다", () => {
+  const SEEDANCE = "bytedance/seedance-2.0/image-to-video";
+
+  it("원가를 초당 0.3024 로 센다 — 표에 없으면 조용히 기본 단가로 떨어진다", () => {
+    expect(estimateCost(SEEDANCE, 10)).toBeCloseTo(3.024, 5);
+    // 표에 없는 엔드포인트가 **0 이 아니라 기본 단가($0.1/s)** 로 떨어진다는 사실을 못 박는다.
+    // 0 보다 나은 것이 아니다 — 3.024 를 1 로 재는 것도 똑같이 조용한 거짓말이고,
+    // 그 값으로 전역 상한이 실제보다 세 배 느슨해진다. 이 테스트가 지키는 것이다.
+    expect(estimateCost("bytedance/모르는모델", 10)).toBe(1);
+  });
+
+  it("Kling 원가는 그대로다", () => {
+    expect(estimateCost("fal-ai/kling-video/v3/standard/image-to-video", 10)).toBeCloseTo(0.84, 5);
+  });
+
+  // ★★ 이것이 이 태스크에서 가장 위험한 자리다
+  it("가짜 모드에서 Seedance 는 fal 로 본다 — 아니면 진짜 호출이 나간다", () => {
+    const before = process.env.SHOTFORM_FAKE;
+    process.env.SHOTFORM_FAKE = "fal";
+    try {
+      expect(isFakeFor(SEEDANCE)).toBe(true);
+      expect(isFakeFor("fal-ai/kling-video/v3/standard/image-to-video")).toBe(true);
+      // ★ 방향은 그대로여야 한다 — 모르는 것은 fal 축으로 떨어지면 안 된다
+      expect(isFakeFor("openai/gpt-4o")).toBe(false);
+      expect(isFakeFor("모르는공급자/모델")).toBe(false);
+    } finally {
+      if (before === undefined) delete process.env.SHOTFORM_FAKE;
+      else process.env.SHOTFORM_FAKE = before;
+    }
+  });
+
+  it("SHOTFORM_FAKE=all 이면 둘 다 가짜다", () => {
+    const before = process.env.SHOTFORM_FAKE;
+    process.env.SHOTFORM_FAKE = "all";
+    try {
+      expect(isFakeFor(SEEDANCE)).toBe(true);
+      expect(isFakeFor("openai/gpt-4o")).toBe(true);
+    } finally {
+      if (before === undefined) delete process.env.SHOTFORM_FAKE;
+      else process.env.SHOTFORM_FAKE = before;
+    }
   });
 });
