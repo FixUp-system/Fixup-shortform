@@ -71,3 +71,72 @@ describe("완성본 내려받기", () => {
     expect(res.status).toBe(400);
   });
 });
+
+// 영상은 볼 때마다 전량이 나간다(개당 8~13MB 실측). 무료 플랜은 저장(1GB)보다
+// 전송(5GB/월)이 먼저 차므로, 같은 사람이 다시 볼 때의 전송을 0 으로 만든다.
+//
+// ★ 각인이 아니라 render.ts 를 ETag 로 쓴다 — 라우트가 이미 getProject 를 부르므로
+//   추가 왕복이 없고, 재합성하면 ts 가 갱신되어 캐시가 저절로 무효화된다.
+//   (URL 은 /api/renders/<id>.mp4 로 늘 같아서 URL 만으로는 갱신을 알릴 수 없다)
+describe("완성본 캐시", () => {
+  beforeEach(() => resetMemoryStore());
+
+  const withEtag = (id, etag) => new Request("http://localhost/x", {
+    headers: {
+      [USER_HEADER]: id, [STATUS_HEADER]: "approved", [ROLE_HEADER]: "user",
+      "if-none-match": etag,
+    },
+  });
+
+  // render.ts 를 doc 에 심는다 — 합성이 끝나면 lib/pipeline.js 가 이 값을 쓴다
+  async function seedRendered(ownerId, ts) {
+    const { updateProject } = await import("../lib/projects.js");
+    const p = await createProject({ settings: {}, material: { text: "가", photos: [] }, ownerId });
+    await updateProject(p.id, ownerId, (d) => ({ ...d, render: { url: `/api/renders/${p.id}.mp4`, ts } }));
+    await putRenderObject(p.id, "진짜-영상-바이트");
+    return p;
+  }
+
+  it("ETag 와 private 캐시 지시를 함께 준다", async () => {
+    const p = await seedRendered(A, 1755000000000);
+    const res = await getRender(as(A), { params: Promise.resolve({ name: `${p.id}.mp4` }) });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("etag")).toBe('"1755000000000"');
+    // ★ private 이어야 한다 — 비공개 영상이 공유 캐시(CDN·프록시)에 남으면 안 된다
+    expect(res.headers.get("cache-control")).toMatch(/private/);
+  });
+
+  it("같은 ETag 로 다시 부르면 304 이고 본문이 0 바이트다", async () => {
+    const p = await seedRendered(A, 1755000000000);
+    const res = await getRender(
+      withEtag(A, '"1755000000000"'),
+      { params: Promise.resolve({ name: `${p.id}.mp4` }) }
+    );
+    expect(res.status).toBe(304);
+    // 이 테스트의 전부다 — 본문이 안 나가야 Storage 전송이 0 이 된다
+    expect((await res.arrayBuffer()).byteLength).toBe(0);
+  });
+
+  it("재합성해서 ts 가 바뀌면 옛 ETag 는 안 먹는다 — 새 영상이 온다", async () => {
+    const p = await seedRendered(A, 1755000000000);
+    const { updateProject } = await import("../lib/projects.js");
+    await updateProject(p.id, A, (d) => ({ ...d, render: { ...d.render, ts: 1755999999999 } }));
+    await putRenderObject(p.id, "새로-만든-영상");
+
+    const res = await getRender(
+      withEtag(A, '"1755000000000"'), // 옛 각인
+      { params: Promise.resolve({ name: `${p.id}.mp4` }) }
+    );
+    expect(res.status).toBe(200);
+    expect(Buffer.from(await res.arrayBuffer()).toString()).toBe("새로-만든-영상");
+  });
+
+  it("남의 것은 ETag 가 맞아도 404 다 — 캐시가 소유자 검사를 앞지르지 않는다", async () => {
+    const p = await seedRendered(A, 1755000000000);
+    const res = await getRender(
+      withEtag(B, '"1755000000000"'),
+      { params: Promise.resolve({ name: `${p.id}.mp4` }) }
+    );
+    expect(res.status).toBe(404);
+  });
+});
