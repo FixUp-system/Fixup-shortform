@@ -83,19 +83,28 @@ export const PATCH = withUser(async (req, { params }, user) => {
     }
   }
 
-  // 클립이 하나라도 있으면 모델을 못 바꾼다. 클립이 한 편에서 가장 비싸서(Seedance 컷당
-  // $1.51), 중간에 바꾸면 한 영상 안에 두 모델이 섞이거나 이미 낸 돈을 버려야 한다.
-  // (바로 위 — 정가를 낸 뒤 길이를 못 바꾸게 한 것과 같은 자리·같은 이유다.)
+  // ★ 모델도 정가를 정한다(videoPrice(seconds, model)) — 그래서 **길이와 똑같은 자**로
+  // 잠근다: 이미 팔았는가.
+  //
+  // 옛 기준은 "클립이 하나라도 생겼는가" 였는데 그것이 두 방향으로 샜다. 정가는
+  // ③목소리·④이미지에서 이미 걷히는데 클립은 ⑤에서야 생기므로, ⑤에 도착한 사장님은
+  // 예외 없이 결제를 마친 상태인데도 칩이 열려 있었다:
+  //   · Seedance 로 160 을 내고 Kling 으로 바꾸면 → 사장님이 110 크레딧을 잃는다
+  //   · Kling 으로 50 을 내고 Seedance 로 바꾸면 → 우리가 편당 ~$6 를 태운다
+  // 게다가 클립 생성이 도는 1~3분 동안은 클립 url 이 아직 없어, 새로고침 한 번이면
+  // 한 편 안에 두 모델이 섞였다(폴백을 기본값과 다르게 둔 이유 자체가 깨진다).
+  //
+  // 그래서 고르는 자리를 결제 **앞**(②대본)으로 옮겼다. 여기서는 낸 뒤를 막기만 한다.
   // 같은 값을 다시 보내는 것은 막지 않는다: 화면이 헛 PATCH 를 보내도 400 이 뜨면 안 된다.
   if (body.settings?.i2v_model !== undefined) {
     const project = await getProject(id, user.id);
     if (
       project &&
       body.settings.i2v_model !== project.settings?.i2v_model &&
-      (project.cuts || []).some((c) => c.video?.url)
+      (await alreadyChargedVideo(id))
     ) {
       return Response.json(
-        { error: "이미 영상을 만들기 시작해서 모델을 바꿀 수 없어요" },
+        { error: "이미 결제된 영상은 모델을 바꿀 수 없어요 — 새로 만들어 주세요" },
         { status: 400 }
       );
     }

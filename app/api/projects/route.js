@@ -32,6 +32,15 @@ export const POST = withUser(async (req, ctx, user) => {
       return Response.json({ error: e.message }, { status: 400 });
     }
   }
+  // ★ 영상 모델은 길이·사이즈와 다르다 — 조용히 접으면 그 방향이 **비싼 쪽**이라
+  // (Seedance 30초 160 vs Kling 50) 오타 하나가 청구를 3배로 만들고, 400 을 아무도
+  // 못 봤으니 알아챌 방법이 없다. PATCH 는 이미 400 을 준다 — 두 입구가 같은 자를 쓴다.
+  if (
+    body?.settings?.i2v_model !== undefined &&
+    !I2V_MODEL_IDS.includes(body.settings.i2v_model)
+  ) {
+    return Response.json({ error: "그 영상 모델은 몰라요" }, { status: 400 });
+  }
   // 영상 사이즈도 자료를 넣는 화면에서 고른다. 길이와 같은 종류의 값이다 —
   // 모르는 값은 조용히 기본(세로)으로 떨어진다: 이 값으로 유료 호출이 나가지만, 목록 밖
   // 값은 우리 화면에서 나올 수 없고(닫힌 칩) 400 으로 막으면 자료를 다시 써야 한다.
@@ -52,9 +61,9 @@ export const POST = withUser(async (req, ctx, user) => {
       target_seconds: target,
       // ★ 기본값을 **명시 저장**한다. 값이 없는 것은 "안 골랐다"가 아니라 "이 기능 전에
       //   만들어졌다"는 뜻이고, 그런 프로젝트는 Kling 으로 돈다(lib/clip-limits.js).
-      i2v_model: I2V_MODEL_IDS.includes(body.settings?.i2v_model)
-        ? body.settings.i2v_model
-        : DEFAULT_I2V_MODEL,
+      //   모르는 값은 위에서 400 으로 막았다 — 조용히 접으면 방향이 비싼 쪽이라
+      //   오타 하나가 청구를 3배로 만든다.
+      i2v_model: body.settings?.i2v_model ?? DEFAULT_I2V_MODEL,
       ...(style ? { style } : {}),
     },
     material: {

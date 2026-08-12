@@ -12,6 +12,7 @@ const admin = strip(readFileSync("app/admin/page.js", "utf8"));
 const voice = strip(readFileSync("app/create/[id]/voice/page.js", "utf8"));
 const images = strip(readFileSync("app/create/[id]/images/page.js", "utf8"));
 const video = strip(readFileSync("app/create/[id]/video/page.js", "utf8"));
+const script = strip(readFileSync("app/create/[id]/script/page.js", "utf8"));
 
 describe("화면 — 크레딧", () => {
   it("편수로 말하지 않는다 — 정가가 길이마다 달라 'N편'은 거짓말이 된다", () => {
@@ -49,7 +50,7 @@ describe("화면 — 크레딧", () => {
 // 클라이언트 번들을 오염시킨다 — pricing 은 import 0 개의 순수 모듈이라 안전하다.
 describe("화면 — 가격표만 가져온다", () => {
   for (const [name, src] of [["QuickCreate", quick], ["admin", admin],
-    ["voice", voice], ["images", images], ["video", video]]) {
+    ["voice", voice], ["images", images], ["video", video], ["script", script]]) {
     it(`${name} 는 lib/charges 를 import 하지 않는다`, () => {
       expect(src).not.toMatch(/from\s+["'][^"']*lib\/charges/);
     });
@@ -88,5 +89,27 @@ describe("④이미지 — 정가·재생성 값", () => {
   it("시작 버튼에 정가를, 재생성 버튼에 재생성 값을 적는다", () => {
     expect(images).toMatch(/videoPrice/);
     expect(images).toMatch(/regenPrice/);
+  });
+});
+
+
+// ★ 영상 모델을 고르는 자리는 **결제 앞**(②대본)이다. 모델이 정가를 정하는데(길이 × 모델)
+// 정가는 ③목소리·④이미지에서 걷히므로, ⑤영상에 도착한 사장님은 예외 없이 이미 결제를
+// 마친 상태다. 그 자리에 고르는 칩을 두면 낸 값과 만드는 값이 어긋난다:
+//   · Seedance 로 160 을 내고 Kling 으로 바꾸면 사장님이 110 크레딧을 잃는다
+//   · Kling 으로 50 을 내고 Seedance 로 바꾸면 우리가 편당 ~$6 를 태운다
+describe("영상 모델을 고르는 자리는 결제 앞이다", () => {
+  it("②대본이 모델 칩을 그리고, 저장 PATCH 를 보낸다", () => {
+    expect(script).toMatch(/I2V_MODELS/);
+    expect(script).toMatch(/i2v_model/);
+  });
+
+  it("②대본의 잠금은 서버와 같은 자다 — charged", () => {
+    expect(script).toMatch(/charged/);
+  });
+
+  it("⑤영상은 읽기 전용이다 — 고르는 버튼이 없다", () => {
+    expect(video).not.toMatch(/saveModel/);
+    expect(video).not.toMatch(/i2v_model/);
   });
 });

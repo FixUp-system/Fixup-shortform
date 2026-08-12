@@ -11,6 +11,7 @@ import { createProject, getProject, updateProject } from "../lib/projects.js";
 // 그 자리표시자로 되돌아가도 이 파일의 테스트가 계속 통과해 되돌림을 못 잡는다(리뷰 I1).
 const OWNER = "33333333-3333-3333-3333-333333333333";
 import { getStore } from "../lib/store/index.js";
+import { chargeVideo } from "../lib/charges.js";
 import { isAudioStale, isImageStale, isClipStale, isRenderStale, renderKey } from "../lib/steps.js";
 
 // 시작 게이트가 붙은 뒤로, 영상 정가(30초 = 50 크레딧)가 없는 사용자는 유료 시작 라우트에서 402 다.
@@ -844,33 +845,51 @@ describe("PATCH /api/projects/[id] — 영상 모델", () => {
     expect((await getProject(p.id, OWNER)).settings.i2v_model).toBe("seedance-2.0");
   });
 
-  // ★★ 잠금 — 클립이 하나라도 있으면 못 바꾼다
-  it("영상을 만들기 시작했으면 모델을 못 바꾼다", async () => {
-    const p = await make({ i2v_model: "seedance-2.0" });
+  // ★★ 잠금은 **정가를 낸 순간**이다 — 클립이 생긴 순간이 아니다.
+  //
+  // 모델이 정가를 정하므로(videoPrice(seconds, model)), 낸 뒤에 바꾸면 낸 값과 만드는
+  // 값이 어긋난다. 차액 청구는 만들지 않았다(청구 장부가 회차·멱등키 기반이라 차액
+  // 개념이 없다) — 바로 위 target_seconds 잠금과 같은 자·같은 이유다.
+  //
+  // 옛 기준("클립이 생겼는가")은 두 방향으로 샜다. 정가는 ③목소리·④이미지에서 이미
+  // 걷히는데 클립은 ⑤에서야 생기므로, 그 사이에 Seedance 로 160 을 내고 Kling 으로
+  // 바꾸면 사장님이 110 크레딧을 잃었고, 반대로 Kling 으로 50 을 내고 Seedance 로
+  // 바꾸면 우리가 편당 ~$6 를 태웠다. 게다가 클립 생성이 도는 1~3분 동안에는 클립
+  // url 이 아직 없어 새로고침 한 번으로 한 편에 두 모델이 섞였다.
+  it("정가를 낸 뒤에는 모델을 못 바꾼다 — 낸 값과 만드는 값이 어긋난다", async () => {
+    await grant();
+    const p = await make({ i2v_model: "seedance-2.0", target_seconds: 30 });
+    await chargeVideo({ userId: OWNER, projectId: p.id, seconds: 30, model: "seedance-2.0" });
+    const res = await PATCH(patchReq({ settings: { i2v_model: "kling-v3" } }), ctx(p.id));
+    expect(res.status).toBe(400);
+    expect((await getProject(p.id, OWNER)).settings.i2v_model).toBe("seedance-2.0");
+  });
+
+  // ★ 클립이 아직 없어도 낸 뒤면 잠긴다 — 이것이 옛 기준으로는 안 잡히던 창이다.
+  it("클립이 아직 없어도 정가를 냈으면 잠긴다", async () => {
+    await grant();
+    const p = await make({ i2v_model: "seedance-2.0", target_seconds: 30 });
+    await chargeVideo({ userId: OWNER, projectId: p.id, seconds: 30, model: "seedance-2.0" });
     await updateProject(p.id, OWNER, (proj) => ({
-      ...proj, cuts: [{ idx: 0, video: { url: "https://x/v.mp4" } }],
+      ...proj, cuts: [{ idx: 0, image: { url: "https://x/i.png" } }],
     }));
     const res = await PATCH(patchReq({ settings: { i2v_model: "kling-v3" } }), ctx(p.id));
     expect(res.status).toBe(400);
     expect((await getProject(p.id, OWNER)).settings.i2v_model).toBe("seedance-2.0");
   });
 
-  it("클립이 아직 없으면 바꿀 수 있다", async () => {
+  it("아직 안 냈으면 바꿀 수 있다 — 고르는 자리는 ②대본이다", async () => {
     const p = await make({ i2v_model: "seedance-2.0" });
-    await updateProject(p.id, OWNER, (proj) => ({
-      ...proj, cuts: [{ idx: 0, image: { url: "https://x/i.png" } }],
-    }));
     const res = await PATCH(patchReq({ settings: { i2v_model: "kling-v3" } }), ctx(p.id));
     expect(res.status ?? 200).toBe(200);
     expect((await getProject(p.id, OWNER)).settings.i2v_model).toBe("kling-v3");
   });
 
   // 화면이 헛 PATCH 를 보내도 400 이 뜨면 안 된다 — 바꾸는 것이 아니라 같은 값이다.
-  it("같은 값을 다시 보내는 것은 클립이 있어도 통과한다", async () => {
-    const p = await make({ i2v_model: "seedance-2.0" });
-    await updateProject(p.id, OWNER, (proj) => ({
-      ...proj, cuts: [{ idx: 0, video: { url: "https://x/v.mp4" } }],
-    }));
+  it("같은 값을 다시 보내는 것은 낸 뒤에도 통과한다", async () => {
+    await grant();
+    const p = await make({ i2v_model: "seedance-2.0", target_seconds: 30 });
+    await chargeVideo({ userId: OWNER, projectId: p.id, seconds: 30, model: "seedance-2.0" });
     const res = await PATCH(patchReq({ settings: { i2v_model: "seedance-2.0" } }), ctx(p.id));
     expect(res.status ?? 200).toBe(200);
   });
@@ -900,10 +919,15 @@ describe("POST /api/projects — 영상 모델", () => {
     expect((await res.json()).settings.i2v_model).toBe("kling-v3");
   });
 
-  // 길이(target_seconds)와 같은 종류다 — 목록 밖 값은 우리 화면에서 나올 수 없고,
-  // 400 으로 막으면 써 둔 자료를 다시 써야 한다.
-  it("모르는 모델은 조용히 기본값으로 떨어진다", async () => {
-    const res = await projectsPOST(patchReq({ material: { text: "가" }, settings: { i2v_model: "seedance-3" } }));
+  // ★ 모르는 모델을 조용히 기본값으로 접지 않는다 — 길이(target_seconds)와 다르다.
+  // 접히는 방향이 하필 **비싼 쪽**(Seedance)이라 오타 하나가 50 크레딧짜리를 160
+  // 크레딧짜리로 만들고, 400 을 아무도 못 봤으니 알아챌 방법이 없다.
+  // PATCH 는 같은 값에 이미 400 을 준다 — 두 입구가 같은 자를 써야 한다.
+  it("모르는 모델은 400 이다 — 조용히 비싼 쪽으로 접지 않는다", async () => {
+    const res0 = await projectsPOST(patchReq({ material: { text: "가" }, settings: { i2v_model: "seedance-3" } }));
+    expect(res0.status).toBe(400);
+    // 값을 아예 안 보내는 것은 정상이다 — 그때만 기본값으로 채운다
+    const res = await projectsPOST(patchReq({ material: { text: "가" } }));
     expect((await res.json()).settings.i2v_model).toBe("seedance-2.0");
   });
 });
