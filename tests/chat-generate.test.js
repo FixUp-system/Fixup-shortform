@@ -67,7 +67,20 @@ describe("POST /api/chat — generate 스키마", () => {
   it("SYSTEM_PROMPT 가 lib 의 화풍 id·목소리 label 을 모두 열거한다", () => {
     const src = readFileSync(new URL("../app/api/chat/route.js", import.meta.url), "utf8");
     const prompt = src.slice(src.indexOf("const SYSTEM_PROMPT = `"), src.indexOf("export const POST"));
-    for (const id of STYLE_PRESETS.map((s) => s.id)) expect(prompt).toContain(`"${id}"`);
-    for (const label of VOICES.map((v) => v.label)) expect(prompt).toContain(`"${label}"`);
+    // ★ 프롬프트 전체에서 찾으면 안 된다. LLM 출력 스키마를 정하는 것은 **union 줄**이고,
+    //   선택 기준 설명은 산문일 뿐이다 — 전체에서 재면 union 에서 화풍이 빠져도
+    //   설명 줄에 이름이 남아 있어 통과한다(리뷰가 실증한 구멍이다).
+    const unionLine = (key) =>
+      prompt.split("\n").map((l) => l.trim()).find((l) => l.startsWith(`"${key}":`));
+    const styleUnion = unionLine("style");
+    expect(styleUnion, "style union 줄을 못 찾았다").toBeTruthy();
+    for (const id of STYLE_PRESETS.map((s) => s.id)) {
+      expect(styleUnion, `union 에 "${id}" 가 없다`).toContain(`"${id}"`);
+    }
+    const voiceUnion = unionLine("voice_label");
+    expect(voiceUnion, "voice_label union 줄을 못 찾았다").toBeTruthy();
+    for (const label of VOICES.map((v) => v.label)) {
+      expect(voiceUnion, `union 에 "${label}" 이 없다`).toContain(`"${label}"`);
+    }
   });
 });

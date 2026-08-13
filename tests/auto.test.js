@@ -186,7 +186,7 @@ describe("자동 관통 실패는 환불한다", () => {
     const p = await makeProject();
     await chargeVideo({ userId: OWNER, projectId: p.id, seconds: 15 });
     // 자동 관통은 모델을 안 넘긴다 → 정가는 레거시(Kling) 표에서 나온다
-    expect(await balanceFor(OWNER)).toBe(-VIDEO_PRICE["kling-v3"][15]);
+    expect(await balanceFor(OWNER)).toBe(-VIDEO_PRICE["kling-v3"]["720p"][15]);
 
     const deps = happyDeps([]);
     deps.extractBriefing = async () => null;
@@ -200,7 +200,7 @@ describe("자동 관통 실패는 환불한다", () => {
     const p = await makeProject();
     await chargeVideo({ userId: OWNER, projectId: p.id, seconds: 15 });
     await runAutoPipeline(p.id, OWNER, happyDeps([]));
-    expect(await balanceFor(OWNER)).toBe(-VIDEO_PRICE["kling-v3"][15]);
+    expect(await balanceFor(OWNER)).toBe(-VIDEO_PRICE["kling-v3"]["720p"][15]);
     expect(await alreadyChargedVideo(p.id)).toBe(true);
   });
 

@@ -1,6 +1,6 @@
 import { getProject, updateProject } from "../../../../lib/projects";
 import { briefingContentChanged } from "../../../../lib/briefing";
-import { clipLimitsForProject, I2V_MODEL_IDS } from "../../../../lib/clip-limits";
+import { clipLimitsForProject, I2V_MODEL_IDS, isResolutionFor, resolutionForProject } from "../../../../lib/clip-limits";
 import { normalizeStyle } from "../../../../lib/styles";
 import { isAspect } from "../../../../lib/aspects";
 import { isSpeed } from "../../../../lib/speeds";
@@ -10,6 +10,21 @@ import { getStore } from "../../../../lib/store/index.js";
 import { alreadyChargedVideo } from "../../../../lib/charges.js";
 import { TARGET_CHOICES } from "../../../../lib/script";
 import { SUBTITLE_POSITIONS, normalizeSubtitle } from "../../../../lib/subtitles.js";
+
+// 결제 뒤 화질 잠금이 **락 안에서** 걸렸다는 표식.
+//
+// 아래 PATCH 의 catch 는 "프로젝트가 없다"를 404 로 옮기는 자리다 — 그 자리에 이 오류가
+// 맨 Error 로 들어가면 잠금이 404 로 뭉개진다. 이름 있는 오류로 갈라서 **사전 판정과 같은
+// 400·같은 문구**로 답한다(NoCredits·BudgetExceeded 와 같은 관용구다).
+//
+// 문구는 한 곳에서만 적는다 — 두 자리(사전 판정·락 안 판정)가 같은 답을 내야 한다.
+const RESOLUTION_LOCKED = "이미 결제된 영상은 화질을 바꿀 수 없어요 — 새로 만들어 주세요";
+class ResolutionLocked extends Error {
+  constructor() {
+    super(RESOLUTION_LOCKED);
+    this.name = "ResolutionLocked";
+  }
+}
 
 export const GET = withUser(async (req, { params }, user) => {
   const { id } = await params;
@@ -92,6 +107,60 @@ export const PATCH = withUser(async (req, { params }, user) => {
     }
   }
 
+  // 화질도 닫힌 목록이다 — 다만 **목록이 모델마다 다르다**(Seedance 만 연다). 그래서
+  // 상수 배열이 아니라 isResolutionFor 가 판정한다(lib/clip-limits.js 가 유일한 자리다).
+  // 안 막으면 아무 값이나 settings 에 들어가고, 그 값이 그대로 fal 유료 호출로 나간다.
+  //
+  // ★ **머지 뒤 모델**로 잰다. 저장된 모델로 재면 모델을 함께 바꾸는 PATCH 에서
+  //   "Seedance 의 1080p 니까 통과"가 되고 저장되는 모델은 Kling 이 된다 — 그 모델에는
+  //   해상도 파라미터 자체가 없는데 문서에는 남아 각인(lib/steps.js)이 그것을 본다.
+  //
+  // ★★ **모델 잠금보다 먼저 판정한다.** 뒤에 두면 모델을 함께 바꾸는 요청을 모델 잠금이
+  //   먼저 400 으로 돌려보내, 이 문이 실제로 무는지를 **어떤 테스트도 못 잰다**
+  //   (리뷰 실측: merged → project 로 되돌려도 11건 전부 그린이었다). 순서가 곧 회귀
+  //   방어다 — 이 문이 스스로 답을 내야 그것이 틀렸을 때 눈에 띈다.
+  if (body.settings?.resolution !== undefined) {
+    const project = await getProject(id, user.id);
+    // ★ 광고 문서는 이 경로가 다루지 않는다 — 아래 결제 잠금이 기존 종류의 청구 장부를
+    // 묻기 전에 막는다(target_seconds 블록과 같은 이유).
+    if (project?.kind === "ad") {
+      return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
+    }
+    const merged = { ...project, settings: { ...project?.settings, ...body.settings } };
+    // 없는 프로젝트는 여기서 400 을 주지 않는다 — 아래 updateProject 가 404 로 답한다.
+    if (project && !isResolutionFor(body.settings.resolution, merged)) {
+      return Response.json({ error: "그 화질은 몰라요" }, { status: 400 });
+    }
+    // ★★ 돈이 새던 자리 — **화질은 정가를 바꾼다**(Seedance 30초: 720p 160 · 1080p 360).
+    // 정가는 ③목소리에서 걷히고 화질 칩은 ②대본에 있다. 결제 뒤에 바꾸면
+    // requireVideoCharge 가 **살아 있는 청구를 보고 그냥 지나가서**(lib/charges.js)
+    // 160 을 내고 원가 2.25배짜리를 받는다. 차액 청구는 만들지 않았다(청구 장부가
+    // 회차·멱등키 기반이라 차액 개념이 없다) — 그래서 못 바꾸게 한다.
+    //
+    // ★ 잠금 기준이 **결제**다(모델처럼 생성 시점이 아니다). 새는 구간이 결제와 첫 클립
+    //   사이라 "첫 클립 뒤"로는 늦고, ②대본 칩이 이미 project.charged 로 잠그므로
+    //   화면과 서버가 같은 것을 본다(GET 이 실어 보내는 alreadyChargedVideo 그 값이다).
+    //   환불받은 프로젝트는 살아 있는 청구가 없어 다시 고를 수 있다 — 다시 돌리면
+    //   새 회차로 정가를 다시 받으므로 어긋나지 않는다.
+    //
+    // ★ 비교는 **날것이 아니라 실제로 값을 치른 화질**(resolutionForProject)로 한다.
+    //   저장값이 없는 프로젝트는 720p 로 청구되므로 720p 를 명시로 보내는 것은 바꾸는
+    //   것이 아니다 — 날것으로 재면 화면의 정상 저장이 400 이 된다.
+    //
+    // ★★★ 여기는 **빠른 실패**일 뿐이다 — 진짜 잠금은 아래 뮤테이터 안에 있다.
+    //   이 판정은 updateProject 의 직렬 큐·version **밖**이라 읽고-나서-쓰기다:
+    //   PATCH(1080p) 와 ③목소리 결제를 동시에 쏘면 PATCH 가 charged=false 를 읽고 →
+    //   그사이 720p 로 청구가 확정되고 → 1080p 가 저장된다. 이 문이 막으려던 바로 그
+    //   시나리오가 그대로 통한다. 그래서 락 안에서 한 번 더 판정한다.
+    if (
+      project &&
+      body.settings.resolution !== resolutionForProject(project) &&
+      (await alreadyChargedVideo(id))
+    ) {
+      return Response.json({ error: RESOLUTION_LOCKED }, { status: 400 });
+    }
+  }
+
   // ★ 영상 모델은 **만들 때 한 번** 정해지고 그 뒤로는 안 바뀐다(2026-08-13 사용자 결정).
   // 고르는 자리는 자료 화면(app/create/page.js)이고, 값은 POST /api/projects 로 함께 온다.
   //
@@ -131,11 +200,24 @@ export const PATCH = withUser(async (req, { params }, user) => {
   }
 
   try {
-    const project = await updateProject(id, user.id, (proj) => {
+    const project = await updateProject(id, user.id, async (proj) => {
       // ★ 광고 문서는 이 경로가 다루지 않는다 — target_seconds 가 없는 본문(예: material 만
       // 고치는 요청)은 위 getProject 가드를 안 거치므로 여기서 다시 막는다. 여기서 던지면
       // 아래 catch 가 기존 문구 그대로 404 로 감싼다 — 없는 것과 같은 취급이다.
       if (proj.kind === "ad") throw new Error("프로젝트를 찾을 수 없어요");
+      // ★★ 화질 잠금의 **진짜 자리** — 여기는 직렬 큐·version 안이고, 저장 직전이다.
+      // 위 사전 판정만 두면 결제와 PATCH 를 동시에 쏘는 순서가 그대로 통한다(그 주석 참고).
+      //
+      // ★ 판정 기준은 위와 글자 그대로 같다 — **지금 문서**가 치른 화질(resolutionForProject)과
+      //   다른 값을 살아 있는 청구가 있는데 넣으려 하는가. 재시도(CAS 패배)로 다시 불려도
+      //   같은 답을 내고, 읽기만 하므로 부작용이 없다.
+      if (
+        body.settings?.resolution !== undefined &&
+        body.settings.resolution !== resolutionForProject(proj) &&
+        (await alreadyChargedVideo(id))
+      ) {
+        throw new ResolutionLocked();
+      }
       const next = { ...proj };
       if (body.material) next.material = { ...proj.material, ...body.material };
       if (body.settings) {
@@ -204,6 +286,10 @@ export const PATCH = withUser(async (req, { params }, user) => {
     });
     return Response.json(project);
   } catch (e) {
+    // 락 안 잠금은 "없는 프로젝트"가 아니다 — 사전 판정과 같은 400·같은 문구로 답한다.
+    if (e instanceof ResolutionLocked) {
+      return Response.json({ error: e.message }, { status: 400 });
+    }
     return Response.json({ error: e.message }, { status: 404 });
   }
 });

@@ -4,7 +4,7 @@ import { TARGET_CHOICES } from "../../../lib/script";
 import { normalizeStyle } from "../../../lib/styles";
 import { ownedPhotoKeys } from "../../../lib/refs-io.js";
 import { withUser } from "../../../lib/auth/require-user.js";
-import { DEFAULT_I2V_MODEL, I2V_MODEL_IDS } from "../../../lib/clip-limits";
+import { DEFAULT_I2V_MODEL, I2V_MODEL_IDS, isResolutionFor } from "../../../lib/clip-limits";
 
 // 내 프로젝트 목록 — doc 통짜를 안 실어 보낸다(listProjects 가 이미 요약해서 준다).
 export const GET = withUser(async (_req, _ctx, user) => {
@@ -55,17 +55,35 @@ export const POST = withUser(async (req, ctx, user) => {
   ) {
     return Response.json({ error: "본인이 올린 사진만 쓸 수 있어요" }, { status: 400 });
   }
+  const settings = {
+    aspect_ratio: aspect,
+    target_seconds: target,
+    // ★ 기본값을 **명시 저장**한다. 값이 없는 것은 "안 골랐다"가 아니라 "이 기능 전에
+    //   만들어졌다"는 뜻이고, 그런 프로젝트는 Kling 으로 돈다(lib/clip-limits.js).
+    //   모르는 값은 위에서 400 으로 막았다 — 조용히 접으면 방향이 비싼 쪽이라
+    //   오타 하나가 청구를 3배로 만든다.
+    i2v_model: body.settings?.i2v_model ?? DEFAULT_I2V_MODEL,
+    ...(style ? { style } : {}),
+  };
+  // ★ 화질. 이 settings 는 **명시 화이트리스트**라(PATCH 처럼 통짜 머지가 아니다) 여기
+  // 적지 않으면 만들 때 고른 화질이 **말없이 사라진다** — 사장님은 1080p 를 골랐다고
+  // 믿는데 720p 로 만들어진다.
+  //
+  // ★ 판정은 PATCH 와 **같은 자**다(isResolutionFor). 목록이 모델마다 다르므로
+  //   지금 만들어지는 settings(=고른 모델이 들어 있는 그것)를 그대로 물어본다.
+  //   모르는 값을 조용히 접지 않는 이유는 모델과 같다 — 접히는 방향이 비싼 쪽이고,
+  //   모델에 없는 값을 저장하면 그대로 fal 유료 호출로 나가 거절당한다.
+  //
+  // ★ **안 보내면 아무것도 안 넣는다.** 기본값을 박으면 "미선택"과 "720p 명시"가
+  //   구분되지 않고, 각인(lib/steps.js)이 그 차이를 본다.
+  if (body?.settings?.resolution !== undefined) {
+    if (!isResolutionFor(body.settings.resolution, { settings })) {
+      return Response.json({ error: "그 화질은 몰라요" }, { status: 400 });
+    }
+    settings.resolution = body.settings.resolution;
+  }
   const project = await createProject({
-    settings: {
-      aspect_ratio: aspect,
-      target_seconds: target,
-      // ★ 기본값을 **명시 저장**한다. 값이 없는 것은 "안 골랐다"가 아니라 "이 기능 전에
-      //   만들어졌다"는 뜻이고, 그런 프로젝트는 Kling 으로 돈다(lib/clip-limits.js).
-      //   모르는 값은 위에서 400 으로 막았다 — 조용히 접으면 방향이 비싼 쪽이라
-      //   오타 하나가 청구를 3배로 만든다.
-      i2v_model: body.settings?.i2v_model ?? DEFAULT_I2V_MODEL,
-      ...(style ? { style } : {}),
-    },
+    settings,
     material: {
       text: body.material.text.slice(0, 4000),
       photos: Array.isArray(body.material.photos) ? body.material.photos : [],

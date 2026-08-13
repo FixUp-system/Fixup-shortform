@@ -992,6 +992,39 @@ describe("POST /api/projects — 영상 모델", () => {
   });
 });
 
+// settings 는 생성 라우트에서 **명시 화이트리스트**다(PATCH 처럼 통짜 머지가 아니다) —
+// 목록에 없는 키는 말없이 사라진다. 화질이 그 자리였다: 만들 때 골라 보내도 안 남고,
+// 사장님은 720p 로 만들어진 것을 1080p 로 골랐다고 믿는다.
+describe("POST /api/projects — 화질", () => {
+  it("고른 화질을 settings 에 담아 만든다", async () => {
+    const res = await projectsPOST(patchReq({ material: { text: "가" }, settings: { resolution: "1080p" } }));
+    expect(res.status ?? 200).toBe(200);
+    expect((await res.json()).settings.resolution).toBe("1080p");
+  });
+
+  // 검증 없이 통과시키면 모델에 없는 값이 저장되고, 그 값이 그대로 fal 유료 호출로 나가
+  // 거절당한다. PATCH 와 같은 자(isResolutionFor)를 쓴다.
+  it("모델에 없는 화질은 400 이다", async () => {
+    const res = await projectsPOST(patchReq({ material: { text: "가" }, settings: { resolution: "2160p" } }));
+    expect(res.status).toBe(400);
+  });
+
+  // Kling 에는 resolution 파라미터 자체가 없다 — 함께 보낸 화질은 "아는 값처럼 생긴 값"이다.
+  it("화질을 안 여는 모델을 고르면서 화질을 보내면 400 이다", async () => {
+    const res = await projectsPOST(patchReq({
+      material: { text: "가" }, settings: { i2v_model: "kling-v3", resolution: "720p" },
+    }));
+    expect(res.status).toBe(400);
+  });
+
+  // ★ 안 보내면 아무것도 안 넣는다 — 기본값을 박으면 "미선택"과 "720p 명시"가 구분이 안 된다
+  //   (각인이 그 차이를 본다, lib/steps.js).
+  it("화질을 안 보내면 settings 에 넣지 않는다", async () => {
+    const res = await projectsPOST(patchReq({ material: { text: "가" } }));
+    expect((await res.json()).settings).not.toHaveProperty("resolution");
+  });
+});
+
 // ★ regen 라우트 3개는 리뷰에서 실측으로 드러난 자리다 — pipeline.js 가
 // regenCut(projectId, ownerId, idx, deps, instruction) 로 인자가 하나 늘었는데, 이 세
 // 라우트는 안 고쳐진 채 옛 자리에 idx 를 넣고 있었다(ownerId 자리에 idx 숫자가 들어가고,

@@ -98,30 +98,30 @@ describe("청구", () => {
   it("잔액은 충전에서 청구를 뺀 값이다", async () => {
     await grant(500);
     await chargeVideo({ userId: A, projectId: P, seconds: 30 });
-    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["kling-v3"][30]);
+    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["kling-v3"]["720p"][30]);
   });
 
   it("길이마다 값이 다르다", async () => {
     await grant(500);
     await chargeVideo({ userId: A, projectId: P, seconds: 60 });
-    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["kling-v3"][60]);
+    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["kling-v3"]["720p"][60]);
   });
 
   it("같은 프로젝트를 두 번 청구하지 않는다 — 자동 관통으로 산 것을 단계별이 또 받지 않게", async () => {
     await grant(500);
     const first = await chargeVideo({ userId: A, projectId: P, seconds: 30 });
     const second = await chargeVideo({ userId: A, projectId: P, seconds: 30 });
-    expect(first).toBe(VIDEO_PRICE["kling-v3"][30]);
+    expect(first).toBe(VIDEO_PRICE["kling-v3"]["720p"][30]);
     expect(second).toBe(0);
-    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["kling-v3"][30]);
+    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["kling-v3"]["720p"][30]);
     expect(await alreadyChargedVideo(P)).toBe(true);
   });
 
   it("컷당 첫 재생성은 공짜, 둘째부터 값을 치른다", async () => {
     await grant(500);
     expect(await chargeRegen({ userId: A, projectId: P, kind: "clip", idx: 0, priorCount: 0 })).toBe(0);
-    expect(await chargeRegen({ userId: A, projectId: P, kind: "clip", idx: 0, priorCount: 1 })).toBe(REGEN_PRICE.clip["kling-v3"]);
-    expect(await balanceFor(A)).toBe(500 - REGEN_PRICE.clip["kling-v3"]);
+    expect(await chargeRegen({ userId: A, projectId: P, kind: "clip", idx: 0, priorCount: 1 })).toBe(REGEN_PRICE.clip["kling-v3"]["720p"]);
+    expect(await balanceFor(A)).toBe(500 - REGEN_PRICE.clip["kling-v3"]["720p"]);
   });
 
   it("컷이 다르면 각자 첫 회가 공짜다", async () => {
@@ -139,7 +139,7 @@ describe("청구", () => {
   it("빚도 버림이다 — 음수 잔액은 더 큰 빚으로 내려간다", async () => {
     await grant(0.5);
     await chargeVideo({ userId: A, projectId: P, seconds: 30 });
-    expect(await balanceFor(A)).toBe(-VIDEO_PRICE["kling-v3"][30]);   // 0.5 - 50 = -49.5 → -50
+    expect(await balanceFor(A)).toBe(-VIDEO_PRICE["kling-v3"]["720p"][30]);   // 0.5 - 50 = -49.5 → -50
   });
 
   it("환불은 잔액을 되돌린다", async () => {
@@ -162,8 +162,8 @@ describe("청구", () => {
     await chargeVideo({ userId: A, projectId: P, seconds: 30 });
     await refundVideo({ userId: A, projectId: P });
     const again = await chargeVideo({ userId: A, projectId: P, seconds: 30 });
-    expect(again).toBe(VIDEO_PRICE["kling-v3"][30]);
-    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["kling-v3"][30]);   // 두 번 줄고 한 번 돌아왔다
+    expect(again).toBe(VIDEO_PRICE["kling-v3"]["720p"][30]);
+    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["kling-v3"]["720p"][30]);   // 두 번 줄고 한 번 돌아왔다
     expect(await alreadyChargedVideo(P)).toBe(true);
   });
 
@@ -181,7 +181,7 @@ describe("청구", () => {
     await refundVideo({ userId: A, projectId: P });
     await chargeVideo({ userId: A, projectId: P, seconds: 30 });
     expect(await chargeVideo({ userId: A, projectId: P, seconds: 30 })).toBe(0);
-    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["kling-v3"][30]);
+    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["kling-v3"]["720p"][30]);
   });
 
   it("동시에 눌러도 한 번만 받는다 — 멱등키가 마지막 방어선이다", async () => {
@@ -191,7 +191,7 @@ describe("청구", () => {
       chargeVideo({ userId: A, projectId: P, seconds: 30 }),
     ]);
     expect(both.filter((n) => n > 0).length).toBe(1);
-    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["kling-v3"][30]);
+    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["kling-v3"]["720p"][30]);
   });
 
   it("환불 행의 주인은 원 청구 행의 주인이다", async () => {
@@ -211,15 +211,15 @@ describe("청구", () => {
 
   it("assertCanAfford 는 모자라면 NoCredits 를 던지고 남은 값을 담는다", async () => {
     await grant(10);
-    await expect(assertCanAfford(A, VIDEO_PRICE["kling-v3"][30])).rejects.toMatchObject({
-      name: "NoCredits", balance: 10, price: VIDEO_PRICE["kling-v3"][30],
+    await expect(assertCanAfford(A, VIDEO_PRICE["kling-v3"]["720p"][30])).rejects.toMatchObject({
+      name: "NoCredits", balance: 10, price: VIDEO_PRICE["kling-v3"]["720p"][30],
     });
-    await expect(assertCanAfford(A, VIDEO_PRICE["kling-v3"][30])).rejects.toBeInstanceOf(NoCredits);
+    await expect(assertCanAfford(A, VIDEO_PRICE["kling-v3"]["720p"][30])).rejects.toBeInstanceOf(NoCredits);
   });
 
   it("정확히 맞으면 통과한다", async () => {
-    await grant(VIDEO_PRICE["kling-v3"][30]);
-    await expect(assertCanAfford(A, VIDEO_PRICE["kling-v3"][30])).resolves.toBeUndefined();
+    await grant(VIDEO_PRICE["kling-v3"]["720p"][30]);
+    await expect(assertCanAfford(A, VIDEO_PRICE["kling-v3"]["720p"][30])).resolves.toBeUndefined();
   });
 });
 
