@@ -10,6 +10,9 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { priceLabel, adVideoPrice } from "../../../lib/pricing";
+// 이 프로젝트가 어느 모델로 만들어지는지 — 사장님이 값을 치르기 전에 알아야 한다.
+// adModel 은 모르는/없는 id 도 기본 모델로 안전하게 떨어진다(옛 문서 보호).
+import { adModel } from "../../../lib/ad/models";
 // 사이드바와 공유하는 광고 프로젝트(components/AdProjectContext) — 사이드바의 하위 단계
 // 표시가 여기서 읽어들인 값을 그대로 본다. 사이드바가 따로 fetch·폴링하지 않아도 되는 이유.
 import { useAdProject } from "../../../components/AdProjectContext";
@@ -121,8 +124,12 @@ export default function AdDetailPage() {
 
   const { status, settings, scenario, videos, video_error } = project;
   const video = videos?.[0] || null;
+  // 이 프로젝트가 어느 모델인지 — adModel 은 항상 값을 준다(모르면 기본 모델).
+  const model = adModel(settings?.model);
   // 이 프로젝트 길이의 정가 — 숫자는 여기서 만들지 않는다, pricing.js 가 만든다.
-  const price = priceLabel(adVideoPrice(settings?.seconds));
+  // ★ 모델을 같이 넘긴다 — 안 넘기면 항상 2.0(가장 싼) 값으로 계산돼 2.5 프로젝트에
+  // 틀린 가격이 뜬다(app/api/ads/[id]/render/route.js 가 실제 청구에 쓰는 값과 갈린다).
+  const price = priceLabel(adVideoPrice(settings?.seconds, settings?.model));
 
   // 아래 네 갈래(draft·scenario·rendering·done+video) 중 어디에도 안 걸리는 경우 —
   // 모르는 status 이거나(나중에 상태가 하나 늘 수 있다), status 는 "done"인데 videos 가
@@ -137,6 +144,8 @@ export default function AdDetailPage() {
   return (
     <>
       <h1 className="pgtitle">광고 영상</h1>
+      {/* 이 영상이 어느 모델로 만들어지는지 — 유료 버튼([이대로 만들기])을 누르기 전에 알아야 한다 */}
+      <p className="pgsub">{model.label} 모델 · {model.hint}</p>
       {err && <p className="pgsub warn">{err}</p>}
       {/* 배경에서 굽다 실패한 것 — 위치를 status 마다 가르지 않는다. 사장님이 못 보면 안 된다. */}
       {video_error && <p className="pgsub warn">{video_error}</p>}
@@ -160,8 +169,16 @@ export default function AdDetailPage() {
               <div className="plan-row" key={i}>
                 <span className="num">{i + 1}</span>
                 <div className="plan-body">
+                  {/* 초 — 장면 머리에 작게. Number.isFinite 로 감싼다: 이 필드가 없는(연출
+                      필드 개편 전에 만든) 옛 시나리오에서는 undefined가 그대로 안 뜨게 한다. */}
+                  {Number.isFinite(shot.seconds) && <span className="badge">{shot.seconds}초</span>}
                   <div className="plan-field"><b>비트</b><span className="editable">{shot.beat || "(없음)"}</span></div>
                   <div className="plan-field"><b>카메라</b><span className="editable">{shot.camera || "(없음)"}</span></div>
+                  {/* 조명·음향 — CF 연출·촬영 감독 SYSTEM(be1cc9c)이 새로 낸다. 컨트롤러 판단:
+                      전부 보여주되 한 줄씩 작게(나중에 줄이는 게 늘리는 것보다 쉽다). 옛
+                      시나리오엔 없을 수 있어 있을 때만 그린다. */}
+                  {shot.lighting && <p className="script-src">조명 · {shot.lighting}</p>}
+                  {shot.sound && <p className="script-src">음향 · {shot.sound}</p>}
                   <div className="plan-field"><b>동작</b><span className="editable">{shot.action || "(없음)"}</span></div>
                   {shot.line && (
                     <div className="plan-field"><b>대사</b><span className="editable">{shot.line}</span></div>

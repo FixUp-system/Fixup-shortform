@@ -221,3 +221,83 @@ describe("/ads/[id] 화면 — 모르는 status 에도 화면이 비지 않는�
     expect(fallbackBlock).toMatch(/status/);
   });
 });
+
+// Task 22 — /ads/new 에 모델·길이 선택을 붙인다. 백엔드(73b201c)는 이미
+// lib/ad/models.js·lib/api/ads/route.js 가 model·seconds 를 받는데 화면에 고르는 자리가 없었다.
+describe("/ads/new 화면 — 모델·길이 선택 (Task 22)", () => {
+  it("모델 칩이 lib/ad/models 의 AD_MODELS 에서 온다 — 라벨을 화면에 복사하지 않는다", () => {
+    expect(src).toMatch(/from ["'][./]*lib\/ad\/models["']/);
+    expect(src).toContain("AD_MODELS");
+    const mapIdx = src.indexOf("AD_MODELS.map(");
+    expect(mapIdx, "AD_MODELS.map( 을 못 찾았다 — 표에서 그리지 않는다").toBeGreaterThan(-1);
+    // 모델 표의 hint 문구(모델별로 다른 값)를 그대로 베끼면 모델이 하나 늘 때 화면만 낡는다
+    expect(src).not.toContain("소리까지 한 번에");
+    expect(src).not.toContain("네이티브 오디오");
+  });
+
+  it("길이 칩이 adSecondsFor(model) 에서 온다 — 배열을 손으로 적지 않는다", () => {
+    expect(src).toMatch(/adSecondsFor\(model\)\.map\(/);
+  });
+
+  it("모델을 바꾸면 지금 고른 길이가 그 모델에서 유효한지 실제로 되돌린다", () => {
+    // onModelChange 가 없으면 모델 칩이 setModel 만 부르고 끝나 — 2.5에서 30초를 고르고
+    // 2.0으로 바꿔도 30초가 그대로 남아 [시나리오 만들기]가 서버 400을 받는다.
+    const fnIdx = src.search(/function\s+onModelChange\s*\(/);
+    expect(fnIdx, "onModelChange 함수가 없다").toBeGreaterThan(-1);
+    const bodyEnd = src.indexOf("\n}", fnIdx);
+    const body = src.slice(fnIdx, bodyEnd);
+    expect(body, "되돌림 판정에 isAdSeconds 를 안 쓴다 — 무엇이 유효한지 직접 다시 만들었을 수 있다")
+      .toContain("isAdSeconds");
+    expect(body, "되돌릴 값이 adSecondsFor(id)[0] 가 아니다 — 그 모델이 실제로 받는 값이 아닐 수 있다")
+      .toMatch(/adSecondsFor\(id\)\[0\]/);
+    // 모델 칩의 onClick 이 이 함수를 실제로 부르는지 — 안 부르면 죽은 코드다
+    const modelChipIdx = src.indexOf("AD_MODELS.map(");
+    const modelChipBlock = src.slice(modelChipIdx, modelChipIdx + 300);
+    expect(modelChipBlock, "모델 칩 onClick 이 onModelChange 를 안 부른다").toMatch(/onClick=\{[^}]*onModelChange/);
+  });
+
+  it("길이 칩마다 정가를 priceLabel(adVideoPrice(...)) 로 보여준다 — 숫자를 박지 않는다", () => {
+    expect(src).toMatch(/priceLabel\(adVideoPrice\(s,\s*model\)\)/);
+    // 65(2.0/15초)·120(2.5/15초)·240(2.5/30초) — 계획 문서에 적힌 세 정가가 소스에 문자 그대로
+    // 없어야 "가격은 pricing.js 하나뿐"이 실제로 지켜진다.
+    expect(src).not.toMatch(/\b65\b/);
+    expect(src).not.toMatch(/\b120\b/);
+    expect(src).not.toMatch(/\b240\b/);
+  });
+
+  it("[시나리오 만들기]가 고른 model·seconds 를 서버로 보낸다", () => {
+    const submitIdx = src.indexOf("async function submit()");
+    expect(submitIdx, "submit 함수를 못 찾았다").toBeGreaterThan(-1);
+    const bodyEnd = src.indexOf("async function", submitIdx + 10);
+    const body = src.slice(submitIdx, bodyEnd === -1 ? undefined : bodyEnd);
+    expect(body, "settings 에 model 을 안 보낸다").toMatch(/settings:\s*\{[^}]*\bmodel\b/);
+    expect(body, "settings 에 seconds 를 안 보낸다").toMatch(/settings:\s*\{[^}]*\bseconds\b/);
+  });
+});
+
+// Task 22 — /ads/[id] 시나리오 카드에 연출 필드(조명·음향·초)를 붙이고, 모델을 보여준다.
+describe("/ads/[id] 화면 — 연출 필드·모델 표시 (Task 22)", () => {
+  it("초는 있을 때만 그린다 — Number.isFinite 가드", () => {
+    expect(detailSrc).toMatch(/\{Number\.isFinite\(shot\.seconds\)\s*&&/);
+  });
+
+  it("조명·음향은 각각 있을 때만 한 줄로 그린다", () => {
+    expect(detailSrc, "shot.lighting 가드가 없다").toMatch(/\{shot\.lighting\s*&&/);
+    expect(detailSrc, "shot.sound 가드가 없다").toMatch(/\{shot\.sound\s*&&/);
+  });
+
+  it("기존 beat·camera·action·line 필드는 그대로 남아 있다", () => {
+    for (const label of ["비트", "카메라", "동작", "대사"]) {
+      expect(detailSrc, `"${label}" 필드가 사라졌다`).toContain(label);
+    }
+  });
+
+  it("이 프로젝트의 모델을 lib/ad/models 의 adModel 로 읽어 보여준다", () => {
+    expect(detailSrc).toMatch(/from ["'].*lib\/ad\/models["']/);
+    expect(detailSrc).toMatch(/adModel\(settings\?\.model\)/);
+  });
+
+  it("가격 계산에 모델을 함께 넘긴다 — 안 넘기면 2.5 프로젝트에 2.0(더 싼) 가격이 뜬다", () => {
+    expect(detailSrc).toMatch(/adVideoPrice\(settings\?\.seconds,\s*settings\?\.model\)/);
+  });
+});

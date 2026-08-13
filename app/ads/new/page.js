@@ -14,6 +14,11 @@ import { useRouter } from "next/navigation";
 import { AD_FORMATS, AD_MOODS, AD_LANGS, AD_STYLE_LINES, DEFAULT_AD_OPTIONS } from "../../../lib/ad/options";
 import { STYLE_PRESETS } from "../../../lib/styles";
 import { ASPECTS, DEFAULT_ASPECT_ID, aspectFor } from "../../../lib/aspects";
+// 모델·길이 — Task 21(백엔드)이 만든 표를 그대로 읽는다. 라벨·길이 목록을 여기 손으로
+// 다시 적으면 모델이 하나 늘 때 화면만 낡는다(위 화풍과 같은 이유).
+import { AD_MODELS, DEFAULT_AD_MODEL, adSecondsFor, isAdSeconds } from "../../../lib/ad/models";
+// 길이 칩에 정가를 같이 보여준다 — 사장님이 고르기 전에 값을 알아야 한다. 숫자는 여기 안 적는다.
+import { priceLabel, adVideoPrice } from "../../../lib/pricing";
 // app/create/page.js 와 같은 이유로 쓴다 — 새 광고를 시작하는 자리에서 이전 광고의
 // 단계가 사이드바에 남지 않게 비운다(components/AdProjectContext).
 import { useAdProject } from "../../../components/AdProjectContext";
@@ -36,6 +41,8 @@ export default function AdNewPage() {
   const [lang, setLang] = useState(DEFAULT_AD_OPTIONS.narration_lang);
   const [style, setStyle] = useState(DEFAULT_AD_OPTIONS.style);
   const [aspect, setAspect] = useState(DEFAULT_ASPECT_ID);
+  const [model, setModel] = useState(DEFAULT_AD_MODEL);
+  const [seconds, setSeconds] = useState(adSecondsFor(DEFAULT_AD_MODEL)[0]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const fileRef = useRef(null);
@@ -67,6 +74,15 @@ export default function AdNewPage() {
     e.target.value = "";
   }
 
+  // 모델을 바꾸면 그 모델이 받는 길이가 바뀐다(lib/ad/models.js — 2.0=15초, 2.5=15·30초).
+  // 지금 고른 길이가 새 모델에서 유효하지 않으면(2.5에서 30초를 골라 둔 채 2.0으로 바꾸는
+  // 경우) 그 모델의 첫 값으로 되돌린다 — 안 그러면 [시나리오 만들기]가 서버(app/api/ads/route.js
+  // 의 isAdSeconds 검사)에서 400을 받는다.
+  function onModelChange(id) {
+    setModel(id);
+    setSeconds((s) => (isAdSeconds(s, id) ? s : adSecondsFor(id)[0]));
+  }
+
   async function submit() {
     setBusy(true); setErr("");
     const res = await fetch("/api/ads", {
@@ -74,7 +90,7 @@ export default function AdNewPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         material: { text, photos },
-        settings: { format, mood, narration_lang: lang, style, aspect_ratio: aspect },
+        settings: { format, mood, narration_lang: lang, style, aspect_ratio: aspect, model, seconds },
       }),
     });
     const data = await res.json();
@@ -186,6 +202,38 @@ export default function AdNewPage() {
                   ))}
                 </div>
                 <div className="tray-note">{aspectFor(aspect).note}에 맞는 규격이에요</div>
+              </div>
+            </div>
+
+            {/* 모델 — 바꾸면 아래 길이도 그 모델이 받는 값으로 되돌아간다(onModelChange) */}
+            <div className="tray-row">
+              <span className="tray-label">모델</span>
+              <div className="tray-col">
+                <div className="chips">
+                  {AD_MODELS.map((m) => (
+                    <button key={m.id} className={`chip${model === m.id ? " on" : ""}`}
+                      onClick={() => onModelChange(m.id)}>
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="tray-note">{AD_MODELS.find((m) => m.id === model)?.hint}</div>
+              </div>
+            </div>
+
+            {/* 길이 — 고른 모델이 받는 값만 나온다(adSecondsFor). 정가를 같이 보여
+                사장님이 고르기 전에 값을 알게 한다 — 숫자는 pricing.js 가 만든다. */}
+            <div className="tray-row">
+              <span className="tray-label">길이</span>
+              <div className="tray-col">
+                <div className="chips">
+                  {adSecondsFor(model).map((s) => (
+                    <button key={s} className={`chip${seconds === s ? " on" : ""}`}
+                      onClick={() => setSeconds(s)}>
+                      {s}초 · {priceLabel(adVideoPrice(s, model))}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
