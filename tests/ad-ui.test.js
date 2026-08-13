@@ -330,8 +330,14 @@ describe("/ads/[id] 화면 — 연출 필드·모델 표시 (Task 22)", () => {
     expect(detailSrc).toMatch(/adModel\(settings\?\.model\)/);
   });
 
-  it("가격 계산에 모델을 함께 넘긴다 — 안 넘기면 2.5 프로젝트에 2.0(더 싼) 가격이 뜬다", () => {
-    expect(detailSrc).toMatch(/adVideoPrice\(settings\?\.seconds,\s*settings\?\.model\)/);
+  it("가격 계산에 모델과 **화질**을 함께 넘긴다 — 안 넘기면 화면만 싼 값을 말한다", () => {
+    // ★ 실사용에서 잡았다(2026-08-13): 1080p 를 골라도 이 화면은 720p 값을 띄웠다.
+    // 실제 청구는 맞았다(app/api/ads/[id]/render/route.js·lib/charges.js 가 세 인자를
+    // 다 넘긴다) — **화면만** 낮게 말해서, 사장님이 본 값과 빠져나간 값이 갈렸다.
+    // 화면이 값을 스스로 만들지 않는다는 규약은 지켰는데도 인자 하나로 뚫린 자리다.
+    expect(detailSrc).toMatch(
+      /adVideoPrice\(settings\?\.seconds,\s*settings\?\.model,\s*settings\?\.resolution\)/
+    );
   });
 });
 
