@@ -173,3 +173,92 @@ describe("완성본 캐시", () => {
     expect(res.status).toBe(404);
   });
 });
+
+// ★ 완성본을 함수 본문으로 흘리면 **Vercel 에서 못 내려받는다** — 함수 응답 본문 상한이
+// 4.5MB 인데 이 영상은 개당 8~13MB 다(그 라우트 주석의 실측값). 그래서 서명 URL 로 넘긴다:
+// 소유자 검사는 함수가 하고, 통과하면 302 로 보내 **본문이 함수를 안 지나간다.**
+//
+// 저장된 주소(/api/renders/<id>.mp4)는 그대로 둔다 — 문서에 남은 url 이 영구히 유효해야
+// 한다는 기존 규약을 지키기 위해서다(서명 URL 을 문서에 저장하지 않는 이유이기도 하다).
+describe("완성본 — 서명 URL 로 넘긴다", () => {
+  beforeEach(() => resetMemoryStore());
+
+  const mk = async (owner = A) =>
+    createProject({ settings: {}, material: { text: "가", photos: [] }, ownerId: owner });
+
+  it("저장소가 서명 URL 을 주면 302 로 넘기고 본문은 안 싣는다", async () => {
+    const p = await mk();
+    await putRenderObject(p.id);
+    memoryStore.signedObjectUrl = async () => "https://storage.example/signed?token=x";
+    try {
+      const res = await getRender(as(A), { params: Promise.resolve({ name: `${p.id}.mp4` }) });
+      expect(res.status).toBe(302);
+      expect(res.headers.get("location")).toBe("https://storage.example/signed?token=x");
+      expect(Buffer.from(await res.arrayBuffer()).length, "본문이 실렸다").toBe(0);
+    } finally {
+      delete memoryStore.signedObjectUrl;
+    }
+  });
+
+  it("★ 소유자 검사는 서명보다 먼저다 — 남의 것은 서명 자체를 안 만든다", async () => {
+    const p = await mk();
+    await putRenderObject(p.id);
+    let asked = 0;
+    memoryStore.signedObjectUrl = async () => { asked += 1; return "https://storage.example/signed"; };
+    try {
+      const res = await getRender(as(B), { params: Promise.resolve({ name: `${p.id}.mp4` }) });
+      expect(res.status).toBe(404);
+      expect(asked, "남의 것인데 서명을 만들었다").toBe(0);
+    } finally {
+      delete memoryStore.signedObjectUrl;
+    }
+  });
+
+  it("서명을 못 만드는 저장소(메모리·로컬)에서는 지금처럼 본문을 흘린다 — 회귀 방어", async () => {
+    const p = await mk();
+    await putRenderObject(p.id, "진짜-영상-바이트");
+    const res = await getRender(as(A), { params: Promise.resolve({ name: `${p.id}.mp4` }) });
+    expect(res.status).toBe(200);
+    expect(Buffer.from(await res.arrayBuffer()).toString()).toBe("진짜-영상-바이트");
+  });
+
+  it("?dl=1 이면 첨부로 받도록 서명한다 — 미리보기는 인라인 그대로", async () => {
+    const p = await mk();
+    await putRenderObject(p.id);
+    const seen = [];
+    memoryStore.signedObjectUrl = async (bucket, key, seconds, opts) => {
+      seen.push(opts?.download ?? null);
+      return "https://storage.example/signed";
+    };
+    try {
+      const url = `http://localhost/api/renders/${p.id}.mp4?dl=1`;
+      const req = new Request(url, { headers: as(A).headers });
+      await getRender(req, { params: Promise.resolve({ name: `${p.id}.mp4` }) });
+      await getRender(as(A), { params: Promise.resolve({ name: `${p.id}.mp4` }) });
+      expect(seen[0], "?dl=1 인데 첨부로 서명하지 않았다").toBeTruthy();
+      expect(seen[1], "미리보기인데 첨부로 서명했다").toBeFalsy();
+    } finally {
+      delete memoryStore.signedObjectUrl;
+    }
+  });
+
+  it("★ 304 판정이 서명보다 앞이다 — 안 바뀐 영상은 서명도 안 만든다(전송 절감 유지)", async () => {
+    const p = await mk();
+    await putRenderObject(p.id);
+    const { getStore } = await import("../lib/store/index.js");
+    const row = await getStore().selectProject(p.id, A);
+    await getStore().updateProjectRow(p.id, A, row.version, { ...row.doc, render: { ts: 777 } });
+    let asked = 0;
+    memoryStore.signedObjectUrl = async () => { asked += 1; return "https://storage.example/signed"; };
+    try {
+      const req = new Request("http://localhost/x", {
+        headers: { ...Object.fromEntries(as(A).headers), "if-none-match": '"777"' },
+      });
+      const res = await getRender(req, { params: Promise.resolve({ name: `${p.id}.mp4` }) });
+      expect(res.status).toBe(304);
+      expect(asked, "304 인데 서명을 만들었다").toBe(0);
+    } finally {
+      delete memoryStore.signedObjectUrl;
+    }
+  });
+});

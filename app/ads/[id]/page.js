@@ -390,7 +390,8 @@ export default function AdDetailPage() {
               <button className="mini" disabled={busy} onClick={startRender}>
                 {busy ? "만드는 중…" : `다시 만들기 · ${price}`}
               </button>
-              <a className="cta" href={video.url} download>
+              {/* ?dl=1 — ⑥완성과 같은 이유(서명 URL 302 뒤에는 그 속성이 안 먹는다) */}
+              <a className="cta" href={`${video.url}?dl=1`} download>
                 내려받기
               </a>
             </div>
