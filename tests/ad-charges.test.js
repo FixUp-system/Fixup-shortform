@@ -124,7 +124,7 @@ describe("광고 청구", () => {
       await grant(1000);
       await expect(
         chargeAd({ userId: U, projectId: P, seconds: 15, model: "seedance-3.0-오타" })
-      ).rejects.toThrow();
+      ).rejects.toThrow(/모르는 광고 모델/);
       // 던졌으니 아무것도 받지 않았다 — 잔액이 그대로다
       expect(await balanceFor(U)).toBe(1000);
     });

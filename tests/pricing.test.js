@@ -93,8 +93,11 @@ describe("광고 영상 정가", () => {
   // ④ 모르는 모델이 조용히 싼 값으로 새면 그 차액이 그대로 우리 돈이다 — regenPrice 와
   // 같은 원칙으로 던진다. "생략"(위 테스트)과 "값은 있는데 모르는 모델"을 가른다.
   it("★ 값이 있는데 모르는 모델은 던진다 — 조용히 2.0 값으로 떨어지면 안 된다", () => {
-    expect(() => adVideoPrice(15, "seedance-3.0-오타")).toThrow();
-    expect(() => adVideoPrice(30, "없는모델")).toThrow();
+    // 메시지까지 확인한다 — 가드를 지워도 table 이 undefined 라 Object.keys(undefined) 가
+    // 다른 TypeError 를 던져 toThrow() 만으로는 가드 자체가 있는지 못 가린다(우연히 초록).
+    // 메시지 문구("모르는 광고 모델")로 **이 가드가 실제로 도는지**를 확인한다.
+    expect(() => adVideoPrice(15, "seedance-3.0-오타")).toThrow(/모르는 광고 모델/);
+    expect(() => adVideoPrice(30, "없는모델")).toThrow(/모르는 광고 모델/);
   });
 
   it("길이가 그 모델의 목록 밖이면 더 비싼 쪽으로 본다 — 싼 쪽으로 떨어지면 원가보다 적게 청구한다", () => {
