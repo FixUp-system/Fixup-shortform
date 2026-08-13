@@ -1,6 +1,6 @@
 import { getProject, updateProject } from "../../../../lib/projects";
 import { briefingContentChanged } from "../../../../lib/briefing";
-import { clipLimitsForProject, I2V_MODEL_IDS, isResolutionFor } from "../../../../lib/clip-limits";
+import { clipLimitsForProject, I2V_MODEL_IDS, isResolutionFor, resolutionForProject } from "../../../../lib/clip-limits";
 import { normalizeStyle } from "../../../../lib/styles";
 import { isAspect } from "../../../../lib/aspects";
 import { isSpeed } from "../../../../lib/speeds";
@@ -92,6 +92,57 @@ export const PATCH = withUser(async (req, { params }, user) => {
     }
   }
 
+  // 화질도 닫힌 목록이다 — 다만 **목록이 모델마다 다르다**(Seedance 만 연다). 그래서
+  // 상수 배열이 아니라 isResolutionFor 가 판정한다(lib/clip-limits.js 가 유일한 자리다).
+  // 안 막으면 아무 값이나 settings 에 들어가고, 그 값이 그대로 fal 유료 호출로 나간다.
+  //
+  // ★ **머지 뒤 모델**로 잰다. 저장된 모델로 재면 모델을 함께 바꾸는 PATCH 에서
+  //   "Seedance 의 1080p 니까 통과"가 되고 저장되는 모델은 Kling 이 된다 — 그 모델에는
+  //   해상도 파라미터 자체가 없는데 문서에는 남아 각인(lib/steps.js)이 그것을 본다.
+  //
+  // ★★ **모델 잠금보다 먼저 판정한다.** 뒤에 두면 모델을 함께 바꾸는 요청을 모델 잠금이
+  //   먼저 400 으로 돌려보내, 이 문이 실제로 무는지를 **어떤 테스트도 못 잰다**
+  //   (리뷰 실측: merged → project 로 되돌려도 11건 전부 그린이었다). 순서가 곧 회귀
+  //   방어다 — 이 문이 스스로 답을 내야 그것이 틀렸을 때 눈에 띈다.
+  if (body.settings?.resolution !== undefined) {
+    const project = await getProject(id, user.id);
+    // ★ 광고 문서는 이 경로가 다루지 않는다 — 아래 결제 잠금이 기존 종류의 청구 장부를
+    // 묻기 전에 막는다(target_seconds 블록과 같은 이유).
+    if (project?.kind === "ad") {
+      return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
+    }
+    const merged = { ...project, settings: { ...project?.settings, ...body.settings } };
+    // 없는 프로젝트는 여기서 400 을 주지 않는다 — 아래 updateProject 가 404 로 답한다.
+    if (project && !isResolutionFor(body.settings.resolution, merged)) {
+      return Response.json({ error: "그 화질은 몰라요" }, { status: 400 });
+    }
+    // ★★ 돈이 새던 자리 — **화질은 정가를 바꾼다**(Seedance 30초: 720p 160 · 1080p 360).
+    // 정가는 ③목소리에서 걷히고 화질 칩은 ②대본에 있다. 결제 뒤에 바꾸면
+    // requireVideoCharge 가 **살아 있는 청구를 보고 그냥 지나가서**(lib/charges.js)
+    // 160 을 내고 원가 2.25배짜리를 받는다. 차액 청구는 만들지 않았다(청구 장부가
+    // 회차·멱등키 기반이라 차액 개념이 없다) — 그래서 못 바꾸게 한다.
+    //
+    // ★ 잠금 기준이 **결제**다(모델처럼 생성 시점이 아니다). 새는 구간이 결제와 첫 클립
+    //   사이라 "첫 클립 뒤"로는 늦고, ②대본 칩이 이미 project.charged 로 잠그므로
+    //   화면과 서버가 같은 것을 본다(GET 이 실어 보내는 alreadyChargedVideo 그 값이다).
+    //   환불받은 프로젝트는 살아 있는 청구가 없어 다시 고를 수 있다 — 다시 돌리면
+    //   새 회차로 정가를 다시 받으므로 어긋나지 않는다.
+    //
+    // ★ 비교는 **날것이 아니라 실제로 값을 치른 화질**(resolutionForProject)로 한다.
+    //   저장값이 없는 프로젝트는 720p 로 청구되므로 720p 를 명시로 보내는 것은 바꾸는
+    //   것이 아니다 — 날것으로 재면 화면의 정상 저장이 400 이 된다.
+    if (
+      project &&
+      body.settings.resolution !== resolutionForProject(project) &&
+      (await alreadyChargedVideo(id))
+    ) {
+      return Response.json(
+        { error: "이미 결제된 영상은 화질을 바꿀 수 없어요 — 새로 만들어 주세요" },
+        { status: 400 }
+      );
+    }
+  }
+
   // ★ 영상 모델은 **만들 때 한 번** 정해지고 그 뒤로는 안 바뀐다(2026-08-13 사용자 결정).
   // 고르는 자리는 자료 화면(app/create/page.js)이고, 값은 POST /api/projects 로 함께 온다.
   //
@@ -112,24 +163,6 @@ export const PATCH = withUser(async (req, { params }, user) => {
         { error: "영상 모델은 만들 때 정해져요 — 바꾸려면 새로 만들어 주세요" },
         { status: 400 }
       );
-    }
-  }
-
-  // 화질도 닫힌 목록이다 — 다만 **목록이 모델마다 다르다**(Seedance 만 연다). 그래서
-  // 상수 배열이 아니라 isResolutionFor 가 판정한다(lib/clip-limits.js 가 유일한 자리다).
-  // 안 막으면 아무 값이나 settings 에 들어가고, 그 값이 그대로 fal 유료 호출로 나간다.
-  //
-  // ★ **머지 뒤 모델**로 잰다. 저장된 모델로 재면 모델을 함께 바꾸는 PATCH 에서
-  //   "Seedance 의 1080p 니까 통과"가 되고 저장되는 모델은 Kling 이 된다 — 그 모델에는
-  //   해상도 파라미터 자체가 없는데 문서에는 남아 각인(lib/steps.js)이 그것을 본다.
-  //   지금은 위의 모델 잠금이 먼저 막지만, 판정 기준을 여기 맞춰 둬야 그 잠금이
-  //   느슨해지는 날 이 문이 혼자 열리지 않는다.
-  if (body.settings?.resolution !== undefined) {
-    const project = await getProject(id, user.id);
-    const merged = { ...project, settings: { ...project?.settings, ...body.settings } };
-    // 없는 프로젝트는 여기서 400 을 주지 않는다 — 아래 updateProject 가 404 로 답한다.
-    if (project && !isResolutionFor(body.settings.resolution, merged)) {
-      return Response.json({ error: "그 화질은 몰라요" }, { status: 400 });
     }
   }
 

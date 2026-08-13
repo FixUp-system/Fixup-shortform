@@ -104,10 +104,15 @@ describe("PATCH /api/projects/[id] — 화질", () => {
 
   // ★★ 모델을 함께 바꾸는 PATCH. 판정을 **바뀌기 전 모델**로 하면
   // "Seedance 의 1080p 니까 통과" → 저장된 모델은 Kling 이 되어 없는 파라미터가 남는다.
-  it("모델을 Kling 으로 바꾸면서 1080p 를 함께 보내도 통과하지 않는다", async () => {
+  //
+  // ★ **문구까지 단정한다.** 상태 코드 400 만 보면 이 테스트가 화질 게이트를 안 잰다 —
+  //   모델 잠금도 400 을 주기 때문이다(리뷰 실측: 판정을 merged → project 로 되돌려도
+  //   11건이 전부 그린이었다). 화질 게이트가 무는 문이라는 것을 문구가 증명한다.
+  it("모델을 Kling 으로 바꾸면서 1080p 를 함께 보내도 통과하지 않는다 — 막는 것은 화질 게이트다", async () => {
     await seedSeedance();
     const res = await PATCH(req({ i2v_model: "kling-v3", resolution: "1080p" }), ctx());
     expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe("그 화질은 몰라요");
     const s = await savedSettings();
     expect(s.resolution).toBeUndefined();
     expect(s.i2v_model).toBe("seedance-2.0");
@@ -119,5 +124,70 @@ describe("PATCH /api/projects/[id] — 화질", () => {
     await seedSeedance();
     expect((await PATCH(req({ i2v_model: "seedance-2.0", resolution: "480p" }), ctx())).status).toBe(200);
     expect((await savedSettings()).resolution).toBe("480p");
+  });
+});
+
+// ★★ 돈이 새던 자리 — 화질은 **정가를 바꾼다**(Seedance 30초: 720p 160 · 1080p 360).
+// 정가는 ③목소리에서 걷히고 화질 칩은 ②대본에 있다. 화면은 결제 뒤 칩을 잠그는데
+// 서버가 안 막아서, 720p 로 내고 PATCH 로 1080p 로 바꾸면 ⑤에서 requireVideoCharge 가
+// **살아 있는 청구를 보고 그냥 지나간다**(lib/charges.js:131) — 160 을 내고 원가 2.25배를 받는다.
+describe("PATCH /api/projects/[id] — 결제 뒤 화질 잠금", () => {
+  const seed = (settings) =>
+    memoryStore.insertProject({ id: P, created_ts: 1, status: "draft", settings }, A);
+  const pay = () =>
+    memoryStore.insertCharge({
+      idem_key: `video:${P}:1`, user_id: A, project_id: P, kind: "video", credits: 160,
+    });
+  const savedSettings = async () => (await memoryStore.selectProject(P, A)).doc.settings;
+
+  beforeEach(() => { resetMemoryStore(); });
+
+  it("정가를 낸 뒤에는 화질을 못 바꾼다", async () => {
+    await seed({ target_seconds: 30, i2v_model: "seedance-2.0", resolution: "720p" });
+    await pay();
+    const res = await PATCH(req({ resolution: "1080p" }), ctx());
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/바꿀 수 없어요/);
+    expect((await savedSettings()).resolution).toBe("720p");
+  });
+
+  it("같은 화질을 다시 보내는 것은 막지 않는다 — 다른 설정을 고치는 정상 저장이다", async () => {
+    await seed({ target_seconds: 30, i2v_model: "seedance-2.0", resolution: "720p" });
+    await pay();
+    expect((await PATCH(req({ resolution: "720p" }), ctx())).status).toBe(200);
+  });
+
+  // 저장값이 없는 프로젝트는 720p 로 값을 치른다(resolutionForProject 의 폴백) —
+  // 그 값을 명시로 보내는 것은 **바꾸는 것이 아니다**. 날것 비교로 재면 여기서 400 이 나
+  // 화면의 정상 저장이 막힌다.
+  it("저장값이 없어도 실제로 치른 화질(720p)과 같으면 통과한다", async () => {
+    await seed({ target_seconds: 30, i2v_model: "seedance-2.0" });
+    await pay();
+    expect((await PATCH(req({ resolution: "720p" }), ctx())).status).toBe(200);
+  });
+
+  it("저장값이 없는데 1080p 로 올리는 것은 막는다", async () => {
+    await seed({ target_seconds: 30, i2v_model: "seedance-2.0" });
+    await pay();
+    expect((await PATCH(req({ resolution: "1080p" }), ctx())).status).toBe(400);
+    expect((await savedSettings()).resolution).toBeUndefined();
+  });
+
+  // 환불된 프로젝트는 살아 있는 청구가 없다 — alreadyChargedVideo 가 false 다.
+  // 다시 돌리면 새 회차로 정가를 다시 받으므로 바꿔도 어긋나지 않는다.
+  it("환불받은 프로젝트는 다시 고를 수 있다", async () => {
+    await seed({ target_seconds: 30, i2v_model: "seedance-2.0", resolution: "720p" });
+    await pay();
+    await memoryStore.insertCharge({
+      idem_key: `refund:${P}:1`, user_id: A, project_id: P, kind: "refund", credits: -160,
+    });
+    expect((await PATCH(req({ resolution: "1080p" }), ctx())).status).toBe(200);
+    expect((await savedSettings()).resolution).toBe("1080p");
+  });
+
+  it("결제 전에는 자유롭게 고른다", async () => {
+    await seed({ target_seconds: 30, i2v_model: "seedance-2.0", resolution: "720p" });
+    expect((await PATCH(req({ resolution: "1080p" }), ctx())).status).toBe(200);
+    expect((await savedSettings()).resolution).toBe("1080p");
   });
 });
