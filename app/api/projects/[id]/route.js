@@ -11,6 +11,21 @@ import { alreadyChargedVideo } from "../../../../lib/charges.js";
 import { TARGET_CHOICES } from "../../../../lib/script";
 import { SUBTITLE_POSITIONS, normalizeSubtitle } from "../../../../lib/subtitles.js";
 
+// 결제 뒤 화질 잠금이 **락 안에서** 걸렸다는 표식.
+//
+// 아래 PATCH 의 catch 는 "프로젝트가 없다"를 404 로 옮기는 자리다 — 그 자리에 이 오류가
+// 맨 Error 로 들어가면 잠금이 404 로 뭉개진다. 이름 있는 오류로 갈라서 **사전 판정과 같은
+// 400·같은 문구**로 답한다(NoCredits·BudgetExceeded 와 같은 관용구다).
+//
+// 문구는 한 곳에서만 적는다 — 두 자리(사전 판정·락 안 판정)가 같은 답을 내야 한다.
+const RESOLUTION_LOCKED = "이미 결제된 영상은 화질을 바꿀 수 없어요 — 새로 만들어 주세요";
+class ResolutionLocked extends Error {
+  constructor() {
+    super(RESOLUTION_LOCKED);
+    this.name = "ResolutionLocked";
+  }
+}
+
 export const GET = withUser(async (req, { params }, user) => {
   const { id } = await params;
   const project = await getProject(id, user.id);
@@ -131,15 +146,18 @@ export const PATCH = withUser(async (req, { params }, user) => {
     // ★ 비교는 **날것이 아니라 실제로 값을 치른 화질**(resolutionForProject)로 한다.
     //   저장값이 없는 프로젝트는 720p 로 청구되므로 720p 를 명시로 보내는 것은 바꾸는
     //   것이 아니다 — 날것으로 재면 화면의 정상 저장이 400 이 된다.
+    //
+    // ★★★ 여기는 **빠른 실패**일 뿐이다 — 진짜 잠금은 아래 뮤테이터 안에 있다.
+    //   이 판정은 updateProject 의 직렬 큐·version **밖**이라 읽고-나서-쓰기다:
+    //   PATCH(1080p) 와 ③목소리 결제를 동시에 쏘면 PATCH 가 charged=false 를 읽고 →
+    //   그사이 720p 로 청구가 확정되고 → 1080p 가 저장된다. 이 문이 막으려던 바로 그
+    //   시나리오가 그대로 통한다. 그래서 락 안에서 한 번 더 판정한다.
     if (
       project &&
       body.settings.resolution !== resolutionForProject(project) &&
       (await alreadyChargedVideo(id))
     ) {
-      return Response.json(
-        { error: "이미 결제된 영상은 화질을 바꿀 수 없어요 — 새로 만들어 주세요" },
-        { status: 400 }
-      );
+      return Response.json({ error: RESOLUTION_LOCKED }, { status: 400 });
     }
   }
 
@@ -182,11 +200,24 @@ export const PATCH = withUser(async (req, { params }, user) => {
   }
 
   try {
-    const project = await updateProject(id, user.id, (proj) => {
+    const project = await updateProject(id, user.id, async (proj) => {
       // ★ 광고 문서는 이 경로가 다루지 않는다 — target_seconds 가 없는 본문(예: material 만
       // 고치는 요청)은 위 getProject 가드를 안 거치므로 여기서 다시 막는다. 여기서 던지면
       // 아래 catch 가 기존 문구 그대로 404 로 감싼다 — 없는 것과 같은 취급이다.
       if (proj.kind === "ad") throw new Error("프로젝트를 찾을 수 없어요");
+      // ★★ 화질 잠금의 **진짜 자리** — 여기는 직렬 큐·version 안이고, 저장 직전이다.
+      // 위 사전 판정만 두면 결제와 PATCH 를 동시에 쏘는 순서가 그대로 통한다(그 주석 참고).
+      //
+      // ★ 판정 기준은 위와 글자 그대로 같다 — **지금 문서**가 치른 화질(resolutionForProject)과
+      //   다른 값을 살아 있는 청구가 있는데 넣으려 하는가. 재시도(CAS 패배)로 다시 불려도
+      //   같은 답을 내고, 읽기만 하므로 부작용이 없다.
+      if (
+        body.settings?.resolution !== undefined &&
+        body.settings.resolution !== resolutionForProject(proj) &&
+        (await alreadyChargedVideo(id))
+      ) {
+        throw new ResolutionLocked();
+      }
       const next = { ...proj };
       if (body.material) next.material = { ...proj.material, ...body.material };
       if (body.settings) {
@@ -255,6 +286,10 @@ export const PATCH = withUser(async (req, { params }, user) => {
     });
     return Response.json(project);
   } catch (e) {
+    // 락 안 잠금은 "없는 프로젝트"가 아니다 — 사전 판정과 같은 400·같은 문구로 답한다.
+    if (e instanceof ResolutionLocked) {
+      return Response.json({ error: e.message }, { status: 400 });
+    }
     return Response.json({ error: e.message }, { status: 404 });
   }
 });

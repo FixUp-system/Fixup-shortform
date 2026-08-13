@@ -190,4 +190,57 @@ describe("PATCH /api/projects/[id] — 결제 뒤 화질 잠금", () => {
     expect((await PATCH(req({ resolution: "1080p" }), ctx())).status).toBe(200);
     expect((await savedSettings()).resolution).toBe("1080p");
   });
+
+  // ★★★ 경합(TOCTOU) — 이 태스크의 존재 이유.
+  //
+  // 사전 판정은 updateProject 의 직렬 큐·version **밖**에 있다. PATCH(1080p) 와 ③목소리
+  // 결제를 동시에 쏘면 ①PATCH 가 charged=false 를 읽고 → ②720p 로 청구가 확정되고 →
+  // ③1080p 가 저장되는 순서가 성립한다. 즉 이 문이 막으려던 바로 그 시나리오가 통한다.
+  //
+  // 재현: 저장소의 selectProject 를 세어 **두 번째 호출**(= updateProject 가 락 안에서 읽는
+  // 그 읽기) 때 결제 행을 끼워 넣는다. 사전 판정 시점(첫 번째 읽기)엔 미결제라 그 문은
+  // 그대로 통과하고, 락 안 판정만이 이것을 잡을 수 있다.
+  //
+  // ⚠️ 문구까지 단정한다 — 상태 코드만 보면 다른 게이트가 준 400 을 잘못 센다.
+  // ⚠️ 500 이면 안 된다 — 던진 것을 라우트가 받아 사전 판정과 같은 400 으로 답해야 한다.
+  it("사전 판정 뒤·저장 전에 결제가 확정되면 락 안에서 막는다", async () => {
+    await seed({ target_seconds: 30, i2v_model: "seedance-2.0", resolution: "720p" });
+    const orig = memoryStore.selectProject.bind(memoryStore);
+    let reads = 0;
+    const spy = vi.spyOn(memoryStore, "selectProject").mockImplementation(async (...args) => {
+      const row = await orig(...args);
+      // 1번째 = 사전 판정(미결제로 읽힌다) · 2번째 = updateProject 가 락 안에서 읽는 읽기
+      if (++reads === 2) await pay();
+      return row;
+    });
+    try {
+      const res = await PATCH(req({ resolution: "1080p" }), ctx());
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toBe(
+        "이미 결제된 영상은 화질을 바꿀 수 없어요 — 새로 만들어 주세요"
+      );
+      expect(reads).toBeGreaterThanOrEqual(2);   // 락 안 읽기까지 갔다 = 사전 판정은 통과했다
+      expect((await savedSettings()).resolution).toBe("720p");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+// ★ 광고 문서(kind:"ad")는 이 경로가 다루지 않는다 — /api/ads/* 가 다룬다.
+// 화질 PATCH 도 target_seconds 게이트와 같은 모양으로 404 여야 한다(리뷰 M3: 프로브로만
+// 확인돼 있고 테스트가 없었다). 여기서 안 막으면 결제 잠금이 **기존 종류의 청구 장부**를
+// 광고 문서에 물어 엉뚱한 답을 낸다.
+describe("PATCH /api/projects/[id] — 광고 문서", () => {
+  beforeEach(() => { resetMemoryStore(); });
+
+  it("광고 문서에 화질을 PATCH 하면 404 다", async () => {
+    await memoryStore.insertProject(
+      { id: P, created_ts: 1, kind: "ad", status: "draft", settings: { i2v_model: "seedance-2.0" } },
+      A
+    );
+    const res = await PATCH(req({ resolution: "1080p" }), ctx());
+    expect(res.status).toBe(404);
+    expect((await res.json()).error).toBe("프로젝트를 찾을 수 없어요");
+  });
 });
