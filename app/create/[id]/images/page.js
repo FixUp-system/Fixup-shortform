@@ -9,7 +9,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 import { useMe } from "../../../../components/MeContext";
 import BackButton from "../../../../components/BackButton";
-import { isImageStale } from "../../../../lib/steps";
+import { isImageStale, isReachable } from "../../../../lib/steps";
 // 상한과 값은 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다).
 import { MAX_REGEN_PER_CUT, priceLabel, regenPrice, videoPrice } from "../../../../lib/pricing";
 import { modelIdForProject, resolutionForProject } from "../../../../lib/clip-limits";
@@ -238,9 +238,12 @@ export default function ImagesStepPage() {
                       ? `고친 화면 ${staleCount}개를 다시 그려 주세요`
                       : "이 그림에서 영상이 시작돼요"}
                   </span>
+                  {/* ★ ③목소리와 같은 이유로 가드와 같은 판정을 쓴다 — 그림은 컷마다
+                      저장되고 status 는 마지막에 한 번이라, 그 사이에 누르면 되돌아온다
+                      (사용자가 ⑤영상에서도 같은 증상을 보고했다, 2026-08-13). */}
                   <button
                     className="cta"
-                    disabled={staleCount > 0}
+                    disabled={staleCount > 0 || !isReachable("video", project)}
                     onClick={() => router.push(`/create/${id}/video`)}
                   >
                     영상 만들러 가기 →

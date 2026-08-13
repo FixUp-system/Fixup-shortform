@@ -12,7 +12,7 @@ import { useProject } from "../../../../components/ProjectContext";
 import { useMe } from "../../../../components/MeContext";
 import BackButton from "../../../../components/BackButton";
 import { VOICES } from "../../../../lib/voices";
-import { isAudioStale } from "../../../../lib/steps";
+import { isAudioStale, isReachable } from "../../../../lib/steps";
 // 상한과 정가는 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다).
 import { MAX_REGEN_PER_CUT, priceLabel, regenPrice, videoPrice } from "../../../../lib/pricing";
 import { modelIdForProject, projectSpeaks, resolutionForProject } from "../../../../lib/clip-limits";
@@ -63,9 +63,15 @@ export default function VoiceStepPage() {
         const st = await res.json();
         setProject((p) => ({ ...p, status: st.status, cuts: st.cuts, voice_error: st.voice_error }));
         if (st.voice_error) { stop(false); setErr(st.voice_error); return; }
-        // 컷마다 소리가 붙었거나 실패 표시가 남았으면 끝난 것이다
+        // 컷마다 소리가 붙었거나 실패 표시가 남았으면 끝난 것이다.
+        //
+        // ★ status 까지 본다. 파이프라인은 컷마다 audio 를 따로 저장하고 status 는
+        //   **다 끝난 뒤 한 번 더** 저장한다(lib/pipeline.js). audio 만 보고 끝내면 그 사이에
+        //   버튼이 열리고, 누르면 가드가 아직 "cuts" 인 status 를 보고 되돌려보낸다 —
+        //   "넘어가다가 돌아오는" 그 증상이다(2026-08-13 프로덕션 실측).
+        //   로컬은 그 창이 밀리초라 거의 안 보이고, 배포 환경은 저장이 왕복이라 넓게 열린다.
         const pending = (st.cuts || []).some((c) => !c.audio && !c.voice_error);
-        if (!pending) stop(false);
+        if (!pending && st.status === "voice") stop(false);
       } catch {
         failures += 1;
         if (failures >= 5) stop(true);
@@ -329,9 +335,13 @@ export default function VoiceStepPage() {
               {staleCount > 0 && (
                 <span className="hint">고친 문장 {staleCount}개를 다시 읽혀 주세요</span>
               )}
+              {/* ★ 가드와 **같은 판정**을 쓴다(isReachable). 화면이 여는 문과 가드가
+                  닫는 문이 갈리면 사장님은 넘어가다가 되돌아온다 — 그 어긋남이 실제로
+                  났고(2026-08-13), 원인은 audio 는 다 저장됐는데 status 는 아직
+                  "cuts" 인 창이었다. 판정을 한 벌로 두면 그 창에서 버튼이 저절로 잠긴다. */}
               <button
                 className="cta"
-                disabled={busy || doneCount === 0 || staleCount > 0}
+                disabled={busy || doneCount === 0 || staleCount > 0 || !isReachable("images", project)}
                 onClick={() => router.push(`/create/${id}/images`)}
               >
                 이미지 만들러 가기 →
