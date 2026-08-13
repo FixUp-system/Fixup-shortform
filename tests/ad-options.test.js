@@ -37,6 +37,45 @@ describe("광고 옵션", () => {
     }
   });
 
+  // ★ 정지 이미지 쪽(tests/styles.test.js)에는 겹침 가드가 있는데 영상 쪽에는 없었다 —
+  //   그래서 AD_STYLE_LINES.cinema 가 photo 줄의 "shallow" 를 그대로 쓰고 있었고,
+  //   주석·보고서는 "안 겹치게 썼다"고 말하고 있었다. **눈이 판정하면 이렇게 된다.**
+  //
+  //   축은 styles.js 쪽과 같다: 실사 촬영 계열 셋(photo·film·cinema)만 pairwise 로 금지한다.
+  //   셋 다 "진짜 장면을 카메라로 찍은 영상"이라 구별이 문구에만 있다. studio 는 실사지만
+  //   찍는 대상이 다르고(배경 없는 제품컷), 비실사는 매체부터 갈리므로 뺀다.
+  const AD_LIVE_CAPTURE = ["photo", "film", "cinema"];
+
+  it("영상 문구도 실사 촬영 계열끼리 낱말을 안 나눈다", () => {
+    const words = (s) => new Set(
+      // 하이픈도 낱말 경계다 — "film-look" 을 통짜로 두면 같은 뜻을 하이픈으로 피해 갈 수 있다
+      String(s).toLowerCase().match(/[a-z]+/g)
+        .filter((w) => ![
+          "a", "an", "and", "the", "with", "of", "in", "on",
+          // 여덟 줄이 전부 **영상**이라 매체 일반명사는 구별 정보가 0 이다.
+          // (styles.js 쪽에서 "still" 이 그렇듯, 여기서는 이것이 그 자리다)
+          "footage",
+        ].includes(w))
+    );
+    for (let i = 0; i < AD_LIVE_CAPTURE.length; i++) {
+      for (let j = i + 1; j < AD_LIVE_CAPTURE.length; j++) {
+        const a = words(AD_STYLE_LINES[AD_LIVE_CAPTURE[i]]);
+        const b = words(AD_STYLE_LINES[AD_LIVE_CAPTURE[j]]);
+        const shared = [...a].filter((w) => b.has(w));
+        expect(shared, `${AD_LIVE_CAPTURE[i]} 와 ${AD_LIVE_CAPTURE[j]} 가 낱말을 나눈다: ${shared.join(", ")}`)
+          .toEqual([]);
+      }
+    }
+  });
+
+  // styles.js 가 실사 프리셋을 새로 들이면 여기 축도 같이 늘어야 한다 — 안 그러면
+  // 새 칩이 조용히 가드 밖에 남는다(정지 이미지 쪽과 짝이 되는 단정이다).
+  it("영상 축이 styles.js 의 실사 분류와 어긋나지 않는다", () => {
+    for (const id of AD_LIVE_CAPTURE) {
+      expect(STYLE_PRESETS.find((s) => s.id === id)?.realistic, `${id} 가 실사가 아니다`).toBe(true);
+    }
+  });
+
   it("기본값이 전부 목록 안에 있다", () => {
     expect(AD_FORMATS.some((f) => f.id === DEFAULT_AD_OPTIONS.format)).toBe(true);
     expect(AD_MOODS.some((m) => m.id === DEFAULT_AD_OPTIONS.mood)).toBe(true);

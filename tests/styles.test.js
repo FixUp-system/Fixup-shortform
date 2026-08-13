@@ -50,17 +50,61 @@ describe("STYLE_PRESETS — 화풍 표", () => {
     expect(cinema.realistic).toBe(true);
   });
 
-  it("시네마의 마감이 실사·필름과 낱말을 하나도 안 나눈다", () => {
-    const words = (s) => new Set(
-      String(s).toLowerCase().match(/[a-z][a-z-]*/g)
-        // 뜻이 없는 이음말은 구별 축이 아니다
-        .filter((w) => !["a", "an", "and", "the", "with", "of", "in", "on"].includes(w))
-    );
-    const cinema = words(STYLE_PRESETS.find((s) => s.id === "cinema").finish);
-    for (const id of ["photo", "film"]) {
-      const other = words(STYLE_PRESETS.find((s) => s.id === id).finish);
-      const shared = [...cinema].filter((w) => other.has(w));
-      expect(shared, `${id} 와 낱말이 겹친다: ${shared.join(", ")}`).toEqual([]);
+  // ★ 어디까지 겹침을 금지하는가 — 축을 여기서 못 박는다.
+  //
+  //   "전 프리셋 대 전 프리셋 무조건 금지"로 재면 안 된다. 그렇게 재면 anime 의
+  //   "detailed painted background" 와 cinema 의 "melted background", studio 의
+  //   "crisp focus on the subject" 같은 **정당한 낱말**까지 잡힌다 — 그 둘은 매체가 달라
+  //   그림만 봐도 갈리므로 낱말이 같아도 두 칩이 같은 말을 하지 않는다.
+  //
+  //   진짜 위험은 **같은 것을 같은 매체로 찍었는데 문구로만 갈리는** 경우다. 그것이
+  //   실사 촬영 계열 셋(photo·film·cinema)이다 — 셋 다 "진짜 장면을 카메라로 찍은 사진"이라
+  //   구별 축이 오직 finish 문구에만 있다. 그래서 **이 셋끼리만 pairwise 로 금지**한다.
+  //
+  //   studio 는 realistic 이지만 여기서 뺀다: 같은 사진이어도 **찍는 대상이 다르다**
+  //   (배경 없는 제품컷). 그래서 photo 와 "lighting" 을 나눠 써도 화면이 헷갈리지 않는다.
+  const LIVE_CAPTURE = ["photo", "film", "cinema"];   // 같은 장면·같은 매체 — 문구로만 갈린다
+  const NOT_LIVE_CAPTURE = ["studio"];                // 실사지만 찍는 대상이 다르다
+
+  const finishWords = (s) => new Set(
+    // ⚠️ 하이픈도 낱말 경계다. `[a-z][a-z-]*` 로 재면 "shallow-focus" 가 "shallow" 와
+    //    다른 낱말이 되어, 같은 뜻을 하이픈으로 이어 붙이는 것만으로 판정이 통째로 뚫린다
+    //    (리뷰 실증: cinema.finish 에 "film-grain" 을 박아도 전부 통과했다).
+    String(s).toLowerCase().match(/[a-z]+/g)
+      // 뜻이 없는 이음말은 구별 축이 아니다
+      .filter((w) => !["a", "an", "and", "the", "with", "of", "in", "on"].includes(w))
+  );
+
+  it("실사 촬영 계열은 마감 낱말을 서로 하나도 안 나눈다", () => {
+    for (let i = 0; i < LIVE_CAPTURE.length; i++) {
+      for (let j = i + 1; j < LIVE_CAPTURE.length; j++) {
+        const a = finishWords(STYLE_PRESETS.find((s) => s.id === LIVE_CAPTURE[i]).finish);
+        const b = finishWords(STYLE_PRESETS.find((s) => s.id === LIVE_CAPTURE[j]).finish);
+        const shared = [...a].filter((w) => b.has(w));
+        expect(shared, `${LIVE_CAPTURE[i]} 와 ${LIVE_CAPTURE[j]} 가 낱말을 나눈다: ${shared.join(", ")}`)
+          .toEqual([]);
+      }
+    }
+  });
+
+  // 실사 프리셋이 새로 생기면 **분류를 강제한다.** 안 그러면 다음 사람이 넷째 실사 칩을
+  // 넣어도 가드가 조용히 그 칩을 안 보고 지나간다(지금 구멍이 그렇게 생겼다).
+  it("모든 실사 프리셋이 둘 중 한 칸에 분류돼 있다", () => {
+    for (const s of STYLE_PRESETS.filter((s) => s.realistic)) {
+      expect(
+        LIVE_CAPTURE.includes(s.id) || NOT_LIVE_CAPTURE.includes(s.id),
+        `실사 프리셋 ${s.id} 를 분류하지 않았다 — 촬영 계열이면 LIVE_CAPTURE 에 넣어 겹침을 금지하고, 아니면 NOT_LIVE_CAPTURE 에 넣고 왜인지 적어라`
+      ).toBe(true);
+    }
+  });
+
+  // ★ "얕은 심도"는 render3d 의 변별 자질이다. cinema 가 같은 뜻을 다시 말하면
+  //   (하이픈으로 적든 아니든) 두 칩이 같은 말을 한다 — cinema 는 "melted background" 로
+  //   결과만 말하고 심도 낱말은 안 쓴다.
+  it("시네마는 심도 낱말을 쓰지 않는다 — render3d 와 뜻이 겹치지 않게", () => {
+    const cinema = finishWords(STYLE_PRESETS.find((s) => s.id === "cinema").finish);
+    for (const w of ["shallow", "depth", "field", "defocus", "defocused"]) {
+      expect(cinema.has(w), `cinema 가 심도 낱말 "${w}" 를 쓴다`).toBe(false);
     }
   });
 
@@ -191,7 +235,7 @@ describe("레퍼런스 지시가 화풍마다 다르다", () => {
   // ★ "첨부와 똑같이 그려라"는 실사에서 맞는 말이지만 애니·일러스트와 정면으로 부딪친다.
   //   비실사에서는 복사가 아니라 재해석이어야 한다 — 형태·배색은 가져오고 화풍으로 다시 그린다.
   it("실사 계열은 똑같이 그리라고 한다", () => {
-    for (const id of ["photo", "studio", "film"]) {
+    for (const id of ["photo", "studio", "film", "cinema"]) {
       expect(styleFor(id).realistic, id).toBe(true);
     }
   });
