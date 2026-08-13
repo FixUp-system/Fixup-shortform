@@ -7,7 +7,9 @@ import { resetMemoryStore } from "../lib/store/memory.js";
 // 건너뛰고 raw.endpoint 를 그대로 써도 "만들면...200" 테스트의 endpoint 단정이 우연히
 // 통과했다(사진 0장이면 코드가 t2v 로 강제해야 하는데, 그 강제를 실제로 테스트가 미는지
 // 이걸로 확인한다).
-vi.mock("../lib/llm.js", () => ({
+// ★ Task 18 — 광고 시나리오가 lib/llm.js(OpenAI) 대신 lib/ad/llm.js(Claude Fable)를 쓰게
+// 바뀌어 mock 대상도 같이 옮긴다. lib/llm.js 자체는 기존 6단계 파이프라인용으로 안 건드렸다.
+vi.mock("../lib/ad/llm.js", () => ({
   callJson: vi.fn(async () => ({
     text: "Vertical commercial. Slow push-in on the product, then a hand lifts it.",
     shots: [{ beat: "제품 등장", camera: "slow push-in", action: "병이 놓인다", line: "매일 아침" }],
