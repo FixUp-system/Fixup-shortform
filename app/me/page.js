@@ -8,7 +8,17 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { NAME_MAX } from "../../lib/display-name";
+// 말·부호 규칙은 lib 하나가 쥔다 — 화면이 다시 적으면 언젠가 한쪽이 뒤집힌다
+import { ledgerLabel } from "../../lib/ledger";
 import { useMe } from "../../components/MeContext";
+
+// 그 사람의 시계로 본 날짜. Intl 로 돌리면 기기 설정에 따라 "2026. 8. 13." 처럼 나와
+// 열 폭이 흔들린다 — 자리수를 고정한다.
+function ymd(ts) {
+  const d = new Date(ts);
+  const p2 = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+}
 
 export default function MePage() {
   const router = useRouter();
@@ -24,6 +34,18 @@ export default function MePage() {
   // "불러오는 중"과 "못 읽었다"를 구분할 수 없고, 무엇보다 이름칸이 빈 채로 남아
   // [저장] 을 누르면 저장돼 있던 이름이 지워진다.
   const loadErr = failed ? "내 정보를 읽지 못했어요 — 잠시 뒤 다시 시도해 주세요." : "";
+
+  // 크레딧 내역 — 잔액 숫자 하나만으로는 "왜 줄었는지"를 알 수 없다. null 은 불러오는 중.
+  const [ledger, setLedger] = useState(null);
+  const [ledgerErr, setLedgerErr] = useState("");
+  useEffect(() => {
+    fetch("/api/credits/history")
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error())))
+      .then((d) => setLedger(d.rows || []))
+      // 조용히 비우지 않는다 — 빈 목록과 "못 읽었다"가 같아 보이면 사장님이 내역이
+      // 없는 줄 안다. 여기는 돈에 관한 화면이라 그 오해가 특히 나쁘다.
+      .catch(() => setLedgerErr("내역을 읽지 못했어요 — 잠시 뒤 다시 시도해 주세요."));
+  }, []);
 
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -159,6 +181,38 @@ export default function MePage() {
           <span className="me-label">가입일</span>
           <span className="me-value">{me?.created_at ? me.created_at.slice(0, 10) : "…"}</span>
         </div>
+      </section>
+
+      <section className="panel me-panel">
+        <h2 className="me-h">크레딧 내역</h2>
+        <p className="pgsub">지금 {me ? <b>{me.balance}</b> : "…"} 크레딧이 남았어요.</p>
+        {ledgerErr && <p className="pgsub warn">{ledgerErr}</p>}
+        {!ledgerErr && ledger === null && <p className="pgsub">불러오는 중…</p>}
+        {!ledgerErr && ledger?.length === 0 && (
+          <p className="pgsub">아직 쓰거나 충전한 내역이 없어요.</p>
+        )}
+        {ledger?.length > 0 && (
+          <ul className="ledger">
+            {ledger.map((r, i) => (
+              <li className="ledger-row" key={`${r.ts}-${i}`}>
+                {/* ★ 사장님 시계로 찍는다. toISOString 은 UTC 라 한국(+9)에서는 오전에 쓴
+                    내역이 하루 전으로 보인다(08-13 08:00 KST = 08-12 23:00 UTC). */}
+                <span className="ledger-date mono">{ymd(r.ts)}</span>
+                <span className="ledger-what">
+                  {ledgerLabel(r.kind)}
+                  {/* 지운 영상의 내역은 장부에 남는다(지워도 환불하지 않는다) — 제목이
+                      없다고 빈칸으로 두면 "무엇에 썼는지 모르는 줄"이 된다. */}
+                  {r.project_id && (
+                    <span className="ledger-of"> · {r.project_title || "지운 영상"}</span>
+                  )}
+                </span>
+                <span className={`ledger-amt mono ${r.delta > 0 ? "led-plus" : ""}`}>
+                  {r.delta > 0 ? `+${r.delta}` : r.delta}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="panel me-panel">

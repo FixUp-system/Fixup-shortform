@@ -1309,6 +1309,27 @@ h1.login-head { margin-inline: auto; }
    홀로 서는 줄("내 영상 N편")까지 밀려 내려간다. */
 .me-panel > .me-row:not(:first-child) { margin-top: 12px; }
 
+/* 크레딧 내역 — 날짜 · 무엇에 · 얼마. 세 열이 늘 같은 자리라 눈이 금액만 따라간다. */
+.ledger { list-style: none; margin: 12px 0 0; padding: 0; }
+.ledger-row {
+  display: grid;
+  grid-template-columns: 92px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+.ledger-row:last-child { border-bottom: 0; }
+.ledger-date { color: var(--ink-soft); font-size: 12px; }
+/* 제목이 길면 줄이 두 줄로 접혀 금액 자리가 흔들린다 — 한 줄로 자른다 */
+.ledger-what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ledger-of { color: var(--ink-soft); }
+.ledger-amt { font-weight: 600; }
+/* 는 줄만 색으로 가른다 — 주는 줄이 대부분이라 그쪽에 색을 주면 화면이 붉어진다 */
+.led-plus { color: var(--good); }
+
+
 /* ── 상단 계정 바 */
 .um { position: relative; display: flex; align-items: center; gap: 12px; }
 .um-credit { font-size: 12px; color: var(--ink-soft); white-space: nowrap; }
