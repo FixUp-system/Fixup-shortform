@@ -6,6 +6,7 @@ import {
   profileFor, fitDurationFor, minSecondsFor, maxSecondsFor,
   speaksFor, projectSpeaks,
   I2V_STEPS, I2V_MAX_SECONDS, fitDuration,
+  DEFAULT_RESOLUTION, resolutionsForProject, resolutionForProject, isResolutionFor,
 } from "../lib/clip-limits";
 
 describe("profileFor — prefix 순서가 곧 로직이다", () => {
@@ -285,5 +286,47 @@ describe("음성을 누가 만드는가 — 모델이 정한다", () => {
     it("모델이 Kling 이면 인물이 다 있어도 말하지 않는다", () => {
       expect(projectSpeaks({ settings: { i2v_model: "kling-v3" }, cast: person([0, 1]), cuts: cuts2 })).toBe(false);
     });
+  });
+});
+
+const seedanceP = { settings: { i2v_model: "seedance-2.0" } };
+const klingP = { settings: { i2v_model: "kling-v3" } };
+
+describe("해상도 목록", () => {
+  it("Seedance 만 해상도를 연다", () => {
+    expect(resolutionsForProject(seedanceP)).toEqual(["480p", "720p", "1080p"]);
+    // Kling 에는 fal 스키마에 resolution 이 아예 없다(2026-08-13 확인).
+    // 빈 목록이면 화면이 선택지를 안 띄운다 — "고를 수 있는 척"을 막는다.
+    expect(resolutionsForProject(klingP)).toEqual([]);
+  });
+
+  it("기본값은 720p 다 — 지금까지 실제로 보낸 값이다", () => {
+    expect(DEFAULT_RESOLUTION).toBe("720p");
+    expect(resolutionForProject(seedanceP)).toBe("720p");
+  });
+
+  it("저장값이 그 모델에 있으면 그것을 쓴다", () => {
+    const p = { settings: { i2v_model: "seedance-2.0", resolution: "1080p" } };
+    expect(resolutionForProject(p)).toBe("1080p");
+  });
+
+  it("모델을 바꿔 해상도가 사라지면 기본값으로 떨어진다", () => {
+    // Seedance 1080p 로 저장해 두고 Kling 으로 바꾼 프로젝트. 그대로 보내면 fal 이 거절한다.
+    const p = { settings: { i2v_model: "kling-v3", resolution: "1080p" } };
+    expect(resolutionForProject(p)).toBe("");
+  });
+
+  it("모델에 없는 해상도는 거절한다", () => {
+    expect(isResolutionFor("1080p", seedanceP)).toBe(true);
+    expect(isResolutionFor("2160p", seedanceP)).toBe(false);
+    expect(isResolutionFor("720p", klingP)).toBe(false);
+  });
+
+  it("모든 프로필이 resolutions 를 갖는다", () => {
+    // 빠뜨린 프로필이 있으면 resolutionsForProject 가 undefined 를 돌려주고
+    // 화면이 .map 에서 죽는다.
+    for (const p of CLIP_PROFILES) {
+      expect(Array.isArray(p.resolutions), `${p.prefix} 에 resolutions 가 없다`).toBe(true);
+    }
   });
 });
