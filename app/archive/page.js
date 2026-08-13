@@ -47,8 +47,7 @@ export default function Archive() {
     if (!selected.size || busy) return;
     const ok = await confirm({
       title: `${selected.size}편을 지울까요?`,
-      body: "만든 영상과 그림이 함께 지워지고 되돌릴 수 없어요.
-쓴 크레딧은 돌아오지 않아요.",
+      body: "만든 영상과 그림이 함께 지워지고 되돌릴 수 없어요.\n쓴 크레딧은 돌아오지 않아요.",
       confirmLabel: "지우기",
     });
     if (!ok) return;

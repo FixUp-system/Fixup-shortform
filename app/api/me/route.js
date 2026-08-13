@@ -19,6 +19,9 @@ export const GET = withUser(async (_req, _ctx, user) => {
     return Response.json({ error: "프로필을 찾을 수 없어요" }, { status: 404 });
   }
   return Response.json({
+    // ★ 내 id — 백오피스가 "지금 넣은 것이 내 계정인가"를 가려 상단바를 다시 읽는다.
+    // 남의 id 를 흘리는 것이 아니다(자기 자신이다).
+    id: user.id,
     email: profile.email,
     name: displayNameOf(profile),
     created_at: profile.created_at ?? null,

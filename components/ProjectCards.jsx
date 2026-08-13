@@ -74,8 +74,7 @@ export default function ProjectCards({ projects, limit, onDeleted, selecting, se
     const name = p.title ? `"${p.title}"` : "이 영상";
     const ok = await confirm({
       title: `${name} 을 지울까요?`,
-      body: "만든 영상과 그림이 함께 지워지고 되돌릴 수 없어요.
-쓴 크레딧은 돌아오지 않아요.",
+      body: "만든 영상과 그림이 함께 지워지고 되돌릴 수 없어요.\n쓴 크레딧은 돌아오지 않아요.",
       confirmLabel: "지우기",
     });
     if (!ok) return;

@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
+import { useMe } from "../../../../components/MeContext";
 import BackButton from "../../../../components/BackButton";
 import { isImageStale } from "../../../../lib/steps";
 // 상한과 값은 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다).
@@ -28,6 +29,10 @@ export default function ImagesStepPage() {
   const { id } = useParams();
   const router = useRouter();
   const { project, setProject, load } = useProject();
+  // ★ 잔액이 여기서 움직인다(정가·재생성). 상단바는 공유본을 보므로 다시 읽어 줘야
+  // 옛 숫자가 안 남는다 — 안 읽으면 크레딧이 나갔는데 화면은 그대로다.
+  // 실패해도 넘어간다: 만들기는 이미 시작됐고, 잔액 표시 하나 때문에 막을 일이 아니다.
+  const { load: reloadMe } = useMe();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [pollTimedOut, setPollTimedOut] = useState(false);
@@ -95,6 +100,7 @@ export default function ImagesStepPage() {
       return;
     }
     await load(id).catch(() => {});
+    await reloadMe().catch(() => {});
     startPolling();
   }
 
@@ -104,6 +110,7 @@ export default function ImagesStepPage() {
   async function dismiss() {
     setErr(""); setDismissed(true);
     await load(id).catch(() => {});
+    await reloadMe().catch(() => {});
   }
 
   async function regen(idx, instruction) {
@@ -115,6 +122,7 @@ export default function ImagesStepPage() {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) setErr(data.error);
     await load(id).catch(() => {});
+    await reloadMe().catch(() => {});
   }
 
   async function editSentence(idx, sentence) {
@@ -123,6 +131,7 @@ export default function ImagesStepPage() {
       body: JSON.stringify({ cut: { idx, sentence } }),
     });
     await load(id).catch(() => {});
+    await reloadMe().catch(() => {});
   }
 
   const cuts = project.cuts || [];

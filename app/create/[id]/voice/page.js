@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
+import { useMe } from "../../../../components/MeContext";
 import BackButton from "../../../../components/BackButton";
 import { VOICES } from "../../../../lib/voices";
 import { isAudioStale } from "../../../../lib/steps";
@@ -20,6 +21,10 @@ export default function VoiceStepPage() {
   const { id } = useParams();
   const router = useRouter();
   const { project, setProject, load } = useProject();
+  // ★ 잔액이 여기서 움직인다(정가·재생성). 상단바는 공유본을 보므로 다시 읽어 줘야
+  // 옛 숫자가 안 남는다 — 안 읽으면 크레딧이 나갔는데 화면은 그대로다.
+  // 실패해도 넘어간다: 만들기는 이미 시작됐고, 잔액 표시 하나 때문에 막을 일이 아니다.
+  const { load: reloadMe } = useMe();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [pollTimedOut, setPollTimedOut] = useState(false);
@@ -108,6 +113,7 @@ export default function VoiceStepPage() {
     const res = await fetch(`/api/projects/${id}/cuts`, { method: "POST" });
     if (!res.ok) setErr((await res.json().catch(() => ({}))).error || "다시 시도하지 못했어요");
     await load(id).catch(() => {});
+    await reloadMe().catch(() => {});
     setBusy(false);
   }
 
@@ -123,6 +129,7 @@ export default function VoiceStepPage() {
       return;
     }
     await load(id).catch(() => {});
+    await reloadMe().catch(() => {});
     startPolling();
   }
 
@@ -137,6 +144,7 @@ export default function VoiceStepPage() {
       return;
     }
     await load(id).catch(() => {});
+    await reloadMe().catch(() => {});
     router.push(`/create/${id}/images`);
   }
 
@@ -151,6 +159,7 @@ export default function VoiceStepPage() {
         return;
       }
       await load(id).catch(() => {});
+    await reloadMe().catch(() => {});
     } finally {
       setRegening(null);
     }

@@ -6,6 +6,7 @@ import { DEFAULT_GRANT } from "../../lib/pricing";
 // 내역의 말·부호는 사장님 화면과 **같은 표**를 쓴다 — 둘이 다른 말을 하면 안 된다
 import { ledgerLabel } from "../../lib/ledger";
 import { useDialog } from "../../components/DialogProvider";
+import { useMe } from "../../components/MeContext";
 
 const STATUS_LABEL = {
   pending: "대기 중",
@@ -29,6 +30,9 @@ export default function AdminPage() {
   // 펼쳐 본 사람의 내역. 문의는 "크레딧이 왜 줄었냐"로 오는데, 운영자가 같은 화면을
   // 못 보면 답할 수가 없었다(잔액 숫자 하나만 보였다).
   const { confirm, prompt } = useDialog();
+  // 상단바가 보는 공유본. 내 계정에 넣었으면 그 자리에서 다시 읽는다 —
+  // 안 읽으면 크레딧을 넣고도 상단바가 옛 숫자를 들고 있어 "안 들어갔나" 싶다.
+  const { me: myself, load: reloadMe } = useMe();
   const [openId, setOpenId] = useState(null);
   const [ledger, setLedger] = useState(null);   // null = 불러오는 중
 
@@ -100,6 +104,8 @@ export default function AdminPage() {
       });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "충전 실패");
       await load();
+      // 남에게 넣었으면 상단바를 흔들 이유가 없다 — 내 것일 때만 다시 읽는다.
+      if (id === myself?.id) await reloadMe();
     } catch (e) {
       setErr(e.message);
     } finally {
