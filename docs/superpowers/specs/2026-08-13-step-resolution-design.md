@@ -24,9 +24,17 @@
 
 **빈 배열이면 화면에 선택지를 안 띄운다.** "고를 수 있는 척"이 가장 나쁘다.
 
-⚠️ Kling 의 해상도 파라미터 유무는 **구현 전에 fal 문서로 확인한다.** 있으면 목록을 채운다.
-확인 못 하면 빈 배열로 두고 그 사실을 주석에 남긴다 — 모르는 값을 보내면 조용히 무시되거나
-거절되고, 어느 쪽인지 알 수 없다.
+★ **Kling 에 해상도 파라미터는 없다 — 확정이다**(2026-08-13). 근거 셋이 일치한다:
+① fal 모델 페이지와 OpenAPI 스키마 어디에도 `resolution` 이 없다(standard·turbo 둘 다)
+② `CLIP_PROFILES` 의 Kling `extra` 에도 원래 없었다
+③ **원장에 Kling standard 5건이 전부 성공**으로 남아 있다(`$2.10`, 실패 0) — `resolution`
+   없이 돌아간다는 실측이다.
+
+그래서 **화질 선택은 Seedance 전용**이다. Kling 을 고른 프로젝트에는 선택지가 안 뜬다.
+
+> 같은 조회에서 확인된 것 하나 더: `CLAUDE.md` 의 "Seedance 엔드포인트 미검증"은 **낡았다** —
+> `bytedance/seedance-2.0/image-to-video` 4건 · `text-to-video` 1건이 전부 성공으로 찍혀 있다
+> (`scripts/measure/probe-ledger-endpoints.mjs` 로 언제든 다시 셀 수 있다).
 
 `extra.resolution` 하드코딩은 걷어낸다. 요청 시점에 `settings.resolution` 으로 채운다
 (`lib/i2v.js`). 프로필의 `extra` 는 **모델별 고정 필드**만 남긴다(`generate_audio` 등).
