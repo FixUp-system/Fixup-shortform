@@ -117,6 +117,42 @@ describe("validateShows — 화면 패스", () => {
   });
 });
 
+describe("validateShows — tone·transition", () => {
+  it("tone 을 전 컷에 복사한다", () => {
+    const out = validateShows(
+      { tone: "채도를 올린 시네마틱 질감", shots: [{ shows: "가" }, { shows: "나" }] },
+      2
+    );
+    expect(out[0].tone).toBe("채도를 올린 시네마틱 질감");
+    expect(out[1].tone, "환경과 같은 경로 — 전체가 정하고 컷이 들고 다닌다")
+      .toBe("채도를 올린 시네마틱 질감");
+  });
+
+  it("transition 은 컷마다 다르다", () => {
+    const out = validateShows(
+      { shots: [{ shows: "가" }, { shows: "나", transition: "발 클로즈업, 같은 눈높이" }] },
+      2
+    );
+    expect(out[0].transition, "첫 컷에는 전환이 없다").toBeUndefined();
+    expect(out[1].transition).toBe("발 클로즈업, 같은 눈높이");
+  });
+
+  it("둘이 없어도 컷을 버리지 않는다", () => {
+    // motion·speed 와 같은 취급 — 화면 설계가 부분적으로 실패해도 그림은 나와야 한다
+    const out = validateShows({ shots: [{ shows: "가" }] }, 1);
+    expect(out).toHaveLength(1);
+    expect(out[0].shows).toBe("가");
+    expect(out[0]).not.toHaveProperty("tone");
+    expect(out[0]).not.toHaveProperty("transition");
+  });
+
+  it("빈 문자열은 없는 것으로 본다", () => {
+    const out = validateShows({ tone: "   ", shots: [{ shows: "가", transition: "" }] }, 1);
+    expect(out[0]).not.toHaveProperty("tone");
+    expect(out[0]).not.toHaveProperty("transition");
+  });
+});
+
 describe("validateDevelopQuestions", () => {
   it("질문만 받아 답변 자리와 함께 돌려준다", () => {
     const qs = validateDevelopQuestions({ questions: [{ question: "왜 시작하셨어요?" }] });
