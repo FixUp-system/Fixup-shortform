@@ -255,14 +255,16 @@ export default function AdminPage() {
               ))}
             </tbody>
           </table>
-          {/* 몇 명을 보고 있는지 — 찾기 전에 알아야 하는 값이 아니라 결과를 보고
-              확인하는 값이라 표 아래다 */}
-          <p className="pgsub admin-count">
-            {found.length === users.length
-              ? `전체 ${users.length}명`
-              : `찾은 ${found.length}명 (전체 ${users.length}명)`}
-          </p>
         </div>
+      )}
+      {/* ★ 수는 표 감싸개(.cost-table-wrap) **밖**이다. 그 안은 가로 스크롤 상자라
+          (overflow-x: auto) 오른쪽 끝에 붙인 글자가 잘려 보인다(2026-08-13 실측). */}
+      {users !== null && found.length > 0 && (
+        <p className="pgsub admin-count">
+          {found.length === users.length
+            ? `전체 ${users.length}명`
+            : `찾은 ${found.length}명 (전체 ${users.length}명)`}
+        </p>
       )}
     </>
   );
