@@ -131,6 +131,17 @@ describe("청구", () => {
     expect(await balanceFor(A)).toBe(500);
   });
 
+  it("소수점 아래는 버린다 — 장부가 numeric 이라 소수 행이 섞일 수 있다", async () => {
+    await grant(500.7);
+    expect(await balanceFor(A)).toBe(500);
+  });
+
+  it("빚도 버림이다 — 음수 잔액은 더 큰 빚으로 내려간다", async () => {
+    await grant(0.5);
+    await chargeVideo({ userId: A, projectId: P, seconds: 30 });
+    expect(await balanceFor(A)).toBe(-VIDEO_PRICE["kling-v3"][30]);   // 0.5 - 50 = -49.5 → -50
+  });
+
   it("환불은 잔액을 되돌린다", async () => {
     await grant(500);
     await chargeVideo({ userId: A, projectId: P, seconds: 30 });
