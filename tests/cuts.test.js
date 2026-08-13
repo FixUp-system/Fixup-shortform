@@ -1087,10 +1087,17 @@ describe("buildImagePrompt — 톤·전환", () => {
   const cut = { idx: 1, shows: "제품이 놓여 있다", sentence: "문장" };
 
   it("두 값이 없으면 프롬프트가 글자 그대로 같다", () => {
-    // 이 작업의 유일한 하드 제약 — 기존 프로젝트의 그림이 달라지면 안 된다
-    const before = buildImagePrompt(cut, project);
-    const after = buildImagePrompt({ ...cut, tone: "", transition: "" }, project);
-    expect(after).toBe(before);
+    // 이 작업의 유일한 하드 제약 — 기존 프로젝트의 그림이 달라지면 안 된다.
+    // ⚠️ 두 호출을 서로 비교하면 헛돈다(둘 다 새 코드를 지나므로, 값이 없어도 문장을
+    //    무조건 붙이는 구현이면 양쪽이 똑같이 붙어 통과한다). 톤·전환을 넣기 **전** 문자열을
+    //    상수로 박아 대조한다 — 위 "실사는 화풍 도입 전과 글자 그대로 같은 프롬프트를 낸다"와 같은 방식이다.
+    const expected =
+      "High-quality photographic still for a short-form video, vertical 9:16 composition. " +
+      "Scene: 제품이 놓여 있다. " +
+      "The video's subject is: 농구화. Keep this exact product/subject consistent in every scene. " +
+      "Cinematic lighting, realistic, no text or letters in the image.";
+    expect(buildImagePrompt(cut, project)).toBe(expected);
+    expect(buildImagePrompt({ ...cut, tone: "", transition: "" }, project)).toBe(expected);
   });
 
   it("톤을 프롬프트에 싣는다", () => {
@@ -1140,8 +1147,10 @@ describe("SHOWS_SYSTEM — 톤·전환 규칙", () => {
     expect(system()).toMatch(/구도로 번역|그 자체로 읽히게/);
   });
 
+  // ⚠️ 여기서 "첫 컷"만 찾으면 헛돈다 — 원래 지문에 "첫 컷은 스크롤을 멈추는 한 방이다"가
+  //    이미 있어서 transition 규칙을 통째로 지워도 초록이었다. 새 문장의 고유 형태를 잡는다.
   it("첫 컷에는 전환이 없다고 알려 준다", () => {
-    expect(system()).toContain("첫 컷");
+    expect(system()).toMatch(/첫 컷에는\s*\*{0,2}\s*넣지 않는다/);
   });
 
   it("톤은 영상 하나에 하나다 — 컷마다 만들지 않게 한다", () => {
@@ -1164,9 +1173,27 @@ describe("SHOWS_SYSTEM — 톤·전환 규칙", () => {
     expect(usableTransition(transition)).toBe(transition);
   });
 
+  // 지문이 가르치는 ✗ 예시가 문지기에 안 걸리면, 지문은 "안 된다"고 하면서 실제로는
+  // 살아남는 값을 가르치는 셈이 된다 — 거짓을 가르치는 예시다.
+  it("지문의 ✗ 예시는 코드 문지기가 버린다", () => {
+    const badTones = ["체육관, 스포트라이트", "카메라가 다가가며 차가워지는 색"];
+    const badTransitions = [
+      "앞 컷에서 이어진다",
+      "직전 컷과 같은 각도",
+      "이어받아 카메라가 다가간 상태로 시작",
+    ];
+    for (const t of badTones) expect(system(), t).toContain(t);
+    for (const t of badTransitions) expect(system(), t).toContain(t);
+    // tone 의 ✗ 하나는 environment 침범이라 문지기가 못 잡는다 — 그것은 말로만 막는다
+    expect(usableTone("카메라가 다가가며 차가워지는 색")).toBe("");
+    for (const t of badTransitions) expect(usableTransition(t), t).toBe("");
+  });
+
   // 카메라 어휘가 든 톤·전환은 usableTone/usableTransition 이 통째로 버린다 —
-  // 지문이 먼저 막아야 버려지는 값이 준다
+  // 지문이 먼저 막아야 버려지는 값이 준다.
+  // ⚠️ "카메라 움직임"만 찾으면 헛돈다 — 기존 shows·motion 규칙에 이미 그 낱말이 있다.
   it("톤·전환에 카메라 움직임을 쓰지 말라고 한다", () => {
-    expect(system()).toMatch(/카메라 움직임|카메라 이동/);
+    expect(system()).toMatch(/한 낱말이라도 섞이면/);       // tone 쪽
+    expect(system()).toMatch(/움직임은 motion 이 맡는다/); // transition 쪽
   });
 });
