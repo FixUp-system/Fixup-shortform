@@ -287,3 +287,36 @@ describe("청구가 모델을 탄다", () => {
     expect(await balanceFor(A)).toBe(100);
   });
 });
+
+// 크레딧은 개수다 — 장부에 소수가 한 번 들어가면 잔액도 화면도 그때부터 소수가 된다.
+// 값은 lib/pricing.js 가 반올림해서 내보내지만, **장부에 닿는 자리**에서 한 번 더 막는다.
+describe("장부에는 정수만 들어간다", () => {
+  beforeEach(() => resetMemoryStore());
+
+  it("영상 청구가 정수다", async () => {
+    await getStore().insertGrant({ user_id: A, amount_credits: 500, reason: "충전", granted_by: ADMIN });
+    const paid = await chargeVideo({ userId: A, projectId: P, seconds: 30 });
+    expect(Number.isInteger(paid)).toBe(true);
+    for (const row of await getStore().listCharges(A)) {
+      expect(Number.isInteger(Number(row.credits)), `장부에 소수가 들어갔다: ${row.credits}`).toBe(true);
+    }
+  });
+
+  it("재생성 청구도 정수다", async () => {
+    await getStore().insertGrant({ user_id: A, amount_credits: 500, reason: "충전", granted_by: ADMIN });
+    await chargeRegen({ userId: A, projectId: P, kind: "clip", idx: 0, priorCount: 1 });
+    for (const row of await getStore().listCharges(A)) {
+      expect(Number.isInteger(Number(row.credits))).toBe(true);
+    }
+  });
+
+  // 환불은 원 청구 행에서 값을 읽는다 — 그 값이 정수면 환불도 정수다(규칙이 하나라는 뜻).
+  it("환불도 정수로 돌아간다", async () => {
+    await getStore().insertGrant({ user_id: A, amount_credits: 500, reason: "충전", granted_by: ADMIN });
+    await chargeVideo({ userId: A, projectId: P, seconds: 30 });
+    await refundVideo({ userId: A, projectId: P });
+    for (const row of await getStore().listCharges(A)) {
+      expect(Number.isInteger(Number(row.credits))).toBe(true);
+    }
+  });
+});

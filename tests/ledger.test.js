@@ -45,3 +45,16 @@ describe("내역의 부호 — 잔액이 얼마나 움직였나", () => {
     expect(ledgerDelta({ source: "grant", credits: -200 })).toBe(-200);
   });
 });
+
+// 옛 장부에는 소수 행이 남아 있다(credit_grants 가 옛 amount_usd 를 이름만 바꿔 쓴 자리 —
+// 실측 +5.18). 크레딧을 정수로 다루기로 한 이상 화면에도 정수로 보여야 한다.
+describe("내역도 정수로 보인다", () => {
+  it("옛 소수 행은 반올림해서 보여 준다", () => {
+    expect(ledgerDelta({ source: "grant", credits: 5.18 })).toBe(5);
+    expect(ledgerDelta({ source: "grant", credits: 5.6 })).toBe(6);
+  });
+
+  it("청구 쪽 소수도 마찬가지다", () => {
+    expect(ledgerDelta({ source: "charge", credits: 24.4 })).toBe(-24);
+  });
+});

@@ -120,3 +120,50 @@ describe("모델별 정가", () => {
     expect(Object.keys(REGEN_PRICE.clip).sort()).toEqual(["kling-v3", "seedance-2.0"]);
   });
 });
+
+// 크레딧은 **개수**다 — 0.7 크레딧으로 살 수 있는 것이 없고, 화면에 "24.4 크레딧 차감"이
+// 뜨면 사장님은 그것이 무슨 뜻인지 모른다(2026-08-13 사용자 결정: 정수 단위로 계산하고,
+// 원가에서 소수가 떨어지면 반올림해서 차감한다).
+describe("값은 늘 정수다", () => {
+  it("표의 값이 전부 정수다", () => {
+    for (const table of Object.values(VIDEO_PRICE)) {
+      for (const [seconds, credits] of Object.entries(table)) {
+        expect(Number.isInteger(credits), `VIDEO_PRICE ${seconds}초가 소수다`).toBe(true);
+      }
+    }
+    for (const [kind, entry] of Object.entries(REGEN_PRICE)) {
+      const values = typeof entry === "number" ? [entry] : Object.values(entry);
+      for (const v of values) expect(Number.isInteger(v), `REGEN_PRICE ${kind} 가 소수다`).toBe(true);
+    }
+  });
+
+  // ★ 표를 정수로 지키는 것만으로는 부족하다. 원가가 바뀌어 누가 24.4 를 적어 넣는 날,
+  // 그 소수가 그대로 장부에 들어가고 잔액이 소수가 된다. 나가는 자리에서 막는다.
+  it("표에 소수가 들어와도 반올림해서 나간다", () => {
+    const before = VIDEO_PRICE["kling-v3"][30];
+    try {
+      VIDEO_PRICE["kling-v3"][30] = 24.4;
+      expect(videoPrice(30, "kling-v3")).toBe(24);
+      VIDEO_PRICE["kling-v3"][30] = 24.6;
+      expect(videoPrice(30, "kling-v3")).toBe(25);
+    } finally {
+      VIDEO_PRICE["kling-v3"][30] = before;
+    }
+  });
+
+  it("재생성 값도 반올림해서 나간다", () => {
+    const before = REGEN_PRICE.image;
+    try {
+      REGEN_PRICE.image = 2.5;
+      expect(regenPrice("image", 1)).toBe(3);
+      REGEN_PRICE.image = 2.4;
+      expect(regenPrice("image", 1)).toBe(2);
+    } finally {
+      REGEN_PRICE.image = before;
+    }
+  });
+
+  it("공짜 회차는 그대로 0 이다", () => {
+    expect(regenPrice("image", 0)).toBe(0);
+  });
+});
