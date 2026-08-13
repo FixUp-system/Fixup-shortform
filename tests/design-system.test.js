@@ -206,3 +206,32 @@ describe("서체", () => {
     expect(css).toMatch(/var\(--font-pretendard\)/);
   });
 });
+
+// 자막 조절판은 네 가지 결정(위치·글꼴·색·크기)을 나란히 놓는 자리다. 행마다 컨트롤이
+// 제각각이면(칩 40px · 슬라이더 16px · 색 22px) 격자가 무너져 프로토타입처럼 보인다.
+// 2026-08-13 사용자 지적: "배치가 균일하지 못하고 글자 크기가 제각각이다".
+describe("자막 조절판 — 한 격자", () => {
+  const css = cssWithoutRoot();
+  const rule = (selector) => {
+    const start = css.indexOf(selector + " {");
+    if (start < 0) return "";
+    return css.slice(start + selector.length, css.indexOf("}", start));
+  };
+
+  it("컨트롤 높이를 한 곳에서 정한다", () => {
+    // 세그먼트·색 견본·슬라이더가 같은 높이라야 네 행의 리듬이 맞는다.
+    expect(rule(".subpanel"), "조절판 자체가 없다").toBeTruthy();
+    expect(css, "컨트롤 높이 토큰(--ctl-h)이 없다").toMatch(/--ctl-h:/);
+  });
+
+  it("드롭다운 글자 크기는 한 자리에서만 정한다", () => {
+    // 글꼴 드롭다운만 키우면 행마다 높이가 갈린다 — 글꼴 차이는 획으로 보이지 크기로 보이지 않는다.
+    expect(rule(".sub-select"), "드롭다운이 없다").toMatch(/font-size/);
+    expect(rule(".sub-select.face"), "글꼴 드롭다운이 크기를 따로 정한다").not.toMatch(/font-size/);
+  });
+
+  it("조절판 안에서 네이티브 위젯 색을 그대로 쓰지 않는다", () => {
+    // 브라우저 기본 파랑은 이 화면에서 유일한 시스템 색이라 눈이 먼저 그리로 간다.
+    expect(rule(".sub-slider"), "슬라이더를 직접 그리지 않는다").toMatch(/appearance:\s*none/);
+  });
+});

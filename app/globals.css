@@ -691,6 +691,142 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
   font-weight: 600;
 }
 
+/* 글꼴을 고르는 칩 — 라벨을 그 글꼴로 그린다(글꼴 이름은 화면이 style 로 넣는다).
+   14px 로는 획의 굵기 차이가 안 보여 고르는 근거가 사라지므로 한 단 키운다.
+   ★ font-weight 를 세우지 않는다 — 켜진 칩이 600 으로 굵어지면 획 굵기가 글꼴 차이인지
+   선택 표시인지 갈리지 않는다. 선택은 배경으로만 말한다. */
+/* ── 자막 조절판 ─────────────────────────────────────────────────────────
+   네 가지 결정(위치·글꼴·색·크기)을 **한 격자**에 놓는다.
+   옛 화면은 행마다 컨트롤이 제각각이라(칩 40px · 슬라이더 16px · 색 22px) 줄이
+   울퉁불퉁했고 글자 크기도 12·14·18px 로 갈렸다.
+
+   ★ 치수를 여기 두 값으로 못 박는다 — 행이 늘어도 격자가 안 흔들린다.
+   --ctl-h  : 모든 컨트롤의 높이(세그먼트·색 견본·슬라이더 손잡이가 같다)
+   --ctl-w  : 컨트롤 열의 폭. 위치 3칸과 글꼴 3칸이 **같은 칸에** 떨어진다 */
+/* 미리보기 영상과 조절판은 **한 열**이다 — 영상은 가운데, 조절판은 왼쪽이면 두 블록의
+   세로선이 어긋나 화면이 기울어 보인다. 치수 토큰도 여기 두고 안쪽이 물려받는다. */
+.sub-editor {
+  --ctl-h: 38px;
+  --ctl-w: 336px;
+  max-width: calc(52px + 14px + var(--ctl-w) + 36px);
+  margin: 0 auto;
+}
+.subpanel {
+  background: var(--deep);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  padding: 0 18px;
+}
+.sub-row {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  align-items: center;
+  gap: 14px;
+  min-height: 62px;
+  border-bottom: 1px solid var(--line);
+}
+.sub-row:last-child { border-bottom: 0; }
+.sub-label { color: var(--ink-soft); font-size: 12px; }
+/* 컨트롤과 그 값이 한 줄에 — 값은 늘 오른쪽 끝이라 눈이 한 자리에서 읽는다 */
+.sub-control { display: flex; align-items: center; gap: 14px; max-width: var(--ctl-w); }
+.sub-value { color: var(--ink-soft); font-size: 12px; margin-left: auto; }
+
+/* 드롭다운 — 네이티브 화살표를 지우고 직접 그린다. 브라우저마다 다른 그 화살표가
+   "손으로 만든 화면" 처럼 보이게 하는 가장 큰 자리다.
+   ★ 크기는 여기 한 곳에서만 정한다 — 글꼴 칸이 따로 키우면 행마다 높이가 갈린다. */
+.sub-select-wrap { position: relative; width: var(--ctl-w); }
+.sub-select {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: var(--ctl-h);
+  padding: 0 38px 0 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 14px;
+  cursor: pointer;
+}
+.sub-select:hover { border-color: var(--ink-soft); }
+.sub-select:disabled { opacity: 0.4; cursor: default; }
+/* 목록은 브라우저가 그린다 — 바탕이 밝게 나오는 창이 있어 글자색을 함께 준다 */
+.sub-select option { background: var(--surface); color: var(--ink); }
+/* 화살표 — 삼각형을 테두리로 그린다(이미지도 색 리터럴도 필요 없다) */
+.sub-select-wrap::after {
+  content: "";
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  width: 0;
+  height: 0;
+  margin-top: -2px;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid var(--ink-soft);
+  pointer-events: none;
+}
+
+/* 색 견본 — 네이티브 입력의 테두리를 지우고 칸 자체를 견본으로 쓴다 */
+.sub-swatch {
+  width: var(--ctl-h);
+  height: var(--ctl-h);
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+  background: transparent;
+  cursor: pointer;
+}
+.sub-swatch::-webkit-color-swatch-wrapper { padding: 0; }
+.sub-swatch::-webkit-color-swatch { border: 0; border-radius: var(--r-ctl); }
+.sub-swatch::-moz-color-swatch { border: 0; border-radius: var(--r-ctl); }
+
+/* 슬라이더 — 브라우저 기본 파랑은 이 어두운 화면에서 유일한 시스템 색이라 눈이 먼저
+   그리로 간다. 트랙과 손잡이를 직접 그려 글자와 같은 색으로 둔다. */
+.sub-slider {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 1;
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--line);
+  cursor: pointer;
+}
+.sub-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--ink);
+}
+.sub-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ink);
+}
+.sub-slider:disabled { opacity: 0.4; cursor: default; }
+
+/* 실행 줄 — 카드 밖에 두면 붕 뜬다. 마지막 행으로 넣고 오른쪽 끝이 실행이다.
+   ★ 두 버튼의 치수를 여기서 통일한다. .mini 는 12px·28px, .mini.confirm-btn 은 14px·36px 라
+   그대로 두면 나란히 선 두 버튼의 크기가 서로 다르다 — 격자를 마지막 줄에서 놓치는 자리다. */
+.sub-row--actions { display: flex; justify-content: flex-end; gap: 10px; }
+.sub-row--actions .mini { height: var(--ctl-h); padding: 0 18px; font-size: 14px; }
+
+/* 키보드로 도는 사람에게 지금 어디인지 보여 준다 */
+.sub-select:focus-visible,
+.sub-swatch:focus-visible,
+.sub-slider:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+@media (max-width: 560px) {
+  /* ★ max-width 도 함께 푼다 — 폭 토큰만 100% 로 바꾸면 calc(52px + 14px + 100% + 36px) 가
+     부모보다 넓어지는 대신 열이 눌린다(실측: 조절판이 90px 짜리 기둥이 됐다). */
+  .sub-editor { --ctl-w: 100%; max-width: 100%; }
+  .sub-row { grid-template-columns: 1fr; gap: 10px; padding: 14px 0; min-height: 0; }
+  .sub-label { font-size: 12px; }
+}
+
 /* 주 실행 버튼 — 한 화면에 하나. 바탕의 반대색이라 화면에서 유일하게 가장 밝다. */
 .cta {
   display: inline-flex;
