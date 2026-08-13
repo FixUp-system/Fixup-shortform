@@ -76,7 +76,7 @@ describe("낡은 클립을 다시 만들면 값을 받는다", () => {
     const before = await getStore().sumCharges(A);
 
     await POST(req(), ctx(p.id));
-    expect(await getStore().sumCharges(A) - before).toBe(REGEN_PRICE.clip["kling-v3"]);
+    expect(await getStore().sumCharges(A) - before).toBe(REGEN_PRICE.clip["kling-v3"]["720p"]);
   });
 
   it("상한을 넘기지 못한다 — 컷별과 같은 3회다", async () => {

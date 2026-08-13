@@ -147,12 +147,21 @@ describe("해상도별 가격", () => {
     expect(videoPrice(15, "seedance-2.0")).toBe(80);
   });
 
+  // 1080p 는 원가비(2.25)가 크레딧에 **그대로** 살아 있다 — 그러니 관계식으로 적는다.
+  // 하드코딩 숫자만 보면 표를 만질 때 관계가 깨져도 통과한다.
   it("1080p 는 720p 의 2.25배다 — 픽셀수 비", () => {
+    expect(videoPrice(30, "seedance-2.0", "1080p")).toBe(videoPrice(30, "seedance-2.0") * 2.25);
+    expect(videoPrice(15, "seedance-2.0", "1080p")).toBe(videoPrice(15, "seedance-2.0") * 2.25);
     expect(videoPrice(30, "seedance-2.0", "1080p")).toBe(360);
     expect(videoPrice(15, "seedance-2.0", "1080p")).toBe(180);
   });
 
-  it("480p 는 720p 의 4/9 다", () => {
+  // ★ 480p 는 관계식으로 못 적는다 — 원가비는 4/9(≈0.444)인데 크레딧은 그것을 5의 배수로
+  //   올려 결과가 **1/2** 이 됐다(lib/pricing.js 의 표 주석 참고). 이름이 "4/9" 라고 적혀
+  //   있으면 본문이 재는 것과 달라서, 값이 4/9 가 아닌데도 초록이라 아무도 안 잡는다.
+  it("480p 는 720p 의 절반이다 — 원가비 4/9 를 5의 배수로 올린 값", () => {
+    expect(videoPrice(30, "seedance-2.0", "480p")).toBe(videoPrice(30, "seedance-2.0") / 2);
+    expect(videoPrice(15, "seedance-2.0", "480p")).toBe(videoPrice(15, "seedance-2.0") / 2);
     expect(videoPrice(30, "seedance-2.0", "480p")).toBe(80);
     expect(videoPrice(15, "seedance-2.0", "480p")).toBe(40);
   });
@@ -167,6 +176,20 @@ describe("해상도별 가격", () => {
     expect(regenPrice("clip", 1, "seedance-2.0", "1080p")).toBe(57);
     expect(regenPrice("clip", 1, "seedance-2.0", "480p")).toBe(12);
     expect(regenPrice("clip", 1, "kling-v3", "1080p")).toBe(8);
+  });
+
+  // ★ 두 표가 갈린 상태에서도 **화면은 떠야 한다.** regenPrice 는 ⑤영상 화면이 부르는
+  //   자리라 던지면 페이지가 통째로 사라진다 — 값이 틀리는 것보다 그쪽이 나쁘다.
+  //   (갈린 것 자체는 아래 대조 테스트가 잡는다. 이건 그때까지의 안전망이다.)
+  it("VIDEO_PRICE 에만 있는 모델이 와도 재생성 값이 안 던진다", () => {
+    VIDEO_PRICE["임시-신모델"] = { "720p": { 15: 1, 30: 2, 45: 3, 60: 4 } };
+    try {
+      // priceModel 은 VIDEO_PRICE 를 보고 이 모델을 그대로 돌려주는데 REGEN_PRICE.clip 에는 없다
+      expect(() => regenPrice("clip", 1, "임시-신모델")).not.toThrow();
+      expect(regenPrice("clip", 1, "임시-신모델")).toBe(REGEN_PRICE.clip[LEGACY][RES]);
+    } finally {
+      delete VIDEO_PRICE["임시-신모델"];
+    }
   });
 
   it("모르는 해상도는 720p 로 본다", () => {
@@ -185,9 +208,15 @@ describe("해상도별 가격", () => {
       expect(priced, `${model.id} 가 가격표에 없다`).toBeTruthy();
       for (const res of profile.resolutions) {
         expect(priced[res], `${model.id} 의 ${res} 가격이 없다`).toBeTruthy();
+        // ★ 재생성 표도 같이 본다. 여기를 빠뜨리면 화면은 그 해상도를 띄우는데 재생성은
+        //   조용히 720p 값을 청구한다 — 값이 안 맞는데 아무도 안 죽는 가장 나쁜 모양이다.
+        expect(REGEN_PRICE.clip[model.id]?.[res], `${model.id} 의 ${res} 재생성 가격이 없다`).toBeTruthy();
       }
-      // 해상도를 안 받는 모델도 720p 한 칸은 있어야 videoPrice 가 떨어질 자리가 있다
-      if (!profile.resolutions.length) expect(priced["720p"]).toBeTruthy();
+      // 해상도를 안 받는 모델도 720p 한 칸은 있어야 videoPrice·regenPrice 가 떨어질 자리가 있다
+      if (!profile.resolutions.length) {
+        expect(priced["720p"]).toBeTruthy();
+        expect(REGEN_PRICE.clip[model.id]?.["720p"]).toBeTruthy();
+      }
     }
   });
 });
