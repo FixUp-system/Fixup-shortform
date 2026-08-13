@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { splitSentences, splitUnits, explodeLongRanges, buildSplitMessages, buildShowsMessages, buildImagePrompt, buildClipPrompt, stillOnly, clauseBoundaries, usableTone, usableTransition } from "../lib/cuts.js";
 import { clipProfileForProject, minSecondsFor, maxSecondsFor } from "../lib/clip-limits.js";
 import { STYLE_PRESETS } from "../lib/styles.js";
@@ -1002,6 +1002,15 @@ describe("제품 외형이 프롬프트에 실린다", () => {
 });
 
 describe("톤·전환 필터", () => {
+  // 문지기가 값을 버릴 때 console.warn 을 한 줄 남긴다(lib/cuts.js). 그 로그 자체는 아래
+  // "버릴 때 흔적을 남긴다"에서 재고, 나머지 케이스가 테스트 출력을 뒤덮지 않게 여기서 막는다.
+  // ⚠️ mockClear 가 필요하다 — 이미 spy 인 console.warn 에 다시 spyOn 하면 같은 mock 이
+  //    돌아와 앞 테스트의 호출 기록이 그대로 남는다(그러면 "안 남긴다" 검사가 헛돈다).
+  beforeEach(() => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    console.warn.mockClear();
+  });
+
   it("카메라 어휘가 든 톤은 안 쓴다", () => {
     // 정지 이미지 프롬프트에 카메라 지시가 새면 그림이 그것을 암시하게 그려진다
     expect(usableTone("천천히 줌 인하는 시네마틱 질감")).toBe("");
@@ -1068,6 +1077,88 @@ describe("톤·전환 필터", () => {
     const b = "방금 내린 커피가 담긴 잔, 눈높이";
     expect(usableTransition(a)).toBe(a);
     expect(usableTransition(b)).toBe(b);
+  });
+
+  // ★ 2026-08-13 최종 리뷰 — 문지기 패턴의 전수 목록을 여기 못 박는다.
+  //
+  // 왜 목록째 박는가: 이 패턴은 각인(toneKey)의 일부다. 나중에 넓히거나 좁히면 이미 굳은
+  // image.tone_of 가 새 판정과 어긋나 그 프로젝트 전 컷이 낡음으로 뒤집히고 사장님에게
+  // 재구매가 제시된다(30초 한 편 ~$9). 목록이 곧 계약이다.
+  describe("문지기 전수 목록", () => {
+    // 막아야 하는 것 — 실제 카메라 움직임 지시
+    const drop = [
+      "카메라가 다가가며 차가워지는 색",
+      "카메라가 도는 느낌",
+      "천천히 줌 인하는 시네마틱 질감",
+      "트래킹으로 훑는 질감",
+      "오빗하는 광고 톤",
+      "크레인으로 올라가는 느낌",
+      "틸트 다운되는 어두운 화면",
+      "틸트 다운하는 질감",
+    ];
+    // 살려야 하는 것 — 카메라·팬·달리·줌이 나오지만 움직임 지시가 아닌 정상값
+    const keep = [
+      "필름 카메라 특유의 거친 입자감",
+      "빈티지 폴라로이드 카메라 톤",
+      "핸드헬드 다큐 질감의 거친 색보정",
+      "생기를 더해 줌",
+      "달리 보이는 진한 대비",
+      // 아래 셋이 이번에 살아난 것들이다(리뷰 실측에서 통째로 버려지고 있었다)
+      "필름 카메라가 만든 거친 입자감",
+      "팬 서비스 같은 화사한 톤",
+      "달리 인상적인 대비",
+      "달리 인식되는 색",
+    ];
+    const dropTransitions = [
+      "줌 인 상태에서 시작하는 아웃솔 클로즈업",
+      "트래킹으로 들어온 발 클로즈업",
+      "카메라가 물러난 자리에서 시작하는 풀 샷",
+    ];
+
+    it("카메라 움직임 지시는 톤에서 전부 버린다", () => {
+      for (const t of drop) expect(usableTone(t), t).toBe("");
+    });
+
+    it("카메라 낱말이 있어도 움직임 지시가 아니면 톤을 살린다", () => {
+      for (const t of keep) expect(usableTone(t), t).toBe(t);
+    });
+
+    it("카메라 움직임 지시는 전환에서도 전부 버린다", () => {
+      for (const t of dropTransitions) expect(usableTransition(t), t).toBe("");
+      // 톤에서 버리는 것은 전환에서도 버린다 — 두 문지기가 같은 패턴을 본다
+      for (const t of drop) expect(usableTransition(t), t).toBe("");
+    });
+  });
+
+  // 버려진 값이 지금까지 아무 데도 안 남았다 — 오검출 셋도 손으로 돌려 보고서야 드러났다.
+  // 이 로그가 "얼마나 자주 터지는가"에 답하는 유일한 자리다.
+  describe("버릴 때 흔적을 남긴다", () => {
+    it("버려진 톤·전환은 값과 이유가 함께 남는다", () => {
+      usableTone("카메라가 다가가며 차가워지는 색");
+      expect(console.warn).toHaveBeenCalledWith(
+        expect.stringContaining("카메라가 다가가며 차가워지는 색")
+      );
+      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("카메라 움직임"));
+
+      console.warn.mockClear();
+      usableTransition("앞 컷에서 이어지는 발 클로즈업");
+      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("앞 컷을 가리키는"));
+    });
+
+    it("값이 애초에 없으면 남기지 않는다 — 그건 정상이다", () => {
+      // 첫 컷에 전환이 없는 것이 정상이라, 여기서 경고를 내면 매 편마다 거짓 경고가 쌓인다
+      usableTone(undefined);
+      usableTone("  ");
+      usableTransition(undefined);
+      usableTransition(null);
+      expect(console.warn).not.toHaveBeenCalled();
+    });
+
+    it("통과한 값도 남기지 않는다", () => {
+      usableTone("필름 카메라가 만든 거친 입자감");
+      usableTransition("발 클로즈업, 아스팔트 위, 같은 눈높이");
+      expect(console.warn).not.toHaveBeenCalled();
+    });
   });
 
   it("값이 없으면 빈 문자열이다", () => {
@@ -1138,6 +1229,10 @@ describe("SHOWS_SYSTEM — 톤·전환 규칙", () => {
   // 지문은 문자열이라 "무엇을 시켰는가"만 잴 수 있다. 그래도 잰다 — 규칙이 조용히 빠지는 것을 막는다.
   const cuts = [{ idx: 0, sentence: "가." }, { idx: 1, sentence: "나." }];
   const system = () => buildShowsMessages(project, cuts).system;
+  // 아래 "✗ 예시" 테스트가 일부러 버려지는 값을 먹인다 — 문지기 경고로 출력이 덮이지 않게 한다
+  beforeEach(() => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
 
   it("출력 형식에 tone 과 transition 이 있다", () => {
     expect(system()).toContain('"tone"');
@@ -1214,6 +1309,10 @@ describe("관통: 화면 설계 → 그림 프롬프트 → 각인", () => {
     briefing: { topic: "농구화" },
   };
   const cutOf = (shot, idx) => ({ ...shot, idx, sentence: idx === 0 ? "가" : "나" });
+  // 아래 두 번째 테스트가 일부러 버려지는 톤·전환을 흘린다 — 문지기 경고를 삼킨다
+  beforeEach(() => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
 
   it("화면 설계 응답 하나가 그림 프롬프트까지 관통한다", () => {
     const shots = validateShows(
