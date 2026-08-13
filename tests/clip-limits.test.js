@@ -6,7 +6,7 @@ import {
   profileFor, fitDurationFor, minSecondsFor, maxSecondsFor,
   speaksFor, projectSpeaks,
   I2V_STEPS, I2V_MAX_SECONDS, fitDuration,
-  DEFAULT_RESOLUTION, resolutionsForProject, resolutionForProject, isResolutionFor,
+  DEFAULT_RESOLUTION, resolutionsForModel, resolutionsForProject, resolutionForProject, isResolutionFor,
 } from "../lib/clip-limits";
 
 describe("profileFor — prefix 순서가 곧 로직이다", () => {
@@ -310,10 +310,26 @@ describe("해상도 목록", () => {
     expect(resolutionForProject(p)).toBe("1080p");
   });
 
-  it("모델을 바꿔 해상도가 사라지면 기본값으로 떨어진다", () => {
-    // Seedance 1080p 로 저장해 두고 Kling 으로 바꾼 프로젝트. 그대로 보내면 fal 이 거절한다.
+  it("해상도를 안 받는 모델에는 아예 안 보낸다", () => {
+    // Seedance 1080p 로 저장해 두고 Kling 으로 바꾼 프로젝트. Kling 에는 resolution 파라미터
+    // 자체가 없으니 기본값으로 떨어뜨리는 것이 아니라 **아무것도 안 싣는다**.
     const p = { settings: { i2v_model: "kling-v3", resolution: "1080p" } };
     expect(resolutionForProject(p)).toBe("");
+  });
+
+  it("목록에 있는데 저장값이 그 안에 없으면 기본값으로 떨어진다", () => {
+    const p = { settings: { i2v_model: "seedance-2.0", resolution: "2160p" } };
+    expect(resolutionForProject(p)).toBe(DEFAULT_RESOLUTION);
+  });
+
+  // 화면은 "저장된 모델"이 아니라 "지금 고르려는 모델"의 목록을 그린다 —
+  // 그때 가짜 project 객체를 만들지 않도록 id 로 묻는 자리가 있어야 한다.
+  it("모델 id 로도 물을 수 있다 — 화면이 가짜 project 를 만들지 않게", () => {
+    expect(resolutionsForModel("seedance-2.0")).toEqual(["480p", "720p", "1080p"]);
+    expect(resolutionsForModel("kling-v3")).toEqual([]);
+    // 모르는 id·없는 id 는 모델 판정 규칙 그대로 Kling(LEGACY)으로 떨어진다
+    expect(resolutionsForModel("뒤죽박죽")).toEqual([]);
+    expect(resolutionsForModel(undefined)).toEqual([]);
   });
 
   it("모델에 없는 해상도는 거절한다", () => {
@@ -322,11 +338,16 @@ describe("해상도 목록", () => {
     expect(isResolutionFor("720p", klingP)).toBe(false);
   });
 
-  it("모든 프로필이 resolutions 를 갖는다", () => {
-    // 빠뜨린 프로필이 있으면 resolutionsForProject 가 undefined 를 돌려주고
-    // 화면이 .map 에서 죽는다.
-    for (const p of CLIP_PROFILES) {
-      expect(Array.isArray(p.resolutions), `${p.prefix} 에 resolutions 가 없다`).toBe(true);
+  // ★ 상수 리터럴의 모양을 다시 적지 않는다 — 화면이 실제로 부르는 **함수**로 잰다.
+  //   (프로필에 resolutions 를 빠뜨려도 `|| []` 가드가 배열을 보장하므로, 리터럴을 훑는
+  //    테스트는 "화면이 .map 에서 죽는다"는 위험을 재지 못한다. 재는 것은 이 계약이다:
+  //    **고를 수 있는 어떤 모델로 물어도 배열이 나온다.**)
+  it("고를 수 있는 모든 모델이 배열을 돌려준다 — 화면이 .map 에서 안 죽는다", () => {
+    for (const id of [...I2V_MODEL_IDS, "없는모델", undefined]) {
+      expect(Array.isArray(resolutionsForModel(id)), `${id} 가 배열이 아니다`).toBe(true);
+      expect(Array.isArray(resolutionsForProject({ settings: { i2v_model: id } }))).toBe(true);
     }
+    // 폴백 프로필(LTX)도 마찬가지다 — 모르는 엔드포인트가 여기로 떨어진다
+    expect(Array.isArray(DEFAULT_CLIP_PROFILE.resolutions)).toBe(true);
   });
 });
