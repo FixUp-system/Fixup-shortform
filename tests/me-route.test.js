@@ -19,7 +19,7 @@ describe("GET /api/me", () => {
     await memoryStore.insertProfile({ id: A, email: "jaechan@fix-up.kr", status: "approved", role: "user" });
   });
 
-  it("이메일·이름·가입일·잔액·영상 수를 한 번에 준다", async () => {
+  it("이메일·이름·가입일·잔액을 한 번에 준다", async () => {
     await memoryStore.updateProfile(A, { display_name: "윤재찬" });
     await memoryStore.insertProject({ id: "p1", created_ts: 1, status: "draft" }, A);
     const res = await GET(req(A), {});
@@ -28,7 +28,9 @@ describe("GET /api/me", () => {
     expect(body.email).toBe("jaechan@fix-up.kr");
     expect(body.name).toBe("윤재찬");
     expect(body.balance).toBe(85.18);
-    expect(body.projectCount).toBe(1);
+    // ★ 영상 수는 안 센다 — 그 줄이 마이페이지에서 빠졌다(보관함이 따로 있다).
+    // 화면이 안 쓰는 값을 위해 요청마다 count 쿼리를 한 번 더 날릴 이유가 없다.
+    expect(body.projectCount).toBeUndefined();
     expect(typeof body.created_at).toBe("string");
     expect(typeof body.gated).toBe("boolean");
   });

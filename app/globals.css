@@ -372,6 +372,23 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
 @media (hover: none) {
   .card-del { opacity: 1; }
 }
+
+/* 고르는 동안의 카드 — 고른 것만 테두리로 말한다(색은 쓰지 않는다, 디자인 시스템 규칙) */
+.project-card.picking { cursor: pointer; }
+.project-card.picked { outline: 2px solid var(--ink); outline-offset: 2px; }
+/* 체크 자리는 고르든 안 고르든 **늘 같은 폭**이라야 제목이 좌우로 안 흔들린다 */
+.card-pick {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  font-size: 12px;
+}
+.project-card.picked .card-pick { background: var(--btn); border-color: var(--btn); color: var(--btn-ink); }
 @media (prefers-reduced-motion: reduce) {
   .card-del { transition: none; }
 }

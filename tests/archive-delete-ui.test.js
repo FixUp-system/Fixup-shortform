@@ -25,3 +25,33 @@ describe("보관함 — 지우기", () => {
     expect(cards).toMatch(/onDeleted|setProjects|filter\(/);
   });
 });
+
+// 하나씩 지우면 스무 편을 치우는 데 스무 번을 묻는다. 정리는 몰아서 하는 일이다.
+// (2026-08-13 사용자 요청: 보관함 머리에 [수정] — 체크해서 한 번에 지우기)
+describe("보관함 — 골라서 한 번에 지우기", () => {
+  const archive = readFileSync("app/archive/page.js", "utf8");
+
+  it("머리에 수정 모드로 드는 자리가 있다", () => {
+    expect(archive).toMatch(/수정/);
+    expect(archive).toMatch(/selecting|editing/);
+  });
+
+  it("고른 것을 쥐고 있다", () => {
+    expect(archive).toMatch(/selected/);
+  });
+
+  // 카드가 <Link> 라 수정 모드에서 눌렀을 때 프로젝트로 들어가 버리면 고를 수가 없다.
+  it("수정 모드에서는 카드를 눌러 고른다 — 이동하지 않는다", () => {
+    expect(cards).toMatch(/selectable|selecting/);
+    expect(cards).toMatch(/preventDefault\(\)/);
+  });
+
+  it("한 번 묻고 고른 것을 다 지운다", () => {
+    expect(archive).toMatch(/confirm\(/);
+    expect(archive).toMatch(/method:\s*["']DELETE["']/);
+  });
+
+  it("아무것도 안 골랐으면 지울 수 없다", () => {
+    expect(archive).toMatch(/disabled=\{[^}]*(size|length)[^}]*\}/);
+  });
+});

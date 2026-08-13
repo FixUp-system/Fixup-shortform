@@ -1,11 +1,11 @@
 "use client";
 
-// 마이페이지 — 이용자가 스스로 고칠 수 있는 것만 둔다(이름·비밀번호).
+// 마이페이지 — 이용자가 스스로 고칠 수 있는 것과 자기 크레딧만 둔다.
 //
-// 보관함은 흡수하지 않는다. listProjects(ownerId) 가 이미 소유자를 필수 인자로 요구해
-// 회원별로 갈려 있다 — 잘 도는 화면을 옮기면 회귀 위험만 생긴다. 링크로만 잇는다.
+// 보관함은 흡수하지 않는다(목록을 여기 그리지 않는다). 링크조차 두지 않는 이유는
+// **사이드바에 늘 있기 때문**이다 — "내 영상 25편 · 보관함 열기" 줄은 같은 말을 한 번 더
+// 하는 자리였다(2026-08-13 사용자 결정).
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { NAME_MAX } from "../../lib/display-name";
 // 말·부호 규칙은 lib 하나가 쥔다 — 화면이 다시 적으면 언젠가 한쪽이 뒤집힌다
@@ -66,6 +66,8 @@ export default function MePage() {
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
   const [pwMsg, setPwMsg] = useState("");
+  // 비밀번호 칸은 접어 둔다 — 누른 사람에게만 편다.
+  const [showPw, setShowPw] = useState(false);
 
   // 1.5초 뒤 로그인 화면으로 보내는 타이머. 그 사이에 사장님이 화면을 떠나면
   // 이미 사라진 화면이 이동을 시킨다 — 언마운트 때 반드시 끈다.
@@ -240,7 +242,17 @@ export default function MePage() {
       </section>
 
       <section className="panel me-panel">
-        <h2 className="me-h">비밀번호 변경</h2>
+        <h2 className="me-h">비밀번호</h2>
+        {/* ★ 평소에는 한 줄이다. 입력칸 셋을 늘 펼쳐 두면 바꿀 생각이 없는 사람에게도
+            화면의 절반이 비밀번호가 된다 — 대부분의 서비스가 접어 두는 이유다.
+            (2026-08-13 사용자 결정) */}
+        {!showPw ? (
+          <div className="me-row">
+            <span className="me-value">로그인할 때 쓰는 비밀번호예요.</span>
+            <button className="mini" onClick={() => setShowPw(true)}>변경</button>
+          </div>
+        ) : (
+        <>
         <p className="pgsub">
           지금 쓰는 비밀번호를 함께 넣어 주세요 — 자리를 비운 사이 다른 사람이 바꾸지 못하게 합니다.
           바꾸면 <b>모든 기기에서 로그아웃</b>되니 다시 로그인해 주세요.
@@ -263,18 +275,23 @@ export default function MePage() {
             <label className="me-label" htmlFor="me-pw-confirm">새 비밀번호 확인</label>
             <input id="me-pw-confirm" className="sent-input" type="password" autoComplete="new-password"
               value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+            {/* 접는 것은 지우는 것이다 — 쓰다 만 값을 남겨 두면 다음에 펼쳤을 때
+                남의 눈에 띈 화면에 그대로 있다. */}
+            <button
+              type="button"
+              className="mini"
+              onClick={() => { setShowPw(false); setCurrent(""); setNext(""); setConfirm(""); setPwMsg(""); }}
+            >
+              취소
+            </button>
             <button className="cta" disabled={busy === "pw"}>바꾸기</button>
           </div>
         </form>
+        </>
+        )}
         {pwMsg && <p className="pgsub">{pwMsg}</p>}
       </section>
 
-      <section className="panel me-panel">
-        <div className="me-row">
-          <span className="me-value">내 영상 {me ? me.projectCount : "…"}편</span>
-          <Link href="/archive" className="back-link">보관함 열기</Link>
-        </div>
-      </section>
     </>
   );
 }
