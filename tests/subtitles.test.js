@@ -733,3 +733,43 @@ describe("줄바꿈이 크기 배율을 안다", () => {
       .toBe(cut[0].sentence.replace(/\s+/g, ""));
   });
 });
+
+describe("테두리는 글자를 따라간다 — 어떤 배경에서도 읽히게", () => {
+  const HD = { width: 1080, height: 1920 };
+  // ASS 의 Style 줄에서 Outline·Shadow 를 읽는다(Format 의 9·10번째 값이다).
+  const rim = (subtitle) => {
+    const line = toAss([{ start: 0, end: 1, text: "가" }], { ...HD, subtitle })
+      .split(/\r?\n/).find((l) => l.startsWith("Style: Main,"));
+    const f = line.slice("Style: ".length).split(",");
+    return { outline: Number(f[8]), shadow: Number(f[9]) };
+  };
+
+  it("기본 폰트·기본 크기는 오늘과 같다 — 옛 완성본이 안 바뀐다", () => {
+    expect(rim(DEFAULT_SUBTITLE).outline).toBe(3);
+  });
+
+  it("글자가 커지면 테두리도 커진다 — 상수면 큰 글씨에서 테두리 몫이 얇아진다", () => {
+    const small = rim({ ...DEFAULT_SUBTITLE, size: SIZE_MIN }).outline;
+    const big = rim({ ...DEFAULT_SUBTITLE, size: SIZE_MAX }).outline;
+    expect(big).toBeGreaterThan(small);
+  });
+
+  it("가는 폰트가 굵은 폰트보다 두꺼운 테두리를 받는다", () => {
+    // 같은 크기에서 Gowun Dodum(부드럽게)은 획이 가늘어 밝은 배경에 묻힌다.
+    // Black Han Sans(강조)는 획 자체가 두꺼워 같은 테두리면 과하다.
+    const soft = rim({ ...DEFAULT_SUBTITLE, font: "soft" }).outline;
+    const impact = rim({ ...DEFAULT_SUBTITLE, font: "impact" }).outline;
+    expect(soft).toBeGreaterThan(impact);
+  });
+
+  it("그림자가 붙는다 — 밝은 배경에서 흰 글자를 떼어 놓는다", () => {
+    expect(rim(DEFAULT_SUBTITLE).shadow).toBeGreaterThan(0);
+  });
+
+  it("설정을 안 주는 옛 경로는 손대지 않는다", () => {
+    const line = toAss([{ start: 0, end: 1, text: "가" }], HD)
+      .split(/\r?\n/).find((l) => l.startsWith("Style: Main,"));
+    const f = line.slice("Style: ".length).split(",");
+    expect([Number(f[8]), Number(f[9])]).toEqual([3, 0]);
+  });
+});
