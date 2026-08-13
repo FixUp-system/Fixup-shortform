@@ -114,14 +114,16 @@ describe("영상 모델은 만들 때 한 번 고른다", () => {
     expect(create, "모델 이름을 화면에 박았다").not.toMatch(/Seedance|Kling/);
   });
 
-  it("②대본은 읽기 전용이다 — 고르는 버튼이 없다", () => {
+  // ★ 뒤 단계는 모델을 **말하지도 않는다**(2026-08-13). 자료 화면에서 이미 골랐고,
+  // 사장님에게 "Seedance 2.0" 이라는 이름은 아무 뜻이 없다 — 할 일 없는 줄을 지웠다.
+  it("②대본은 모델을 말하지 않는다", () => {
     expect(script).not.toMatch(/saveModel/);
-    // 무엇으로 만드는지는 말해 준다(표에서 이름을 가져오므로 I2V_MODELS 는 남는다)
-    expect(script).toMatch(/I2V_MODELS/);
+    expect(script).not.toMatch(/I2V_MODELS/);
   });
 
-  it("⑤영상도 읽기 전용이다 — 고르는 버튼이 없다", () => {
+  it("⑤영상도 모델을 말하지 않는다", () => {
     expect(video).not.toMatch(/saveModel/);
     expect(video).not.toMatch(/i2v_model/);
+    expect(video).not.toMatch(/I2V_MODELS/);
   });
 });

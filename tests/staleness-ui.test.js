@@ -316,24 +316,31 @@ describe("②대본에서 이야기 더 들려주기를 뺐다", () => {
 
 // 사장님이 로컬에서 눈으로 확인할 자리 — 뽑힌 연출과 컷마다의 속도가 화면에 보여야 한다.
 // 값이 코드 안에만 있으면 잘 됐는지 알 방법이 없다.
-describe("②대본이 연출 바람과 속도를 보여준다", () => {
+// ★ 연출 바람·초점은 **화면에서 걷어냈다**(2026-08-13 사용자 결정). "로우 앵글 트래킹",
+// "역광 실루엣" 같은 촬영 용어는 사장님이 읽어야 할 말이 아니고, 둘 다 읽기만 하는
+// 자리라 할 일이 없었다. 값은 그대로 흐른다 — 브리핑이 자료에서 뽑고(briefing.test.js)
+// 화면 설계가 지문으로 받는다(cuts.test.js 의 "화면 설계가 연출 바람을 받는다").
+describe("②대본은 촬영 용어를 보여주지 않는다", () => {
   const src = read("app/create/[id]/script/page.js");
 
-  it("브리핑이 뽑은 연출 바람을 보여준다", () => {
-    expect(src).toContain("briefing?.direction");
+  it("연출 바람을 화면에 그리지 않는다", () => {
+    expect(src).not.toContain("briefing?.direction");
+  });
+
+  it("초점(물건·사람·장소)을 화면에 그리지 않는다", () => {
+    expect(src).not.toContain("focus.mode");
+    expect(src).not.toContain("따라가는 것");
+  });
+
+  // 그림의 재료라 고칠 길은 남긴다 — 다만 접어 두고, 펴야 보인다.
+  it("화면·움직임은 접어 두되 고칠 수 있다", () => {
+    expect(src).toMatch(/showShots/);
+    expect(src).toMatch(/saveCut\(c\.idx,\s*\{\s*shows:/);
+    expect(src).toMatch(/saveCut\(c\.idx,\s*\{\s*motion:/);
   });
 
   it("컷마다 속도를 보여주고 고칠 수 있다", () => {
     expect(src).toMatch(/from ["'][./]*lib\/speeds["']/);
     expect(src).toMatch(/saveCut\(c\.idx,\s*\{\s*speed:/);
-  });
-});
-
-// 연출은 "연출 — 어느 순간" 쌍을 줄바꿈으로 잇는다. HTML 이 줄바꿈을 접으면 쌍 경계가 사라진다.
-describe("연출 여러 줄이 화면에서 접히지 않는다", () => {
-  it("줄바꿈을 살리는 클래스를 쓴다", () => {
-    expect(read("app/create/[id]/script/page.js")).toContain("direction-lines");
-    const css = read("app/globals.css");
-    expect(css).toMatch(/\.direction-lines\s*\{[^}]*white-space:\s*pre-line/);
   });
 });

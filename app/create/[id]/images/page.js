@@ -148,20 +148,17 @@ export default function ImagesStepPage() {
   const madeAny = cuts.some((c) => c.image || c.source === "photo");
   // 구성이 없는 영상에서는 컷의 문장이 곧 그림을 만드는 글이다(lib/cuts.js buildImagePrompt).
   // 구성이 있으면 그림의 바탕은 장면 설명이지만, 그때도 문장은 어떤 그림을 고를지에 쓰인다(lib/vlm.js).
-  const hasSynopsis = !!project.synopsis;
 
   return (
     <div className="images-layout">
       <section className="panel images-col">
         <h2>{cuts.length === 0 ? "대본을 먼저 만들어 주세요"
           : generating ? "컷별 이미지를 만들고 있어요"
-          : !madeAny ? <>컷마다 그림을 그립니다 <span className="badge vlm">이미지</span></>
-          : <>컷별 이미지를 확인해 주세요 <span className="badge vlm">승인 게이트</span></>}</h2>
+          : !madeAny ? "컷마다 그림을 그립니다"
+          : "컷별 이미지를 확인해 주세요"}</h2>
         {cuts.length > 0 && (
           <p className="pgsub">
-            {hasSynopsis
-              ? "이미지를 클릭하면 오른쪽에서 크게 보고 고칠 수 있어요 · 아래 문장은 읽어 줄 말이에요 — 그림을 만드는 바탕은 컷마다 적어 둔 장면 설명이라, 그림을 바꾸려면 오른쪽에 수정 지시를 적어 주세요"
-              : "이미지를 클릭하면 오른쪽에서 크게 보고 고칠 수 있어요 · 아래 문장은 읽어 줄 말이면서, 이 영상에서는 그림을 만드는 글이기도 해요 — 문장을 고친 뒤 다시 만들면 그림도 달라져요"}
+            그림을 누르면 크게 보고 고칠 수 있어요
           </p>
         )}
         {shownErr && (
@@ -190,11 +187,12 @@ export default function ImagesStepPage() {
                     if (sentence && sentence !== c.sentence) editSentence(c.idx, sentence);
                   }}>{c.sentence}</span>”
                 <div className="badges">
-                  <span className={`badge ${c.source === "photo" ? "photo" : "ai"}`}>
-                    {c.source === "photo" ? `내 사진 · ${photo?.filename || ""}` : "AI 생성"}
-                  </span>
-                  {(c.ref_ids?.length || c.ref_photo_id) && <span className="badge vlm">레퍼런스 적용</span>}
-                  {c.vlm?.note && <span className="badge ai">{c.vlm.note.slice(0, 30)}</span>}
+                  {/* ★ "AI 생성"·"레퍼런스 적용"·품질 판정은 걷어냈다(2026-08-13) — 전부 내부
+                      상태라 사장님이 보고 할 일이 없다. 내 사진으로 만든 컷만 남긴다:
+                      그건 사장님이 준 것이라 구별할 이유가 있다. */}
+                  {c.source === "photo" && (
+                    <span className="badge photo">내 사진 · {photo?.filename || ""}</span>
+                  )}
                   <span className="badge ai">{c.seconds}초</span>
                   {isImageStale(c, project) && (
                     <span className="badge warn">
@@ -229,7 +227,7 @@ export default function ImagesStepPage() {
                   <span className="hint">
                     {staleCount > 0
                       ? `고친 화면 ${staleCount}개를 다시 그려 주세요`
-                      : "이미지가 곧 각 컷의 시작 프레임이 됩니다"}
+                      : "이 그림에서 영상이 시작돼요"}
                   </span>
                   <button
                     className="cta"
@@ -252,7 +250,6 @@ export default function ImagesStepPage() {
           url={imgUrl(activeCut)}
           photoName={project.material.photos.find((p) => p.id === activeCut.photo_id)?.filename}
           aspect={project.settings?.aspect_ratio || "9:16"}
-          hasSynopsis={hasSynopsis}
           stalled={stalled}
           onRegen={regen}
         />
@@ -275,7 +272,7 @@ function frameStyle(aspect) {
 
 // 우측 큰 미리보기 + 컷별 수정. instruction 입력은 컷마다 초기화돼야 하므로
 // 부모가 key={cut.idx}로 이 컴포넌트를 갈아끼운다(로컬 state가 자연히 리셋됨).
-function PreviewPane({ cut, url, photoName, aspect, hasSynopsis, stalled, onRegen }) {
+function PreviewPane({ cut, url, photoName, aspect, stalled, onRegen }) {
   const [instr, setInstr] = useState("");
   const isPhoto = cut.source === "photo";
   const busyCut = !stalled && cut.state === "generating";
@@ -292,8 +289,7 @@ function PreviewPane({ cut, url, photoName, aspect, hasSynopsis, stalled, onRege
         {url ? <img src={url} alt="" /> : <span className="ph">{placeholder(cut.state)}</span>}
       </div>
       <div className="badges mt-md">
-        <span className={`badge ${isPhoto ? "photo" : "ai"}`}>{isPhoto ? `내 사진 · ${photoName || ""}` : "AI 생성"}</span>
-        {(cut.ref_ids?.length || cut.ref_photo_id) && <span className="badge vlm">레퍼런스 적용</span>}
+        {isPhoto && <span className="badge photo">내 사진 · {photoName || ""}</span>}
         <span className="badge ai">{cut.seconds}초</span>
       </div>
       <p className="preview-sentence">“{cut.sentence}”</p>
@@ -302,11 +298,8 @@ function PreviewPane({ cut, url, photoName, aspect, hasSynopsis, stalled, onRege
         <p className="preview-note">내가 올린 사진이라 그대로 쓰여요.</p>
       ) : (
         <div className="preview-edit">
-          <p className="preview-note">
-            {hasSynopsis
-              ? "그림을 바꾸려면 여기에 적어주세요 — 위 문장은 읽어 줄 말이고, 그림을 만드는 바탕은 이 컷에 적어 둔 장면 설명이에요. 문장을 고친 뒤 다시 만들면 고르는 그림이 달라질 수 있어요."
-              : "그림을 바꾸려면 여기에 적어주세요 — 위 문장은 읽어 줄 말이면서 그림을 만드는 글이기도 해서, 문장을 고친 뒤 다시 만들면 그림도 달라져요."}
-          </p>
+          {/* ★ 안내를 지웠다(2026-08-13) — 아래 입력칸이 예시까지 들고 같은 말을 한다.
+              "문장이 그림의 재료"라는 뒷단 설명은 사장님이 알아야 할 일이 아니다. */}
           {cut.edit_instruction && <p className="preview-note">지난 수정 지시: {cut.edit_instruction}</p>}
           <textarea
             className="ref"
@@ -329,8 +322,8 @@ function PreviewPane({ cut, url, photoName, aspect, hasSynopsis, stalled, onRege
           </div>
           <span className="regen-note mono">
             {atLimit
-              ? `재생성 상한 도달 (${MAX_REGEN_PER_CUT}/${MAX_REGEN_PER_CUT})`
-              : `재생성 ${cut.regen_count}/${MAX_REGEN_PER_CUT}`}
+              ? `더는 다시 만들 수 없어요 (${MAX_REGEN_PER_CUT}/${MAX_REGEN_PER_CUT})`
+              : `다시 만듦 ${cut.regen_count}/${MAX_REGEN_PER_CUT}`}
           </span>
         </div>
       )}

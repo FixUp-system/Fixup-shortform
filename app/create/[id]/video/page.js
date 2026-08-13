@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 import BackButton from "../../../../components/BackButton";
-import { I2V_MAX_SECONDS, I2V_MODELS, modelIdForProject, projectSpeaks } from "../../../../lib/clip-limits";
+import { I2V_MAX_SECONDS, modelIdForProject, projectSpeaks } from "../../../../lib/clip-limits";
 import { isClipStale } from "../../../../lib/steps";
 // 상한과 값은 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다).
 import { MAX_REGEN_PER_CUT, priceLabel, regenPrice } from "../../../../lib/pricing";
@@ -98,8 +98,6 @@ export default function VideoStepPage() {
 
   const cuts = project?.cuts || [];
   const chosenModel = modelIdForProject(project);
-  // label·hint 는 화면이 적지 않는다 — lib/clip-limits.js 의 표에서 그대로 온다
-  const chosenModelInfo = I2V_MODELS.find((m) => m.id === chosenModel);
   // 활성 모델의 클립 상한. 서버가 실어 보낸다 — 없으면(옛 응답) 기본 프로필 값으로 떨어진다
   const clipMax = project?.clip_limits?.max ?? I2V_MAX_SECONDS;
   // 남은 컷 = 클립이 없거나 낡은 컷. runVideoPipeline 의 건너뛰기 조건의 정확한 반대다.
@@ -126,7 +124,7 @@ export default function VideoStepPage() {
       <p className="pgsub">
         {doneCount > 0
           ? `${doneCount}/${cuts.length}개 컷을 만들었어요`
-          : "이미지가 각 컷의 시작 프레임이 되고, 읽은 길이만큼 움직여요."}
+          : "그림이 움직이기 시작해요 — 읽은 길이만큼."}
         {truncatedCount > 0 && ` · ${truncatedCount}개 컷은 ${clipMax}초까지만 움직여요`}
       </p>
 
@@ -207,12 +205,6 @@ export default function VideoStepPage() {
         </div>
       </div>
 
-      {/* ★ 여기서는 읽기만 한다 — 고르는 자리는 ②대본이다.
-          모델이 정가를 정하는데(길이 × 모델) 정가는 ③목소리·④이미지에서 이미 걷힌다.
-          그래서 이 화면에 도착한 사장님은 예외 없이 결제를 마친 상태이고, 여기서 바꾸면
-          낸 값과 만드는 값이 어긋난다(차액 청구는 만들지 않았다). */}
-      <div className="eyebrow mt-lg">영상 모델</div>
-      <p className="pgsub">이 영상은 {chosenModelInfo?.label} 으로 만들어요.</p>
 
       <div className="step-actions">
         <BackButton stepKey="video" />

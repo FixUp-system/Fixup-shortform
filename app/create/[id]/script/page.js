@@ -8,7 +8,7 @@ import { useProject } from "../../../../components/ProjectContext";
 import BackButton from "../../../../components/BackButton";
 import { estimateSeconds } from "../../../../lib/script";
 import { areCutsStale } from "../../../../lib/steps";
-import { I2V_MAX_SECONDS, I2V_MODELS, modelIdForProject } from "../../../../lib/clip-limits";
+import { I2V_MAX_SECONDS } from "../../../../lib/clip-limits";
 import { videoPrice } from "../../../../lib/pricing";
 import { SPEEDS, DEFAULT_SPEED_ID } from "../../../../lib/speeds";
 
@@ -19,6 +19,10 @@ export default function ScriptStepPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [instruction, setInstruction] = useState("");
+  // ★ 화면·움직임은 **기본으로 접어 둔다**(2026-08-13 사용자 결정). 그림을 만드는 재료라
+  // 고칠 수 있어야 하지만, 사장님이 매번 읽어야 하는 말은 아니다 — 촬영 용어라 대개는
+  // 무슨 뜻인지도 모른다. 그림이 이상하게 나왔을 때만 펴서 고치면 된다.
+  const [showShots, setShowShots] = useState(false);
   const [draft, setDraft] = useState(null); // 손으로 고치는 중인 원고(저장 전)
   // 자동 생성이 한 번만 돌게 막는다 — busy는 비동기라 effect가 두 번 불리면 과금이 두 배가 된다.
   const textRef = useRef(null);
@@ -38,10 +42,6 @@ export default function ScriptStepPage() {
   // 서버 원고가 바뀌면 편집 중인 초안을 버린다(재생성 결과가 화면에 보이게)
   useEffect(() => { setDraft(null); }, [project?.script?.version]);
 
-  // ★ 영상 모델은 **만들 때 한 번** 고른다(자료 화면). 여기서는 무엇으로 만드는지만 말한다 —
-  // 모델이 정가를 정하는데(길이 × 모델) 그 정가는 ③목소리·④이미지에서 걷히므로, 뒤에서
-  // 바꾸면 낸 값과 만드는 값이 어긋난다. 서버도 PATCH 를 400 으로 막는다.
-  const chosenModel = modelIdForProject(project);
 
 
   // 글이 늘면 칸이 아래로 밀린다 — 자료 넣는 화면과 같은 방식이다(안에서 스크롤하지 않는다).
@@ -125,24 +125,6 @@ export default function ScriptStepPage() {
 
   // 초점을 고치면 구성을 다시 만든다 — 라우트가 컷을 비우므로 이어서 부르면 새로 나뉜다.
   // 분할·화면 설계·캐스팅은 OpenAI 만 써서 fal 값이 들지 않는다.
-  async function saveFocus(subject) {
-    // busy 로 잠근다 — 저장하는 동안 컷이 비어 있어, 그 틈에 승인을 누르면 분할이 한 번 더 돈다.
-    // 이 저장소가 같은 자리에서 이미 값을 치렀다(표시가 없어 두 번 눌렸다).
-    if (busy) return;
-    setBusy(true); setErr("");
-    try {
-      const focus = { ...project.briefing.focus, subject };
-      const res = await fetch(`/api/projects/${id}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ briefing: { focus } }),
-      }).catch(() => null);
-      if (!res || !res.ok) { setErr("고친 것을 저장하지 못했어요 — 다시 시도해 주세요"); return; }
-      await load(id).catch(() => {});
-      await splitCuts();
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function genScript(instr) {
     setBusy(true); setErr("");
@@ -231,7 +213,7 @@ export default function ScriptStepPage() {
 
   return (
     <section className="panel panel--narrow">
-      <h2>대본을 확인해 주세요 <span className="badge vlm">승인 게이트</span></h2>
+      <h2>대본을 확인해 주세요</h2>
       {err && <p className="pgsub warn">{err}</p>}
       {staleCuts && (
         <p className="pgsub warn">
@@ -255,9 +237,6 @@ export default function ScriptStepPage() {
         이대로 읽으면 약 {estimateSeconds({ text: shown })}초 · 글을 고치면 그대로 저장돼요
         {draft !== null && draft !== text && " (저장하려면 글 밖을 한 번 클릭하세요)"}
       </div>
-      <div className="script-src">
-        컷은 이 원고를 잘라서 만들어요 — 여기서 승인한 문장이 그대로 화면에 실립니다
-      </div>
       {madeCuts && (
         <div className="script-src warn">
           이미 만들어 둔 이미지가 있어요 — 대본을 다시 쓰면 컷을 처음부터 다시 만들게 되고, 그 이미지는 지워져요
@@ -273,40 +252,19 @@ export default function ScriptStepPage() {
         </button>
       </div>
 
-      {/* 초점 — 이 영상이 무엇을 따라가는지. 여기서 고치면 구성을 다시 만든다.
-          그림과 클립이 이것을 기준으로 나오므로, 만들기 전에 고쳐야 값이 안 든다. */}
-      {project.briefing?.focus?.subject && (
-        <>
-          <div className="eyebrow mt-lg">
-            이 영상이 따라가는 것 <small>고치면 구성을 다시 만들어요</small>
-          </div>
-          <p className="pgsub">
-            <b>{project.briefing.focus.mode}</b>{" — "}
-            <span contentEditable suppressContentEditableWarning
-              onBlur={(e) => {
-                const v = e.currentTarget.textContent.trim();
-                if (v && v !== project.briefing.focus.subject) saveFocus(v);
-              }}>{project.briefing.focus.subject}</span>
-          </p>
-        </>
-      )}
-
+      {/* ★ 초점(물건·사람·장소)과 연출 바람은 **화면에서 걷어냈다**(2026-08-13 사용자 결정).
+          사장님은 영상 제작 용어를 모르고, 둘 다 읽기만 하는 자리라 할 일이 없었다.
+          뒷단은 그대로다 — 브리핑이 자료에서 뽑고(lib/briefing), 컷·화면 설계가 그것을
+          지문으로 받는다(lib/cuts). 보여 주지 않을 뿐 결과물에는 계속 실린다. */}
       {/* 구성 — 원고를 컷으로 나누고 컷마다 무엇을 보여줄지·어떻게 움직일지 정한 것.
           승인 앞에 두는 이유: 그림과 클립이 여기서 나오므로, 만들기 전에 고쳐야 값이 안 든다. */}
-      {/* 브리핑이 자료에서 뽑은 연출 바람 — 화면 설계가 이것을 보고 만든다.
-          읽기 전용이다: 고치려면 자료를 고친다(브리핑이 다시 뽑는다). 여기서 고치게 하면
-          자료와 어긋난 값이 남고, 다음 정리에서 조용히 덮인다. */}
-      {project.briefing?.direction && (
-        <>
-          <div className="eyebrow mt-lg">
-            연출 <small>자료에서 이렇게 읽었어요 — 화면이 이걸 따라갑니다</small>
-          </div>
-          <p className="script-src direction-lines">{project.briefing.direction}</p>
-        </>
-      )}
-
       <div className="eyebrow mt-lg">
-        구성 <small>문장·화면·움직임을 눌러서 고칠 수 있어요</small>
+        구성 <small>문장을 눌러서 고칠 수 있어요</small>
+        {cuts.length > 0 && (
+          <button className="mini eyebrow-btn" onClick={() => setShowShots((v) => !v)}>
+            {showShots ? "화면 설명 접기" : "화면 설명 보기"}
+          </button>
+        )}
       </div>
       {splitting ? (
         <p className="pgsub">원고를 컷으로 나누는 중이에요…</p>
@@ -333,6 +291,8 @@ export default function ScriptStepPage() {
                       if (v && v !== c.sentence) saveCut(c.idx, { sentence: v });
                     }}>{c.sentence}</span>”
                 </div>
+                {showShots && (
+                <>
                 <div className="plan-field">
                   <b>화면</b>
                   <span contentEditable suppressContentEditableWarning className="editable"
@@ -349,6 +309,8 @@ export default function ScriptStepPage() {
                       if (v && v !== c.motion) saveCut(c.idx, { motion: v });
                     }}>{c.motion || "거의 정지, 아주 느린 카메라 이동"}</span>
                 </div>
+                </>
+                )}
                 <div className="badges">
                   <span className="badge ai">{c.seconds}초</span>
                   {/* 속도 — 컷 사이 대비를 만드는 값. 화면 설계가 정하지만 여기서 고칠 수 있다.
@@ -370,13 +332,7 @@ export default function ScriptStepPage() {
           ))}
         </div>
       )}
-      <div className="eyebrow mt-lg">
-        영상 모델
-      </div>
-      <p className="pgsub">
-        이 영상은 {I2V_MODELS.find((m) => m.id === chosenModel)?.label} 으로 만들어요 —
-        만들 때 고른 값이라 바꿀 수 없어요.
-      </p>
+
 
       <div className="step-actions">
         <BackButton stepKey="script" />
