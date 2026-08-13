@@ -1123,3 +1123,50 @@ describe("buildImagePrompt — 톤·전환", () => {
     expect(p.indexOf("발 클로즈업, 같은 눈높이")).toBeLessThan(p.indexOf("그림자를 더 깊게"));
   });
 });
+
+describe("SHOWS_SYSTEM — 톤·전환 규칙", () => {
+  // 지문은 문자열이라 "무엇을 시켰는가"만 잴 수 있다. 그래도 잰다 — 규칙이 조용히 빠지는 것을 막는다.
+  const cuts = [{ idx: 0, sentence: "가." }, { idx: 1, sentence: "나." }];
+  const system = () => buildShowsMessages(project, cuts).system;
+
+  it("출력 형식에 tone 과 transition 이 있다", () => {
+    expect(system()).toContain('"tone"');
+    expect(system()).toContain('"transition"');
+  });
+
+  it("전환을 자기 완결적으로 쓰라고 시킨다", () => {
+    // 이 지시가 없으면 모델이 "앞 컷에서 이어진다"를 쓰고 코드가 통째로 버린다(usableTransition)
+    expect(system()).toContain("앞 컷");
+    expect(system()).toMatch(/구도로 번역|그 자체로 읽히게/);
+  });
+
+  it("첫 컷에는 전환이 없다고 알려 준다", () => {
+    expect(system()).toContain("첫 컷");
+  });
+
+  it("톤은 영상 하나에 하나다 — 컷마다 만들지 않게 한다", () => {
+    expect(system()).toMatch(/전 컷이 이 하나를 공유|영상 하나의/);
+  });
+
+  // ★ tone 과 environment 가 겹치면 이 설계의 약한 고리가 된다 —
+  //   장소·시간대·조명은 이미 environment 가 맡고 있고, 둘 다 전 컷에 복사된다.
+  it("톤과 무대의 경계를 긋는다", () => {
+    expect(system()).toMatch(/장소·시간대·조명은 environment/);
+  });
+
+  // 지문이 가르치는 ✓ 예시가 코드 문지기에 걸리면 지문이 스스로를 무효로 만든다.
+  it("지문의 ✓ 예시가 코드 문지기를 통과한다", () => {
+    const tone = "어두운 배경에 제품 색만 채도를 올린 시네마틱 광고 필름 질감";
+    const transition = "발 클로즈업, 아스팔트 위, 같은 눈높이";
+    expect(system()).toContain(tone);
+    expect(system()).toContain(transition);
+    expect(usableTone(tone)).toBe(tone);
+    expect(usableTransition(transition)).toBe(transition);
+  });
+
+  // 카메라 어휘가 든 톤·전환은 usableTone/usableTransition 이 통째로 버린다 —
+  // 지문이 먼저 막아야 버려지는 값이 준다
+  it("톤·전환에 카메라 움직임을 쓰지 말라고 한다", () => {
+    expect(system()).toMatch(/카메라 움직임|카메라 이동/);
+  });
+});
