@@ -317,7 +317,9 @@ describe("⑥완성 — 자막 조절판과 영상을 나란히", () => {
   it("둘을 한 줄에 세운다", () => {
     const at = css.indexOf(".done-stage {");
     expect(at, ".done-stage 규칙이 없다").toBeGreaterThan(-1);
-    expect(css.slice(at, css.indexOf("}", at))).toMatch(/display:\s*flex/);
+    // ★ 격자로 바뀌었다(2026-08-13) — 제목을 1행에 두고 상자·영상을 2행에 세워야
+    // 윗변이 맞기 때문이다. "한 줄에 세운다"는 계약은 그대로다.
+    expect(css.slice(at, css.indexOf("}", at))).toMatch(/display:\s*(flex|grid)/);
   });
 
   it("조절판이 영상보다 먼저 온다 — 왼쪽이다", () => {
@@ -332,5 +334,138 @@ describe("⑥완성 — 자막 조절판과 영상을 나란히", () => {
   // 좁은 화면에서까지 나란히 두면 둘 다 못 쓰게 좁아진다.
   it("좁아지면 위아래로 쌓는다", () => {
     expect(css).toMatch(/\.done-stage \{[\s\S]*?\}[\s\S]*?@media[^{]*\{[\s\S]*?\.done-stage[\s\S]*?column/);
+  });
+});
+
+// ★ 실측으로 잡은 넘침(2026-08-13) — 조절판 438 + 간격 24 + 영상 360 = 822 인데 카드
+// 안폭이 720 이라, 둘이 카드 밖으로 **양옆 31px 씩** 삐져나갔다. 폭을 카드에 맞추고,
+// 세로는 영상 높이에 맞춘다(사용자 요청).
+describe("⑥완성 — 조절판이 카드 안에 들어오고 영상과 키를 맞춘다", () => {
+  const css = readFileSync("app/globals.css", "utf8");
+
+  it("이름이 '수정'이다 — 무엇을 고치는지는 뒤의 설명이 말한다", () => {
+    expect(src, "'자막 꾸미기'가 남아 있다").not.toContain("자막 꾸미기");
+    expect(src).toMatch(/수정 <small>/);
+    // 설명까지 지우면 "수정"만 남아 무엇을 고치는 자리인지 알 수 없다
+    expect(src).toContain("끌어서 옮기고");
+    // ★ 값 이야기는 뺀다(사용자 요청) — 이 화면에는 값이 나가는 자리가 없어서
+    // "값이 들지 않아요"는 없는 걱정을 만든다.
+    expect(src, "값 이야기가 남아 있다").not.toMatch(/값이 들지 않아요/);
+  });
+
+  it("★ 조절판+간격+영상이 카드 안폭(720)을 안 넘는다", () => {
+    // 조절판 총폭 = 라벨 52 + 간격 14 + 컨트롤 열(--ctl-w) + 안쪽 여백 36
+    const at = css.indexOf(".sub-editor {");
+    expect(at).toBeGreaterThan(-1);
+    const rule = css.slice(at, css.indexOf("}", at));
+    const w = Number(/--ctl-w:\s*(\d+)px/.exec(rule)?.[1]);
+    expect(w, "--ctl-w 를 못 찾겠다").toBeGreaterThan(0);
+    const editorWidth = 52 + 14 + w + 36;
+    // 영상 360 + 무대 간격 24 를 더해도 카드 안폭 720 이하여야 한다
+    expect(editorWidth + 24 + 360, `조절판이 ${editorWidth}px 라 카드를 넘는다`).toBeLessThanOrEqual(720);
+  });
+
+  it("★ 세로는 영상에 안 맞춘다 — 조절판은 제 내용만큼만 차지한다", () => {
+    // 한때 영상 높이(640px)까지 늘렸다가 되돌렸다(2026-08-13 사용자 요청): 늘리면 네 줄
+    // 사이가 허옇게 벌어져 빽빽한 조절판이 아니라 빈 상자로 보인다.
+    const at = css.indexOf(".done-stage {");
+    const rule = css.slice(at, css.indexOf("}", at));
+    expect(rule, "무대가 세로로 늘리고 있다(stretch)").not.toMatch(/align-items:\s*stretch/);
+    // 격자에서는 start 가 flex-start 자리다
+    expect(rule).toMatch(/align-items:\s*(flex-)?start/);
+    // 상자에 높이를 물리면 같은 일이 다시 벌어진다
+    expect(css, "subpanel 에 height:100% 가 남아 있다").not.toMatch(/\.done-stage \.subpanel \{[^}]*height:\s*100%/);
+  });
+});
+
+// ★ [기본으로]와 [영상에 적용]은 **같은 크기**여야 한다(사용자 요청). 라벨 길이가
+// 상황마다 달라(적용됨 / 영상에 적용 / 영상에 반영하는 중…) 글자 수에 폭을 맡기면
+// 버튼이 커졌다 작아졌다 한다 — 줄을 반씩 나눠 갖게 해서 폭을 라벨과 떼어 놓는다.
+describe("⑥완성 — 조절판의 두 버튼은 같은 크기다", () => {
+  const css = readFileSync("app/globals.css", "utf8");
+  const at = css.indexOf(".sub-row--actions .mini");
+  const rule = at > -1 ? css.slice(at, css.indexOf("}", at)) : "";
+
+  it("둘이 줄을 반씩 나눠 갖는다 — 폭이 라벨 길이를 안 탄다", () => {
+    expect(at, ".sub-row--actions .mini 규칙이 없다").toBeGreaterThan(-1);
+    expect(rule, "flex 로 나눠 갖지 않는다").toMatch(/flex:\s*1/);
+  });
+
+  it("높이도 같다 — 두 버튼의 기본 치수가 서로 다르다(.mini 28px vs .confirm-btn 36px)", () => {
+    expect(rule).toMatch(/height:\s*var\(--ctl-h\)/);
+    expect(rule).toMatch(/font-size:\s*14px/);
+  });
+
+  it("★ 가장 긴 라벨이 들어간다 — 좁아진 폭(약 145px)에 '영상에 반영하는 중…'이 들어가야 한다", () => {
+    // 글자 112px + 좌우 여백. 18px 씩이면 148px 이 필요해 넘친다 — 12px 로 줄인다.
+    const pad = Number(/padding:\s*0\s+(\d+)px/.exec(rule)?.[1]);
+    expect(pad, "좌우 여백을 못 찾겠다").toBeGreaterThan(0);
+    expect(112 + pad * 2, `여백 ${pad}px 이면 가장 긴 라벨이 넘친다`).toBeLessThanOrEqual(144);
+  });
+});
+
+// ★ ⑥완성 머리 문구를 뺀다(사용자 요청). "완성했어요 — 약 11초."는 바로 아래 재생되는
+// 영상이 이미 말하는 것을 한 번 더 말하는 줄이었다.
+describe("⑥완성 — 군더더기 문구를 안 둔다", () => {
+  it("'완성했어요 — 약 N초' 줄이 없다", () => {
+    expect(src, "완성 문구가 남아 있다").not.toContain("완성했어요");
+  });
+
+  it("가짜 모드·실패 같은 **사장님이 모르면 곤란한** 안내는 그대로 남는다", () => {
+    expect(src).toContain("가짜 모드라 파일은 만들어지지 않았어요");
+    expect(src).toMatch(/자막이 들어가지 않아요/);
+  });
+});
+
+// ★ 영상과 조절판 상자의 **윗변을 맞춘다**(사용자 요청). 예전에는 "수정" 제목이 왼쪽 칸
+// 맨 위를 차지해, 회색 상자가 영상보다 31px 아래에서 시작했다. 숫자를 박아 밀지 않고
+// 무대를 격자로 만들어 제목을 제 줄(1행)에 두고, 상자와 영상을 같은 줄(2행)에 세운다.
+describe("⑥완성 — 영상과 조절판이 같은 높이에서 시작한다", () => {
+  const css = readFileSync("app/globals.css", "utf8");
+
+  it("제목이 무대의 직접 자식이다 — 조절판 안에 있으면 그만큼 상자가 밀린다", () => {
+    const stage = src.indexOf('className="done-stage"');
+    const eyebrow = src.indexOf("eyebrow", stage);
+    const editor = src.indexOf('className="sub-editor"', stage);
+    expect(eyebrow, "제목이 없다").toBeGreaterThan(-1);
+    expect(eyebrow, "제목이 조절판 안에 남아 있다").toBeLessThan(editor);
+  });
+
+  it("무대가 격자다 — 제목은 1행, 상자와 영상은 2행", () => {
+    const at = css.indexOf(".done-stage {");
+    const rule = css.slice(at, css.indexOf("}", at));
+    expect(rule).toMatch(/display:\s*grid/);
+    expect(css).toMatch(/\.done-stage \.sub-eyebrow \{[^}]*grid-(row|area)/);
+  });
+
+  it("좁아지면 여전히 한 줄로 쌓인다 — 나란히 두면 둘 다 못 쓰게 좁아진다", () => {
+    expect(css).toMatch(/@media[^{]*\{[\s\S]*?\.done-stage \{[^}]*grid-template-columns:\s*auto;/);
+  });
+});
+
+// ★ 영상 비율에 따라 미리보기와 테두리 카드가 함께 자란다(2026-08-13 사용자 승인).
+// 상자: 가로 560 · 세로 640. 9:16 은 360×640(=지금 그대로), 1:1·16:9 는 가로 560 이
+// 이겨 카드가 960 까지 넓어진다.
+describe("⑥완성 — 영상 비율에 카드가 따라온다", () => {
+  const css = readFileSync("app/globals.css", "utf8");
+
+  it("상자 치수(560×640)가 CSS 에 있고, 비율은 화면이 넘긴다", () => {
+    expect(css, "상자 규칙이 없다").toMatch(/\.done-stage \.done-preview \{[^}]*min\(560px/);
+    expect(css).toMatch(/640px \* var\(--ar/);
+    // 비율은 프로젝트에서 온다 — 화면이 --ar 을 실어 준다(값을 CSS 에 박으면 비율이 두 벌이 된다)
+    expect(src, "--ar 을 안 넘긴다").toMatch(/"--ar"/);
+  });
+
+  it("★ 카드가 내용에 맞춰 자란다 — 760 고정이 아니라 최대 960", () => {
+    expect(src, "완성 카드에 전용 클래스가 없다").toMatch(/panel--stage/);
+    const at = css.indexOf(".panel--stage");
+    expect(at, ".panel--stage 규칙이 없다").toBeGreaterThan(-1);
+    const rule = css.slice(at, css.indexOf("}", at));
+    expect(rule).toMatch(/width:\s*fit-content/);
+    expect(rule).toMatch(/max-width:\s*960px/);
+  });
+
+  it("★ panel--narrow 는 안 건드린다 — 대본·구성·브리핑이 같이 쓰는 폭이다", () => {
+    expect(css).toMatch(/\.panel--narrow \{ max-width: 760px; \}/);
   });
 });

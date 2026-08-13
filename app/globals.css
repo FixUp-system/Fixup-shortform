@@ -291,6 +291,10 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
 .step-actions .fwd { margin-left: auto; display: flex; align-items: center; gap: 14px; }
 .step-actions .hint { color: var(--ink-soft); font-size: 12px; line-height: 1.45; text-align: right; max-width: 360px; }
 .step-actions .cta { margin-top: 0; }
+/* 장면 목록의 머리줄([수정하기]) — .step-actions 의 오른쪽 정렬(.fwd)만 빌려 쓰고,
+   구분선과 넉넉한 위 여백은 걷어낸다. 저 둘은 "화면 아래쪽 실행줄"의 모양이라
+   목록 머리에 그대로 쓰면 시나리오 본문과 장면 목록 사이가 두 번 끊겨 보인다. */
+.step-actions.plan-head { margin-top: 14px; padding-top: 0; border-top: 0; }
 
 .side-new {
   display: block;
@@ -663,6 +667,10 @@ a.side-item { text-decoration: none; }
 }
 /* 읽기 좋은 폭 — 대본·구성·브리핑 패널이 공통으로 쓴다 */
 .panel--narrow { max-width: 760px; }
+/* ⑥완성 전용 폭 — 무대(조절판 336 + 간격 24 + 영상)가 정한다. 영상이 비율에 따라
+   360~560 이라 카드도 760~960 사이에서 같이 자란다. panel--narrow 뒤에 두어 그 760 을
+   덮는다(그 클래스 자체는 대본·구성·브리핑이 함께 써서 건드리면 안 된다). */
+.panel--stage { width: fit-content; max-width: 960px; }
 .panel--wide { max-width: 880px; }
 
 .eyebrow {
@@ -771,7 +779,12 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
    세로선이 어긋나 화면이 기울어 보인다. 치수 토큰도 여기 두고 안쪽이 물려받는다. */
 .sub-editor {
   --ctl-h: 38px;
-  --ctl-w: 336px;
+  /* ★ 234px 다(예전 336px). 조절판 총폭 = 52 + 14 + --ctl-w + 36 이라 336px 이면
+     조절판이 438px 이 되고, 영상 360 + 간격 24 를 더하면 822px — 카드 안폭 720px 을
+     넘어 **둘 다 카드 밖으로 31px 씩 삐져나갔다**(2026-08-13 실측). 234 면 총 336 이라
+     336 + 24 + 360 = 720 으로 정확히 맞는다. 영상 폭(.done-preview 의 360px)이 바뀌면
+     이 값도 같이 봐야 한다 — 둘의 합이 곧 무대의 폭이다. */
+  --ctl-w: 234px;
   max-width: calc(52px + 14px + var(--ctl-w) + 36px);
   margin: 0 auto;
 }
@@ -876,7 +889,12 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
    ★ 두 버튼의 치수를 여기서 통일한다. .mini 는 12px·28px, .mini.confirm-btn 은 14px·36px 라
    그대로 두면 나란히 선 두 버튼의 크기가 서로 다르다 — 격자를 마지막 줄에서 놓치는 자리다. */
 .sub-row--actions { display: flex; justify-content: flex-end; gap: 10px; }
-.sub-row--actions .mini { height: var(--ctl-h); padding: 0 18px; font-size: 14px; }
+/* ★ 둘이 줄을 **반씩 나눠 갖는다**(flex:1). 글자 수에 폭을 맡기면 [기본으로] 86px ·
+   [적용됨] 74px 처럼 크기가 서로 다르고, 같은 버튼이 라벨에 따라(적용됨 → 영상에 적용 →
+   영상에 반영하는 중…) 커졌다 작아졌다 한다(2026-08-13 사용자 요청·실측).
+   ★ 좌우 여백이 12px 인 이유: 반씩 나누면 한 칸이 약 145px 인데, 가장 긴 라벨
+   '영상에 반영하는 중…'이 글자만 112px 이다. 18px 씩이면 148px 이 필요해 넘친다. */
+.sub-row--actions .mini { flex: 1; min-width: 0; height: var(--ctl-h); padding: 0 12px; font-size: 14px; white-space: nowrap; }
 
 /* 키보드로 도는 사람에게 지금 어디인지 보여 준다 */
 .sub-select:focus-visible,
@@ -1120,18 +1138,42 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
    아래위로 두면 조절판을 만지는 동안 영상이 화면 밖으로 밀려, 고친 결과를 보려고
    매번 스크롤해야 했다(2026-08-13 사용자 요청). */
 .done-stage {
-  display: flex;
-  align-items: flex-start;
+  /* ★ 격자다(예전 flex). 제목("수정")이 조절판 안에 있으면 그 높이만큼 회색 상자가
+     아래로 밀려 영상 윗변과 31px 어긋났다 — 제목을 1행 왼쪽 칸에 두고 상자와 영상을
+     2행에 나란히 세우면 **숫자를 박지 않고** 윗변이 맞는다(2026-08-13 사용자 요청). */
+  display: grid;
+  grid-template-columns: auto auto;
+  /* ★ 조절판을 영상 높이(640px)까지 늘려 봤다가 **되돌렸다**(2026-08-13 사용자 요청).
+     늘리면 네 줄(위치·글꼴·색·크기) 사이가 허옇게 벌어져, 빽빽한 조절판이 아니라
+     빈 상자로 보인다. 조절판은 제 내용만큼만 차지하고 윗변만 영상과 맞춘다. */
+  align-items: start;
   justify-content: center;
-  gap: 24px;
+  gap: 0 24px;
   margin-top: 14px;
 }
-/* 무대 안에서는 둘 다 자기 여백을 버린다 — 줄의 윗변을 맞추는 것은 무대가 한다 */
-.done-stage .done-preview { margin: 0; flex: none; }
-.done-stage .sub-editor { margin: 0; flex: none; }
-/* 좁아지면 나란히 두는 것이 오히려 손해다 — 둘 다 못 쓰게 좁아진다 */
+/* 제목은 1행 왼쪽 칸에만 — 오른쪽 칸(영상)은 1행을 비워 두고 2행부터 시작한다.
+   그래서 회색 상자와 영상의 윗변이 같은 줄에서 만난다. */
+.done-stage .sub-eyebrow { grid-row: 1; grid-column: 1; margin: 0 0 10px; }
+.done-stage .sub-editor { grid-row: 2; grid-column: 1; margin: 0; }
+/* ★ 영상을 **가로 560 · 세로 640 상자**에 가둔다(2026-08-13 사용자 승인).
+   비율(--ar = 가로/세로)은 화면이 넘긴다 — 값의 출처는 프로젝트 하나여야 한다.
+     9:16  → min(560, 640×0.5625=360)  = 360×640  (지금과 한 픽셀도 안 바뀐다)
+     1:1   → min(560, 640×1     =640)  = 560×560
+     16:9  → min(560, 640×1.778 =1138) = 560×315
+   기본값 0.5625 는 --ar 이 안 왔을 때의 9:16 이다 — 옛 화면이 갑자기 넓어지지 않게. */
+.done-stage .done-preview {
+  grid-row: 2; grid-column: 2; margin: 0;
+  width: min(560px, calc(640px * var(--ar, 0.5625)));
+  max-width: 100%;
+}
+/* 좁아지면 나란히 두는 것이 오히려 손해다 — 둘 다 못 쓰게 좁아진다.
+   한 칸짜리 격자로 바꾸고 셋을 순서대로 쌓는다(제목 → 조절판 → 영상). */
 @media (max-width: 900px) {
-  .done-stage { flex-direction: column; align-items: center; }
+  .done-stage { grid-template-columns: auto; justify-items: center; gap: 0; }
+  .done-stage .sub-eyebrow,
+  .done-stage .sub-editor,
+  .done-stage .done-preview { grid-row: auto; grid-column: 1; }
+  .done-stage .done-preview { margin-top: 14px; }
 }
 
 .done-preview { width: 100%; max-width: 360px; margin: 14px auto 0; position: static; }
