@@ -57,15 +57,16 @@ describe("사이드바 — 광고 하위 단계는 이동이 아니라 표시다
     expect(src).toContain("adStepIndex");
   });
 
-  it("하위 단계 항목에 href가 없다 — Link가 아니라 span으로 그려 누를 수 없게 한다", () => {
-    // AD_STEPS.map( ... ) 블록을 찾아 그 안에서 <Link 를 쓰지 않는지 본다.
-    // 기존 6단계 StepList는 <Link를 쓰지만, 광고는 "표시"이지 "이동"이 아니므로 달라야 한다.
+  // ★ 2026-08-13 뒤집힌 결정: 이제 **이동한다.** 지나온 단계를 다시 볼 길이 아예 없었다.
+  // 주소에 남기므로(?step=) 뒤로가기·새로고침·링크 공유가 산다. 아직 안 온 단계는 그대로
+  // 잠금이라 <span> 으로 남는다 — 없는 것을 열 수 없다.
+  it("갈 수 있는 단계는 Link, 아직 안 온 단계는 span 이다", () => {
     const mapIdx = src.indexOf("AD_STEPS.map(");
     expect(mapIdx, "AD_STEPS.map( 을 못 찾았다").toBeGreaterThan(-1);
-    const closeIdx = src.indexOf("</div>", mapIdx);
-    const block = src.slice(mapIdx, closeIdx);
-    expect(block, "광고 하위 단계가 <Link를 쓴다 — 누르면 이동해 버린다").not.toMatch(/<Link\b/);
-    expect(block, "광고 하위 단계에 <span이 없다").toMatch(/<span\b/);
+    const block = src.slice(mapIdx, src.indexOf("export default", mapIdx));
+    expect(block, "단계가 링크가 아니다").toMatch(/<Link/);
+    expect(block, "잠긴 단계를 그릴 <span 이 없다").toMatch(/<span/);
+    expect(block, "갈 수 있는지 판정을 안 쓴다").toMatch(/isAdStepReachable/);
   });
 
   it("기존 side-steps·side-step 클래스를 그대로 재사용한다 — 두 목록(기존 6단계+광고 4단계) 모두에서 쓰인다", () => {

@@ -7,12 +7,14 @@
 // 이 화면이 유료 버튼([이대로 만들기]·[다시 만들기])을 든다 — 가격은 반드시 lib/pricing.js
 // 에서 읽는다. 숫자를 여기 박으면 /ads/new · 이 화면 · 서버가 각자 다른 값을 말하게 된다.
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { priceLabel, adVideoPrice } from "../../../lib/pricing";
 // 이 프로젝트가 어느 모델로 만들어지는지 — 사장님이 값을 치르기 전에 알아야 한다.
 // adModel 은 모르는/없는 id 도 기본 모델로 안전하게 떨어진다(옛 문서 보호).
 import { adModel } from "../../../lib/ad/models";
+// 지나온 단계를 다시 볼 수 있는가 — 사이드바와 **같은 판정**을 쓴다(두 벌이면 갈린다).
+import { isAdStepReachable } from "../../../lib/ad/steps";
 // 큐 대기 상한 — 서버(lib/ad/generate.js)와 같은 계산을 여기서도 부른다(Task 23).
 // ★ 숫자를 이 화면에 다시 박지 마라. 두 벌이면 언젠가 갈린다 — 이 저장소가 반복해서
 // 겪은 실패 모양이다(가격도 같은 이유로 lib/pricing.js 하나다). lib/ad/timing.js 는
@@ -33,6 +35,7 @@ const POLL_MS = 2000;
 
 export default function AdDetailPage() {
   const { id } = useParams();
+  const searchParams = useSearchParams();
   // project·setProject·load 는 컨텍스트에서 온다(null = 아직 못 불러왔다) — 사이드바가
   // 같은 값을 읽어 하위 단계를 그린다. 이 화면이 유일한 발신자이고, 사이드바는 수신만 한다.
   const { project, setProject, load } = useAdProject();
@@ -149,11 +152,20 @@ export default function AdDetailPage() {
   // 모르는 status 이거나(나중에 상태가 하나 늘 수 있다), status 는 "done"인데 videos 가
   // 비어 있는 저장 어긋남이다. 둘 다 지금 파이프라인에서는 안 생기지만, 안 생긴다는 것과
   // 화면이 그 경우를 다룰 수 있다는 것은 다른 얘기다 — 막히면 이 화면에는 비개발자만 있다.
+  // ★ **보는 단계**와 **실제 상태**를 가른다(2026-08-13).
+  // 주소의 ?step 이 지나온 단계면 그 화면을 그린다 — 시나리오를 다시 보고 싶어도
+  // 돌아갈 길이 없었다. 없거나 아직 안 온 단계면 지금 상태를 그대로 따른다.
+  //
+  // ⚠️ 폴링·자동 진행은 **status** 를 본다(view 가 아니다). 보고 있는 화면이 진행을
+  // 멈추거나 되돌리면 안 된다 — 굽는 중에 시나리오를 들춰 봐도 굽기는 계속 돈다.
+  const wanted = searchParams.get("step");
+  const view = wanted && isAdStepReachable(wanted, status) ? wanted : status;
+
   const handled =
-    status === "draft" ||
-    status === "scenario" ||
-    status === "rendering" ||
-    (status === "done" && !!video);
+    view === "draft" ||
+    view === "scenario" ||
+    view === "rendering" ||
+    (view === "done" && !!video);
 
   return (
     <>
@@ -164,7 +176,7 @@ export default function AdDetailPage() {
       {/* 배경에서 굽다 실패한 것 — 위치를 status 마다 가르지 않는다. 사장님이 못 보면 안 된다. */}
       {video_error && <p className="pgsub warn">{video_error}</p>}
 
-      {status === "draft" && (
+      {view === "draft" && (
         <section className="panel panel--wide">
           <p className="pgsub">시나리오를 만들어 주세요 — 무료예요. 마음에 안 들면 몇 번이든 다시 쓸 수 있어요.</p>
           <button className="cta" disabled={busy} onClick={makeScenario}>
@@ -173,7 +185,7 @@ export default function AdDetailPage() {
         </section>
       )}
 
-      {status === "scenario" && (
+      {view === "scenario" && (
         <section className="panel panel--wide">
           <h2>시나리오를 확인해 주세요</h2>
           <p className="script-src">{scenario?.text}</p>
@@ -218,7 +230,7 @@ export default function AdDetailPage() {
         </section>
       )}
 
-      {status === "rendering" && (
+      {view === "rendering" && (
         <section className="panel panel--wide">
           {/* 짐작할 수 있는 말이 없으면 사장님은 고장난 줄 안다(15초짜리도 8분 가까이
               걸린다, 실측 근거는 lib/ad/timing.js). 상한(분 단위 십몇 분)이 아니라
@@ -230,7 +242,7 @@ export default function AdDetailPage() {
         </section>
       )}
 
-      {status === "done" && video && (
+      {view === "done" && video && (
         <section className="panel panel--narrow">
           <h2>완성했어요 <span className="badge vlm">완성</span></h2>
           <div className="preview-pane done-preview">

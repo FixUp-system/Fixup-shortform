@@ -10,7 +10,7 @@ import { useProject } from "./ProjectContext";
 import { useAdProject } from "./AdProjectContext";
 import { useMe } from "./MeContext";
 import { STEPS, currentStepKey, isReachable, stepHref } from "../lib/steps";
-import { AD_STEPS, adStepIndex } from "../lib/ad/steps";
+import { AD_STEPS, adStepIndex, isAdStepReachable } from "../lib/ad/steps";
 
 // 진행 중인 프로젝트의 현재 단계 주소 — 없으면 새 프로젝트 화면.
 // 사이드바 '영상 만들기' 링크가 이걸 써서, 작업 중에 눌러도 프로젝트를 잃지 않는다.
@@ -66,21 +66,31 @@ function StepList({ pathname }) {
 // 아무 데도 안 간다. status → 지금 자리는 lib/ad/steps.js의 adStepIndex가 판정한다.
 function AdStepList({ adProject }) {
   const idx = adStepIndex(adProject?.status);
+  const id = adProject?.id;
   return (
     <div className="side-steps">
       {AD_STEPS.map((s, i) => {
         const active = i === idx;
         const passed = i < idx;
+        // ★ 지나온 단계는 **눌러서 다시 본다**(2026-08-13). 주소에 남기므로 뒤로가기와
+        // 새로고침이 산다. 아직 안 온 단계는 그대로 잠금 — 없는 것을 열 수 없다.
+        const canGo = id && isAdStepReachable(s.key, adProject?.status);
         const cls = `side-step${active ? " on" : ""}${passed ? " passed" : ""}${!active && !passed ? " locked" : ""}`;
-        return (
-          <span key={s.key} className={cls} aria-disabled={!active ? "true" : undefined} aria-current={active ? "step" : undefined}>
+        const inner = (
+          <>
             <i>{passed ? <><Icon name="check" size={12} /><span className="sr-only">완료</span></> : s.no}</i>{s.label}
             {/* '확인' — 사람이 실제로 멈춰 기다리는 유일한 자리(②시나리오)에만, 그리고
                 지금 그 자리일 때만 붙인다. 지난 단계까지 붙이면 "아직 기다리는 중"이라는
-                거짓 신호가 된다. 기존 .side-step em(준비 중 꼬리표) 자리를 그대로 쓴다 —
-                새 CSS가 없다. */}
+                거짓 신호가 된다. */}
             {s.waits && active && <em>확인</em>}
-          </span>
+          </>
+        );
+        return canGo ? (
+          <Link key={s.key} href={`/ads/${id}?step=${s.key}`} className={cls} aria-current={active ? "step" : undefined}>
+            {inner}
+          </Link>
+        ) : (
+          <span key={s.key} className={cls} aria-disabled="true">{inner}</span>
         );
       })}
     </div>

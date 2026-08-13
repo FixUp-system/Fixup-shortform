@@ -108,13 +108,15 @@ describe("/ads/[id] 화면", () => {
     expect(detailSrc).not.toMatch(/\b65\b/);
   });
 
-  it("상태 넷을 실제로 가른다 — status 값과 비교하는 자리가 있다", () => {
+  it("상태 넷을 실제로 가른다 — view 값과 비교하는 자리가 있다", () => {
     // "draft"라는 낱말이 주석에만 있어도 toContain은 통과한다. 그 상태의 화면이
     // 실제로 존재한다는 증거는 status 를 그 값과 비교(===)하는 조건문이다.
     for (const s of ["draft", "scenario", "rendering", "done"]) {
       expect(detailSrc, `"${s}" 라는 낱말이 없다`).toContain(s);
-      expect(detailSrc, `status === "${s}" 비교가 없다 — 그 상태를 실제로 안 다룰 수 있다`)
-        .toMatch(new RegExp(`status\\s*===\\s*["']${s}["']`));
+      // ★ 2026-08-13: 분기가 **보는 단계(view)** 를 본다 — 주소의 ?step 으로 지나온 단계를
+      // 다시 볼 수 있게 됐기 때문이다. 진짜 status 는 폴링·자동 진행이 그대로 쓴다.
+      expect(detailSrc, `view === "${s}" 비교가 없다 — 그 상태를 실제로 안 다룰 수 있다`)
+        .toMatch(new RegExp(`view\\s*===\\s*["']${s}["']`));
     }
   });
 
@@ -200,7 +202,7 @@ describe("/ads/[id] 화면 — 모르는 status 에도 화면이 비지 않는�
     // done 블록(JSX)의 조건은 "status === \"done\" && video"(느낌표 없이) — handled 판정식의
     // "&& !!video"와는 다른 문자열이라 서로 안 헷갈린다. 기본 갈래가 그보다 뒤에 있어야
     // "네 블록을 다 지나온 다음의 catch-all"이라는 구조가 성립한다.
-    const doneBlockIdx = detailSrc.indexOf('status === "done" && video');
+    const doneBlockIdx = detailSrc.indexOf('view === "done" && video');
     expect(doneBlockIdx, "done 블록의 JSX 조건을 못 찾았다").toBeGreaterThan(-1);
     expect(fallbackIdx).toBeGreaterThan(doneBlockIdx);
   });
