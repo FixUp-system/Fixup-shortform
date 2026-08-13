@@ -1,21 +1,14 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import QuickCreate from "../components/QuickCreate";
-
-// 홈은 **빠른 생성**이다 — 사이드바에서 홈을 누르면 대화창이 바로 뜬다.
-// 단계별 만들기는 사이드바의 '영상 만들기', 만든 것은 '보관함'이 맡는다.
-// 한 화면이 진입로 세 개를 이고 있으면 무엇을 하러 온 화면인지 흐려진다.
+// 루트는 **단계별 흐름의 첫 화면**으로 보낸다.
+//
+// 여기는 원래 "빠른 생성"(자료 한 번 적으면 ①~⑥ 을 검토 없이 관통하는 모드)이었다.
+// 2026-08-13 에 화면에서 내렸다 — 만드는 길이 둘이면 사장님이 무엇을 하러 온 화면인지
+// 흐려지고, 두 길의 화면·문구를 계속 나란히 손봐야 한다.
+//
+// ★ 뒷단은 **그대로 살아 있다**: components/QuickCreate.jsx · lib/auto.js ·
+//   POST /api/projects/[id]/auto. 되살릴 때 커밋을 뒤지지 않아도 되게 남겨 뒀다.
+//   (지금은 아무 화면도 QuickCreate 를 그리지 않는다.)
 export default function Home() {
-  return (
-    <>
-      <h1 className="pgtitle">
-        빠른 생성 <small className="badge warn">실험</small>
-      </h1>
-      <p className="pgsub">
-        대화로 필요한 정보만 모으면, 대본부터 완성까지 자동으로 만들어요.
-        낭독과 자막이 들어간 완성 영상이 나와요.
-      </p>
-      <QuickCreate />
-    </>
-  );
+  redirect("/create");
 }

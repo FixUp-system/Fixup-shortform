@@ -202,50 +202,46 @@ export default function MePage() {
         {/* ★ 비밀번호는 "내 정보" 안에 있다 — 이름·이메일·가입일과 같은 성격(내 계정)이라
             섹션을 따로 두면 같은 이야기가 두 상자로 갈린다(2026-08-13 사용자 결정).
             평소에는 한 줄이고, [수정] 을 누른 사람에게만 편다. */}
-        {!showPw ? (
-          <div className="me-row">
-            <span className="me-label">비밀번호</span>
+        {/* ★ 줄 이름은 **늘 보인다**. 펼치면 이름까지 사라지던 옛 모양은, 화면이 바뀐 뒤
+            무엇을 고치는 자리인지 알려 주는 말이 없었다(2026-08-13 사용자 지적).
+            [수정] 은 펼치면 감춘다 — 되돌리는 길은 폼 안의 [취소] 하나다. */}
+        <div className="me-row">
+          <span className="me-label">비밀번호 관리</span>
+          {!showPw && (
             <button className="mini" onClick={() => setShowPw(true)}>수정</button>
-          </div>
-        ) : (
-          <>
-            {/* 펼쳤을 때의 이 경고는 남긴다 — 바꾸면 **모든 기기에서 로그아웃**된다는 것은
-                누르기 전에 알아야 하는 일이다. */}
-            <p className="pgsub">
-              지금 쓰는 비밀번호를 함께 넣어 주세요 — 자리를 비운 사이 다른 사람이 바꾸지 못하게 합니다.
-              바꾸면 <b>모든 기기에서 로그아웃</b>되니 다시 로그인해 주세요.
-            </p>
-            <form className="me-form" onSubmit={changePassword}>
-              <label className="me-row">
-                <span className="me-label">현재 비밀번호</span>
-                <input className="sent-input" type="password" autoComplete="current-password"
-                  value={current} onChange={(e) => setCurrent(e.target.value)} />
-              </label>
-              <label className="me-row">
-                <span className="me-label">새 비밀번호</span>
-                <input className="sent-input" type="password" autoComplete="new-password"
-                  value={next} onChange={(e) => setNext(e.target.value)} />
-              </label>
-              {/* 마지막 칸과 버튼을 같은 줄에 둔다 — 이름 쪽과 같은 모양이라야 두 폼이
-                  따로 놀지 않는다. label 로 감싸면 버튼을 눌러도 입력칸이 포커스를
-                  가져가므로 여기만 div + htmlFor 로 푼다. */}
-              <div className="me-row">
-                <label className="me-label" htmlFor="me-pw-confirm">새 비밀번호 확인</label>
-                <input id="me-pw-confirm" className="sent-input" type="password" autoComplete="new-password"
-                  value={confirm} onChange={(e) => setConfirm(e.target.value)} />
-                {/* 접는 것은 지우는 것이다 — 쓰다 만 값을 남겨 두면 다음에 펼쳤을 때
-                    남의 눈에 띈 화면에 그대로 있다. */}
-                <button
-                  type="button"
-                  className="mini"
-                  onClick={() => { setShowPw(false); setCurrent(""); setNext(""); setConfirm(""); setPwMsg(""); }}
-                >
-                  취소
-                </button>
-                <button className="cta" disabled={busy === "pw"}>바꾸기</button>
-              </div>
-            </form>
-          </>
+          )}
+        </div>
+        {showPw && (
+          <form className="me-form" onSubmit={changePassword}>
+            <label className="me-row">
+              <span className="me-label">현재 비밀번호</span>
+              <input className="sent-input" type="password" autoComplete="current-password"
+                value={current} onChange={(e) => setCurrent(e.target.value)} />
+            </label>
+            <label className="me-row">
+              <span className="me-label">새 비밀번호</span>
+              <input className="sent-input" type="password" autoComplete="new-password"
+                value={next} onChange={(e) => setNext(e.target.value)} />
+            </label>
+            {/* 마지막 칸과 버튼을 같은 줄에 둔다 — 이름 쪽과 같은 모양이라야 두 폼이
+                따로 놀지 않는다. label 로 감싸면 버튼을 눌러도 입력칸이 포커스를
+                가져가므로 여기만 div + htmlFor 로 푼다. */}
+            <div className="me-row">
+              <label className="me-label" htmlFor="me-pw-confirm">새 비밀번호 확인</label>
+              <input id="me-pw-confirm" className="sent-input" type="password" autoComplete="new-password"
+                value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+              {/* 접는 것은 지우는 것이다 — 쓰다 만 값을 남겨 두면 다음에 펼쳤을 때
+                  남의 눈에 띈 화면에 그대로 있다. */}
+              <button
+                type="button"
+                className="mini"
+                onClick={() => { setShowPw(false); setCurrent(""); setNext(""); setConfirm(""); setPwMsg(""); }}
+              >
+                취소
+              </button>
+              <button className="cta" disabled={busy === "pw"}>바꾸기</button>
+            </div>
+          </form>
         )}
         {pwMsg && <p className="pgsub">{pwMsg}</p>}
       </section>
