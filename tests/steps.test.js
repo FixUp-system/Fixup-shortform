@@ -442,6 +442,17 @@ describe("clipKey — 해상도", () => {
     expect(clipKey(cut, a)).not.toBe(clipKey(cut, b));
   });
 
+  // ★ 각인은 저장값을 **날것으로** 읽으면 안 된다. resolutionForProject 가 목록 밖 값을
+  //   기본값으로 정규화하는데, 그 정규화를 건너뛰면 "2160p" 같은 값이 각인에 그대로 붙어
+  //   이미 값을 치른 클립이 통째로 낡는다(~$9/편). 지금은 두 입구가 isResolutionFor 로
+  //   막아 도달 불가지만, 그 검증이 느슨해지는 날 이 테스트가 잡는다.
+  it("목록 밖 해상도가 저장돼 있어도 기본값으로 정규화된다 — 각인에 안 샌다", () => {
+    const 이상값 = { settings: { i2v_model: "seedance-2.0", resolution: "2160p" } };
+    const 미선택 = { settings: { i2v_model: "seedance-2.0" } };
+    expect(clipKey(cut, 이상값)).not.toContain("2160p");
+    expect(clipKey(cut, 이상값)).toBe(clipKey(cut, 미선택));
+  });
+
   it("해상도를 안 고른 Seedance 프로젝트는 720p 로 각인된다", () => {
     // resolutionForProject 가 기본값을 주므로 저장 여부와 무관하게 같은 값이 나온다.
     // 사장님이 720p 를 명시로 골라도 각인이 안 바뀐다.
