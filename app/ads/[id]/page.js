@@ -13,15 +13,23 @@ import { priceLabel, adVideoPrice } from "../../../lib/pricing";
 // 이 프로젝트가 어느 모델로 만들어지는지 — 사장님이 값을 치르기 전에 알아야 한다.
 // adModel 은 모르는/없는 id 도 기본 모델로 안전하게 떨어진다(옛 문서 보호).
 import { adModel } from "../../../lib/ad/models";
+// 큐 대기 상한 — 서버(lib/ad/generate.js)와 같은 계산을 여기서도 부른다(Task 23).
+// ★ 숫자를 이 화면에 다시 박지 마라. 두 벌이면 언젠가 갈린다 — 이 저장소가 반복해서
+// 겪은 실패 모양이다(가격도 같은 이유로 lib/pricing.js 하나다). lib/ad/timing.js 는
+// import 문이 없는 순수 함수라 "use client" 화면이 그대로 불러올 수 있다.
+import { adPollTimeoutMs, adEstimatedMinutes } from "../../../lib/ad/timing";
 // 사이드바와 공유하는 광고 프로젝트(components/AdProjectContext) — 사이드바의 하위 단계
 // 표시가 여기서 읽어들인 값을 그대로 본다. 사이드바가 따로 fetch·폴링하지 않아도 되는 이유.
 import { useAdProject } from "../../../components/AdProjectContext";
 
-// 폴링 주기 — 기존 단계 화면들(app/create/[id]/*/page.js)과 같다.
+// 폴링 주기 — 기존 단계 화면들(app/create/[id]/*/page.js)과 같다. ★ 이건 "화면이 서버
+// 상태를 몇 초마다 묻는가"고, fal 큐 폴링 간격(서버 쪽, lib/ad/generate.js 의 4초)과는
+// 다른 축이다 — 건드리지 않는다.
 const POLL_MS = 2000;
-// fal 생성은 느리다(탐침 실측 4초 클립에 134초) — 15초 분량은 더 걸릴 수 있어
-// 완성 화면(app/create/[id]/done/page.js)과 같은 10분을 상한으로 둔다.
-const POLL_TIMEOUT_MS = 10 * 60 * 1000;
+// ⚠️ 예전엔 고정 10분이었다(app/create/[id]/done/page.js 와 맞춘 값). fal 이 큐 API로
+// 바뀌며 서버 쪽 상한이 길이에 비례하게 됐고(15초≈13분·30초≈23분, lib/ad/timing.js),
+// 화면이 고정 10분에서 먼저 포기하면 서버는 아직 도는데 "오래 걸린다"고 잘못 알린다.
+// 그래서 고정값을 버리고 project.settings.seconds 로 매번 계산한다(아래 startPolling).
 
 export default function AdDetailPage() {
   const { id } = useParams();
@@ -50,6 +58,12 @@ export default function AdDetailPage() {
     setPollTimedOut(false);
     let failures = 0;
     const startedAt = Date.now();
+    // 이 굽기의 길이 — project 는 클로저로 최신값을 본다(호출 시점의 state). 서버가
+    // Number(settings.seconds) || 15 로 기본값을 두는 것과 같은 기본값을 쓴다
+    // (lib/ad/generate.js) — 갈리면 표시되는 예상 시간과 실제 상한이 서로 다른 길이
+    // 기준으로 계산된다.
+    const effectiveSeconds = Number(project?.settings?.seconds) || 15;
+    const timeoutMs = adPollTimeoutMs(effectiveSeconds);
     const stop = (timedOut) => {
       clearInterval(pollRef.current);
       pollRef.current = null;
@@ -60,7 +74,7 @@ export default function AdDetailPage() {
       }
     };
     pollRef.current = setInterval(async () => {
-      if (Date.now() - startedAt > POLL_TIMEOUT_MS) return stop(true);
+      if (Date.now() - startedAt > timeoutMs) return stop(true);
       try {
         const res = await fetch(`/api/ads/${id}/status`);
         if (!res.ok) throw new Error();
@@ -206,7 +220,13 @@ export default function AdDetailPage() {
 
       {status === "rendering" && (
         <section className="panel panel--wide">
-          <p className="pgsub">영상을 만드는 중이에요 — 몇 분 걸릴 수 있어요…</p>
+          {/* 짐작할 수 있는 말이 없으면 사장님은 고장난 줄 안다(15초짜리도 8분 가까이
+              걸린다, 실측 근거는 lib/ad/timing.js). 상한(분 단위 십몇 분)이 아니라
+              "보통 이 정도"인 추정치를 보여준다 — 상한을 그대로 보여주면 실제보다
+              훨씬 길어 보인다. */}
+          <p className="pgsub">
+            영상을 만드는 중이에요 — 길이에 따라 다르지만 보통 {adEstimatedMinutes(settings?.seconds)}분쯤 걸려요…
+          </p>
         </section>
       )}
 

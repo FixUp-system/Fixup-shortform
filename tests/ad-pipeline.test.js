@@ -120,6 +120,31 @@ describe("광고 파이프라인", () => {
     expect(await balanceFor(U)).toBe(200 - AD_VIDEO_PRICE["seedance-2.0-fast"][15] * 2);
   });
 
+  // ★ Task 23 — fal 큐 폴링 도중 서버가 재시작되면 그 폴링 루프 자체가 사라진다.
+  //   request_id 가 문서에 남아 있어야 나중에 이어붙일 단서가 생긴다(이어붙이기 자체는
+  //   이번 범위 밖이다 — 저장만 확인한다). lib/ad/generate.js 는 접수 직후·폴링 시작
+  //   전에 onRequestId 콜백을 부른다 — 여기서는 그 콜백이 실제로 문서에 쓰이는지를
+  //   pipeline.js 쪽만 잰다(generate.js 의 실제 큐 흐름은 tests/ad-generate.test.js 몫).
+  it("★ request_id 를 문서에 저장한다 — 폴링 도중 재시작돼도 이어붙일 단서가 남는다", async () => {
+    const p = await makeAd();
+    await getStore().insertGrant({ user_id: U, amount_credits: 200, reason: "t" });
+    await runWithActor(U, () => runScenarioStep(p.id, U, { generateScenario: async () => scenario }));
+    await runWithActor(U, () =>
+      runAdRenderPipeline(p.id, U, {
+        generateAdVideo: async ({ onRequestId }) => {
+          // 실제 lib/ad/generate.js 가 접수 응답을 받은 직후 부르는 것과 같은 자리다.
+          await onRequestId?.("fal-req-xyz");
+          return { url: "https://fal.example/v.mp4", seconds: 15 };
+        },
+        storeVideo: async (url) => url,
+      })
+    );
+    const back = await getProject(p.id, U);
+    // ★ 지키려는 것: pipeline.js 가 onRequestId 를 안 넘기거나, 콜백이 문서에 안 쓰면
+    // 이 필드가 비어 있어 실패한다.
+    expect(back.ad_request_id).toBe("fal-req-xyz");
+  });
+
   // ★ 한 번의 굽기 안에서는 여전히 한 번만 받는다 — openNewAttempt 를 더한 것이
   //   runAdRenderPipeline 안에서 chargeAd 를 두 번 부르게 만들지 않았는지 확인한다.
   it("한 번의 굽기 안에서는 여전히 한 번만 받는다", async () => {
