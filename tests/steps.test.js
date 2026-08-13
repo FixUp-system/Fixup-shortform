@@ -422,6 +422,15 @@ describe("clipKey — 해상도", () => {
     expect(clipKey(cut)).not.toContain("720p");
   });
 
+  // ★★ 하드 제약을 무는 자리. main 에 이미 있는 Seedance 프로젝트들은 settings.resolution 이
+  //    없는 채로 클립을 샀다(선택 UI 가 이 브랜치 것이다). 기본값을 각인에 붙이면 그 클립들이
+  //    통째로 낡아 픽셀이 같은 mp4 를 다시 사게 된다(~$9/편, 원장 성공 5건 $6.65).
+  it("기본 화질이면 각인에 자리가 안 붙는다 — 옛 Seedance 클립이 안 낡는다", () => {
+    const 미선택 = { settings: { i2v_model: "seedance-2.0" } };
+    expect(clipKey(cut, 미선택)).toBe(clipKey(cut, { settings: {} }));  // 옛 각인과 글자 그대로 같다
+    expect(clipKey(cut, 미선택)).not.toContain("720p");
+  });
+
   it("Seedance 는 해상도가 각인에 들어간다", () => {
     const p = { settings: { i2v_model: "seedance-2.0", resolution: "1080p" } };
     expect(clipKey(cut, p)).toContain("1080p");
