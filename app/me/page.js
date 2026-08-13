@@ -38,14 +38,29 @@ export default function MePage() {
   // 크레딧 내역 — 잔액 숫자 하나만으로는 "왜 줄었는지"를 알 수 없다. null 은 불러오는 중.
   const [ledger, setLedger] = useState(null);
   const [ledgerErr, setLedgerErr] = useState("");
-  useEffect(() => {
-    fetch("/api/credits/history")
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error())))
-      .then((d) => setLedger(d.rows || []))
+  const [ledgerMore, setLedgerMore] = useState(false);
+  const [ledgerBusy, setLedgerBusy] = useState(false);
+
+  // before 를 주면 그 시각보다 앞선 것만 온다 — 이어 받는 동안 새 줄이 생겨도
+  // 이미 본 줄이 다시 나오거나 건너뛰지 않는다(번호 커서였다면 밀린다).
+  async function loadLedger(before) {
+    setLedgerBusy(true);
+    try {
+      const q = before ? `?before=${before}` : "";
+      const res = await fetch(`/api/credits/history${q}`);
+      if (!res.ok) throw new Error();
+      const d = await res.json();
+      setLedger((prev) => (before ? [...(prev || []), ...d.rows] : d.rows));
+      setLedgerMore(!!d.has_more);
+    } catch {
       // 조용히 비우지 않는다 — 빈 목록과 "못 읽었다"가 같아 보이면 사장님이 내역이
       // 없는 줄 안다. 여기는 돈에 관한 화면이라 그 오해가 특히 나쁘다.
-      .catch(() => setLedgerErr("내역을 읽지 못했어요 — 잠시 뒤 다시 시도해 주세요."));
-  }, []);
+      setLedgerErr("내역을 읽지 못했어요 — 잠시 뒤 다시 시도해 주세요.");
+    } finally {
+      setLedgerBusy(false);
+    }
+  }
+  useEffect(() => { loadLedger(); }, []);
 
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -212,6 +227,15 @@ export default function MePage() {
               </li>
             ))}
           </ul>
+        )}
+        {ledgerMore && (
+          <button
+            className="mini"
+            disabled={ledgerBusy}
+            onClick={() => loadLedger(ledger[ledger.length - 1].ts)}
+          >
+            {ledgerBusy ? "불러오는 중…" : "더 보기"}
+          </button>
         )}
       </section>
 

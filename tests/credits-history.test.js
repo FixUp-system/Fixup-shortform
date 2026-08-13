@@ -18,6 +18,12 @@ const req = (uid = A) => ({
   headers: new Headers({ [USER_HEADER]: uid, [STATUS_HEADER]: "approved", [ROLE_HEADER]: "user" }),
 });
 const body = async (uid = A) => (await GET(req(uid), {})).json();
+// 페이지 나누기 — 라우트는 질의문자로 받는다
+const reqQ = (q, uid = A) => ({
+  url: `http://localhost/api/credits/history?${q}`,
+  headers: new Headers({ [USER_HEADER]: uid, [STATUS_HEADER]: "approved", [ROLE_HEADER]: "user" }),
+});
+const bodyQ = async (q, uid = A) => (await GET(reqQ(q, uid), {})).json();
 
 const grant = (uid, n) =>
   getStore().insertGrant({ user_id: uid, amount_credits: n, reason: "충전", granted_by: ADMIN });
@@ -99,5 +105,34 @@ describe("크레딧 내역", () => {
     await grant(A, 500);
     const { balance } = await body();
     expect(balance).toBe(500);
+  });
+
+  // 내역은 계속 쌓인다 — 한 번에 다 내려주면 화면이 수백 줄로 늘어지고, 오래 쓴 사장님일수록
+  // 느려진다(그 사람이 가장 많이 낸 사람이다).
+  it("한 번에 주는 줄 수를 제한한다", async () => {
+    for (let i = 0; i < 25; i++) await grant(A, 10);
+    const { rows, has_more } = await bodyQ("limit=20");
+    expect(rows.length).toBe(20);
+    expect(has_more).toBe(true);
+  });
+
+  it("이어서 더 달라고 하면 그 뒤부터 준다", async () => {
+    for (let i = 0; i < 5; i++) {
+      await grant(A, (i + 1) * 10);
+      await new Promise((r) => setTimeout(r, 3));
+    }
+    const first = await bodyQ("limit=2");
+    const next = await bodyQ(`limit=2&before=${first.rows[first.rows.length - 1].ts}`);
+    // 이어 받은 줄이 앞 묶음과 겹치지 않는다
+    const seen = new Set(first.rows.map((r) => r.ts));
+    expect(next.rows.every((r) => !seen.has(r.ts))).toBe(true);
+    expect(next.rows[0].delta).toBe(30);
+  });
+
+  it("마지막 묶음에서는 더 없다고 말한다", async () => {
+    await grant(A, 100);
+    const { rows, has_more } = await bodyQ("limit=20");
+    expect(rows.length).toBe(1);
+    expect(has_more).toBe(false);
   });
 });

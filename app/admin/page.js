@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 // 기본값은 가격표에서 온다 — 운영자가 매번 고르는 값이라도 출처는 한 곳이다.
 import { DEFAULT_GRANT } from "../../lib/pricing";
+// 내역의 말·부호는 사장님 화면과 **같은 표**를 쓴다 — 둘이 다른 말을 하면 안 된다
+import { ledgerLabel } from "../../lib/ledger";
 
 const STATUS_LABEL = {
   pending: "대기 중",
@@ -10,10 +12,31 @@ const STATUS_LABEL = {
   blocked: "차단됨",
 };
 
+// 그 사람의 시계로 본 날짜 — 마이페이지와 같은 규칙이다(toISOString 은 UTC 라
+// 한국에서 오전에 쓴 내역이 하루 전으로 보인다).
+function ymd(ts) {
+  const d = new Date(ts);
+  const p2 = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+}
+
 export default function AdminPage() {
   const [users, setUsers] = useState(null);
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
+  // 펼쳐 본 사람의 내역. 문의는 "크레딧이 왜 줄었냐"로 오는데, 운영자가 같은 화면을
+  // 못 보면 답할 수가 없었다(잔액 숫자 하나만 보였다).
+  const [openId, setOpenId] = useState(null);
+  const [ledger, setLedger] = useState(null);   // null = 불러오는 중
+
+  async function toggleLedger(id) {
+    if (openId === id) { setOpenId(null); return; }
+    setOpenId(id);
+    setLedger(null);
+    const r = await fetch(`/api/admin/users/${id}/ledger`);
+    if (!r.ok) { setErr("내역을 읽지 못했어요"); setOpenId(null); return; }
+    setLedger((await r.json()).rows || []);
+  }
 
   async function load() {
     const r = await fetch("/api/admin/users");
@@ -118,8 +141,8 @@ export default function AdminPage() {
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => (
-                <tr key={u.id}>
+              {users.flatMap((u) => (
+                [<tr key={u.id}>
                   <td className="mono">{u.email}</td>
                   <td>
                     <span className={`st-badge st-${u.status === "approved" ? "done" : u.status === "blocked" ? "error" : "submitted"}`}>
@@ -131,6 +154,9 @@ export default function AdminPage() {
                     <span className="st-badge">{u.balance ?? 0}</span>
                   </td>
                   <td>
+                    <button className="mini" onClick={() => toggleLedger(u.id)}>
+                      {openId === u.id ? "내역 닫기" : "내역"}
+                    </button>{" "}
                     <button className="mini" disabled={busy === u.id} onClick={() => grant(u.id)}>
                       크레딧 넣기
                     </button>{" "}
@@ -148,7 +174,35 @@ export default function AdminPage() {
                       </button>
                     )}
                   </td>
+                </tr>,
+              ].concat(openId === u.id ? [(
+                <tr key={`${u.id}-ledger`}>
+                  <td colSpan={5}>
+                    {ledger === null ? (
+                      <p className="pgsub">불러오는 중…</p>
+                    ) : ledger.length === 0 ? (
+                      <p className="pgsub">아직 쓰거나 충전한 내역이 없어요.</p>
+                    ) : (
+                      <ul className="ledger">
+                        {ledger.map((r, i) => (
+                          <li className="ledger-row" key={`${r.ts}-${i}`}>
+                            <span className="ledger-date mono">{ymd(r.ts)}</span>
+                            <span className="ledger-what">
+                              {ledgerLabel(r.kind)}
+                              {r.project_id && (
+                                <span className="ledger-of"> · {r.project_title || "지운 영상"}</span>
+                              )}
+                            </span>
+                            <span className={`ledger-amt mono ${r.delta > 0 ? "led-plus" : ""}`}>
+                              {r.delta > 0 ? `+${r.delta}` : r.delta}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </td>
                 </tr>
+              )] : [])
               ))}
             </tbody>
           </table>

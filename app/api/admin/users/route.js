@@ -1,6 +1,8 @@
 // GET /api/admin/users — 승인 대기·전체 사용자 목록 (운영자 전용)
 import { withUser } from "../../../../lib/auth/require-user.js";
 import { getStore } from "../../../../lib/store/index.js";
+// 잔액을 보이는 값으로 만드는 규칙은 한 곳이다 — 사장님 화면과 같은 값이어야 한다
+import { floorBalance } from "../../../../lib/charges.js";
 
 export const GET = withUser(async () => {
   const store = getStore();
@@ -11,7 +13,7 @@ export const GET = withUser(async () => {
   const withCredits = await Promise.all(
     users.map(async (u) => ({
       ...u,
-      balance: (grants.get(u.id) || 0) - (await store.sumCharges(u.id)),
+      balance: floorBalance((grants.get(u.id) || 0) - (await store.sumCharges(u.id))),
     }))
   );
   return Response.json({ users: withCredits });
