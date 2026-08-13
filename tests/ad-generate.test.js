@@ -11,6 +11,7 @@ import { generateAdVideo } from "../lib/ad/generate.js";
 import { runWithActor } from "../lib/actor.js";
 import { resetMemoryStore } from "../lib/store/memory.js";
 import { getStore } from "../lib/store/index.js";
+import { addRecord, limitProject } from "../lib/costs.js";
 
 const U = "00000000-0000-4000-8000-00000000000a";
 const project = {
@@ -86,6 +87,33 @@ describe("광고 영상 생성", () => {
     expect(seen.body.image_urls).toBeUndefined();
     expect(out.url).toBe("https://fal.example/v.mp4");
     expect(out.seconds).toBe(15);
+  });
+
+  // ★ Task 25 — 위 테스트는 하드코딩된 "720p"로도 통과한다(project.settings 에 resolution
+  // 이 없어 기본값과 우연히 같다). 실제로 settings.resolution 을 읽는지는 720p 가 아닌
+  // 값을 골라야만 잡힌다 — 그래서 1080p·480p 두 값을 명시로 준다.
+  it("★ 고른 해상도(1080p)가 fal 요청 몸통의 resolution 에 실린다", async () => {
+    resetMemoryStore();
+    await grantCredits();
+    let seen;
+    const fetchImpl = fakeQueueFetch({ onSubmit: (s) => { seen = s; } });
+    const hiRes = { ...project, settings: { ...project.settings, model: "seedance-2.0", resolution: "1080p" } };
+    await runWithActor(U, () =>
+      generateAdVideo({ project: hiRes, scenario: { text: "P", endpoint: "t2v" }, refs: [], fetchImpl, waitImpl: noWait })
+    );
+    expect(seen.body.resolution).toBe("1080p");
+  });
+
+  it("480p 를 고르면 480p 가 그대로 실린다", async () => {
+    resetMemoryStore();
+    await grantCredits();
+    let seen;
+    const fetchImpl = fakeQueueFetch({ onSubmit: (s) => { seen = s; } });
+    const loRes = { ...project, settings: { ...project.settings, resolution: "480p" } };
+    await runWithActor(U, () =>
+      generateAdVideo({ project: loRes, scenario: { text: "P", endpoint: "t2v" }, refs: [], fetchImpl, waitImpl: noWait })
+    );
+    expect(seen.body.resolution).toBe("480p");
   });
 
   it("i2v 는 사진 한 장을 image_url 로 넘긴다", async () => {
@@ -247,5 +275,70 @@ describe("광고 영상 생성", () => {
     // 실패한다. 반대로 상한 로직이 없어 무한 루프면 이 테스트 자체가 끝나지 않는다
     // (타임아웃으로 실패) — 두 실패 모양을 다 이 하나의 단정이 가른다.
     expect(statusCalls).toBeGreaterThanOrEqual(2);
+  });
+});
+
+// ★ Task 25 — 광고 경로는 assertBudget 의 프로젝트 축(폭주 방어)을 안 탄다. 광고는 한 번
+// 누르면 한 편이 통짜로 나가는 구조라 기존 6단계가 걱정하던 "컷마다 반복 호출로 폭주"가
+// 구조적으로 없다. 전역·잔액(사용자)·체험 축은 그대로 막아야 한다 — 프로젝트 축 하나만
+// 빠졌는지, 나머지 안전핀까지 같이 뽑히지 않았는지를 이 describe 가 가른다.
+describe("광고 영상 생성 — 예산 축(★ Task 25, 프로젝트 축만 뺀다)", () => {
+  afterEach(() => { delete process.env.SHOTFORM_FAKE; delete process.env.SHOTFORM_BUDGET_TOTAL_USD; resetMemoryStore(); });
+
+  it("★ 프로젝트 누적이 프로젝트 상한을 넘어도 광고 생성은 막히지 않는다", async () => {
+    resetMemoryStore();
+    await grantCredits();
+    // 이 프로젝트에 이미 프로젝트 상한을 넘는 원가를 쌓아 둔다 — 프로젝트 축이 살아
+    // 있었다면 여기서 막혔어야 한다.
+    await addRecord({
+      request_id: "prior-over-project-limit", ts: Date.now(), endpoint: "bytedance/seedance-2.0",
+      stage: "광고영상", user: U, project_id: project.id,
+      prompt: "-", duration: "15", aspect_ratio: "9:16",
+      est_cost_usd: limitProject() + 1, status: "done", video_url: "u",
+    });
+    const fetchImpl = fakeQueueFetch();
+    await expect(
+      runWithActor(U, () =>
+        generateAdVideo({ project, scenario: { text: "P", endpoint: "t2v" }, refs: [], fetchImpl, waitImpl: noWait })
+      )
+    ).resolves.toBeTruthy();
+  });
+
+  it("★ skipProjectAxis 여도 전역 상한은 그대로 막는다", async () => {
+    resetMemoryStore();
+    await grantCredits();
+    process.env.SHOTFORM_BUDGET_TOTAL_USD = "0.01";
+    const fetchImpl = fakeQueueFetch();
+    await runWithActor(U, () =>
+      generateAdVideo({ project, scenario: { text: "P", endpoint: "t2v" }, refs: [], fetchImpl, waitImpl: noWait })
+    )
+      .then(() => { throw new Error("막았어야 한다"); })
+      .catch((e) => { expect(e.scope).toBe("total"); });
+  });
+
+  it("★ skipProjectAxis 여도 사용자 잔액이 음수면 그대로 막는다", async () => {
+    resetMemoryStore();
+    // 충전 없이 청구만 심어 잔액을 음수로 만든다
+    await getStore().insertCharge({
+      user_id: U, project_id: project.id, kind: "ad_video", credits: 100, idem_key: "neg-balance-1",
+    });
+    const fetchImpl = fakeQueueFetch();
+    await runWithActor(U, () =>
+      generateAdVideo({ project, scenario: { text: "P", endpoint: "t2v" }, refs: [], fetchImpl, waitImpl: noWait })
+    )
+      .then(() => { throw new Error("막았어야 한다"); })
+      .catch((e) => { expect(e.scope).toBe("user"); });
+  });
+
+  it("★ skipProjectAxis 여도 체험 한도는 그대로 막는다", async () => {
+    resetMemoryStore();
+    // grantCredits() 를 호출하지 않는다 — 충전도 청구도 없는 순수 체험자다. 광고 한 편의
+    // 원가($4 안팎)가 체험 한도($0.5)를 이미 넘는다.
+    const fetchImpl = fakeQueueFetch();
+    await runWithActor(U, () =>
+      generateAdVideo({ project, scenario: { text: "P", endpoint: "t2v" }, refs: [], fetchImpl, waitImpl: noWait })
+    )
+      .then(() => { throw new Error("막았어야 한다"); })
+      .catch((e) => { expect(e.scope).toBe("trial"); });
   });
 });

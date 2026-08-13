@@ -119,6 +119,54 @@ describe("assertBudget", () => {
   });
 });
 
+// ★ Task 25 — 광고 경로는 프로젝트 축(폭주 방어)을 안 탄다. "빼는 방식은 명시적이어야
+// 한다"는 요구대로 이름 있는 옵션(skipProjectAxis)으로 뺀다 — projectId 를 슬쩍 안 넘겨서
+// 우연히 건너뛰게 하지 않는다. 이 describe 는 그 옵션 자체를 단위로 잰다(호출부 배선은
+// tests/ad-generate.test.js·tests/ad-pipeline.test.js 몫).
+describe("assertBudget — skipProjectAxis", () => {
+  beforeEach(() => fresh({ total: "10", project: "3" }));
+
+  it("★ skipProjectAxis:true 면 프로젝트 상한을 넘어도 통과한다", async () => {
+    await record(costs, { project_id: "p1", est_cost_usd: 2 });
+    // 2 + 2 = 4 > 3(프로젝트 상한) 인데 이 축을 뺐으니 통과해야 한다
+    await expect(
+      runWithActor("t-user", () =>
+        costs.assertBudget({ projectId: "p1", endpoint: "fal-ai/veo3.1", amount: 5, skipProjectAxis: true })
+      )
+    ).resolves.toBeUndefined();
+  });
+
+  it("skipProjectAxis 를 안 주면(기본값) 지금처럼 프로젝트 상한이 막는다 — 기존 6단계 보호", async () => {
+    await record(costs, { project_id: "p1", est_cost_usd: 2 });
+    await expect(
+      runWithActor("t-user", () =>
+        costs.assertBudget({ projectId: "p1", endpoint: "fal-ai/veo3.1", amount: 5 })
+      )
+    ).rejects.toThrow(/예산 상한/);
+  });
+
+  it("★ skipProjectAxis 여도 전역 상한은 그대로 막는다", async () => {
+    await record(costs, { project_id: "p2", est_cost_usd: 9 });
+    // 9 + 2 = 11 > 10(전역 상한) — 프로젝트가 아니라 전역이 잡아야 한다
+    await runWithActor("t-user", () =>
+      costs.assertBudget({ projectId: "p1", endpoint: "fal-ai/veo3.1", amount: 5, skipProjectAxis: true })
+    )
+      .then(() => { throw new Error("막았어야 한다"); })
+      .catch((e) => { expect(e.scope).toBe("total"); });
+  });
+
+  it("★ skipProjectAxis 여도 사용자 잔액이 음수면 그대로 막는다", async () => {
+    await memoryStore.insertCharge({
+      user_id: "t-user", project_id: "p1", kind: "video", credits: 2000, idem_key: "skip-axis-neg",
+    });
+    await runWithActor("t-user", () =>
+      costs.assertBudget({ projectId: "p1", endpoint: "fal-ai/veo3.1", amount: 5, skipProjectAxis: true })
+    )
+      .then(() => { throw new Error("막았어야 한다"); })
+      .catch((e) => { expect(e.scope).toBe("user"); });
+  });
+});
+
 describe("가짜 모드", () => {
   it("가짜 모드에서는 재지도 막지도 않는다 — 0원이므로", async () => {
     await fresh({ total: "0", project: "0" });

@@ -145,6 +145,29 @@ describe("광고 파이프라인", () => {
     expect(back.ad_request_id).toBe("fal-req-xyz");
   });
 
+  // ★ Task 25 — 잔액 검사(app/api/ads/[id]/render/route.js 의 assertCanAfford)는 이미
+  //   project.settings.resolution 을 읽어 1080p 값(175)을 요구한다(Task 24). chargeAd
+  //   호출이 resolution 을 안 넘기면 실제로는 항상 720p 값(80)만 차감돼 두 값이 어긋난다
+  //   — 사장님이 더 낼 필요가 없는 것처럼 보이지만, 원가는 1080p 만큼 나가는데 청구는
+  //   덜 받는 구조다. 고치기 전에는 아래 balanceFor 단정이 720p 값(80)으로 어긋나 RED.
+  it("★ 1080p 프로젝트는 1080p 값으로 청구된다 — 잔액 검사와 실제 청구가 같은 값이어야 한다", async () => {
+    const p = await runWithActor(U, () =>
+      createProject({
+        settings: { ...SETTINGS, model: "seedance-2.0", resolution: "1080p" },
+        material: { text: "앰플 광고", photos: [] }, ownerId: U, kind: "ad",
+      })
+    );
+    await getStore().insertGrant({ user_id: U, amount_credits: 1000, reason: "t" });
+    await runWithActor(U, () => runScenarioStep(p.id, U, { generateScenario: async () => scenario }));
+    await runWithActor(U, () =>
+      runAdRenderPipeline(p.id, U, {
+        generateAdVideo: async () => ({ url: "https://fal.example/v.mp4", seconds: 15 }),
+        storeVideo: async (url) => url,
+      })
+    );
+    expect(await balanceFor(U)).toBe(1000 - AD_VIDEO_PRICE["seedance-2.0"][15]["1080p"]);
+  });
+
   // ★ 한 번의 굽기 안에서는 여전히 한 번만 받는다 — openNewAttempt 를 더한 것이
   //   runAdRenderPipeline 안에서 chargeAd 를 두 번 부르게 만들지 않았는지 확인한다.
   it("한 번의 굽기 안에서는 여전히 한 번만 받는다", async () => {
