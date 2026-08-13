@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { loadProjects } from "../../lib/projects-client";
 import ProjectCards from "../../components/ProjectCards";
+import { useDialog } from "../../components/DialogProvider";
 
 export default function Archive() {
   const [projects, setProjects] = useState(null); // null = 불러오는 중
@@ -11,6 +12,7 @@ export default function Archive() {
 
   // 정리는 몰아서 하는 일이다 — 하나씩 지우면 스무 편을 치우는 데 스무 번을 묻는다.
   // 평소에는 카드가 프로젝트로 들어가는 문이고, [수정] 을 누른 동안에만 고르는 자리가 된다.
+  const { confirm } = useDialog();
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState(() => new Set());
   const [busy, setBusy] = useState(false);
@@ -43,9 +45,13 @@ export default function Archive() {
   // ★ 성공한 것만 목록에서 뺀다 — 실패한 카드는 남아 있어야 다시 시도할 수 있다.
   async function removeSelected() {
     if (!selected.size || busy) return;
-    if (!confirm(
-      `${selected.size}편을 지울까요?\n\n만든 영상과 그림이 함께 지워지고 되돌릴 수 없어요. 쓴 크레딧은 돌아오지 않아요.`
-    )) return;
+    const ok = await confirm({
+      title: `${selected.size}편을 지울까요?`,
+      body: "만든 영상과 그림이 함께 지워지고 되돌릴 수 없어요.
+쓴 크레딧은 돌아오지 않아요.",
+      confirmLabel: "지우기",
+    });
+    if (!ok) return;
 
     setBusy(true);
     setErr("");

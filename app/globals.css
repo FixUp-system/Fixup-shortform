@@ -877,6 +877,38 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
   .sub-label { font-size: 12px; }
 }
 
+/* ── 팝업 ────────────────────────────────────────────────────────────────
+   브라우저 기본 대화상자를 대신한다. 상자는 패널과 같은 옷이고(--surface·--line·
+   --r-card), 버튼은 이 저장소의 보조/주 버튼 그대로다 — 새 언어를 만들지 않는다. */
+.dlg {
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0;
+  max-width: 440px;
+  width: calc(100% - 32px);
+}
+/* 배경은 눌러서 닫는 자리이기도 하다(DialogProvider 의 onClick) */
+.dlg::backdrop { background: rgba(0, 0, 0, 0.6); }
+.dlg-box { padding: 22px; display: flex; flex-direction: column; gap: 12px; }
+.dlg-title { margin: 0; font-size: 18px; font-weight: 600; }
+/* 본문은 줄바꿈을 살린다 — "되돌릴 수 없어요" 같은 말이 제목과 한 덩어리로 붙으면 안 읽힌다 */
+.dlg-body { margin: 0; color: var(--ink-soft); font-size: 14px; line-height: 1.7; white-space: pre-line; }
+.dlg-input {
+  height: 46px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+  background: var(--deep);
+  color: var(--ink);
+  padding: 0 14px;
+  font-size: 14px;
+}
+.dlg-input:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+/* 실행은 오른쪽 끝 — 이 저장소의 다른 줄과 같은 자리다 */
+.dlg-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
+.dlg-actions .mini { height: 46px; padding: 0 18px; font-size: 14px; }
+
 /* 주 실행 버튼 — 한 화면에 하나. 바탕의 반대색이라 화면에서 유일하게 가장 밝다. */
 .cta {
   display: inline-flex;

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { DEFAULT_GRANT } from "../../lib/pricing";
 // 내역의 말·부호는 사장님 화면과 **같은 표**를 쓴다 — 둘이 다른 말을 하면 안 된다
 import { ledgerLabel } from "../../lib/ledger";
+import { useDialog } from "../../components/DialogProvider";
 
 const STATUS_LABEL = {
   pending: "대기 중",
@@ -15,6 +16,7 @@ const STATUS_LABEL = {
 // 그 사람의 시계로 본 날짜 — 마이페이지와 같은 규칙이다(toISOString 은 UTC 라
 // 한국에서 오전에 쓴 내역이 하루 전으로 보인다).
 function ymd(ts) {
+  // 장부는 숫자(ts)로, 프로필은 ISO 문자열로 온다 — 둘 다 받는다.
   const d = new Date(ts);
   const p2 = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
@@ -26,6 +28,7 @@ export default function AdminPage() {
   const [err, setErr] = useState("");
   // 펼쳐 본 사람의 내역. 문의는 "크레딧이 왜 줄었냐"로 오는데, 운영자가 같은 화면을
   // 못 보면 답할 수가 없었다(잔액 숫자 하나만 보였다).
+  const { confirm, prompt } = useDialog();
   const [openId, setOpenId] = useState(null);
   const [ledger, setLedger] = useState(null);   // null = 불러오는 중
 
@@ -67,16 +70,25 @@ export default function AdminPage() {
     setBusy("");
   }
 
-  // 크레딧과 사유를 받아 넣는다. prompt 를 쓰는 이유는 운영자 전용 화면이고 이 동작이
-  // 드물기 때문이다 — 전용 모달을 만들 만큼의 빈도가 아니다(필요해지면 그때 만든다).
-  // ⚠️ window.prompt 는 브라우저 모달이라 자동화 도구(E2E·스크립트)를 막는다.
-  // 운영자 전용 화면이라 그 대가를 받아들인 것이다.
+  // 크레딧과 사유를 받아 넣는다. 값을 두 번 묻는 이유는 **장부에 사유가 함께 남아야**
+  // 하기 때문이다 — 나중에 "이 500 은 왜 들어갔나"에 답할 수 있는 유일한 자리다.
   async function grant(id) {
-    const raw = window.prompt("몇 크레딧을 넣을까요? (회수는 음수)", String(DEFAULT_GRANT));
+    const raw = await prompt({
+      title: "크레딧 넣기",
+      body: "회수하려면 음수를 넣어 주세요. 소수점은 쓰지 않습니다.",
+      defaultValue: String(DEFAULT_GRANT),
+      numeric: true,
+      confirmLabel: "다음",
+    });
     if (raw === null) return;
     const credits = Number(raw);
     if (!Number.isInteger(credits) || credits === 0) return;
-    const reason = window.prompt("사유를 적어 주세요", "체험");
+    const reason = await prompt({
+      title: "사유",
+      body: "장부에 그대로 남습니다.",
+      defaultValue: "체험",
+      confirmLabel: "넣기",
+    });
     if (!reason || !reason.trim()) return;
     setBusy(id);
     setErr("");
@@ -95,9 +107,13 @@ export default function AdminPage() {
     }
   }
 
-  // 운영자 전용 화면이고 드문 동작이라 prompt 로 받는다(크레딧 넣기와 같은 이유).
   async function resetPassword(id) {
-    const pw = window.prompt("새 비밀번호를 정해 주세요 (6자 이상)");
+    const pw = await prompt({
+      title: "비밀번호 재설정",
+      body: "새 비밀번호를 정해 주세요 (6자 이상). 상대에게는 따로 알려 주셔야 합니다.",
+      password: true,
+      confirmLabel: "재설정",
+    });
     if (!pw) return;
     setBusy(id);
     try {
@@ -117,9 +133,10 @@ export default function AdminPage() {
 
   return (
     <>
-      <h1 className="pgtitle">사용자 승인</h1>
+      <h1 className="pgtitle">사용자 관리</h1>
       <p className="pgsub">
-        승인·차단 모두 상대의 다음 요청부터 바로 반영돼요 — 다시 로그인할 필요는 없어요.
+        크레딧을 넣고, 승인하거나 막을 수 있어요. 승인·차단은 상대의 다음 요청부터 바로
+        반영돼요 — 다시 로그인할 필요는 없어요.
       </p>
 
       {err && <p className="pgsub warn">{err}</p>}
@@ -136,6 +153,7 @@ export default function AdminPage() {
                 <th>이메일</th>
                 <th>상태</th>
                 <th>역할</th>
+                <th>가입일</th>
                 <th>크레딧</th>
                 <th></th>
               </tr>
@@ -150,6 +168,9 @@ export default function AdminPage() {
                     </span>
                   </td>
                   <td>{u.role}</td>
+                  {/* 언제 들어온 사람인지 — 승인 대기가 쌓였을 때 먼저 볼 줄을 고르는 근거다.
+                      날짜 규칙은 마이페이지·크레딧 내역과 같다(ymd: 사장님 시계). */}
+                  <td className="mono">{u.created_at ? ymd(u.created_at) : "—"}</td>
                   <td>
                     <span className="st-badge">{u.balance ?? 0}</span>
                   </td>
@@ -177,7 +198,7 @@ export default function AdminPage() {
                 </tr>,
               ].concat(openId === u.id ? [(
                 <tr key={`${u.id}-ledger`}>
-                  <td colSpan={5}>
+                  <td colSpan={6}>
                     {ledger === null ? (
                       <p className="pgsub">불러오는 중…</p>
                     ) : ledger.length === 0 ? (

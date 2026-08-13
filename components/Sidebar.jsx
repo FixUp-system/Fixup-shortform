@@ -88,6 +88,17 @@ export default function Sidebar() {
         <span className="ic"><Icon name="template" /></span>템플릿
         <span className="soon-tag">준비 중</span>
       </button>
+      {/* ★ 운영자 전용 두 자리. 못 읽으면 숨기는 쪽으로 떨어진다(fail-closed) —
+          링크를 숨겨도 운영자는 주소로 들어갈 수 있고, 진짜 경계는 middleware 의 역할
+          게이트다. 사용자 관리로 가는 길이 아예 없어서 주소를 외워야 했다(2026-08-13). */}
+      {isAdmin && (
+        <Link
+          href="/admin"
+          className={`side-item${pathname === "/admin" ? " on" : ""}`}
+        >
+          <span className="ic"><Icon name="user" /></span>사용자 관리
+        </Link>
+      )}
       {isAdmin && (
         <Link
           href="/costs"

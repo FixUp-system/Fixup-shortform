@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
+import { useDialog } from "./DialogProvider";
 
 // 홈과 보관함이 같은 카드를 쓴다. 마크업을 두 벌로 두면 한쪽만 고쳐지는 날이 온다.
 
@@ -61,6 +62,7 @@ function Thumb({ video, image, alt }) {
 // 보관함의 [수정] 이 그 상태를 쥐고, 여기는 시키는 대로 그린다.
 export default function ProjectCards({ projects, limit, onDeleted, selecting, selected, onToggleSelect }) {
   const shown = limit ? projects.slice(0, limit) : projects;
+  const { confirm, alert } = useDialog();
   const [busyId, setBusyId] = useState(null);
 
   // ★ 카드 전체가 <Link> 다 — 막지 않으면 지우기를 눌러도 프로젝트로 들어가 버린다.
@@ -70,14 +72,21 @@ export default function ProjectCards({ projects, limit, onDeleted, selecting, se
     e.stopPropagation();
     if (busyId) return;
     const name = p.title ? `"${p.title}"` : "이 영상";
-    if (!confirm(`${name} 을 지울까요?
-
-만든 영상과 그림이 함께 지워지고 되돌릴 수 없어요. 쓴 크레딧은 돌아오지 않아요.`)) return;
+    const ok = await confirm({
+      title: `${name} 을 지울까요?`,
+      body: "만든 영상과 그림이 함께 지워지고 되돌릴 수 없어요.
+쓴 크레딧은 돌아오지 않아요.",
+      confirmLabel: "지우기",
+    });
+    if (!ok) return;
     setBusyId(p.id);
     const res = await fetch(`/api/projects/${p.id}`, { method: "DELETE" });
     setBusyId(null);
     if (!res.ok) {
-      alert((await res.json().catch(() => ({}))).error || "지우지 못했어요");
+      await alert({
+        title: "지우지 못했어요",
+        body: (await res.json().catch(() => ({}))).error || "잠시 뒤 다시 시도해 주세요.",
+      });
       return;
     }
     onDeleted?.(p.id);
