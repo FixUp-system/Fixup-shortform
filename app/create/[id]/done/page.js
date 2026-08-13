@@ -317,6 +317,10 @@ export default function DoneStepPage() {
     // 세로가 긴 비율에서 화면 밖으로 넘치지 않게 — CSS 의 9:16 고정값을 비율에서 다시 뽑는다
     maxWidth: `calc((100vh - 210px) * ${aspect.width} / ${aspect.height})`,
   };
+  // 미리보기를 **가로 560 · 세로 640 상자**에 가둔다. 상자 치수는 CSS 가 쥐고, 비율만
+  // 여기서 넘긴다(--ar) — 비율의 출처는 프로젝트 하나여야 한다(위 aspectFor).
+  // 9:16 이면 640×9/16 = 360 이라 지금과 한 픽셀도 안 바뀐다.
+  const previewStyle = { "--ar": aspect.width / aspect.height };
 
   // 미리보기에 띄울 자막 — **완성본과 같은 함수로 나눈다.**
   //
@@ -379,8 +383,11 @@ export default function DoneStepPage() {
 
   if (!clipCount) return <p className="pgsub">영상을 먼저 만들어 주세요.</p>;
 
+  // ★ panel--stage — 완성 화면 전용 폭이다. panel--narrow(760 고정)는 대본·구성·브리핑도
+  // 함께 쓰므로 건드리지 않는다. 여기만 내용에 맞춰 자라고(최대 960), 그 폭을 정하는 것은
+  // 영상 비율이다(위 previewStyle).
   return (
-    <section className="panel panel--narrow">
+    <section className="panel panel--narrow panel--stage">
       <h2>완성본을 내려받습니다 <span className="badge vlm">완성</span></h2>
       {err && <p className="pgsub warn">{err}</p>}
       {/* 지난번 시도가 왜 실패했는지 — 라우트가 render_error 에 남겨 둔다. 진입·새로고침으로
@@ -415,7 +422,6 @@ export default function DoneStepPage() {
         </>
       ) : (
         <>
-          <p className="pgsub">완성했어요 — 약 {Math.round(render.seconds || 0)}초.</p>
           {stale && (
             <div className="script-src warn">{staleMessage}</div>
           )}
@@ -428,11 +434,17 @@ export default function DoneStepPage() {
               조절판을 만지는 동안 영상이 화면 밖으로 밀려, 고친 결과를 보려고 매번
               스크롤해야 했다. 좁은 화면에서는 다시 위아래로 쌓인다(globals.css). */}
           <div className="done-stage">
+          {/* ★ 제목을 조절판 **밖**으로 뺐다(2026-08-13 사용자 요청). 안에 두면 제목 높이
+              만큼 회색 상자가 아래로 밀려, 영상 윗변과 31px 어긋나 보였다. 무대가 격자라
+              제목은 1행 왼쪽 칸, 상자와 영상은 2행에 나란히 선다 — 숫자를 박아 미는 것이
+              아니라 격자가 맞춘다. */}
+          {rawUrl && (
+            <div className="eyebrow sub-eyebrow">
+              수정 <small>끌어서 옮기고 글꼴·색·크기를 골라요</small>
+            </div>
+          )}
           {rawUrl && (
               <div className="sub-editor">
-              <div className="eyebrow mt-lg">
-                자막 꾸미기 <small>끌어서 옮기고 글꼴·색·크기를 골라요 — 다시 굽는 데 값이 들지 않아요</small>
-              </div>
               {/* 네 가지 결정을 한 장에 같은 리듬으로 둔다. 예전에는 위치 칩과 글꼴 칩이
                   라벨 없이 두 줄로 붙어 있어, 어느 줄이 무엇을 고르는 줄인지 알 수 없었다. */}
               <div className="subpanel">
@@ -536,7 +548,7 @@ export default function DoneStepPage() {
           )}
           {/* ★ 자막 없는 원본을 재생하고 그 위에 브라우저가 자막을 그린다 — 구워진 자막 위에
               미리보기를 얹으면 자막이 둘로 보인다. 원본이 없는 옛 프로젝트는 완성본 그대로다. */}
-          <div className="preview-pane done-preview">
+          <div className="preview-pane done-preview" style={previewStyle}>
             <div className="preview-frame" ref={stageRef} style={frameStyle}>
               {/* key 로 다시 만든다 — src 만 바꾸면 브라우저가 이미 물고 있던 스트림을 이어 튼다 */}
               <video key={previewSrc} className="preview-video" controls src={previewSrc} />
