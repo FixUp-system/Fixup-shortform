@@ -118,7 +118,8 @@ describe("⑥완성 — 빠른 위치 칩", () => {
     const block = src.slice(at, src.indexOf(";", src.indexOf("=", at)));
     expect(block, "프리셋 자리가 posFromLegacyPosition 에서 오지 않는다").toContain("posFromLegacyPosition");
     expect(block, "위치 목록을 화면이 손으로 적었다").toContain("SUBTITLE_POSITIONS");
-    expect(src).toMatch(/setSub\(\(s\) => \(\{ \.\.\.s, pos: clampPos\(p\.pos\) \}\)\)/);
+    // 고른 자리는 **프리셋의 pos** 를 clampPos 로 통과시켜 세팅한다(화면이 비율을 새로 적지 않는다)
+    expect(src).toMatch(/pos: clampPos\((p|preset)\.pos\)/);
   });
 
   it("켜진 칩을 pos 에서 거꾸로 판정한다 — subtitle_position 을 읽지 않는다", () => {
@@ -127,8 +128,8 @@ describe("⑥완성 — 빠른 위치 칩", () => {
     // 드래그로 옮긴 뒤에도 칩이 켜진 채라 화면이 거짓말을 한다.
     const chipIdx = src.indexOf("POSITION_PRESETS.map");
     expect(chipIdx, "칩을 프리셋 표에서 그리지 않는다").toBeGreaterThan(-1);
-    const chipBlock = src.slice(chipIdx, src.indexOf("</div>", chipIdx));
-    expect(chipBlock, "칩 켜짐을 subtitle_position 으로 판정한다").not.toContain("subtitle_position");
+    const chipBlock = src.slice(chipIdx, src.indexOf("</select>", chipIdx));
+    expect(chipBlock, "고른 자리를 subtitle_position 으로 판정한다").not.toContain("subtitle_position");
     expect(src, "옛 위치를 다시 저장하지 않는다").not.toContain("subtitle_position:");
   });
 });
@@ -221,7 +222,10 @@ describe("⑥완성 — 원본이 없는 옛 프로젝트", () => {
 
   // 옛 프로젝트는 완성본을 그대로 재생한다(원본이 없으니 재생할 것이 그것뿐이다)
   it("원본이 없으면 완성본을 재생한다", () => {
-    expect(src).toContain("src={rawUrl || render.url}");
+    // 재생기는 previewSrc 하나를 본다. 그 식이 원본이 없을 때 완성본으로 떨어져야 한다
+    // (rawUrl 이 없으면 미리보기를 얹을 수 없으니 구워진 자막이 있는 완성본을 튼다).
+    expect(src).toMatch(/const previewSrc =[^;]*rawUrl \|\| finalSrc/);
+    expect(src).toContain("src={previewSrc}");
   });
 });
 
@@ -236,5 +240,65 @@ describe("⑥완성 — 자막만 낡았을 때는 있던 완성본을 받을 �
   // 라우트가 render_error 에 사유를 남기는데 읽는 화면이 없으면 그 필드는 거짓말이다.
   it("지난 실패 사유(render_error)를 화면이 읽는다", () => {
     expect(src).toContain("project?.render_error");
+  });
+});
+
+describe("⑥완성 — 고르는 것을 그 모습대로 보여 준다", () => {
+  // 글꼴을 이름으로만 고르면 사장님은 "부드럽게"가 어떤 글씨인지 모른 채 고른다.
+  // 웹폰트는 이미 실려 있으니 칩 자체를 그 글꼴로 그린다 — 이름은 lib 의 label 그대로다.
+  it("글꼴 칩을 그 글꼴로 그린다", () => {
+    const chips = src.match(/SUBTITLE_FONTS\.map\([\s\S]{0,700}?\)\)\}/);
+    expect(chips, "글꼴 칩을 그리는 자리를 못 찾았다").toBeTruthy();
+    expect(chips[0], "칩이 cssFamily 로 안 그려진다 — 이름만 보고 고르게 된다")
+      .toContain("cssFamily");
+  });
+
+  // 미리보기 테두리가 상수면, 새 규칙(글자를 따라가는 테두리)과 어긋나 고른 것과 다른 결과가 나온다.
+  it("미리보기 테두리도 lib 이 정한다 — rimFor 를 쓴다", () => {
+    expect(src).toMatch(/rimFor/);
+  });
+
+  // [적용]이 켜진 칩과 같은 옷을 입으면 실행이 선택으로 읽힌다.
+  it("[적용]은 선택 칩이 아니다", () => {
+    const apply = src.match(/<button[^>]*applyToVideo[^>]*>/);
+    expect(apply, "적용 버튼을 못 찾았다").toBeTruthy();
+    expect(apply[0], "실행 버튼이 켜진 칩(chip on)으로 그려진다").not.toMatch(/chip on/);
+  });
+});
+
+// 미리보기가 문장을 통째로 흘리면 여섯 줄이 되는데 완성본은 두 줄이다 — 자리(아랫변 기준)도
+// 크기도 그만큼 다르게 보인다. 나누는 규칙은 lib 하나여야 한다.
+describe("⑥완성 — 미리보기는 완성본과 같이 나눈다", () => {
+  it("문장을 buildCues 로 나눈다 — 화면이 따로 흘리지 않는다", () => {
+    expect(src).toMatch(/buildCues/);
+  });
+});
+
+// 사장님 눈에 "적용했는데 영상이 그대로"로 보이던 자리들이다.
+// 실제로는 구워지고 있었는데(2026-08-13 실측: 완성본 프레임이 설정을 정확히 반영),
+// ①화면이 늘 **자막 없는 원본**을 재생해서 볼 자리가 없었고 ②영상을 만드는 버튼이
+// [자막 적용]·[다시 합치기] 둘이라 어느 것이 반영하는 것인지 알 수 없었다.
+describe("⑥완성 — 적용하면 그 영상을 보여 준다", () => {
+  it("고치는 중이 아니면 완성본을 재생한다", () => {
+    // 원본은 자막이 없다 — 늘 원본을 틀면 적용 결과를 화면에서 볼 수 없다.
+    expect(src).toMatch(/dirty/);
+  });
+
+  it("다시 구우면 새 파일을 받는다 — 각인을 URL 에 싣는다", () => {
+    // URL 이 늘 같아서(/api/renders/<id>.mp4) 그대로 두면 <video> 가 옛 파일을 계속 쓴다.
+    expect(src).toMatch(/render\.ts/);
+  });
+
+  it("영상을 만드는 버튼은 하나다 — 조절 패널이 있으면 하단 버튼은 안 그린다", () => {
+    // 하단의 재합성 버튼(onClick={start})은 조절 패널이 없을 때만 나온다.
+    // 패널이 있으면 [영상에 적용] 하나가 자막 굽기와 전체 재합성을 다 맡는다.
+    for (const m of src.matchAll(/<button[^>]*onClick=\{start\}/g)) {
+      const before = src.slice(Math.max(0, m.index - 200), m.index);
+      expect(before, "재합성 버튼이 rawUrl 갈래로 가려지지 않는다").toMatch(/!rawUrl|!\(render && rawUrl\)/);
+    }
+  });
+
+  it("자막만 바뀐 것과 컷이 낡은 것을 한 버튼이 갈라 처리한다", () => {
+    expect(src).toMatch(/applyToVideo/);
   });
 });

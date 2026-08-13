@@ -15,6 +15,8 @@ import {
   normalizeSubtitle,
   clampPos,
   outlineFor,
+  rimFor,
+  buildCues,
   subtitleStyle,
   posFromLegacyPosition,
   SUBTITLE_LINE_HEIGHT,
@@ -52,6 +54,9 @@ const POSITION_PRESETS = SUBTITLE_POSITIONS.map((id) => ({
 // 켜진 칩은 pos 에서 거꾸로 판정한다 — settings.subtitle_position 을 읽으면 화면이 거짓말을
 // 한다(드래그로 옮겨도 칩은 켜진 채다). 드래그해서 어느 프리셋과도 다르면 아무 칩도 안 켜진다.
 // 눈금 하나 차이로 꺼지지 않게 아주 작은 여유만 둔다.
+// 드래그로 옮겨 어느 프리셋과도 안 맞을 때 목록이 가리킬 자리. 저장되는 값이 아니다.
+const CUSTOM_POS = "custom";
+
 const samePos = (a, b) => Math.abs(a[0] - b[0]) < 0.005 && Math.abs(a[1] - b[1]) < 0.005;
 
 export default function DoneStepPage() {
@@ -150,7 +155,38 @@ export default function DoneStepPage() {
     e.currentTarget.releasePointerCapture?.(e.pointerId);
   }
 
-  // [적용] — 설정을 저장한 뒤 **자막만** 다시 굽는다. 클립·소리·그림은 그대로라 값이 안 든다.
+  // [영상에 적용] — 설정을 저장한 뒤 **영상에 반영한다.** 길은 코드가 고른다:
+  // 컷·소리·그림이 낡았으면 전체를 다시 합치고, 자막만 달라졌으면 원본 위에 자막만 굽는다
+  // (훨씬 빠르고 클립을 다시 받지 않는다). 사장님이 두 길을 구별할 이유가 없다 —
+  // 옛 화면은 [자막 적용]과 [다시 합치기]를 나란히 두어, 어느 것이 영상에 반영하는
+  // 것인지 알 수 없었다(2026-08-13 사용자 지적).
+  async function applyToVideo() {
+    if (applying || busy) return;
+    // 몸통이 낡았으면 자막만 구워 봐야 옛 클립 위에 새 자막이 얹힌다 — 전체를 다시 합친다.
+    // 전체 합성도 settings.subtitle 을 읽으므로 자막 설정은 그 길에서도 실린다.
+    if (stale && !subtitleOnlyStale) {
+      setApplying(true);
+      try {
+        const saved = await fetch(`/api/projects/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ settings: { subtitle: sub } }),
+        });
+        if (!saved.ok) {
+          throw new Error((await saved.json().catch(() => ({}))).error || "자막 설정을 저장하지 못했어요");
+        }
+      } catch (e) {
+        setErr(e.message || "자막 설정을 저장하지 못했어요");
+        setApplying(false);
+        return;
+      }
+      setApplying(false);
+      return start();
+    }
+    return applySubtitle();
+  }
+
+  // 설정을 저장한 뒤 **자막만** 다시 굽는다. 클립·소리·그림은 그대로라 값이 안 든다.
   // 저장을 먼저 하는 이유: 재굽기가 실패해도 고른 설정은 남아야 다음에 다시 시도할 수 있다.
   async function applySubtitle() {
     if (applying || busy) return;
@@ -261,6 +297,18 @@ export default function DoneStepPage() {
   // ①드래그한 자리가 잘린 프레임 기준이라 최종과 다른 자리를 가리키고, ②글자 크기를
   // box.height(=폭×16/9)로 재는데 ffmpeg 는 실제 높이로 재서 크기까지 어긋났다.
   // 값은 lib/aspects 에서 가져온다 — 화면이 손으로 적으면 값이 두 벌이 된다.
+  // 고치는 중인가 — 저장된 설정과 지금 고른 값이 다른가.
+  //
+  // ★ 이것이 재생기의 갈림이다. 옛 화면은 **늘 자막 없는 원본**을 틀어서, 적용이 실제로
+  // 되고 있어도(구운 파일은 설정을 정확히 반영한다) 사장님 눈에는 "영상이 그대로"였다.
+  // 고치는 중에는 미리보기(원본 + 브라우저가 그리는 자막), 아니면 **진짜 완성본**을 튼다.
+  const dirty = JSON.stringify(sub) !== JSON.stringify(seedSubtitle(project));
+
+  // ★ 완성본 URL 은 늘 같다(/api/renders/<id>.mp4) — 다시 구워도 <video> 는 옛 파일을
+  // 그대로 쓴다. 각인(render.ts)을 실어 다른 주소로 만든다. 라우트는 질의문자를 안 본다.
+  const finalSrc = render?.url ? `${render.url}?v=${render.ts || 0}` : null;
+  const previewSrc = dirty || !finalSrc ? rawUrl || finalSrc : finalSrc;
+
   const aspect = aspectFor(project?.settings?.aspect_ratio);
   const frameStyle = {
     position: "relative",
@@ -270,8 +318,15 @@ export default function DoneStepPage() {
     maxWidth: `calc((100vh - 210px) * ${aspect.width} / ${aspect.height})`,
   };
 
-  // 미리보기에 띄울 자막 — 첫 문장이면 충분하다(자리·크기·색을 보는 용도다)
-  const sampleText = (cuts.find((c) => (c.sentence || "").trim())?.sentence || "자막 미리보기").trim();
+  // 미리보기에 띄울 자막 — **완성본과 같은 함수로 나눈다.**
+  //
+  // ★ 문장을 통째로 흘리면 상자 폭에 따라 여섯 줄이 되는데 완성본은 두 줄이다. pos 가 글자
+  // 블록의 아랫변 기준이라 줄 수가 다르면 자막이 차지하는 자리가 통째로 달라지고, 낱말도
+  // 아무 데서나 잘린다("하/이톱"). 나누는 규칙은 lib 하나여야 한다.
+  const sampleCut = cuts.find((c) => (c.sentence || "").trim());
+  const sampleText = (box.height && sampleCut
+    ? buildCues([sampleCut], { width: box.width, height: box.height, subtitle: sub })[0]?.text
+    : sampleCut?.sentence) || "자막 미리보기";
   const font = SUBTITLE_FONTS.find((f) => f.id === sub.font) || SUBTITLE_FONTS[0];
   // ★ 완성본과 **같은 함수**로 잰다. 여기서 따로 곱하면 미리보기와 최종이 갈린다.
   const previewFontSize = box.height
@@ -280,8 +335,14 @@ export default function DoneStepPage() {
   // 외곽선 색은 사장님이 고르지 않는다 — lib 의 같은 규칙(글자색의 반대 명도)을 쓴다.
   // ASS 의 외곽선을 브라우저에서는 그림자 여덟 방향으로 흉내 낸다.
   const outline = outlineFor(sub.color);
-  const outlineShadow = [[-2, 0], [2, 0], [0, -2], [0, 2], [-2, -2], [2, -2], [-2, 2], [2, 2]]
-    .map(([x, y]) => `${x}px ${y}px 0 ${outline}`)
+  // ★ 두께도 lib 이 정한다 — 글꼴이 가늘수록·글자가 클수록 두꺼워진다(rimFor).
+  // 여기서 2px 로 못 박아 두면 고른 것과 다른 결과가 나온다.
+  // 미리보기 상자 치수로 잰 글자 크기를 넘기므로 값이 이미 미리보기 픽셀이다.
+  const rim = rimFor(sub.font, previewFontSize);
+  const outlineShadow = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]]
+    .map(([x, y]) => `${x * rim.outline}px ${y * rim.outline}px 0 ${outline}`)
+    // ASS 의 Shadow 는 오른쪽 아래로 떨어지는 그림자다 — 밝은 배경에서 아랫변을 떼어 놓는다
+    .concat(`${rim.shadow}px ${rim.shadow}px ${rim.shadow}px rgba(0,0,0,0.55)`)
     .join(", ");
   const overlayStyle = {
     position: "absolute",
@@ -290,9 +351,15 @@ export default function DoneStepPage() {
     // ★ pos 는 글자 블록의 **아랫변** 기준이다 — ffmpeg 의 \pos + Alignment 2 와 같은 뜻.
     // 기준이 갈리면 미리보기와 완성본의 자막 높이가 어긋나고, 두 줄이 되면 덜컹거린다.
     transform: "translate(-50%, -100%)",
-    maxWidth: "84%",
+    // 완성본을 틀 때는 자막이 **영상 안에** 이미 구워져 있다 — 미리보기까지 그리면 둘로 보인다.
+    // 지우지 않고 감추기만 하는 이유는 **끄는 자리**를 남겨 두려고다: 사장님이 영상 속 자막을
+    // 그대로 끌면 그 순간 고치는 중이 되어 미리보기가 다시 나타난다.
+    opacity: dirty ? 1 : 0,
     textAlign: "center",
-    whiteSpace: "pre-line",
+    // ★ 줄바꿈은 이미 lib 이 정했다(buildCues) — 여기서 폭을 걸어 **다시** 접으면 완성본과
+    // 다른 줄 수가 나온다. 실제로 두 줄짜리가 미리보기에서만 네 줄이 되고 낱말이 잘렸다
+    // ("하/이톱"). ffmpeg 는 \N 자리에서만 끊으므로 미리보기도 그래야 같은 그림이다.
+    whiteSpace: "pre",
     fontSize: previewFontSize,
     // 줄 높이도 lib 이 쥔다 — 옛 위치를 옮길 때 쓰는 글자 블록 높이와 같은 값이어야 한다
     lineHeight: SUBTITLE_LINE_HEIGHT,
@@ -361,7 +428,8 @@ export default function DoneStepPage() {
               미리보기를 얹으면 자막이 둘로 보인다. 원본이 없는 옛 프로젝트는 완성본 그대로다. */}
           <div className="preview-pane done-preview">
             <div className="preview-frame" ref={stageRef} style={frameStyle}>
-              <video className="preview-video" controls src={rawUrl || render.url} />
+              {/* key 로 다시 만든다 — src 만 바꾸면 브라우저가 이미 물고 있던 스트림을 이어 튼다 */}
+              <video key={previewSrc} className="preview-video" controls src={previewSrc} />
               {rawUrl && (
                 <div
                   style={overlayStyle}
@@ -378,53 +446,83 @@ export default function DoneStepPage() {
 
           {rawUrl && (
             <>
+              <div className="sub-editor">
               <div className="eyebrow mt-lg">
-                자막 꾸미기 <small>끌어서 옮기고 폰트·색·크기를 골라요 — 다시 굽는 데 값이 들지 않아요</small>
+                자막 꾸미기 <small>끌어서 옮기고 글꼴·색·크기를 골라요 — 다시 굽는 데 값이 들지 않아요</small>
               </div>
-              {/* 빠른 위치. 켜짐은 pos 에서 거꾸로 판정하므로, 끌어서 옮기면 아무 칩도 안 켜진다 */}
-              <div className="chips">
-                {POSITION_PRESETS.map((p) => (
-                  <button
-                    key={p.id}
-                    className={`chip${samePos(sub.pos, p.pos) ? " on" : ""}`}
-                    disabled={applying}
-                    onClick={() => setSub((s) => ({ ...s, pos: clampPos(p.pos) }))}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-              <div className="chips">
-                {SUBTITLE_FONTS.map((f) => (
-                  <button
-                    key={f.id}
-                    className={`chip${sub.font === f.id ? " on" : ""}`}
-                    disabled={applying}
-                    onClick={() => setSub((s) => ({ ...s, font: f.id }))}
-                  >
-                    {f.label}
-                  </button>
-                ))}
-              </div>
-              <div className="brief">
-                <div className="brief-row">
-                  <b>글자색</b>
-                  <div className="val">
+              {/* 네 가지 결정을 한 장에 같은 리듬으로 둔다. 예전에는 위치 칩과 글꼴 칩이
+                  라벨 없이 두 줄로 붙어 있어, 어느 줄이 무엇을 고르는 줄인지 알 수 없었다. */}
+              <div className="subpanel">
+                <div className="sub-row">
+                  <span className="sub-label">위치</span>
+                  {/* 고른 값은 pos 에서 거꾸로 판정한다 — 끌어서 옮기면 어느 자리와도 안 맞으므로
+                      "직접 옮김"으로 떨어진다(그때 목록을 비우면 화면이 거짓말을 한다). */}
+                  <div className="sub-select-wrap">
+                    <select
+                      className="sub-select"
+                      aria-label="자막 위치"
+                      value={POSITION_PRESETS.find((p) => samePos(sub.pos, p.pos))?.id || CUSTOM_POS}
+                      disabled={applying}
+                      onChange={(e) => {
+                        const preset = POSITION_PRESETS.find((p) => p.id === e.target.value);
+                        if (preset) setSub((s) => ({ ...s, pos: clampPos(preset.pos) }));
+                      }}
+                    >
+                      {POSITION_PRESETS.map((p) => (
+                        <option key={p.id} value={p.id}>{p.label}</option>
+                      ))}
+                      <option value={CUSTOM_POS} disabled>직접 옮김</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="sub-row">
+                  <span className="sub-label">글꼴</span>
+                  {/* ★ 고른 글꼴을 **그 글꼴로** 보여 준다 — 이름만 보고 고르면 "부드럽게"가 어떤
+                      글씨인지 모른 채 고르게 된다. 이름(label)·글꼴 이름(cssFamily) 둘 다 lib 에서
+                      온다. 브라우저용 이름이라야 한다(ffmpeg 의 family 가 아니다).
+                      목록 안 글자까지 그 글꼴로 그릴지는 브라우저가 정한다 — 못 그려도 닫힌
+                      상태에서는 늘 제 글꼴로 보이므로 고르는 근거가 사라지지 않는다. */}
+                  <div className="sub-select-wrap">
+                    <select
+                      className="sub-select face"
+                      aria-label="자막 글꼴"
+                      style={{ fontFamily: font.cssFamily }}
+                      value={sub.font}
+                      disabled={applying}
+                      onChange={(e) => setSub((s) => ({ ...s, font: e.target.value }))}
+                    >
+                      {SUBTITLE_FONTS.map((f) => (
+                        <option key={f.id} value={f.id} style={{ fontFamily: f.cssFamily }}>
+                          {f.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="sub-row">
+                  <span className="sub-label">색</span>
+                  {/* 테두리 색은 사장님이 고르는 것이 아니다 — 미리보기가 이미 보여 주므로
+                      값을 글자로 적지 않는다(옛 화면은 테두리 색의 hex 를 그대로 적었다). */}
+                  <div className="sub-control">
                     <input
+                      className="sub-swatch"
                       type="color"
+                      aria-label="자막 글자색"
                       value={sub.color}
                       disabled={applying}
                       onChange={(e) => setSub((s) => ({ ...s, color: e.target.value.toUpperCase() }))}
                     />
-                    <span className="mono"> {sub.color} · 테두리 {outline}</span>
+                    <span className="sub-value mono">{sub.color}</span>
                   </div>
                 </div>
-                <div className="brief-row">
-                  <b>크기</b>
-                  <div className="val">
+                <div className="sub-row">
+                  <span className="sub-label">크기</span>
+                  <div className="sub-control">
                     {/* 범위는 lib 이 쥔다 — 두 벌이면 슬라이더 끝과 저장되는 값이 갈린다 */}
                     <input
+                      className="sub-slider"
                       type="range"
+                      aria-label="자막 크기"
                       min={SIZE_MIN}
                       max={SIZE_MAX}
                       step="0.05"
@@ -432,18 +530,25 @@ export default function DoneStepPage() {
                       disabled={applying}
                       onChange={(e) => setSub((s) => ({ ...s, size: Number(e.target.value) }))}
                     />
-                    <span className="mono"> {sub.size.toFixed(2)}배</span>
+                    <span className="sub-value mono">{sub.size.toFixed(2)}배</span>
                   </div>
                 </div>
+                {/* 실행도 이 격자 안이다 — 카드 밖에 두면 어느 카드에 딸린 버튼인지 흐려진다.
+                    주 버튼은 미리보기 패널의 선례(.mini.confirm-btn)를 그대로 쓴다 —
+                    이 화면의 .cta 는 [내려받기]다(한 화면에 하나). */}
+                <div className="sub-row sub-row--actions">
+                  {/* 되돌리기 값도 lib 이 쥔다 — 화면이 기본값을 다시 적지 않는다 */}
+                  <button className="mini" disabled={applying || busy} onClick={() => setSub(normalizeSubtitle(DEFAULT_SUBTITLE))}>
+                    기본으로
+                  </button>
+                  {/* ★ 영상을 만드는 버튼은 이 하나다. 자막만 굽는지 전체를 다시 합치는지는
+                      코드가 고른다(applyToVideo) — 사장님이 고를 일이 아니다.
+                      고친 게 없으면 누를 것이 없다 — 재생 중인 그 영상이 이미 결과다. */}
+                  <button className="mini confirm-btn" disabled={applying || busy || !dirty} onClick={applyToVideo}>
+                    {applying || busy ? "영상에 반영하는 중…" : dirty ? "영상에 적용" : "적용됨"}
+                  </button>
+                </div>
               </div>
-              <div className="chips">
-                {/* 되돌리기 값도 lib 이 쥔다 — 화면이 기본값을 다시 적지 않는다 */}
-                <button className="chip" disabled={applying} onClick={() => setSub(normalizeSubtitle(DEFAULT_SUBTITLE))}>
-                  기본으로
-                </button>
-                <button className="chip on" disabled={applying} onClick={applySubtitle}>
-                  {applying ? "다시 굽는 중…" : "적용"}
-                </button>
               </div>
             </>
           )}
@@ -466,25 +571,37 @@ export default function DoneStepPage() {
         <div className="fwd">
           {render && !render.fake && render.url && (!stale || subtitleOnlyStale) ? (
             <>
-              <button className="mini" disabled={busy} onClick={start}>
-                {busy ? "합치는 중…" : "다시 합치기"}
-              </button>
+              {/* ★ 조절 패널이 있으면 [영상에 적용] 하나가 두 길을 다 맡는다 — 여기에
+                  [다시 합치기]를 또 두면 어느 것이 영상에 반영하는 버튼인지 알 수 없다.
+                  패널이 없는 옛 프로젝트(원본 없음)에서만 이 길이 필요하다. */}
+              {!rawUrl && (
+                <button className="mini" disabled={busy} onClick={start}>
+                  {busy ? "합치는 중…" : "다시 합치기"}
+                </button>
+              )}
               <a className="cta" href={render.url} download>
                 내려받기
               </a>
             </>
           ) : (
             <>
+              {/* ★ 조절 패널이 있는 상태(완성본 + 원본이 있다)에서는 영상을 만드는 버튼이
+                  위의 [영상에 적용] 하나다 — 여기에 또 두면 둘 중 무엇을 눌러야 반영되는지
+                  알 수 없다. 컷이 낡은 경우도 그 버튼이 전체 재합성으로 보낸다. */}
               <span className="hint">
-                {stale
+                {render && rawUrl
+                  ? "위의 [영상에 적용]을 누르면 지금 내용으로 다시 만들어요"
+                  : stale
                   ? "다시 합치면 지금 내용으로 내려받을 수 있어요"
                   : render
                   ? "컷을 고쳤다면 다시 합쳐 주세요"
                   : "합치는 데 조금 걸려요"}
               </span>
-              <button className="cta" disabled={busy} onClick={start}>
-                {busy ? "합치는 중…" : render ? "다시 합치기" : "완성본 만들기"}
-              </button>
+              {!(render && rawUrl) && (
+                <button className="cta" disabled={busy} onClick={start}>
+                  {busy ? "합치는 중…" : render ? "다시 합치기" : "완성본 만들기"}
+                </button>
+              )}
             </>
           )}
         </div>
