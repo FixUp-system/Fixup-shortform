@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { generateClip, fitDuration, I2V_MAX_SECONDS } from "../lib/i2v";
-import { profileFor, fitDurationFor, maxSecondsFor, clipProfileForProject } from "../lib/clip-limits";
+import { profileFor, fitDurationFor, maxSecondsFor, clipProfileForProject, DEFAULT_RESOLUTION } from "../lib/clip-limits";
+import { estimateCost } from "../lib/costs.js";
 import { runWithActor } from "../lib/actor.js";
 import { memoryStore } from "../lib/store/memory.js";
 
@@ -300,5 +301,82 @@ describe("클립이 프로젝트의 모델로 나간다", () => {
     const mine = rows.filter((r) => r.project_id === "p-seed");
     expect(mine).toHaveLength(1);
     expect(mine[0].endpoint).toBe("bytedance/seedance-2.0/image-to-video");
+  });
+});
+
+// 사장님이 ⑤에서 고른 화질이 실제 fal 요청까지 흘러야 한다. 여기가 그 이음매다 —
+// 프로필의 extra 에는 이제 resolution 이 없다(요청 시점에 고른 값을 싣는 자리를 비워 뒀다).
+describe("고른 화질이 요청에 실린다", () => {
+  // 가짜 모드가 켜져 있으면 요청이 아예 안 나간다 — 여기서는 꺼 둔다.
+  beforeEach(() => { process.env.SHOTFORM_FAKE = "off"; });
+
+  const captor = () => {
+    const box = {};
+    return {
+      box,
+      fetchImpl: async (_url, init) => {
+        box.body = JSON.parse(init.body);
+        return { ok: true, json: async () => ({ video: { url: "https://x/v.mp4" } }) };
+      },
+    };
+  };
+
+  const base = { imageUrl: "https://x/i.png", seconds: 5, aspect_ratio: "9:16", prompt: "움직인다", projectId: "p1" };
+
+  it("Seedance 요청에 고른 해상도가 실린다", async () => {
+    const { box, fetchImpl } = captor();
+    await runWithActor("t-user", () =>
+      generateClip({ ...base, project: { settings: { i2v_model: "seedance-2.0", resolution: "1080p" } }, fetchImpl })
+    );
+    expect(box.body.resolution).toBe("1080p");
+  });
+
+  it("해상도를 안 고르면 기본값이 실린다", async () => {
+    const { box, fetchImpl } = captor();
+    await runWithActor("t-user", () =>
+      generateClip({ ...base, project: { settings: { i2v_model: "seedance-2.0" } }, fetchImpl })
+    );
+    expect(box.body.resolution).toBe(DEFAULT_RESOLUTION);
+  });
+
+  it("목록에 없는 해상도는 기본값으로 떨어진다 — 옛 값이 남아 거절당하지 않게", async () => {
+    const { box, fetchImpl } = captor();
+    await runWithActor("t-user", () =>
+      generateClip({ ...base, project: { settings: { i2v_model: "seedance-2.0", resolution: "2160p" } }, fetchImpl })
+    );
+    expect(box.body.resolution).toBe(DEFAULT_RESOLUTION);
+  });
+
+  // 모르는 필드를 보내면 거절될 수 있다 — 해상도를 안 여는 모델에는 키 자체가 없어야 한다.
+  it("Kling 요청에는 resolution 키가 아예 없다", async () => {
+    const { box, fetchImpl } = captor();
+    await runWithActor("t-user", () =>
+      generateClip({ ...base, project: { settings: { i2v_model: "kling-v3", resolution: "1080p" } }, fetchImpl })
+    );
+    expect("resolution" in box.body).toBe(false);
+  });
+
+  it("project 를 안 넘긴 옛 호출부에도 resolution 키가 없다", async () => {
+    const { box, fetchImpl } = captor();
+    await runWithActor("t-user", () => generateClip({ ...base, fetchImpl }));
+    expect("resolution" in box.body).toBe(false);
+  });
+
+  // ★ 원장과 실청구가 갈리는 자리 — 1080p 를 사고 720p 로 기록하면 원가가 절반 이하로 남는다.
+  it("원가 기록도 같은 해상도를 본다", async () => {
+    const { fetchImpl } = captor();
+    await runWithActor("t-user", () =>
+      generateClip({
+        ...base, projectId: "p-1080",
+        project: { settings: { i2v_model: "seedance-2.0", resolution: "1080p" } },
+        fetchImpl,
+      })
+    );
+    const rows = await memoryStore.allCosts();
+    const mine = rows.filter((r) => r.project_id === "p-1080");
+    expect(mine).toHaveLength(1);
+    // 5초 × $0.682(1080p) — 720p($0.3034)로 기록되면 여기서 갈린다
+    expect(mine[0].est_cost_usd).toBeCloseTo(estimateCost("bytedance/seedance-2.0/image-to-video", 5, "1080p"), 6);
+    expect(mine[0].est_cost_usd).not.toBeCloseTo(estimateCost("bytedance/seedance-2.0/image-to-video", 5, "720p"), 6);
   });
 });
