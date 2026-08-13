@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   STEPS, currentStepKey, isReachable, areCutsStale, stepFromPathname, stepHref,
-  clipKey, renderKey, isAudioStale, isImageStale, isClipStale, isRenderStale,
+  clipKey, renderKey, isAudioStale, isImageStale, isClipStale, isRenderStale, toneKey,
   isSubtitlePositionOnlyStale, isSubtitleOnlyStale,
 } from "../lib/steps.js";
 import { DEFAULT_SUBTITLE } from "../lib/subtitles.js";
@@ -209,6 +209,34 @@ describe("낡음 판정 — 산출물마다 무엇에서 나왔는지 각인한�
       it("프로젝트를 안 주면 화풍 판정을 건너뛴다", () => {
         expect(isImageStale(cut("illust|"))).toBe(false);
         expect(isImageStale(cut("illust|"), 3)).toBe(false);
+      });
+    });
+
+    describe("톤 각인", () => {
+      it("각인이 없던 그림은 안 낡는다", () => {
+        // 옛 프로젝트가 통째로 낡으면 재구매가 제시된다 — style_of 때 겪은 함정이다
+        const cut = { shows: "가", image: { url: "u", of: "가" } };
+        expect(isImageStale(cut, {})).toBe(false);
+      });
+
+      it("톤이 바뀌면 낡는다", () => {
+        const cut = { shows: "가", tone: "새 톤", image: { url: "u", of: "가", tone_of: "옛 톤" } };
+        expect(isImageStale(cut, {})).toBe(true);
+      });
+
+      it("톤이 그대로면 안 낡는다", () => {
+        const cut = { shows: "가", tone: "같은 톤", image: { url: "u", of: "가", tone_of: "같은 톤\n" } };
+        expect(isImageStale(cut, {})).toBe(false);
+      });
+
+      it("걸러지는 값은 각인에 안 들어간다", () => {
+        // 쓰이지 않는 값으로 낡음을 판정하면 그림이 안 바뀌는데 낡았다고 나온다
+        expect(toneKey({ tone: "천천히 줌 인", transition: "앞 컷에서" })).toBe("");
+      });
+
+      it("톤과 전환을 한 줄로 굳힌다", () => {
+        expect(toneKey({ tone: "질감", transition: "구도" })).toBe("질감\n구도");
+        expect(toneKey({ tone: "질감" })).toBe("질감\n");
       });
     });
   });
