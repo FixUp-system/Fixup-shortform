@@ -908,51 +908,41 @@ describe("PATCH /api/projects/[id] — 영상 모델", () => {
     expect((await getProject(p.id, OWNER)).settings.i2v_model).toBeUndefined();
   });
 
-  it("아는 값이면 저장된다", async () => {
-    const p = await make();
-    const res = await PATCH(patchReq({ settings: { i2v_model: "seedance-2.0" } }), ctx(p.id));
-    expect(res.status ?? 200).toBe(200);
+  it("만들 때 고른 값이 그대로 저장된다", async () => {
+    const p = await make({ i2v_model: "seedance-2.0" });
     expect((await getProject(p.id, OWNER)).settings.i2v_model).toBe("seedance-2.0");
   });
 
-  // ★★ 잠금은 **정가를 낸 순간**이다 — 클립이 생긴 순간이 아니다.
+  // ★★ 잠금은 **프로젝트를 만든 순간**이다 — 결제 여부가 아니다.
   //
-  // 모델이 정가를 정하므로(videoPrice(seconds, model)), 낸 뒤에 바꾸면 낸 값과 만드는
-  // 값이 어긋난다. 차액 청구는 만들지 않았다(청구 장부가 회차·멱등키 기반이라 차액
-  // 개념이 없다) — 바로 위 target_seconds 잠금과 같은 자·같은 이유다.
+  // 2026-08-13 사용자 결정: "처음에 선택하면 변경할 수 없는 걸로". 모델은 자료 화면에서
+  // 한 번 고르고 만들 때 함께 저장된다(POST /api/projects). 그 뒤 PATCH 로는 못 바꾼다.
   //
-  // 옛 기준("클립이 생겼는가")은 두 방향으로 샜다. 정가는 ③목소리·④이미지에서 이미
-  // 걷히는데 클립은 ⑤에서야 생기므로, 그 사이에 Seedance 로 160 을 내고 Kling 으로
-  // 바꾸면 사장님이 110 크레딧을 잃었고, 반대로 Kling 으로 50 을 내고 Seedance 로
-  // 바꾸면 우리가 편당 ~$6 를 태웠다. 게다가 클립 생성이 도는 1~3분 동안에는 클립
-  // url 이 아직 없어 새로고침 한 번으로 한 편에 두 모델이 섞였다.
-  it("정가를 낸 뒤에는 모델을 못 바꾼다 — 낸 값과 만드는 값이 어긋난다", async () => {
-    await grant();
-    const p = await make({ i2v_model: "seedance-2.0", target_seconds: 30 });
-    await chargeVideo({ userId: OWNER, projectId: p.id, seconds: 30, model: "seedance-2.0" });
-    const res = await PATCH(patchReq({ settings: { i2v_model: "kling-v3" } }), ctx(p.id));
-    expect(res.status).toBe(400);
-    expect((await getProject(p.id, OWNER)).settings.i2v_model).toBe("seedance-2.0");
-  });
-
-  // ★ 클립이 아직 없어도 낸 뒤면 잠긴다 — 이것이 옛 기준으로는 안 잡히던 창이다.
-  it("클립이 아직 없어도 정가를 냈으면 잠긴다", async () => {
-    await grant();
-    const p = await make({ i2v_model: "seedance-2.0", target_seconds: 30 });
-    await chargeVideo({ userId: OWNER, projectId: p.id, seconds: 30, model: "seedance-2.0" });
-    await updateProject(p.id, OWNER, (proj) => ({
-      ...proj, cuts: [{ idx: 0, image: { url: "https://x/i.png" } }],
-    }));
-    const res = await PATCH(patchReq({ settings: { i2v_model: "kling-v3" } }), ctx(p.id));
-    expect(res.status).toBe(400);
-    expect((await getProject(p.id, OWNER)).settings.i2v_model).toBe("seedance-2.0");
-  });
-
-  it("아직 안 냈으면 바꿀 수 있다 — 고르는 자리는 ②대본이다", async () => {
+  // 왜 결제 시점이 아니라 생성 시점인가: 모델이 정가를 정하는데(videoPrice(seconds, model))
+  // 정가는 ③목소리·④이미지에서 걷힌다. "결제 전이면 바꿔도 된다"로 두면 ②대본에서 바꾼
+  // 값과 ③에서 걷는 값이 서로 다른 창이 생기고, 만드는 중에 바뀌면 한 편에 두 모델이
+  // 섞인다. 차액 정산은 만들지 않는다(청구 장부가 회차·멱등키 기반이라 차액 개념이 없다).
+  it("만든 뒤에는 모델을 못 바꾼다 — 결제 전이어도 마찬가지다", async () => {
     const p = await make({ i2v_model: "seedance-2.0" });
     const res = await PATCH(patchReq({ settings: { i2v_model: "kling-v3" } }), ctx(p.id));
+    expect(res.status).toBe(400);
+    expect((await getProject(p.id, OWNER)).settings.i2v_model).toBe("seedance-2.0");
+  });
+
+  it("정가를 낸 뒤에도 물론 못 바꾼다", async () => {
+    await grant();
+    const p = await make({ i2v_model: "seedance-2.0", target_seconds: 30 });
+    await chargeVideo({ userId: OWNER, projectId: p.id, seconds: 30, model: "seedance-2.0" });
+    const res = await PATCH(patchReq({ settings: { i2v_model: "kling-v3" } }), ctx(p.id));
+    expect(res.status).toBe(400);
+    expect((await getProject(p.id, OWNER)).settings.i2v_model).toBe("seedance-2.0");
+  });
+
+  // 화면이 설정을 통째로 다시 보낼 때 같은 값이 실려 온다 — 그것까지 400 이면 안 된다.
+  it("같은 값을 다시 보내는 것은 막지 않는다", async () => {
+    const p = await make({ i2v_model: "seedance-2.0" });
+    const res = await PATCH(patchReq({ settings: { i2v_model: "seedance-2.0" } }), ctx(p.id));
     expect(res.status ?? 200).toBe(200);
-    expect((await getProject(p.id, OWNER)).settings.i2v_model).toBe("kling-v3");
   });
 
   // 화면이 헛 PATCH 를 보내도 400 이 뜨면 안 된다 — 바꾸는 것이 아니라 같은 값이다.

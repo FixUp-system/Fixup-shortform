@@ -15,6 +15,9 @@ import { useProject } from "../../components/ProjectContext";
 import { TARGET_CHOICES } from "../../lib/script";
 import { DEFAULT_STYLE_ID } from "../../lib/styles";
 import { ASPECTS, DEFAULT_ASPECT_ID, aspectFor } from "../../lib/aspects";
+import { I2V_MODELS, DEFAULT_I2V_MODEL } from "../../lib/clip-limits";
+// 값은 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다)
+import { videoPrice } from "../../lib/pricing";
 import StylePicker from "../../components/StylePicker";
 
 export default function CreatePage() {
@@ -24,6 +27,10 @@ export default function CreatePage() {
   const [photos, setPhotos] = useState([]); // {id, filename, url}
   const [seconds, setSeconds] = useState(null); // null = 자동(자료가 정함)
   const [aspect, setAspect] = useState(DEFAULT_ASPECT_ID);
+  // ★ 영상 모델은 **여기서 한 번** 고른다 — 만든 뒤에는 못 바꾼다(서버도 400 으로 막는다).
+  // 모델이 정가를 정하는데(길이 × 모델) 정가는 ③목소리·④이미지에서 걷히므로, 뒤에서
+  // 바꾸면 낸 값과 만드는 값이 어긋난다. 차액 정산은 만들지 않았다.
+  const [model, setModel] = useState(DEFAULT_I2V_MODEL);
   const [stylePreset, setStylePreset] = useState(DEFAULT_STYLE_ID);
   const [styleNote, setStyleNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -64,7 +71,7 @@ export default function CreatePage() {
       body: JSON.stringify({
         material: { text, photos },
         settings: {
-          target_seconds: seconds, aspect_ratio: aspect,
+          target_seconds: seconds, aspect_ratio: aspect, i2v_model: model,
           style: { preset: stylePreset, note: styleNote },
         },
       }),
@@ -132,6 +139,29 @@ export default function CreatePage() {
                   ))}
                 </div>
                 <div className="tray-note">{aspectFor(aspect).note}에 맞는 규격이에요</div>
+              </div>
+            </div>
+
+            {/* 영상 모델 — 움직임을 만드는 방식이자 **정가를 정하는 값**이다. 만든 뒤에는
+                못 바꾸므로(모델이 값을 정하고 그 값은 ③④에서 걷힌다) 여기가 유일한 자리다.
+                이름·설명·값은 화면이 적지 않는다 — lib/clip-limits 의 표와 가격표에서 온다. */}
+            <div className="tray-row">
+              <span className="tray-label">영상 모델</span>
+              <div className="tray-col">
+                <div className="chips">
+                  {I2V_MODELS.map((m) => (
+                    <button key={m.id} className={`chip${model === m.id ? " on" : ""}`}
+                      onClick={() => setModel(m.id)}>
+                      {m.label} · {videoPrice(seconds, m.id)} 크레딧
+                    </button>
+                  ))}
+                </div>
+                {/* ★ 길이를 안 고르면(자동) 가격표가 30초 값으로 떨어진다 — 그 숫자를 확정처럼
+                    적으면 자료가 짧아 15초로 나왔을 때 사장님이 다른 값을 본다. 기준을 말한다. */}
+                <div className="tray-note">
+                  {I2V_MODELS.find((m) => m.id === model)?.hint} · 만든 뒤에는 바꿀 수 없어요
+                  {seconds === null && " · 값은 30초 기준이고 길이에 따라 달라져요"}
+                </div>
               </div>
             </div>
 

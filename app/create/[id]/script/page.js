@@ -38,26 +38,11 @@ export default function ScriptStepPage() {
   // 서버 원고가 바뀌면 편집 중인 초안을 버린다(재생성 결과가 화면에 보이게)
   useEffect(() => { setDraft(null); }, [project?.script?.version]);
 
-  // ★ 영상 모델은 **결제 앞**에서 고른다. 모델이 정가를 정하므로(길이 × 모델),
-  // 낸 뒤에 바꾸면 낸 값과 만드는 값이 어긋난다 — 그래서 ⑤영상에서는 읽기 전용이다.
-  // 잠금 판정은 서버(PATCH /api/projects/[id])와 같은 자여야 한다: 이미 팔았는가.
+  // ★ 영상 모델은 **만들 때 한 번** 고른다(자료 화면). 여기서는 무엇으로 만드는지만 말한다 —
+  // 모델이 정가를 정하는데(길이 × 모델) 그 정가는 ③목소리·④이미지에서 걷히므로, 뒤에서
+  // 바꾸면 낸 값과 만드는 값이 어긋난다. 서버도 PATCH 를 400 으로 막는다.
   const chosenModel = modelIdForProject(project);
-  const modelLocked = !!project?.charged;
 
-  async function saveModel(modelId) {
-    if (busy || modelLocked || modelId === chosenModel) return;
-    setErr("");
-    const res = await fetch(`/api/projects/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ settings: { i2v_model: modelId } }),
-    });
-    if (!res.ok) {
-      setErr((await res.json().catch(() => ({}))).error || "영상 모델을 저장하지 못했어요");
-      return;
-    }
-    await load(id).catch(() => {});
-  }
 
   // 글이 늘면 칸이 아래로 밀린다 — 자료 넣는 화면과 같은 방식이다(안에서 스크롤하지 않는다).
   // auto 로 되돌린 뒤 재므로 지운 만큼 다시 접힌다. 바닥은 CSS 의 min-height 가 잡는다.
@@ -386,32 +371,12 @@ export default function ScriptStepPage() {
         </div>
       )}
       <div className="eyebrow mt-lg">
-        영상 모델 <small>움직임을 만드는 방식이 달라요 — 값도 다릅니다</small>
+        영상 모델
       </div>
-      {modelLocked ? (
-        <p className="pgsub">
-          이 영상은 {I2V_MODELS.find((m) => m.id === chosenModel)?.label} 으로 만들어요 —
-          결제가 끝나서 바꿀 수 없어요.
-        </p>
-      ) : (
-        <>
-          <div className="chips">
-            {I2V_MODELS.map((m) => (
-              <button
-                key={m.id}
-                className={`chip${m.id === chosenModel ? " on" : ""}`}
-                disabled={busy}
-                onClick={() => saveModel(m.id)}
-              >
-                {m.label} · {videoPrice(project?.settings?.target_seconds, m.id)} 크레딧
-              </button>
-            ))}
-          </div>
-          <p className="pgsub">
-            {I2V_MODELS.find((m) => m.id === chosenModel)?.hint} · 만들기 시작하면 바꿀 수 없어요.
-          </p>
-        </>
-      )}
+      <p className="pgsub">
+        이 영상은 {I2V_MODELS.find((m) => m.id === chosenModel)?.label} 으로 만들어요 —
+        만들 때 고른 값이라 바꿀 수 없어요.
+      </p>
 
       <div className="step-actions">
         <BackButton stepKey="script" />

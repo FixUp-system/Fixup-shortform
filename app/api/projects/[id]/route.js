@@ -83,28 +83,24 @@ export const PATCH = withUser(async (req, { params }, user) => {
     }
   }
 
-  // ★ 모델도 정가를 정한다(videoPrice(seconds, model)) — 그래서 **길이와 똑같은 자**로
-  // 잠근다: 이미 팔았는가.
+  // ★ 영상 모델은 **만들 때 한 번** 정해지고 그 뒤로는 안 바뀐다(2026-08-13 사용자 결정).
+  // 고르는 자리는 자료 화면(app/create/page.js)이고, 값은 POST /api/projects 로 함께 온다.
   //
-  // 옛 기준은 "클립이 하나라도 생겼는가" 였는데 그것이 두 방향으로 샜다. 정가는
-  // ③목소리·④이미지에서 이미 걷히는데 클립은 ⑤에서야 생기므로, ⑤에 도착한 사장님은
-  // 예외 없이 결제를 마친 상태인데도 칩이 열려 있었다:
+  // 왜 뒤에서 못 바꾸나: 모델이 정가를 정하는데(videoPrice(seconds, model)) 정가는
+  // ③목소리·④이미지에서 걷힌다. 뒤에서 바꾸면 낸 값과 만드는 값이 어긋난다 —
   //   · Seedance 로 160 을 내고 Kling 으로 바꾸면 → 사장님이 110 크레딧을 잃는다
   //   · Kling 으로 50 을 내고 Seedance 로 바꾸면 → 우리가 편당 ~$6 를 태운다
-  // 게다가 클립 생성이 도는 1~3분 동안은 클립 url 이 아직 없어, 새로고침 한 번이면
-  // 한 편 안에 두 모델이 섞였다(폴백을 기본값과 다르게 둔 이유 자체가 깨진다).
+  // 차액 정산은 만들지 않는다(청구 장부가 회차·멱등키 기반이라 차액 개념이 없다).
+  // 게다가 클립 생성이 도는 1~3분 동안 바뀌면 한 편 안에 두 모델이 섞인다.
   //
-  // 그래서 고르는 자리를 결제 **앞**(②대본)으로 옮겼다. 여기서는 낸 뒤를 막기만 한다.
+  // ★ 결제 여부로 재지 않는다 — "안 냈으면 바꿔도 된다"로 두면 ②대본에서 바꾼 값과
+  // ③에서 걷는 값이 서로 다른 창이 생긴다. 생성 시점 하나가 자다.
   // 같은 값을 다시 보내는 것은 막지 않는다: 화면이 헛 PATCH 를 보내도 400 이 뜨면 안 된다.
   if (body.settings?.i2v_model !== undefined) {
     const project = await getProject(id, user.id);
-    if (
-      project &&
-      body.settings.i2v_model !== project.settings?.i2v_model &&
-      (await alreadyChargedVideo(id))
-    ) {
+    if (project && body.settings.i2v_model !== project.settings?.i2v_model) {
       return Response.json(
-        { error: "이미 결제된 영상은 모델을 바꿀 수 없어요 — 새로 만들어 주세요" },
+        { error: "영상 모델은 만들 때 정해져요 — 바꾸려면 새로 만들어 주세요" },
         { status: 400 }
       );
     }

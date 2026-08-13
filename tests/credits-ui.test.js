@@ -9,6 +9,7 @@ const menu = strip(readFileSync("components/UserMenu.jsx", "utf8"));
 const ctxSrc = strip(readFileSync("components/MeContext.jsx", "utf8"));
 const quick = strip(readFileSync("components/QuickCreate.jsx", "utf8"));
 const admin = strip(readFileSync("app/admin/page.js", "utf8"));
+const create = strip(readFileSync("app/create/page.js", "utf8"));
 const voice = strip(readFileSync("app/create/[id]/voice/page.js", "utf8"));
 const images = strip(readFileSync("app/create/[id]/images/page.js", "utf8"));
 const video = strip(readFileSync("app/create/[id]/video/page.js", "utf8"));
@@ -93,22 +94,33 @@ describe("④이미지 — 정가·재생성 값", () => {
 });
 
 
-// ★ 영상 모델을 고르는 자리는 **결제 앞**(②대본)이다. 모델이 정가를 정하는데(길이 × 모델)
-// 정가는 ③목소리·④이미지에서 걷히므로, ⑤영상에 도착한 사장님은 예외 없이 이미 결제를
-// 마친 상태다. 그 자리에 고르는 칩을 두면 낸 값과 만드는 값이 어긋난다:
+// ★ 영상 모델은 **프로젝트를 만들 때 한 번** 고른다. 그 뒤로는 어디서도 못 바꾼다
+// (2026-08-13 사용자 결정: "처음에 선택하면 변경할 수 없는 걸로").
+//
+// 왜 뒤에서 못 바꾸나: 모델이 정가를 정하는데(길이 × 모델) 정가는 ③목소리·④이미지에서
+// 걷힌다. 뒤에서 바꾸면 낸 값과 만드는 값이 어긋난다 —
 //   · Seedance 로 160 을 내고 Kling 으로 바꾸면 사장님이 110 크레딧을 잃는다
 //   · Kling 으로 50 을 내고 Seedance 로 바꾸면 우리가 편당 ~$6 를 태운다
-describe("영상 모델을 고르는 자리는 결제 앞이다", () => {
-  it("②대본이 모델 칩을 그리고, 저장 PATCH 를 보낸다", () => {
+// 차액 정산은 만들지 않기로 했다(청구 장부가 회차·멱등키 기반이라 차액 개념이 없다).
+// 게다가 만드는 중에 바뀌면 한 편에 두 모델이 섞인다.
+describe("영상 모델은 만들 때 한 번 고른다", () => {
+  it("자료 화면이 모델을 고르고 만들 때 함께 보낸다", () => {
+    expect(create).toMatch(/I2V_MODELS/);
+    expect(create).toMatch(/i2v_model/);
+  });
+
+  it("값·이름을 화면이 손으로 적지 않는다 — 표와 가격표에서 온다", () => {
+    expect(create).toMatch(/videoPrice/);
+    expect(create, "모델 이름을 화면에 박았다").not.toMatch(/Seedance|Kling/);
+  });
+
+  it("②대본은 읽기 전용이다 — 고르는 버튼이 없다", () => {
+    expect(script).not.toMatch(/saveModel/);
+    // 무엇으로 만드는지는 말해 준다(표에서 이름을 가져오므로 I2V_MODELS 는 남는다)
     expect(script).toMatch(/I2V_MODELS/);
-    expect(script).toMatch(/i2v_model/);
   });
 
-  it("②대본의 잠금은 서버와 같은 자다 — charged", () => {
-    expect(script).toMatch(/charged/);
-  });
-
-  it("⑤영상은 읽기 전용이다 — 고르는 버튼이 없다", () => {
+  it("⑤영상도 읽기 전용이다 — 고르는 버튼이 없다", () => {
     expect(video).not.toMatch(/saveModel/);
     expect(video).not.toMatch(/i2v_model/);
   });
