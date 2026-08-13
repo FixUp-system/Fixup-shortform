@@ -18,6 +18,9 @@ import {
   secondsForText,
   targetChars,
   capacitySeconds,
+  BOOKEND_MIN_CHARS,
+  wantsBookend,
+  bookendBlock,
 } from "../lib/script.js";
 
 const project = {
@@ -592,5 +595,158 @@ describe("대본이 '말할 것'을 정리된 사실로 받는다", () => {
   it("안 쓴 사실에도 연출이 섞이지 않는다", () => {
     const p = brief(["하이톱이 발목을 지지한다", "극단적 슬로모션으로 하이라이트"]);
     expect(unusedFacts(p, "짧은 원고입니다.")).toEqual(["하이톱이 발목을 지지한다"]);
+  });
+});
+
+// ── 수미상관 ──────────────────────────────────────────────────────────────
+// 설계 docs/superpowers/specs/2026-08-13-script-bookend-design.md
+// 연 자리로 돌아와 닫는다. 짧은 편(15초)에는 걸지 않는다 — 문장 넷 중 둘이 같은 얘기가 된다.
+
+describe("수미상관 — 짧은 편에는 걸지 않는다", () => {
+  const withSeconds = (s) => ({ ...project, settings: { ...project.settings, target_seconds: s } });
+
+  it("15초짜리는 걸지 않는다", () => {
+    expect(wantsBookend(withSeconds(15))).toBe(false);
+  });
+
+  it("30·45·60초는 건다", () => {
+    for (const s of [30, 45, 60]) expect(wantsBookend(withSeconds(s))).toBe(true);
+  });
+
+  // 사장님이 길이를 안 고르면 자료가 길이를 정한다 — 고른 초만 보면 이 경로가 통째로 빠진다
+  it("자동(길이 미선택)이면 자료 양으로 갈린다", () => {
+    const few = { ...project, settings: { aspect_ratio: "9:16" }, briefing: { ...project.briefing, key_points: ["하나", "둘"], asked: [] } };
+    const many = { ...project, settings: { aspect_ratio: "9:16" }, briefing: { ...project.briefing, key_points: ["하나", "둘", "셋", "넷", "다섯"], asked: [] } };
+    expect(targetChars(few)).toBeLessThanOrEqual(BOOKEND_MIN_CHARS);
+    expect(wantsBookend(few)).toBe(false);
+    expect(targetChars(many)).toBeGreaterThan(BOOKEND_MIN_CHARS);
+    expect(wantsBookend(many)).toBe(true);
+  });
+
+  // 사실 4개 × 30자 = 정확히 120자. 경계는 **넘어야** 켜진다(> 이지 >= 가 아니다).
+  it("딱 120자면 끈다", () => {
+    const exact = {
+      ...project,
+      settings: { aspect_ratio: "9:16" },
+      briefing: { ...project.briefing, key_points: ["하나", "둘", "셋", "넷"], asked: [] },
+    };
+    expect(targetChars(exact)).toBe(BOOKEND_MIN_CHARS);
+    expect(wantsBookend(exact)).toBe(false);
+  });
+});
+
+describe("bookendBlock — 문구는 한 자리에만 있다", () => {
+  it("세 종류 모두 같은 머리말을 단다", () => {
+    for (const kind of ["write", "rewrite", "edit"]) {
+      expect(bookendBlock(kind)).toContain("[구조 — 수미상관]");
+    }
+  });
+
+  // 지난번 라이브에서 "신발에서 시작해 신발로 끝나는 구조가 이를 가능하게 합니다" 가 나왔다.
+  // 연출 지시를 구조로 만들지 못하고 낭독해 버린 것이라, 이 금지가 빠지면 그대로 재발한다.
+  it("구조를 낭독하지 말라는 금지가 들어 있다", () => {
+    expect(bookendBlock("write")).toContain("구조를 입 밖에 내지 않는다");
+    expect(bookendBlock("rewrite")).toContain("구조를 입 밖에 내지 않는다");
+  });
+
+  it("같은 말을 되풀이하지 말라고 시킨다 — 되풀이 결함으로 오인되는 자리다", () => {
+    expect(bookendBlock("write")).toContain("같은 말을 되풀이하지 않는다");
+  });
+
+  it("되돌리기 몫은 세 가지 충돌을 덮는다", () => {
+    const r = bookendBlock("rewrite");
+    expect(r).toContain("마지막 문장도 새 첫 문장에 맞춰 함께 고친다");
+    expect(r).toContain("'같은 말 되풀이'가 아니다");
+    expect(r).toContain("닫는 문장은 남긴다");
+  });
+
+  it("교정 몫은 지우지 말라는 것 하나다", () => {
+    const e = bookendBlock("edit");
+    expect(e).toContain("군더더기가 아니다");
+    expect(e).not.toContain("닫는 문장은 남긴다");
+  });
+
+  it("기본값은 write 다", () => {
+    expect(bookendBlock()).toBe(bookendBlock("write"));
+  });
+});
+
+describe("buildScriptMessages — 수미상관", () => {
+  const withSeconds = (s) => ({ ...project, settings: { ...project.settings, target_seconds: s } });
+
+  it("30초면 지문에 수미상관이 실린다", () => {
+    const user = buildScriptMessages(withSeconds(30)).messages[0].content;
+    expect(user).toContain("[구조 — 수미상관]");
+    expect(user).toContain("구조를 입 밖에 내지 않는다");
+  });
+
+  it("15초면 한 자도 안 들어간다 — 기존 동작 불변", () => {
+    const user = buildScriptMessages(withSeconds(15)).messages[0].content;
+    expect(user).not.toContain("수미상관");
+  });
+
+  // 상수에 넣으면 길이를 모르는 채로 늘 걸린다. 조건부라는 것을 못 박는다.
+  it("SYSTEM 상수에는 들어가지 않는다", () => {
+    expect(buildScriptMessages(withSeconds(30)).system).not.toContain("수미상관");
+  });
+
+  // 수정 지시는 지문의 맨 끝이라야 한다 — 구조 설명이 그 뒤에 오면 지시가 묻힌다
+  it("수정 지시가 수미상관 블록보다 뒤에 온다", () => {
+    const p = { ...withSeconds(30), script: { text: "기존 원고입니다." } };
+    const user = buildScriptMessages(p, "더 짧게").messages[0].content;
+    expect(user.indexOf("[구조 — 수미상관]")).toBeLessThan(user.indexOf("[수정 지시]"));
+  });
+});
+
+describe("buildScriptRewriteMessages — 수미상관", () => {
+  const withSeconds = (s) => ({ ...project, settings: { ...project.settings, target_seconds: s } });
+  const draft = { text: "3,000원짜리 앰플이 하루 만에 품절됐습니다. 시카가 진정시킵니다." };
+
+  it("30초면 되돌리기 몫 셋이 실린다", () => {
+    const c = buildScriptRewriteMessages(withSeconds(30), draft, ["약한 오프닝"]).messages[0].content;
+    expect(c).toContain("마지막 문장도 새 첫 문장에 맞춰 함께 고친다");
+    expect(c).toContain("'같은 말 되풀이'가 아니다");
+    expect(c).toContain("닫는 문장은 남긴다");
+  });
+
+  it("15초면 한 자도 안 들어간다", () => {
+    const c = buildScriptRewriteMessages(withSeconds(15), draft, ["약한 오프닝"]).messages[0].content;
+    expect(c).not.toContain("수미상관");
+  });
+
+  it("REWRITE_SYSTEM 상수에는 들어가지 않는다", () => {
+    expect(buildScriptRewriteMessages(withSeconds(30), draft, ["분량 초과"]).system).not.toContain("수미상관");
+  });
+
+  // 지적 사유가 무엇이든 구조는 지켜야 한다 — '분량 초과' 로 줄일 때가 특히 위험하다
+  it("어떤 결함으로 불렸든 실린다", () => {
+    for (const f of ["약한 오프닝", "같은 말 되풀이", "분량 초과", "분량 미달"]) {
+      expect(buildScriptRewriteMessages(withSeconds(45), draft, [f]).messages[0].content).toContain("[구조 — 수미상관]");
+    }
+  });
+});
+
+describe("buildScriptEditMessages — 수미상관", () => {
+  const withSeconds = (s) => ({ ...project, settings: { ...project.settings, target_seconds: s } });
+  const draft = { text: "3,000원짜리 앰플이 하루 만에 품절됐습니다. 그 3,000원짜리는 오늘도 오후면 없습니다." };
+
+  it("30초면 지우지 말라는 말이 실린다", () => {
+    const c = buildScriptEditMessages(withSeconds(30), draft).messages[0].content;
+    expect(c).toContain("군더더기가 아니다");
+  });
+
+  it("15초면 한 자도 안 들어간다", () => {
+    const c = buildScriptEditMessages(withSeconds(15), draft).messages[0].content;
+    expect(c).not.toContain("수미상관");
+  });
+
+  it("EDIT_SYSTEM 상수에는 들어가지 않는다", () => {
+    expect(buildScriptEditMessages(withSeconds(30), draft).system).not.toContain("수미상관");
+  });
+
+  it("[분량] 은 그대로 남는다", () => {
+    const c = buildScriptEditMessages(withSeconds(30), draft).messages[0].content;
+    expect(c).toContain("[분량]");
+    expect(c).toContain("[다듬을 원고]");
   });
 });
