@@ -15,7 +15,7 @@ import { useProject } from "../../components/ProjectContext";
 import { TARGET_CHOICES } from "../../lib/script";
 import { DEFAULT_STYLE_ID } from "../../lib/styles";
 import { ASPECTS, DEFAULT_ASPECT_ID, aspectFor } from "../../lib/aspects";
-import { I2V_MODELS, DEFAULT_I2V_MODEL, DEFAULT_RESOLUTION } from "../../lib/clip-limits";
+import { I2V_MODELS, DEFAULT_I2V_MODEL, DEFAULT_RESOLUTION, resolutionsForModel } from "../../lib/clip-limits";
 // 값은 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다)
 import { videoPrice } from "../../lib/pricing";
 import StylePicker from "../../components/StylePicker";
@@ -161,9 +161,13 @@ export default function CreatePage() {
                 </div>
                 {/* ★ 길이를 안 고르면(자동) 가격표가 30초 값으로 떨어진다 — 그 숫자를 확정처럼
                     적으면 자료가 짧아 15초로 나왔을 때 사장님이 다른 값을 본다. 기준을 말한다. */}
+                {/* ★ 값은 **기본 화질** 기준이다 — ②대본에서 더 높은 화질을 고르면 올라간다.
+                    화질을 안 고르는 모델(Kling·LTX)에는 그 말을 안 붙인다: 여기 없는 선택을
+                    있는 것처럼 말하는 것이 "고를 수 있는 척"과 같은 잘못이다. */}
                 <div className="tray-note">
                   {I2V_MODELS.find((m) => m.id === model)?.hint} · 만든 뒤에는 바꿀 수 없어요
                   {seconds === null && " · 값은 30초 기준이고 길이에 따라 달라져요"}
+                  {resolutionsForModel(model).length > 0 && " · 화질에 따라서도 달라져요"}
                 </div>
               </div>
             </div>

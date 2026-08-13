@@ -20,14 +20,18 @@ const quick = read("components/QuickCreate.jsx");
 describe("②대본 — 화질 선택", () => {
   it("화질 목록을 lib/clip-limits 에서 읽는다 — 화면이 해상도 문자열을 적지 않는다", () => {
     expect(script).toMatch(/resolutionsForProject\(project\)/);
+    // 큰따옴표만 잡으면 작은따옴표·백틱·JSX 텍스트로 박아 넣고 빠져나간다.
+    // (주석은 strip 이 먼저 걷어내므로 여기 남는 것은 전부 화면이 적은 값이다.)
     expect(script, "해상도 값을 화면에 박았다 — 모델이 여는 목록은 표가 안다")
-      .not.toMatch(/"(480p|720p|1080p)"/);
+      .not.toMatch(/['"`]\s*(480p|720p|1080p)\s*['"`]|>[^<>]*\b(480p|720p|1080p)\b/);
   });
 
   it("고를 수 있는 값이 없으면(Kling·LTX) 아무것도 안 그린다", () => {
     // "고를 수 있는 척"이 가장 나쁘다 — Kling 에는 resolution 파라미터가 아예 없어
     // 고른 순간 fal 이 거절한다. 그리는 자리가 목록 길이로 잠겨 있어야 한다.
-    expect(script).toMatch(/resolutions\.length\s*>\s*0\s*&&/);
+    // ★ 문자열이 있는지만 보면 안 된다 — 안 쓰는 변수에 남겨 두고 칩을 무조건 그려도
+    //   통과한다. 그 길이 판정 **뒤에 칩 그리기가 실제로 매달려 있는지**까지 묶어 잰다.
+    expect(script).toMatch(/resolutions\.length\s*>\s*0\s*&&\s*\(?\s*<[\s\S]{0,800}?resolutions\.map\(/);
   });
 
   it("지금 고른 값은 resolutionForProject 로 읽는다 — 저장값을 직접 읽지 않는다", () => {
