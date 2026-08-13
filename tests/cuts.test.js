@@ -1078,3 +1078,48 @@ describe("톤·전환 필터", () => {
     expect(usableTransition({ tone: "x" })).toBe("");
   });
 });
+
+describe("buildImagePrompt — 톤·전환", () => {
+  const project = {
+    settings: { aspect_ratio: "9:16" },
+    briefing: { topic: "농구화" },
+  };
+  const cut = { idx: 1, shows: "제품이 놓여 있다", sentence: "문장" };
+
+  it("두 값이 없으면 프롬프트가 글자 그대로 같다", () => {
+    // 이 작업의 유일한 하드 제약 — 기존 프로젝트의 그림이 달라지면 안 된다
+    const before = buildImagePrompt(cut, project);
+    const after = buildImagePrompt({ ...cut, tone: "", transition: "" }, project);
+    expect(after).toBe(before);
+  });
+
+  it("톤을 프롬프트에 싣는다", () => {
+    const p = buildImagePrompt({ ...cut, tone: "채도를 올린 시네마틱 질감" }, project);
+    expect(p).toContain("채도를 올린 시네마틱 질감");
+  });
+
+  it("전환을 프롬프트에 싣는다", () => {
+    const p = buildImagePrompt({ ...cut, transition: "발 클로즈업, 같은 눈높이" }, project);
+    expect(p).toContain("발 클로즈업, 같은 눈높이");
+  });
+
+  it("카메라 어휘가 든 톤은 안 싣는다", () => {
+    const p = buildImagePrompt({ ...cut, tone: "천천히 줌 인하는 질감" }, project);
+    expect(p).not.toContain("줌 인");
+  });
+
+  it("참조어가 든 전환은 안 싣는다", () => {
+    const p = buildImagePrompt({ ...cut, transition: "앞 컷에서 이어지는 발" }, project);
+    expect(p).not.toContain("앞 컷");
+  });
+
+  it("사용자 수정 지시는 톤·전환보다 뒤에 온다", () => {
+    // 가장 강하게 반영되어야 하는 것은 사장님이 직접 적은 지시다 — 항상 끝이다
+    const p = buildImagePrompt(
+      { ...cut, tone: "채도를 올린 시네마틱 질감", transition: "발 클로즈업, 같은 눈높이", edit_instruction: "그림자를 더 깊게" },
+      project,
+    );
+    expect(p.indexOf("채도를 올린 시네마틱 질감")).toBeLessThan(p.indexOf("그림자를 더 깊게"));
+    expect(p.indexOf("발 클로즈업, 같은 눈높이")).toBeLessThan(p.indexOf("그림자를 더 깊게"));
+  });
+});
