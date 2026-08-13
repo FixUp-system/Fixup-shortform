@@ -1011,11 +1011,47 @@ describe("톤·전환 필터", () => {
     expect(usableTone(t)).toBe(t);
   });
 
+  // 판정용 패턴이 넓으면 대가가 "낱말 하나"가 아니라 "값 통째"다 — tone 은 영상 전체에
+  // 복사되므로 오검출 하나가 톤 레이어 전체를 0 으로 만든다
+  it("카메라를 명사로 언급한 톤은 살린다", () => {
+    const a = "필름 카메라 특유의 거친 입자감";
+    const b = "빈티지 폴라로이드 카메라 톤";
+    expect(usableTone(a)).toBe(a);
+    expect(usableTone(b)).toBe(b);
+  });
+
+  it("질감 서술과 방향어 없는 낱말은 살린다", () => {
+    // 핸드헬드는 카메라 이동이 아니라 질감이다. '줌'·'달리'는 방향어가 없으면 딴 뜻이다
+    const a = "핸드헬드 다큐 질감의 거친 색보정";
+    const b = "생기를 더해 줌";
+    const c = "달리 보이는 진한 대비";
+    expect(usableTone(a)).toBe(a);
+    expect(usableTone(b)).toBe(b);
+    expect(usableTone(c)).toBe(c);
+  });
+
+  it("움직임이 명확한 카메라 지시는 버린다", () => {
+    expect(usableTone("트래킹으로 훑는 질감")).toBe("");
+    expect(usableTone("오빗하는 광고 톤")).toBe("");
+    expect(usableTone("크레인으로 올라가는 느낌")).toBe("");
+    expect(usableTone("틸트 다운되는 어두운 화면")).toBe("");
+  });
+
   it("참조어가 든 전환은 통째로 버린다", () => {
     // 이미지 모델은 '앞 컷'을 모른다 — 일부만 자르면 짧은 구도 서술의 뜻이 무너진다
     expect(usableTransition("앞 컷에서 이어지는 발 클로즈업")).toBe("");
+    expect(usableTransition("앞의 컷과 같은 눈높이")).toBe("");
     expect(usableTransition("직전 컷과 같은 구도")).toBe("");
-    expect(usableTransition("방금 본 손이 그대로")).toBe("");
+    expect(usableTransition("이전 장면의 손이 그대로")).toBe("");
+    expect(usableTransition("앞 장면을 이어받아 잡은 풀 샷")).toBe("");
+    expect(usableTransition("위와 같은 구도")).toBe("");
+  });
+
+  // transition 은 "이 컷이 시작하는 구도"라 카메라 어휘가 들어오기 딱 좋은 자리다
+  it("카메라 움직임이 든 전환도 버린다", () => {
+    expect(usableTransition("줌 인 상태에서 시작하는 아웃솔 클로즈업")).toBe("");
+    expect(usableTransition("트래킹으로 들어온 발 클로즈업")).toBe("");
+    expect(usableTransition("카메라가 물러난 자리에서 시작하는 풀 샷")).toBe("");
   });
 
   it("자기 완결적인 전환은 쓴다", () => {
@@ -1023,9 +1059,22 @@ describe("톤·전환 필터", () => {
     expect(usableTransition(t)).toBe(t);
   });
 
+  // '방금'은 앞 컷 참조가 아니라 신선함 서술인 쪽이 훨씬 흔하다
+  it("'방금'이 든 정상 전환은 살린다", () => {
+    const a = "방금 구운 빵의 클로즈업";
+    const b = "방금 내린 커피가 담긴 잔, 눈높이";
+    expect(usableTransition(a)).toBe(a);
+    expect(usableTransition(b)).toBe(b);
+  });
+
   it("값이 없으면 빈 문자열이다", () => {
     expect(usableTone(undefined)).toBe("");
     expect(usableTransition(undefined)).toBe("");
     expect(usableTone("  ")).toBe("");
+    expect(usableTransition("  ")).toBe("");
+    expect(usableTone(null)).toBe("");
+    expect(usableTransition(null)).toBe("");
+    expect(usableTone(42)).toBe("");
+    expect(usableTransition({ tone: "x" })).toBe("");
   });
 });
