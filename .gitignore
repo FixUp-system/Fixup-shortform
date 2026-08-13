@@ -6,3 +6,5 @@ out/
 data/
 npm-debug.log*
 .DS_Store
+# dev 서버 로그 — `npm run dev > dev.log` 로 띄울 때 생긴다. 저장소에 남길 것이 아니다.
+dev.log

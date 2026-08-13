@@ -2,6 +2,7 @@ import "./globals.css";
 import { GeistSans } from "geist/font/sans";
 import localFont from "next/font/local";
 import { ProjectProvider } from "../components/ProjectContext";
+import { AdProjectProvider } from "../components/AdProjectContext";
 import AppShell from "../components/AppShell";
 import DialogProvider from "../components/DialogProvider";
 
@@ -28,9 +29,13 @@ export default function RootLayout({ children }) {
             단독 화면이다(components/AppShell.jsx) */}
         {/* 팝업은 한 자리에서 그린다 — 화면마다 만들면 모양이 갈린다(components/DialogProvider.jsx) */}
         <ProjectProvider>
-          <DialogProvider>
-            <AppShell>{children}</AppShell>
-          </DialogProvider>
+          {/* 광고와 단계별 만들기가 각자 공유본을 쥔다. 팝업은 그 둘 안쪽에서
+              어느 화면이든 부를 수 있어야 한다(components/DialogProvider.jsx). */}
+          <AdProjectProvider>
+            <DialogProvider>
+              <AppShell>{children}</AppShell>
+            </DialogProvider>
+          </AdProjectProvider>
         </ProjectProvider>
       </body>
     </html>

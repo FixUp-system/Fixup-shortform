@@ -12,10 +12,19 @@ import { modelIdForProject, projectSpeaks } from "../../../../../../../lib/clip-
 export const POST = withUser(async (req, { params }, user) => {
   const { id, idx } = await params;
 
-  // ★ 말하는 모델에서는 목소리가 클립과 한 몸이라 따로 다시 만들 수 없다.
-  // 어떤 청구보다도 앞이다 — 못 줄 것에 값을 받지 않는다. 가짜 모드에서도 같은 답이어야
-  // 화면이 두 모드에서 같게 굴러간다.
+  // 문 둘을 **어떤 청구보다도 앞**에 둔다 — 못 줄 것에 값을 받지 않는다.
+  // 가짜 모드에서도 같은 답이어야 화면이 두 모드에서 같게 굴러간다(아래 청구 블록은
+  // `!fakeFal()` 일 때만 도는데, 이 저장소가 권하는 개발 방식이 바로 가짜 모드다).
+  // 재생성은 폴링이 아니라 버튼을 누를 때만 도는 자리라 getProject 하나가 늘어도 괜찮다.
   const project = await getProject(id, user.id);
+
+  // ★ 광고 문서(kind:"ad")는 이 경로가 다루지 않는다 — /api/ads/* 가 다룬다.
+  // 없는 것과 같이 404 다: 남의 것이 아니라 "이 문 뒤에 없는 것"이라서다.
+  if (project?.kind === "ad") {
+    return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
+  }
+
+  // ★ 말하는 모델에서는 목소리가 클립과 한 몸이라 따로 다시 만들 수 없다.
   if (project && projectSpeaks(project)) {
     return Response.json(
       { error: "이 영상은 목소리가 영상에 함께 만들어져요 — 영상을 다시 만들어 주세요" },

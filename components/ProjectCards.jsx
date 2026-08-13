@@ -18,6 +18,16 @@ export const STATUS_LABEL = {
   done: "완성",
 };
 
+// 광고 경로(kind:"ad")의 상태 라벨 — 별도 표를 둔다. 광고 문서도 status 값으로
+// "draft"·"done"을 쓰지만(lib/ad/pipeline.js) 뜻이 기존 6단계와 다르다("draft"는
+// 시나리오 전, "done"은 굽기 완료뿐) — 표를 섞으면 카드가 엉뚱한 단어를 보여준다.
+const AD_STATUS_LABEL = {
+  draft: "자료",
+  scenario: "시나리오",
+  rendering: "만드는 중",
+  done: "완성",
+};
+
 // 카드 썸네일 — 완성본이 있으면 영상을, 없으면 첫 컷 그림을 보여준다.
 //
 // 영상은 마우스를 올렸을 때만 재생한다. 카드가 열 개여도 한 번에 하나만 움직이므로
@@ -56,10 +66,12 @@ function Thumb({ video, image, alt }) {
 
 // limit 을 주면 그만큼만 그린다(홈은 최근 몇 개, 보관함은 전부).
 //
-// onDeleted 를 주면 카드마다 지우는 자리가 생긴다 — 보관함만 준다. 홈(빠른 생성)은
-// "최근 몇 개"를 보여 주는 자리라, 거기서 지우면 목록이 조용히 다른 카드로 채워진다.
+// onDeleted 를 주면 카드마다 지우는 자리가 생긴다 — 보관함만 준다. 홈은 "최근 몇 개"를
+// 보여 주는 자리라, 거기서 지우면 목록이 조용히 다른 카드로 채워진다.
 // selecting 을 주면 카드가 **고르는 자리**가 된다 — 눌러도 프로젝트로 안 들어간다.
-// 보관함의 [수정] 이 그 상태를 쥐고, 여기는 시키는 대로 그린다.
+//
+// ★ 두 세계가 한 목록에 섞인다(단계별 영상 · 광고). listProjects 요약의 kind 로 가른다 —
+// 없으면(옛 문서) null 이고, 그때는 기존 동작 그대로다.
 export default function ProjectCards({ projects, limit, onDeleted, selecting, selected, onToggleSelect }) {
   const shown = limit ? projects.slice(0, limit) : projects;
   const { confirm, alert } = useDialog();
@@ -93,41 +105,48 @@ export default function ProjectCards({ projects, limit, onDeleted, selecting, se
 
   return (
     <ul className="project-grid">
-      {shown.map((p) => (
-        <li key={p.id}>
-          {/* ★ 카드 전체가 <Link> 라, 고르는 동안에는 그 이동을 막아야 한다.
-              막지 않으면 두 번째 카드를 고르려는 순간 프로젝트로 들어가 버린다. */}
-          <Link
-            href={`/create/${p.id}`}
-            className={`project-card${selecting ? " picking" : ""}${selected?.has(p.id) ? " picked" : ""}`}
-            onClick={selecting ? (e) => { e.preventDefault(); onToggleSelect?.(p.id); } : undefined}
-          >
-            <span className="project-thumb">
-              <Thumb video={p.video_url} image={p.image_url} alt={p.title || "만든 영상"} />
-              {p.video_url && <span className="thumb-tag">영상</span>}
-            </span>
-            <span className="project-meta">
-              <span className="title">{p.title || "제목 없음"}</span>
-              <span className="badge ai">{STATUS_LABEL[p.status] || p.status}</span>
-              {selecting && (
-                <span className="card-pick" aria-hidden="true">{selected?.has(p.id) ? "✓" : ""}</span>
-              )}
-              {/* 고르는 동안에는 낱개 지우기를 감춘다 — 두 가지 지우는 길이 한 화면에 있으면
-                  어느 것이 지금 도는 길인지 흐려진다 */}
-              {onDeleted && !selecting && (
-                <button
-                  className="card-del"
-                  aria-label="이 영상 지우기"
-                  disabled={busyId === p.id}
-                  onClick={(e) => remove(e, p)}
-                >
-                  {busyId === p.id ? "지우는 중…" : "지우기"}
-                </button>
-              )}
-            </span>
-          </Link>
-        </li>
-      ))}
+      {shown.map((p) => {
+        const isAd = p.kind === "ad";
+        // 광고는 자기 화면으로 간다. 고르는 중에는 어느 쪽이든 이동을 막는다 —
+        // 막지 않으면 두 번째 카드를 고르려는 순간 그 프로젝트로 들어가 버린다.
+        const href = isAd ? `/ads/${p.id}` : `/create/${p.id}`;
+        const label = isAd ? (AD_STATUS_LABEL[p.status] || p.status) : (STATUS_LABEL[p.status] || p.status);
+        return (
+          <li key={p.id}>
+            <Link
+              href={href}
+              className={`project-card${selecting ? " picking" : ""}${selected?.has(p.id) ? " picked" : ""}`}
+              onClick={selecting ? (e) => { e.preventDefault(); onToggleSelect?.(p.id); } : undefined}
+            >
+              <span className="project-thumb">
+                <Thumb video={p.video_url} image={p.image_url} alt={p.title || "만든 영상"} />
+                {p.video_url && <span className="thumb-tag">영상</span>}
+              </span>
+              <span className="project-meta">
+                <span className="title">{p.title || "제목 없음"}</span>
+                {/* 종류 표시 — 광고 문서에만 붙는다. 옛 문서는 이 배지가 아예 없다 */}
+                {isAd && <span className="badge ai">광고</span>}
+                <span className="badge ai">{label}</span>
+                {selecting && (
+                  <span className="card-pick" aria-hidden="true">{selected?.has(p.id) ? "✓" : ""}</span>
+                )}
+                {/* 고르는 동안에는 낱개 지우기를 감춘다 — 두 가지 지우는 길이 한 화면에
+                    있으면 어느 것이 지금 도는 길인지 흐려진다 */}
+                {onDeleted && !selecting && (
+                  <button
+                    className="card-del"
+                    aria-label="이 영상 지우기"
+                    disabled={busyId === p.id}
+                    onClick={(e) => remove(e, p)}
+                  >
+                    {busyId === p.id ? "지우는 중…" : "지우기"}
+                  </button>
+                )}
+              </span>
+            </Link>
+          </li>
+        );
+      })}
     </ul>
   );
 }

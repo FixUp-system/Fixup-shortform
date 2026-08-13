@@ -12,6 +12,19 @@ import { modelIdForProject } from "../../../../../../../lib/clip-limits.js";
 export const POST = withUser(async (req, { params }, user) => {
   const { id, idx } = await params;
 
+  // ★ 광고 문서(kind:"ad")는 이 경로가 다루지 않는다 — /api/ads/* 가 다룬다.
+  // 없는 것과 같이 404 다: 남의 것이 아니라 "이 문 뒤에 없는 것"이라서다.
+  //
+  // 아래 "컷당 첫 재생성" 블록 안에도 이 판정이 있었지만 그 블록은 `!fakeFal()` 일 때만
+  // 돈다 — SHOTFORM_FAKE=fal·all(이 저장소가 CLAUDE.md 에서 권장하는 정상 개발 방식)에서는
+  // 통째로 건너뛰어 곧장 regenClip 으로 가므로 광고 문서가 안 걸렸다. 여기서 가짜 모드
+  // 여부와 무관하게 먼저 확인한다. 재생성은 폴링이 아니라 버튼을 누를 때만 도는 자리라
+  // getProject 호출이 하나 늘어도 비용 문제가 안 된다.
+  const guardProject = await getProject(id, user.id);
+  if (guardProject?.kind === "ad") {
+    return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
+  }
+
   // 컷당 첫 재생성은 공짜, 둘째부터 정가. 회차는 그 컷이 이미 쓴 횟수다.
   //
   // ★ 회차는 **프로젝트 문서**(clip_regen_count)가 센다 — 청구 장부로 세면 첫 회가 공짜라

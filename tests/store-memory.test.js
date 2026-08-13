@@ -136,4 +136,20 @@ describe("인메모리 store — 폴링용 부분 읽기", () => {
     expect(await s.selectProjectRender("p1", OTHER)).toBeNull();
     expect(await s.selectProjectCuts("p1", OTHER)).toBeNull();
   });
+
+  // ★ Task 7 — 기존 라우트가 광고 문서(kind:"ad")를 걸러내려면 이 셋(status 폴링이 쓰는
+  // 좁은 셀렉터)이 kind 를 실어야 한다. doc 통짜를 안 읽는 자리라 셀렉터가 안 실으면
+  // 라우트가 아예 판정할 수 없다.
+  it("셋 다 kind 를 싣는다 — 옛 문서는 null, 광고 문서는 값 그대로", async () => {
+    await seed(); // doc 에는 kind 가 없다 — 옛 문서
+    const s = getStore();
+    expect((await s.selectProjectProgress("p1", OWNER)).kind).toBeNull();
+    expect((await s.selectProjectRender("p1", OWNER)).kind).toBeNull();
+    expect((await s.selectProjectCuts("p1", OWNER)).kind).toBeNull();
+
+    await s.insertProject({ id: "p2", status: "draft", kind: "ad", cuts: [] }, OWNER);
+    expect((await s.selectProjectProgress("p2", OWNER)).kind).toBe("ad");
+    expect((await s.selectProjectRender("p2", OWNER)).kind).toBe("ad");
+    expect((await s.selectProjectCuts("p2", OWNER)).kind).toBe("ad");
+  });
 });

@@ -198,6 +198,30 @@ describe("폴링용 부분 읽기 — doc 통짜를 select 하지 않는다", ()
     await supabaseStore.selectProject("p1", "o");
     expect(readsWholeDoc(H.calls[0].select.cols)).toBe(true);
   });
+
+  // ★ Task 7 — 기존 라우트가 광고 문서(kind:"ad")를 걸러내려면 이 셋이 kind 를 실어야
+  // 한다(status 폴링 라우트는 doc 통짜를 안 읽으므로 이 셀렉터가 유일한 판정 자리다).
+  // memory.js 와 같은 계약이어야 한다 — 한쪽만 고치면 테스트는 통과하고 라이브가 깨진다.
+  it("selectProjectProgress·selectProjectRender·selectProjectCuts 셋 다 kind 를 싣는다", async () => {
+    await supabaseStore.selectProjectProgress("p1", "o");
+    expect(H.calls[0].select.cols).toMatch(/kind:doc->>kind/);
+
+    await supabaseStore.selectProjectRender("p1", "o");
+    expect(H.calls[1].select.cols).toMatch(/kind:doc->>kind/);
+
+    await supabaseStore.selectProjectCuts("p1", "o");
+    expect(H.calls[2].select.cols).toMatch(/kind:doc->>kind/);
+  });
+
+  it("kind 를 읽어 응답에 실어 준다 — 없으면 null", async () => {
+    H.respond = () => ({ data: { status: "images", kind: "ad" }, error: null });
+    const p = await supabaseStore.selectProjectProgress("p1", "o");
+    expect(p.kind).toBe("ad");
+
+    H.respond = () => ({ data: { status: "images" }, error: null }); // kind 없음 = 옛 문서
+    const r = await supabaseStore.selectProjectRender("p1", "o");
+    expect(r.kind).toBeNull();
+  });
 });
 
 describe("allCosts — 행 상한", () => {

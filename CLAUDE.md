@@ -1,42 +1,33 @@
 # shotform-saas — 작업 지침
 
-> 워크트리 `C:\Users\fixup\shotform-video` · 브랜치 **`feature/i2v-model`**
-> (2026-08-12 기준: **origin/main 에 미푸시**. 커밋 수도 테스트 수치도 적는 순간 낡으니
-> **세어라** — 불변인 것은 "**전부 그린**"뿐이다:
-> `git rev-list --count origin/main..HEAD` · `npx vitest run`)
+> **`main` 한 갈래다.** 2026-08-13 에 두 줄기가 합쳐졌다 — 단계별 영상(자막·크레딧·정리)과
+> **광고 영상**(`feat/ad-video`). 작업 경로는 여기 안 적는다 — 적어 둔 절대 경로가 머신이
+> 바뀌며 죽은 채 남아 있었다. 커밋 수도 테스트 수치도 적는 순간 낡으니 **세어라** —
+> 불변인 것은 "**전부 그린**"뿐이다:
+> `git rev-list --count origin/main..HEAD` · `npx vitest run`
 >
+> ⚠️ **새로 클론했으면 `npm install` 이 먼저다.** 안 하면 `npx vitest run` 이 테스트가 아니라
+> `Cannot find module 'vitest/config'` 로 죽는다 — 테스트 실패로 오해하기 쉽다.
 > ⚠️ **이 저장소에는 Vercel 프로젝트가 없다** — `main` 에 푸시해도 배포되는 것이 없다.
 > ⚠️ **`next.config.mjs` 는 의도적 미커밋**이다(주석에 "커밋하지 않는다"). `git add -A` 금지.
-> ⚠️ 3737 포트에 dev 서버 + Cloudflare 터널이 붙어 있을 수 있다. 오래 켜 두면 워커가 죽어
-> `Jest worker encountered … exceeding retry limit` 이 뜬다 — **코드가 아니라 그 프로세스**이니
-> 껐다 켜면 풀린다(터널은 별도 프로세스라 URL 이 유지된다).
+> ⚠️ **dev 서버를 둘 이상 띄우려면 `SHOTFORM_DIST_DIR` 로 빌드 디렉터리를 갈라라.** 안 가르면
+> 같은 `.next` 를 덮어써 돌아가던 서버가 404 가 된다(2026-08-13 실측).
 
-> ## 2026-08-12 에 들어온 것 — 라이브 검증이 셋 다 안 됐다
+> ## 라이브 검증이 아직 안 된 것 (2026-08-12~13)
 >
-> 네 덩이가 이 브랜치에 있다: **LLM→Claude Opus 5** · **모델 고르는 자리를 결제 앞(②대본)으로**
-> · **Seedance 네이티브 음성**(클립이 직접 말한다) · **자막 조절**(드래그·폰트·색·크기).
->
-> **★ 아직 아무도 실물로 안 돌렸다. 셋 다 확인이 필요하고 앞의 둘은 0원이다:**
 > 1. **컷 간 목소리 일관성** — 설계가 "무너지면 구현하지 않는다"로 건 **정지 게이트**인데
 >    통과된 적이 없다. `bash scripts/measure/seedance-voice.sh`(fal 직접 $3.63) 또는
 >    이미 만들어 둔 컷 2개짜리 클립을 이어 들으면 0원.
->    무너지면 `lib/clip-limits.js` 의 `speaks: true` → `false` **한 줄**로 전 경로가 옛 동작으로
->    돌아온다(단 진행 중 프로젝트가 있으면 전 컷이 낡음으로 뒤집혀 재구매가 제시된다)
-> 2. **자막 ffmpeg 굽기 4회**(기본값·폰트 3종·색·크기 1.6) — 로컬 ffmpeg 라 **0원**.
->    `soft`(Gowun Dodum) 한글 글리프는 cmap format 12 라 아무도 눈으로 못 봤다 —
->    틀리면 **두부(□□□) 글자**가 나오는데 알려 줄 자리가 코드에 없다
-> 3. **Seedance 엔드포인트**(`bytedance/seedance-2.0/image-to-video` · `resolution:"720p"`) —
+>    무너지면 `lib/clip-limits.js` 의 `speaks: true` → `false` **한 줄**로 되돌아온다
+> 2. **Seedance 엔드포인트**(`bytedance/seedance-2.0/image-to-video` · `resolution:"720p"`) —
 >    틀리면 이미지까지 값을 다 치른 뒤 ⑤에서 전 컷 실패
+> 3. **크레딧이 실제로 깎이는 흐름** — 가짜 모드는 청구를 통째로 건너뛴다(`if (!fakeFal())`).
+>    진짜 모드로 한 편 관통해야 "영상 만들기 −N" 줄이 내역에 쌓이는 것을 볼 수 있다
 >
-> **후속 과제는 두 문서에 전부 적혀 있다**:
-> `docs/measurements/2026-08-12-seedance-voice.md`(음성 7건) ·
-> `docs/superpowers/specs/2026-08-12-subtitle-styling-design.md`(자막 11건).
+> ⚠️ **결제를 붙이기 전에 볼 것**: 자막 원본(`-raw.mp4`) 때문에 저장이 **두 배**다(편당
+> ~20MB). 지우기는 이제 있다(보관함) — 무료 플랜 1GB 면 50편에서 찬다.
 >
-> ⚠️ **결제를 붙이기 전에 반드시 볼 것**: 자막 원본(`-raw.mp4`) 때문에 저장이 **두 배**인데
-> (편당 ~20MB) **삭제 경로가 아예 없어 영구 누적**이다. 무료 플랜 1GB 면 50편에서 찬다.
->
-> ★ **이 세션의 교훈**: 결함이 **태스크 경계**에 모였다(개별 리뷰는 다 통과인데 합쳐 봐야
-> 드러나는 자리에서 Critical 일곱). 계획을 파일 단위로 쪼개면 그 사이를 아무도 안 본다 —
+> ★ **교훈**: 결함이 **태스크 경계**에 모인다(개별 리뷰는 다 통과인데 합쳐 봐야 드러난다).
 > **"값이 어디서 만들어져 어디까지 흐르는가"를 태스크 하나로** 세울 것.
 
 > ## 인증이 붙었고, 라이브로 관통했다 (2026-08-01 코드 · 08-04 검증)
@@ -70,29 +61,33 @@
 >   **던진다** — 라우트는 `withUser` 가, 스크립트는 `runWithActor("admin", …)` 가 세운다
 > - **신원 검증은 `middleware.js` 에서 요청당 한 번**, 결과를 요청 헤더로 주입한다.
 >   라우트는 `withUser(handler, {adminOnly})` 로 읽기만 한다. **matcher 가 곧 보안 경계다**
-> - 예산 축이 셋이다: 전역($300 안전핀) · **사용자별**(크레딧 잔액) · 체험(`FREE_TRIAL_USD`).
->   프로젝트 축은 걷어냈다(2026-08-12)
+> - 예산 축이 셋이다(`BudgetExceeded.scope`): `total` 전역 안전핀 · `user` 잔액 ·
+>   `trial` 체험 누적(`FREE_TRIAL_USD`). **프로젝트 축은 걷어냈다(2026-08-12)** —
+>   크레딧을 내고 산 영상이 상한에 걸려 죽는 "돈은 있는데 못 만드는" 상태를 만들었다
 >
 > ⚠️ **백필 전에는 배포하지 마라** — `.eq("owner_id")` 는 NULL 과 안 맞아 기존 프로젝트가
 > 전부 안 보인다.
 
 ## 세션 마무리 규칙
 
-**세션을 마칠 때는 항상 지금까지의 작업을 정리해 wiki(`C:\Users\fixup\obsidian_jaechan`)에
-반영한다.** 사용자가 따로 요청하지 않아도 한다.
+**세션을 마칠 때는 항상 지금까지의 작업을 정리해 wiki 에 반영한다.** 사용자가 따로 요청하지
+않아도 한다.
 
-- 보관함의 `CLAUDE.md`(운영 지침)와 `index.md`를 먼저 읽고 그 규약을 따른다
-- 관련 페이지(`products/shotform-saas`, `concepts/shotform-*`)를 갱신하고,
-  새로 배운 것이 크면 `sources/`에 소스 페이지를 만든다
-- `index.md`·`log.md`도 함께 갱신한다
+- **보관함 위치와 폴더 규약은 여기 안 적는다** — 전역 규칙(`~/.claude/rules/obsidian-wiki.md`)이
+  정본이고, 그 파일이 가리키는 보관함의 `CLAUDE.md`를 **먼저 읽고** 그 규약을 따른다.
+  (옛 경로 `C:\Users\fixup\obsidian_jaechan` 은 머신과 함께 사라졌다. 여기에 경로를 다시
+  적으면 같은 일이 또 생긴다 — 두 벌이면 한쪽이 죽는다)
 - **wiki 파일은 Write/Edit 도구로만 쓴다.** PowerShell로 쓰면 한글이 깨진다
   (Windows PowerShell 5.1의 인코딩 기본값 문제. 실제로 한 번 파일을 깨뜨렸다)
 
-**이 파일보다 wiki가 최신이다.** 세션을 시작할 때 wiki의 최신 `sources/shotform-*` 페이지를
-먼저 읽는다(2026-07-29 현재 `sources/shotform-invalidation-and-cuts-2026-07-29.md`).
+**이 파일보다 wiki가 최신이다.** 세션을 시작할 때 보관함에서 이 제품(shotform)의 최신
+페이지를 먼저 읽는다.
 
 ## 이 저장소에서 일하는 방식
 
+- ★ **다른 사람과 함께 쓰는 저장소다. `main` 에 직접 쓰지 않는다.**
+  고칠 것은 **로컬에서 브랜치를 따서** 하고(`git checkout -b <type>/<주제>`), 푸시·PR 은
+  사용자가 요청할 때만 한다. GitHub 에서 파일을 직접 고치지 않는다 — 남의 작업과 부딪힌다
 - **측정 없이 품질을 주장하지 않는다.** 프롬프트를 고쳤으면 실제로 돌려서 수치를 본다.
   → 스킬 `measuring-llm-prompt-changes`(`.claude/skills/`)에 방법이 정리돼 있다
 - 지켜져야 하는 것(길이·원문 보존·중복)은 프롬프트가 아니라 **코드가 판정**한다
@@ -109,11 +104,25 @@
 ## 실행
 
 ```bash
-npm run dev                      # localhost:3000
-SHOTFORM_FAKE=fal npm run dev    # fal(이미지·TTS·i2v·합성)만 가짜, LLM(Claude·gpt-4o vision)은 진짜
-SHOTFORM_FAKE=all npm run dev    # LLM까지 가짜 — 완전 0원, 배선·상태 전이만 확인
-npx vitest run                   # 테스트 — 개수는 여기서 센다(적어 두지 않는다)
+npm install                                  # 새 클론이면 이것부터
+cp .env.local.example .env.local             # 키를 채운다 — 없으면 서버가 뜨면서 죽는다
+npm run dev                                  # localhost:3000
+SHOTFORM_FAKE=fal npm run dev                # fal(이미지·TTS·i2v·합성)만 가짜, LLM 은 진짜
+SHOTFORM_FAKE=all npm run dev                # LLM 까지 가짜 — 완전 0원, 배선·상태 전이만 확인
+SHOTFORM_DIST_DIR=.next-x npx next dev -p 3005   # 둘째 서버는 빌드 디렉터리를 갈라야 한다
+SHOTFORM_DIST_DIR=.next-verify npx next build    # dev 를 안 죽이고 컴파일만 확인
+npx vitest run                               # 전체 — 개수는 여기서 센다(적어 두지 않는다)
+npx vitest run tests/steps.test.js           # 파일 하나만
+npx vitest run -t "낡음"                      # 이름으로 골라서
 ```
+
+린터·타입체커는 없다(순수 JS, `tsconfig`·eslint 설정 없음). **판정하는 것은 테스트뿐이다** —
+`npx vitest run` 이 그린인지가 유일한 관문이다.
+
+⚠️ **`.env.local.example` 의 `FAL_I2V_ENDPOINT` 값은 코드 기본값과 다르다.** 예시는
+`fal-ai/ltx-2.3/…`(옛 모델)인데 코드 기본값은 Kling v3 다(`lib/clip-limits.js` 의
+`DEFAULT_I2V_ENDPOINT`). 예시를 그대로 복사하면 **눈금 모델로 되돌아간다** — 값을 지우면
+코드 기본값(Kling)으로 돈다.
 
 `SHOTFORM_FAKE`는 `lib/fake.js` 한 곳에서 판정한다(`off`/`fal`/`all`). 옛 이름
 `SHOTFORM_FAKE_IMAGES=1`도 `fal`로 인정된다. **모르는 값은 `off`(=진짜, 돈이 나감)로 본다.**
@@ -216,6 +225,38 @@ readable if not configured"** 이고 보관 기간 과금도 문서에 없다. �
   문장만 고치면 소리만 낡고 그림은 살아남는다
 - 구성(synopsis) 단계는 폐지됐다. 옛 프로젝트 폴백만 남아 있다
 
+## 값이 사는 곳 — 두 벌이면 갈린다
+
+이 저장소의 규칙 하나: **같은 값을 두 군데 두지 않는다.** 아래는 전부 실제로 갈려서 사고가
+났던 자리다. 새 코드가 숫자나 모델 문자열을 들고 있으면 먼저 이 표를 본다.
+
+| 무엇 | 유일한 자리 |
+|---|---|
+| 단계 표(①~⑥)·라우팅 가드 | `lib/steps.js` 의 `STEPS` |
+| 낡음 판정(각인 `of`) | `lib/steps.js` 하단 — `isImageStale`·`isClipStale`·`isRenderStale`… |
+| 크레딧 가격·재생성 상한·체험 한도 | `lib/pricing.js` |
+| 클립 모델 엔드포인트·길이 눈금·모델별 필드 | `lib/clip-limits.js` 의 `CLIP_PROFILES` |
+| 원가 단가·예산 축·원장 기록 | `lib/costs.js` |
+| 크레딧 장부(청구·환불·멱등키) | `lib/charges.js` |
+| 가짜 모드 판정 | `lib/fake.js` |
+| 저장소 구현 선택 | `lib/store/index.js` |
+| 신원 검증(요청당 1회) | `middleware.js` — 라우트는 `withUser`(`lib/auth/require-user.js`)로 **읽기만** |
+| 공개 경로·민낯 화면 목록 | `lib/auth/paths.js` (둘로 나뉜 이유가 주석에 있다 — 합치지 마라) |
+| 비용 주체(actor) | `lib/actor.js` AsyncLocalStorage — 컨텍스트가 없으면 **던진다** |
+| 화면 비율·픽셀 치수 | `lib/aspects.js` |
+| 목소리 후보 | `lib/voices.js` |
+| DB 스키마 | `db/schema.sql` 하나 (통째로 다시 올려도 안전) |
+
+★ **화면("use client")이 import 하는 모듈은 `fs` 를 끌면 안 된다.** 그래서 순수 데이터·순수
+함수만 두는 파일이 따로 있다: `pricing.js` · `clip-limits.js` · `aspects.js` · `voices.js` ·
+`styles.js` · `steps.js` · `auth/paths.js`. 이 저장소는 화면이 서버 전용 모듈을 끌고 와 빌드가
+깨진 사고를 세 번 겪었다 — 이 파일들에 import 를 더할 때는 그 사슬 끝에 `fs` 가 없는지 본다.
+
+★ **오래 걸리는 라우트는 fire-and-forget 이다** — `/images`·`/voice`·`/clips`·`/auto` 는
+파이프라인을 띄우고 바로 응답한다. 그래서 그쪽 실패는 HTTP 코드가 아니라 프로젝트 문서의
+`images_error`·`voice_error`·`video_error`·`auto.state` 로만 보이고, 화면은 짝이 되는
+`…/status` 를 2초마다 폴링해 읽는다. `withUser` 의 402/503 변환도 그 자리에는 못 닿는다.
+
 ## 이어서 할 일
 
 > **제품 방향(2026-07-31)**: 서비스로 출시한다. 순서는 **저장 계층 → 인증·RLS → 크레딧 →
@@ -226,6 +267,12 @@ readable if not configured"** 이고 보관 기간 과금도 문서에 없다. �
 0. ~~**저장 계층 Supabase 이전**~~ → **완료(07-31).** 위 "저장 계층" 절 참고.
 0-1. ~~**인증·RLS**~~ → **완료(08-01 코드 · 08-04 라이브 관통).** 위 "인증이 붙었고" 절 참고.
 0-2. ~~**크레딧**~~ → **완료(08-05 코드 · 08-06 가격표 개편·0원 관통 검증).** 아래 "크레딧" 절 참고.
+0-3. **영상 모델 선택 — 설계·계획만 있고 코드는 한 줄도 없다(다음 작업).**
+   `specs/2026-08-12-i2v-model-selection-design.md` + `plans/2026-08-12-i2v-model-selection.md`(8태스크).
+   ⑤영상에서 모델을 고른다 — 기본 **Seedance 2.0**, 대안은 지금의 Kling v3. 첫 클립을 만들면 잠긴다.
+   모델 id 는 `settings.i2v_model` 에 저장하고 **env `FAL_I2V_ENDPOINT` 는 폐지**한다(원천이 둘이면 갈린다).
+   ★ **옛 프로젝트는 `settings.i2v_model` 이 없으면 Kling v3 다** — 반대로 두면 한 편 안에 두 모델이 섞인다.
+   현재 코드에 `seedance`·`i2v_model` 은 **0건**이다(`grep` 실측). 계획 문서의 모델 표·정가 표를 글자 그대로 쓴다.
 
 > ### 크레딧 — 가격표가 붙었다 (2026-08-05 도입 · 08-06 크레딧 단위로 개편)
 >
@@ -260,7 +307,16 @@ readable if not configured"** 이고 보관 기간 과금도 문서에 없다. �
 > 정가가 길이마다 달라 "N편 남음"이 거짓말이 된다).
 >
 > 옛 고정 상한 env `SHOTFORM_BUDGET_USER_USD` 와 편수 기준가 `SHOTFORM_PER_VIDEO_USD` 는
-> 둘 다 **죽은 env** 다. 남은 안전핀은 전역·프로젝트 둘뿐이고, 사용자 축은 잔액이 맡는다.
+> 둘 다 **죽은 env** 다. env 로 남은 안전핀은 전역·프로젝트 둘뿐이고, 사용자 축은 잔액이 맡는다.
+>
+> **그리고 축이 하나 더 있다 — 체험(`scope: "trial"`).** `assertBudget` 이 **결제 이력도
+> 크레딧도 없는** 사람의 **누적 원가**를 `FREE_TRIAL_USD`(=$0.5, `lib/pricing.js`)로 막는다.
+> 정가는 ③목소리에서 받으므로 그 앞(대화·브리핑·대본)은 크레딧 0 으로도 도는데, 그 자리가
+> 무제한이면 그대로 우리 돈이라서다. 판정이 `charged <= 0 && balance <= 0` 인 이유는
+> `lib/costs.js` 주석에 있다 — **잔액만 보면 돈 낸 사장님이 자기가 산 영상 도중에 갇힌다**
+> (실제로 그랬고 탈출구가 없었다). 그러니 `balance <= 0` 하나로 줄이지 마라.
+> 측정 스크립트가 첫 유료 호출부터 죽는 것도 대개 이 그물이다 — `SHOTFORM_MEASURE_USER` 에
+> **크레딧을 가진 uuid** 를 넣어 돌린다(`"admin"` 은 충전이 불가능한 영구 체험자다).
 >
 > ⚠️ **`db/schema.sql` 을 라이브에 먼저 올려라 — 그 전에는 배포하지 마라.**
 > 이번에는 **열 이름 이관이 포함된다**: `credit_grants.amount_usd → amount_credits`.
@@ -317,7 +373,8 @@ readable if not configured"** 이고 보관 기간 과금도 문서에 없다. �
 6. **문단 구조는 보장한 적이 없다** — `validateCutRanges`가 문장을 `" "`로 잇고
    `splitSentences`가 개행을 버린다. 07-29에 고친 것은 "절 나눔 안에서의 보존"이다
 7. `target_seconds`에 `TARGET_CHOICES`(15·30·45·60) 밖의 값을 주면 조용히 `null`로 저장된다
-8. **main 병합·배포** — origin/main 대비 164커밋. 사용자가 요청할 때만 한다
+8. **배포** — `main` 은 `origin/main` 과 같다(미푸시 0). 배포는 사용자가 요청할 때만 한다.
+   그 전에 위 크레딧 절의 **`db/schema.sql` 라이브 반영**과 **`credit_grants` 재조정**을 먼저 본다
 
 ## 잊으면 안 되는 것
 
