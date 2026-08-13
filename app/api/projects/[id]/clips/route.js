@@ -5,7 +5,7 @@ import { withUser } from "../../../../../lib/auth/require-user.js";
 import { requireVideoCharge, assertCanAfford, chargeRegen, NoCredits } from "../../../../../lib/charges.js";
 import { regenPrice, MAX_REGEN_PER_CUT } from "../../../../../lib/pricing.js";
 import { fakeFal } from "../../../../../lib/fake";
-import { modelIdForProject, projectSpeaks } from "../../../../../lib/clip-limits.js";
+import { modelIdForProject, projectSpeaks, resolutionForProject } from "../../../../../lib/clip-limits.js";
 
 // 이 라우트는 **살아 있는 청구를 요구한다**(requireVideoCharge). 클립은 영상 정가에
 // 포함이라 정상 흐름에서는 그냥 지나가지만, 정가를 안 낸(또는 환불받은) 프로젝트로
@@ -63,7 +63,7 @@ export const POST = withUser(async (req, { params }, user) => {
     try {
       await requireVideoCharge({
         userId: user.id, projectId: id, seconds: project.settings?.target_seconds,
-        model: modelIdForProject(project),
+        model: modelIdForProject(project), resolution: resolutionForProject(project),
       });
     } catch (e) {
       if (e instanceof NoCredits) return Response.json({ error: e.message }, { status: 402 });
@@ -80,6 +80,9 @@ export const POST = withUser(async (req, { params }, user) => {
   const stale = remaining.filter((c) => c.video?.url);
   if (!fakeFal() && stale.length) {
     const model = modelIdForProject(project);
+    // ★ 일괄 [남은 N개 만들기]도 컷별 [다시 만들기]와 **같은 값**이어야 한다 — 해상도를
+    //   여기만 빠뜨리면 1080p 클립을 720p 값에 일괄로 다시 만드는 길이 화면에 남는다.
+    const resolution = resolutionForProject(project);
 
     // 상한 판정이 **청구보다 앞**이다 — 컷별 라우트와 같은 이유다(내고 아무것도 못 받는
     // 응답을 만들지 않는다).
@@ -94,7 +97,7 @@ export const POST = withUser(async (req, { params }, user) => {
 
     const bill = stale.map((c) => {
       const prior = Number(c.clip_regen_count) || 0;
-      return { idx: c.idx, prior, price: regenPrice("clip", prior, model) };
+      return { idx: c.idx, prior, price: regenPrice("clip", prior, model, resolution) };
     });
     const total = bill.reduce((sum, b) => sum + b.price, 0);
 
@@ -111,7 +114,8 @@ export const POST = withUser(async (req, { params }, user) => {
     for (const b of bill) {
       if (b.price > 0) {
         await chargeRegen({
-          userId: user.id, projectId: id, kind: "clip", idx: b.idx, priorCount: b.prior, model,
+          userId: user.id, projectId: id, kind: "clip", idx: b.idx, priorCount: b.prior,
+          model, resolution,
         });
       }
       // ★ 값이 0(첫 회)이어도 회차는 올린다 — 안 올리면 영원히 첫 회라 계속 공짜다.

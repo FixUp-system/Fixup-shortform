@@ -26,10 +26,10 @@ const req = () => ({ headers: new Headers({ [USER_HEADER]: A, [STATUS_HEADER]: "
 const ctx = (id) => ({ params: Promise.resolve({ id }) });
 
 // 클립이 있고 **낡은** 컷을 만든다 — 그림이 클립보다 새로우면 낡음이다(lib/steps.js).
-async function projectWithStaleClip(clipRegenCount = 0) {
+async function projectWithStaleClip(clipRegenCount = 0, settings = {}) {
   const p = await createProject({
     ownerId: A,
-    settings: { target_seconds: 30, i2v_model: "kling-v3", aspect_ratio: "9:16" },
+    settings: { target_seconds: 30, i2v_model: "kling-v3", aspect_ratio: "9:16", ...settings },
     material: { text: "자료", photos: [] },
   });
   await updateProject(p.id, A, (proj) => ({
@@ -77,6 +77,20 @@ describe("낡은 클립을 다시 만들면 값을 받는다", () => {
 
     await POST(req(), ctx(p.id));
     expect(await getStore().sumCharges(A) - before).toBe(REGEN_PRICE.clip["kling-v3"]["720p"]);
+  });
+
+  // ★ 일괄 버튼도 화질을 타야 한다 — 컷별 [다시 만들기]와 같은 값이어야 하는데,
+  // 여기만 해상도를 안 넘기면 1080p 클립을 720p 값(25)에 다시 만들 수 있다.
+  it("1080p 프로젝트는 1080p 재생성 값을 받는다", async () => {
+    await grant(500);
+    const p = await projectWithStaleClip(1, { i2v_model: "seedance-2.0", resolution: "1080p" });
+    await chargeVideo({
+      userId: A, projectId: p.id, seconds: 30, model: "seedance-2.0", resolution: "1080p",
+    });
+    const before = await getStore().sumCharges(A);
+
+    await POST(req(), ctx(p.id));
+    expect(await getStore().sumCharges(A) - before).toBe(REGEN_PRICE.clip["seedance-2.0"]["1080p"]);
   });
 
   it("상한을 넘기지 못한다 — 컷별과 같은 3회다", async () => {

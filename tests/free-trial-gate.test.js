@@ -106,6 +106,18 @@ describe("체험 한도", () => {
     });
   });
 
+  // ★ 예산 가드도 사장님이 고른 화질을 봐야 한다. 안 넘기면 estimateCost 가 720p 열로
+  // 떨어져 1080p 호출을 원가의 절반 이하로 재고, 그물이 **느슨한 방향으로** 틀린다.
+  it("해상도를 넘기면 그 원가로 잰다 — 1080p 를 720p 로 재면 그물이 느슨해진다", async () => {
+    const endpoint = "bytedance/seedance-2.0/image-to-video";
+    const call = (resolution) =>
+      runWithActor(A, () => assertBudget({ endpoint, amount: 1, resolution }));
+    // 1초 원가는 720p $0.3034 · 1080p $0.682 다(lib/costs.js 의 PRICE_TABLE).
+    // 체험 한도가 $0.5 라 그 둘 사이에 선이 있다 — 안 넘기면 둘 다 통과한다.
+    await expect(call("720p")).resolves.toBeUndefined();
+    await expect(call("1080p")).rejects.toThrow(BudgetExceeded);
+  });
+
   it("가짜 모드는 잴 것이 없다 — 그물을 아예 안 친다", async () => {
     await spend(FREE_TRIAL_USD * 10);
     vi.stubEnv("SHOTFORM_FAKE", "all");

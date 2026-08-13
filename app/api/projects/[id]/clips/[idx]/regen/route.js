@@ -7,7 +7,7 @@ import {
 import { regenPrice, MAX_REGEN_PER_CUT } from "../../../../../../../lib/pricing.js";
 import { BudgetExceeded } from "../../../../../../../lib/costs.js";
 import { fakeFal } from "../../../../../../../lib/fake";
-import { modelIdForProject } from "../../../../../../../lib/clip-limits.js";
+import { modelIdForProject, resolutionForProject } from "../../../../../../../lib/clip-limits.js";
 
 export const POST = withUser(async (req, { params }, user) => {
   const { id, idx } = await params;
@@ -58,7 +58,7 @@ export const POST = withUser(async (req, { params }, user) => {
       try {
         await requireVideoCharge({
           userId: user.id, projectId: id, seconds: project.settings?.target_seconds,
-          model: modelIdForProject(project),
+          model: modelIdForProject(project), resolution: resolutionForProject(project),
         });
       } catch (e) {
         if (e instanceof NoCredits) return Response.json({ error: e.message }, { status: 402 });
@@ -66,7 +66,9 @@ export const POST = withUser(async (req, { params }, user) => {
       }
     }
 
-    const price = regenPrice("clip", prior, modelIdForProject(project));
+    // ★ 해상도까지 넘긴다 — 안 넘기면 1080p 클립을 720p 값(25)에 다시 만들 수 있다.
+    //   아래 chargeRegen 과 **같은 인자**여야 한다(잔액 검사와 걷는 값이 갈리면 안 된다).
+    const price = regenPrice("clip", prior, modelIdForProject(project), resolutionForProject(project));
     if (price > 0) {
       try {
         await assertCanAfford(user.id, price);
@@ -76,7 +78,7 @@ export const POST = withUser(async (req, { params }, user) => {
       }
       await chargeRegen({
         userId: user.id, projectId: id, kind: "clip", idx: Number(idx), priorCount: prior,
-        model: modelIdForProject(project),
+        model: modelIdForProject(project), resolution: resolutionForProject(project),
       });
       charged = prior;   // 실패하면 이 회차를 되돌린다
     }

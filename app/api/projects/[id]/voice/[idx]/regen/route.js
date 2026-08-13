@@ -7,7 +7,7 @@ import {
 import { regenPrice, MAX_REGEN_PER_CUT } from "../../../../../../../lib/pricing.js";
 import { BudgetExceeded } from "../../../../../../../lib/costs.js";
 import { fakeFal } from "../../../../../../../lib/fake";
-import { modelIdForProject, projectSpeaks } from "../../../../../../../lib/clip-limits.js";
+import { modelIdForProject, projectSpeaks, resolutionForProject } from "../../../../../../../lib/clip-limits.js";
 
 export const POST = withUser(async (req, { params }, user) => {
   const { id, idx } = await params;
@@ -64,7 +64,7 @@ export const POST = withUser(async (req, { params }, user) => {
       try {
         await requireVideoCharge({
           userId: user.id, projectId: id, seconds: project.settings?.target_seconds,
-          model: modelIdForProject(project),
+          model: modelIdForProject(project), resolution: resolutionForProject(project),
         });
       } catch (e) {
         if (e instanceof NoCredits) return Response.json({ error: e.message }, { status: 402 });
@@ -82,6 +82,7 @@ export const POST = withUser(async (req, { params }, user) => {
       }
       await chargeRegen({
         userId: user.id, projectId: id, kind: "voice", idx: Number(idx), priorCount: prior,
+        // 이미지·목소리 재생성은 값이 하나다 — 해상도를 안 넘기는 것이 맞다(lib/pricing.js 의 REGEN_PRICE).
         model: modelIdForProject(project),
       });
       charged = prior;   // 실패하면 이 회차를 되돌린다
