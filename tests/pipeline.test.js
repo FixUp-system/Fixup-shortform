@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { isAudioStale, isImageStale, isClipStale, isRenderStale, renderKey } from "../lib/steps.js";
+import { isAudioStale, isImageStale, isClipStale, isRenderStale, renderKey, toneKey } from "../lib/steps.js";
 import { splitUnits } from "../lib/cuts.js";
 
 const llmMock = vi.hoisted(() => ({ callJson: vi.fn() }));
@@ -306,6 +306,34 @@ describe("분할 → 이미지 (이어 부르면 갈라지기 전과 같다)", (
     expect(ai.image.style_of).toBe("photo|");
     expect(isImageStale(ai, saved)).toBe(false);
     expect(isImageStale(ai, { settings: { style: { preset: "anime" } } })).toBe(true);
+  });
+
+  // ⚠️ 이 자리를 테스트가 안 보면, engraved 를 tone_of: cut.tone(원문 그대로)으로 바꿔도
+  //    전체 스위트가 그린이다. 그러면 걸러지는 톤을 가진 컷은 각인(원문)과 toneKey("")가
+  //    어긋나 **다음 화면 진입에서 전 컷이 낡음으로 뒤집히고 재구매가 제시된다.**
+  it("톤도 함께 각인한다 — 단, 그림에 안 들어간 톤은 각인도 안 한다", async () => {
+    const p = await makeProject();
+    await runBoth(p.id, {
+      ...deps(),
+      splitCuts: async () => [
+        { idx: 0, sentence: "쓰는 톤", shows: "딸기라떼", seconds: 6, source: "ai", regen_count: 0,
+          tone: "따뜻한 오후 햇살", transition: "정면 구도로 연다" },
+        // 카메라 어휘가 섞여 usableTone 이 통째로 버린다 — 프롬프트에 안 들어가니 각인도 없다
+        { idx: 1, sentence: "걸러지는 톤", shows: "간판", seconds: 6, source: "ai", regen_count: 0,
+          tone: "천천히 줌 인하는 질감" },
+      ],
+    });
+    const cuts = (await projects.getProject(p.id, OWNER)).cuts;
+    expect(cuts[0].image.tone_of).toBe(toneKey(cuts[0]));
+    expect(cuts[0].image.tone_of).toBe("따뜻한 오후 햇살\n정면 구도로 연다");
+    expect(isImageStale(cuts[0])).toBe(false);
+    // 톤을 고치면 그 자리에서 낡는다
+    expect(isImageStale({ ...cuts[0], tone: "차가운 새벽" })).toBe(true);
+
+    // 걸러진 톤은 키 자체가 없다 — 빈 문자열을 붙이면 undefined 가 아니게 되어
+    // 판정에 들어오고, 각인이 없던 옛 그림까지 같은 문으로 낡는다
+    expect("tone_of" in cuts[1].image).toBe(false);
+    expect(isImageStale(cuts[1])).toBe(false);
   });
 
   it("컷마다 그림을 한 장만 만든다 — 후보 2장이던 것을 줄였다", async () => {
