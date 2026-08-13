@@ -1,6 +1,5 @@
 import { withUser } from "../../../../../lib/auth/require-user.js";
-import { updateProject } from "../../../../../lib/projects.js";
-import { runAdRenderPipeline } from "../../../../../lib/ad/pipeline.js";
+import { startAdRender } from "../../../../../lib/ad/pipeline.js";
 import { assertCanAfford, NoCredits, alreadyChargedAd } from "../../../../../lib/charges.js";
 import { adVideoPrice } from "../../../../../lib/pricing.js";
 import { hasRenderedAdVideo } from "../../../../../lib/ad/attempt.js";
@@ -49,12 +48,20 @@ export const POST = withUser(async (_req, { params }, user) => {
     }
   }
 
-  runAdRenderPipeline(id, user.id).catch(async (e) => {
-    console.error("광고 파이프라인 실패:", e);
-    await updateProject(id, user.id, (p) => ({
-      ...p, video_error: e?.message || "영상을 만들지 못했어요",
-    })).catch(() => {});
-  });
+  // ★★ await 한다. 예전에는 파이프라인을 띄우고 바로 202 를 보냈는데(fire-and-forget),
+  // 배포(Vercel 서버리스)는 **응답이 나가면 인스턴스를 얼린다** — fal 폴링 루프가 통째로
+  // 사라져 영상이 영영 안 나왔다(시나리오는 동기 경로라 멀쩡했고 영상만 안 됐다).
+  //
+  // 그렇다고 여기서 완성까지 기다릴 수도 없다: lib/ad/timing.js 실측이 출력 1초당 ≈33.5초라
+  // 15초 광고가 ≈8.4분인데 서버리스 상한은 300초다. 그래서 startAdRender 는 **접수만** 한다 —
+  // 몇 초로 끝나고, 완성은 화면이 두드리는 GET …/status 가 수거한다.
+  try {
+    await startAdRender(id, user.id);
+  } catch (e) {
+    // 여기서 실패하면 startAdRender 가 이미 환불하고 문서에 video_error 를 남겼다.
+    console.error("광고 접수 실패:", e);
+    return Response.json({ error: e?.message || "영상을 만들지 못했어요" }, { status: 500 });
+  }
 
   return Response.json({ started: true }, { status: 202 });
 });
