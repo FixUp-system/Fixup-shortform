@@ -14,6 +14,9 @@ import { useRouter } from "next/navigation";
 import { AD_FORMATS, AD_MOODS, AD_LANGS, AD_STYLE_LINES, DEFAULT_AD_OPTIONS } from "../../../lib/ad/options";
 import { STYLE_PRESETS } from "../../../lib/styles";
 import { ASPECTS, DEFAULT_ASPECT_ID, aspectFor } from "../../../lib/aspects";
+// app/create/page.js 와 같은 이유로 쓴다 — 새 광고를 시작하는 자리에서 이전 광고의
+// 단계가 사이드바에 남지 않게 비운다(components/AdProjectContext).
+import { useAdProject } from "../../../components/AdProjectContext";
 
 // 화풍 라벨은 styles.js 에 있지만, 고를 수 있는 것은 AD_STYLE_LINES 에 영상용 문구가 있는
 // id 뿐이어야 한다 — 둘이 어긋나면 화면에는 있는데 서버(normalizeAdOptions)가 400 을 낸다.
@@ -25,6 +28,7 @@ const MAX_PHOTOS = 4;
 
 export default function AdNewPage() {
   const router = useRouter();
+  const { setProject } = useAdProject();
   const [text, setText] = useState("");
   const [photos, setPhotos] = useState([]); // {id, filename, url}
   const [format, setFormat] = useState(DEFAULT_AD_OPTIONS.format);
@@ -36,6 +40,9 @@ export default function AdNewPage() {
   const [err, setErr] = useState("");
   const fileRef = useRef(null);
   const textRef = useRef(null);
+
+  // 새 광고를 시작하는 자리 — 이전 광고의 단계가 사이드바에 남지 않게 비운다
+  useEffect(() => { setProject(null); }, [setProject]);
 
   // 글이 늘면 칸이 아래로 밀린다 — 안에서 스크롤하지 않는다(app/create/page.js 와 같은 규칙).
   useEffect(() => {

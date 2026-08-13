@@ -10,6 +10,9 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { priceLabel, adVideoPrice } from "../../../lib/pricing";
+// 사이드바와 공유하는 광고 프로젝트(components/AdProjectContext) — 사이드바의 하위 단계
+// 표시가 여기서 읽어들인 값을 그대로 본다. 사이드바가 따로 fetch·폴링하지 않아도 되는 이유.
+import { useAdProject } from "../../../components/AdProjectContext";
 
 // 폴링 주기 — 기존 단계 화면들(app/create/[id]/*/page.js)과 같다.
 const POLL_MS = 2000;
@@ -19,23 +22,23 @@ const POLL_TIMEOUT_MS = 10 * 60 * 1000;
 
 export default function AdDetailPage() {
   const { id } = useParams();
-  const [project, setProject] = useState(null); // null = 아직 못 불러왔다
+  // project·setProject·load 는 컨텍스트에서 온다(null = 아직 못 불러왔다) — 사이드바가
+  // 같은 값을 읽어 하위 단계를 그린다. 이 화면이 유일한 발신자이고, 사이드바는 수신만 한다.
+  const { project, setProject, load } = useAdProject();
   const [loadErr, setLoadErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [pollTimedOut, setPollTimedOut] = useState(false);
   const pollRef = useRef(null);
 
-  async function load() {
-    const res = await fetch(`/api/ads/${id}`);
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) { setLoadErr(data.error || "찾을 수 없어요"); return null; }
-    setProject(data);
-    return data;
-  }
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, [id]);
+  // id 가 바뀌면 먼저 비운다 — 안 비우면 방금 전 광고의 상태(사이드바 하위 단계 포함)가
+  // 새 광고를 불러오는 동안 잠깐 남는다.
+  useEffect(() => {
+    setProject(null);
+    setLoadErr("");
+    load(id).catch((e) => setLoadErr(e.message || "찾을 수 없어요"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   useEffect(() => () => { clearInterval(pollRef.current); pollRef.current = null; }, []);
 

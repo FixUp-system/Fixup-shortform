@@ -2,6 +2,7 @@ import "./globals.css";
 import { GeistSans } from "geist/font/sans";
 import localFont from "next/font/local";
 import { ProjectProvider } from "../components/ProjectContext";
+import { AdProjectProvider } from "../components/AdProjectContext";
 import AppShell from "../components/AppShell";
 
 // 라틴·숫자는 Geist가, 한글은 Pretendard가 받는다 (Geist에 한글 글리프가 없다).
@@ -26,7 +27,9 @@ export default function RootLayout({ children }) {
         {/* BETA 배너·사이드바는 AppShell이 화면(경로)에 따라 그린다 — 로그인/대기 화면은
             단독 화면이다(components/AppShell.jsx) */}
         <ProjectProvider>
-          <AppShell>{children}</AppShell>
+          <AdProjectProvider>
+            <AppShell>{children}</AppShell>
+          </AdProjectProvider>
         </ProjectProvider>
       </body>
     </html>
