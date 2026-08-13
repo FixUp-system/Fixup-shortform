@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { isAudioStale, isImageStale, isClipStale, isRenderStale, renderKey, toneKey } from "../lib/steps.js";
-import { splitUnits } from "../lib/cuts.js";
+import { splitUnits, buildImagePrompt } from "../lib/cuts.js";
 
 const llmMock = vi.hoisted(() => ({ callJson: vi.fn() }));
 vi.mock("../lib/llm.js", () => ({ callJson: (...a) => llmMock.callJson(...a) }));
@@ -129,6 +129,43 @@ describe("defaultDeps.splitCuts — 두 패스", () => {
     const cuts = await pipeline.defaultDeps.splitCuts(await saved(), OWNER);
     expect(cuts).toHaveLength(3);
     expect(cuts[1].sentence).toBe("시럽은 쓰지 않습니다.");
+  });
+
+  // ★ 관통의 이음매 — 화면 설계가 답한 톤·전환이 **컷에 꽂히는 그 한 줄**을 잰다.
+  //
+  // tests/cuts.test.js 의 관통 테스트는 validateShows → buildImagePrompt → toneKey 를
+  // 잇지만, 컷과 화면 설계를 합치는 것은 손으로 한다. 실제로 그 합치기가 일어나는 자리는
+  // pipeline.js 의 `cuts.map((c, i) => ({ ...c, ...designed[i] }))` 하나뿐이라, 누가 그 spread 를
+  // 화이트리스트(shows·motion·speed 만 뽑기)로 "정리"하면 톤·전환이 조용히 사라진다 —
+  // 프롬프트에도 각인에도 안 실리니 **전 영상이 톤 없이 나오는데 테스트는 전부 초록**이다.
+  // 그래서 여기서는 스텁 컷이 아니라 실제 splitCuts 를 통과시킨다.
+  it("화면 설계가 답한 톤·전환이 컷에 꽂혀 그림 프롬프트와 각인까지 간다", async () => {
+    const p = await saved();
+    llmMock.callJson
+      .mockResolvedValueOnce(ranges)
+      .mockResolvedValueOnce({
+        tone: "채도를 올린 시네마틱 질감",
+        environment: "성수동 골목, 골든아워",
+        shots: [
+          { shows: "딸기를 가는 손 클로즈업" },
+          { shows: "골목을 걷는 시점 샷", transition: "발끝이 화면 아래에 걸린 로우 앵글" },
+        ],
+      })
+      .mockResolvedValueOnce(noCast);
+    const cuts = await pipeline.defaultDeps.splitCuts(p, OWNER);
+
+    // 톤은 영상 하나의 값이라 전 컷에 꽂힌다. 전환은 컷 고유이고 첫 컷에는 없다.
+    expect(cuts[0].tone).toBe("채도를 올린 시네마틱 질감");
+    expect(cuts[1].tone).toBe("채도를 올린 시네마틱 질감");
+    expect(cuts[0].transition).toBeUndefined();
+    expect(cuts[1].transition).toBe("발끝이 화면 아래에 걸린 로우 앵글");
+
+    // 그리고 그 값이 그림 지시와 각인 양쪽에 도달한다 — 여기까지 와야 관통이다
+    expect(buildImagePrompt(cuts[0], p)).toContain("채도를 올린 시네마틱 질감");
+    expect(buildImagePrompt(cuts[1], p)).toContain("발끝이 화면 아래에 걸린 로우 앵글");
+    expect(buildImagePrompt(cuts[0], p)).not.toContain("발끝이 화면 아래에");
+    expect(toneKey(cuts[0])).not.toBe(toneKey(cuts[1]));
+    expect(toneKey(cuts[1])).toContain("발끝이 화면 아래에 걸린 로우 앵글");
   });
 
   it("원고가 없으면 컷 분할 실패를 던진다", async () => {

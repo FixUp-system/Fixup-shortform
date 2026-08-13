@@ -1247,8 +1247,8 @@ describe("관통: 화면 설계 → 그림 프롬프트 → 각인", () => {
     expect(p1).toContain("실내 체육관, 야간");
 
     // 각인은 컷마다 다르다 — 전환이 다르기 때문이다
+    // 둘 다 "" 면 not.toBe 가 먼저 실패하므로 "비어 있지 않다"를 따로 재지 않는다
     expect(toneKey(shots[0])).not.toBe(toneKey(shots[1]));
-    expect(toneKey(shots[0])).toBeTruthy();
     expect(toneKey(shots[1])).toContain("발 클로즈업, 아스팔트 위");
   });
 
@@ -1300,11 +1300,16 @@ describe("관통: 화면 설계 → 그림 프롬프트 → 각인", () => {
       },
       2
     );
+    const p0 = buildImagePrompt(cutOf(shots[0], 0), proj);
     const p1 = buildImagePrompt(cutOf(shots[1], 1), proj);
     expect(p1).toContain("채도를 올린 시네마틱 질감");   // 톤은 산다
     expect(p1).not.toContain("줌 인");                    // 전환은 버려진다
     expect(toneKey(shots[1])).toBe("채도를 올린 시네마틱 질감\n");
-    // 걸러진 전환 때문에 두 컷의 각인이 같아진다 — 프롬프트도 같은 이유로 같다
+    // 걸러진 전환 때문에 두 컷의 각인이 같아진다.
+    // 프롬프트 전체는 shows 가 달라 같을 수 없으니, **전환 절이 양쪽 다 없다**로 좁혀 잰다 —
+    // 각인이 같아진 것과 프롬프트가 전환을 안 실은 것이 같은 사실이어야 한다.
     expect(toneKey(shots[0])).toBe(toneKey(shots[1]));
+    expect(p0).not.toContain("Compose the opening framing");
+    expect(p1).not.toContain("Compose the opening framing");
   });
 });
