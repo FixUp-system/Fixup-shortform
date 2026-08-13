@@ -639,3 +639,85 @@ describe("광고 라우트 — 굽기", () => {
     delete process.env.SHOTFORM_FAKE;
   });
 });
+
+// ★ 컷 편집 · 되돌리기 라우트. 편집분이 라우트를 지나 프롬프트까지 닿는지, 그리고
+// 되돌리기가 남의 것을 못 건드리는지를 잰다.
+describe("광고 라우트 — 컷 편집 · 되돌리기", () => {
+  beforeEach(() => resetMemoryStore());
+
+  const ctxOf = (id) => ({ params: Promise.resolve({ id }) });
+  const postWith = (body) =>
+    new Request("http://x", { method: "POST", headers: H, ...(body ? { body: JSON.stringify(body) } : {}) });
+
+  async function madeWithScenario() {
+    const { POST: makeScenario } = await import("../app/api/ads/[id]/scenario/route.js");
+    const made = await (await createAd(post(OK))).json();
+    await makeScenario(postWith(null), ctxOf(made.id));
+    return made;
+  }
+
+  it("고친 컷을 보내면 그 내용이 LLM 프롬프트에 실린다 — 라우트가 body 를 버리면 실패한다", async () => {
+    const { POST: makeScenario } = await import("../app/api/ads/[id]/scenario/route.js");
+    const { callJson } = await import("../lib/ad/llm.js");
+    const made = await madeWithScenario();
+    callJson.mockClear();
+
+    const res = await makeScenario(
+      postWith({ shots: [{ beat: "사장님이 손으로 고친 비트" }] }),
+      ctxOf(made.id)
+    );
+    expect(res.status).toBe(200);
+    const sent = JSON.stringify(callJson.mock.calls.at(-1)[0]);
+    expect(sent).toContain("사장님이 손으로 고친 비트");
+  });
+
+  it("body 가 없거나 깨져도 지금처럼 동작한다 — [다시 쓰기]는 body 없이 부른다", async () => {
+    const { POST: makeScenario } = await import("../app/api/ads/[id]/scenario/route.js");
+    const made = await madeWithScenario();
+    expect((await makeScenario(postWith(null), ctxOf(made.id))).status).toBe(200);
+    const broken = new Request("http://x", { method: "POST", headers: H, body: "{" });
+    expect((await makeScenario(broken, ctxOf(made.id))).status).toBe(200);
+  });
+
+  it("되돌리면 직전 시나리오로 돌아간다 — 200", async () => {
+    const { POST: makeScenario } = await import("../app/api/ads/[id]/scenario/route.js");
+    const { POST: undo } = await import("../app/api/ads/[id]/scenario/undo/route.js");
+    const { callJson } = await import("../lib/ad/llm.js");
+    const made = await madeWithScenario();
+    callJson.mockImplementationOnce(async () => ({
+      text: "둘째 지시문", shots: [{ beat: "둘째" }], endpoint: "i2v",
+    }));
+    await makeScenario(postWith(null), ctxOf(made.id));
+
+    const res = await undo(postWith(null), ctxOf(made.id));
+    expect(res.status).toBe(200);
+    const doc = await res.json();
+    expect(doc.scenario.text).not.toBe("둘째 지시문");
+    expect(doc.scenario.prev).toBeUndefined();
+  });
+
+  it("되돌릴 것이 없으면 400 — 사장님이 할 일이 있는 실패다", async () => {
+    const { POST: undo } = await import("../app/api/ads/[id]/scenario/undo/route.js");
+    const made = await madeWithScenario();
+    expect((await undo(postWith(null), ctxOf(made.id))).status).toBe(400);
+  });
+
+  it("★ 남의 광고는 되돌릴 수 없다 — 404", async () => {
+    const { POST: undo } = await import("../app/api/ads/[id]/scenario/undo/route.js");
+    const made = await madeWithScenario();
+    const res = await undo(
+      new Request("http://x", { method: "POST", headers: { ...H, [USER_HEADER]: OTHER } }),
+      ctxOf(made.id)
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("★ 굽는 중에는 되돌릴 수 없다 — 400", async () => {
+    const { POST: undo } = await import("../app/api/ads/[id]/scenario/undo/route.js");
+    const { getStore } = await import("../lib/store/index.js");
+    const made = await madeWithScenario();
+    const row = await getStore().selectProject(made.id, U);
+    await getStore().updateProjectRow(made.id, U, row.version, { ...row.doc, status: "rendering" });
+    expect((await undo(postWith(null), ctxOf(made.id))).status).toBe(400);
+  });
+});

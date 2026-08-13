@@ -64,25 +64,36 @@ function StepList({ pathname }) {
 // `/ads/[id]` 한 페이지가 status에 따라 넷으로 변하고, 진행은 전부 자동이다(사람이 누를
 // 곳은 ②시나리오 확인뿐). 그래서 이 목록은 이동(<Link>)이 아니라 표시(<span>)다 — 눌러도
 // 아무 데도 안 간다. status → 지금 자리는 lib/ad/steps.js의 adStepIndex가 판정한다.
-function AdStepList({ adProject }) {
+function AdStepList({ adProject, view }) {
+  // 두 축을 가른다.
+  //  - idx: **실제로 어디까지 왔는가**(status). 지나옴(체크 표시)·잠금·이동 가능 판정.
+  //  - viewIdx: **지금 무엇을 보고 있는가**(주소의 ?step). 불이 켜지는 자리.
+  // 완성된 광고에서 ②시나리오를 다시 보면 둘이 갈린다 — 예전에는 idx 하나로 둘 다
+  // 정해서, 시나리오를 보고 있는데 ④완성에 불이 켜져 있었다(2026-08-13 실측).
   const idx = adStepIndex(adProject?.status);
+  const viewIdx = view ? adStepIndex(view) : idx;
   const id = adProject?.id;
   return (
     <div className="side-steps">
       {AD_STEPS.map((s, i) => {
-        const active = i === idx;
+        const active = i === viewIdx;
+        // 지나옴은 진행 기준이다 — 보고 있는 자리라고 해서 "아직 안 지나온" 것이 되지 않는다.
         const passed = i < idx;
         // ★ 지나온 단계는 **눌러서 다시 본다**(2026-08-13). 주소에 남기므로 뒤로가기와
         // 새로고침이 산다. 아직 안 온 단계는 그대로 잠금 — 없는 것을 열 수 없다.
         const canGo = id && isAdStepReachable(s.key, adProject?.status);
-        const cls = `side-step${active ? " on" : ""}${passed ? " passed" : ""}${!active && !passed ? " locked" : ""}`;
+        // ★ 잠금은 **갈 수 있는가**로 정한다(canGo 와 같은 판정). 예전에는 "활성도
+        // 지나옴도 아니면 잠금"이었는데, 보는 자리(view)와 진행(status)이 갈리는 순간
+        // 그 규칙이 무너진다 — 완성된 광고에서 ②시나리오를 보면 ④완성이 눌리는데도
+        // 잠긴 회색으로 보였다(2026-08-13 실측). 모양과 실제 동작이 어긋나면 안 된다.
+        const cls = `side-step${active ? " on" : ""}${passed ? " passed" : ""}${!canGo ? " locked" : ""}`;
         const inner = (
           <>
             <i>{passed ? <><Icon name="check" size={12} /><span className="sr-only">완료</span></> : s.no}</i>{s.label}
             {/* '확인' — 사람이 실제로 멈춰 기다리는 유일한 자리(②시나리오)에만, 그리고
                 지금 그 자리일 때만 붙인다. 지난 단계까지 붙이면 "아직 기다리는 중"이라는
                 거짓 신호가 된다. */}
-            {s.waits && active && <em>확인</em>}
+            {s.waits && active && i === idx && <em>확인</em>}
           </>
         );
         return canGo ? (
@@ -114,7 +125,7 @@ export default function Sidebar() {
   // 진행 중인 프로젝트가 있으면 그 프로젝트로, 없으면 새로 시작 화면으로.
   const makeVideoHref = makeHref(project);
   // 광고 영상 — inCreate와 같은 결. 컨텍스트는 읽기만 한다(components/AdProjectContext).
-  const { project: adProject } = useAdProject();
+  const { project: adProject, view: adView } = useAdProject();
   const inAds = pathname.startsWith("/ads");
   const makeVideoAdHref = makeAdHref(adProject);
   return (
@@ -132,7 +143,7 @@ export default function Sidebar() {
       <Link href={makeVideoAdHref} className={`side-item${inAds ? " on" : ""}`}>
         <span className="ic"><Icon name="ad" /></span>광고 영상
       </Link>
-      {inAds && <AdStepList adProject={adProject} />}
+      {inAds && <AdStepList adProject={adProject} view={adView} />}
       {inAds && adProject?.id && (
         <Link href="/ads/new" className="side-new">+ 새 광고 만들기</Link>
       )}

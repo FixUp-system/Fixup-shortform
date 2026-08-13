@@ -160,3 +160,51 @@ describe("사이드바 — 기존 동작 회귀 없음", () => {
     expect(src).toContain('className="side-grow"');
   });
 });
+
+// ★ 실제 화면에서 잡은 어긋남(2026-08-13) — 완성된 광고에서 ②시나리오를 눌러 다시 봐도
+// 사이드바는 ④완성에 불이 켜진 채였다. 사이드바가 **실제 status** 로만 현재 자리를
+// 정했기 때문이다. 지금 보고 있는 단계(view)를 화면이 알려 주고, 사이드바는 그것을 켠다.
+describe("사이드바 — 보고 있는 단계에 불이 켜진다", () => {
+  const ctxSrc = readFileSync("components/AdProjectContext.jsx", "utf8");
+  const pageSrc = readFileSync("app/ads/[id]/page.js", "utf8");
+
+  it("컨텍스트가 보는 단계를 나른다 — 사이드바가 주소를 따로 읽지 않는다", () => {
+    expect(ctxSrc, "컨텍스트에 view 가 없다").toMatch(/\bview\b/);
+    expect(ctxSrc).toMatch(/setView/);
+    // 사이드바가 useSearchParams 로 직접 읽으면 이 규약이 깨진다(요청·상태가 두 갈래가 된다)
+    expect(src, "사이드바가 주소를 직접 읽는다").not.toContain("useSearchParams");
+  });
+
+  it("화면이 보는 단계를 컨텍스트에 알린다 — 안 알리면 사이드바는 영영 status 만 본다", () => {
+    expect(pageSrc).toMatch(/setView\(/);
+  });
+
+  it("★ 활성 표시는 보는 단계로 정한다 — status 로만 정하면 ?step 이동이 사이드바에 안 보인다", () => {
+    const block = clean.slice(clean.indexOf("function AdStepList"), clean.indexOf("export default function Sidebar"));
+    expect(block, "AdStepList 가 view 를 안 받는다").toMatch(/view/);
+    // 활성 판정이 보는 단계의 번호를 쓴다
+    expect(block).toMatch(/viewIdx|activeIdx/);
+  });
+
+  it("지나옴·잠금은 여전히 실제 status 로 정한다 — 보는 것과 진행한 것은 다르다", () => {
+    const block = clean.slice(clean.indexOf("function AdStepList"), clean.indexOf("export default function Sidebar"));
+    expect(block, "adStepIndex(status) 판정이 사라졌다").toMatch(/adStepIndex\(adProject\?\.status\)/);
+    expect(block).toMatch(/isAdStepReachable\(s\.key,\s*adProject\?\.status\)/);
+  });
+
+  it("★ '확인' 꼬리표는 실제로 거기 멈춰 있을 때만 — 완성본에서 시나리오를 들춰볼 때 뜨면 거짓말이다", () => {
+    const block = clean.slice(clean.indexOf("function AdStepList"), clean.indexOf("export default function Sidebar"));
+    expect(block).toMatch(/s\.waits\s*&&\s*active\s*&&\s*i\s*===\s*idx/);
+  });
+});
+
+// ★ 위 수정 직후 실제 화면에서 잡은 파생 결함 — 완성된 광고에서 ②시나리오를 보면
+// ④완성이 **잠긴 회색**으로 보였다(누르면 가지는데). 잠금을 "활성도 지나옴도 아니면"
+// 으로 정했기 때문이다. 보는 자리를 옮기는 순간 그 규칙이 무너진다.
+describe("사이드바 — 잠금은 '갈 수 있는가'로 정한다", () => {
+  it("★ 잠금 판정이 이동 가능(canGo)과 같은 것을 본다 — 보는 자리와 무관해야 한다", () => {
+    const block = clean.slice(clean.indexOf("function AdStepList"), clean.indexOf("export default function Sidebar"));
+    expect(block, "잠금이 canGo 를 안 본다 — 도달한 단계가 잠겨 보인다").toMatch(/!canGo\s*\?\s*["'] locked["']/);
+    expect(block, "옛 규칙(!active && !passed)이 남아 있다").not.toMatch(/!active\s*&&\s*!passed/);
+  });
+});

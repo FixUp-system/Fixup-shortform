@@ -3,7 +3,7 @@ import { resetMemoryStore } from "../lib/store/memory.js";
 import { getStore } from "../lib/store/index.js";
 import { createProject, getProject } from "../lib/projects.js";
 import { runWithActor } from "../lib/actor.js";
-import { runScenarioStep, runAdRenderPipeline } from "../lib/ad/pipeline.js";
+import { runScenarioStep, runAdRenderPipeline, undoScenario } from "../lib/ad/pipeline.js";
 import { balanceFor } from "../lib/charges.js";
 import { AD_VIDEO_PRICE } from "../lib/pricing.js";
 import { hasRenderedAdVideo } from "../lib/ad/attempt.js";
@@ -244,5 +244,72 @@ describe("광고 파이프라인 — storeVideoDefault", () => {
         })
       )
     ).rejects.toThrow();
+  });
+});
+
+// ★ 컷 편집과 되돌리기 — 재생성은 옛 시나리오를 지운다. 편집까지 얹은 뒤 결과가 나쁘면
+// 사장님이 들인 손이 통째로 사라지므로, 직전 한 벌은 남긴다.
+describe("컷 편집 · 되돌리기", () => {
+  beforeEach(() => resetMemoryStore());
+
+  const first = { text: "첫 지시문", shots: [{ beat: "가", seconds: 15 }], endpoint: "t2v" };
+  const second = { text: "둘째 지시문", shots: [{ beat: "나", seconds: 15 }], endpoint: "t2v" };
+
+  async function withScenario() {
+    const p = await makeAd();
+    await runWithActor(U, () => runScenarioStep(p.id, U, { generateScenario: async () => first }));
+    return p;
+  }
+
+  it("고친 컷이 시나리오를 만드는 쪽에 전달된다 — 안 닿으면 편집이 화면 장식이다", async () => {
+    const p = await withScenario();
+    let seen = null;
+    await runWithActor(U, () =>
+      runScenarioStep(p.id, U, {
+        edits: [{ beat: "사장님이 고친 비트", seconds: 15 }],
+        generateScenario: async ({ project, edits }) => { seen = { project, edits }; return second; },
+      })
+    );
+    expect(seen.edits).toEqual([{ n: 1, shot: { seconds: 15, beat: "사장님이 고친 비트" } }]);
+  });
+
+  it("다시 쓰면 직전 시나리오가 prev 에 남는다", async () => {
+    const p = await withScenario();
+    await runWithActor(U, () => runScenarioStep(p.id, U, { generateScenario: async () => second }));
+    const back = await getProject(p.id, U);
+    expect(back.scenario.text).toBe("둘째 지시문");
+    expect(back.scenario.prev.text).toBe("첫 지시문");
+  });
+
+  it("★ prev 는 한 벌만 쌓인다 — prev 안의 prev 는 없다", async () => {
+    const p = await withScenario();
+    await runWithActor(U, () => runScenarioStep(p.id, U, { generateScenario: async () => second }));
+    await runWithActor(U, () => runScenarioStep(p.id, U, { generateScenario: async () => ({ ...second, text: "셋째" }) }));
+    const back = await getProject(p.id, U);
+    expect(back.scenario.prev.text).toBe("둘째 지시문");
+    expect(back.scenario.prev.prev).toBeUndefined();
+  });
+
+  it("되돌리면 직전 것으로 돌아가고 회차는 안 는다 — LLM 을 안 부르니까", async () => {
+    const p = await withScenario();
+    await runWithActor(U, () => runScenarioStep(p.id, U, { generateScenario: async () => second }));
+    const triesBefore = (await getProject(p.id, U)).scenario.tries;
+    await runWithActor(U, () => undoScenario(p.id, U));
+    const back = await getProject(p.id, U);
+    expect(back.scenario.text).toBe("첫 지시문");
+    expect(back.scenario.tries).toBe(triesBefore);
+    expect(back.status).toBe("scenario");
+  });
+
+  it("되돌린 뒤에는 또 되돌릴 수 없다 — 한 벌만 보관한다", async () => {
+    const p = await withScenario();
+    await runWithActor(U, () => runScenarioStep(p.id, U, { generateScenario: async () => second }));
+    await runWithActor(U, () => undoScenario(p.id, U));
+    await expect(runWithActor(U, () => undoScenario(p.id, U))).rejects.toThrow();
+  });
+
+  it("되돌릴 것이 없으면 던진다", async () => {
+    const p = await withScenario();
+    await expect(runWithActor(U, () => undoScenario(p.id, U))).rejects.toThrow();
   });
 });

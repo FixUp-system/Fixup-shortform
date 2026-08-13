@@ -16,6 +16,14 @@ const Ctx = createContext(null);
 
 export function AdProjectProvider({ children }) {
   const [project, setProject] = useState(null);
+  // 지금 **보고 있는** 단계. 실제 진행(project.status)과 다를 수 있다 — 완성된 광고에서
+  // ②시나리오를 눌러 다시 보는 경우다(주소의 ?step). 사이드바는 이 값으로 불을 켠다.
+  //
+  // ★ 사이드바가 useSearchParams 로 주소를 직접 읽지 않는 이유: 이 파일 머리의 규약
+  // 그대로다 — **화면이 유일한 발신자, 사이드바는 수신만**. 두 곳이 각자 주소를 해석하면
+  // "볼 수 있는 단계인가" 판정이 두 벌이 되어 언젠가 갈린다(그 판정은 lib/ad/steps.js 의
+  // isAdStepReachable 하나뿐이어야 한다).
+  const [view, setView] = useState(null);
 
   const load = useCallback(async (id) => {
     const res = await fetch(`/api/ads/${id}`);
@@ -28,7 +36,10 @@ export function AdProjectProvider({ children }) {
     return data;
   }, []);
 
-  const value = useMemo(() => ({ project, setProject, load }), [project, load]);
+  const value = useMemo(
+    () => ({ project, setProject, load, view, setView }),
+    [project, load, view]
+  );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
