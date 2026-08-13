@@ -235,3 +235,28 @@ describe("자막 조절판 — 한 격자", () => {
     expect(rule(".sub-slider"), "슬라이더를 직접 그리지 않는다").toMatch(/appearance:\s*none/);
   });
 });
+
+// 나란히 선 버튼의 높이가 다르면 줄이 어긋나 보인다. 주/보조는 **색과 폭**으로 가르고
+// 높이는 맞춘다(2026-08-13 사용자 지적: 보관함 [수정] 70px vs [새 영상 만들기] 50px,
+// 비밀번호 [취소] 28px vs [바꾸기] 46px).
+describe("한 줄에 선 버튼은 높이가 같다", () => {
+  const css = cssWithoutRoot();
+  const has = (selector, prop) => {
+    const start = css.indexOf(selector + " {");
+    if (start < 0) return false;
+    return css.slice(start, css.indexOf("}", start)).includes(prop);
+  };
+
+  it("보관함 머리의 보조 버튼이 높이를 정한다", () => {
+    expect(has(".home-header .mini", "height"), ".home-header .mini 가 높이를 안 정한다").toBe(true);
+  });
+
+  it("마이페이지 한 줄의 보조 버튼도 높이를 정한다", () => {
+    expect(has(".me-row .mini", "height"), ".me-row .mini 가 높이를 안 정한다").toBe(true);
+  });
+
+  // .cta 의 margin-top(20px)이 머리 줄에 들어오면 그 줄만 아래로 밀린다.
+  it("머리 줄에서는 주 버튼의 위 여백을 지운다", () => {
+    expect(has(".home-header .cta", "margin-top"), ".home-header .cta 의 여백을 안 지운다").toBe(true);
+  });
+});

@@ -242,7 +242,7 @@ export default function MePage() {
       </section>
 
       <section className="panel me-panel">
-        <h2 className="me-h">비밀번호</h2>
+        <h2 className="me-h">비밀번호 관리</h2>
         {/* ★ 평소에는 한 줄이다. 입력칸 셋을 늘 펼쳐 두면 바꿀 생각이 없는 사람에게도
             화면의 절반이 비밀번호가 된다 — 대부분의 서비스가 접어 두는 이유다.
             (2026-08-13 사용자 결정) */}
