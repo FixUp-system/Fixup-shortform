@@ -404,6 +404,44 @@ describe("clipKey — 말하는 컷은 대사·목소리에서 파생된다", ()
   });
 });
 
+describe("clipKey — 해상도", () => {
+  const cut = { image: { url: "u" }, seconds: 5, motion: "천천히" };
+
+  it("해상도를 안 받는 모델에서는 각인이 안 바뀐다", () => {
+    // 이 작업의 하드 제약 — 붙이는 순간 이미 값을 치른 클립이 통째로 낡는다(~$9/편)
+    const kling = { settings: { i2v_model: "kling-v3" } };
+    const before = clipKey(cut, { settings: { i2v_model: "kling-v3" } });
+    expect(clipKey(cut, kling)).toBe(before);
+    expect(clipKey(cut, kling)).not.toContain("720p");
+  });
+
+  it("project 를 안 주면 해상도를 안 붙인다", () => {
+    // cuts.some(clipKey) 처럼 포인트프리로 넘기면 배열 번호가 이 자리에 온다.
+    // 덜 알리는 쪽이 안전하다(isImageStale 의 style_of 와 같은 방침).
+    expect(clipKey(cut, 1)).not.toContain("720p");
+    expect(clipKey(cut)).not.toContain("720p");
+  });
+
+  it("Seedance 는 해상도가 각인에 들어간다", () => {
+    const p = { settings: { i2v_model: "seedance-2.0", resolution: "1080p" } };
+    expect(clipKey(cut, p)).toContain("1080p");
+  });
+
+  it("해상도를 바꾸면 각인이 달라진다 — 그래야 클립이 낡는다", () => {
+    const a = { settings: { i2v_model: "seedance-2.0", resolution: "720p" } };
+    const b = { settings: { i2v_model: "seedance-2.0", resolution: "1080p" } };
+    expect(clipKey(cut, a)).not.toBe(clipKey(cut, b));
+  });
+
+  it("해상도를 안 고른 Seedance 프로젝트는 720p 로 각인된다", () => {
+    // resolutionForProject 가 기본값을 주므로 저장 여부와 무관하게 같은 값이 나온다.
+    // 사장님이 720p 를 명시로 골라도 각인이 안 바뀐다.
+    const 미선택 = { settings: { i2v_model: "seedance-2.0" } };
+    const 명시 = { settings: { i2v_model: "seedance-2.0", resolution: "720p" } };
+    expect(clipKey(cut, 미선택)).toBe(clipKey(cut, 명시));
+  });
+});
+
 describe("자막 위치와 완성본 각인", () => {
   const withCuts = (settings) => ({
     settings,
