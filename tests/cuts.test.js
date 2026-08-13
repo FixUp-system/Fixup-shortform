@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { splitSentences, splitUnits, explodeLongRanges, buildSplitMessages, buildShowsMessages, buildImagePrompt, buildClipPrompt, stillOnly, clauseBoundaries } from "../lib/cuts.js";
+import { splitSentences, splitUnits, explodeLongRanges, buildSplitMessages, buildShowsMessages, buildImagePrompt, buildClipPrompt, stillOnly, clauseBoundaries, usableTone, usableTransition } from "../lib/cuts.js";
 import { clipProfileForProject, minSecondsFor, maxSecondsFor } from "../lib/clip-limits.js";
 import { STYLE_PRESETS } from "../lib/styles.js";
 
@@ -995,5 +995,37 @@ describe("제품 외형이 프롬프트에 실린다", () => {
   it("사람 초점에서는 쓰지 않는다", () => {
     const prompt = buildImagePrompt(cut, p({ mode: "사람", subject: "50대 주인", look: "반백 머리" }));
     expect(prompt).not.toContain("반백 머리");
+  });
+});
+
+describe("톤·전환 필터", () => {
+  it("카메라 어휘가 든 톤은 안 쓴다", () => {
+    // 정지 이미지 프롬프트에 카메라 지시가 새면 그림이 그것을 암시하게 그려진다
+    expect(usableTone("천천히 줌 인하는 시네마틱 질감")).toBe("");
+    expect(usableTone("카메라가 도는 느낌")).toBe("");
+  });
+
+  it("정상 톤은 온전히 쓴다", () => {
+    // 과잉 필터로 정상값을 날리면 이 기능이 아무 일도 안 한다
+    const t = "어두운 배경에 제품 색만 채도를 올린 시네마틱 광고 필름 질감";
+    expect(usableTone(t)).toBe(t);
+  });
+
+  it("참조어가 든 전환은 통째로 버린다", () => {
+    // 이미지 모델은 '앞 컷'을 모른다 — 일부만 자르면 짧은 구도 서술의 뜻이 무너진다
+    expect(usableTransition("앞 컷에서 이어지는 발 클로즈업")).toBe("");
+    expect(usableTransition("직전 컷과 같은 구도")).toBe("");
+    expect(usableTransition("방금 본 손이 그대로")).toBe("");
+  });
+
+  it("자기 완결적인 전환은 쓴다", () => {
+    const t = "발 클로즈업, 아스팔트 위, 같은 눈높이";
+    expect(usableTransition(t)).toBe(t);
+  });
+
+  it("값이 없으면 빈 문자열이다", () => {
+    expect(usableTone(undefined)).toBe("");
+    expect(usableTransition(undefined)).toBe("");
+    expect(usableTone("  ")).toBe("");
   });
 });
