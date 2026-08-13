@@ -1,7 +1,7 @@
 // 자동 배치 — 값이 나가는 판정이라 LLM 에 통째로 안 맡긴다.
 // 코드가 먼저 좁히고, 남는 결정 지점은 "사진 1장" 하나다.
 import { describe, it, expect } from "vitest";
-import { pickEndpointKind, buildScenarioMessages, validateScenario, generateScenario } from "../lib/ad/scenario.js";
+import { pickEndpointKind, buildScenarioMessages, validateScenario, generateScenario, pickEditedShots } from "../lib/ad/scenario.js";
 
 const settings = {
   seconds: 15, aspect_ratio: "9:16", narration_lang: "ko",
@@ -210,5 +210,71 @@ describe("시나리오 검증", () => {
     // 기존 필드도 여전히 살아있다
     expect(out.shots[0].camera).toBe("로우 앵글 슬로우 푸시인");
     expect(out.shots[0].action).toBe("제품이 서서히 회전한다, 슬로모션");
+  });
+});
+
+// ★ 컷 편집 — 사장님이 장면을 고치면 그 편집분을 프롬프트에 실어 전체를 다시 쓴다.
+//
+// 이 기능의 존재 이유는 "고쳤는데 영상은 그대로"를 막는 것이다. 영상에 닿는 것은
+// scenario.text 하나뿐이라(lib/ad/generate.js 가 prompt 로 그것만 보낸다), 편집분이
+// text 재생성에 실리지 않으면 화면만 바뀌고 결과는 안 바뀐다.
+describe("컷 편집을 프롬프트에 싣는다", () => {
+  const saved = [
+    { beat: "등장", camera: "로우앵글", lighting: "탑라이트", action: "회전", sound: "드럼", line: "첫 대사", seconds: 5 },
+    { beat: "클로즈업", camera: "매크로", lighting: "림라이트", action: "오빗", sound: "신스", line: "둘째 대사", seconds: 10 },
+  ];
+  const material = { text: "앰플 광고", photos: [] };
+
+  it("고친 것이 없으면 프롬프트가 글자 그대로 지금과 같다 — 기존 흐름을 안 흔든다", () => {
+    const before = buildScenarioMessages({ settings, material });
+    const after = buildScenarioMessages({ settings, material, edits: [] });
+    expect(JSON.stringify(after)).toBe(JSON.stringify(before));
+    expect(JSON.stringify(buildScenarioMessages({ settings, material, edits: undefined })))
+      .toBe(JSON.stringify(before));
+  });
+
+  it("고친 장면만 프롬프트에 실린다 — 안 고친 장면은 모델이 자유롭게 다시 쓴다", () => {
+    const edits = pickEditedShots(saved, [
+      { ...saved[0], line: "고친 대사" },
+      { ...saved[1] },
+    ]);
+    const all = JSON.stringify(buildScenarioMessages({ settings, material, edits }));
+    expect(all).toContain("고친 대사");
+    // 안 고친 2번 장면의 내용은 안 실린다
+    // (2번의 beat "클로즈업"으로는 못 잰다 — 그 낱말은 포맷 hero 의 기본 문구에도 있다)
+    expect(all).not.toContain("림라이트");
+    expect(all).not.toContain("둘째 대사");
+  });
+
+  it("고친 장면은 몇 번째인지와 함께 '그대로 지킨다'로 실린다", () => {
+    const edits = pickEditedShots(saved, [saved[0], { ...saved[1], beat: "고친 비트" }]);
+    const all = JSON.stringify(buildScenarioMessages({ settings, material, edits }));
+    expect(all).toContain("고친 비트");
+    expect(all).toMatch(/2\s*번/);          // 몇 번째 장면인지
+    expect(all).toMatch(/그대로 지킨다/);    // 지키라는 지시
+  });
+
+  it("★ 초는 편집으로 치지 않는다 — 화면이 안 여는 값이고, 합이 전체 길이를 깨면 안 된다", () => {
+    // 초만 다르게 보내면 "고친 장면 없음"이다
+    expect(pickEditedShots(saved, [{ ...saved[0], seconds: 99 }, saved[1]])).toEqual([]);
+    // 다른 필드를 고치면서 초까지 보내도, 실리는 초는 저장된 값이다
+    const edits = pickEditedShots(saved, [{ ...saved[0], seconds: 99, beat: "고친 비트" }, saved[1]]);
+    expect(edits).toHaveLength(1);
+    expect(edits[0].shot.seconds).toBe(5);
+  });
+
+  it("★ 장면을 늘리거나 줄여서 보내도 저장된 장면 수를 넘지 않는다 — 화면에 그런 길이 없다", () => {
+    const tooMany = pickEditedShots(saved, [saved[0], saved[1], { beat: "몰래 넣은 장면" }]);
+    expect(tooMany).toEqual([]);
+    // 모자라게 보내면 온 만큼만 본다
+    const fewer = pickEditedShots(saved, [{ ...saved[0], beat: "고침" }]);
+    expect(fewer).toHaveLength(1);
+    expect(fewer[0].n).toBe(1);
+  });
+
+  it("보낸 값이 shots 가 아니면 편집 없음으로 본다", () => {
+    expect(pickEditedShots(saved, null)).toEqual([]);
+    expect(pickEditedShots(saved, "가")).toEqual([]);
+    expect(pickEditedShots(null, [{ beat: "가" }])).toEqual([]);
   });
 });

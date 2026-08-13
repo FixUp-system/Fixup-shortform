@@ -312,8 +312,11 @@ describe("/ads/[id] 화면 — 연출 필드·모델 표시 (Task 22)", () => {
   });
 
   it("조명·음향은 각각 있을 때만 한 줄로 그린다", () => {
-    expect(detailSrc, "shot.lighting 가드가 없다").toMatch(/\{shot\.lighting\s*&&/);
-    expect(detailSrc, "shot.sound 가드가 없다").toMatch(/\{shot\.sound\s*&&/);
+    // ★ 컷 편집이 붙으며 가드가 (editing || shot.X) 로 넓어졌다 — **편집 중에만** 빈 줄을
+    // 그린다(옛 시나리오에 조명·음향이 없으면 채워 넣을 길이 없어서다). 볼 때의 계약은
+    // 그대로다: 값이 없으면 안 그린다.
+    expect(detailSrc, "shot.lighting 가드가 없다").toMatch(/\(editing \|\| shot\.lighting\)\s*&&/);
+    expect(detailSrc, "shot.sound 가드가 없다").toMatch(/\(editing \|\| shot\.sound\)\s*&&/);
   });
 
   it("기존 beat·camera·action·line 필드는 그대로 남아 있다", () => {
@@ -329,5 +332,99 @@ describe("/ads/[id] 화면 — 연출 필드·모델 표시 (Task 22)", () => {
 
   it("가격 계산에 모델을 함께 넘긴다 — 안 넘기면 2.5 프로젝트에 2.0(더 싼) 가격이 뜬다", () => {
     expect(detailSrc).toMatch(/adVideoPrice\(settings\?\.seconds,\s*settings\?\.model\)/);
+  });
+});
+
+// ★ 컷 편집 — 사장님이 시나리오를 보고 그 자리에서 고친다.
+//
+// 이 저장소의 화면 계약은 소스 문자열을 읽어 잰다. 그래서 "편집이 실제로 동작하는가"는
+// 못 재고, **편집을 여는 배선이 있는가**를 잰다. 아래 단정 하나하나가 사라지면 정확히
+// 그 배선이 끊긴 것이다.
+describe("/ads/[id] — 컷 편집", () => {
+  it("[수정하기]가 장면 목록보다 위에 있다 — 1번 장면 앞이어야 손이 먼저 닿는다", () => {
+    expect(detailSrc).toContain("수정하기");
+    const editBtn = detailSrc.indexOf("수정하기");
+    const shotList = detailSrc.indexOf("plan-list");
+    expect(editBtn).toBeGreaterThan(-1);
+    expect(shotList).toBeGreaterThan(-1);
+    expect(editBtn, "[수정하기]가 장면 목록 아래에 있다").toBeLessThan(shotList);
+  });
+
+  it("★ 필드가 실제로 열린다 — contentEditable 없이 .editable 만 붙이면 모양만 편집이다", () => {
+    // 이 화면은 편집 기능 이전에도 className="editable" 을 쓰고 있었다(스타일만).
+    // 진짜 편집은 contentEditable 이 가른다 — app/create/[id]/script/page.js 와 같은 패턴.
+    expect(detailSrc, "contentEditable 이 없다 — 모양만 편집이다").toContain("contentEditable");
+    expect(detailSrc).toContain("suppressContentEditableWarning");
+  });
+
+  it("★ 초는 안 연다 — 합이 전체 길이를 깨는 자리다", () => {
+    // 초 배지는 그리되(badge), 그 자리에 contentEditable 이 붙으면 안 된다
+    const secondsLine = detailSrc.split("\n").find((l) => l.includes("shot.seconds") && l.includes("badge"));
+    expect(secondsLine, "초 배지를 못 찾겠다").toBeTruthy();
+    expect(secondsLine).not.toContain("contentEditable");
+  });
+
+  it("편집한 컷을 shots 로 실어 시나리오 라우트에 보낸다 — 안 보내면 화면 장식이다", () => {
+    expect(detailSrc).toMatch(/\/api\/ads\/\$\{id\}\/scenario/);
+    expect(detailSrc, "고친 shots 를 body 로 안 보낸다").toMatch(/body:.*shots/s);
+  });
+
+  it("되돌리기 라우트를 부른다", () => {
+    expect(detailSrc).toMatch(/\/api\/ads\/\$\{id\}\/scenario\/undo/);
+    expect(detailSrc).toContain("되돌리기");
+  });
+
+  it("★ 되돌리기는 되돌릴 것이 있을 때만 보인다 — 없는 길을 띄우지 않는다", () => {
+    expect(detailSrc).toMatch(/scenario\?\.prev\s*&&/);
+  });
+
+  it("★ 편집 중에는 유료 버튼([이대로 만들기])을 감춘다 — 값이 나가는 문을 열어두지 않는다", () => {
+    expect(detailSrc).toMatch(/!editing\s*&&[\s\S]{0,400}이대로 만들기/);
+  });
+
+  it("★ done 에서는 [수정하기]가 없다 — 완성본을 실수로 되돌리지 않는다", () => {
+    // done 갈래에 편집 배선이 없어야 한다.
+    // ★ 'view === "done"' 으로 자르면 안 된다 — 그 문자열은 위쪽 handled 계산에도 있어서
+    //   시나리오 갈래까지 통째로 잘려 들어온다(처음에 그렇게 써서 헛되이 실패했다).
+    const doneStart = detailSrc.indexOf('view === "done" && video &&');
+    expect(doneStart).toBeGreaterThan(-1);
+    expect(detailSrc.slice(doneStart)).not.toContain("수정하기");
+  });
+});
+
+// ★ 실제 화면에서 잡은 결함(2026-08-13) — 편집을 켜면 같은 문구의 버튼이 둘이 됐고,
+// 그중 하나는 편집분을 **안 싣고** 보내 사장님이 고친 것이 조용히 사라졌다.
+// 소스 훑기도 빌드도 못 잡는 자리라(문법은 멀쩡하다) 계약으로 박아 둔다.
+describe("/ads/[id] — 편집 중 버튼", () => {
+  it("★ 편집 중에는 '그냥 다시 쓰기'가 없다 — 누르면 고친 것이 말없이 사라지는 문이다", () => {
+    // 자유 재작성 버튼은 편집이 꺼져 있을 때만 그린다
+    expect(detailSrc).toMatch(/\{!editing\s*&&[\s\S]{0,300}다시 쓰기 · 무료/);
+  });
+
+  it("편집 중 값을 보내는 버튼은 하나뿐이다 — 두 개면 어느 것이 반영하는지 알 수 없다", () => {
+    // 라벨만 센다(화살표까지) — 주석에도 같은 말이 나와서 낱말만 세면 주석을 센다
+    const labels = detailSrc.match(/고친 대로 다시 쓰기 →/g) || [];
+    expect(labels.length, "'고친 대로 다시 쓰기' 버튼이 둘 이상이다").toBe(1);
+  });
+});
+
+// ★ [수정하기]는 장면 목록 머리의 **오른쪽 끝**이다. 이 저장소는 실행 버튼을 오른쪽에
+// 두고(.step-actions .fwd 가 margin-left:auto), 새 CSS 를 만들지 않고 그 규약을 그대로 쓴다.
+describe("/ads/[id] — [수정하기] 자리", () => {
+  it("오른쪽 끝에 붙는다 — .fwd 안에 있어야 margin-left:auto 를 탄다", () => {
+    const head = detailSrc.slice(detailSrc.indexOf("plan-head"), detailSrc.indexOf("plan-list"));
+    expect(head, "[수정하기]가 plan-head 머리 안에 없다").toContain("수정하기");
+    expect(head, "[수정하기]가 .fwd 밖이라 왼쪽에 붙는다").toMatch(/className="fwd"/);
+  });
+});
+
+// ★ 실제 화면에서 잡은 어긋남 — done 프로젝트를 ?step=scenario 로 열면 시나리오 갈래가
+// 그려지고, 거기 [수정하기]가 같이 떴다. "done 에서는 숨긴다"는 **보는 화면(view)** 이
+// 아니라 **실제 상태(status)** 로 판정해야 지켜진다. 고치면 완성본이 scenario 로 되돌아간다.
+describe("/ads/[id] — done 은 못 고친다", () => {
+  it("★ [수정하기]는 실제 status 로 잠근다 — view 로 판정하면 ?step=scenario 로 우회된다", () => {
+    const head = detailSrc.slice(detailSrc.indexOf("plan-head"), detailSrc.indexOf("plan-list"));
+    expect(head, "머리줄이 status 를 안 본다 — 완성본에서도 편집이 열린다")
+      .toMatch(/status\s*===\s*["']scenario["']/);
   });
 });

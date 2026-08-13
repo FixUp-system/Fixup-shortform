@@ -14,7 +14,7 @@ import { priceLabel, adVideoPrice } from "../../../lib/pricing";
 // adModel 은 모르는/없는 id 도 기본 모델로 안전하게 떨어진다(옛 문서 보호).
 import { adModel } from "../../../lib/ad/models";
 // 지나온 단계를 다시 볼 수 있는가 — 사이드바와 **같은 판정**을 쓴다(두 벌이면 갈린다).
-import { isAdStepReachable } from "../../../lib/ad/steps";
+import { adViewStep } from "../../../lib/ad/steps";
 // 큐 대기 상한 — 서버(lib/ad/generate.js)와 같은 계산을 여기서도 부른다(Task 23).
 // ★ 숫자를 이 화면에 다시 박지 마라. 두 벌이면 언젠가 갈린다 — 이 저장소가 반복해서
 // 겪은 실패 모양이다(가격도 같은 이유로 lib/pricing.js 하나다). lib/ad/timing.js 는
@@ -33,17 +33,42 @@ const POLL_MS = 2000;
 // 화면이 고정 10분에서 먼저 포기하면 서버는 아직 도는데 "오래 걸린다"고 잘못 알린다.
 // 그래서 고정값을 버리고 project.settings.seconds 로 매번 계산한다(아래 startPolling).
 
+// 장면의 한 필드 — 볼 때는 글자, 고칠 때는 열린 칸.
+//
+// ★ contentEditable 을 값(v)으로 다시 그리지 않는다. React 가 편집 중인 노드의 자식을
+// 갈아끼우면 커서가 맨 앞으로 튄다 — 그래서 초기 내용만 넣고(children) 이후는 브라우저에
+// 맡긴 뒤, 보낼 때 DOM 에서 걷는다(rewriteWithEdits). app/create/[id]/script/page.js 와
+// 같은 방식이다.
+// ★ key 를 editing 으로 가른다 — 편집을 껐다 켜면 저장된 값으로 새로 그린다([취소]가
+// 실제로 되돌리는 자리다).
+function Field({ editing, name, v }) {
+  return (
+    <span
+      key={editing ? "edit" : "read"}
+      className="editable"
+      data-field={name}
+      {...(editing ? { contentEditable: true, suppressContentEditableWarning: true } : {})}
+    >
+      {v || (editing ? "" : "(없음)")}
+    </span>
+  );
+}
+
 export default function AdDetailPage() {
   const { id } = useParams();
   const searchParams = useSearchParams();
   // project·setProject·load 는 컨텍스트에서 온다(null = 아직 못 불러왔다) — 사이드바가
   // 같은 값을 읽어 하위 단계를 그린다. 이 화면이 유일한 발신자이고, 사이드바는 수신만 한다.
-  const { project, setProject, load } = useAdProject();
+  const { project, setProject, load, setView } = useAdProject();
   const [loadErr, setLoadErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [pollTimedOut, setPollTimedOut] = useState(false);
+  // 컷 편집 모드 — 켜면 장면 필드가 열리고 유료 버튼이 숨는다.
+  const [editing, setEditing] = useState(false);
   const pollRef = useRef(null);
+  // 편집한 값을 걷어올 자리(장면 목록). 아래 rewriteWithEdits 주석 참고.
+  const editRef = useRef(null);
 
   // id 가 바뀌면 먼저 비운다 — 안 비우면 방금 전 광고의 상태(사이드바 하위 단계 포함)가
   // 새 광고를 불러오는 동안 잠깐 남는다.
@@ -55,6 +80,13 @@ export default function AdDetailPage() {
   }, [id]);
 
   useEffect(() => () => { clearInterval(pollRef.current); pollRef.current = null; }, []);
+
+  // 보는 단계를 사이드바에 알린다 — 사이드바는 주소를 스스로 안 읽는다(수신만 한다).
+  // 화면을 떠나면 비운다: 안 비우면 다른 화면으로 갔다가 돌아왔을 때 옛 단계가 켜져 있다.
+  useEffect(() => {
+    setView(adViewStep(searchParams.get("step"), project?.status));
+    return () => setView(null);
+  }, [searchParams, project?.status, setView]);
 
   function startPolling() {
     clearInterval(pollRef.current);
@@ -108,13 +140,48 @@ export default function AdDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.status]);
 
-  // 시나리오 만들기·다시 쓰기 — 같은 라우트다. LLM 만 쓰고 무료다.
-  async function makeScenario() {
+  // 시나리오 만들기·다시 쓰기·고친 대로 다시 쓰기 — **같은 라우트**다. LLM 만 쓰고 무료다.
+  //
+  // ★ edited 를 넘기면 고친 컷이 함께 간다. 무엇이 실제로 고쳐졌는지는 서버가 저장된
+  // 시나리오와 대조해 판정한다 — 화면은 "지금 보이는 장면들"을 그대로 보낼 뿐이다.
+  async function makeScenario(edited) {
     setBusy(true); setErr("");
-    const res = await fetch(`/api/ads/${id}/scenario`, { method: "POST" });
+    const res = await fetch(`/api/ads/${id}/scenario`, {
+      method: "POST",
+      ...(edited ? { headers: { "content-type": "application/json" }, body: JSON.stringify({ shots: edited }) } : {}),
+    });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) { setErr(data.error || "시나리오를 만들지 못했어요"); setBusy(false); return; }
     setProject(data);
+    setEditing(false);
+    setBusy(false);
+  }
+
+  // 고친 대로 다시 쓰기 — 편집 중인 화면에서 값을 걷어 위 함수에 넘긴다.
+  //
+  // ★ DOM 에서 걷는다(useState 로 매 글자를 붙들지 않는다). contentEditable 을 제어
+  // 컴포넌트로 만들면 한 글자마다 리렌더가 돌아 커서가 맨 끝으로 튄다 — 이 저장소가
+  // app/create/[id]/script/page.js 에서 이미 같은 방식을 쓴다.
+  function rewriteWithEdits() {
+    const rows = editRef.current?.querySelectorAll("[data-shot]") || [];
+    const edited = Array.from(rows).map((row) => {
+      const out = {};
+      for (const el of row.querySelectorAll("[data-field]")) {
+        out[el.dataset.field] = (el.textContent || "").trim();
+      }
+      return out;
+    });
+    makeScenario(edited);
+  }
+
+  // 되돌리기 — 직전 시나리오로. LLM 을 안 부르니 회차도 안 먹는다(서버가 지킨다).
+  async function undoScenario() {
+    setBusy(true); setErr("");
+    const res = await fetch(`/api/ads/${id}/scenario/undo`, { method: "POST" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { setErr(data.error || "되돌리지 못했어요"); setBusy(false); return; }
+    setProject(data);
+    setEditing(false);
     setBusy(false);
   }
 
@@ -139,6 +206,7 @@ export default function AdDetailPage() {
     return <p className="pgsub">불러오는 중…</p>;
   }
 
+  const wanted = searchParams.get("step");
   const { status, settings, scenario, videos, video_error } = project;
   const video = videos?.[0] || null;
   // 이 프로젝트가 어느 모델인지 — adModel 은 항상 값을 준다(모르면 기본 모델).
@@ -158,8 +226,9 @@ export default function AdDetailPage() {
   //
   // ⚠️ 폴링·자동 진행은 **status** 를 본다(view 가 아니다). 보고 있는 화면이 진행을
   // 멈추거나 되돌리면 안 된다 — 굽는 중에 시나리오를 들춰 봐도 굽기는 계속 돈다.
-  const wanted = searchParams.get("step");
-  const view = wanted && isAdStepReachable(wanted, status) ? wanted : status;
+  // 규칙은 lib/ad/steps.js 에 한 벌만 둔다 — 위 useEffect(사이드바에 알리는 자리)와
+  // 여기가 같은 함수를 부른다. 두 벌이면 화면과 사이드바가 서로 다른 단계를 가리킨다.
+  const view = adViewStep(wanted, status);
 
   const handled =
     view === "draft" ||
@@ -190,24 +259,59 @@ export default function AdDetailPage() {
           <h2>시나리오를 확인해 주세요</h2>
           <p className="script-src">{scenario?.text}</p>
 
-          <div className="plan-list">
+          {/* 장면 목록의 머리 — [수정하기]가 1번 장면보다 **위**에 있어야 손이 먼저 닿는다.
+              편집 중에는 [취소]로 바뀐다(같은 자리에서 켜고 끈다). */}
+          {/* ★ 편집은 **실제 상태(status)** 로 잠근다. view 로 판정하면 완성본을
+              ?step=scenario 로 열었을 때 [수정하기]가 그대로 떠서, 고치는 순간 status 가
+              scenario 로 되돌아간다 — "done 에서는 숨긴다"가 주소 한 줄로 뚫린다.
+              (실제 화면에서 잡았다. 보는 단계와 실제 상태를 가른 이 화면의 규칙 그대로다.) */}
+          <div className="step-actions plan-head">
+            {/* .fwd 가 margin-left:auto 라 오른쪽 끝에 붙는다 — 이 화면의 다른 실행
+                버튼들과 같은 자리다. 새 CSS 규약을 만들지 않는다. */}
+            <div className="fwd">
+              {status === "scenario" &&
+                (editing ? (
+                  <button className="mini" disabled={busy} onClick={() => setEditing(false)}>
+                    취소
+                  </button>
+                ) : (
+                  <button className="mini" disabled={busy} onClick={() => setEditing(true)}>
+                    수정하기
+                  </button>
+                ))}
+            </div>
+          </div>
+          {editing && (
+            <p className="pgsub">
+              고치고 싶은 곳을 눌러 바로 고치세요 — 고친 장면은 그대로 지키고 나머지는 다시 씁니다.
+              장면 길이(초)는 전체 길이에 맞춰져 있어 고칠 수 없어요.
+            </p>
+          )}
+
+          <div className="plan-list" ref={editRef}>
             {(scenario?.shots || []).map((shot, i) => (
-              <div className="plan-row" key={i}>
+              <div className="plan-row" key={i} data-shot={i}>
                 <span className="num">{i + 1}</span>
                 <div className="plan-body">
                   {/* 초 — 장면 머리에 작게. Number.isFinite 로 감싼다: 이 필드가 없는(연출
                       필드 개편 전에 만든) 옛 시나리오에서는 undefined가 그대로 안 뜨게 한다. */}
                   {Number.isFinite(shot.seconds) && <span className="badge">{shot.seconds}초</span>}
-                  <div className="plan-field"><b>비트</b><span className="editable">{shot.beat || "(없음)"}</span></div>
-                  <div className="plan-field"><b>카메라</b><span className="editable">{shot.camera || "(없음)"}</span></div>
+                  <div className="plan-field"><b>비트</b><Field editing={editing} name="beat" v={shot.beat} /></div>
+                  <div className="plan-field"><b>카메라</b><Field editing={editing} name="camera" v={shot.camera} /></div>
                   {/* 조명·음향 — CF 연출·촬영 감독 SYSTEM(be1cc9c)이 새로 낸다. 컨트롤러 판단:
                       전부 보여주되 한 줄씩 작게(나중에 줄이는 게 늘리는 것보다 쉽다). 옛
-                      시나리오엔 없을 수 있어 있을 때만 그린다. */}
-                  {shot.lighting && <p className="script-src">조명 · {shot.lighting}</p>}
-                  {shot.sound && <p className="script-src">음향 · {shot.sound}</p>}
-                  <div className="plan-field"><b>동작</b><span className="editable">{shot.action || "(없음)"}</span></div>
-                  {shot.line && (
-                    <div className="plan-field"><b>대사</b><span className="editable">{shot.line}</span></div>
+                      시나리오엔 없을 수 있어 있을 때만 그린다.
+                      ★ 편집 중에는 비어 있어도 그린다 — 안 그러면 옛 시나리오에서 그 줄을
+                      **채워 넣을 길이 없다**(고칠 수는 있는데 만들 수는 없는 상태가 된다). */}
+                  {(editing || shot.lighting) && (
+                    <div className="plan-field"><b>조명</b><Field editing={editing} name="lighting" v={shot.lighting} /></div>
+                  )}
+                  {(editing || shot.sound) && (
+                    <div className="plan-field"><b>음향</b><Field editing={editing} name="sound" v={shot.sound} /></div>
+                  )}
+                  <div className="plan-field"><b>동작</b><Field editing={editing} name="action" v={shot.action} /></div>
+                  {(editing || shot.line) && (
+                    <div className="plan-field"><b>대사</b><Field editing={editing} name="line" v={shot.line} /></div>
                   )}
                 </div>
               </div>
@@ -215,17 +319,44 @@ export default function AdDetailPage() {
           </div>
 
           <div className="step-actions">
-            {/* 다시 쓰기 — 싼 문. LLM 만 쓰고 무료다(위 도입 문구와 같은 값). */}
-            <button className="mini" disabled={busy} onClick={makeScenario}>
-              {busy ? "쓰는 중…" : "다시 쓰기 · 무료"}
-            </button>
-            <div className="fwd">
-              <span className="hint">이대로 만들면 크레딧이 나가요 — 되돌릴 수 없어요</span>
-              {/* 이대로 만들기 — 비싼 문. .cta .cr 이 버튼 안에서 값을 강조한다(app/ads/new/page.js 와 같은 자리). */}
-              <button className="cta" disabled={busy} onClick={startRender}>
-                {busy ? "시작하는 중…" : "이대로 만들기 →"} <span className="cr">{price}</span>
+            {/* 다시 쓰기 — 싼 문. LLM 만 쓰고 무료다(위 도입 문구와 같은 값).
+                ★ onClick={makeScenario} 로 바로 묶지 않는다 — 그러면 클릭 이벤트가
+                첫 인자로 들어가 "고친 컷"으로 오해된다(포인트프리 함정, 이 저장소가
+                filter 에서 이미 밟았다). */}
+            {/* ★ 편집 중에는 안 그린다. 편집 중에도 그렸더니 "고친 대로 다시 쓰기" 문구의
+                버튼이 둘이 됐는데, **이쪽은 편집분을 안 싣는다** — 사장님이 공들여 고친
+                것이 말없이 사라지는 문이었다(실제 화면에서 잡았다. 소스 훑기도 빌드도
+                문법이 멀쩡해서 못 잡는 자리다). 편집을 그만두는 길은 위 [취소]다. */}
+            {!editing && (
+              <button className="mini" disabled={busy} onClick={() => makeScenario()}>
+                {busy ? "쓰는 중…" : "다시 쓰기 · 무료"}
               </button>
-            </div>
+            )}
+            {/* 되돌리기 — 직전 것이 있을 때만. 없는 길을 띄우면 눌러 보고서야 없는 줄 안다 */}
+            {scenario?.prev && !editing && (
+              <button className="mini" disabled={busy} onClick={undoScenario}>
+                되돌리기
+              </button>
+            )}
+            {editing && (
+              <div className="fwd">
+                <span className="hint">고친 장면은 그대로 지키고 나머지를 다시 씁니다 — 무료예요</span>
+                <button className="cta" disabled={busy} onClick={rewriteWithEdits}>
+                  {busy ? "쓰는 중…" : "고친 대로 다시 쓰기 →"} <span className="cr">무료</span>
+                </button>
+              </div>
+            )}
+            {/* ★ 편집 중에는 유료 버튼을 아예 안 그린다. 고치는 중에 값이 나가는 문이
+                열려 있으면, 아직 반영도 안 된 화면을 보고 [이대로 만들기]를 누른다. */}
+            {!editing && (
+              <div className="fwd">
+                <span className="hint">이대로 만들면 크레딧이 나가요 — 되돌릴 수 없어요</span>
+                {/* 이대로 만들기 — 비싼 문. .cta .cr 이 버튼 안에서 값을 강조한다(app/ads/new/page.js 와 같은 자리). */}
+                <button className="cta" disabled={busy} onClick={startRender}>
+                  {busy ? "시작하는 중…" : "이대로 만들기 →"} <span className="cr">{price}</span>
+                </button>
+              </div>
+            )}
           </div>
         </section>
       )}
