@@ -38,6 +38,29 @@ describe("composeVideo", () => {
     expect(r.seconds).toBe(17); // 4 + 13, 소리 기준
   });
 
+  it("배경음악을 합성 인자까지 관통시킨다", async () => {
+    // buildFfmpegArgs 가 받아도 composeVideo 가 안 넘기면 부를 방법이 없다
+    // ffmpeg 는 두 번 돈다 — 합성, 그다음 자막 굽기. 음악은 첫 번째(합성)에 들어간다.
+    const calls = [];
+    await composeVideo({
+      projectId: "p1", cuts: CUTS, aspect_ratio: "9:16",
+      musicPath: "/t/bgm.mp3",
+      runFfmpeg: async (args) => { calls.push(args); },
+      downloadImpl: async (_url, dest) => dest,
+      writeFileImpl: async () => {},
+      mkdirImpl: async () => {},
+      readFileImpl: async () => Buffer.from("mp4"),
+      putObjectImpl: async () => {},
+    });
+    const compose = calls[0];
+    expect(compose).toContain("/t/bgm.mp3");
+    expect(compose.join(" ")).toContain("amix");
+    // 낭독 합(17초)이 페이드 시작점을 정한다 — composeVideo 가 길이를 알고 있다
+    expect(compose.join(" ")).toContain("afade=t=out:st=15.00");
+    // 자막 굽기는 원본을 다시 인코딩할 뿐이라 음악을 또 얹지 않는다
+    expect(calls[1]?.join(" ") ?? "").not.toContain("amix");
+  });
+
   it("로컬 ffmpeg 로 만들고 우리 서버 경로를 돌려준다", async () => {
     const r = await composeVideo({
       projectId: "p1", cuts: CUTS, aspect_ratio: "9:16",
@@ -332,6 +355,99 @@ describe("buildFfmpegArgs", () => {
     const filter = args.join(" ");
     expect(filter).not.toContain("trim=");
     expect(filter).not.toContain("tpad");
+  });
+});
+
+// 배경음악 — 자막과 같은 자리에 붙는다. 컷마다 깔면 경계에서 음악이 끊기므로
+// 이어붙인 결과([ca])에 한 번만 섞는다.
+describe("buildFfmpegArgs — 배경음악", () => {
+  const local = [
+    { video: "/t/0.mp4", audio: "/t/0.mp3", wantSeconds: 4, haveSeconds: 4 },
+    { video: "/t/1.mp4", audio: "/t/1.mp3", wantSeconds: 6, haveSeconds: 6 },
+  ];
+  const base = { local, assPath: "/t/s.ass", out: "/t/o.mp4", width: 1080, height: 1920 };
+  const graphOf = (args) => args[args.indexOf("-filter_complex") + 1];
+
+  it("이어붙인 뒤에 한 번만 섞는다", () => {
+    const args = buildFfmpegArgs({ ...base, musicPath: "/t/bgm.mp3", seconds: 10 });
+    const graph = graphOf(args);
+    // 컷이 둘이라도 amix 는 하나다
+    expect(graph.split("amix").length).toBe(2);
+    expect(graph, "concat 결과에 걸려야 한다").toMatch(/\[ca\]\[bg\]amix/);
+    expect(args[args.indexOf("-map") + 1], "자막은 여전히 영상 쪽").toBe("[outv]");
+  });
+
+  it("나레이션 볼륨을 깎지 않는다", () => {
+    // amix 기본값 normalize=1 은 입력 개수로 나눈다 — 빠뜨리면 목소리가 절반이 되고,
+    // 화면상 아무 오류가 없어 원인을 찾기 어렵다.
+    const graph = graphOf(buildFfmpegArgs({ ...base, musicPath: "/t/bgm.mp3", seconds: 10 }));
+    expect(graph).toContain("normalize=0");
+  });
+
+  it("음악이 영상보다 길면 잘라낸다", () => {
+    const graph = graphOf(buildFfmpegArgs({ ...base, musicPath: "/t/bgm.mp3", seconds: 10 }));
+    expect(graph).toContain("duration=first");
+  });
+
+  it("음악이 영상보다 짧으면 반복해 채운다 — 뒤가 무음이 되던 자리다", () => {
+    const args = buildFfmpegArgs({ ...base, musicPath: "/t/bgm.mp3", seconds: 10 });
+    const i = args.indexOf("-stream_loop");
+    expect(i, "-stream_loop 은 입력 옵션이라 -i 앞에 와야 한다").toBeGreaterThan(-1);
+    expect(args[i + 1]).toBe("-1");
+    expect(args[i + 2]).toBe("-i");
+    expect(args[i + 3], "반복은 음악에만 건다").toBe("/t/bgm.mp3");
+  });
+
+  it("음악을 나레이션 아래로 깔고 끝에서 페이드아웃한다", () => {
+    const graph = graphOf(buildFfmpegArgs({ ...base, musicPath: "/t/bgm.mp3", seconds: 10 }));
+    expect(graph, "기본 15%").toContain("volume=0.15");
+    expect(graph, "10초짜리면 8초부터 2초간").toContain("afade=t=out:st=8.00:d=2");
+  });
+
+  it("볼륨을 인자로 조절한다 — 실제 트랙이 없는 지금은 귀로 못 맞춘다", () => {
+    const graph = graphOf(buildFfmpegArgs({ ...base, musicPath: "/t/bgm.mp3", seconds: 10, musicVolume: 0.4 }));
+    expect(graph).toContain("volume=0.4");
+  });
+
+  it("영상이 페이드보다 짧으면 처음부터 페이드아웃한다", () => {
+    const graph = graphOf(buildFfmpegArgs({ ...base, musicPath: "/t/bgm.mp3", seconds: 1 }));
+    expect(graph, "음수 시작점은 ffmpeg 가 거절한다").toContain("afade=t=out:st=0.00:d=2");
+  });
+
+  it("길이를 모르면 페이드를 걸지 않는다 — 음악은 그대로 깔린다", () => {
+    const graph = graphOf(buildFfmpegArgs({ ...base, musicPath: "/t/bgm.mp3" }));
+    expect(graph).toContain("amix");
+    expect(graph).not.toContain("afade");
+  });
+
+  it("음악이 없으면 지금과 똑같이 만든다", () => {
+    // 이 기능의 유일한 하드 제약 — 기존 프로젝트의 합성이 한 글자도 달라지면 안 된다
+    const args = buildFfmpegArgs({ ...base, musicPath: null, seconds: 10 });
+    const graph = graphOf(args);
+    expect(graph).not.toContain("amix");
+    expect(graph).not.toContain("volume=");
+    expect(args).not.toContain("-stream_loop");
+    expect(args[args.indexOf("-map") + 3], "소리는 concat 결과를 그대로 쓴다").toBe("[ca]");
+    expect(args.filter((a, i) => args[i - 1] === "-i")).toEqual(["/t/0.mp4", "/t/0.mp3", "/t/1.mp4", "/t/1.mp3"]);
+  });
+
+  it("말하는 클립(소리 파일 없음)에도 음악을 깐다", () => {
+    // 소리 출처가 클립 안이든 TTS 든 [ca] 는 같은 자리다 — 분기가 늘면 안 된다.
+    // 입력이 항목마다 1개인 경로라 음악 인덱스가 어긋나기 쉽다.
+    const args = buildFfmpegArgs({
+      local: [
+        { video: "/t/0.mp4", wantSeconds: 4, haveSeconds: 4 },
+        { video: "/t/1.mp4", wantSeconds: 6, haveSeconds: 6 },
+      ],
+      assPath: "/t/s.ass", out: "/t/o.mp4", width: 1080, height: 1920,
+      musicPath: "/t/bgm.mp3", seconds: 10,
+    });
+    const graph = graphOf(args);
+    expect(args.filter((a, i) => args[i - 1] === "-i")).toEqual(["/t/0.mp4", "/t/1.mp4", "/t/bgm.mp3"]);
+    expect(graph, "음악은 세 번째 입력(0-based 2)").toContain("[2:a]");
+    // 클립 자신의 오디오 스트림을 그대로 쓰는 경로가 유지돼야 한다
+    expect(graph).toContain("[0:a]anull[a0]");
+    expect(graph).toContain("[1:a]anull[a1]");
   });
 });
 

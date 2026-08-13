@@ -108,3 +108,68 @@ describe("로컬 합성 — 실제 ffmpeg", () => {
     expect(seconds).toBeLessThan(3.4);
   }, 120000);
 });
+
+// 배경음악 — 단위 테스트는 필터 **문자열**만 본다. 문법이 틀렸는지, amix 가 실제로
+// 무엇을 하는지는 진짜 ffmpeg 만 안다.
+describe("배경음악 — 실제 ffmpeg", () => {
+  // 소리 크기를 dB 로 잰다. mean_volume 은 0 dBFS 가 최대이고 음수로 내려간다.
+  async function meanVolume(file) {
+    const { tail } = await run(["-i", file, "-af", "volumedetect", "-f", "null", "-"]);
+    const m = tail.match(/mean_volume:\s*(-?[\d.]+) dB/);
+    return m ? Number(m[1]) : NaN;
+  }
+
+  it("음악이 영상보다 짧아도 끝까지 깔리고 길이가 안 변한다", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "compose-music-"));
+    // 영상 6초 / 음악 2초 — 반복이 없으면 뒤 4초가 무음이 된다
+    await run(["-y", "-f", "lavfi", "-i", "color=c=0x2A3040:s=540x960:d=6,format=yuv420p", "-c:v", "libx264", path.join(dir, "v0.mp4")]);
+    await run(["-y", "-f", "lavfi", "-i", "sine=frequency=220:duration=6", "-c:a", "aac", path.join(dir, "a0.m4a")]);
+    await run(["-y", "-f", "lavfi", "-i", "sine=frequency=880:duration=2", "-c:a", "aac", path.join(dir, "bgm.m4a")]);
+
+    const out = path.join(dir, "out.mp4");
+    const { code, tail } = await run(buildFfmpegArgs({
+      local: [{ video: path.join(dir, "v0.mp4"), audio: path.join(dir, "a0.m4a"), wantSeconds: 6, haveSeconds: 6 }],
+      out, width: 540, height: 960,
+      musicPath: path.join(dir, "bgm.m4a"), seconds: 6,
+    }));
+    expect(code, `ffmpeg stderr:\n${tail}`).toBe(0);
+
+    const probe = await run(["-i", out]);
+    const m = probe.tail.match(/Duration:\s*(\d+):(\d+):([\d.]+)/);
+    const seconds = m ? Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) : 0;
+    console.log("음악 합성 결과 길이:", seconds, "초 (영상 6초 / 음악 2초)");
+    expect(seconds).toBeGreaterThan(5.7);
+    expect(seconds).toBeLessThan(6.4);
+
+    // 마지막 1초에 소리가 살아 있는가 — 반복이 안 되면 여기가 무음이다
+    const tailCut = path.join(dir, "tail.m4a");
+    await run(["-y", "-ss", "5", "-i", out, "-t", "1", "-c:a", "aac", tailCut]);
+    const v = await meanVolume(tailCut);
+    console.log("마지막 1초 볼륨:", v, "dB");
+    expect(v, "무음이면 -91 dB 근처가 나온다").toBeGreaterThan(-50);
+  }, 120000);
+
+  it("나레이션 볼륨을 깎지 않는다", async () => {
+    // amix 의 기본값(normalize=1)은 입력 개수로 나눠 나레이션을 약 6 dB 낮춘다.
+    // 음악을 **무음**으로 넣으면 그 감쇄만 남아 눈금에 잡힌다.
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "compose-mixvol-"));
+    await run(["-y", "-f", "lavfi", "-i", "color=c=0x2A3040:s=540x960:d=4,format=yuv420p", "-c:v", "libx264", path.join(dir, "v0.mp4")]);
+    await run(["-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=4", "-c:a", "aac", path.join(dir, "a0.m4a")]);
+    await run(["-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-t", "4", "-c:a", "aac", path.join(dir, "silent.m4a")]);
+
+    const local = [{ video: path.join(dir, "v0.mp4"), audio: path.join(dir, "a0.m4a"), wantSeconds: 4, haveSeconds: 4 }];
+    const plain = path.join(dir, "plain.mp4");
+    const mixed = path.join(dir, "mixed.mp4");
+    await run(buildFfmpegArgs({ local, out: plain, width: 540, height: 960 }));
+    const { code, tail } = await run(buildFfmpegArgs({
+      local, out: mixed, width: 540, height: 960,
+      musicPath: path.join(dir, "silent.m4a"), // 무음 — 볼륨 변화는 전부 amix 탓이다
+    }));
+    expect(code, `ffmpeg stderr:\n${tail}`).toBe(0);
+
+    const before = await meanVolume(plain);
+    const after = await meanVolume(mixed);
+    console.log(`나레이션 볼륨: ${before} dB → ${after} dB (차이 ${(after - before).toFixed(2)})`);
+    expect(after - before, "normalize=0 을 빠뜨리면 약 -6 dB 가 된다").toBeGreaterThan(-1);
+  }, 120000);
+});
