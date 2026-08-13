@@ -33,6 +33,10 @@ export default function AdminPage() {
   // 상단바가 보는 공유본. 내 계정에 넣었으면 그 자리에서 다시 읽는다 —
   // 안 읽으면 크레딧을 넣고도 상단바가 옛 숫자를 들고 있어 "안 들어갔나" 싶다.
   const { me: myself, load: reloadMe } = useMe();
+  // 찾기와 줄 수 — 사용자가 늘면 표를 눈으로 훑을 수 없다.
+  // ★ 서버가 아니라 화면에서 거른다: listProfiles 가 이미 500명까지 한 번에 주고,
+  //   그 위에서 거르는 것이 왕복 없이 즉시 반응한다. 500을 넘기 시작하면 그때 서버로 옮긴다.
+  const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState(null);
   const [ledger, setLedger] = useState(null);   // null = 불러오는 중
 
@@ -137,6 +141,12 @@ export default function AdminPage() {
     }
   }
 
+  // 이메일과 id 로 찾는다 — 문의는 대개 이메일로 오지만, 로그·장부에는 id 만 남는다.
+  const q = query.trim().toLowerCase();
+  const found = (users || []).filter(
+    (u) => !q || u.email?.toLowerCase().includes(q) || u.id?.toLowerCase().includes(q)
+  );
+
   return (
     <>
       <h1 className="pgtitle">사용자 관리</h1>
@@ -145,12 +155,24 @@ export default function AdminPage() {
         반영돼요 — 다시 로그인할 필요는 없어요.
       </p>
 
+      {users !== null && (
+        <div className="admin-tools">
+          <input
+            className="sent-input admin-search"
+            type="search"
+            placeholder="이메일이나 id 로 찾기"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
+      )}
+
       {err && <p className="pgsub warn">{err}</p>}
 
       {users === null ? (
         <p className="pgsub">불러오는 중…</p>
-      ) : users.length === 0 ? (
-        <p className="pgsub">사용자가 없어요.</p>
+      ) : found.length === 0 ? (
+        <p className="pgsub">{query ? "찾는 사용자가 없어요." : "사용자가 없어요."}</p>
       ) : (
         <div className="cost-table-wrap">
           <table className="cost-table">
@@ -165,7 +187,7 @@ export default function AdminPage() {
               </tr>
             </thead>
             <tbody>
-              {users.flatMap((u) => (
+              {found.flatMap((u) => (
                 [<tr key={u.id}>
                   <td className="mono">{u.email}</td>
                   <td>
@@ -233,6 +255,13 @@ export default function AdminPage() {
               ))}
             </tbody>
           </table>
+          {/* 몇 명을 보고 있는지 — 찾기 전에 알아야 하는 값이 아니라 결과를 보고
+              확인하는 값이라 표 아래다 */}
+          <p className="pgsub admin-count">
+            {found.length === users.length
+              ? `전체 ${users.length}명`
+              : `찾은 ${found.length}명 (전체 ${users.length}명)`}
+          </p>
         </div>
       )}
     </>

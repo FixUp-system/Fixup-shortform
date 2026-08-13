@@ -10,6 +10,8 @@ import { useMe } from "../../../../components/MeContext";
 import BackButton from "../../../../components/BackButton";
 import { I2V_MAX_SECONDS, modelIdForProject, projectSpeaks } from "../../../../lib/clip-limits";
 import { isClipStale } from "../../../../lib/steps";
+// 비율은 lib 한 곳에서 온다 — 화면이 표를 또 만들면 언젠가 갈린다(④이미지가 그랬다)
+import { aspectFor } from "../../../../lib/aspects";
 // 상한과 값은 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다).
 import { MAX_REGEN_PER_CUT, priceLabel, regenPrice } from "../../../../lib/pricing";
 
@@ -105,6 +107,15 @@ export default function VideoStepPage() {
 
   const cuts = project?.cuts || [];
   const chosenModel = modelIdForProject(project);
+
+  // ★ 미리보기 틀은 **프로젝트 비율**이다(⑥완성과 같은 규칙). 9:16 으로 고정해 두면
+  // 16:9·1:1 프로젝트의 클립이 세로 틀에 맞춰 잘려 보이고, 키우면 그 잘림이 그대로 커진다.
+  // 폭을 뷰포트 높이로 제한해 세로가 길어도 화면을 넘지 않는다.
+  const aspect = aspectFor(project?.settings?.aspect_ratio);
+  const frameStyle = {
+    aspectRatio: `${aspect.width} / ${aspect.height}`,
+    maxWidth: `calc((100vh - 210px) * ${aspect.width} / ${aspect.height})`,
+  };
   // 활성 모델의 클립 상한. 서버가 실어 보낸다 — 없으면(옛 응답) 기본 프로필 값으로 떨어진다
   const clipMax = project?.clip_limits?.max ?? I2V_MAX_SECONDS;
   // 남은 컷 = 클립이 없거나 낡은 컷. runVideoPipeline 의 건너뛰기 조건의 정확한 반대다.
@@ -193,7 +204,7 @@ export default function VideoStepPage() {
         </div>
 
         <div className="preview-pane">
-          <div className="preview-frame">
+          <div className="preview-frame" style={frameStyle}>
             {/* 다시 만드는 중에는 옛 클립을 감춘다 — 그대로 두면 바뀐 줄 알고 또 누르게 된다 */}
             {regening === selected?.idx ? (
               selected?.image?.url ? <img src={selected.image.url} alt="" /> : null

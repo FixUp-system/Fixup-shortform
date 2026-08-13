@@ -102,10 +102,16 @@ describe("⑥완성 — 미리보기 비율이 프로젝트를 따른다", () =>
     expect(block, "9:16 을 손으로 적었다").not.toMatch(/9 ?\/ ?16/);
   });
 
-  it("영상을 잘라 보여 주지 않는다 — ⑥완성만 contain", () => {
-    const rule = css.match(/\.done-preview \.preview-video \{[^}]*\}/)?.[0];
-    expect(rule, ".done-preview .preview-video 규칙이 없다").toBeTruthy();
-    expect(rule).toContain("object-fit: contain");
+  // ★ 2026-08-13: ⑤영상도 같은 규칙이 됐다. 거기만 9:16 고정 틀에 cover 라, 16:9·1:1
+  // 프로젝트의 클립이 잘려 보였고 키우면 그 잘림이 그대로 커졌다(사용자 지적).
+  it("영상을 잘라 보여 주지 않는다 — 미리보기는 전부 contain", () => {
+    const base = css.match(/\.preview-frame \.preview-video \{[^}]*\}/)?.[0];
+    expect(base, ".preview-frame .preview-video 규칙이 없다").toBeTruthy();
+    expect(base, "미리보기 영상이 잘린다(cover)").toContain("object-fit: contain");
+
+    const done = css.match(/\.done-preview \.preview-video \{[^}]*\}/)?.[0];
+    expect(done, ".done-preview .preview-video 규칙이 없다").toBeTruthy();
+    expect(done).toContain("object-fit: contain");
   });
 });
 
@@ -300,5 +306,31 @@ describe("⑥완성 — 적용하면 그 영상을 보여 준다", () => {
 
   it("자막만 바뀐 것과 컷이 낡은 것을 한 버튼이 갈라 처리한다", () => {
     expect(src).toMatch(/applyToVideo/);
+  });
+});
+
+// 자막을 고치는 자리와 그 결과가 **한눈에** 들어와야 한다 — 아래위로 두면 조절판을
+// 만질 때 영상이 화면 밖으로 밀린다(2026-08-13 사용자 요청: 영상 왼쪽에 배치).
+describe("⑥완성 — 자막 조절판과 영상을 나란히", () => {
+  const css = readFileSync("app/globals.css", "utf8");
+
+  it("둘을 한 줄에 세운다", () => {
+    const at = css.indexOf(".done-stage {");
+    expect(at, ".done-stage 규칙이 없다").toBeGreaterThan(-1);
+    expect(css.slice(at, css.indexOf("}", at))).toMatch(/display:\s*flex/);
+  });
+
+  it("조절판이 영상보다 먼저 온다 — 왼쪽이다", () => {
+    const stage = src.indexOf('className="done-stage"');
+    expect(stage, "done-stage 를 안 그린다").toBeGreaterThan(-1);
+    const editor = src.indexOf('className="sub-editor"', stage);
+    const preview = src.indexOf("done-preview", stage);
+    expect(editor).toBeGreaterThan(-1);
+    expect(editor, "영상이 조절판보다 앞에 있다").toBeLessThan(preview);
+  });
+
+  // 좁은 화면에서까지 나란히 두면 둘 다 못 쓰게 좁아진다.
+  it("좁아지면 위아래로 쌓는다", () => {
+    expect(css).toMatch(/\.done-stage \{[\s\S]*?\}[\s\S]*?@media[^{]*\{[\s\S]*?\.done-stage[\s\S]*?column/);
   });
 });

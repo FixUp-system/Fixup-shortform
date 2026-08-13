@@ -1082,10 +1082,13 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
 }
 
 /* 미리보기 프레임 안의 영상 — 이미지와 같은 규칙으로 채운다 */
+/* ★ 미리보기 영상은 **자르지 않는다**(contain). 틀은 프로젝트 비율과 같으므로 평소에는
+   빈 곳이 안 생기고, 어긋나는 경우(옛 프로젝트·재생 중 비율 변화)에도 잘리는 대신
+   레터박스가 생긴다 — 잘린 그림은 사장님이 "깨졌다"로 읽는다(2026-08-13). */
 .preview-frame .preview-video {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
 }
 
@@ -1105,6 +1108,32 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
 .plan-field .editable { flex: 1; color: var(--ink); }
 
 /* 완성 화면 — 미리보기를 가운데로 */
+/* 사용자 관리의 도구 줄 — 찾기 · 줄 수 · 지금 보고 있는 수 */
+/* 찾기는 표의 **오른쪽 끝**에 선다 — 표를 보다가 손이 가는 자리다 */
+.admin-tools { display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+/* 표 폭의 절반 — 이메일·uuid 가 들어갈 만큼은 되되, 줄을 통째로 먹지는 않는다 */
+.admin-tools .admin-search { flex: none; width: 50%; min-width: 240px; }
+/* 표 아래 **오른쪽 끝**에서 조용히 말한다 — 찾기 전에 볼 값이 아니라 결과를 보고 확인하는 값이다 */
+.admin-count { margin: 12px 0 0; text-align: right; }
+
+/* ⑥완성의 무대 — 자막 조절판(왼쪽)과 영상(오른쪽)을 나란히 세운다.
+   아래위로 두면 조절판을 만지는 동안 영상이 화면 밖으로 밀려, 고친 결과를 보려고
+   매번 스크롤해야 했다(2026-08-13 사용자 요청). */
+.done-stage {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 24px;
+  margin-top: 14px;
+}
+/* 무대 안에서는 둘 다 자기 여백을 버린다 — 줄의 윗변을 맞추는 것은 무대가 한다 */
+.done-stage .done-preview { margin: 0; flex: none; }
+.done-stage .sub-editor { margin: 0; flex: none; }
+/* 좁아지면 나란히 두는 것이 오히려 손해다 — 둘 다 못 쓰게 좁아진다 */
+@media (max-width: 900px) {
+  .done-stage { flex-direction: column; align-items: center; }
+}
+
 .done-preview { width: 100%; max-width: 360px; margin: 14px auto 0; position: static; }
 /* ★ ⑥완성의 미리보기만 contain 이다 — 여기서는 자막을 **영상 위 좌표**로 옮기므로,
    cover 로 잘라 보여 주면 드래그한 자리가 잘린 프레임 기준이 되어 최종과 다른 자리를 가리킨다.

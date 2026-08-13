@@ -424,28 +424,11 @@ export default function DoneStepPage() {
               이 합성 방식에서는 자막이 들어가지 않아요 (SHOTFORM_COMPOSER=fal)
             </div>
           )}
-          {/* ★ 자막 없는 원본을 재생하고 그 위에 브라우저가 자막을 그린다 — 구워진 자막 위에
-              미리보기를 얹으면 자막이 둘로 보인다. 원본이 없는 옛 프로젝트는 완성본 그대로다. */}
-          <div className="preview-pane done-preview">
-            <div className="preview-frame" ref={stageRef} style={frameStyle}>
-              {/* key 로 다시 만든다 — src 만 바꾸면 브라우저가 이미 물고 있던 스트림을 이어 튼다 */}
-              <video key={previewSrc} className="preview-video" controls src={previewSrc} />
-              {rawUrl && (
-                <div
-                  style={overlayStyle}
-                  onPointerDown={onPointerDown}
-                  onPointerMove={onPointerMove}
-                  onPointerUp={onPointerUp}
-                  onPointerCancel={onPointerUp}
-                >
-                  {sampleText}
-                </div>
-              )}
-            </div>
-          </div>
-
+          {/* ★ 조절판을 **영상 왼쪽**에 세운다(2026-08-13 사용자 요청). 아래위로 두면
+              조절판을 만지는 동안 영상이 화면 밖으로 밀려, 고친 결과를 보려고 매번
+              스크롤해야 했다. 좁은 화면에서는 다시 위아래로 쌓인다(globals.css). */}
+          <div className="done-stage">
           {rawUrl && (
-            <>
               <div className="sub-editor">
               <div className="eyebrow mt-lg">
                 자막 꾸미기 <small>끌어서 옮기고 글꼴·색·크기를 골라요 — 다시 굽는 데 값이 들지 않아요</small>
@@ -550,8 +533,28 @@ export default function DoneStepPage() {
                 </div>
               </div>
               </div>
-            </>
           )}
+          {/* ★ 자막 없는 원본을 재생하고 그 위에 브라우저가 자막을 그린다 — 구워진 자막 위에
+              미리보기를 얹으면 자막이 둘로 보인다. 원본이 없는 옛 프로젝트는 완성본 그대로다. */}
+          <div className="preview-pane done-preview">
+            <div className="preview-frame" ref={stageRef} style={frameStyle}>
+              {/* key 로 다시 만든다 — src 만 바꾸면 브라우저가 이미 물고 있던 스트림을 이어 튼다 */}
+              <video key={previewSrc} className="preview-video" controls src={previewSrc} />
+              {rawUrl && (
+                <div
+                  style={overlayStyle}
+                  onPointerDown={onPointerDown}
+                  onPointerMove={onPointerMove}
+                  onPointerUp={onPointerUp}
+                  onPointerCancel={onPointerUp}
+                >
+                  {sampleText}
+                </div>
+              )}
+            </div>
+          </div>
+
+          </div>
 
           {/* 원본이 없는 옛 프로젝트 — 자막이 이미 구워져 있어 그 위에 미리보기를 얹을 수 없다.
               조절 UI 를 그냥 숨기기만 하면 사장님은 이 기능이 있는지조차 모른다. 아래에 이미
