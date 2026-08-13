@@ -2,6 +2,9 @@ import { describe, it, expect, vi } from "vitest";
 import { splitSentences, splitUnits, explodeLongRanges, buildSplitMessages, buildShowsMessages, buildImagePrompt, buildClipPrompt, stillOnly, clauseBoundaries, usableTone, usableTransition } from "../lib/cuts.js";
 import { clipProfileForProject, minSecondsFor, maxSecondsFor } from "../lib/clip-limits.js";
 import { STYLE_PRESETS } from "../lib/styles.js";
+// 관통 테스트라 파일 경계를 넘는다 — 화면 설계(validate) → 그림 프롬프트(cuts) → 각인(steps).
+import { validateShows } from "../lib/validate.js";
+import { toneKey } from "../lib/steps.js";
 
 const project = {
   settings: { aspect_ratio: "9:16" },
@@ -1195,5 +1198,113 @@ describe("SHOWS_SYSTEM — 톤·전환 규칙", () => {
   it("톤·전환에 카메라 움직임을 쓰지 말라고 한다", () => {
     expect(system()).toMatch(/한 낱말이라도 섞이면/);       // tone 쪽
     expect(system()).toMatch(/움직임은 motion 이 맡는다/); // transition 쪽
+  });
+});
+
+// 관통 — 화면 설계 응답 하나가 그림 프롬프트와 각인까지 흐른다.
+//
+// 이 저장소는 태스크 경계에서 반복해 샜다(개별 리뷰는 다 통과인데 합쳐 봐야 드러난다).
+// 그래서 이 테스트는 파일 하나를 보지 않고 값의 경로를 본다:
+//   validateShows(응답) → 컷 → buildImagePrompt(그림 지시) → toneKey(각인)
+// 핵심은 마지막 줄이다 — **프롬프트와 각인이 같은 것을 봐야 한다.** 갈리면 그림이 안 바뀌는데
+// 낡았다고 나오거나(재구매 제시) 그림이 바뀌는데 안 낡았다고 나온다.
+describe("관통: 화면 설계 → 그림 프롬프트 → 각인", () => {
+  const proj = {
+    settings: { aspect_ratio: "9:16" },
+    briefing: { topic: "농구화" },
+  };
+  const cutOf = (shot, idx) => ({ ...shot, idx, sentence: idx === 0 ? "가" : "나" });
+
+  it("화면 설계 응답 하나가 그림 프롬프트까지 관통한다", () => {
+    const shots = validateShows(
+      {
+        tone: "채도를 올린 시네마틱 질감",
+        environment: "실내 체육관, 야간",
+        shots: [
+          { shows: "제품이 놓여 있다" },
+          { shows: "달리는 발", transition: "발 클로즈업, 아스팔트 위" },
+        ],
+      },
+      2
+    );
+    expect(shots).toHaveLength(2);
+    // 톤은 영상 하나의 값이라 전 컷에 복사된다. 전환은 컷 고유이고 첫 컷에는 없다.
+    expect(shots[0].tone).toBe("채도를 올린 시네마틱 질감");
+    expect(shots[1].tone).toBe("채도를 올린 시네마틱 질감");
+    expect(shots[0].transition).toBeUndefined();
+
+    const p0 = buildImagePrompt(cutOf(shots[0], 0), proj);
+    const p1 = buildImagePrompt(cutOf(shots[1], 1), proj);
+
+    // 톤은 두 컷에 똑같이 — 그것이 곧 영상의 일관성이다
+    expect(p0).toContain("채도를 올린 시네마틱 질감");
+    expect(p1).toContain("채도를 올린 시네마틱 질감");
+    // 전환은 둘째 컷에만
+    expect(p0).not.toContain("아스팔트");
+    expect(p1).toContain("발 클로즈업, 아스팔트 위");
+    // 무대도 전 컷에 같이 실린다(톤과 함께 복사되는 값)
+    expect(p0).toContain("실내 체육관, 야간");
+    expect(p1).toContain("실내 체육관, 야간");
+
+    // 각인은 컷마다 다르다 — 전환이 다르기 때문이다
+    expect(toneKey(shots[0])).not.toBe(toneKey(shots[1]));
+    expect(toneKey(shots[0])).toBeTruthy();
+    expect(toneKey(shots[1])).toContain("발 클로즈업, 아스팔트 위");
+  });
+
+  // ★ 이 테스트의 핵심. 문지기가 버린 값은 프롬프트에도 없고 각인에도 없어야 한다 —
+  // 둘이 갈리는 순간 낡음 판정이 거짓이 되고, 그 버튼은 유료 호출이다.
+  it("걸러지는 톤·전환은 프롬프트와 각인에서 함께 사라진다", () => {
+    const shots = validateShows(
+      {
+        // 카메라 움직임이 섞인 톤 — usableTone 이 통째로 버린다
+        tone: "카메라가 다가가며 차가워지는 색",
+        environment: "실내 체육관, 야간",
+        shots: [
+          { shows: "제품이 놓여 있다" },
+          // 앞 컷을 가리키는 전환 — usableTransition 이 통째로 버린다
+          { shows: "달리는 발", transition: "앞 컷에서 이어받아 같은 각도" },
+        ],
+      },
+      2
+    );
+    // 저장되는 값 자체는 그대로다 — 사장님이 화면에서 보고 고칠 근거를 잃지 않는다
+    expect(shots[0].tone).toBe("카메라가 다가가며 차가워지는 색");
+    expect(shots[1].transition).toBe("앞 컷에서 이어받아 같은 각도");
+
+    const p0 = buildImagePrompt(cutOf(shots[0], 0), proj);
+    const p1 = buildImagePrompt(cutOf(shots[1], 1), proj);
+
+    // 그림 지시에는 안 실린다
+    expect(p0).not.toContain("카메라가 다가가며");
+    expect(p1).not.toContain("카메라가 다가가며");
+    expect(p0).not.toContain("Overall look and color treatment");
+    expect(p1).not.toContain("앞 컷에서 이어받아");
+    expect(p1).not.toContain("Compose the opening framing");
+
+    // 각인에도 안 들어간다 — 둘 다 걸러졌으니 각인 자체가 비고,
+    // 파이프라인은 빈 각인이면 image.tone_of 를 아예 안 붙인다(옛 그림 보호와 같은 자리다)
+    expect(toneKey(shots[0])).toBe("");
+    expect(toneKey(shots[1])).toBe("");
+  });
+
+  // 한쪽만 걸러지는 경우 — 살아남은 값은 프롬프트와 각인 양쪽에 그대로 있어야 한다
+  it("한쪽만 걸러져도 프롬프트와 각인이 같은 것을 본다", () => {
+    const shots = validateShows(
+      {
+        tone: "채도를 올린 시네마틱 질감",
+        shots: [
+          { shows: "제품이 놓여 있다" },
+          { shows: "달리는 발", transition: "줌 인 상태로 시작하는 발 클로즈업" },
+        ],
+      },
+      2
+    );
+    const p1 = buildImagePrompt(cutOf(shots[1], 1), proj);
+    expect(p1).toContain("채도를 올린 시네마틱 질감");   // 톤은 산다
+    expect(p1).not.toContain("줌 인");                    // 전환은 버려진다
+    expect(toneKey(shots[1])).toBe("채도를 올린 시네마틱 질감\n");
+    // 걸러진 전환 때문에 두 컷의 각인이 같아진다 — 프롬프트도 같은 이유로 같다
+    expect(toneKey(shots[0])).toBe(toneKey(shots[1]));
   });
 });
