@@ -49,7 +49,7 @@ export default function LoginPage() {
   return (
     <>
       {/* login-head — 제목·부제를 카드와 같은 420px 기둥에 세운다(정렬 축을 하나로). */}
-      <h1 className="pgtitle login-head">shotform</h1>
+      <h1 className="pgtitle login-head">shortform</h1>
       <p className="pgsub login-head">
         {isSignup
           ? "이메일과 비밀번호로 가입해요. 운영자 승인 뒤에 쓸 수 있어요."

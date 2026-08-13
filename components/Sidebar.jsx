@@ -69,7 +69,7 @@ export default function Sidebar() {
   return (
     <aside className="side">
       <div className="logo">
-        <i><Icon name="play" size={16} /></i>shotform
+        <i><Icon name="play" size={16} /></i>shortform
       </div>
       <Link href={makeVideoHref} className={`side-item${inCreate ? " on" : ""}`}>
         <span className="ic"><Icon name="sparkle" /></span>영상 만들기 (단계별)
@@ -107,10 +107,6 @@ export default function Sidebar() {
           <span className="ic"><Icon name="clock" /></span>비용 기록
         </Link>
       )}
-      <button className="side-item soon" disabled>
-        <span className="ic"><Icon name="gear" /></span>설정
-        <span className="soon-tag">준비 중</span>
-      </button>
       {/* 크레딧 상자가 없어도 목록을 위로 붙여 둔다 */}
       <div className="side-grow" />
     </aside>

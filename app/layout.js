@@ -16,7 +16,7 @@ const pretendard = localFont({
 });
 
 export const metadata = {
-  title: "shotform — 숏폼 자동 생성",
+  title: "shortform — 숏폼 자동 생성",
   description: "대화만 하면 숏폼 영상이 만들어져요",
 };
 

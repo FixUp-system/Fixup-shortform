@@ -9,7 +9,7 @@ import { TARGET_CHOICES } from "../../../lib/script";
 import { STYLE_PRESETS, DEFAULT_STYLE_ID } from "../../../lib/styles";
 import { VOICES } from "../../../lib/voices";
 
-const SYSTEM_PROMPT = `너는 shotform의 영상 제작 도우미다. 사용자와 한국어로 대화하며 숏폼 완성 영상(낭독+자막 포함) 제작에 필요한 정보를 수집한다.
+const SYSTEM_PROMPT = `너는 shortform의 영상 제작 도우미다. 사용자와 한국어로 대화하며 숏폼 완성 영상(낭독+자막 포함) 제작에 필요한 정보를 수집한다.
 
 수집할 정보:
 1) 자료: 영상의 주제·내용·살릴 포인트 (사용자의 첫 메시지에 대부분 담겨 있다)
