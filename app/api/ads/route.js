@@ -1,7 +1,10 @@
 import { createProject } from "../../../lib/projects.js";
 import { isAspect, DEFAULT_ASPECT_ID } from "../../../lib/aspects.js";
 import { normalizeAdOptions } from "../../../lib/ad/options.js";
-import { isAdSeconds, isAdModel, adSecondsFor, DEFAULT_AD_MODEL } from "../../../lib/ad/models.js";
+import {
+  isAdSeconds, isAdModel, adSecondsFor, DEFAULT_AD_MODEL,
+  isAdResolution, adResolutionsFor, DEFAULT_AD_RESOLUTION,
+} from "../../../lib/ad/models.js";
 import { ownedPhotoKeys } from "../../../lib/refs-io.js";
 import { withUser } from "../../../lib/auth/require-user.js";
 
@@ -37,6 +40,17 @@ export const POST = withUser(async (req, _ctx, user) => {
   if (!isAdSeconds(seconds, model)) {
     return Response.json({ error: `이 모델은 ${adSecondsFor(model).join("·")}초만 만들 수 있어요` }, { status: 400 });
   }
+
+  // ★ Task 24 — 해상도도 모델에 딸린 닫힌 목록이다(길이와 같은 결). 안 보내면 기본
+  // 해상도(720p)를 명시 저장한다 — 옛 문서 보호 규칙과 같은 값이라 "생략=720p"가
+  // 만드는 시점부터 저장된 시점까지 한 번도 안 갈린다.
+  const resolution = body?.settings?.resolution ?? DEFAULT_AD_RESOLUTION;
+  if (!isAdResolution(resolution, model)) {
+    return Response.json(
+      { error: `이 모델은 ${adResolutionsFor(model).join("·")} 만 만들 수 있어요` },
+      { status: 400 }
+    );
+  }
   const aspect = body?.settings?.aspect_ratio ?? DEFAULT_ASPECT_ID;
   if (!isAspect(aspect)) {
     return Response.json({ error: "그 화면 비율은 몰라요" }, { status: 400 });
@@ -54,7 +68,7 @@ export const POST = withUser(async (req, _ctx, user) => {
     kind: "ad",
     // ★ 모델을 명시 저장한다. 나중에 모델이 늘 때 "값이 없으면 어느 모델인가"가
     //   옛 문서의 뜻을 바꾼다 — 처음부터 적어 두면 그 질문이 안 생긴다.
-    settings: { ...options, seconds, aspect_ratio: aspect, model },
+    settings: { ...options, seconds, aspect_ratio: aspect, model, resolution },
     material: { text: body.material.text.slice(0, 4000), photos },
     ownerId: user.id,
   });

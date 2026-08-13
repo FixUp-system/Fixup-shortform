@@ -29,10 +29,20 @@ export const POST = withUser(async (_req, { params }, user) => {
   // 계속 통과한다 — 그게 옳다(같은 회차를 이어서 굽는 정상 흐름).
   if (!(await alreadyChargedAd(id)) || hasRenderedAdVideo(project)) {
     try {
-      // ★ 모델을 넘긴다 — 안 넘기면 항상 2.0 값(가장 싼 값)으로 잔액을 검사하게 되어,
-      // 2.5 로 구우려는 사람이 402 를 안 받고 통과했다가 실제 청구(lib/ad/pipeline.js 의
+      // ★ 모델을 넘긴다 — 안 넘기면 항상 기본 모델 값으로 잔액을 검사하게 되어,
+      // 더 비싼 모델로 구우려는 사람이 402 를 안 받고 통과했다가 실제 청구(lib/ad/pipeline.js 의
       // chargeAd, 같은 project.settings.model 을 읽는다)에서야 모자란 것이 드러난다.
-      await assertCanAfford(user.id, adVideoPrice(project.settings?.seconds, project.settings?.model));
+      //
+      // ★ Task 24 — 해상도도 넘긴다(같은 이유, 같은 원칙). ⚠️ 다만 lib/ad/pipeline.js 의
+      // chargeAd 호출은 이번 태스크에서 resolution 을 못 넘겼다(그 파일이 Task 23 이 쓰는
+      // 중이라 잠겨 있다) — 그래서 실제 청구는 지금 항상 720p 값이다. 480p·1080p 를 고른
+      // 사장님에게는 이 잔액 검사가 실제로 받을 금액보다 **더 높게** 요구할 수 있다(과소
+      // 청구가 아니라 과잉 게이트다 — 손해 보는 방향은 아니지만 사용자 경험 결함이다).
+      // 자세한 내용은 task-24-report.md의 "후속으로 남긴 것" 참고.
+      await assertCanAfford(
+        user.id,
+        adVideoPrice(project.settings?.seconds, project.settings?.model, project.settings?.resolution)
+      );
     } catch (e) {
       if (e instanceof NoCredits) return Response.json({ error: e.message }, { status: 402 });
       throw e;

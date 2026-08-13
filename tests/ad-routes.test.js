@@ -61,7 +61,7 @@ describe("광고 라우트 — 문서", () => {
     expect(doc.status).toBe("draft");
   });
 
-  it("15초가 아니면 400 — 기본 모델(2.0 fast)은 15초 하나뿐이다", async () => {
+  it("15초가 아니면 400 — 기본 모델(2.0 standard)은 15초 하나뿐이다", async () => {
     const res = await createAd(post({ ...OK, settings: { ...OK.settings, seconds: 30 } }));
     expect(res.status).toBe(400);
   });
@@ -164,9 +164,10 @@ describe("광고 라우트 — 문서", () => {
       expect(doc.settings.model).toBe("seedance-2.5");
     });
 
-    // ③ 옛 문서 보호 — settings.model 이 없는 옛 광고 문서를 PATCH 하면 2.0 값 그대로다.
-    // 실제 store 에 model 필드가 아예 없는 문서를 직접 심어(라우트를 안 거쳐) 재현한다.
-    it("★ settings.model 이 없는 옛 문서를 PATCH 해도 2.0 값으로 본다(30초는 400)", async () => {
+    // ③ 옛 문서 보호 — settings.model 이 없는 옛 광고 문서를 PATCH 하면 기본 모델
+    // (standard) 값 그대로다. 실제 store 에 model 필드가 아예 없는 문서를 직접 심어
+    // (라우트를 안 거쳐) 재현한다.
+    it("★ settings.model 이 없는 옛 문서를 PATCH 해도 기본 모델(standard) 값으로 본다(30초는 400)", async () => {
       const made = await (await createAd(post(OK))).json();
       const { getStore } = await import("../lib/store/index.js");
       const row = await getStore().selectProject(made.id, U);
@@ -174,15 +175,15 @@ describe("광고 라우트 — 문서", () => {
       await getStore().updateProjectRow(made.id, U, row.version, {
         ...row.doc, settings: settingsWithoutModel,
       });
-      // 15초는 그대로 통과해야 한다(2.0 값)
+      // 15초는 그대로 통과해야 한다(기본 모델 값)
       const ok15 = await patchAd(
         patch({ settings: { mood: "bright" } }),
         { params: Promise.resolve({ id: made.id }) }
       );
       expect(ok15.status).toBe(200);
-      expect((await ok15.json()).settings.model).toBe("seedance-2.0-fast");
+      expect((await ok15.json()).settings.model).toBe(DEFAULT_AD_MODEL);
 
-      // 다시 모델 없는 상태로 되돌리고, 30초를 요구하면 2.0 값으로 판정돼 400 이어야 한다
+      // 다시 모델 없는 상태로 되돌리고, 30초를 요구하면 기본 모델 값으로 판정돼 400 이어야 한다
       const row2 = await getStore().selectProject(made.id, U);
       const { model: m2, ...s2 } = row2.doc.settings;
       await getStore().updateProjectRow(made.id, U, row2.version, { ...row2.doc, settings: s2 });
@@ -191,6 +192,65 @@ describe("광고 라우트 — 문서", () => {
         { params: Promise.resolve({ id: made.id }) }
       );
       expect(bad30.status).toBe(400);
+    });
+
+    // ★ Task 24 — settings.resolution 이 없는 옛 문서는 720p 로 본다. 반대로 두면
+    // 이미 만든 영상들이 다른 해상도로 판정된다.
+    it("★ settings.resolution 이 없는 옛 문서를 PATCH 해도 720p 로 본다", async () => {
+      const made = await (await createAd(post(OK))).json();
+      const { getStore } = await import("../lib/store/index.js");
+      const row = await getStore().selectProject(made.id, U);
+      const { resolution, ...settingsWithoutResolution } = row.doc.settings;
+      await getStore().updateProjectRow(made.id, U, row.version, {
+        ...row.doc, settings: settingsWithoutResolution,
+      });
+      const res = await patchAd(
+        patch({ settings: { mood: "bright" } }),
+        { params: Promise.resolve({ id: made.id }) }
+      );
+      expect(res.status).toBe(200);
+      expect((await res.json()).settings.resolution).toBe("720p");
+    });
+
+    // ★ Task 24 — 모델을 바꾸면 해상도도 그 모델 기준으로 다시 본다(길이와 같은 규칙).
+    it("★ standard·1080p 로 만든 뒤 모델만 fast 로 바꾸면 400 — fast 는 1080p 가 없다", async () => {
+      const made = await (
+        await createAd(post({ ...OK, settings: { ...OK.settings, model: "seedance-2.0", resolution: "1080p" } }))
+      ).json();
+      const res = await patchAd(
+        patch({ settings: { model: "seedance-2.0-fast" } }),
+        { params: Promise.resolve({ id: made.id }) }
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it("★ 모르는 해상도는 POST 에서 400", async () => {
+      const res = await createAd(
+        post({ ...OK, settings: { ...OK.settings, resolution: "4k" } })
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it("★ 모델이 안 받는 해상도는 POST 에서 400 — fast 에 1080p", async () => {
+      const res = await createAd(
+        post({ ...OK, settings: { ...OK.settings, model: "seedance-2.0-fast", resolution: "1080p" } })
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it("해상도를 안 주면 기본값(720p)이 명시 저장된다", async () => {
+      const res = await createAd(post(OK));
+      const doc = await res.json();
+      expect(doc.settings.resolution).toBe("720p");
+    });
+
+    it("★ standard 는 1080p 를 고를 수 있다", async () => {
+      const res = await createAd(
+        post({ ...OK, settings: { ...OK.settings, model: "seedance-2.0", resolution: "1080p" } })
+      );
+      expect(res.status).toBe(200);
+      const doc = await res.json();
+      expect(doc.settings.resolution).toBe("1080p");
     });
   });
 
@@ -388,6 +448,20 @@ describe("광고 라우트 — 굽기", () => {
     return made;
   }
 
+  // ★ Task 24 — standard·1080p 로 만든 프로젝트. 같은 모델·길이라도 해상도가 잔액
+  // 검사에 실제로 반영되는지를 재는 자리다(withScenario25 와 같은 목적, 축만 해상도다).
+  async function withScenario1080p() {
+    const made = await (
+      await createAd(post({ ...OK, settings: { ...OK.settings, model: "seedance-2.0", resolution: "1080p" } }))
+    ).json();
+    const { getStore } = await import("../lib/store/index.js");
+    const row = await getStore().selectProject(made.id, U);
+    await getStore().updateProjectRow(made.id, U, row.version, {
+      ...row.doc, scenario: { text: "P", shots: [{ beat: "가" }], endpoint: "t2v", tries: 1 }, status: "scenario",
+    });
+    return made;
+  }
+
   it("잔액이 없으면 402", async () => {
     const { POST: render } = await import("../app/api/ads/[id]/render/route.js");
     const made = await withScenario();
@@ -431,18 +505,48 @@ describe("광고 라우트 — 굽기", () => {
       params: Promise.resolve({ id: made.id }),
     });
     expect(res.status).toBe(402);
-    // 대조 — 2.0/15초 정가라면 이 잔액으로 충분했다는 것을 같이 남긴다
+    // 대조 — 2.0-fast/15초 정가라면 이 잔액으로 충분했다는 것을 같이 남긴다
     expect(100).toBeGreaterThan(AD_VIDEO_PRICE["seedance-2.0-fast"][15]);
-    expect(100).toBeLessThan(AD_VIDEO_PRICE["seedance-2.5"][30]);
+    expect(100).toBeLessThan(AD_VIDEO_PRICE["seedance-2.5"][30]["720p"]);
   });
 
   it("2.5·30초도 정가만큼 잔액이 있으면 202 로 시작한다", async () => {
     process.env.SHOTFORM_FAKE = "fal";
     const { getStore } = await import("../lib/store/index.js");
     const { AD_VIDEO_PRICE } = await import("../lib/pricing.js");
-    await getStore().insertGrant({ user_id: U, amount_credits: AD_VIDEO_PRICE["seedance-2.5"][30], reason: "t" });
+    await getStore().insertGrant({ user_id: U, amount_credits: AD_VIDEO_PRICE["seedance-2.5"][30]["720p"], reason: "t" });
     const { POST: render } = await import("../app/api/ads/[id]/render/route.js");
     const made = await withScenario25();
+    const res = await render(new Request("http://x", { method: "POST", headers: H }), {
+      params: Promise.resolve({ id: made.id }),
+    });
+    expect(res.status).toBe(202);
+    delete process.env.SHOTFORM_FAKE;
+  });
+
+  // ── Task 24 — 정가 계산에 해상도가 반영된다(모델·길이가 같아도 해상도가 축이다) ──
+  it("★ 1080p 는 정가가 더 높다 — 720p 면 통과할 잔액도 1080p 면 402", async () => {
+    const { getStore } = await import("../lib/store/index.js");
+    const { AD_VIDEO_PRICE } = await import("../lib/pricing.js");
+    // standard·15초·720p(80) 는 넉넉히 내는 잔액이지만 1080p(175) 에는 못 미친다
+    await getStore().insertGrant({ user_id: U, amount_credits: 100, reason: "t" });
+    const { POST: render } = await import("../app/api/ads/[id]/render/route.js");
+    const made = await withScenario1080p();
+    const res = await render(new Request("http://x", { method: "POST", headers: H }), {
+      params: Promise.resolve({ id: made.id }),
+    });
+    expect(res.status).toBe(402);
+    expect(100).toBeGreaterThan(AD_VIDEO_PRICE["seedance-2.0"][15]["720p"]);
+    expect(100).toBeLessThan(AD_VIDEO_PRICE["seedance-2.0"][15]["1080p"]);
+  });
+
+  it("1080p 도 정가만큼 잔액이 있으면 202 로 시작한다", async () => {
+    process.env.SHOTFORM_FAKE = "fal";
+    const { getStore } = await import("../lib/store/index.js");
+    const { AD_VIDEO_PRICE } = await import("../lib/pricing.js");
+    await getStore().insertGrant({ user_id: U, amount_credits: AD_VIDEO_PRICE["seedance-2.0"][15]["1080p"], reason: "t" });
+    const { POST: render } = await import("../app/api/ads/[id]/render/route.js");
+    const made = await withScenario1080p();
     const res = await render(new Request("http://x", { method: "POST", headers: H }), {
       params: Promise.resolve({ id: made.id }),
     });
@@ -523,8 +627,9 @@ describe("광고 라우트 — 굽기", () => {
     await getStore().updateProjectRow(made.id, U, row.version, {
       ...row.doc, status: "done", videos: [{ url: "/api/renders/x.mp4", seconds: 15 }],
     });
-    // 이미 첫 회차로 65 를 썼으니(위 chargeAd), 새 회차 65 를 또 낼 잔액을 채운다.
-    await getStore().insertGrant({ user_id: U, amount_credits: AD_VIDEO_PRICE["seedance-2.0-fast"][15] * 2, reason: "t" });
+    // 이미 첫 회차로 기본 모델(standard)·720p 값을 썼으니(위 chargeAd, model 생략),
+    // 새 회차를 또 낼 잔액을 채운다.
+    await getStore().insertGrant({ user_id: U, amount_credits: AD_VIDEO_PRICE["seedance-2.0"][15]["720p"] * 2, reason: "t" });
     const { POST: render } = await import("../app/api/ads/[id]/render/route.js");
     const res = await render(new Request("http://x", { method: "POST", headers: H }), {
       params: Promise.resolve({ id: made.id }),

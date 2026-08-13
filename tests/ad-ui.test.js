@@ -256,13 +256,41 @@ describe("/ads/new 화면 — 모델·길이 선택 (Task 22)", () => {
     expect(modelChipBlock, "모델 칩 onClick 이 onModelChange 를 안 부른다").toMatch(/onClick=\{[^}]*onModelChange/);
   });
 
+  // ★ Task 24 — 해상도가 셋째 인자다. 길이 칩은 "지금 고른 해상도" 기준 정가를 보여준다.
   it("길이 칩마다 정가를 priceLabel(adVideoPrice(...)) 로 보여준다 — 숫자를 박지 않는다", () => {
-    expect(src).toMatch(/priceLabel\(adVideoPrice\(s,\s*model\)\)/);
-    // 65(2.0/15초)·120(2.5/15초)·240(2.5/30초) — 계획 문서에 적힌 세 정가가 소스에 문자 그대로
-    // 없어야 "가격은 pricing.js 하나뿐"이 실제로 지켜진다.
-    expect(src).not.toMatch(/\b65\b/);
-    expect(src).not.toMatch(/\b120\b/);
-    expect(src).not.toMatch(/\b240\b/);
+    expect(src).toMatch(/priceLabel\(adVideoPrice\(s,\s*model,\s*resolution\)\)/);
+    // 65(2.0-fast/15초)·35/80/175(standard/15초 480p·720p·1080p)·55/120(2.5/15초 480p·720p)·
+    // 110/240(2.5/30초 480p·720p) — 정가 숫자가 소스에 문자 그대로 없어야 "가격은
+    // pricing.js 하나뿐"이 실제로 지켜진다.
+    for (const n of [65, 35, 80, 175, 55, 120, 110, 240]) {
+      expect(src, `가격 ${n} 이 소스에 그대로 있다`).not.toMatch(new RegExp(`\\b${n}\\b`));
+    }
+  });
+
+  // ★ Task 24 — 해상도 칩. 모델·길이 칩과 같은 결(표에서 읽고, 정가를 같이 보여준다).
+  it("해상도 칩이 lib/ad/models 의 adResolutionsFor(model) 에서 온다 — 배열을 손으로 안 적는다", () => {
+    expect(src).toMatch(/adResolutionsFor\(model\)\.map\(/);
+  });
+
+  it("해상도 칩마다 정가를 priceLabel(adVideoPrice(...)) 로 보여준다", () => {
+    expect(src).toMatch(/priceLabel\(adVideoPrice\(seconds,\s*model,\s*r\)\)/);
+  });
+
+  it("모델을 바꾸면 지금 고른 해상도가 그 모델에서 유효한지 실제로 되돌린다", () => {
+    const fnIdx = src.search(/function\s+onModelChange\s*\(/);
+    expect(fnIdx, "onModelChange 함수가 없다").toBeGreaterThan(-1);
+    const bodyEnd = src.indexOf("\n}", fnIdx);
+    const body = src.slice(fnIdx, bodyEnd);
+    expect(body, "되돌림 판정에 isAdResolution 을 안 쓴다").toContain("isAdResolution");
+    expect(body, "되돌릴 값이 adResolutionsFor(id)[0] 가 아니다").toMatch(/adResolutionsFor\(id\)\[0\]/);
+  });
+
+  it("[시나리오 만들기]가 고른 resolution 을 서버로 보낸다", () => {
+    const submitIdx = src.indexOf("async function submit()");
+    expect(submitIdx, "submit 함수를 못 찾았다").toBeGreaterThan(-1);
+    const bodyEnd = src.indexOf("async function", submitIdx + 10);
+    const body = src.slice(submitIdx, bodyEnd === -1 ? undefined : bodyEnd);
+    expect(body, "settings 에 resolution 을 안 보낸다").toMatch(/settings:\s*\{[^}]*\bresolution\b/);
   });
 
   it("[시나리오 만들기]가 고른 model·seconds 를 서버로 보낸다", () => {

@@ -1,7 +1,10 @@
 import { getProject, updateProject } from "../../../../lib/projects.js";
 import { isAspect } from "../../../../lib/aspects.js";
 import { normalizeAdOptions } from "../../../../lib/ad/options.js";
-import { isAdSeconds, isAdModel, adSecondsFor, DEFAULT_AD_MODEL } from "../../../../lib/ad/models.js";
+import {
+  isAdSeconds, isAdModel, adSecondsFor, DEFAULT_AD_MODEL,
+  isAdResolution, adResolutionsFor, DEFAULT_AD_RESOLUTION,
+} from "../../../../lib/ad/models.js";
 import { ownedPhotoKeys } from "../../../../lib/refs-io.js";
 import { withUser } from "../../../../lib/auth/require-user.js";
 
@@ -48,6 +51,17 @@ export const PATCH = withUser(async (req, { params }, user) => {
   if (!isAdSeconds(seconds, model)) {
     return Response.json({ error: `이 모델은 ${adSecondsFor(model).join("·")}초만 만들 수 있어요` }, { status: 400 });
   }
+
+  // ★ Task 24 — 해상도도 모델을 바꾸면 **그 모델 기준으로 다시** 본다(길이와 같은 규칙).
+  // standard·1080p 로 만든 뒤 모델만 fast 로 되돌리면 400 이어야 한다(fast 는 1080p 가
+  // 없다). 옛 문서(settings.resolution 없음)는 720p 로 본다.
+  const resolution = body?.settings?.resolution ?? project.settings.resolution ?? DEFAULT_AD_RESOLUTION;
+  if (!isAdResolution(resolution, model)) {
+    return Response.json(
+      { error: `이 모델은 ${adResolutionsFor(model).join("·")} 만 만들 수 있어요` },
+      { status: 400 }
+    );
+  }
   const aspect = body?.settings?.aspect_ratio ?? project.settings.aspect_ratio;
   if (!isAspect(aspect)) return Response.json({ error: "그 화면 비율은 몰라요" }, { status: 400 });
 
@@ -71,7 +85,7 @@ export const PATCH = withUser(async (req, { params }, user) => {
   //   그래서 굽고 나서 모델을 바꾸는 것을 따로 잠그지 않았다(보고서 참고).
   const updated = await updateProject(id, user.id, (p) => ({
     ...p,
-    settings: { ...p.settings, ...options, seconds, aspect_ratio: aspect, model },
+    settings: { ...p.settings, ...options, seconds, aspect_ratio: aspect, model, resolution },
     material: { ...p.material, text, photos },
     scenario: null,
     status: "draft",
