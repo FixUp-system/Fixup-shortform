@@ -39,6 +39,52 @@ describe("STYLE_PRESETS — 화풍 표", () => {
     const mediums = STYLE_PRESETS.map((s) => s.medium);
     expect(new Set(mediums).size).toBe(mediums.length);
   });
+
+  // ★ 시네마는 실사 셋 중 셋째다. photo(조명) · film(필름 질감) 과 **같은 매체**라
+  //   구별 축이 문구에만 있다 — 낱말이 겹치는 순간 사장님이 고른 것과 나온 것이 같아지고
+  //   칩 하나가 헛돈다(film 프리셋에 적어 둔 위험이 그대로 여기 온다).
+  //   그래서 "겹치는 낱말이 없다"를 눈이 아니라 **코드가 판정한다.**
+  it("시네마 프리셋이 있고 렌즈·카메라 축이다", () => {
+    const cinema = STYLE_PRESETS.find((s) => s.id === "cinema");
+    expect(cinema, "cinema 프리셋이 없다").toBeTruthy();
+    expect(cinema.realistic).toBe(true);
+  });
+
+  it("시네마의 마감이 실사·필름과 낱말을 하나도 안 나눈다", () => {
+    const words = (s) => new Set(
+      String(s).toLowerCase().match(/[a-z][a-z-]*/g)
+        // 뜻이 없는 이음말은 구별 축이 아니다
+        .filter((w) => !["a", "an", "and", "the", "with", "of", "in", "on"].includes(w))
+    );
+    const cinema = words(STYLE_PRESETS.find((s) => s.id === "cinema").finish);
+    for (const id of ["photo", "film"]) {
+      const other = words(STYLE_PRESETS.find((s) => s.id === id).finish);
+      const shared = [...cinema].filter((w) => other.has(w));
+      expect(shared, `${id} 와 낱말이 겹친다: ${shared.join(", ")}`).toEqual([]);
+    }
+  });
+
+  // ⚠️ 글자는 ffmpeg 가 태운다. 모델은 한글을 틀리게 쓴다("핑계다"→"핑게다" 실측).
+  //    프롬프트가 글자를 **요구하면** 안 된다 — 못 그리는 것은 애초에 시키지 않는다.
+  it("어떤 프리셋도 글자·자막을 요구하지 않는다", () => {
+    // ⚠️ 부분일치로 재면 안 된다 — illust 의 "textured paper feel"(질감)이 "text" 에 걸린다.
+    //    금지 대상은 **낱말**이다.
+    const BANNED = /^(text|texts|letter|letters|lettering|typograph\w*|caption|captions|subtitle|subtitles|title|titles|font|fonts|signage|logo|logos)$/;
+    for (const s of STYLE_PRESETS) {
+      for (const w of `${s.medium} ${s.finish}`.toLowerCase().match(/[a-z][a-z-]*/g)) {
+        expect(BANNED.test(w), `${s.id} 가 "${w}" 를 요구한다`).toBe(false);
+      }
+    }
+  });
+
+  // 화면 비율은 lib/aspects.js 가 정하는 **별개 축**이다. 프롬프트에 숫자 비율을 박으면
+  // 두 벌이 되어 갈린다 — buildImagePrompt 가 이미 `${orient} composition` 을 붙인다.
+  it("어떤 프리셋도 화면 비율을 박지 않는다", () => {
+    for (const s of STYLE_PRESETS) {
+      const t = `${s.medium} ${s.finish}`;
+      expect(/\d+(\.\d+)?\s*:\s*\d+/.test(t), `${s.id} 에 숫자 비율이 있다`).toBe(false);
+    }
+  });
 });
 
 describe("styleFor — 닫힌 목록", () => {
@@ -81,6 +127,12 @@ describe("styleKey — 각인용 파생값", () => {
     expect(a).not.toBe(c);
   });
 
+  it("새 프리셋도 각인된다 — 시네마로 바꾸면 그림이 낡는다", () => {
+    expect(styleKey({ settings: { style: { preset: "cinema", note: "" } } })).toBe("cinema|");
+    expect(styleKey({ settings: { style: { preset: "cinema" } } }))
+      .not.toBe(styleKey({ settings: { style: { preset: "photo" } } }));
+  });
+
   it("화풍이 없는 프로젝트도 같은 키를 낸다 — 되물어도 답이 같다", () => {
     expect(styleKey({})).toBe(styleKey({ settings: {} }));
     expect(styleKey({})).toBe(styleKey({ settings: { style: { preset: "photo" } } }));
@@ -90,6 +142,7 @@ describe("styleKey — 각인용 파생값", () => {
 describe("normalizeStyle — 저장 전 게이트", () => {
   it("목록 안의 프리셋을 통과시킨다", () => {
     expect(normalizeStyle({ preset: "scifi" })).toEqual({ preset: "scifi", note: "" });
+    expect(normalizeStyle({ preset: "cinema" })).toEqual({ preset: "cinema", note: "" });
   });
 
   // validate.js 의 focus.mode 와 같은 결이다 — 닫힌 목록은 코드가 판정한다.
