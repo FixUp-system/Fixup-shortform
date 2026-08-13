@@ -29,7 +29,10 @@ export const POST = withUser(async (_req, { params }, user) => {
   // 계속 통과한다 — 그게 옳다(같은 회차를 이어서 굽는 정상 흐름).
   if (!(await alreadyChargedAd(id)) || hasRenderedAdVideo(project)) {
     try {
-      await assertCanAfford(user.id, adVideoPrice(project.settings?.seconds));
+      // ★ 모델을 넘긴다 — 안 넘기면 항상 2.0 값(가장 싼 값)으로 잔액을 검사하게 되어,
+      // 2.5 로 구우려는 사람이 402 를 안 받고 통과했다가 실제 청구(lib/ad/pipeline.js 의
+      // chargeAd, 같은 project.settings.model 을 읽는다)에서야 모자란 것이 드러난다.
+      await assertCanAfford(user.id, adVideoPrice(project.settings?.seconds, project.settings?.model));
     } catch (e) {
       if (e instanceof NoCredits) return Response.json({ error: e.message }, { status: 402 });
       throw e;

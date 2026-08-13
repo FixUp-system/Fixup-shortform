@@ -66,7 +66,7 @@ describe("광고 파이프라인", () => {
     const back = await getProject(p.id, U);
     expect(back.videos.length).toBe(1);
     expect(back.status).toBe("done");
-    expect(await balanceFor(U)).toBe(200 - AD_VIDEO_PRICE[15]);
+    expect(await balanceFor(U)).toBe(200 - AD_VIDEO_PRICE["seedance-2.0-fast"][15]);
   });
 
   it("★ 실패하면 환불하고 scenario 로 되돌린다", async () => {
@@ -109,7 +109,7 @@ describe("광고 파이프라인", () => {
     };
     await runWithActor(U, () => runAdRenderPipeline(p.id, U, deps));
     expect((await getProject(p.id, U)).status).toBe("done");
-    expect(await balanceFor(U)).toBe(200 - AD_VIDEO_PRICE[15]);
+    expect(await balanceFor(U)).toBe(200 - AD_VIDEO_PRICE["seedance-2.0-fast"][15]);
 
     // [다시 만들기] — 시나리오는 그대로고 영상만 새로 굽는다. fal 원가는 또 나간다.
     await runWithActor(U, () => runAdRenderPipeline(p.id, U, deps));
@@ -117,7 +117,7 @@ describe("광고 파이프라인", () => {
     expect(back.status).toBe("done");
     expect(back.videos.length).toBe(1); // 최신 한 편으로 덮어쓴다 — 회차 목록이 아니다
     // ★ 핵심 단정 — 정가를 또 받아 잔액이 두 번째로 준다
-    expect(await balanceFor(U)).toBe(200 - AD_VIDEO_PRICE[15] * 2);
+    expect(await balanceFor(U)).toBe(200 - AD_VIDEO_PRICE["seedance-2.0-fast"][15] * 2);
   });
 
   // ★ 한 번의 굽기 안에서는 여전히 한 번만 받는다 — openNewAttempt 를 더한 것이
@@ -132,7 +132,7 @@ describe("광고 파이프라인", () => {
         storeVideo: async (url) => url,
       })
     );
-    expect(await balanceFor(U)).toBe(200 - AD_VIDEO_PRICE[15]);
+    expect(await balanceFor(U)).toBe(200 - AD_VIDEO_PRICE["seedance-2.0-fast"][15]);
   });
 });
 

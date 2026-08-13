@@ -1,7 +1,7 @@
 import { createProject } from "../../../lib/projects.js";
 import { isAspect, DEFAULT_ASPECT_ID } from "../../../lib/aspects.js";
 import { normalizeAdOptions } from "../../../lib/ad/options.js";
-import { isAdSeconds, DEFAULT_AD_MODEL, AD_SECONDS } from "../../../lib/ad/models.js";
+import { isAdSeconds, isAdModel, adSecondsFor, DEFAULT_AD_MODEL } from "../../../lib/ad/models.js";
 import { ownedPhotoKeys } from "../../../lib/refs-io.js";
 import { withUser } from "../../../lib/auth/require-user.js";
 
@@ -24,9 +24,18 @@ export const POST = withUser(async (req, _ctx, user) => {
     return Response.json({ error: e.message }, { status: 400 });
   }
 
-  const seconds = body?.settings?.seconds ?? AD_SECONDS[0];
-  if (!isAdSeconds(seconds)) {
-    return Response.json({ error: `지금은 ${AD_SECONDS.join("·")}초만 만들 수 있어요` }, { status: 400 });
+  // 모델도 **닫힌 목록**이다. 모르는 모델이면 400 — 여기를 통과한 값만 값이 걸린
+  // 가격·과금 계산(lib/pricing.js·lib/charges.js)에 흘러간다.
+  const model = body?.settings?.model ?? DEFAULT_AD_MODEL;
+  if (!isAdModel(model)) {
+    return Response.json({ error: "그 영상 모델은 몰라요" }, { status: 400 });
+  }
+
+  // ★ 길이는 고른 모델 기준이다 — 모델마다 고를 수 있는 길이가 다르다(2.0=15초,
+  // 2.5=15·30초). AD_SECONDS 처럼 전역 배열 하나로 재던 시절과 갈리는 자리다.
+  const seconds = body?.settings?.seconds ?? adSecondsFor(model)[0];
+  if (!isAdSeconds(seconds, model)) {
+    return Response.json({ error: `이 모델은 ${adSecondsFor(model).join("·")}초만 만들 수 있어요` }, { status: 400 });
   }
   const aspect = body?.settings?.aspect_ratio ?? DEFAULT_ASPECT_ID;
   if (!isAspect(aspect)) {
@@ -45,7 +54,7 @@ export const POST = withUser(async (req, _ctx, user) => {
     kind: "ad",
     // ★ 모델을 명시 저장한다. 나중에 모델이 늘 때 "값이 없으면 어느 모델인가"가
     //   옛 문서의 뜻을 바꾼다 — 처음부터 적어 두면 그 질문이 안 생긴다.
-    settings: { ...options, seconds, aspect_ratio: aspect, model: DEFAULT_AD_MODEL },
+    settings: { ...options, seconds, aspect_ratio: aspect, model },
     material: { text: body.material.text.slice(0, 4000), photos },
     ownerId: user.id,
   });

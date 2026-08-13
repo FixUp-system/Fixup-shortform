@@ -23,7 +23,7 @@ import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js"
 import { createProject } from "../lib/projects.js";
 import { runWithActor } from "../lib/actor.js";
 import { DEFAULT_AD_MODEL } from "../lib/ad/models.js";
-import { AD_VIDEO_PRICE } from "../lib/pricing.js";
+import { AD_VIDEO_PRICE, adVideoPrice } from "../lib/pricing.js";
 
 const U = "00000000-0000-4000-8000-00000000000a";
 const H = { [USER_HEADER]: U, [STATUS_HEADER]: "approved", [ROLE_HEADER]: "user" };
@@ -61,9 +61,137 @@ describe("광고 라우트 — 문서", () => {
     expect(doc.status).toBe("draft");
   });
 
-  it("15초가 아니면 400 — v1 은 닫힌 목록이다", async () => {
+  it("15초가 아니면 400 — 기본 모델(2.0 fast)은 15초 하나뿐이다", async () => {
     const res = await createAd(post({ ...OK, settings: { ...OK.settings, seconds: 30 } }));
     expect(res.status).toBe(400);
+  });
+
+  // ── Task 21 — 영상 모델 선택(백엔드) ──────────────────────────────────
+  describe("영상 모델", () => {
+    // ① 2.5 로 30초를 만들 수 있고 2.0 으로는 400
+    it("★ 2.5 모델은 30초를 만들 수 있다", async () => {
+      const res = await createAd(
+        post({ ...OK, settings: { ...OK.settings, model: "seedance-2.5", seconds: 30 } })
+      );
+      expect(res.status).toBe(200);
+      const doc = await res.json();
+      expect(doc.settings.model).toBe("seedance-2.5");
+      expect(doc.settings.seconds).toBe(30);
+    });
+
+    it("★ 2.0 모델(기본)에 30초를 주면 400 — 길이가 모델에 딸린다", async () => {
+      const res = await createAd(
+        post({ ...OK, settings: { ...OK.settings, model: "seedance-2.0-fast", seconds: 30 } })
+      );
+      expect(res.status).toBe(400);
+    });
+
+    // ④ 모르는 모델 id 는 400
+    it("★ 모르는 모델 id 는 400", async () => {
+      const res = await createAd(
+        post({ ...OK, settings: { ...OK.settings, model: "seedance-3.0-오타" } })
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it("모델을 안 주면 기본 모델이 명시 저장된다", async () => {
+      const res = await createAd(post(OK));
+      const doc = await (res).json();
+      expect(doc.settings.model).toBe(DEFAULT_AD_MODEL);
+    });
+
+    // ② 정가가 모델·길이마다 다르다 — 화면(app/ads/[id]/page.js)이 읽는 값과 같은 함수다.
+    it("모델·길이 조합마다 정가가 다르다", () => {
+      expect(adVideoPrice(15, "seedance-2.0-fast")).toBe(65);
+      expect(adVideoPrice(15, "seedance-2.5")).toBe(120);
+      expect(adVideoPrice(30, "seedance-2.5")).toBe(240);
+    });
+
+    // PATCH — 모델을 바꿀 수 있고, 바꾸면 길이도 그 모델 기준으로 다시 본다.
+    it("★ PATCH 로 모델을 2.5 로 바꿀 수 있다(길이가 그대로 15초라 유효하다)", async () => {
+      const made = await (await createAd(post(OK))).json();
+      const res = await patchAd(
+        patch({ settings: { model: "seedance-2.5" } }),
+        { params: Promise.resolve({ id: made.id }) }
+      );
+      expect(res.status).toBe(200);
+      const doc = await res.json();
+      expect(doc.settings.model).toBe("seedance-2.5");
+      expect(doc.settings.seconds).toBe(15);
+    });
+
+    it("★ PATCH 로 2.5 → 30초까지 함께 바꿀 수 있다", async () => {
+      const made = await (await createAd(post(OK))).json();
+      const res = await patchAd(
+        patch({ settings: { model: "seedance-2.5", seconds: 30 } }),
+        { params: Promise.resolve({ id: made.id }) }
+      );
+      expect(res.status).toBe(200);
+      const doc = await res.json();
+      expect(doc.settings.model).toBe("seedance-2.5");
+      expect(doc.settings.seconds).toBe(30);
+    });
+
+    it("★ 2.5·30초로 만든 뒤 모델만 2.0 으로 되돌리면 400 — 길이를 그대로 두면 2.0 이 못 받는다", async () => {
+      const made = await (
+        await createAd(post({ ...OK, settings: { ...OK.settings, model: "seedance-2.5", seconds: 30 } }))
+      ).json();
+      const res = await patchAd(
+        patch({ settings: { model: "seedance-2.0-fast" } }),
+        { params: Promise.resolve({ id: made.id }) }
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it("★ PATCH 에 모르는 모델 id 를 주면 400", async () => {
+      const made = await (await createAd(post(OK))).json();
+      const res = await patchAd(
+        patch({ settings: { model: "없는모델" } }),
+        { params: Promise.resolve({ id: made.id }) }
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it("PATCH 에서 모델을 안 주면 기존 모델이 보존된다", async () => {
+      const made = await (
+        await createAd(post({ ...OK, settings: { ...OK.settings, model: "seedance-2.5" } }))
+      ).json();
+      const res = await patchAd(
+        patch({ settings: { mood: "bright" } }),
+        { params: Promise.resolve({ id: made.id }) }
+      );
+      const doc = await res.json();
+      expect(doc.settings.model).toBe("seedance-2.5");
+    });
+
+    // ③ 옛 문서 보호 — settings.model 이 없는 옛 광고 문서를 PATCH 하면 2.0 값 그대로다.
+    // 실제 store 에 model 필드가 아예 없는 문서를 직접 심어(라우트를 안 거쳐) 재현한다.
+    it("★ settings.model 이 없는 옛 문서를 PATCH 해도 2.0 값으로 본다(30초는 400)", async () => {
+      const made = await (await createAd(post(OK))).json();
+      const { getStore } = await import("../lib/store/index.js");
+      const row = await getStore().selectProject(made.id, U);
+      const { model, ...settingsWithoutModel } = row.doc.settings;
+      await getStore().updateProjectRow(made.id, U, row.version, {
+        ...row.doc, settings: settingsWithoutModel,
+      });
+      // 15초는 그대로 통과해야 한다(2.0 값)
+      const ok15 = await patchAd(
+        patch({ settings: { mood: "bright" } }),
+        { params: Promise.resolve({ id: made.id }) }
+      );
+      expect(ok15.status).toBe(200);
+      expect((await ok15.json()).settings.model).toBe("seedance-2.0-fast");
+
+      // 다시 모델 없는 상태로 되돌리고, 30초를 요구하면 2.0 값으로 판정돼 400 이어야 한다
+      const row2 = await getStore().selectProject(made.id, U);
+      const { model: m2, ...s2 } = row2.doc.settings;
+      await getStore().updateProjectRow(made.id, U, row2.version, { ...row2.doc, settings: s2 });
+      const bad30 = await patchAd(
+        patch({ settings: { seconds: 30 } }),
+        { params: Promise.resolve({ id: made.id }) }
+      );
+      expect(bad30.status).toBe(400);
+    });
   });
 
   it("모르는 옵션은 400", async () => {
@@ -246,6 +374,20 @@ describe("광고 라우트 — 굽기", () => {
     return made;
   }
 
+  // 2.5·30초로 만든 프로젝트에 시나리오까지 심는다 — 모델별 정가가 굽기 라우트의
+  // 잔액 검사에 실제로 반영되는지를 재는 자리다.
+  async function withScenario25() {
+    const made = await (
+      await createAd(post({ ...OK, settings: { ...OK.settings, model: "seedance-2.5", seconds: 30 } }))
+    ).json();
+    const { getStore } = await import("../lib/store/index.js");
+    const row = await getStore().selectProject(made.id, U);
+    await getStore().updateProjectRow(made.id, U, row.version, {
+      ...row.doc, scenario: { text: "P", shots: [{ beat: "가" }], endpoint: "t2v", tries: 1 }, status: "scenario",
+    });
+    return made;
+  }
+
   it("잔액이 없으면 402", async () => {
     const { POST: render } = await import("../app/api/ads/[id]/render/route.js");
     const made = await withScenario();
@@ -270,6 +412,37 @@ describe("광고 라우트 — 굽기", () => {
     await getStore().insertGrant({ user_id: U, amount_credits: 200, reason: "t" });
     const { POST: render } = await import("../app/api/ads/[id]/render/route.js");
     const made = await withScenario();
+    const res = await render(new Request("http://x", { method: "POST", headers: H }), {
+      params: Promise.resolve({ id: made.id }),
+    });
+    expect(res.status).toBe(202);
+    delete process.env.SHOTFORM_FAKE;
+  });
+
+  // ── Task 21 — 정가 계산에 모델이 반영된다 ────────────────────────────
+  it("★ 2.5 는 정가가 더 높다 — 2.0 이면 통과할 잔액도 2.5 면 402", async () => {
+    const { getStore } = await import("../lib/store/index.js");
+    const { AD_VIDEO_PRICE } = await import("../lib/pricing.js");
+    // 2.0/15초(65) 는 넉넉히 내는 잔액이지만 2.5/30초(240) 에는 못 미친다
+    await getStore().insertGrant({ user_id: U, amount_credits: 100, reason: "t" });
+    const { POST: render } = await import("../app/api/ads/[id]/render/route.js");
+    const made = await withScenario25();
+    const res = await render(new Request("http://x", { method: "POST", headers: H }), {
+      params: Promise.resolve({ id: made.id }),
+    });
+    expect(res.status).toBe(402);
+    // 대조 — 2.0/15초 정가라면 이 잔액으로 충분했다는 것을 같이 남긴다
+    expect(100).toBeGreaterThan(AD_VIDEO_PRICE["seedance-2.0-fast"][15]);
+    expect(100).toBeLessThan(AD_VIDEO_PRICE["seedance-2.5"][30]);
+  });
+
+  it("2.5·30초도 정가만큼 잔액이 있으면 202 로 시작한다", async () => {
+    process.env.SHOTFORM_FAKE = "fal";
+    const { getStore } = await import("../lib/store/index.js");
+    const { AD_VIDEO_PRICE } = await import("../lib/pricing.js");
+    await getStore().insertGrant({ user_id: U, amount_credits: AD_VIDEO_PRICE["seedance-2.5"][30], reason: "t" });
+    const { POST: render } = await import("../app/api/ads/[id]/render/route.js");
+    const made = await withScenario25();
     const res = await render(new Request("http://x", { method: "POST", headers: H }), {
       params: Promise.resolve({ id: made.id }),
     });
@@ -351,7 +524,7 @@ describe("광고 라우트 — 굽기", () => {
       ...row.doc, status: "done", videos: [{ url: "/api/renders/x.mp4", seconds: 15 }],
     });
     // 이미 첫 회차로 65 를 썼으니(위 chargeAd), 새 회차 65 를 또 낼 잔액을 채운다.
-    await getStore().insertGrant({ user_id: U, amount_credits: AD_VIDEO_PRICE[15] * 2, reason: "t" });
+    await getStore().insertGrant({ user_id: U, amount_credits: AD_VIDEO_PRICE["seedance-2.0-fast"][15] * 2, reason: "t" });
     const { POST: render } = await import("../app/api/ads/[id]/render/route.js");
     const res = await render(new Request("http://x", { method: "POST", headers: H }), {
       params: Promise.resolve({ id: made.id }),

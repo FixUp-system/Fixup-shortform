@@ -1,7 +1,7 @@
 import { getProject, updateProject } from "../../../../lib/projects.js";
 import { isAspect } from "../../../../lib/aspects.js";
 import { normalizeAdOptions } from "../../../../lib/ad/options.js";
-import { isAdSeconds } from "../../../../lib/ad/models.js";
+import { isAdSeconds, isAdModel, adSecondsFor, DEFAULT_AD_MODEL } from "../../../../lib/ad/models.js";
 import { ownedPhotoKeys } from "../../../../lib/refs-io.js";
 import { withUser } from "../../../../lib/auth/require-user.js";
 
@@ -37,8 +37,17 @@ export const PATCH = withUser(async (req, { params }, user) => {
   } catch (e) {
     return Response.json({ error: e.message }, { status: 400 });
   }
+  // ★ 모델을 바꿀 수 있다. 옛 문서(모델 없음)는 기본 모델로 본다 — lib/ad/models.js 의
+  // adModel() 과 같은 폴백이지만, "모르는지"는 못 가리는 그 함수 대신 isAdModel 로 가른다.
+  const model = body?.settings?.model ?? project.settings.model ?? DEFAULT_AD_MODEL;
+  if (!isAdModel(model)) return Response.json({ error: "그 영상 모델은 몰라요" }, { status: 400 });
+
+  // ★ 모델을 바꾸면 길이도 **그 모델 기준으로 다시** 본다 — 2.5→2.0 으로 바꾸는데
+  // 길이가 그대로 30초면 400 이어야 한다(2.0 은 15초뿐이다).
   const seconds = body?.settings?.seconds ?? project.settings.seconds;
-  if (!isAdSeconds(seconds)) return Response.json({ error: "그 길이는 아직 안 돼요" }, { status: 400 });
+  if (!isAdSeconds(seconds, model)) {
+    return Response.json({ error: `이 모델은 ${adSecondsFor(model).join("·")}초만 만들 수 있어요` }, { status: 400 });
+  }
   const aspect = body?.settings?.aspect_ratio ?? project.settings.aspect_ratio;
   if (!isAspect(aspect)) return Response.json({ error: "그 화면 비율은 몰라요" }, { status: 400 });
 
@@ -56,9 +65,13 @@ export const PATCH = withUser(async (req, { params }, user) => {
 
   // ★ 고치면 시나리오를 버리고 draft 로 되돌린다.
   //   낡은 시나리오로 굽는 길을 아예 막는다 — 그래서 낡음 판정을 새로 만들 필요가 없다.
+  //   모델 변경도 같은 규칙을 탄다: 시나리오가 버려지므로 낡은(다른 모델의) 시나리오로
+  //   굽는 일이 없고, 다음 굽기의 청구는 항상 "지금" settings.model 로 다시 계산된다
+  //   (app/api/ads/[id]/render/route.js·lib/ad/pipeline.js 가 project 를 매번 새로 읽는다) —
+  //   그래서 굽고 나서 모델을 바꾸는 것을 따로 잠그지 않았다(보고서 참고).
   const updated = await updateProject(id, user.id, (p) => ({
     ...p,
-    settings: { ...p.settings, ...options, seconds, aspect_ratio: aspect },
+    settings: { ...p.settings, ...options, seconds, aspect_ratio: aspect, model },
     material: { ...p.material, text, photos },
     scenario: null,
     status: "draft",
