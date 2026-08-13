@@ -350,6 +350,32 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
   font-size: 12px;
 }
 .project-meta { display: flex; align-items: center; gap: 8px; }
+/* 카드의 지우기 — 되돌릴 수 없는 동작이라 눈에 먼저 띄면 안 된다. 평소에는 흐리게 두고
+   카드에 마우스를 올렸을 때만 또렷해진다. 손가락으로 쓰는 화면에는 늘 보인다
+   (hover 가 없는 기기에서 숨기면 지울 길이 아예 없어진다). */
+.card-del {
+  flex: none;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-soft);
+  border-radius: var(--r-pill);
+  padding: 3px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.project-card:hover .card-del,
+.card-del:focus-visible { opacity: 1; }
+.card-del:hover { color: var(--ink); border-color: var(--ink-soft); }
+.card-del:disabled { opacity: 1; cursor: default; }
+@media (hover: none) {
+  .card-del { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-del { transition: none; }
+}
+
 /* 제목이 남는 폭을 다 먹고, 넘치면 말줄임한다. min-width:0 이 없으면 flex 항목의
    기본 min-width:auto 때문에 줄지 않아 배지를 밀어낸다. */
 .project-meta .title {

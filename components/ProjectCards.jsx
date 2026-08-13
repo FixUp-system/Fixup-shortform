@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 
 // 홈과 보관함이 같은 카드를 쓴다. 마크업을 두 벌로 두면 한쪽만 고쳐지는 날이 온다.
@@ -54,8 +54,33 @@ function Thumb({ video, image, alt }) {
 }
 
 // limit 을 주면 그만큼만 그린다(홈은 최근 몇 개, 보관함은 전부).
-export default function ProjectCards({ projects, limit }) {
+//
+// onDeleted 를 주면 카드마다 지우는 자리가 생긴다 — 보관함만 준다. 홈(빠른 생성)은
+// "최근 몇 개"를 보여 주는 자리라, 거기서 지우면 목록이 조용히 다른 카드로 채워진다.
+export default function ProjectCards({ projects, limit, onDeleted }) {
   const shown = limit ? projects.slice(0, limit) : projects;
+  const [busyId, setBusyId] = useState(null);
+
+  // ★ 카드 전체가 <Link> 다 — 막지 않으면 지우기를 눌러도 프로젝트로 들어가 버린다.
+  // ★ 되돌릴 수 없으므로 한 번 묻는다. 카드가 격자로 촘촘해 오조작이 쉽다.
+  async function remove(e, p) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (busyId) return;
+    const name = p.title ? `"${p.title}"` : "이 영상";
+    if (!confirm(`${name} 을 지울까요?
+
+만든 영상과 그림이 함께 지워지고 되돌릴 수 없어요. 쓴 크레딧은 돌아오지 않아요.`)) return;
+    setBusyId(p.id);
+    const res = await fetch(`/api/projects/${p.id}`, { method: "DELETE" });
+    setBusyId(null);
+    if (!res.ok) {
+      alert((await res.json().catch(() => ({}))).error || "지우지 못했어요");
+      return;
+    }
+    onDeleted?.(p.id);
+  }
+
   return (
     <ul className="project-grid">
       {shown.map((p) => (
@@ -68,6 +93,16 @@ export default function ProjectCards({ projects, limit }) {
             <span className="project-meta">
               <span className="title">{p.title || "제목 없음"}</span>
               <span className="badge ai">{STATUS_LABEL[p.status] || p.status}</span>
+              {onDeleted && (
+                <button
+                  className="card-del"
+                  aria-label="이 영상 지우기"
+                  disabled={busyId === p.id}
+                  onClick={(e) => remove(e, p)}
+                >
+                  {busyId === p.id ? "지우는 중…" : "지우기"}
+                </button>
+              )}
             </span>
           </Link>
         </li>

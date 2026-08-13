@@ -6,6 +6,7 @@ import { isAspect } from "../../../../lib/aspects";
 import { isSpeed } from "../../../../lib/speeds";
 import { ownedPhotoKeys } from "../../../../lib/refs-io.js";
 import { withUser } from "../../../../lib/auth/require-user.js";
+import { getStore } from "../../../../lib/store/index.js";
 import { alreadyChargedVideo } from "../../../../lib/charges.js";
 import { TARGET_CHOICES } from "../../../../lib/script";
 import { SUBTITLE_POSITIONS, normalizeSubtitle } from "../../../../lib/subtitles.js";
@@ -193,4 +194,34 @@ export const PATCH = withUser(async (req, { params }, user) => {
   } catch (e) {
     return Response.json({ error: e.message }, { status: 404 });
   }
+});
+
+// DELETE /api/projects/[id] — 보관함에서 지운다.
+//
+// ★ 장부는 **건드리지 않는다.** 지우면 환불이 되면 "만들고 지워서 되돌려받는" 길이 열린다.
+// 돈이 오간 사실은 프로젝트 문서가 아니라 credit_charges 에 있고, 장부는 무슨 일이 있었는지
+// 남기는 것이 일이다(환불조차 행을 지우지 않고 음수 행을 더한다 — lib/charges.js).
+//
+// ★ 완성본 파일은 **함께 지운다.** 저장 용량이 진짜 제약이다 — 자막 원본(-raw.mp4) 때문에
+// 편당 ~20MB 라 무료 플랜 1GB 면 50편에서 찬다. 지우기가 그 용량을 되찾는 유일한 길이다.
+// 파일 삭제가 실패해도 프로젝트 삭제를 막지 않는다: 사장님이 요청한 일은 "목록에서 치우는
+// 것"이고, 파일은 이미 없을 수도 있다(가짜 모드·합성 전 프로젝트). 실패는 로그로 남긴다.
+//
+// ★ 올린 사진(uploads)은 안 지운다 — 같은 사진을 다른 프로젝트가 쓰고 있을 수 있다.
+// upload_owners 는 키의 주인만 기록하고 "어느 프로젝트가 쓰는지"는 모른다.
+export const DELETE = withUser(async (_req, { params }, user) => {
+  const { id } = await params;
+
+  // 소유자 확인은 스토어가 한다(owner_id 를 조건에 넣는다) — 없는 것과 남의 것을
+  // 같은 404 로 답해 존재 여부를 흘리지 않는다(GET·PATCH 와 같은 규칙).
+  const gone = await getStore().deleteProject(id, user.id);
+  if (!gone) return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
+
+  for (const key of [`${id}.mp4`, `${id}-raw.mp4`]) {
+    await getStore().deleteObject("renders", key).catch((e) => {
+      console.error("완성본 삭제 실패:", key, e?.message);
+    });
+  }
+
+  return Response.json({ ok: true });
 });

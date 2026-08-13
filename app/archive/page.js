@@ -31,7 +31,12 @@ export default function Archive() {
       {projects?.length === 0 && !err && (
         <p className="pgsub">아직 만든 영상이 없어요. 새로 만들어 보세요.</p>
       )}
-      {projects && projects.length > 0 && <ProjectCards projects={projects} />}
+      {projects && projects.length > 0 && (
+        <ProjectCards
+          projects={projects}
+          onDeleted={(id) => setProjects((list) => list.filter((p) => p.id !== id))}
+        />
+      )}
     </>
   );
 }
