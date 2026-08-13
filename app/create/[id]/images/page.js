@@ -12,7 +12,7 @@ import BackButton from "../../../../components/BackButton";
 import { isImageStale } from "../../../../lib/steps";
 // 상한과 값은 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다).
 import { MAX_REGEN_PER_CUT, priceLabel, regenPrice, videoPrice } from "../../../../lib/pricing";
-import { modelIdForProject } from "../../../../lib/clip-limits";
+import { modelIdForProject, resolutionForProject } from "../../../../lib/clip-limits";
 
 // 그림이 아직 없는 자리에 뭐라고 쓸지.
 // "생성 중…"은 **실제로 도는 동안에만** 쓴다 — 누르기 전에도 그렇게 적혀 있으면
@@ -228,7 +228,7 @@ export default function ImagesStepPage() {
                       ? "그리는 중…"
                       : project.charged
                         ? "이미지 만들기"
-                        : `이미지 만들기 · ${videoPrice(project.settings?.target_seconds, modelIdForProject(project))} 크레딧`}
+                        : `이미지 만들기 · ${videoPrice(project.settings?.target_seconds, modelIdForProject(project), resolutionForProject(project))} 크레딧`}
                   </button>
                 </>
               ) : (

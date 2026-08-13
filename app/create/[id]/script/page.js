@@ -8,7 +8,10 @@ import { useProject } from "../../../../components/ProjectContext";
 import BackButton from "../../../../components/BackButton";
 import { estimateSeconds } from "../../../../lib/script";
 import { areCutsStale } from "../../../../lib/steps";
-import { I2V_MAX_SECONDS } from "../../../../lib/clip-limits";
+import {
+  I2V_MAX_SECONDS, modelIdForProject,
+  resolutionsForProject, resolutionForProject,
+} from "../../../../lib/clip-limits";
 import { videoPrice } from "../../../../lib/pricing";
 import { SPEEDS, DEFAULT_SPEED_ID } from "../../../../lib/speeds";
 
@@ -123,6 +126,22 @@ export default function ScriptStepPage() {
     await load(id).catch(() => {});
   }
 
+  // 화질 저장. 사이즈·컨셉과 같은 경로다(PATCH settings) — 화면마다 다른 길을 내지 않는다.
+  // 실패를 삼키지 않는 이유: 고른 화질과 실제로 만들어지는 화질이 갈리면 값이 어긋난 채
+  // 결제까지 간다(720p 160 vs 1080p 360).
+  async function saveResolution(resolution) {
+    const res = await fetch(`/api/projects/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings: { resolution } }),
+    }).catch(() => null);
+    if (!res || !res.ok) {
+      setErr((await res?.json().catch(() => ({})))?.error || "화질을 저장하지 못했어요 — 다시 골라 주세요");
+      return;
+    }
+    setErr("");
+    await load(id).catch(() => {});
+  }
+
   // 초점을 고치면 구성을 다시 만든다 — 라우트가 컷을 비우므로 이어서 부르면 새로 나뉜다.
   // 분할·화면 설계·캐스팅은 OpenAI 만 써서 fal 값이 들지 않는다.
 
@@ -211,6 +230,24 @@ export default function ScriptStepPage() {
   const flatten = (s) => s.replace(/\s*\n\s*/g, " ").replace(/\s{2,}/g, " ").trim();
   const splitting = project.status === "cuts" && cuts.length === 0 && !project.cuts_error;
 
+  // 화질 — 이 모델이 실제로 여는 값만 고른다. 목록도 지금 고른 값도 표(lib/clip-limits)가
+  // 준다. 화면이 "480p·720p·1080p" 를 적으면 fal 이 값을 닫는 날 화면만 낡는다.
+  //
+  // ★ 목록이 비면 아무것도 안 그린다(Kling·LTX). 그 모델에는 resolution 파라미터 자체가
+  //   없어서, 고를 수 있는 척하면 고른 순간 fal 이 거절한다.
+  // ★ 지금 값을 project.settings.resolution 이 아니라 resolutionForProject 로 읽는 이유:
+  //   저장값이 이 모델의 목록 밖이면(모델이 바뀐 옛 프로젝트) 그 자리에서 기본값으로
+  //   떨어진다 — 화면이 켠 값과 fal 에 실리는 값이 같아진다.
+  const resolutions = resolutionsForProject(project);
+  const resolution = resolutionForProject(project);
+  // ★ 잠금은 **정가를 낸 뒤**다. 모델 칩이 "만든 뒤에는 못 바꾼다"인 것과 같은 이유이고
+  //   (낸 값과 만드는 값이 어긋나면 차액 정산할 방법이 없다), 스펙의 "첫 클립 뒤"보다
+  //   한 걸음 이르다 — 정가는 ③목소리에서 걷히고 클립은 그 뒤라, 그 사이에 1080p 로
+  //   바꾸면 160 을 내고 원가 2.25 배를 태운다.
+  //   판정은 서버가 장부에서 내려 준 project.charged 하나다(③목소리 화면과 같은 값) —
+  //   화면이 장부를 추측하지 않는다.
+  const resolutionLocked = !!project.charged;
+
   return (
     <section className="panel panel--narrow">
       <h2>대본을 확인해 주세요</h2>
@@ -251,6 +288,29 @@ export default function ScriptStepPage() {
           {instruction ? "지시 반영" : "전체 다시 쓰기"}
         </button>
       </div>
+
+      {resolutions.length > 0 && (
+        <div className="mt-lg">
+          <div className="eyebrow">
+            영상 화질 <small>{resolutionLocked ? "이미 값을 치러서 바꿀 수 없어요" : "값이 달라져요 — 만들기 전에 골라 주세요"}</small>
+          </div>
+          <div className="chips">
+            {resolutions.map((r) => (
+              <button key={r} className={`chip${resolution === r ? " on" : ""}`}
+                disabled={busy || resolutionLocked}
+                onClick={() => saveResolution(r)}>
+                {r} · {videoPrice(project.settings?.target_seconds, modelIdForProject(project), r)} 크레딧
+              </button>
+            ))}
+          </div>
+          {/* 길이를 안 골랐으면 가격표가 30초 값으로 떨어진다 — 자료 화면과 같은 문구로
+              기준을 말한다. 확정처럼 적으면 15초로 나왔을 때 다른 값을 본다. */}
+          <div className="tray-note">
+            높은 화질일수록 또렷하지만 값이 더 들어요
+            {!project.settings?.target_seconds && " · 값은 30초 기준이고 길이에 따라 달라져요"}
+          </div>
+        </div>
+      )}
 
       {/* ★ 초점(물건·사람·장소)과 연출 바람은 **화면에서 걷어냈다**(2026-08-13 사용자 결정).
           사장님은 영상 제작 용어를 모르고, 둘 다 읽기만 하는 자리라 할 일이 없었다.

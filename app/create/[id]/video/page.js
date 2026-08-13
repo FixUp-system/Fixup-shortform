@@ -8,7 +8,9 @@ import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 import { useMe } from "../../../../components/MeContext";
 import BackButton from "../../../../components/BackButton";
-import { I2V_MAX_SECONDS, modelIdForProject, projectSpeaks } from "../../../../lib/clip-limits";
+import {
+  I2V_MAX_SECONDS, modelIdForProject, projectSpeaks, resolutionForProject,
+} from "../../../../lib/clip-limits";
 import { isClipStale } from "../../../../lib/steps";
 // 비율은 lib 한 곳에서 온다 — 화면이 표를 또 만들면 언젠가 갈린다(④이미지가 그랬다)
 import { aspectFor } from "../../../../lib/aspects";
@@ -193,7 +195,9 @@ export default function VideoStepPage() {
                             누르기 전에 보여 준다. */}
                         {regening === c.idx
                           ? "만드는 중…"
-                          : `다시 만들기 · ${priceLabel(regenPrice("clip", c.clip_regen_count || 0, modelIdForProject(project)))}`}
+                          // ★ 화질까지 넘긴다 — 1080p 는 25 가 아니라 57 이다.
+                          //   라우트(clips/[idx]/regen)가 걷는 값과 같은 출처를 본다.
+                          : `다시 만들기 · ${priceLabel(regenPrice("clip", c.clip_regen_count || 0, modelIdForProject(project), resolutionForProject(project)))}`}
                       </button>
                     </>
                   )}

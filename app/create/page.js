@@ -15,7 +15,7 @@ import { useProject } from "../../components/ProjectContext";
 import { TARGET_CHOICES } from "../../lib/script";
 import { DEFAULT_STYLE_ID } from "../../lib/styles";
 import { ASPECTS, DEFAULT_ASPECT_ID, aspectFor } from "../../lib/aspects";
-import { I2V_MODELS, DEFAULT_I2V_MODEL } from "../../lib/clip-limits";
+import { I2V_MODELS, DEFAULT_I2V_MODEL, DEFAULT_RESOLUTION } from "../../lib/clip-limits";
 // 값은 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다)
 import { videoPrice } from "../../lib/pricing";
 import StylePicker from "../../components/StylePicker";
@@ -152,7 +152,10 @@ export default function CreatePage() {
                   {I2V_MODELS.map((m) => (
                     <button key={m.id} className={`chip${model === m.id ? " on" : ""}`}
                       onClick={() => setModel(m.id)}>
-                      {m.label} · {videoPrice(seconds, m.id)} 크레딧
+                      {/* ★ 화질은 여기서 안 고른다 — 프로젝트가 생긴 뒤 ②대본에서 고른다.
+                          그래서 값은 **기본 화질** 기준이고, 그것을 인자로 명시한다
+                          (비우면 다음 사람이 "해상도를 안 보는 자리"로 읽는다). */}
+                      {m.label} · {videoPrice(seconds, m.id, DEFAULT_RESOLUTION)} 크레딧
                     </button>
                   ))}
                 </div>

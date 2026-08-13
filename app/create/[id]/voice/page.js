@@ -15,7 +15,7 @@ import { VOICES } from "../../../../lib/voices";
 import { isAudioStale } from "../../../../lib/steps";
 // 상한과 정가는 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다).
 import { MAX_REGEN_PER_CUT, priceLabel, regenPrice, videoPrice } from "../../../../lib/pricing";
-import { modelIdForProject, projectSpeaks } from "../../../../lib/clip-limits";
+import { modelIdForProject, projectSpeaks, resolutionForProject } from "../../../../lib/clip-limits";
 
 export default function VoiceStepPage() {
   const { id } = useParams();
@@ -172,7 +172,13 @@ export default function VoiceStepPage() {
   // 문장을 고친 뒤 옛 문장을 읽은 소리가 남아 있으면 다음으로 보내지 않는다
   const staleCount = cuts.filter(isAudioStale).length;
   // 이 영상의 정가 — 길이마다 다르다. 목소리 시작이 이 값을 받는 자리다.
-  const price = videoPrice(project?.settings?.target_seconds, modelIdForProject(project));
+  // ★ 화질까지 함께 본다 — 안 넘기면 1080p 프로젝트가 화면에 720p 값(160)을 적고
+  //   실제로는 360 이 깎인다. 청구는 lib/charges.js 가 같은 출처(resolutionForProject)를 본다.
+  const price = videoPrice(
+    project?.settings?.target_seconds,
+    modelIdForProject(project),
+    resolutionForProject(project),
+  );
 
   // 대본 승인 직후 이 화면에 도착하면 컷이 아직 없다 — 분할이 도는 중이다.
   // 분할은 대본 승인이 띄우고(POST /cuts), 여기서는 컷이 생기기를 기다리기만 한다.
