@@ -101,12 +101,12 @@ describe("호출 게이트 — 사용자 축은 잔액이다", () => {
     });
   });
 
-  it("전역 상한은 그대로 회사 안전핀이다 — 잔액이 넉넉해도 막힌다", async () => {
+  // ★ 2026-08-13: 회사 안전핀(전역 원가 상한)을 걷어냈다. 요금은 크레딧이 맡는다.
+  it("전역 상한은 없다 — 잔액이 넉넉하면 통과한다", async () => {
     process.env.SHOTFORM_BUDGET_TOTAL_USD = "0.01";
     await grantTo(A, 1000);
     await runWithActor(A, async () => {
-      await expect(assertBudget({ endpoint: KLING, amount: 5 }))
-        .rejects.toMatchObject({ name: "BudgetExceeded", scope: "total" });
+      await expect(assertBudget({ endpoint: KLING, amount: 5 })).resolves.toBeUndefined();
     });
   });
 

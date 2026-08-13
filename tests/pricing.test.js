@@ -198,17 +198,12 @@ describe("광고 영상 정가", () => {
     }
   });
 
-  it("2.0-fast/15초 = 65(기존값 유지) · 2.5/15초/720p = 120 · 2.5/30초/720p = 240 — 원가 계산에서 뽑은 값", () => {
-    expect(AD_VIDEO_PRICE["seedance-2.0-fast"][15]).toBe(65);
+  it("2.0/15초/720p = 80 · 2.5/15초/720p = 120 · 2.5/30초/720p = 240 — 원가 계산에서 뽑은 값", () => {
+    expect(cellPrice("seedance-2.0", 15, "720p")).toBe(80);
     expect(cellPrice("seedance-2.5", 15, "720p")).toBe(120);
     expect(cellPrice("seedance-2.5", 30, "720p")).toBe(240);
   });
 
-  // ★ Task 24 — 기본 모델이 standard 다. standard/720p 는 fast 보다 비싸다(1080p 가
-  // 열리는 값비싼 티어라 원가도 fast 보다 높다).
-  it("★ 기본 모델(standard)이 fast 보다 비싸다 — 같은 720p·15초라도 티어가 다르다", () => {
-    expect(adVideoPrice(15, "seedance-2.0", "720p")).toBeGreaterThan(AD_VIDEO_PRICE["seedance-2.0-fast"][15]);
-  });
 
   it("★ standard 만 1080p 값이 있다 — 1080p 가 720p 보다 비싸다", () => {
     expect(AD_VIDEO_PRICE["seedance-2.0"][15]["1080p"]).toBeGreaterThan(AD_VIDEO_PRICE["seedance-2.0"][15]["720p"]);
@@ -225,16 +220,12 @@ describe("광고 영상 정가", () => {
     expect(AD_VIDEO_PRICE["seedance-2.0"][15]["720p"]).toBeGreaterThan(AD_VIDEO_PRICE["seedance-2.0"][15]["480p"]);
   });
 
-  it("같은 길이·해상도라도 2.5 가 2.0-fast 보다 비싸다 — 토큰당 단가·해상도가 더 크다", () => {
-    expect(cellPrice("seedance-2.5", 15, "720p")).toBeGreaterThan(AD_VIDEO_PRICE["seedance-2.0-fast"][15]);
-  });
 
   it("★ 기존 영상 정가와 섞이지 않는다 — 표가 둘이다", () => {
-    expect(AD_VIDEO_PRICE["seedance-2.0-fast"][15]).not.toBe(VIDEO_PRICE[15]);
+    expect(cellPrice("seedance-2.0", 15, "720p")).not.toBe(VIDEO_PRICE[15]);
   });
 
   it("adVideoPrice(seconds, modelId, resolution) 가 모델·길이·해상도 조합대로 값을 낸다", () => {
-    expect(adVideoPrice(15, "seedance-2.0-fast")).toBe(65);
     expect(adVideoPrice(15, "seedance-2.0", "720p")).toBe(80);
     expect(adVideoPrice(15, "seedance-2.0", "1080p")).toBe(175);
     expect(adVideoPrice(15, "seedance-2.0", "480p")).toBe(35);
@@ -258,12 +249,7 @@ describe("광고 영상 정가", () => {
   });
 
   // 해상도 무관 칸(fast)은 resolution 을 생략해도 값이 안 갈린다.
-  it("해상도 무관 모델(fast)은 해상도를 뭘 줘도(또는 안 줘도) 값이 같다", () => {
-    expect(adVideoPrice(15, "seedance-2.0-fast")).toBe(65);
-    expect(adVideoPrice(15, "seedance-2.0-fast", "480p")).toBe(65);
-    expect(adVideoPrice(15, "seedance-2.0-fast", "720p")).toBe(65);
-  });
-
+  
   // ④ 모르는 모델이 조용히 싼 값으로 새면 그 차액이 그대로 우리 돈이다 — regenPrice 와
   // 같은 원칙으로 던진다. "생략"(위 테스트)과 "값은 있는데 모르는 모델"을 가른다.
   it("★ 값이 있는데 모르는 모델은 던진다 — 조용히 기본값으로 떨어지면 안 된다", () => {
@@ -274,19 +260,10 @@ describe("광고 영상 정가", () => {
     expect(() => adVideoPrice(30, "없는모델")).toThrow(/모르는 광고 모델/);
   });
 
-  // ★ Task 24 — 해상도에도 같은 원칙: 값이 있는데 그 모델이 안 받는 해상도면 던진다.
-  it("★ 값이 있는데 그 모델이 안 받는 해상도는 던진다 — standard 만 되는 1080p 를 fast 에 주면 안 된다", () => {
-    expect(() => adVideoPrice(15, "seedance-2.0-fast", "1080p")).not.toThrow();
-    // ↑ fast 칸은 해상도 무관(숫자)이라 지금 구현은 resolution 을 무시하고 65 를 낸다
-    //   (해상도 유효성 자체는 라우트의 isAdResolution 이 400 으로 막는다 — 아래 대조).
-    //   여기서는 "해상도별 표(2.5)"가 실제로 던지는지를 확인한다.
-    expect(() => adVideoPrice(15, "seedance-2.5", "1080p")).toThrow(/그 해상도를 지원하지 않아요/);
-    expect(() => adVideoPrice(15, "seedance-2.0", "4k")).toThrow(/그 해상도를 지원하지 않아요/);
-  });
 
   it("길이가 그 모델의 목록 밖이면 더 비싼 쪽으로 본다 — 싼 쪽으로 떨어지면 원가보다 적게 청구한다", () => {
     expect(adVideoPrice(999, "seedance-2.5", "720p")).toBe(cellPrice("seedance-2.5", 30, "720p"));
-    expect(adVideoPrice(null, "seedance-2.0-fast")).toBe(AD_VIDEO_PRICE["seedance-2.0-fast"][15]);
+    expect(adVideoPrice(null, "seedance-2.0", "720p")).toBe(cellPrice("seedance-2.0", 15, "720p"));
   });
 
   it("시나리오 다시 쓰기 상한이 있다 — 무료·무제한이면 원가가 샌다", () => {

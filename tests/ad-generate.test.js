@@ -305,16 +305,18 @@ describe("광고 영상 생성 — 예산 축(★ Task 25, 프로젝트 축만 �
     ).resolves.toBeTruthy();
   });
 
-  it("★ skipProjectAxis 여도 전역 상한은 그대로 막는다", async () => {
+    // ★ 2026-08-13: 전역 원가 상한을 걷어냈다(env 하나가 전사 공용이라 누가 쓰든
+    // 그 숫자에 닿으면 모두가 멈췄다). 남은 그물은 잔액과 체험 한도다.
+  it("전역 원가 상한은 없다 — 쌓인 원가로는 광고 생성이 안 막힌다", async () => {
     resetMemoryStore();
     await grantCredits();
     process.env.SHOTFORM_BUDGET_TOTAL_USD = "0.01";
     const fetchImpl = fakeQueueFetch();
-    await runWithActor(U, () =>
-      generateAdVideo({ project, scenario: { text: "P", endpoint: "t2v" }, refs: [], fetchImpl, waitImpl: noWait })
-    )
-      .then(() => { throw new Error("막았어야 한다"); })
-      .catch((e) => { expect(e.scope).toBe("total"); });
+    await expect(
+      runWithActor(U, () =>
+        generateAdVideo({ project, scenario: { text: "P", endpoint: "t2v" }, refs: [], fetchImpl, waitImpl: noWait })
+      )
+    ).resolves.toBeTruthy();
   });
 
   it("★ skipProjectAxis 여도 사용자 잔액이 음수면 그대로 막는다", async () => {

@@ -69,19 +69,8 @@ describe("광고 모델과 비용 축", () => {
     expect(estimateCost(T2V, 15)).toBeCloseTo(estimateCost(T2V, 15, "720p"), 6);
   });
 
-  it("fast 티어는 해상도를 뭘 줘도 같은(해상도 무관) 단가다", () => {
-    const c = estimateCost(T2V_FAST, 1);
-    expect(estimateCost(T2V_FAST, 1, "480p")).toBeCloseTo(c, 6);
-    expect(estimateCost(T2V_FAST, 1, "720p")).toBeCloseTo(c, 6);
-  });
-
-  it("fast 티어(옛 기본 모델)도 standard 와 다른 제 단가로 잡힌다 — 접두사가 안 겹친다", () => {
-    const perSecStandard = perSecOf(adModel(DEFAULT_AD_MODEL), "720p");
-    const perSecFast = adModel("seedance-2.0-fast").perSecUsd;
-    expect(estimateCost(T2V_FAST, 15)).toBeCloseTo(perSecFast * 15, 6);
-    expect(estimateCost(T2V_FAST, 15)).not.toBeCloseTo(perSecStandard * 15, 6);
-  });
-
+  
+  
   // ── Task 21 — Seedance 2.5 ────────────────────────────────────────────
   // ⑥ 가짜 모드가 2.5 엔드포인트도 fal 축으로 본다(`bytedance/` 접두사) — FAL_PREFIXES 는
   // "bytedance/" 전체를 걸어 뒀으니 "-2.5"도 자동으로 걸린다. 새 접두사를 안 더해도 되는
@@ -118,12 +107,7 @@ describe("광고 모델과 비용 축", () => {
     expect(estimateCost(T2V_25, 1, "720p")).toBeGreaterThan(estimateCost(T2V_25, 1, "480p"));
   });
 
-  it("2.5 가 fast 티어보다 초당 원가가 높다 — 토큰식·고해상도라 더 비싸다", () => {
-    const perSec20fast = adModel("seedance-2.0-fast").perSecUsd;
-    const perSec25 = perSecOf(adModel("seedance-2.5"), "720p");
-    expect(perSec25).toBeGreaterThan(perSec20fast);
-  });
-
+  
   // 표 두 곳(lib/ad/models.js 의 perSecUsd · lib/costs.js 의 PRICE_TABLE)이 모델·해상도마다
   // 갈리지 않는지 — AD_MODELS 를 훑어 대조한다(둘 다 "같은 값이어야 한다" 주석이 붙어 있다).
   it("모델·해상도마다 perSecUsd 와 원가표(PRICE_TABLE) 단가가 같다", () => {

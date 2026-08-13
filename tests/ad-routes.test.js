@@ -81,7 +81,7 @@ describe("광고 라우트 — 문서", () => {
 
     it("★ 2.0 모델(기본)에 30초를 주면 400 — 길이가 모델에 딸린다", async () => {
       const res = await createAd(
-        post({ ...OK, settings: { ...OK.settings, model: "seedance-2.0-fast", seconds: 30 } })
+        post({ ...OK, settings: { ...OK.settings, model: "seedance-2.0", seconds: 30 } })
       );
       expect(res.status).toBe(400);
     });
@@ -102,7 +102,7 @@ describe("광고 라우트 — 문서", () => {
 
     // ② 정가가 모델·길이마다 다르다 — 화면(app/ads/[id]/page.js)이 읽는 값과 같은 함수다.
     it("모델·길이 조합마다 정가가 다르다", () => {
-      expect(adVideoPrice(15, "seedance-2.0-fast")).toBe(65);
+      expect(adVideoPrice(15, "seedance-2.0", "720p")).toBe(80);
       expect(adVideoPrice(15, "seedance-2.5")).toBe(120);
       expect(adVideoPrice(30, "seedance-2.5")).toBe(240);
     });
@@ -137,7 +137,7 @@ describe("광고 라우트 — 문서", () => {
         await createAd(post({ ...OK, settings: { ...OK.settings, model: "seedance-2.5", seconds: 30 } }))
       ).json();
       const res = await patchAd(
-        patch({ settings: { model: "seedance-2.0-fast" } }),
+        patch({ settings: { model: "seedance-2.0" } }),
         { params: Promise.resolve({ id: made.id }) }
       );
       expect(res.status).toBe(400);
@@ -213,12 +213,13 @@ describe("광고 라우트 — 문서", () => {
     });
 
     // ★ Task 24 — 모델을 바꾸면 해상도도 그 모델 기준으로 다시 본다(길이와 같은 규칙).
-    it("★ standard·1080p 로 만든 뒤 모델만 fast 로 바꾸면 400 — fast 는 1080p 가 없다", async () => {
+    // fast 티어가 사라진 뒤에도 같은 규칙을 재는 자리다 — 1080p 는 **2.0 만** 연다.
+    it("★ 2.0·1080p 로 만든 뒤 모델만 2.5 로 바꾸면 400 — 2.5 는 1080p 가 없다", async () => {
       const made = await (
         await createAd(post({ ...OK, settings: { ...OK.settings, model: "seedance-2.0", resolution: "1080p" } }))
       ).json();
       const res = await patchAd(
-        patch({ settings: { model: "seedance-2.0-fast" } }),
+        patch({ settings: { model: "seedance-2.5" } }),
         { params: Promise.resolve({ id: made.id }) }
       );
       expect(res.status).toBe(400);
@@ -233,7 +234,7 @@ describe("광고 라우트 — 문서", () => {
 
     it("★ 모델이 안 받는 해상도는 POST 에서 400 — fast 에 1080p", async () => {
       const res = await createAd(
-        post({ ...OK, settings: { ...OK.settings, model: "seedance-2.0-fast", resolution: "1080p" } })
+        post({ ...OK, settings: { ...OK.settings, model: "seedance-2.5", resolution: "1080p" } })
       );
       expect(res.status).toBe(400);
     });
@@ -505,8 +506,8 @@ describe("광고 라우트 — 굽기", () => {
       params: Promise.resolve({ id: made.id }),
     });
     expect(res.status).toBe(402);
-    // 대조 — 2.0-fast/15초 정가라면 이 잔액으로 충분했다는 것을 같이 남긴다
-    expect(100).toBeGreaterThan(AD_VIDEO_PRICE["seedance-2.0-fast"][15]);
+    // 대조 — 2.0/15초/720p 정가라면 이 잔액으로 충분했다는 것을 같이 남긴다
+    expect(100).toBeGreaterThan(AD_VIDEO_PRICE["seedance-2.0"][15]["720p"]);
     expect(100).toBeLessThan(AD_VIDEO_PRICE["seedance-2.5"][30]["720p"]);
   });
 

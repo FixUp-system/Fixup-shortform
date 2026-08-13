@@ -79,7 +79,7 @@ describe("assertBudget", () => {
     ); // 던지지 않으면 통과다
   });
 
-  it("전역 상한은 프로젝트가 하나여도 여전히 막는다", async () => {
+  it("전역 상한은 없다 — 프로젝트가 하나여도 안 막는다", async () => {
     await fresh({ total: "10" });
     await record(costs, { project_id: "p1", est_cost_usd: 9 });
     // 9 + 2 = 11 > 10. 축을 못 박는다 — 이름 없는 toThrow 는 엉뚱한 이유로도 통과한다
@@ -87,24 +87,17 @@ describe("assertBudget", () => {
       runWithActor("t-user", () =>
         costs.assertBudget({ projectId: "p1", endpoint: "fal-ai/veo3.1", amount: 5 })
       )
-    ).rejects.toMatchObject({ name: "BudgetExceeded", scope: "total" });
+    ).resolves.toBeUndefined();
   });
 
-  it("전체 상한은 프로젝트를 가리지 않고 넘으면 막는다", async () => {
-    await record(costs, { project_id: "p2", est_cost_usd: 9 });
-    // 9 + 2 = 11 > 10
+  // ★ 2026-08-13: 전역 원가 상한을 걷어냈다. env 하나가 전사 공용이라 누가 쓰든 그 숫자에
+  // 닿는 순간 모두가 멈췄다 — 크레딧을 내고 산 영상도 함께 죽는다. 요금은 크레딧이 맡고,
+  // 여기 남은 그물은 **잔액 음수**와 **체험 한도** 둘이다.
+  it("얼마가 쌓여도 원가 총액으로는 막지 않는다", async () => {
+    await record(costs, { project_id: "p2", est_cost_usd: 9999 });
     await expect(
       runWithActor("t-user", () =>
         costs.assertBudget({ projectId: "p1", endpoint: "fal-ai/veo3.1", amount: 5 })
-      )
-    ).rejects.toThrow(/예산 상한/);
-  });
-
-  it("projectId가 없으면 전체 상한만 본다", async () => {
-    await record(costs, { project_id: "p1", est_cost_usd: 2.9 });
-    await expect(
-      runWithActor("t-user", () =>
-        costs.assertBudget({ endpoint: "fal-ai/veo3.1", amount: 5 })
       )
     ).resolves.toBeUndefined();
   });
@@ -140,14 +133,14 @@ describe("assertBudget — skipProjectAxis", () => {
     ).resolves.toBeUndefined();
   });
 
-  it("★ skipProjectAxis 여도 전역 상한은 그대로 막는다", async () => {
-    await record(costs, { project_id: "p2", est_cost_usd: 9 });
+  it("★ skipProjectAxis 여도 남은 그물(잔액)은 그대로 막는다", async () => {
+    await memoryStore.insertGrant({ user_id: "t-user", amount_credits: -1001, reason: "테스트", granted_by: "admin" });
     // 9 + 2 = 11 > 10(전역 상한) — 프로젝트가 아니라 전역이 잡아야 한다
     await runWithActor("t-user", () =>
       costs.assertBudget({ projectId: "p1", endpoint: "fal-ai/veo3.1", amount: 5, skipProjectAxis: true })
     )
       .then(() => { throw new Error("막았어야 한다"); })
-      .catch((e) => { expect(e.scope).toBe("total"); });
+      .catch((e) => { expect(e.scope).toBe("user"); });
   });
 
   it("★ skipProjectAxis 여도 사용자 잔액이 음수면 그대로 막는다", async () => {
@@ -177,16 +170,27 @@ describe("가짜 모드", () => {
 // 여기서 보는 것은 "던지는가"가 아니라 "fetch 가 안 불렸는가"다 — 그게 돈이 안 나갔다는 뜻이다.
 const bust = () => "?t=" + Date.now() + Math.random();
 
+// ★ 2026-08-13: 전역 원가 상한이 사라졌으니, 이 배선을 재는 방아쇠도 살아 있는 그물로
+// 바꾼다 — **잔액이 음수면 fal 이 나가면 안 된다**. 재는 것(가드에 걸리면 fetch 를 안
+// 부른다)은 그대로다.
 describe("호출부 배선 — 가드에 걸리면 fal 로 나가지 않는다", () => {
-  beforeEach(() => fresh({ total: "0.01" }));
+  beforeEach(async () => {
+    await fresh();
+    // 넉넉한 충전을 회수해 잔액을 음수로 만든다(fresh 가 1000 을 넣는다)
+    for (const u of ["t-user", "local"]) {
+      await memoryStore.insertGrant({ user_id: u, amount_credits: -1001, reason: "테스트", granted_by: "admin" });
+    }
+  });
 
   it("이미지: 상한을 넘으면 fetch 를 부르지 않는다", async () => {
     const { generateImage } = await import("../lib/imagegen.js" + bust());
     let called = false;
     const fetchImpl = async () => { called = true; return { ok: true, json: async () => ({}) }; };
     await expect(
-      generateImage({ prompt: "p", aspect_ratio: "9:16", projectId: "p1", fetchImpl })
-    ).rejects.toThrow(/예산 상한/);
+      runWithActor("t-user", () =>
+        generateImage({ prompt: "p", aspect_ratio: "9:16", projectId: "p1", fetchImpl })
+      )
+    ).rejects.toThrow(/크레딧이 모자라요/);
     expect(called).toBe(false);
   });
 
@@ -195,8 +199,10 @@ describe("호출부 배선 — 가드에 걸리면 fal 로 나가지 않는다",
     let called = false;
     const fetchImpl = async () => { called = true; return { ok: true, json: async () => ({}) }; };
     await expect(
-      generateSpeech({ text: "가".repeat(500), voiceId: "v", projectId: "p1", fetchImpl })
-    ).rejects.toThrow(/예산 상한/);
+      runWithActor("t-user", () =>
+        generateSpeech({ text: "가".repeat(500), voiceId: "v", projectId: "p1", fetchImpl })
+      )
+    ).rejects.toThrow(/크레딧이 모자라요/);
     expect(called).toBe(false);
   });
 
@@ -205,8 +211,10 @@ describe("호출부 배선 — 가드에 걸리면 fal 로 나가지 않는다",
     let called = false;
     const fetchImpl = async () => { called = true; return { ok: true, json: async () => ({}) }; };
     await expect(
-      generateClip({ imageUrl: "u", seconds: 5, aspect_ratio: "9:16", projectId: "p1", fetchImpl })
-    ).rejects.toThrow(/예산 상한/);
+      runWithActor("t-user", () =>
+        generateClip({ imageUrl: "u", seconds: 5, aspect_ratio: "9:16", projectId: "p1", fetchImpl })
+      )
+    ).rejects.toThrow(/크레딧이 모자라요/);
     expect(called).toBe(false);
   });
 });

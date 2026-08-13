@@ -110,13 +110,7 @@ describe("광고 청구", () => {
       expect(await balanceFor(U)).toBe(1000 - AD_VIDEO_PRICE["seedance-2.5"][30]["720p"]);
     });
 
-    it("2.5 로 15초를 만들면 fast/15초보다 비싸게 받는다", async () => {
-      await grant(1000);
-      const paid = await chargeAd({ userId: U, projectId: P, seconds: 15, model: "seedance-2.5", resolution: "720p" });
-      expect(paid).toBe(AD_VIDEO_PRICE["seedance-2.5"][15]["720p"]);
-      expect(paid).toBeGreaterThan(AD_VIDEO_PRICE["seedance-2.0-fast"][15]);
-    });
-
+    
     // ③ 옛 문서 보호 — model·resolution 을 안 넘기면(옛 광고 프로젝트) 기본 모델
     // (standard)·720p 값으로 청구된다.
     it("★ model·resolution 을 안 넘기면(옛 문서) 기본 모델(standard)·720p 값으로 청구된다", async () => {
@@ -169,7 +163,8 @@ describe("광고 청구", () => {
     // adVideoPrice(seconds, modelId, resolution) 을 라우트가 부르는 것과 같은 조합 — 화면
     // (app/ads/[id]/page.js)이 읽는 값과 같은 함수다.
     it("모델·길이·해상도 조합마다 정가가 다르다", () => {
-      expect(adVideoPrice(15, "seedance-2.0-fast")).toBe(65);
+      // 해상도를 생략하면 기본(720p) 값이다 — fast 티어가 사라져 65 라는 칸도 없다
+      expect(adVideoPrice(15, "seedance-2.0")).toBe(80);
       expect(adVideoPrice(15, "seedance-2.0", "720p")).toBe(80);
       expect(adVideoPrice(15, "seedance-2.0", "1080p")).toBe(175);
       expect(adVideoPrice(15, "seedance-2.5", "720p")).toBe(120);

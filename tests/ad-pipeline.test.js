@@ -11,7 +11,7 @@ import { hasRenderedAdVideo } from "../lib/ad/attempt.js";
 const U = "00000000-0000-4000-8000-00000000000a";
 const SETTINGS = {
   seconds: 15, aspect_ratio: "9:16", narration_lang: "ko",
-  format: "hero", style: "photo", mood: "premium", model: "seedance-2.0-fast",
+  format: "hero", style: "photo", mood: "premium", model: "seedance-2.0",
 };
 
 async function makeAd() {
@@ -66,7 +66,7 @@ describe("광고 파이프라인", () => {
     const back = await getProject(p.id, U);
     expect(back.videos.length).toBe(1);
     expect(back.status).toBe("done");
-    expect(await balanceFor(U)).toBe(200 - AD_VIDEO_PRICE["seedance-2.0-fast"][15]);
+    expect(await balanceFor(U)).toBe(200 - AD_VIDEO_PRICE["seedance-2.0"][15]["720p"]);
   });
 
   it("★ 실패하면 환불하고 scenario 로 되돌린다", async () => {
@@ -109,7 +109,7 @@ describe("광고 파이프라인", () => {
     };
     await runWithActor(U, () => runAdRenderPipeline(p.id, U, deps));
     expect((await getProject(p.id, U)).status).toBe("done");
-    expect(await balanceFor(U)).toBe(200 - AD_VIDEO_PRICE["seedance-2.0-fast"][15]);
+    expect(await balanceFor(U)).toBe(200 - AD_VIDEO_PRICE["seedance-2.0"][15]["720p"]);
 
     // [다시 만들기] — 시나리오는 그대로고 영상만 새로 굽는다. fal 원가는 또 나간다.
     await runWithActor(U, () => runAdRenderPipeline(p.id, U, deps));
@@ -117,7 +117,7 @@ describe("광고 파이프라인", () => {
     expect(back.status).toBe("done");
     expect(back.videos.length).toBe(1); // 최신 한 편으로 덮어쓴다 — 회차 목록이 아니다
     // ★ 핵심 단정 — 정가를 또 받아 잔액이 두 번째로 준다
-    expect(await balanceFor(U)).toBe(200 - AD_VIDEO_PRICE["seedance-2.0-fast"][15] * 2);
+    expect(await balanceFor(U)).toBe(200 - AD_VIDEO_PRICE["seedance-2.0"][15]["720p"] * 2);
   });
 
   // ★ Task 23 — fal 큐 폴링 도중 서버가 재시작되면 그 폴링 루프 자체가 사라진다.
@@ -180,7 +180,7 @@ describe("광고 파이프라인", () => {
         storeVideo: async (url) => url,
       })
     );
-    expect(await balanceFor(U)).toBe(200 - AD_VIDEO_PRICE["seedance-2.0-fast"][15]);
+    expect(await balanceFor(U)).toBe(200 - AD_VIDEO_PRICE["seedance-2.0"][15]["720p"]);
   });
 });
 
