@@ -230,8 +230,10 @@ describe("/ads/new 화면 — 모델·길이 선택 (Task 22)", () => {
   it("모델 칩이 lib/ad/models 의 AD_MODELS 에서 온다 — 라벨을 화면에 복사하지 않는다", () => {
     expect(src).toMatch(/from ["'][./]*lib\/ad\/models["']/);
     expect(src).toContain("AD_MODELS");
-    const mapIdx = src.indexOf("AD_MODELS.map(");
-    expect(mapIdx, "AD_MODELS.map( 을 못 찾았다 — 표에서 그리지 않는다").toBeGreaterThan(-1);
+    // ★ 숨김이 생기며 AD_MODELS.filter(...).map( 이 됐다(2026-08-13). "표에서 그린다"는
+    // 계약은 그대로다 — 기준점만 넓힌다.
+    const mapIdx = src.search(/AD_MODELS(\.filter\(.*?\))?\.map\(/);
+    expect(mapIdx, "AD_MODELS 에서 그리지 않는다").toBeGreaterThan(-1);
     // 모델 표의 hint 문구(모델별로 다른 값)를 그대로 베끼면 모델이 하나 늘 때 화면만 낡는다
     expect(src).not.toContain("소리까지 한 번에");
     expect(src).not.toContain("네이티브 오디오");
@@ -253,7 +255,7 @@ describe("/ads/new 화면 — 모델·길이 선택 (Task 22)", () => {
     expect(body, "되돌릴 값이 adSecondsFor(id)[0] 가 아니다 — 그 모델이 실제로 받는 값이 아닐 수 있다")
       .toMatch(/adSecondsFor\(id\)\[0\]/);
     // 모델 칩의 onClick 이 이 함수를 실제로 부르는지 — 안 부르면 죽은 코드다
-    const modelChipIdx = src.indexOf("AD_MODELS.map(");
+    const modelChipIdx = src.search(/AD_MODELS(\.filter\(.*?\))?\.map\(/);
     const modelChipBlock = src.slice(modelChipIdx, modelChipIdx + 300);
     expect(modelChipBlock, "모델 칩 onClick 이 onModelChange 를 안 부른다").toMatch(/onClick=\{[^}]*onModelChange/);
   });
@@ -330,8 +332,14 @@ describe("/ads/[id] 화면 — 연출 필드·모델 표시 (Task 22)", () => {
     expect(detailSrc).toMatch(/adModel\(settings\?\.model\)/);
   });
 
-  it("가격 계산에 모델을 함께 넘긴다 — 안 넘기면 2.5 프로젝트에 2.0(더 싼) 가격이 뜬다", () => {
-    expect(detailSrc).toMatch(/adVideoPrice\(settings\?\.seconds,\s*settings\?\.model\)/);
+  it("가격 계산에 모델과 **화질**을 함께 넘긴다 — 안 넘기면 화면만 싼 값을 말한다", () => {
+    // ★ 실사용에서 잡았다(2026-08-13): 1080p 를 골라도 이 화면은 720p 값을 띄웠다.
+    // 실제 청구는 맞았다(app/api/ads/[id]/render/route.js·lib/charges.js 가 세 인자를
+    // 다 넘긴다) — **화면만** 낮게 말해서, 사장님이 본 값과 빠져나간 값이 갈렸다.
+    // 화면이 값을 스스로 만들지 않는다는 규약은 지켰는데도 인자 하나로 뚫린 자리다.
+    expect(detailSrc).toMatch(
+      /adVideoPrice\(settings\?\.seconds,\s*settings\?\.model,\s*settings\?\.resolution\)/
+    );
   });
 });
 
@@ -426,5 +434,13 @@ describe("/ads/[id] — done 은 못 고친다", () => {
     const head = detailSrc.slice(detailSrc.indexOf("plan-head"), detailSrc.indexOf("plan-list"));
     expect(head, "머리줄이 status 를 안 본다 — 완성본에서도 편집이 열린다")
       .toMatch(/status\s*===\s*["']scenario["']/);
+  });
+});
+
+// ★ 숨긴 모델은 칩으로 안 그린다 — 표에 남아 있어도(옛 문서 보호) 새로 고를 수는 없다.
+describe("/ads/new — 숨긴 모델은 안 보인다", () => {
+  it("모델 칩이 hidden 을 거른다", () => {
+    expect(src, "AD_MODELS 를 거르지 않고 그대로 그린다")
+      .toMatch(/AD_MODELS\.filter\(\([^)]*\)\s*=>\s*![^)]*\.hidden\)/);
   });
 });

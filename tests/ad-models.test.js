@@ -134,3 +134,30 @@ describe("광고 모델 표", () => {
     expect(/^\s*import\s/m.test(src)).toBe(false);
   });
 });
+
+// ★ 2.5 를 화면에서 숨긴다(2026-08-13 사용자 요청 — 원가가 크다).
+//
+// **지우지 않는다.** 지우면 이미 2.5 로 만든 문서가 가격 계산에서 던져 화면째 죽는다
+// (오늘 seedance-2.0-fast 에서 실제로 그랬다). 고르는 길만 닫고, 값·엔드포인트·검증은
+// 그대로 살려 둔다 — 옛 문서는 계속 열리고 계속 만들 수 있어야 한다.
+describe("2.5 는 화면에서만 숨긴다", () => {
+  it("표에는 남아 있고 hidden 표시가 붙는다", () => {
+    const m = AD_MODELS.find((x) => x.id === "seedance-2.5");
+    expect(m, "2.5 가 표에서 사라졌다 — 옛 문서가 죽는다").toBeTruthy();
+    expect(m.hidden, "hidden 표시가 없다").toBe(true);
+  });
+
+  it("★ 서버는 여전히 받는다 — 이미 2.5 인 프로젝트가 저장·수정·굽기에서 막히면 안 된다", () => {
+    expect(isAdModel("seedance-2.5")).toBe(true);
+    expect(adSecondsFor("seedance-2.5").length).toBeGreaterThan(0);
+    expect(adResolutionsFor("seedance-2.5").length).toBeGreaterThan(0);
+  });
+
+  it("기본 모델은 숨김이 아니다 — 숨긴 것이 기본이면 아무도 못 고른다", () => {
+    expect(AD_MODELS.find((m) => m.id === DEFAULT_AD_MODEL)?.hidden).toBeFalsy();
+  });
+
+  it("고를 수 있는 모델이 하나는 남는다", () => {
+    expect(AD_MODELS.filter((m) => !m.hidden).length).toBeGreaterThan(0);
+  });
+});

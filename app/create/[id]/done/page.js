@@ -594,7 +594,11 @@ export default function DoneStepPage() {
                   {busy ? "합치는 중…" : "다시 합치기"}
                 </button>
               )}
-              <a className="cta" href={render.url} download>
+              {/* ★ ?dl=1 — 서명 URL 로 302 하면 다른 출처가 되어 아래 속성이 무시된다.
+                  첨부로 내려줄지를 Storage 가 정하게 하는 신호다(app/api/renders/[name]).
+                  ⚠️ 이 주석에 그 속성 이름을 적지 마라 — tests/staleness-ui.test.js 가
+                  낱말의 첫 등장으로 앵커를 찾는다(적었다가 그 테스트를 깼다). */}
+              <a className="cta" href={`${render.url}?dl=1`} download>
                 내려받기
               </a>
             </>

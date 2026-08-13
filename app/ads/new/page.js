@@ -217,7 +217,8 @@ export default function AdNewPage() {
               <span className="tray-label">모델</span>
               <div className="tray-col">
                 <div className="chips">
-                  {AD_MODELS.map((m) => (
+                  {/* 숨긴 모델(hidden)은 안 그린다 — 표에는 남아 있다(lib/ad/models.js 주석) */}
+                  {AD_MODELS.filter((m) => !m.hidden).map((m) => (
                     <button key={m.id} className={`chip${model === m.id ? " on" : ""}`}
                       onClick={() => onModelChange(m.id)}>
                       {m.label}

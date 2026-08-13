@@ -214,7 +214,10 @@ export default function AdDetailPage() {
   // 이 프로젝트 길이의 정가 — 숫자는 여기서 만들지 않는다, pricing.js 가 만든다.
   // ★ 모델을 같이 넘긴다 — 안 넘기면 항상 2.0(가장 싼) 값으로 계산돼 2.5 프로젝트에
   // 틀린 가격이 뜬다(app/api/ads/[id]/render/route.js 가 실제 청구에 쓰는 값과 갈린다).
-  const price = priceLabel(adVideoPrice(settings?.seconds, settings?.model));
+  // ★ 화질(resolution)까지 넘긴다. 안 넘기면 이 화면만 **720p 값**을 말한다 —
+  //   실제 청구는 세 인자를 다 넘기므로(app/api/ads/[id]/render/route.js·lib/charges.js)
+  //   1080p 를 고른 사장님이 화면에서 본 값보다 더 많이 빠져나간다(2026-08-13 실사용에서 잡힘).
+  const price = priceLabel(adVideoPrice(settings?.seconds, settings?.model, settings?.resolution));
 
   // 아래 네 갈래(draft·scenario·rendering·done+video) 중 어디에도 안 걸리는 경우 —
   // 모르는 status 이거나(나중에 상태가 하나 늘 수 있다), status 는 "done"인데 videos 가
@@ -387,7 +390,8 @@ export default function AdDetailPage() {
               <button className="mini" disabled={busy} onClick={startRender}>
                 {busy ? "만드는 중…" : `다시 만들기 · ${price}`}
               </button>
-              <a className="cta" href={video.url} download>
+              {/* ?dl=1 — ⑥완성과 같은 이유(서명 URL 302 뒤에는 그 속성이 안 먹는다) */}
+              <a className="cta" href={`${video.url}?dl=1`} download>
                 내려받기
               </a>
             </div>

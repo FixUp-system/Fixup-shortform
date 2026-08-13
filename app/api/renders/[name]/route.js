@@ -9,6 +9,9 @@ import { getStore } from "../../../../lib/store/index.js";
 // ⑥완성 화면의 미리보기가 그것을 재생한다. uuid 만 받던 때는 `r`·`w` 가 hex 가 아니라
 // 400 이 나서, 자막 적용은 되는데 미리보기만 안 보였다.
 // 소유자 검사는 어느 갈래든 **m[1](프로젝트 id)** 하나로 한다 — 원본도 같은 문을 지난다.
+// 서명 수명 — 재생 중에 만료되면 영상이 중간에 끊긴다. 넉넉하되 짧게 둔다.
+const SIGNED_URL_SECONDS = 60 * 30;
+
 const RENDER_MP4 = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(-raw)?\.mp4$/;
 
 export const GET = withUser(async (req, { params }, user) => {
@@ -38,9 +41,31 @@ export const GET = withUser(async (req, { params }, user) => {
     return new Response(null, { status: 304, headers: { ETag: etag, "Cache-Control": "private, no-cache" } });
   }
 
+  // ★ 본문을 함수로 흘리지 않는다 — Vercel 함수의 응답 본문 상한이 4.5MB 인데 이
+  // 영상은 개당 8~13MB 다(위 캐시 주석의 실측값). 소유자 검사까지는 함수가 하고,
+  // 통과하면 **짧은 수명의 서명 URL 로 302** 를 보내 브라우저가 Storage 에서 직접 받는다.
+  //
+  // ★ 저장된 주소(/api/renders/<id>.mp4)는 그대로다 — 문서에 남은 url 이 영구히
+  //   유효해야 한다는 규약을 지킨다. 서명은 이 문을 지날 때마다 새로 만든다.
+  // ★ 서명을 못 만드는 저장소(메모리·로컬 개발)에서는 아래 기존 경로로 떨어진다.
+  //   그래야 로컬에서 지금처럼 그대로 돌고, 테스트도 실제 바이트를 확인할 수 있다.
+  // ★ ?dl=1 은 내려받기 링크만 붙인다. 302 뒤에는 다른 출처라 <a download> 가 안 먹어서,
+  //   첨부로 내려줄지를 서명에 실어 Storage 가 정하게 한다(미리보기는 인라인이어야 한다).
+  const store = getStore();
+  if (typeof store.signedObjectUrl === "function") {
+    const wantsDownload = new URL(req.url).searchParams.get("dl") === "1";
+    const signed = await store
+      .signedObjectUrl("renders", name, SIGNED_URL_SECONDS, wantsDownload ? { download: name } : {})
+      .catch(() => null);
+    if (signed) {
+      return new Response(null, {
+        status: 302,
+        headers: { Location: signed, "Cache-Control": "private, no-store" },
+      });
+    }
+  }
+
   // 완성본은 renders 비공개 버킷에 있다 — 이 라우트가 소유자를 확인하고 흘려준다.
-  // 서명 URL 을 프론트에 주지 않는 이유는 uploads 와 같다: 문서에 저장된 url 이
-  // 영구히 유효해야 한다.
   try {
     const buf = await getStore().getObject("renders", name);
     return new Response(buf, {

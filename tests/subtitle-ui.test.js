@@ -469,3 +469,19 @@ describe("⑥완성 — 영상 비율에 카드가 따라온다", () => {
     expect(css).toMatch(/\.panel--narrow \{ max-width: 760px; \}/);
   });
 });
+
+// ★ 내려받기 링크는 ?dl=1 을 붙인다 — 서명 URL 로 302 하면 **다른 출처**가 되어
+// <a download> 속성이 무시된다(브라우저 규칙). 첨부로 내려줄지는 Storage 가 정해야 하고,
+// 그 신호가 이 질의문자다. 미리보기(<video>)는 붙이지 않는다 — 인라인이어야 재생된다.
+describe("⑥완성 — 내려받기는 첨부로 요청한다", () => {
+  it("내려받기 링크에 ?dl=1 이 붙는다", () => {
+    expect(src, "내려받기 링크가 없다").toMatch(/<a[^>]*className="cta"[^>]*href=/);
+    expect(src, "?dl=1 을 안 붙인다 — 서명 URL 뒤에서 새 탭으로 열린다").toMatch(/dl=1/);
+  });
+
+  it("미리보기 src 에는 안 붙인다 — 첨부로 내려오면 재생이 안 된다", () => {
+    const previewLine = src.split("\n").find((l) => l.includes("previewSrc") && l.includes("src="));
+    expect(previewLine, "미리보기 src 를 못 찾겠다").toBeTruthy();
+    expect(previewLine).not.toContain("dl=1");
+  });
+});
