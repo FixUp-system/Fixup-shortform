@@ -1,6 +1,6 @@
 import { getProject, updateProject } from "../../../../lib/projects";
 import { briefingContentChanged } from "../../../../lib/briefing";
-import { clipLimitsForProject, I2V_MODEL_IDS } from "../../../../lib/clip-limits";
+import { clipLimitsForProject, I2V_MODEL_IDS, isResolutionFor } from "../../../../lib/clip-limits";
 import { normalizeStyle } from "../../../../lib/styles";
 import { isAspect } from "../../../../lib/aspects";
 import { isSpeed } from "../../../../lib/speeds";
@@ -112,6 +112,24 @@ export const PATCH = withUser(async (req, { params }, user) => {
         { error: "영상 모델은 만들 때 정해져요 — 바꾸려면 새로 만들어 주세요" },
         { status: 400 }
       );
+    }
+  }
+
+  // 화질도 닫힌 목록이다 — 다만 **목록이 모델마다 다르다**(Seedance 만 연다). 그래서
+  // 상수 배열이 아니라 isResolutionFor 가 판정한다(lib/clip-limits.js 가 유일한 자리다).
+  // 안 막으면 아무 값이나 settings 에 들어가고, 그 값이 그대로 fal 유료 호출로 나간다.
+  //
+  // ★ **머지 뒤 모델**로 잰다. 저장된 모델로 재면 모델을 함께 바꾸는 PATCH 에서
+  //   "Seedance 의 1080p 니까 통과"가 되고 저장되는 모델은 Kling 이 된다 — 그 모델에는
+  //   해상도 파라미터 자체가 없는데 문서에는 남아 각인(lib/steps.js)이 그것을 본다.
+  //   지금은 위의 모델 잠금이 먼저 막지만, 판정 기준을 여기 맞춰 둬야 그 잠금이
+  //   느슨해지는 날 이 문이 혼자 열리지 않는다.
+  if (body.settings?.resolution !== undefined) {
+    const project = await getProject(id, user.id);
+    const merged = { ...project, settings: { ...project?.settings, ...body.settings } };
+    // 없는 프로젝트는 여기서 400 을 주지 않는다 — 아래 updateProject 가 404 로 답한다.
+    if (project && !isResolutionFor(body.settings.resolution, merged)) {
+      return Response.json({ error: "그 화질은 몰라요" }, { status: 400 });
     }
   }
 

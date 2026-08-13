@@ -69,3 +69,55 @@ describe("PATCH /api/projects/[id] — 길이", () => {
     expect((await PATCH(req({ target_seconds: 15 }), ctx())).status).toBe(200);
   });
 });
+
+// 화질은 닫힌 목록인데 **목록이 모델마다 다르다** — Seedance 만 열고 Kling·LTX 는 안 연다.
+// settings 는 화이트리스트 없이 얕게 머지되므로 여기서 안 막으면 아무 값이나 들어가고,
+// 그 값이 그대로 fal 유료 호출로 나간다(lib/i2v.js 가 resolution 키로 싣는다).
+describe("PATCH /api/projects/[id] — 화질", () => {
+  const seedanceSettings = { target_seconds: 15, i2v_model: "seedance-2.0" };
+  const seedSeedance = () =>
+    memoryStore.insertProject({ id: P, created_ts: 1, status: "draft", settings: seedanceSettings }, A);
+  const savedSettings = async () => (await memoryStore.selectProject(P, A)).doc.settings;
+
+  beforeEach(() => { resetMemoryStore(); });
+
+  it("모델이 여는 화질은 저장된다", async () => {
+    await seedSeedance();
+    expect((await PATCH(req({ resolution: "1080p" }), ctx())).status).toBe(200);
+    expect((await savedSettings()).resolution).toBe("1080p");
+  });
+
+  it("모델에 없는 해상도는 저장을 거절한다", async () => {
+    await seedSeedance();
+    const res = await PATCH(req({ resolution: "2160p" }), ctx());
+    expect(res.status).toBe(400);
+    expect((await savedSettings()).resolution).toBeUndefined();
+  });
+
+  // Kling 은 이 파라미터 자체가 없다 — "아는 화질처럼 생긴 값"이라고 받아 두면
+  // 화면에 없는 선택이 문서에 남고, 각인(lib/steps.js)이 그 값을 본다.
+  it("해상도를 안 여는 모델(레거시=Kling)에는 어떤 값도 못 넣는다", async () => {
+    await seedProject();   // i2v_model 없음 = 레거시 Kling
+    expect((await PATCH(req({ resolution: "1080p" }), ctx())).status).toBe(400);
+    expect((await savedSettings()).resolution).toBeUndefined();
+  });
+
+  // ★★ 모델을 함께 바꾸는 PATCH. 판정을 **바뀌기 전 모델**로 하면
+  // "Seedance 의 1080p 니까 통과" → 저장된 모델은 Kling 이 되어 없는 파라미터가 남는다.
+  it("모델을 Kling 으로 바꾸면서 1080p 를 함께 보내도 통과하지 않는다", async () => {
+    await seedSeedance();
+    const res = await PATCH(req({ i2v_model: "kling-v3", resolution: "1080p" }), ctx());
+    expect(res.status).toBe(400);
+    const s = await savedSettings();
+    expect(s.resolution).toBeUndefined();
+    expect(s.i2v_model).toBe("seedance-2.0");
+  });
+
+  // 같은 모델을 다시 보내는 것은 정상 저장이다(화면이 헛 PATCH 를 보낼 수 있다) —
+  // 그때 화질 판정은 **머지 뒤 모델**로 하므로 그대로 통과해야 한다.
+  it("같은 모델을 함께 보내면서 화질을 고르는 것은 막지 않는다", async () => {
+    await seedSeedance();
+    expect((await PATCH(req({ i2v_model: "seedance-2.0", resolution: "480p" }), ctx())).status).toBe(200);
+    expect((await savedSettings()).resolution).toBe("480p");
+  });
+});
