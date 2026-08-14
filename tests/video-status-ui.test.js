@@ -104,26 +104,41 @@ describe("⑤영상 — 생성 상태 표시", () => {
     expect(guard).toContain("remainingCount === 0");
   });
 
-  // ★ 멈춘 컷에는 c.video 도 c.video_error 도 없어 컷별 버튼이 **아예 렌더되지 않는다.**
-  //   그러니 멈춤 문구가 그 버튼을 가리키면 없는 길을 알려주는 것이다. 실제로 열려 있어야
-  //   하는 것은 아래 만들기 CTA 이고, 그것이 busy 로 잠겨 있으면 멈춤 초반 3분 동안
-  //   사장님이 할 수 있는 일이 하나도 없다.
-  it("멈췄을 때 실제로 있는 길만 말하고, 그 길을 열어 둔다", () => {
+  // ★ 멈춤은 **확신이 아니라 의심**이다 — 심장박동이 2분 없었다는 뜻일 뿐 파이프라인은
+  //   아직 살아 있을 수 있다. 그런데 POST /clips 에는 진행 중 잠금이 없다(유일한 가드가
+  //   "남은 것이 있나"인데 멈춤이면 언제나 참이다). 그래서 이때 유료 버튼을 권하면
+  //   살아 있는 실행 위에 두 번째 과금이 나고(남은 낡은 컷을 다음 등급 값으로 다시 걷고
+  //   3회 상한까지 깎는다) 같은 컷에 파이프라인이 하나 더 뜬다.
+  //   멈춤 문구는 공짜이고 언제나 되는 길만 말해야 한다.
+  it("멈춤 문구가 돈 드는 길을 권하지 않는다", () => {
     const at = video.indexOf('gen.kind === "stalled"');
     expect(at, "멈춤 분기가 없다").toBeGreaterThan(-1);
     const block = video.slice(at, video.indexOf("</p>", at));
-    expect(block, "렌더되지 않는 컷별 버튼을 가리킨다").not.toContain("컷별로 다시 만들");
+    // 판정 대상은 **사장님이 읽는 글**이다 — 왜 그러면 안 되는지 적어 둔 주석은 뺀다
+    const copy = block.replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+    // 컷별이든 프로젝트 단위든 "만들기"는 전부 크레딧이 나가는 길이다
+    expect(copy, "멈춤 문구가 돈 드는 버튼을 가리킨다").not.toMatch(/만들기/);
+    expect(copy, "렌더되지 않는 컷별 버튼을 가리킨다").not.toContain("컷별로 다시 만들");
+    // 대신 공짜이고 언제나 되는 길을 준다
+    expect(copy, "멈춤일 때 할 수 있는 공짜 행동을 안 알려준다").toContain("새로고침");
+  });
 
+  // 문구뿐 아니라 버튼 자체가 잠겨 있어야 한다 — 말리면서 열어 두면 눌린다.
+  it("멈춤 동안 프로젝트 단위 유료 버튼이 잠긴다", () => {
     const startIdx = video.indexOf("onClick={start}");
     expect(startIdx, "만들기 버튼이 없다").toBeGreaterThan(-1);
     const btn = video.slice(video.lastIndexOf("<button", startIdx), startIdx);
     const disabled = btn.match(/disabled=\{([^}]*)\}/);
     expect(disabled, "만들기 버튼에 disabled 가 없다").toBeTruthy();
+    expect(disabled[1], "폴링 플래그로 잠그면 판정과 어긋난다").not.toMatch(/\bbusy\b/);
+    expect(disabled[1], "도는 중에 안 잠긴다").toContain('gen.kind === "running"');
     expect(
       disabled[1],
-      "busy 로 잠가 두면 멈춤 동안 유일한 탈출구까지 잠긴다"
-    ).not.toMatch(/\bbusy\b/);
-    expect(disabled[1]).toContain('gen.kind === "running"');
+      "멈춤에 안 잠긴다 — 살아 있을지 모르는 실행 위에 두 번째 과금이 난다"
+    ).toContain('gen.kind === "stalled"');
+    // ★ 실패는 반대로 **열려 있어야** 한다. 프로젝트 단위 video_error 는 라우트의 catch
+    //   에서만 쓰이므로 그때는 파이프라인이 이미 끝난 뒤라 다시 눌러도 겹치지 않는다.
+    expect(disabled[1], "실패까지 잠그면 정상 재시도 경로가 막힌다").not.toContain("failed");
   });
 
   // ★ 멈춤 동안에도 busy 는 참이다(5분 상한에 닿아야 풀린다). 카드가 busy 를 보면
