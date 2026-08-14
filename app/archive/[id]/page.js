@@ -15,7 +15,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { adModel } from "../../../lib/ad/models";
-import { modelIdForProject, resolutionForProject } from "../../../lib/clip-limits";
+import { I2V_MODELS, modelIdForProject, resolutionForProject } from "../../../lib/clip-limits";
 
 // 한 줄짜리 정보. 값이 없으면 줄째 안 그린다 — 빈 칸을 늘어놓으면 무엇이 없는지가 아니라
 // 화면이 덜 만들어진 것처럼 보인다.
@@ -71,7 +71,12 @@ export default function ArchiveDetailPage() {
   const video = isAd ? doc.videos?.[0]?.url : doc.render?.url;
   // 이어서 작업하는 자리 — 종류마다 제작 화면이 다르다.
   const workHref = isAd ? `/ads/${id}` : `/create/${id}/briefing`;
-  const modelLabel = isAd ? adModel(s.model)?.label : modelIdForProject(doc);
+  // 모델은 **전체 이름**으로 적는다 — 여기는 모델 묶음 밖이라 "2.0" 만 적으면 무엇의
+  // 2.0 인지 알 수 없다. 이름은 표에서 온다(화면이 짓지 않는다).
+  const modelId = isAd ? s.model : modelIdForProject(doc);
+  const modelLabel = isAd
+    ? adModel(s.model)?.name || adModel(s.model)?.label
+    : I2V_MODELS.find((m) => m.id === modelId)?.label || modelId;
   const resolution = isAd ? s.resolution : resolutionForProject(doc);
   const seconds = isAd ? s.seconds : s.target_seconds;
 
@@ -86,7 +91,7 @@ export default function ArchiveDetailPage() {
 
           <div className="sub-editor">
             <div className="brief">
-              <Row label="사장님이 준 것">
+              <Row label="사용자 입력">
                 {doc.material?.text ? (
                   <span className="script-src">{doc.material.text}</span>
                 ) : null}
@@ -108,13 +113,13 @@ export default function ArchiveDetailPage() {
                   붙어 있다 — useState 로 흉내 내면 그것을 직접 만들어야 하고 대개 빠뜨린다. */}
             {isAd && doc.scenario?.text && (
               <details className="lib-fold">
-                <summary>시나리오 — 영상 모델에 넘긴 글</summary>
+                <summary>프롬프트 — 영상 모델에 넘긴 글</summary>
                 <p className="script-src">{doc.scenario.text}</p>
               </details>
             )}
             {!isAd && doc.script?.text && (
               <details className="lib-fold">
-                <summary>원고 — 낭독한 글</summary>
+                <summary>프롬프트 — 낭독한 원고</summary>
                 <p className="script-src">{doc.script.text}</p>
               </details>
             )}

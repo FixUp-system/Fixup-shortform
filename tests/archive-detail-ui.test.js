@@ -44,3 +44,35 @@ describe("보관함 상세 — 테두리를 넓힌다", () => {
     expect(width).toBeLessThanOrEqual(1160);
   });
 });
+
+// ★ 문구·표시 손질(2026-08-14 사용자 요청).
+describe("보관함 상세 — 말과 표시를 다듬는다", () => {
+  const page = readFileSync("app/archive/[id]/page.js", "utf8");
+  const adModels = readFileSync("lib/ad/models.js", "utf8");
+
+  it("'사장님이 준 것' 이 아니라 '사용자 입력' 이다", () => {
+    expect(page).not.toContain("사장님이 준 것");
+    expect(page).toContain("사용자 입력");
+  });
+
+  it("'시나리오' 가 아니라 '프롬프트' 다 — 모델에 넘긴 글이라는 뜻이 더 곧다", () => {
+    expect(page, "아직 시나리오라고 부른다").not.toMatch(/<summary>시나리오/);
+    expect(page).toMatch(/<summary>프롬프트/);
+  });
+
+  it("★ 모델을 'Seedance 2.0' 형식으로 적는다 — id('seedance-2.0')도 라벨('2.0')도 아니다", () => {
+    // 단계별은 I2V_MODELS 에 이미 그 이름이 있다(label: "Seedance 2.0").
+    expect(page, "단계별이 모델 id 를 그대로 쓴다").toMatch(/I2V_MODELS/);
+    // 광고 표의 label 은 칩에 쓰는 짧은 이름("2.0")이라 그대로 쓰면 안 된다.
+    expect(adModels, "광고 표에 전체 이름(name)이 없다").toMatch(/name:\s*"Seedance 2\.[05]"/);
+  });
+
+  it("★ 아래 버튼 셋의 치수가 같다 — .mini(12px)와 .cta(16px)가 섞여 있었다", () => {
+    const css = readFileSync("app/globals.css", "utf8");
+    const at = css.indexOf(".panel--library .step-actions");
+    expect(at, "상세 화면의 버튼 치수를 맞추는 규칙이 없다").toBeGreaterThan(-1);
+    const rule = css.slice(at, css.indexOf("}", at));
+    expect(rule).toMatch(/font-size:\s*14px/);
+    expect(rule).toMatch(/height:/);
+  });
+});

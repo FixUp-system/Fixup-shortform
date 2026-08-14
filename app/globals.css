@@ -695,6 +695,18 @@ a.side-item { text-decoration: none; }
 .lib-fold[open] > summary::before { content: "▾ "; }
 .lib-fold > summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .lib-fold > *:not(summary) { margin-top: 10px; }
+/* 아래 버튼 셋의 치수를 맞춘다 — .mini(12px·padding 6/12)와 .cta(16px·12/20)가 섞여
+   [보관함으로]·[내려받기]가 [이어서 작업하기]보다 눈에 띄게 작았다(2026-08-14 사용자 지적).
+   색은 그대로 둔다: 무엇이 주 버튼인지는 여전히 보여야 한다. */
+.panel--library .step-actions .mini,
+.panel--library .step-actions .cta {
+  height: 40px;
+  padding: 0 18px;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
 
 .eyebrow {
   font-size: 14px;
