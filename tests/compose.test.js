@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { composeVideo, buildFfmpegArgs, burnArgs, burnSubtitles } from "../lib/compose";
 import { runWithActor } from "../lib/actor.js";
+import { subtitleFontFor } from "../lib/subtitle-langs.js";
 
 import { mkdtempSync } from "fs";
 import { tmpdir } from "os";
@@ -720,5 +721,69 @@ describe("원본과 완성본을 나눈다", () => {
     const s = burnArgs({ raw: "C:\\t\\raw.mp4", assPath: "C:\\t\\s.ass", out: "C:\\t\\o.mp4" }).join(" ");
     expect(s).toContain("C\\:/t/s.ass");
     expect(s).not.toMatch(/subtitles='[A-Z]:/);
+  });
+});
+
+// ★★ 두부(□)가 나오는 자리다. 언어를 따라야 하는 것이 **둘**이다:
+//    ① ASS 의 Fontname ② ffmpeg 에 넘기는 폰트 경로(fontsdir).
+//    하나만 바꾸면 libass 가 오류 없이 다른 폰트로 대체해 한자·가나가 전부 네모가 된다.
+//    합성이 lang 을 안 넘기면 ①부터 조용히 한국어로 남는다 — 그것을 여기서 잡는다.
+describe("합성이 자막 언어를 끝까지 나른다", () => {
+  const deps = {
+    aspect_ratio: "9:16",
+    runFfmpeg: async () => {},
+    downloadImpl: async (_url, dest) => dest,
+    writeFileImpl: async () => {},
+    mkdirImpl: async () => {},
+    mkdtempImpl: async () => "/tmp/x",
+    rmImpl: async () => {},
+    readFileImpl: async () => Buffer.from("mp4"),
+    putObjectImpl: async () => {},
+  };
+  const JA_CUTS = [
+    {
+      idx: 0, sentence: "첫", seconds: 4,
+      subtitles: { ja: { text: "最初", of: "첫" } },
+      video: { url: "https://f/v0.mp4", seconds: 4 },
+      audio: { url: "https://f/a0.mp3", seconds: 4 },
+    },
+  ];
+  const fontsdirOf = (args) => (args.join(" ").match(/fontsdir='([^']+)'/) || [])[1];
+  const expectedDir = (lang) =>
+    path.dirname(path.resolve(process.cwd(), subtitleFontFor(lang).file)).replace(/\\/g, "/").replace(/:/g, "\\:");
+
+  it("자막만 다시 구울 때 글자와 폰트가 함께 일본어로 간다", async () => {
+    let ass = "";
+    const args = [];
+    await burnSubtitles({
+      ...deps, projectId: "p1", cuts: JA_CUTS, lang: "ja",
+      writeFileImpl: async (_p, body) => { ass = body; },
+      runFfmpeg: async (a) => { args.push(a); },
+    });
+    expect(ass, "번역이 안 실렸다").toContain("最初");
+    expect(ass.split("\n").find((l) => l.startsWith("Style: Main"))).toContain("Noto Sans JP");
+    // ★ 폰트 경로가 안 따라가면 ASS 이름만 일본어고 파일은 한국어라 두부가 된다
+    expect(fontsdirOf(args[0])).toBe(expectedDir("ja"));
+  });
+
+  it("전체 재합성도 언어를 싣는다", async () => {
+    let ass = "";
+    const args = [];
+    await composeVideo({
+      ...deps, projectId: "p1", cuts: JA_CUTS, lang: "ja",
+      writeFileImpl: async (_p, body) => { ass = body; },
+      runFfmpeg: async (a) => { args.push(a); },
+    });
+    expect(ass).toContain("最初");
+    expect(ass.split("\n").find((l) => l.startsWith("Style: Main"))).toContain("Noto Sans JP");
+    // 두 번째가 자막 굽기다(첫 번째는 자막 없는 원본)
+    expect(fontsdirOf(args[1])).toBe(expectedDir("ja"));
+  });
+
+  // 회귀 0 — 언어를 안 주거나 ko 면 인자가 한 글자도 달라지면 안 된다
+  it("한국어·미지정은 ffmpeg 인자가 오늘 그대로다", () => {
+    const a = { raw: "/t/raw.mp4", assPath: "/t/s.ass", out: "/t/o.mp4" };
+    expect(burnArgs({ ...a, lang: "ko" })).toEqual(burnArgs(a));
+    expect(fontsdirOf(burnArgs(a))).toBe(expectedDir("ko"));
   });
 });

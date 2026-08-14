@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { existsSync, statSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { SUBTITLE_FONTS } from "../lib/subtitles.js";
+import { SUBTITLE_FONTS, toAss } from "../lib/subtitles.js";
+import { SUBTITLE_LANGS, subtitleFontFor } from "../lib/subtitle-langs.js";
 
 // 폰트 파일의 `name` 테이블에서 family(nameID 1)를 읽는다.
 //
@@ -78,6 +79,25 @@ describe("자막 폰트 파일", () => {
     it(`${f.id} 의 assets/ 와 public/fonts/ 가 같은 파일이다`, () => {
       const sha = (p) => createHash("sha1").update(readFileSync(p)).digest("hex");
       expect(sha(WEB_FILES[f.id]), `${WEB_FILES[f.id]} 가 ${FILES[f.id]} 와 다르다`).toBe(sha(FILES[f.id]));
+    });
+  }
+});
+
+// ★★ 언어를 따라야 하는 것이 **둘**이다 — ASS 에 적히는 Fontname 과 ffmpeg 가 읽는 폰트
+//    파일. 하나만 바꾸면 libass 가 오류 한 줄 없이 다른 폰트로 대체해 **한자·가나가 전부
+//    두부(□)** 로 나간다. 이 검사가 그 둘을 한 자리에서 묶는다: ASS 가 부르는 이름이
+//    실제로 그 언어의 폰트 파일 **안에 적힌 이름**이어야 한다.
+describe("언어의 ASS 폰트 이름과 폰트 파일이 같은 것을 가리킨다", () => {
+  for (const lang of SUBTITLE_LANGS) {
+    it(`${lang.id}(${lang.label})`, () => {
+      const { file } = subtitleFontFor(lang.id);
+      expect(existsSync(file), `${file} 가 없다`).toBe(true);
+      const style = toAss([], { width: 1080, height: 1920, lang: lang.id })
+        .split("\n")
+        .find((l) => l.startsWith("Style: Main"));
+      const named = style.split(",")[1];
+      expect(named, `${lang.id} 의 ASS 이름이 ${file} 의 내부 이름과 다르다 — 두부가 된다`)
+        .toBe(familyOf(file));
     });
   }
 });

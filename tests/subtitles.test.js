@@ -885,3 +885,58 @@ describe("공백 없는 언어의 폭과 줄바꿈", () => {
     expect(breakTwoLines("短", 10)).toBe("短");
   });
 });
+
+// ★ 이 기능이 조용히 망가지는 방식: 글자만 언어를 따르고 폰트가 안 따라가면(또는 반대면)
+//   화면 전체가 두부(□)가 된다. ffmpeg 는 오류를 내지 않는다 — 그래서 코드가 판정한다.
+describe("자막이 언어를 따른다", () => {
+  it("언어를 주면 그 번역으로 자막을 만든다", () => {
+    const cuts = [{ idx: 0, sentence: "빠릅니다.", spoken_seconds: 2, seconds: 5,
+                    subtitles: { ja: { text: "速いです。", of: "빠릅니다." } } }];
+    expect(buildCues(cuts, { lang: "ja" })[0].text).toBe("速いです。");
+  });
+
+  it("한국어는 원문을 쓴다 — 회귀 0", () => {
+    const cuts = [{ idx: 0, sentence: "빠릅니다.", spoken_seconds: 2, seconds: 5 }];
+    expect(buildCues(cuts, { lang: "ko" })[0].text).toBe("빠릅니다.");
+    expect(buildCues(cuts)[0].text).toBe("빠릅니다."); // 안 주면 지금 그대로
+  });
+
+  // ★ 번역이 낡았으면 옛 글자를 구우면 안 된다
+  it("각인이 어긋난 번역은 쓰지 않고 원문으로 떨어진다", () => {
+    const cuts = [{ idx: 0, sentence: "고쳤습니다.", spoken_seconds: 2, seconds: 5,
+                    subtitles: { ja: { text: "速いです。", of: "옛 문장." } } }];
+    expect(buildCues(cuts, { lang: "ja" })[0].text).toBe("고쳤습니다.");
+  });
+
+  // 번역이 아예 없는 컷도 마찬가지다 — 빈 자막이 아니라 한국어가 나온다
+  it("번역이 없으면 원문으로 떨어진다", () => {
+    const cuts = [{ idx: 0, sentence: "아직 안 옮겼습니다.", spoken_seconds: 2, seconds: 5 }];
+    expect(buildCues(cuts, { lang: "zh" })[0].text).toBe("아직 안 옮겼습니다.");
+  });
+
+  it("ASS 스타일이 언어의 폰트 이름을 쓴다", () => {
+    const ass = toAss([], { width: 1080, height: 1920, lang: "ja" });
+    expect(ass).toContain("Noto Sans JP");
+  });
+
+  it("중국어도 그 폰트 이름을 쓴다", () => {
+    expect(toAss([], { width: 1080, height: 1920, lang: "zh" })).toContain("Noto Sans SC");
+  });
+
+  // ★ 한국어일 때만 SUBTITLE_FONTS 의 스타일(기본·강조·부드럽게)이 폰트를 정한다.
+  //   일본어·중국어는 폰트가 한 벌뿐이라 스타일을 골라도 그 폰트가 이겨야 한다 —
+  //   여기서 스타일이 이기면 Black Han Sans 에 한자가 없어 두부가 된다.
+  it("일본어에서는 스타일 선택이 폰트를 못 바꾼다", () => {
+    const ass = toAss([], { width: 1080, height: 1920, lang: "ja", subtitle: { font: "impact" } });
+    expect(ass).toContain("Noto Sans JP");
+    expect(ass).not.toContain("Black Han Sans");
+  });
+
+  // 회귀 0 — 언어를 안 주거나 ko 면 오늘과 **글자 그대로** 같아야 한다
+  it("한국어 ASS 는 오늘과 글자 그대로 같다", () => {
+    const cues = [{ start: 0, end: 1.5, text: "안녕하세요" }];
+    const base = toAss(cues, { width: 1080, height: 1920 });
+    expect(toAss(cues, { width: 1080, height: 1920, lang: "ko" })).toBe(base);
+    expect(base).toContain("Pretendard");
+  });
+});

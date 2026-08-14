@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import {
   STEPS, stepsFor, currentStepKey, isReachable, areCutsStale, stepFromPathname, stepHref,
   clipKey, renderKey, isAudioStale, isImageStale, isClipStale, isRenderStale, toneKey,
-  isSubtitlePositionOnlyStale, isSubtitleOnlyStale,
+  isSubtitlePositionOnlyStale, isSubtitleOnlyStale, subtitleHead, renderKeyBody,
 } from "../lib/steps.js";
 import { DEFAULT_SUBTITLE } from "../lib/subtitles.js";
 
@@ -696,5 +696,50 @@ describe("app/create/[id]/layout.js — 가드가 STEPS 가 아니라 stepsFor �
     // import 줄을 뺀 본문에 bare STEPS 식별자가 남아 있으면 스코프 밖 참조라 ReferenceError 다
     const body = src.split("\n").filter((l) => l !== importLine).join("\n");
     expect(body).not.toMatch(/\bSTEPS\b/);
+  });
+});
+
+// 자막 각인에 언어가 들어가야 언어를 바꿨을 때 완성본이 낡는다 — 안 들어가면 사장님이
+// 언어를 바꿔도 아무 일이 안 일어난다(다시 굽기 버튼조차 안 뜬다).
+describe("자막 각인에 언어가 들어간다", () => {
+  it("언어를 바꾸면 완성본이 낡는다", () => {
+    const a = { settings: { subtitle_lang: "ko" } };
+    const b = { settings: { subtitle_lang: "ja" } };
+    expect(subtitleHead(a)).not.toBe(subtitleHead(b));
+  });
+
+  // ★ 회귀 0 — 한국어·미설정은 각인이 오늘과 글자 그대로 같아야 한다.
+  //   붙이면 이미 만든 완성본이 전부 낡아 픽셀이 같은 mp4 를 다시 굽는다.
+  it("한국어·미설정은 각인이 오늘 그대로다", () => {
+    const cuts = [{ sentence: "가", audio: { url: "a" }, video: { url: "v" } }];
+    expect(subtitleHead({ settings: {} })).toBe(null);
+    expect(subtitleHead({ settings: { subtitle_lang: "ko" } })).toBe(null);
+    expect(renderKey({ settings: { subtitle_lang: "ko" }, cuts })).toBe(renderKey({ cuts }));
+  });
+
+  // 자막 설정과 언어가 함께 있어도 머리는 한 줄이고, 몸통은 그대로 떨어져 나와야 한다
+  it("언어 머리도 몸통에서 떼어진다", () => {
+    const cuts = [{ sentence: "가", audio: { url: "a" }, video: { url: "v" } }];
+    const body = renderKey({ cuts });
+    expect(renderKeyBody(renderKey({ settings: { subtitle_lang: "ja" }, cuts }))).toBe(body);
+    expect(
+      renderKeyBody(renderKey({ settings: { subtitle_lang: "ja", subtitle_position: "top" }, cuts }))
+    ).toBe(body);
+    expect(
+      renderKeyBody(renderKey({ settings: { subtitle_lang: "zh", subtitle: { ...DEFAULT_SUBTITLE, color: "#FF0000" } }, cuts }))
+    ).toBe(body);
+  });
+
+  // 언어만 바꾼 것은 자막만 다시 구우면 된다(로컬 ffmpeg, 값 0원). 컷이 낡았다고 하면
+  // 사장님이 클립을 다시 사야 하는 줄 안다.
+  it("언어만 바꾸면 자막만 낡은 것으로 본다", () => {
+    const cuts = [{ sentence: "가", audio: { url: "a" }, video: { url: "v" } }];
+    const project = {
+      settings: { subtitle_lang: "ja" },
+      cuts,
+      render: { of: renderKey({ cuts }) },
+    };
+    expect(isRenderStale(project)).toBe(true);
+    expect(isSubtitleOnlyStale(project)).toBe(true);
   });
 });

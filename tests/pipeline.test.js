@@ -936,6 +936,22 @@ describe("runRenderPipeline — 하나로 합친다", () => {
     });
     expect(got.subtitle).toBeUndefined();
     expect(got.subtitlePosition).toBe("top");
+    expect(got.lang).toBeUndefined();   // 언어를 안 고른 프로젝트는 옛 경로 그대로다
+  });
+
+  // 전체 재합성에서 언어가 빠지면 완성본만 조용히 한국어가 된다(각인은 그 언어로 찍힌다)
+  it("전체 재합성도 자막 언어를 싣는다", async () => {
+    const p = await makeProject();
+    await projects.updateProject(p.id, OWNER, (proj) => ({
+      ...proj, status: "video", settings: { aspect_ratio: "9:16", subtitle_lang: "ja" },
+      cuts: [{ idx: 0, sentence: "문장", seconds: 4, video: { url: "v0" }, audio: { url: "a0", seconds: 4 } }],
+    }));
+
+    let got;
+    await pipeline.runRenderPipeline(p.id, OWNER, {
+      compose: async (args) => { got = args; return { url: "u", seconds: 4 }; },
+    });
+    expect(got.lang).toBe("ja");
   });
 
   it("완성본에 컷별 소리·클립·문장을 각인한다 — 컷을 고치면 낡는다", async () => {
@@ -1016,6 +1032,21 @@ describe("runSubtitlePipeline — 각인의 머리만 갈아 끼운다", () => {
       burn: async (args) => { got = args; return { url: "/api/renders/x.mp4", seconds: 4 }; },
     });
     expect(got.subtitlePosition).toBe("top");
+  });
+
+  // ★ 언어를 안 태우면 자막만 다시 구울 때 조용히 한국어로 돌아가는데, 각인 머리에는
+  //   언어가 들어 있어 "그 언어로 만들었다"고 찍힌다 — 낡음으로도 안 잡힌다.
+  it("자막 언어도 함께 태운다", async () => {
+    const p = await projectWithRender();
+    await projects.updateProject(p.id, OWNER, (proj) => ({
+      ...proj, settings: { ...proj.settings, subtitle_lang: "ja" },
+    }));
+
+    let got;
+    await pipeline.runSubtitlePipeline(p.id, OWNER, {
+      burn: async (args) => { got = args; return { url: "/api/renders/x.mp4", seconds: 4 }; },
+    });
+    expect(got.lang).toBe("ja");
   });
 });
 
