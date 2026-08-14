@@ -451,9 +451,9 @@ describe("POST /api/projects/[id]/script — 원고", () => {
   });
 
   it("교정본이 분량을 불려 놓으면 초안을 지킨다", async () => {
-    const p = await projectWithBriefing();                    // 목표 60자
-    const fit = { script: "가".repeat(70) };                  // 목표 안
-    const bloated = { script: "나".repeat(140) };             // 교정이 두 배로 불림
+    const p = await projectWithBriefing();                    // 목표(밀도 반영) 27자
+    const fit = { script: "가".repeat(27) };                  // 목표 안, 결함 없음 — 되돌리기가 끼어들지 않는다
+    const bloated = { script: "나".repeat(54) };              // 교정이 두 배로 불림(목표 27자를 넘긴다)
     llmMock.callJson.mockResolvedValueOnce(fit).mockResolvedValue(bloated);
     await scriptPOST(patchReq({}), ctx(p.id));
     expect((await getProject(p.id, OWNER)).script.text).toBe(fit.script);
