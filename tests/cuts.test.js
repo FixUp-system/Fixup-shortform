@@ -1,4 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { execSync } from "node:child_process";
+import { writeFileSync, unlinkSync } from "node:fs";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { splitSentences, splitUnits, explodeLongRanges, buildSplitMessages, buildShowsMessages, buildImagePrompt, buildClipPrompt, stillOnly, clauseBoundaries, usableTone, usableTransition, allocateCutSeconds, fillSilentCuts, CONTENT_MAX_SECONDS, stageOf, castLooksOf, subjectOf, orientOf } from "../lib/cuts.js";
 import { clipProfileForProject, minSecondsFor, maxSecondsFor } from "../lib/clip-limits.js";
 import { STYLE_PRESETS } from "../lib/styles.js";
@@ -572,14 +576,15 @@ describe("buildClipPrompt — 클립도 무대와 인물을 받는다", () => {
     expect(buildClipPrompt(cut, project).startsWith("빠른 속도로 도로를 질주한다. fast, explosive motion.")).toBe(true);
   });
 
-  it("무대·인물·제품·톤·화면비가 실린다", () => {
+  it("무대·인물·제품·톤이 실린다 — 화면비는 안 실린다(lib/i2v.js 가 API 필드로 이미 보낸다)", () => {
     const p = buildClipPrompt(cut, project);
     expect(p).toContain("해질녘 해안 도로");
     expect(p).toContain("20대 남성: 검정 재킷");
     expect(p).toContain("빨간 스포츠카");
     expect(p).toContain("매끈한 2도어 쿠페");
     expect(p).toContain("차가운 색감");
-    expect(p).toContain("vertical 9:16");
+    expect(p).not.toContain("9:16");
+    expect(p).not.toContain("Frame:");
   });
 
   it("첫 프레임 유지와 금지문은 맨 뒤에 그대로 남는다", () => {
@@ -589,13 +594,23 @@ describe("buildClipPrompt — 클립도 무대와 인물을 받는다", () => {
     expect(p.indexOf("The attached image")).toBeGreaterThan(p.indexOf("해질녘 해안 도로"));
   });
 
-  // ★ 값이 없는 옛 컷의 프롬프트가 길어지면 안 된다
-  it("값이 없으면 절이 안 붙는다 — 옛 컷은 지금과 같다", () => {
-    const bare = { settings: {}, briefing: {} };
-    const p = buildClipPrompt({ idx: 0, motion: "천천히 움직인다" }, bare);
-    expect(p).not.toContain("Setting");
-    expect(p).not.toContain("Characters");
-    expect(p).not.toContain("subject is");
+  // ★ 값이 없는 옛 컷의 프롬프트가 길어지면 안 된다 — not.toContain 은 몇 낱말만 가리키므로
+  // 이 태스크 이전 코드(866ba61, 맥락 절을 더하기 전)가 내던 값과 **바이트 그대로** 같은지
+  // 직접 비교한다. Task 1 리뷰어가 신·구 출력을 비교하던 방식과 같다.
+  it("값이 없으면 절이 안 붙는다 — 옛 컷은 이 태스크 이전 코드와 바이트 그대로 같다", async () => {
+    const oldSrc = execSync("git show 866ba61:lib/cuts.js", { encoding: "utf8" });
+    const tmpPath = path.resolve("lib", `__pre-clip-context-${process.pid}-${Date.now()}.mjs`);
+    writeFileSync(tmpPath, oldSrc, "utf8");
+    try {
+      const old = await import(pathToFileURL(tmpPath).href);
+      const bare = { settings: {}, briefing: {} };
+      const cutInput = { idx: 0, motion: "천천히 움직인다" };
+      const before = old.buildClipPrompt(cutInput, bare);
+      const after = buildClipPrompt(cutInput, bare);
+      expect(after).toBe(before);
+    } finally {
+      unlinkSync(tmpPath);
+    }
   });
 
   it("말하는 경로의 대사·목소리 문구가 안 바뀐다", () => {
@@ -612,10 +627,10 @@ describe("buildClipPrompt — 클립도 무대와 인물을 받는다", () => {
     // 대사·목소리는 바이트 그대로 실린다 — 자막(ffmpeg)이 태우는 원고와 갈리면 안 된다
     expect(p).toContain('Says exactly, in Korean: "안녕하세요"');
     expect(p).toContain("중저음, 차분하고 단단한 톤");
-    // 그리고 이 경로도 같은 맥락 절을 받는다
+    // 그리고 이 경로도 같은 맥락 절을 받는다 — 화면비는 여기도 안 실린다
     expect(p).toContain("해질녘 해안 도로");
     expect(p).toContain("차가운 색감");
-    expect(p).toContain("vertical 9:16");
+    expect(p).not.toContain("9:16");
   });
 });
 
