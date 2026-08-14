@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { splitSentences, splitUnits, explodeLongRanges, buildSplitMessages, buildShowsMessages, buildImagePrompt, buildClipPrompt, stillOnly, clauseBoundaries, usableTone, usableTransition } from "../lib/cuts.js";
+import { splitSentences, splitUnits, explodeLongRanges, buildSplitMessages, buildShowsMessages, buildImagePrompt, buildClipPrompt, stillOnly, clauseBoundaries, usableTone, usableTransition, allocateCutSeconds } from "../lib/cuts.js";
 import { clipProfileForProject, minSecondsFor, maxSecondsFor } from "../lib/clip-limits.js";
 import { STYLE_PRESETS } from "../lib/styles.js";
 // 관통 테스트라 파일 경계를 넘는다 — 화면 설계(validate) → 그림 프롬프트(cuts) → 각인(steps).
@@ -1410,5 +1410,63 @@ describe("관통: 화면 설계 → 그림 프롬프트 → 각인", () => {
     expect(toneKey(shots[0])).toBe(toneKey(shots[1]));
     expect(p0).not.toContain("Compose the opening framing");
     expect(p1).not.toContain("Compose the opening framing");
+  });
+});
+
+describe("allocateCutSeconds — 고른 초를 컷에 배분한다", () => {
+  const profile = { min: 3, max: 15 }; // Kling v3 와 같은 모양
+
+  it("여백을 컷에 나눠 얹어 합이 고른 초가 된다", () => {
+    const cuts = [{ spoken_seconds: 4 }, { spoken_seconds: 3 }, { spoken_seconds: 3 }];
+    const out = allocateCutSeconds(cuts, 15, profile);
+    expect(out.reduce((a, b) => a + b, 0)).toBe(15);
+    // 바닥(말하는 시간)보다 작아지지 않는다 — 말이 잘리면 안 된다
+    out.forEach((s, i) => expect(s).toBeGreaterThanOrEqual(cuts[i].spoken_seconds));
+  });
+
+  it("모델 하한을 밑돌지 않는다", () => {
+    const cuts = [{ spoken_seconds: 1 }, { spoken_seconds: 1 }];
+    const out = allocateCutSeconds(cuts, 15, profile);
+    out.forEach((s) => expect(s).toBeGreaterThanOrEqual(3));
+    expect(out.reduce((a, b) => a + b, 0)).toBe(15);
+  });
+
+  it("모델 상한을 넘지 않는다 — 넘길 여백은 버린다", () => {
+    const cuts = [{ spoken_seconds: 2 }];
+    const out = allocateCutSeconds(cuts, 60, profile);
+    expect(out).toEqual([15]); // 상한에서 멈춘다. 합이 60 이 안 돼도 넘지 않는다
+  });
+
+  // ★ 말이 고른 초보다 길면 말이 이긴다 — 자르면 문장 끝이 사라진다
+  it("말하는 시간의 합이 고른 초보다 크면 말을 따른다", () => {
+    const cuts = [{ spoken_seconds: 9 }, { spoken_seconds: 9 }];
+    const out = allocateCutSeconds(cuts, 15, profile);
+    expect(out).toEqual([9, 9]);
+  });
+
+  it("무음 컷(말하는 시간 0)은 여백만 받는다", () => {
+    const cuts = [{ spoken_seconds: 0, silent: true }, { spoken_seconds: 6 }];
+    const out = allocateCutSeconds(cuts, 15, profile);
+    expect(out.reduce((a, b) => a + b, 0)).toBe(15);
+    expect(out[0]).toBeGreaterThanOrEqual(3); // 하한은 받는다
+  });
+
+  it("컷이 없으면 빈 배열이다", () => {
+    expect(allocateCutSeconds([], 15, profile)).toEqual([]);
+    expect(allocateCutSeconds(null, 15, profile)).toEqual([]);
+  });
+
+  // ★ 컨트롤러 판단(2026-08-14): 배분은 고른 초가 있을 때만이 아니라 항상 돈다.
+  // 자동 길이(고른 초 없음) 프로젝트에서는 spoken_seconds 합을 목표로 주므로,
+  // 결과가 "바닥뿐"이 되어 지금까지의 컷별 값(모델 하한 이상으로 올라간 seconds)과
+  // 같아진다는 것을 증명한다 — 이 배분을 무조건 돌려도 자동 길이 프로젝트가
+  // 깨지지 않는다는 근거다.
+  it("자동 길이(목표=말하는 시간 합)면 결과가 바닥뿐이라 지금까지의 값과 같다", () => {
+    const cuts = [{ spoken_seconds: 4 }, { spoken_seconds: 2 }, { spoken_seconds: 6 }];
+    const target = cuts.reduce((a, c) => a + c.spoken_seconds, 0); // 12
+    const out = allocateCutSeconds(cuts, target, profile);
+    // 모델 하한(3)에 못 미치던 두 번째 컷만 3으로 올라가고, 나머지는 말하는 시간 그대로다 —
+    // 여분(target - 바닥합)이 없으니 라운드로빈이 아무것도 얹지 않는다.
+    expect(out).toEqual([4, 3, 6]);
   });
 });
