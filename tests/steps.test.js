@@ -463,6 +463,40 @@ describe("clipKey — 해상도", () => {
   });
 });
 
+describe("clipKey — 프롬프트에 실리는 것은 각인에도 있다", () => {
+  const base = { settings: { aspect_ratio: "9:16" }, briefing: {}, cast: [] };
+  const cut = { idx: 0, image: { url: "u" }, seconds: 5, motion: "달린다" };
+
+  it("무대를 바꾸면 클립이 낡는다", () => {
+    const a = clipKey({ ...cut, environment: "해변" }, base);
+    const b = clipKey({ ...cut, environment: "도심" }, base);
+    expect(a).not.toBe(b);
+  });
+
+  it("톤을 바꾸면 낡는다", () => {
+    expect(clipKey({ ...cut, tone: "따뜻" }, base)).not.toBe(clipKey({ ...cut, tone: "차갑" }, base));
+  });
+
+  it("이 컷의 인물이 바뀌면 낡는다", () => {
+    const p1 = { ...base, cast: [{ who: "A", look: "긴 머리", cuts: [0] }] };
+    const p2 = { ...base, cast: [{ who: "A", look: "짧은 머리", cuts: [0] }] };
+    expect(clipKey(cut, p1)).not.toBe(clipKey(cut, p2));
+  });
+
+  it("제품 앵커가 바뀌면 낡는다", () => {
+    const p1 = { ...base, briefing: { topic: "커피" } };
+    const p2 = { ...base, briefing: { topic: "차" } };
+    expect(clipKey(cut, p1)).not.toBe(clipKey(cut, p2));
+  });
+
+  // ★ 관계없는 값은 안 건드린다 — 다른 컷의 인물이 바뀌었다고 이 컷이 낡으면 안 된다
+  it("다른 컷의 인물이 바뀌어도 이 컷은 안 낡는다", () => {
+    const p1 = { ...base, cast: [{ who: "B", look: "x", cuts: [1] }] };
+    const p2 = { ...base, cast: [{ who: "B", look: "y", cuts: [1] }] };
+    expect(clipKey(cut, p1)).toBe(clipKey(cut, p2));
+  });
+});
+
 describe("자막 위치와 완성본 각인", () => {
   const withCuts = (settings) => ({
     settings,
