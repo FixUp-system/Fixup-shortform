@@ -177,6 +177,40 @@ describe("buildCues", () => {
     expect(cues[0].start).toBe(0);
     expect(cues[0].end).toBe(4);
   });
+
+  // ★ 이 테스트는 held/span 이 다시 뒤바뀌는 것을 잡기 위해 있다(2026-08-14 리뷰).
+  // 한 조각짜리 컷만 보면 두 값을 바꿔치기해도 초록불이 나올 수 있다 — 여러 조각으로
+  // 나뉜 컷에서만 "마지막 조각이 컷 끝(held)에 못 박히는지 말 끝(span)에 못 박히는지"가
+  // 갈린다. 치수(V)를 줘서 긴 문장이 두 조각 이상으로 쪼개지게 한다.
+  it("여러 조각으로 나뉜 컷도 마지막 조각이 말 끝에 못 박힌다 — 컷 끝이 아니다", () => {
+    const V = { width: 1080, height: 1920 };
+    const LONG = "세탁소에서는 전문적인 장비와 세제를 사용하여 운동화를 새것처럼 만들어줍니다.";
+    const cuts = [
+      { idx: 0, sentence: LONG, spoken_seconds: 3, seconds: 8, video: { seconds: 8 } },
+      { idx: 1, sentence: "다음 컷입니다.", spoken_seconds: 2, seconds: 4, video: { seconds: 4 } },
+    ];
+    const cues = buildCues(cuts, V);
+    const firstCutCues = cues.filter((c) => c.start < 8 - 4); // 둘째 컷 시작(8) 전
+    expect(firstCutCues.length).toBeGreaterThan(1);           // 여러 조각으로 나뉘었다
+    expect(firstCutCues[0].end).toBeLessThan(3);               // 첫 조각은 말하는 도중에 끝난다
+    expect(firstCutCues[firstCutCues.length - 1].end).toBe(3); // 마지막 조각 = 말 끝(3), 컷 끝(8) 아니다
+    expect(cues.find((c) => c.text.includes("다음"))?.start).toBe(8); // 둘째 컷은 화면 시간(8) 뒤에 시작
+  });
+
+  // 리뷰가 손으로 확인한 두 경계 — 코드로도 못 박아 둔다.
+  it("spoken_seconds 가 0 이면 화면 시간을 그대로 쓴다", () => {
+    const cues = buildCues([{ idx: 0, sentence: "영일 때.", spoken_seconds: 0, seconds: 5, video: { seconds: 5 } }]);
+    expect(cues[0]).toEqual({ start: 0, end: 5, text: "영일 때." });
+  });
+
+  it("spoken_seconds 가 화면 시간보다 길면 화면 시간에서 잘린다 — 다음 컷을 침범하지 않는다", () => {
+    const cues = buildCues([
+      { idx: 0, sentence: "길게 말함.", spoken_seconds: 9, seconds: 5, video: { seconds: 5 } },
+      { idx: 1, sentence: "다음.", spoken_seconds: 1, seconds: 3, video: { seconds: 3 } },
+    ]);
+    expect(cues[0]).toEqual({ start: 0, end: 5, text: "길게 말함." }); // 9 가 아니라 5
+    expect(cues[1].start).toBe(5);
+  });
 });
 
 describe("toAss", () => {
