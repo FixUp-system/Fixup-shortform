@@ -198,8 +198,6 @@ export default function ImagesStepPage() {
   //   파이프라인은 여전히 죽어 있는데, 접기로 이 값이 false 가 되면 아직 generating 인 컷이
   //   busyCut 으로 다시 잠겨 "닫고 컷별로 다시 만들기"가 약속한 바로 그 일을 막는다.
   const stalled = pollTimedOut || gen.kind === "stalled" || gen.kind === "failed";
-  // 멈춤·실패에서 손댈 첫 컷 — 안내에서 오른쪽 미리보기로 곧장 데려간다.
-  const stuckIdx = cuts.find((c) => !isCutDone(c, "images"))?.idx ?? cuts[0]?.idx ?? null;
   // 아직 한 장도 만들지 않았는가 — 시작 버튼을 보일지 가른다
   const madeAny = cuts.some((c) => c.image || c.source === "photo");
   // 구성이 없는 영상에서는 컷의 문장이 곧 그림을 만드는 글이다(lib/cuts.js buildImagePrompt).
@@ -229,12 +227,12 @@ export default function ImagesStepPage() {
 
         {gen.kind === "stalled" && (
           <p className="pgsub warn">
-            ⚠ 진행이 멈춰 있어요 — 컷 {gen.done}/{gen.total}에서 더 나아가지 않고 있어요.{" "}
-            {/* ★ 접기를 부르지 않는다. 여기서는 감출 실패 문구가 아직 없어 얻는 것도 없는데,
-                접어 두면 뒤늦게 도착한 진짜 실패가 그 원인 대신 "멈췄어요"로 읽힌다. */}
-            <button className="mini" disabled={busy} onClick={() => setSelectedIdx(stuckIdx)}>
-              컷별로 다시 만들기
-            </button>
+            {/* ★ 여기에는 버튼을 두지 않는다. 살아 있는 탈출구는 이미 오른쪽에 있고
+                (멈춤 동안 stalled 가 참이라 컷별 버튼의 busyCut 잠금이 풀린다), 여기 하나 더
+                두면 죽은 버튼이 된다 — 폴링이 도는 동안이라 busy 로 잠기거나, 눌러도 보이는
+                변화가 없다. 무엇을 해 준다고 하고 안 하는 것이 이 화면이 고치려던 병이다. */}
+            ⚠ 진행이 멈춰 있어요 — 컷 {gen.done}/{gen.total}에서 한참째 그대로예요.
+            {" "}오른쪽 그림 아래 [다시 만들기]로 이어서 하실 수 있어요.
           </p>
         )}
 

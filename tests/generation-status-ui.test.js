@@ -90,14 +90,25 @@ describe("④이미지 — 생성 상태 표시", () => {
     expect(start, "다시 시작할 때 접어 둔 것을 풀지 않는다").toMatch(/setDismissedMsg\(\s*null\s*\)/);
   });
 
-  it("★ 멈춤 안내는 접기 상태를 건드리지 않는다 — 건드리면 뒤늦게 온 실패가 오진된다", () => {
-    // 멈춤에서 dismiss 를 부르면(이미 stalled 라 얻는 것도 없다) 빗장만 걸려서,
-    // 나중에 도착한 images_error 가 진짜 원인 대신 "진행이 멈춰 있어요"로 읽힌다.
+  it("★ 멈춤 안내에는 손댈 것이 없다 — 죽은 버튼을 두느니 살아 있는 곳을 가리킨다", () => {
+    // 여기 버튼을 두면 반드시 거짓말이 된다: 멈춤은 폴링이 도는 동안에도 나므로 busy 로
+    // 잠기고, 안 잠가도 오른쪽 미리보기는 이미 그 컷을 보고 있어 눌러도 아무 변화가 없다.
+    // 그리고 dismiss 를 부르면 빗장이 걸려 뒤늦게 온 진짜 실패가 "멈췄어요"로 오진된다.
+    // 살아 있는 탈출구는 오른쪽 컷별 [다시 만들기] 하나뿐이니, 안내는 그것을 가리키기만 한다.
     const stalledBanner = block('gen.kind === "stalled" && (', 'gen.kind === "failed"');
     expect(stalledBanner, "멈춤 안내가 dismiss 를 부른다 — 접기 빗장이 걸려 실패가 오진된다")
       .not.toMatch(/dismiss/);
-    expect(stalledBanner, "멈춤 안내 버튼에 disabled={busy} 가 없다 — 도는 중에도 눌린다")
-      .toMatch(/disabled=\{busy\}/);
+    expect(stalledBanner, "멈춤 안내에 조작할 것이 있다 — 여기 둔 것은 죽은 버튼이 된다")
+      .not.toMatch(/<button|onClick=|disabled=/);
+    expect(stalledBanner, "살아 있는 탈출구가 어디인지 말해 주지 않는다").toMatch(/다시 만들기/);
+  });
+
+  it("★ 멈춘 동안 컷별 [다시 만들기]는 눌린다 — 안내가 가리키는 곳이 실제로 살아 있어야 한다", () => {
+    // 위 안내에서 버튼을 걷어낸 근거가 바로 이것이다. 이 잠금이 stalled 를 안 보게 되는 순간
+    // 안내는 없는 문을 가리키는 말이 된다.
+    const busyCut = block("const busyCut =", ";");
+    expect(busyCut, "멈춤 중에도 컷이 generating 이라 컷별 버튼이 잠긴다 — 탈출구가 없어진다")
+      .toMatch(/!stalled/);
   });
 
   it("서버가 잰 멈춤 시간을 읽는다 — 브라우저 시계로 빼지 않는다", () => {
