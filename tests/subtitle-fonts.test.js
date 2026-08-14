@@ -69,3 +69,15 @@ describe("자막 폰트가 그 언어를 실제로 덮는가", () => {
     }
   });
 });
+
+// ★ 재배포하는 폰트는 라이선스를 동봉해야 한다(OFL-1.1 의 조건이다).
+//   CJK 만 적어 두고 한국어 폰트를 빠뜨리면 "왜 절반만 있지"를 다음 사람이 다시 조사한다.
+it("자막 폰트 다섯 개가 모두 라이선스 노트에 적혀 있다", () => {
+  const note = readFileSync("assets/SUBTITLE-FONTS-LICENSE-NOTE.md", "utf8");
+  for (const f of [
+    "subtitle-font.otf", "subtitle-impact.ttf", "subtitle-soft.ttf",
+    "subtitle-ja.otf", "subtitle-zh.otf",
+  ]) {
+    expect(note, `${f} 가 라이선스 노트에 없다`).toContain(f);
+  }
+});
