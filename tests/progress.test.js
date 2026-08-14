@@ -62,11 +62,19 @@ describe("generationState", () => {
 
   it("컷이 없으면 idle", () => {
     expect(generationState({ ...base, total: 0 }).kind).toBe("idle");
+    // 기본값은 undefined 에만 걸린다. total: null 이 ②를 빠져나가면 `0 >= null` 이 참이 되어
+    // "완료 0/null" 이 화면에 뜬다.
+    expect(generationState({ ...base, total: null }).kind).toBe("idle");
   });
 
   it("다 끝났으면 done — 진척이 오래 멈춰 있어도 done 이 먼저다", () => {
     const s = generationState({ ...base, done: 3, total: 3, stalledForMs: 999_999 });
     expect(s.kind).toBe("done");
+  });
+
+  // 재실행이 컷을 다시 찍으면 done 이 total 을 넘길 수 있다.
+  it("done 이 total 을 넘겨도 done 이다", () => {
+    expect(generationState({ ...base, done: 4, total: 3 }).kind).toBe("done");
   });
 
   it("시작 전이면 idle — 누르지 않았는데 스피너가 돌면 안 된다", () => {
@@ -76,6 +84,18 @@ describe("generationState", () => {
   it("도는 중이면 running", () => {
     const s = generationState({ ...base, done: 1, stalledForMs: 3000 });
     expect(s).toMatchObject({ kind: "running", done: 1, total: 3 });
+    // reason 은 실패일 때만 채운다.
+    expect(s.reason).toBeNull();
+  });
+
+  // ★ busy 는 "이 탭에서 내가 눌렀다"는 지역 표시일 뿐이다. 새로고침 뒤·다른 탭·
+  //   시작하지 않고 폴링만 하는 화면에서는 돌고 있어도 false 다. 여기서 idle 로 접으면
+  //   진행도 멈춤도 영영 안 보인다 — 이 기능이 없애려는 바로 그 거짓 음성이다.
+  it("내가 안 눌렀어도 이 단계의 심장박동이 살아 있으면 running 이다 — 새로고침 뒤에도 봐야 한다", () => {
+    expect(generationState({ ...base, busy: false, stalledForMs: 3000 }).kind).toBe("running");
+  });
+  it("내가 안 눌렀어도 이 단계의 심장박동이 임계만큼 멎었으면 stalled 다", () => {
+    expect(generationState({ ...base, busy: false, stalledForMs: STALL_MS }).kind).toBe("stalled");
   });
 
   it("임계 직전은 아직 running", () => {
