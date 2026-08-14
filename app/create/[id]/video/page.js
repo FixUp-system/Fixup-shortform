@@ -16,6 +16,11 @@ import { isClipStale } from "../../../../lib/steps";
 import { aspectFor } from "../../../../lib/aspects";
 // 상한과 값은 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다).
 import { MAX_REGEN_PER_CUT, priceLabel, regenPrice } from "../../../../lib/pricing";
+// 폴링 루프·진행 판정·오류 필드 표는 전부 lib 한 벌이다. 화면마다 복붙해 두었더니
+// 조금씩 다르게 틀렸다(④이미지가 images_error 를 영영 못 보던 버그가 그것이다).
+import { startPolling } from "../../../../lib/poll";
+import { generationState, isCutDone } from "../../../../lib/progress";
+import { firstError } from "../../../../lib/step-errors";
 
 export default function VideoStepPage() {
   const { id } = useParams();
@@ -32,49 +37,45 @@ export default function VideoStepPage() {
   const [pollTimedOut, setPollTimedOut] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState(null);
   const [regening, setRegening] = useState(null); // 다시 만드는 중인 컷 idx
-  const pollRef = useRef(null);
+  // 상태 라우트가 돌려준 마지막 응답 그대로. 진행 판정에 필요한 심장박동(progress)과
+  // 멈춘 시간(stalled_for_ms)은 프로젝트 문서가 아니라 여기에만 실려 온다.
+  const [status, setStatus] = useState(null);
+  const stopRef = useRef(null);
 
-  useEffect(() => () => { clearInterval(pollRef.current); pollRef.current = null; }, []);
+  useEffect(() => () => { stopRef.current?.(); stopRef.current = null; }, []);
 
-  function startPolling() {
-    clearInterval(pollRef.current);
+  function beginPolling() {
+    stopRef.current?.();
     setPollTimedOut(false);
-    let failures = 0;
-    const startedAt = Date.now();
-    const stop = (timedOut) => {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-      setBusy(false);
-      if (timedOut) {
-        setPollTimedOut(true);
-        setErr("상태 확인이 오래 걸리고 있어요 — 새로고침하거나 다시 시도해 주세요");
-      }
-    };
-    pollRef.current = setInterval(async () => {
-      if (Date.now() - startedAt > 5 * 60 * 1000) return stop(true);
-      try {
-        const res = await fetch(`/api/projects/${id}/clips/status`);
-        if (!res.ok) throw new Error();
-        failures = 0;
-        const st = await res.json();
+    stopRef.current = startPolling({
+      url: `/api/projects/${id}/clips/status`,
+      onTick: (st) => {
+        setStatus(st);
         setProject((p) => ({ ...p, status: st.status, cuts: st.cuts, video_error: st.video_error }));
-        if (st.video_error) { stop(false); setErr(st.video_error); return; }
-        const pending = (st.cuts || []).some((c) => !c.video && !c.video_error);
-        if (!pending) stop(false);
-      } catch {
-        failures += 1;
-        if (failures >= 5) stop(true);
-      }
-    }, 2000);
+        if (firstError(st, "video")) return true;
+        return !(st.cuts || []).some((c) => !c.video && !c.video_error);
+      },
+      onStop: ({ timedOut }) => {
+        // ★ 반드시 여기서 비운다. startPolling 이 돌려주는 것은 "떼기"라 스스로 끝난
+        //   폴링에서는 안 불리고, 안 비우면 손잡이가 영원히 truthy 라 아래 복원
+        //   useEffect 가 "이미 돌고 있다"고 오인해 폴링이 다시 살아나지 않는다.
+        stopRef.current = null;
+        setBusy(false);
+        if (timedOut) {
+          setPollTimedOut(true);
+          setErr("상태 확인이 오래 걸리고 있어요 — 새로고침하거나 다시 시도해 주세요");
+        }
+      },
+    });
   }
 
   // 진입·새로고침 복원 — 아직 만들지 않은 컷이 남아 있으면 폴링을 잇는다
   useEffect(() => {
     const cuts = project?.cuts || [];
     const waiting = cuts.length > 0 && cuts.some((c) => !c.video && !c.video_error);
-    if (project?.status === "video" && !pollRef.current && !pollTimedOut && waiting) {
+    if (project?.status === "video" && !stopRef.current && !pollTimedOut && waiting) {
       setBusy(true);
-      startPolling();
+      beginPolling();
     }
   }, [project?.status, project?.cuts]);
 
@@ -88,7 +89,7 @@ export default function VideoStepPage() {
     }
     await load(id).catch(() => {});
     await reloadMe().catch(() => {});
-    startPolling();
+    beginPolling();
   }
 
   // 다시 만드는 동안 그 컷을 잠근다.
@@ -131,6 +132,23 @@ export default function VideoStepPage() {
   const staleCount = cuts.filter((c) => isClipStale(c, project)).length;
   const selected = cuts.find((c) => c.idx === selectedIdx) || cuts.find((c) => c.video) || cuts[0];
 
+  // "안 눌렀다 / 되고 있다 / 멈춘 것 같다 / 실패했다 / 끝났다" — 판정은 lib 한 벌이 한다.
+  const gen = generationState({
+    // ★ `doneCount` 를 넘기지 않는다 — 그것은 **성공한** 클립 수라 화면 문구
+    //   ("N/M개 컷을 만들었어요")의 값이다. 진행 판정이 원하는 것은 **더 기다릴 것이
+    //   남았는가**이므로 실패로 끝난 컷도 끝난 것으로 세야 한다(안 그러면 실패 컷 하나가
+    //   영원히 "만드는 중"으로 남는다). 그래서 파이프라인과 같은 함수를 쓴다.
+    done: cuts.filter((c) => isCutDone(c, "video")).length,
+    total: cuts.length,
+    error: firstError({ ...project, ...(status || {}) }, "video"),
+    phase: status?.progress?.phase ?? project?.progress?.phase ?? null,
+    stepPhase: "video",
+    // ★ 멈춘 시간은 서버가 재서 실어 보낸다. 브라우저가 자기 시계로 빼면 사장님 PC 가
+    //   3분 빠를 때 시작하자마자 "멈췄어요"가 뜬다.
+    stalledForMs: status?.stalled_for_ms ?? null,
+    busy,
+  });
+
   if (!cuts.length) return <p className="pgsub">대본을 먼저 만들어 주세요.</p>;
   // ★ 말하는 모델은 예외다 — 목소리를 클립이 만드니 낭독이 아예 없다.
   //   컷 길이는 분할 때 잡은 추정 초가 그대로 최종값이다(lib/subtitles.js 의 cutSeconds).
@@ -143,6 +161,20 @@ export default function VideoStepPage() {
     <section className="panel">
       <h2>컷을 영상으로 만듭니다 <span className="badge vlm">영상</span></h2>
       {err && <p className="pgsub warn">{err}</p>}
+      {/* 되는 중·멈춤·실패를 서로 다른 말로 알린다 — 셋을 뭉뚱그리면 사장님이 기다려야
+          하는지 손을 써야 하는지 알 수 없다. */}
+      {gen.kind === "running" && (
+        <p className="pgsub">
+          <span className="spinner" aria-hidden="true" /> 컷 {gen.done}/{gen.total} 만드는 중이에요
+        </p>
+      )}
+      {gen.kind === "stalled" && (
+        <p className="pgsub warn">
+          ⚠ 진행이 멈춰 있는 것 같아요 — 컷 {gen.done}/{gen.total}에서 더 나아가지 않고 있어요.
+          아래에서 컷별로 다시 만들 수 있어요.
+        </p>
+      )}
+      {gen.kind === "failed" && <p className="pgsub warn">⚠ {gen.reason.message}</p>}
       <p className="pgsub">
         {doneCount > 0
           ? `${doneCount}/${cuts.length}개 컷을 만들었어요`
@@ -190,7 +222,10 @@ export default function VideoStepPage() {
                       </span>
                       <button
                         className="mini"
-                        disabled={busy || regening !== null || (c.clip_regen_count || 0) >= MAX_REGEN_PER_CUT}
+                        // ★ busy 가 아니라 **실제로 도는 중**일 때만 잠근다. 멈췄거나
+                        //   실패했을 때도 busy 는 참인 채로 남을 수 있는데, 그때 이 버튼이
+                        //   사장님의 유일한 탈출구다 — 잠가 두면 할 수 있는 일이 없다.
+                        disabled={gen.kind === "running" || regening !== null || (c.clip_regen_count || 0) >= MAX_REGEN_PER_CUT}
                         onClick={() => regen(c.idx)}
                       >
                         {/* 컷마다 첫 회는 공짜다. 클립은 다시 만드는 값이 가장 비싸므로
