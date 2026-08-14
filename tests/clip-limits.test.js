@@ -286,6 +286,44 @@ describe("음성을 누가 만드는가 — 모델이 정한다", () => {
     it("모델이 Kling 이면 인물이 다 있어도 말하지 않는다", () => {
       expect(projectSpeaks({ settings: { i2v_model: "kling-v3" }, cast: person([0, 1]), cuts: cuts2 })).toBe(false);
     });
+
+    // ★ "말할 사람이 없는 컷"과 "말하지 않기로 한 컷"은 다르다.
+    //   앞엣것은 사고(제품 클로즈업에 대사가 배정 안 됨)라 전체를 TTS 로 보내야 하고,
+    //   뒤엣것은 연출이라 나머지 컷의 목소리를 뺏으면 안 된다.
+    //   가르지 않으면 무음 컷 하나 때문에 모든 Seedance 프로젝트가 TTS 로 떨어진다.
+    it("의도한 무음 컷은 판정에서 건너뛴다", () => {
+      const project = {
+        settings: { i2v_model: "seedance-2.0" },
+        cuts: [
+          { idx: 0, sentence: "", silent: true },
+          { idx: 1, sentence: "말하는 컷입니다." },
+        ],
+        cast: [{ who: "20대 남성", cuts: [1] }],
+      };
+      expect(projectSpeaks(project)).toBe(true);
+    });
+
+    it("무음 컷만 있으면 말하지 않는다", () => {
+      const project = {
+        settings: { i2v_model: "seedance-2.0" },
+        cuts: [{ idx: 0, sentence: "", silent: true }],
+        cast: [{ who: "20대 남성", cuts: [] }],
+      };
+      expect(projectSpeaks(project)).toBe(false);
+    });
+
+    // 사고는 그대로 사고다 — 문장은 있는데 말할 사람이 없으면 전체 TTS
+    it("캐스팅이 안 된 말하는 컷은 여전히 전체를 TTS 로 보낸다", () => {
+      const project = {
+        settings: { i2v_model: "seedance-2.0" },
+        cuts: [
+          { idx: 0, sentence: "말하는 컷입니다." },
+          { idx: 1, sentence: "이 컷은 배정이 없습니다." },
+        ],
+        cast: [{ who: "20대 남성", cuts: [0] }],
+      };
+      expect(projectSpeaks(project)).toBe(false);
+    });
   });
 });
 
