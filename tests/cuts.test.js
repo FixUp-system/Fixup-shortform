@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { splitSentences, splitUnits, explodeLongRanges, buildSplitMessages, buildShowsMessages, buildImagePrompt, buildClipPrompt, stillOnly, clauseBoundaries, usableTone, usableTransition, allocateCutSeconds, fillSilentCuts, CONTENT_MAX_SECONDS, stageOf, castLooksOf, subjectOf, orientOf } from "../lib/cuts.js";
 import { clipProfileForProject, minSecondsFor, maxSecondsFor } from "../lib/clip-limits.js";
 import { STYLE_PRESETS } from "../lib/styles.js";
+import { MOTION_AXES } from "../lib/motion.js";
+import { SPEEDS } from "../lib/speeds.js";
 // 관통 테스트라 파일 경계를 넘는다 — 화면 설계(validate) → 그림 프롬프트(cuts) → 각인(steps).
 import { validateShows } from "../lib/validate.js";
 import { toneKey } from "../lib/steps.js";
@@ -1409,7 +1411,7 @@ describe("SHOWS_SYSTEM — 톤·전환 규칙", () => {
   // ⚠️ "카메라 움직임"만 찾으면 헛돈다 — 기존 shows·motion 규칙에 이미 그 낱말이 있다.
   it("톤·전환에 카메라 움직임을 쓰지 말라고 한다", () => {
     expect(system()).toMatch(/한 낱말이라도 섞이면/);       // tone 쪽
-    expect(system()).toMatch(/움직임은 motion 이 맡는다/); // transition 쪽
+    expect(system()).toMatch(/움직임은 움직임 축이 맡는다/); // transition 쪽
   });
 });
 
@@ -1798,5 +1800,59 @@ describe("절의 재료를 고르는 함수", () => {
     expect(orientOf({ settings: { aspect_ratio: "1:1" } })).toBe("square 1:1");
     expect(orientOf({ settings: { aspect_ratio: "16:9" } })).toBe("horizontal 16:9");
     expect(orientOf({ settings: {} })).toBe("horizontal 16:9"); // 지금 동작 그대로
+  });
+});
+
+describe("SHOWS_SYSTEM — 움직임 축", () => {
+  const cuts = [{ idx: 0, sentence: "가." }, { idx: 1, sentence: "나." }];
+  const system = () => buildShowsMessages({ material: {}, briefing: {}, settings: {} }, cuts).system;
+
+  it("세 축이 전부 지문에 나온다", () => {
+    for (const a of MOTION_AXES) {
+      expect(system()).toContain(`${a.id}(${a.label})`);
+    }
+  });
+
+  // 축 줄은 손으로 적은 것이 아니라 MOTION_AXES 에서 만들어진다 — hint 까지 그대로 실린다.
+  // 목록에서 한 줄을 빼면 지문도 함께 줄어드는 것이 이 설계의 안전장치다.
+  it("축 줄이 목록에서 만들어진다 — hint 가 그대로 실린다", () => {
+    for (const a of MOTION_AXES) {
+      expect(system()).toContain(`  · ${a.id}(${a.label}) — ${a.hint}`);
+    }
+  });
+
+  // 출력 형식(JSON)도 목록에서 만들어진다 — 여기가 갈리면 모델이 축을 아예 안 답한다.
+  it("출력 형식에 세 축이 필드로 들어 있다", () => {
+    for (const a of MOTION_AXES) {
+      expect(system()).toContain(`"${a.id}":"${a.label} 움직임 한 줄`);
+    }
+  });
+
+  it("옛 motion 필드를 더 이상 요구하지 않는다", () => {
+    expect(system()).not.toContain("motion 은 그 정지 화면에서");
+    expect(system()).not.toContain("둘 다 넣지 않는다");
+    // ★ 지문 어디에도 motion 이 없어야 한다 — 한 군데라도 남으면 모델이 없는 필드를 답한다
+    expect(system()).not.toMatch(/motion/i);
+  });
+});
+
+describe("speed — intensity 통합은 문구를 바꾸지 않는다", () => {
+  const cuts = [{ idx: 0, sentence: "가." }, { idx: 1, sentence: "나." }];
+  const system = () => buildShowsMessages({ material: {}, briefing: {}, settings: {} }, cuts).system;
+
+  it("지문이 speed 를 '빠르고 센지'로 정의한다", () => {
+    expect(system()).toContain("얼마나 빠르고 센지");
+  });
+  it("speed 가 세 축 전체에 걸린다고 알려 준다", () => {
+    expect(system()).toContain("세 축 전체에 걸리는 값이라 컷 하나에 하나만 고른다");
+  });
+  it("★ clip 문구는 그대로다 — 바뀌면 저장된 컷이 전부 낡는다", () => {
+    expect(SPEEDS.map((s) => s.clip)).toEqual([
+      "almost still, only the faintest drift",
+      "slow, deliberate motion",
+      "real-time speed, natural pacing",
+      "fast, explosive motion",
+      "extreme slow motion, time nearly frozen",
+    ]);
   });
 });
