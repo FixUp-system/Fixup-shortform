@@ -341,10 +341,7 @@ readable if not configured"** 이고 보관 기간 과금도 문서에 없다. �
 연속 5회 실패면 중단). 화면에서 `setInterval` 을 직접 돌리지 마라.
 ⚠️ **남은 예외 하나** — 광고 화면(`app/ads/[id]/page.js`)은 아직 자기 `setInterval` 루프를
 들고 있다(상한이 영상 길이에 딸린 `adPollTimeoutMs` 라 그냥 못 옮긴다). 거기를 손대게 되면
-같이 옮겨라.
-⚠️ 그리고 **그물이 한 화면만 덮는다** — `tests/generation-status-ui.test.js` 는
-`app/create/[id]/images/page.js` 만 읽는다. ④이미지에 `setInterval` 이 돌아오면 잡히지만
-나머지 넷은 안 막힌다. 눈으로 봐야 한다. 쓸 때 밟았던 것 셋:
+같이 옮겨라. 쓸 때 밟았던 것 셋:
 
 - **화면은 `onStop` 안에서 자기 ref 를 스스로 null 로 비운다.** `poll.js` 가 비우는 것은
   자기 내부 handle 뿐이라, 돌려받은 `stop` 을 쥔 화면 ref 는 계속 truthy 다 — 스스로 멈춘
@@ -354,6 +351,12 @@ readable if not configured"** 이고 보관 기간 과금도 문서에 없다. �
   5분에 조용히 멈추면 화면이 굳는다
 - **`onTick` 은 await 된다.** async `onTick` 을 안 기다리면 항상 truthy 인 Promise 가
   돌아와 첫 회차에 폴링이 죽는다
+
+`setInterval` 금지는 **단계 화면 다섯 전부**가 소스 문자열 검사로 막혀 있다. 다만 **그물이
+세 파일에 흩어져 있다** — ④이미지는 `tests/generation-status-ui.test.js`, ⑤영상은
+`tests/video-status-ui.test.js`, ②대본·③목소리·⑥완성은 `tests/poll-migration-ui.test.js`.
+⚠️ 그래서 **단계 화면을 새로 더하면 어디에도 안 걸린다** — 세 파일 중 하나(대개
+`poll-migration-ui`, 화면 목록을 배열로 돌린다)에 그 화면을 손으로 넣어야 그물이 덮는다.
 
 ## 이어서 할 일
 
