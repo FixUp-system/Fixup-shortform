@@ -6,7 +6,6 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 import BackButton from "../../../../components/BackButton";
-import { estimateSeconds } from "../../../../lib/script";
 import { areCutsStale } from "../../../../lib/steps";
 import {
   I2V_MAX_SECONDS, modelIdForProject,
@@ -22,10 +21,11 @@ export default function ScriptStepPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [instruction, setInstruction] = useState("");
-  // ★ 화면·움직임은 **기본으로 접어 둔다**(2026-08-13 사용자 결정). 그림을 만드는 재료라
-  // 고칠 수 있어야 하지만, 사장님이 매번 읽어야 하는 말은 아니다 — 촬영 용어라 대개는
-  // 무슨 뜻인지도 모른다. 그림이 이상하게 나왔을 때만 펴서 고치면 된다.
-  const [showShots, setShowShots] = useState(false);
+  // ★ 화면·움직임은 **기본으로 펴 둔다**(2026-08-14 사용자 결정 — 08-13 의 "접어 둔다"를
+  // 뒤집었다). 접어 두면 그림이 무엇으로 만들어지는지 보이지 않아, 이상하게 나온 뒤에야
+  // 여기 고칠 자리가 있다는 것을 안다. 그때는 이미 값을 치른 뒤다.
+  // 읽기 부담보다 "만들기 전에 보인다"가 값이 크다.
+  const [showShots, setShowShots] = useState(true);
   const [draft, setDraft] = useState(null); // 손으로 고치는 중인 원고(저장 전)
   // 자동 생성이 한 번만 돌게 막는다 — busy는 비동기라 effect가 두 번 불리면 과금이 두 배가 된다.
   const textRef = useRef(null);
@@ -270,10 +270,14 @@ export default function ScriptStepPage() {
           else setDraft(null); // 문단만 다르고 내용은 같다 — 저장하지 않고 표시본으로 되돌린다
         }}
       />
-      <div className="script-src">
-        이대로 읽으면 약 {estimateSeconds({ text: shown })}초 · 글을 고치면 그대로 저장돼요
-        {draft !== null && draft !== text && " (저장하려면 글 밖을 한 번 클릭하세요)"}
-      </div>
+      {/* ★ 추정 초("이대로 읽으면 약 11초")와 저장 안내는 걷어냈다(2026-08-14 사용자 결정).
+          읽는 사람이 할 일이 없는 설명이었고, 무엇보다 **고른 길이와 어긋난 숫자를 여기서
+          처음 보여 주는** 자리였다 — 15초를 골랐는데 11초라고 적히면 사장님은 그것을
+          고칠 방법 없이 읽기만 한다. 길이를 맞추는 일은 화면 문구가 아니라 원고가 진다.
+          손으로 고치는 중일 때의 저장 안내만 남긴다 — 그것은 설명이 아니라 할 일이다. */}
+      {draft !== null && draft !== text && (
+        <div className="script-src">저장하려면 글 밖을 한 번 클릭하세요</div>
+      )}
       {madeCuts && (
         <div className="script-src warn">
           이미 만들어 둔 이미지가 있어요 — 대본을 다시 쓰면 컷을 처음부터 다시 만들게 되고, 그 이미지는 지워져요
@@ -291,8 +295,13 @@ export default function ScriptStepPage() {
 
       {resolutions.length > 0 && (
         <div className="mt-lg">
+          {/* ★ 설명 문구는 걷어냈다(2026-08-14 사용자 결정) — 이 화면에 남기는 안내는
+              구성의 "문장을 눌러서 고칠 수 있어요" 하나뿐이다. 칩 자체가 값을 달고 있어
+              무엇이 달라지는지는 칩이 말한다.
+              ★ 다만 **잠겼을 때의 사유는 남긴다.** 그것은 설명이 아니라 못 누르는 이유다 —
+              지우면 눌리지 않는 칩만 남아 고장으로 보인다. */}
           <div className="eyebrow">
-            영상 화질 <small>{resolutionLocked ? "이미 값을 치러서 바꿀 수 없어요" : "값이 달라져요 — 만들기 전에 골라 주세요"}</small>
+            영상 화질 {resolutionLocked && <small>이미 값을 치러서 바꿀 수 없어요</small>}
           </div>
           <div className="chips">
             {resolutions.map((r) => (
@@ -303,12 +312,14 @@ export default function ScriptStepPage() {
               </button>
             ))}
           </div>
-          {/* 길이를 안 골랐으면 가격표가 30초 값으로 떨어진다 — 자료 화면과 같은 문구로
-              기준을 말한다. 확정처럼 적으면 15초로 나왔을 때 다른 값을 본다. */}
-          <div className="tray-note">
-            높은 화질일수록 또렷하지만 값이 더 들어요
-            {!project.settings?.target_seconds && " · 값은 30초 기준이고 길이에 따라 달라져요"}
-          </div>
+          {/* "높은 화질일수록 값이 더 들어요"는 걷어냈다(2026-08-14) — 칩에 값이 적혀 있어
+              같은 말을 두 번 하는 자리였다.
+              ★ 길이를 안 골랐을 때의 기준 표기는 **남긴다.** 그때는 칩의 값이 30초 기준으로
+              떨어지는데, 그 말이 없으면 15초로 나왔을 때 사장님이 다른 값을 보고 어긋났다고
+              여긴다. 이것은 설명이 아니라 그 숫자가 무엇인지에 대한 단서다. */}
+          {!project.settings?.target_seconds && (
+            <div className="tray-note">값은 30초 기준이고 길이에 따라 달라져요</div>
+          )}
         </div>
       )}
 
