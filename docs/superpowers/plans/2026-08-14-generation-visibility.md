@@ -18,6 +18,7 @@
 - **`patchFn` 은 순수해야 한다.** `updateProject` 는 낙관적 락이라 CAS 에 지면 같은 `patchFn` 을 다시 부른다(`lib/projects.js:25-40`). 시각(`Date.now()`)은 `patchFn` **밖에서** 재서 닫아 넣는다.
 - **스토어 구현 둘이 같은 계약이어야 한다.** `lib/store/memory.js` 와 `lib/store/supabase.js` 의 부분 읽기 함수는 같은 모양을 돌려준다(`memory.js:64-67` 주석). 한쪽만 고치면 테스트는 통과하고 프로덕션이 깨진다.
 - **멈춤 임계 120,000ms.** 상수는 `lib/progress.js` 한 곳에만 적는다.
+- **"끝난 컷"의 정의는 `lib/progress.js` 의 `isCutDone(cut, phase)` 하나가 쥔다.** 파이프라인이든 화면이든 그 술어를 손으로 다시 적지 않는다 — 실제로 갈렸다. 계획 초안은 이미지 단계의 술어를 두 곳에 적었고 둘 다 실패한 컷(`image` 없이 `state:"needs_attention"`)을 세지 않아, 정상 종료한 실행이 영구히 "멈춤"으로 읽혔다. 진행 판정에 넘기는 `done` 은 **더 기다릴 것이 남았는가**를 세는 값이라 실패로 끝난 컷도 끝난 것이다. 사장님에게 보여주는 "N개 만들었어요"는 그것과 **다른 값**(성공한 것만)이니 섞지 말 것.
 - **합성(render)은 멈춤 판정에서 제외한다.** 합성은 단일 ffmpeg 작업이라 중간 진척이 없고 최대 10분까지 정상적으로 걸린다 — 120초 임계를 적용하면 정상 합성이 전부 "멈춤"으로 보인다.
 - 기존 **2,272 그린**이 유지되어야 한다. 매 태스크 끝에서 `npm test` 전체를 돌린다.
 - 한국어 주석·문구. 사장님에게 보이는 말에는 내부 필드명(`images_error` 등)을 쓰지 않는다.
@@ -830,7 +831,7 @@ git commit -m "feat(api): 생성이 시작될 때 심장박동을 찍는다 — 
 네 상태를 가르는 유일한 자리. 화면이 직접 재지 않는 이유는 ① 렌더 테스트 인프라가 없어 경계를 잴 수 없고 ② 같은 판정을 화면 다섯이 쓰는데 흩으면 갈리기 때문이다(이번 버그가 그렇게 났다).
 
 **Files:**
-- Create: `lib/progress.js`
+- Modify: `lib/progress.js` — **이미 존재한다.** Task 4 의 수정 라운드가 만들었고 지금은 공용 판정 술어 `isCutDone(cut, phase)` 하나만 들어 있다(파이프라인과 화면이 "무엇이 끝난 컷인가"를 한 곳에서 보게 하려고 옮겼다 — 화면이 같은 술어를 손으로 다시 적어 결함이 복제돼 있었다). 이 태스크는 그 파일에 **덧붙인다**: `STALL_MS`·`STALL_EXEMPT_PHASES`·`stalledFor`·`generationState`. `isCutDone` 과 그 테스트는 건드리지 않는다.
 - Test: `tests/progress.test.js`
 
 **Interfaces:**
@@ -1440,7 +1441,7 @@ Expected: FAIL
 
 ```js
 import { startPolling } from "../../../../lib/poll";
-import { generationState } from "../../../../lib/progress";
+import { generationState, isCutDone } from "../../../../lib/progress";
 import { firstError } from "../../../../lib/step-errors";
 ```
 
@@ -1492,7 +1493,10 @@ import { firstError } from "../../../../lib/step-errors";
   // 판정은 lib/progress 하나가 낸다 — 화면은 그린다.
   const err0 = firstError({ ...project, ...(status || {}) }, "images");
   const gen = generationState({
-    done: cuts.filter((c) => c.image || c.source === "photo").length,
+    // ★ 술어를 여기 손으로 적지 않는다 — 파이프라인의 심장박동과 **같은 함수**를 쓴다.
+    //   손으로 적었을 때 실제로 갈렸다: 실패한 컷(image 없이 needs_attention)을 안 세서
+    //   정상 종료한 실행이 영구히 "멈춤"으로 읽혔다. 한 곳에서 오면 그 표류가 불가능하다.
+    done: cuts.filter((c) => isCutDone(c, "images")).length,
     total: cuts.length,
     error: dismissed ? null : err0,
     phase: status?.progress?.phase ?? project.progress?.phase ?? null,
@@ -1619,7 +1623,7 @@ Expected: FAIL — ⑤영상 블록 5건
 
 ```js
 import { startPolling } from "../../../../lib/poll";
-import { generationState } from "../../../../lib/progress";
+import { generationState, isCutDone } from "../../../../lib/progress";
 import { firstError } from "../../../../lib/step-errors";
 ```
 
@@ -1662,7 +1666,11 @@ import { firstError } from "../../../../lib/step-errors";
 
 ```js
   const gen = generationState({
-    done: doneCount,
+    // ★ `doneCount` 를 넘기지 않는다 — 그것은 **성공한** 클립 수라 화면 문구
+    //   ("N/M개 컷을 만들었어요")의 값이다. 진행 판정이 원하는 것은 **더 기다릴 것이
+    //   남았는가**이므로 실패로 끝난 컷도 끝난 것으로 세야 한다(안 그러면 실패 컷 하나가
+    //   영원히 "만드는 중"으로 남는다). 그래서 파이프라인과 같은 함수를 쓴다.
+    done: cuts.filter((c) => isCutDone(c, "video")).length,
     total: cuts.length,
     error: firstError({ ...project, ...(status || {}) }, "video"),
     phase: status?.progress?.phase ?? project?.progress?.phase ?? null,
