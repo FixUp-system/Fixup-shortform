@@ -100,7 +100,31 @@ describe("④이미지 — 생성 상태 표시", () => {
       .not.toMatch(/dismiss/);
     expect(stalledBanner, "멈춤 안내에 조작할 것이 있다 — 여기 둔 것은 죽은 버튼이 된다")
       .not.toMatch(/<button|onClick=|disabled=/);
-    expect(stalledBanner, "살아 있는 탈출구가 어디인지 말해 주지 않는다").toMatch(/다시 만들기/);
+  });
+
+  it("★ 멈춤 안내가 가리키는 조작은 멈춤 중에 실제로 눌린다 — 회색 버튼을 가리키면 안 된다", () => {
+    // 글자 하나를 박아 두지 않는다. **불변식**은 "안내가 [대괄호로] 이름을 부른 조작이
+    // 컷별 미리보기에 실제로 있고, 멈춘 사장님이 그 자리에서 곧바로 누를 수 있다"는 것이다.
+    // 이렇게 두면 라벨이 바뀌었을 때 조용히 어긋나지 않고 시끄럽게 깨진다.
+    const stalledBanner = block('gen.kind === "stalled" && (', 'gen.kind === "failed"');
+    const named = [...stalledBanner.matchAll(/\[([^\]]+)\]/g)].map((m) => m[1].trim());
+    expect(named.length, "안내가 어떤 조작으로 이어가라는 것인지 이름을 대지 않는다")
+      .toBeGreaterThan(0);
+
+    const pane = images.slice(images.indexOf("function PreviewPane("));
+    expect(pane, "PreviewPane 을 못 찾았다").toBeTruthy();
+    const buttons = [...pane.matchAll(/<button[\s\S]*?<\/button>/g)].map((m) => m[0]);
+
+    for (const label of named) {
+      const owners = buttons.filter((b) => b.includes(label));
+      expect(owners.length, `안내가 부른 [${label}] 이 컷별 미리보기에 없다`).toBeGreaterThan(0);
+      for (const b of owners) {
+        const disabled = (b.match(/disabled=\{([^}]*)\}/) || [, ""])[1];
+        // 글을 써야 열리는 버튼(!instr.trim())은 멈춰서 온 사장님 눈에는 그냥 회색이다.
+        expect(disabled, `[${label}] 은 뭔가를 입력해야 열린다 — 멈춤 안내가 회색 버튼을 가리킨다`)
+          .not.toMatch(/instr/);
+      }
+    }
   });
 
   it("★ 멈춘 동안 컷별 [다시 만들기]는 눌린다 — 안내가 가리키는 곳이 실제로 살아 있어야 한다", () => {
