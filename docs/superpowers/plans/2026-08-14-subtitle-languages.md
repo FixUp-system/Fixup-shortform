@@ -725,6 +725,113 @@ git commit -m "docs(assets): 한국어 자막 폰트의 라이선스도 기록�
 
 ---
 
+### Task 9: 미리보기가 CJK 를 예측 가능하게 그린다 — **사용자 지시로 추가**
+
+> ★ Task 6 리뷰가 "미리보기는 OS 대체 폰트로 그린다"를 지적했고 사용자가 처리를 지시했다(2026-08-14).
+
+**Files:**
+- Modify: `lib/subtitle-langs.js` (`previewFontStackFor` 신설)
+- Modify: `app/create/[id]/done/page.js` (미리보기 `fontFamily`)
+- Test: `tests/subtitle-lang-ui.test.js` · `tests/subtitle-fonts.test.js` 중 맞는 자리
+
+**★ 먼저 확인한 것 — 우려의 절반은 사실이 아니었다.**
+
+리뷰는 "미리보기와 굽기의 **줄바꿈**이 어긋날 수 있다"고 했는데, 코드를 보니 **아니다**:
+
+```js
+// ★ 줄바꿈은 이미 lib 이 정했다(buildCues) — 여기서 폭을 걸어 **다시** 접으면 완성본과 다르다
+whiteSpace: "pre",
+```
+
+줄바꿈은 `breakTwoLines` 가 정하고 미리보기는 `pre` 로 그대로 그린다. **미리보기와 굽기의 줄바꿈
+지점은 같은 함수에서 나와 항상 같다.** 폰트가 달라 바뀌는 것은 **글자 모양뿐**이다.
+
+→ 그래서 **Noto CJK 웹폰트(4.5~8.3MB)를 들이지 않는다.** 그 무게는 얻는 것에 비해 과하고,
+서브셋 파이프라인이라는 별개 과제를 끌고 온다.
+
+**대신 하는 것: 언어별 시스템 폰트 스택.** 내려받는 바이트가 **0** 이고, 브라우저의 임의 대체
+대신 **우리가 고른 순서**로 고르게 한다. Noto CJK 가 깔린 기기에서는 **굽는 것과 같은 서체**가 뜬다.
+
+- [ ] **Step 1: 실패하는 테스트를 쓴다**
+
+```js
+// ★ 미리보기는 ffmpeg 가 아니라 브라우저가 그린다 — cssFamily 축이 따로 있는 이유다.
+//   일본어·중국어에는 그 항목이 없어 브라우저 임의 대체에 맡겨져 있었다(Task 6 리뷰).
+//   웹폰트를 들이지 않는 이유는 계획에 적혀 있다: 줄바꿈은 이미 같고, 무게가 과하다.
+describe("previewFontStackFor — 미리보기의 CJK 서체", () => {
+  it("한국어는 지금 쓰던 자막 폰트 이름을 그대로 돌려준다 — 회귀 0", () => {
+    expect(previewFontStackFor("ko", "Pretendard Subtitle")).toBe("Pretendard Subtitle");
+  });
+
+  it("일본어·중국어는 그 언어를 그릴 수 있는 스택을 준다", () => {
+    const ja = previewFontStackFor("ja");
+    const zh = previewFontStackFor("zh");
+    // 굽는 폰트를 맨 앞에 둔다 — 깔려 있으면 완성본과 같은 서체가 보인다
+    expect(ja).toContain("Noto Sans JP");
+    expect(zh).toContain("Noto Sans SC");
+    // 없을 때를 대비한 시스템 후보가 뒤에 있다
+    expect(ja.split(",").length).toBeGreaterThan(2);
+    expect(zh.split(",").length).toBeGreaterThan(2);
+    expect(ja).toMatch(/sans-serif\s*$/);
+    expect(zh).toMatch(/sans-serif\s*$/);
+    // 한국어 전용 서체를 앞에 두면 안 된다 — 한자가 없어 글자마다 대체가 튄다
+    expect(ja).not.toContain("Black Han Sans");
+    expect(zh).not.toContain("Black Han Sans");
+  });
+
+  it("모르는 언어는 한국어와 같게 떨어진다", () => {
+    expect(previewFontStackFor("fr", "Pretendard Subtitle")).toBe("Pretendard Subtitle");
+  });
+});
+```
+
+- [ ] **Step 2: 실패를 확인한다**
+
+Run: `npx vitest run -t "previewFontStackFor"`
+Expected: FAIL — 함수가 없다.
+
+- [ ] **Step 3: 구현한다**
+
+`lib/subtitle-langs.js` 에 더한다(⚠️ **import 를 두지 마라** — 화면이 그대로 읽는다):
+
+```js
+// 미리보기(브라우저)가 쓸 글꼴 스택. **ffmpeg 가 쓰는 것과 다른 축이다** —
+// 굽기는 파일을 읽고(subtitleFontFor), 미리보기는 브라우저가 이름으로 고른다.
+//
+// ★ 웹폰트를 안 쓴다. Noto CJK 는 4.5~8.3MB 라 화면 한 장에 지우기엔 무겁고,
+//   **줄바꿈은 이미 미리보기와 굽기가 같다**(둘 다 breakTwoLines 가 정하고 화면은 pre 로 그린다).
+//   달라지는 것은 글자 모양뿐이라 시스템 글꼴로 충분하다.
+// ★ 굽는 폰트 이름을 맨 앞에 둔다 — 그 폰트가 깔린 기기에서는 완성본과 같은 서체가 보인다.
+// ★ 한국어 자막 폰트를 앞에 두면 안 된다: 한자가 없어 글자마다 대체가 일어나 들쭉날쭉해진다.
+const PREVIEW_STACKS = {
+  ja: `"Noto Sans JP", "Hiragino Sans", "Yu Gothic", Meiryo, "MS PGothic", sans-serif`,
+  zh: `"Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Source Han Sans SC", SimHei, sans-serif`,
+};
+
+export function previewFontStackFor(langId, koFamily) {
+  return PREVIEW_STACKS[langId] || koFamily;
+}
+```
+
+`app/create/[id]/done/page.js` 의 미리보기 `fontFamily` 를 `previewFontStackFor(lang, <지금 쓰던 cssFamily>)`
+로 바꾼다. **한국어 경로는 지금 값이 그대로 나와야 한다.**
+
+번역 검토 목록의 번역문에도 같은 스택을 쓴다 — 거기가 사장님이 실제로 읽는 자리다.
+
+- [ ] **Step 4: 통과를 확인한다**
+
+Run: `npx vitest run`
+Run: `SHOTFORM_DIST_DIR=.next-verify npx next build`
+
+- [ ] **Step 5: 커밋**
+
+```bash
+git add lib/subtitle-langs.js "app/create/[id]/done/page.js" tests/subtitle-lang-ui.test.js
+git commit -m "fix(subtitle-ui): 미리보기가 CJK 를 예측 가능한 글꼴로 그린다"
+```
+
+---
+
 ## 마무리
 
 - wiki 반영(저장소 세션 마무리 규칙)
