@@ -6,6 +6,16 @@ import { readFileSync } from "fs";
 
 const images = readFileSync("app/create/[id]/images/page.js", "utf8");
 
+// 소스에서 재는 이상 잘라내는 범위가 곧 테스트의 정확도다. 글자 수로 자르면 무관한
+// 서식 변경이 재는 대상을 조용히 바꾸므로, 시작·끝 표식으로 **구조**를 잡고 둘 다 먼저 확인한다.
+function block(startMark, endMark) {
+  const from = images.indexOf(startMark);
+  expect(from, `소스에 ${startMark} 이 없다`).toBeGreaterThan(-1);
+  const to = images.indexOf(endMark, from + startMark.length);
+  expect(to, `${startMark} 뒤에 ${endMark} 이 없다`).toBeGreaterThan(from);
+  return images.slice(from, to);
+}
+
 describe("④이미지 — 생성 상태 표시", () => {
   it("판정을 lib/progress 에 맡긴다", () => {
     expect(images).toMatch(/generationState/);
@@ -29,8 +39,9 @@ describe("④이미지 — 생성 상태 표시", () => {
   it("폴링이 스스로 끝나면 손잡이를 비운다 — 안 비우면 다시 시작할 수 없다", () => {
     // startPolling 이 돌려주는 것은 함수라 영원히 truthy 다. onStop 에서 비우지 않으면
     // "이미 돌고 있음" 가드에 걸려 폴링이 되살아나지 않는다.
-    const onStop = images.slice(images.indexOf("onStop:"), images.indexOf("onStop:") + 400);
-    expect(images.indexOf("onStop:")).toBeGreaterThan(-1);
+    // 잘라내는 범위는 글자 수가 아니라 **구조**로 잡는다 — 고정 400자로 자르면 콜백을
+    // 손보기만 해도 재는 대상이 조용히 달라진다.
+    const onStop = block("onStop:", "});");
     expect(onStop, "onStop 안에서 ref 를 null 로 비우지 않는다").toMatch(/stopRef\.current\s*=\s*null/);
   });
 
@@ -46,6 +57,47 @@ describe("④이미지 — 생성 상태 표시", () => {
 
   it("임계 시간을 화면에 손으로 적지 않는다", () => {
     expect(images, "120000 을 화면에 적었다").not.toMatch(/120_?000/);
+  });
+
+  // ── 접기(dismiss)는 **띠지를 감추는 일**이다. 그 이상을 하면 안 된다.
+  //    서버에는 images_error 를 지우는 경로가 없어서, 접기가 판정까지 건드리면
+  //    사장님을 실패에서 꺼내 주려던 버튼이 오히려 탈출구를 닫는다.
+
+  it("★ 닫아도 컷별 [다시 생성]은 열려 있다 — 접기는 탈출구를 닫지 않는다", () => {
+    // 접기가 판정에 끼어들면 stalled 가 꺼지고, 아직 generating 인 컷이 busyCut 으로 다시
+    // 잠겨 "닫고 컷별로 다시 만들기"가 약속한 바로 그 일을 못 하게 된다.
+    // 서버에는 images_error 를 지우는 경로가 없으니 접어도 파이프라인은 여전히 죽어 있다.
+    const stalled = block("const stalled =", ";");
+    expect(stalled, "stalled 계산에 접기 상태가 섞여 있다 — 접는 순간 탈출구가 닫힌다")
+      .not.toMatch(/dismiss/i);
+    // 판정 자체(generationState 의 error 인자)도 접기와 무관해야 한다. 접었다고 오류를
+    // null 로 주면 판정이 running 으로 되살아나 죽은 파이프라인 옆에서 스피너가 돈다.
+    const errArg = block("\n    error:", "\n");
+    expect(errArg, "판정에 넘기는 오류가 접기로 지워진다 — 판정은 실제 상태여야 한다")
+      .not.toMatch(/dismiss/i);
+  });
+
+  it("★ 닫은 뒤 새로 난 실패는 그대로 보인다 — 접기는 한 번 걸면 끝나는 빗장이 아니다", () => {
+    // boolean 빗장이면 접은 뒤 도착한 진짜 실패가 영영 안 뜬다 — 이 계획이 드러내려는
+    // 바로 그 실패가. 무엇을 접었는지 기억해 두고 그 문구만 감춘다.
+    // 여는 중괄호까지 표식에 넣는다 — stalled 계산식 안의 같은 글귀에 걸리지 않게.
+    const failedBanner = block('{gen.kind === "failed"', "</p>");
+    expect(failedBanner, "무엇을 접었는지 기억하지 않는다 — 빗장 하나면 새 실패가 묻힌다")
+      .toMatch(/dismissedMsg/);
+    expect(failedBanner, "접어 둔 문구와 지금 실패를 견주지 않는다").toMatch(/!==/);
+    // 다시 만들기를 시작하면 접어 둔 것은 무효다.
+    const start = block("async function start()", "\n  }");
+    expect(start, "다시 시작할 때 접어 둔 것을 풀지 않는다").toMatch(/setDismissedMsg\(\s*null\s*\)/);
+  });
+
+  it("★ 멈춤 안내는 접기 상태를 건드리지 않는다 — 건드리면 뒤늦게 온 실패가 오진된다", () => {
+    // 멈춤에서 dismiss 를 부르면(이미 stalled 라 얻는 것도 없다) 빗장만 걸려서,
+    // 나중에 도착한 images_error 가 진짜 원인 대신 "진행이 멈춰 있어요"로 읽힌다.
+    const stalledBanner = block('gen.kind === "stalled" && (', 'gen.kind === "failed"');
+    expect(stalledBanner, "멈춤 안내가 dismiss 를 부른다 — 접기 빗장이 걸려 실패가 오진된다")
+      .not.toMatch(/dismiss/);
+    expect(stalledBanner, "멈춤 안내 버튼에 disabled={busy} 가 없다 — 도는 중에도 눌린다")
+      .toMatch(/disabled=\{busy\}/);
   });
 
   it("서버가 잰 멈춤 시간을 읽는다 — 브라우저 시계로 빼지 않는다", () => {

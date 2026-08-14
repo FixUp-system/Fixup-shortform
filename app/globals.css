@@ -560,7 +560,8 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
   border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
   animation: spin .7s linear infinite; vertical-align: -.1em;
 }
-@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+/* 둘 다 덮는다 — .spin 만 남겨 두면 움직임을 줄여 달라고 한 사장님 화면에서 그것만 계속 돈다 */
+@media (prefers-reduced-motion: reduce) { .spin, .spinner { animation: none; } }
 
 .vid-result {
   width: 230px;

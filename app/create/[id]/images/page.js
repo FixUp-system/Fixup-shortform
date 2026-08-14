@@ -44,7 +44,10 @@ export default function ImagesStepPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [pollTimedOut, setPollTimedOut] = useState(false);
-  const [dismissed, setDismissed] = useState(false); // 컷이 남은 채 난 실패를 화면에서 접었는가
+  // 접어 둔 실패의 **문구**를 들고 있는다(접었는가/아닌가의 boolean 이 아니다).
+  // boolean 빗장이면 한 번 접은 뒤에 도착한 진짜 실패가 영영 안 뜬다 — 이 계획이
+  // 드러내려는 바로 그 실패가 조용히 묻힌다. 무엇을 접었는지 알아야 그것만 감춘다.
+  const [dismissedMsg, setDismissedMsg] = useState(null);
   const [selectedIdx, setSelectedIdx] = useState(null); // 우측 큰 미리보기로 볼 컷
   const [status, setStatus] = useState(null); // 마지막 상태 응답 — 심장박동이 여기 온다
   const stopRef = useRef(null);
@@ -101,7 +104,8 @@ export default function ImagesStepPage() {
 
   // 그림 만들기 시작 — 컷당 후보 2장이라 가장 비싼 단계다. 눌러야 나간다.
   async function start() {
-    setErr(""); setPollTimedOut(false); setBusy(true);
+    // 다시 만들기를 시작하면 접어 둔 것은 무효다 — 안 풀면 같은 문구의 실패가 또 나도 안 뜬다.
+    setErr(""); setPollTimedOut(false); setDismissedMsg(null); setBusy(true);
     const res = await fetch(`/api/projects/${id}/images`, { method: "POST" });
     if (!res.ok) {
       setErr((await res.json().catch(() => ({}))).error || "시작하지 못했어요");
@@ -116,8 +120,15 @@ export default function ImagesStepPage() {
   // 실패가 남은 경우의 빠져나갈 길. 다시 [이미지 만들기]를 누르면 409로 막힌다(만든 그림을
   // 지우지 않으려고). images_error를 지우는 서버 경로도 없다 — load만으로는 같은 실패가 돌아온다.
   // 그래서 화면에서 접고, 최신 상태를 한 번 받아온 뒤 컷별 [다시 생성]으로 이어가게 한다.
+  //
+  // ★ 접기가 하는 일은 **띠지를 감추는 것 하나**다. 판정(stalled)은 건드리지 않는다 —
+  //   건드리면 아직 generating 인 컷이 다시 잠겨, 이 버튼이 약속한 "컷별로 다시 만들기"를
+  //   바로 그 버튼이 막는다. 그리고 지금 접은 문구만 기억한다: 그 뒤에 새로 난 실패는
+  //   그대로 보여야 한다.
   async function dismiss() {
-    setErr(""); setDismissed(true);
+    // 띠지에 실제로 적힌 문구(분류를 거친 쪽)를 기억한다 — 날 문구를 넣으면 비교가 어긋나
+    // 접었는데도 그대로 남는다.
+    setErr(""); setDismissedMsg(gen.kind === "failed" ? gen.reason.message : null);
     await load(id).catch(() => {});
     await reloadMe().catch(() => {});
   }
@@ -169,7 +180,10 @@ export default function ImagesStepPage() {
     //      "N개 만들었어요"(성공만 센 수)와는 다른 숫자다. 섞지 말 것.
     done: cuts.filter((c) => isCutDone(c, "images")).length,
     total: cuts.length,
-    error: dismissed ? null : err0,
+    // ★ 접기를 여기 섞지 않는다. 판정은 실제 상태 그대로여야 한다 — 접었다고 오류를 null 로
+    //   주면 판정이 running 으로 되살아나, 이미 죽은 파이프라인 옆에서 스피너가 돈다.
+    //   감추는 일은 아래 띠지에서만 한다.
+    error: err0,
     phase: status?.progress?.phase ?? project.progress?.phase ?? null,
     stepPhase: "images",
     // ★ 서버가 잰 값을 그대로 읽는다. 브라우저가 자기 시계로 빼면 사장님 PC 가
@@ -179,7 +193,13 @@ export default function ImagesStepPage() {
   });
   // 파이프라인이 더 안 도는 상태(멈춤·실패)이거나 상태를 아예 못 읽었으면 기다릴 게 없다 —
   // 컷별 [다시 생성]을 열어준다.
+  //
+  // ★ 접기가 여기 끼어들면 안 된다. 서버에는 images_error 를 지우는 경로가 없어 접어도
+  //   파이프라인은 여전히 죽어 있는데, 접기로 이 값이 false 가 되면 아직 generating 인 컷이
+  //   busyCut 으로 다시 잠겨 "닫고 컷별로 다시 만들기"가 약속한 바로 그 일을 막는다.
   const stalled = pollTimedOut || gen.kind === "stalled" || gen.kind === "failed";
+  // 멈춤·실패에서 손댈 첫 컷 — 안내에서 오른쪽 미리보기로 곧장 데려간다.
+  const stuckIdx = cuts.find((c) => !isCutDone(c, "images"))?.idx ?? cuts[0]?.idx ?? null;
   // 아직 한 장도 만들지 않았는가 — 시작 버튼을 보일지 가른다
   const madeAny = cuts.some((c) => c.image || c.source === "photo");
   // 구성이 없는 영상에서는 컷의 문장이 곧 그림을 만드는 글이다(lib/cuts.js buildImagePrompt).
@@ -210,11 +230,17 @@ export default function ImagesStepPage() {
         {gen.kind === "stalled" && (
           <p className="pgsub warn">
             ⚠ 진행이 멈춰 있어요 — 컷 {gen.done}/{gen.total}에서 더 나아가지 않고 있어요.{" "}
-            <button className="mini" onClick={dismiss}>컷별로 다시 만들기</button>
+            {/* ★ 접기를 부르지 않는다. 여기서는 감출 실패 문구가 아직 없어 얻는 것도 없는데,
+                접어 두면 뒤늦게 도착한 진짜 실패가 그 원인 대신 "멈췄어요"로 읽힌다. */}
+            <button className="mini" disabled={busy} onClick={() => setSelectedIdx(stuckIdx)}>
+              컷별로 다시 만들기
+            </button>
           </p>
         )}
 
-        {gen.kind === "failed" && (
+        {/* 접기는 **이 띠지 하나**만 감춘다. 접어 둔 문구와 다른 실패가 오면 접힌 적 없다는
+            듯 뜬다 — 그 뒤에 새로 난 실패는 그대로 보여야 하기 때문이다. */}
+        {gen.kind === "failed" && gen.reason.message !== dismissedMsg && (
           <p className="pgsub warn">
             ⚠ {gen.reason.message}{" "}
             {gen.reason.retryable && (
