@@ -13,6 +13,12 @@ import { isImageStale, isReachable } from "../../../../lib/steps";
 // 상한과 값은 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다).
 import { MAX_REGEN_PER_CUT, priceLabel, regenPrice, videoPrice } from "../../../../lib/pricing";
 import { modelIdForProject, resolutionForProject } from "../../../../lib/clip-limits";
+// 폴링 한 벌·판정 한 벌·오류 필드 표 한 벌. 화면은 그리기만 한다 —
+// 같은 판정을 화면마다 손으로 적었을 때 조용히 갈렸고, 그 어긋남이 이 화면이
+// images_error 를 영영 못 보던 버그였다(2026-08-14).
+import { startPolling } from "../../../../lib/poll";
+import { generationState, isCutDone } from "../../../../lib/progress";
+import { firstError } from "../../../../lib/step-errors";
 
 // 그림이 아직 없는 자리에 뭐라고 쓸지.
 // "생성 중…"은 **실제로 도는 동안에만** 쓴다 — 누르기 전에도 그렇게 적혀 있으면
@@ -40,42 +46,43 @@ export default function ImagesStepPage() {
   const [pollTimedOut, setPollTimedOut] = useState(false);
   const [dismissed, setDismissed] = useState(false); // 컷이 남은 채 난 실패를 화면에서 접었는가
   const [selectedIdx, setSelectedIdx] = useState(null); // 우측 큰 미리보기로 볼 컷
-  const pollRef = useRef(null);
+  const [status, setStatus] = useState(null); // 마지막 상태 응답 — 심장박동이 여기 온다
+  const stopRef = useRef(null);
 
   // 언마운트 정리 — ref까지 비운다. 비우지 않으면 (dev StrictMode의 재마운트처럼) 다시 마운트됐을 때
   // "이미 돌고 있음"으로 오인해 폴링이 되살아나지 않는다.
-  useEffect(() => () => { clearInterval(pollRef.current); pollRef.current = null; }, []);
+  useEffect(() => () => { stopRef.current?.(); stopRef.current = null; }, []);
 
-  function startPolling() {
-    clearInterval(pollRef.current);
+  function beginPolling() {
+    stopRef.current?.();
     setPollTimedOut(false);
-    let failures = 0;
-    const startedAt = Date.now();
-    const stop = (timedOut) => {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-      setBusy(false);
-      if (timedOut) {
-        setPollTimedOut(true);
-        setErr("생성 상태 확인이 오래 걸리고 있어요 — 새로고침하거나 다시 시도해 주세요");
-      }
-    };
-    pollRef.current = setInterval(async () => {
-      if (Date.now() - startedAt > 5 * 60 * 1000) return stop(true);
-      try {
-        const res = await fetch(`/api/projects/${id}/cuts/status`);
-        if (!res.ok) throw new Error();
-        failures = 0;
-        const st = await res.json();
-        setProject((p) => ({ ...p, status: st.status, cuts: st.cuts, cuts_error: st.cuts_error }));
-        if (st.cuts_error) { stop(false); setErr(st.cuts_error); return; }
+    stopRef.current = startPolling({
+      url: `/api/projects/${id}/cuts/status`,
+      onTick: (st) => {
+        setStatus(st);
+        setProject((p) => ({
+          ...p, status: st.status, cuts: st.cuts,
+          cuts_error: st.cuts_error, images_error: st.images_error,
+        }));
+        // 실패했으면 더 두드릴 것이 없다
+        if (firstError(st, "images")) return true;
         const pending = (st.cuts || []).some((c) => ["pending", "generating"].includes(c.state));
-        if (st.cuts?.length && !pending) stop(false);
-      } catch {
-        failures += 1;
-        if (failures >= 5) stop(true);
-      }
-    }, 2000);
+        return !!st.cuts?.length && !pending;
+      },
+      onStop: ({ timedOut }) => {
+        // ★ 여기서 반드시 비운다. startPolling 이 돌려주는 것은 **떼는 함수**라 영원히
+        //   truthy 다 — 안 비우면 스스로 끝난 폴링을 "아직 돌고 있음"으로 오인해
+        //   다시 시작할 수 없다.
+        stopRef.current = null;
+        setBusy(false);
+        if (timedOut) {
+          setPollTimedOut(true);
+          // ★ "오래 걸린다"가 아니다 — 상태를 못 읽은 것이다. 둘은 다른 사건이고,
+          //   전에는 같은 문구를 써서 사장님이 생성이 느린 줄 알았다.
+          setErr("상태를 확인하지 못했어요 — 새로고침해 주세요");
+        }
+      },
+    });
   }
 
   // 진입·새로고침 복원: **만드는 중인** 컷이 남아 있으면 폴링을 잇는다.
@@ -86,9 +93,9 @@ export default function ImagesStepPage() {
   useEffect(() => {
     const cuts = project?.cuts || [];
     const running = cuts.some((c) => c.state === "generating");
-    if (running && !project.images_error && !pollRef.current && !pollTimedOut) {
+    if (running && !project.images_error && !stopRef.current && !pollTimedOut) {
       setBusy(true);
-      startPolling();
+      beginPolling();
     }
   }, [project?.status, project?.cuts, project?.images_error]);
 
@@ -103,7 +110,7 @@ export default function ImagesStepPage() {
     }
     await load(id).catch(() => {});
     await reloadMe().catch(() => {});
-    startPolling();
+    beginPolling();
   }
 
   // 실패가 남은 경우의 빠져나갈 길. 다시 [이미지 만들기]를 누르면 409로 막힌다(만든 그림을
@@ -150,11 +157,29 @@ export default function ImagesStepPage() {
   // busy 는 방금 [이미지 만들기]를 누른 경우다 — 그때는 아직 컷이 pending 이라 generating 이 없다.
   // busy 없이 pending 만으로 판단하면 시작 전과 구별되지 않는다.
   const generating = cuts.some((c) => c.state === "generating") || (busy && cuts.some((c) => c.state === "pending"));
+  // 판정은 lib/progress 하나가 낸다 — 화면은 그린다.
   // 새로고침·재진입으로 들어오면 실패는 화면 상태가 아니라 프로젝트에 남아 있다 — 둘 다 본다.
-  // 접기(dismiss)는 프로젝트에 남은 실패에만 적용한다 — 그 뒤에 새로 난 실패는 그대로 보여야 한다.
-  const shownErr = err || (dismissed ? "" : project.images_error || "");
-  // 실패가 남아 있으면 파이프라인은 이미 죽었다 — 폴링을 기다릴 게 없으니 컷별 [다시 생성]을 열어준다
-  const stalled = pollTimedOut || !!project.images_error;
+  // 접기(dismiss)는 남은 실패를 화면에서만 접는 길이다(서버에 지우는 경로가 없다).
+  const err0 = firstError({ ...project, ...(status || {}) }, "images");
+  const gen = generationState({
+    // ★ 술어를 여기 손으로 적지 않는다 — 파이프라인의 심장박동과 **같은 함수**를 쓴다.
+    //   손으로 적었을 때 실제로 갈렸다: 실패한 컷(image 없이 needs_attention)을 안 세서
+    //   정상 종료한 실행이 영구히 "멈춤"으로 읽혔다. 한 곳에서 오면 그 표류가 불가능하다.
+    //   ⚠️ 이 done 은 "더 기다릴 것이 남았는가"의 답이다 — 사장님께 보이는
+    //      "N개 만들었어요"(성공만 센 수)와는 다른 숫자다. 섞지 말 것.
+    done: cuts.filter((c) => isCutDone(c, "images")).length,
+    total: cuts.length,
+    error: dismissed ? null : err0,
+    phase: status?.progress?.phase ?? project.progress?.phase ?? null,
+    stepPhase: "images",
+    // ★ 서버가 잰 값을 그대로 읽는다. 브라우저가 자기 시계로 빼면 사장님 PC 가
+    //   3분 빠를 때 시작하자마자 "멈췄어요"가 뜬다.
+    stalledForMs: status?.stalled_for_ms ?? null,
+    busy,
+  });
+  // 파이프라인이 더 안 도는 상태(멈춤·실패)이거나 상태를 아예 못 읽었으면 기다릴 게 없다 —
+  // 컷별 [다시 생성]을 열어준다.
+  const stalled = pollTimedOut || gen.kind === "stalled" || gen.kind === "failed";
   // 아직 한 장도 만들지 않았는가 — 시작 버튼을 보일지 가른다
   const madeAny = cuts.some((c) => c.image || c.source === "photo");
   // 구성이 없는 영상에서는 컷의 문장이 곧 그림을 만드는 글이다(lib/cuts.js buildImagePrompt).
@@ -172,10 +197,29 @@ export default function ImagesStepPage() {
             그림을 누르면 크게 보고 고칠 수 있어요
           </p>
         )}
-        {shownErr && (
+        {/* 네 가지는 사장님에게 서로 다른 사건이다 — 도는 중 / 멈춤 / 실패 / 상태 못 읽음.
+            전에는 전부 한 문단이라 무엇을 해야 할지 알 수 없었다. */}
+        {err && <p className="pgsub warn">{err}</p>}
+
+        {gen.kind === "running" && (
+          <p className="pgsub">
+            <span className="spinner" aria-hidden="true" /> 컷 {gen.done}/{gen.total} 만드는 중이에요
+          </p>
+        )}
+
+        {gen.kind === "stalled" && (
           <p className="pgsub warn">
-            {shownErr}{" "}
-            <button className="mini" onClick={dismiss} disabled={busy}>닫고 컷별로 다시 만들기</button>
+            ⚠ 진행이 멈춰 있어요 — 컷 {gen.done}/{gen.total}에서 더 나아가지 않고 있어요.{" "}
+            <button className="mini" onClick={dismiss}>컷별로 다시 만들기</button>
+          </p>
+        )}
+
+        {gen.kind === "failed" && (
+          <p className="pgsub warn">
+            ⚠ {gen.reason.message}{" "}
+            {gen.reason.retryable && (
+              <button className="mini" onClick={dismiss} disabled={busy}>닫고 컷별로 다시 만들기</button>
+            )}
           </p>
         )}
         {cuts.map((c) => {

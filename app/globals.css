@@ -553,6 +553,15 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* 도는 중임을 글자 말고도 알린다 — 글자만 있으면 멈춘 화면과 구별되지 않는다.
+   위 .spin 과 달리 글줄 안에 섞여 흐르므로 크기를 em 으로 잡는다. */
+.spinner {
+  display: inline-block; width: .8em; height: .8em; margin-right: .4em;
+  border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
+  animation: spin .7s linear infinite; vertical-align: -.1em;
+}
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+
 .vid-result {
   width: 230px;
   max-width: 100%;
