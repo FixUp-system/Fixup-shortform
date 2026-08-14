@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  STEPS, currentStepKey, isReachable, areCutsStale, stepFromPathname, stepHref,
+  STEPS, stepsFor, currentStepKey, isReachable, areCutsStale, stepFromPathname, stepHref,
   clipKey, renderKey, isAudioStale, isImageStale, isClipStale, isRenderStale, toneKey,
   isSubtitlePositionOnlyStale, isSubtitleOnlyStale,
 } from "../lib/steps.js";
@@ -625,5 +625,42 @@ describe("isSubtitleOnlyStale — 자막만 바뀌었는가", () => {
   // ★ 옛 이름은 별칭으로 남는다 — 호출처(app/create/[id]/done/page.js)를 한 번에 못 고친다
   it("옛 이름도 같은 함수를 가리킨다", () => {
     expect(isSubtitlePositionOnlyStale).toBe(isSubtitleOnlyStale);
+  });
+});
+
+describe("stepsFor — 말하는 프로젝트에는 목소리 단계가 없다", () => {
+  const speaking = {
+    settings: { i2v_model: "seedance-2.0" },
+    cuts: [{ idx: 0, sentence: "말하는 컷입니다." }],
+    cast: [{ who: "20대 남성", cuts: [0] }],
+  };
+  const tts = { settings: { i2v_model: "kling-v3" }, cuts: [{ idx: 0, sentence: "컷." }], cast: [] };
+
+  it("Seedance 프로젝트에서는 voice 가 빠진다", () => {
+    expect(stepsFor(speaking).map((s) => s.key)).toEqual(
+      ["material", "script", "images", "video", "done"]
+    );
+  });
+
+  it("Kling 프로젝트는 지금과 같다", () => {
+    expect(stepsFor(tts).map((s) => s.key)).toEqual(
+      ["material", "script", "voice", "images", "video", "done"]
+    );
+  });
+
+  it("프로젝트가 없으면 기본 목록이다", () => {
+    expect(stepsFor(null).map((s) => s.key)).toEqual(STEPS.map((s) => s.key));
+  });
+
+  // ★ 화면이 여는 문과 가드가 닫는 문이 갈리면 안 된다(2026-08-13 에 겪은 결함).
+  //   숨긴 단계로 보내 놓고 가드가 되돌리면 사장님은 버튼이 고장난 것으로 본다.
+  it("말하는 프로젝트는 컷이 끝나면 목소리가 아니라 이미지로 간다", () => {
+    expect(currentStepKey({ ...speaking, briefing: { confirmed: true }, status: "cuts" }))
+      .toBe("images");
+  });
+
+  it("TTS 프로젝트는 지금처럼 목소리로 간다", () => {
+    expect(currentStepKey({ ...tts, briefing: { confirmed: true }, status: "cuts" }))
+      .toBe("voice");
   });
 });

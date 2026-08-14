@@ -9,7 +9,7 @@ import { useProject } from "./ProjectContext";
 // 광고 프로젝트 공유본 — /ads/[id] 화면이 채운다. 여기서는 읽기만 한다(자체 fetch 없음).
 import { useAdProject } from "./AdProjectContext";
 import { useMe } from "./MeContext";
-import { STEPS, currentStepKey, isReachable, stepHref } from "../lib/steps";
+import { STEPS, stepsFor, currentStepKey, isReachable, stepHref } from "../lib/steps";
 import { AD_STEPS, adStepIndex, isAdStepReachable } from "../lib/ad/steps";
 
 // 진행 중인 프로젝트의 현재 단계 주소 — 없으면 새 프로젝트 화면.
@@ -32,9 +32,12 @@ function StepList({ pathname }) {
   const id = project?.id;
   const here = currentStepKey(project);
 
+  // ★ stepsFor(project) — 말하는 프로젝트에서는 목소리 단계가 목록에 없다.
+  //   여기서 STEPS를 그대로 읽으면 사이드바가 여는 문(목소리)을 화면·가드가 닫는다
+  //   (lib/steps.js의 stepsFor 주석 참고, 2026-08-13에 겪은 결함과 같은 모양).
   return (
     <div className="side-steps">
-      {STEPS.map((s) => {
+      {stepsFor(project).map((s) => {
         const href = stepHref(s, id);
         const active = href && (href === pathname || (s.key === "material" && pathname === "/create"));
         const reachable = isReachable(s.key, project);

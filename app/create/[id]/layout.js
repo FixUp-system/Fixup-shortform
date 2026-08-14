@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useProject } from "../../../components/ProjectContext";
-import { STEPS, currentStepKey, isReachable, stepFromPathname, stepHref } from "../../../lib/steps";
+import { stepsFor, currentStepKey, isReachable, stepFromPathname, stepHref } from "../../../lib/steps";
 
 export default function ProjectLayout({ children }) {
   const { id } = useParams();
