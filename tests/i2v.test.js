@@ -131,6 +131,20 @@ describe("generateClip", () => {
     ).rejects.toThrow(/비어/);
   });
 
+  // ★ 이 원장 문자열이 이 저장소의 계측기다 — "클립 프롬프트에 무대·인물·제품이 없다"를
+  //   발견한 것이 바로 cost_records.meta.prompt 였다(2026-08-14). 300자에서 자르면
+  //   Setting: 까지만 남고 Characters·The subject is·Color treatment 가 사라져,
+  //   라이브에서 무엇을 보냈는지 확인할 채널이 막힌다(실측 최대 603자).
+  it("원장에 프롬프트를 자르지 않고 적는다 — 라이브에서 무엇을 보냈는지 볼 수 있어야 한다", async () => {
+    const prompt = `${"가".repeat(500)}끝맺음 문장`;
+    const fetchImpl = async () => ({ ok: true, json: async () => ({ video: { url: "https://fal.media/v.mp4" } }) });
+    await runWithActor("t-user", () =>
+      generateClip({ imageUrl: "i", seconds: 4, aspect_ratio: "9:16", prompt, projectId: "p-ledger", fetchImpl })
+    );
+    const row = (await memoryStore.allCosts()).find((r) => r.project_id === "p-ledger");
+    expect(row.prompt).toBe(prompt);
+  });
+
   it("실패하면 상태 코드를 담아 던진다", async () => {
     const fetchImpl = async () => ({ ok: false, status: 500, text: async () => "boom" });
     await expect(

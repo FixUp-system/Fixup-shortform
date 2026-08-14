@@ -51,6 +51,19 @@ describe("generateImage — 레퍼런스", () => {
     expect(seen.body.image_urls[0]).toContain(Buffer.from("AAA").toString("base64"));
   });
 
+  // 클립 쪽(lib/i2v.js)과 **같은 한도**를 쓴다 — 값이 두 벌이면 갈린다.
+  // 이미지 프롬프트는 실측 평균 558자·최대 729자로 44/44 컷이 전부 300자를 넘는다
+  // (2026-08-15, 저장된 프로젝트). 즉 원장의 이미지 프롬프트는 지금까지 전부 잘려 있었다.
+  it("원장에 프롬프트를 자르지 않고 적는다", async () => {
+    const prompt = `${"가".repeat(500)}끝맺음 문장`;
+    const seen = {};
+    await runWithActor("t-user", () =>
+      generateImage({ prompt, aspect_ratio: "9:16", projectId: "p-ledger", fetchImpl: ok(seen) })
+    );
+    const row = (await memoryStore.allCosts()).find((r) => r.project_id === "p-ledger");
+    expect(row.prompt).toBe(prompt);
+  });
+
   it("가짜 모드에서는 fal 을 부르지 않는다", async () => {
     process.env.SHOTFORM_FAKE = "all";
     let called = false;
