@@ -3,6 +3,7 @@ import { splitSentences, splitUnits, explodeLongRanges, buildSplitMessages, buil
 import { clipProfileForProject, minSecondsFor, maxSecondsFor } from "../lib/clip-limits.js";
 import { STYLE_PRESETS } from "../lib/styles.js";
 import { MOTION_AXES } from "../lib/motion.js";
+import { motionFields, motionRules, speedRule } from "../lib/cuts.js";
 import { SPEEDS } from "../lib/speeds.js";
 // 관통 테스트라 파일 경계를 넘는다 — 화면 설계(validate) → 그림 프롬프트(cuts) → 각인(steps).
 import { validateShows } from "../lib/validate.js";
@@ -1828,11 +1829,59 @@ describe("SHOWS_SYSTEM — 움직임 축", () => {
     }
   });
 
+  it("예시도 목록에서 만들어진다 — ✓ 예시가 축의 example 그대로다", () => {
+    for (const a of MOTION_AXES) {
+      expect(system()).toContain(`  ✓ ${a.id}: "${a.example}"`);
+    }
+    for (const a of MOTION_AXES.filter((x) => x.bad)) {
+      expect(system()).toContain(`  ✗ ${a.id}: "${a.bad}"`);
+    }
+  });
+
+  it("개수를 말하는 자리가 목록에서 나온다", () => {
+    expect(system()).toContain(`아래 ${MOTION_AXES.length}개 축 중`);
+  });
+
   it("옛 motion 필드를 더 이상 요구하지 않는다", () => {
     expect(system()).not.toContain("motion 은 그 정지 화면에서");
     expect(system()).not.toContain("둘 다 넣지 않는다");
     // ★ 지문 어디에도 motion 이 없어야 한다 — 한 군데라도 남으면 모델이 없는 필드를 답한다
     expect(system()).not.toMatch(/motion/i);
+  });
+});
+
+// ★ 이 설계의 안전장치는 "무너지면 MOTION_AXES 에서 한 줄을 뺀다"이다.
+//   그것이 참인지를 **주장하지 않고 실제로 실행해서** 확인한다 — 축을 뺀 목록으로 지문을
+//   조립해 보고, 뺀 축의 흔적(id·label·hint·example)이 0건인지 본다.
+//   "motion 이 없다"만 재는 단언으로는 이 회귀를 못 잡는다(남는 것은 motion 이 아니라 ambient 다).
+describe("★ 축을 빼면 지문에서 그 축이 통째로 사라진다", () => {
+  const gone = MOTION_AXES.find((a) => a.id === "ambient");
+  const kept = MOTION_AXES.filter((a) => a.id !== "ambient");
+  const rolled = [motionFields(kept), motionRules(kept), speedRule(kept)].join("\n");
+
+  it("뺀 축의 id·label·hint·example 이 하나도 남지 않는다", () => {
+    for (const trace of [gone.id, gone.label, gone.hint, gone.example]) {
+      expect(rolled, trace).not.toContain(trace);
+    }
+  });
+
+  it("남은 축은 출력 형식·규칙·예시에 그대로 있다", () => {
+    for (const a of kept) {
+      expect(rolled).toContain(`"${a.id}":`);
+      expect(rolled).toContain(`· ${a.id}(${a.label})`);
+      expect(rolled).toContain(`✓ ${a.id}: "${a.example}"`);
+    }
+  });
+
+  it("개수를 말하는 자리도 함께 줄어든다", () => {
+    expect(rolled).toContain(`아래 ${kept.length}개 축 중`);
+    expect(rolled).toContain(`위 움직임 축 ${kept.length}개 전체에 걸리는 값이라`);
+    expect(rolled).not.toContain(`${MOTION_AXES.length}개 축 중`);
+  });
+
+  it("축을 전부 빼도 던지지 않는다 — 되돌리기의 끝까지 간다", () => {
+    expect(() => [motionFields([]), motionRules([]), speedRule([])].join("\n")).not.toThrow();
+    expect(motionFields([])).toBe("");
   });
 });
 
@@ -1843,8 +1892,8 @@ describe("speed — intensity 통합은 문구를 바꾸지 않는다", () => {
   it("지문이 speed 를 '빠르고 센지'로 정의한다", () => {
     expect(system()).toContain("얼마나 빠르고 센지");
   });
-  it("speed 가 세 축 전체에 걸린다고 알려 준다", () => {
-    expect(system()).toContain("세 축 전체에 걸리는 값이라 컷 하나에 하나만 고른다");
+  it("speed 가 축 전체에 걸린다고 알려 준다", () => {
+    expect(system()).toContain(`위 움직임 축 ${MOTION_AXES.length}개 전체에 걸리는 값이라 컷 하나에 하나만 고른다`);
   });
   it("★ clip 문구는 그대로다 — 바뀌면 저장된 컷이 전부 낡는다", () => {
     expect(SPEEDS.map((s) => s.clip)).toEqual([
