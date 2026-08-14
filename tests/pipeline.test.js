@@ -465,7 +465,8 @@ describe("runVoicePipeline — 컷마다 따로 읽힌다", () => {
     //   allocateCutSeconds 가 배분한 값이라 지킨다 — 덮으면 여백이 통째로 사라진다.
     expect(saved.cuts[0].spoken_seconds).toBe(4.3);
     expect(saved.cuts[0].seconds).toBe(8);   // 배분된 여백이 살아 있다
-    // 말이 화면 시간보다 길면 화면 시간이 따라 올라간다 — 말은 자르지 않는다
+    // 배분된 화면 시간(9)이 실측(4.3)보다 길 때도 그대로 지켜진다 — 여기서 줄어들지 않는다.
+    // (실측이 화면 시간을 넘는 경우는 아래 "실측이 화면 시간보다 길면…" 이 따로 검증한다)
     expect(saved.cuts[1].spoken_seconds).toBe(4.3);
     expect(saved.cuts[1].seconds).toBe(9);
   });
@@ -584,7 +585,42 @@ describe("runVoicePipeline — 컷마다 따로 읽힌다", () => {
     expect(logs.some((l) => l.includes("추정") && l.includes("실측")), "긴 실측이 로그에 없다").toBe(true);
     const after = await projects.getProject(p.id, OWNER);
     expect(after.status, "로그를 남겨도 흐름은 그대로 간다").toBe("voice");
-    expect(after.cuts.find((c) => c.source === "ai").seconds, "실측이 추정을 덮는다").toBe(9);
+    // Math.max(추정 6, 실측 9) — 낭독이 배분된 화면 시간을 넘어서 화면 시간이 따라 올라간 것
+    expect(after.cuts.find((c) => c.source === "ai").seconds, "실측이 화면 시간을 넘어서면 화면 시간이 따라간다").toBe(9);
+  });
+});
+
+describe("regenVoice — 재생성도 배분된 화면 시간을 지킨다", () => {
+  async function withCut(cut) {
+    const p = await makeProject();
+    await projects.updateProject(p.id, OWNER, (proj) => ({
+      ...proj, status: "voice", voice_id: "v1", cuts: [cut],
+    }));
+    return p;
+  }
+
+  // ★ 2026-08-14: 재생성은 이미 산 클립을 다시 쓰는 흐름이다 — 새 실측이 짧게 나왔다고
+  //   화면 시간(=이미 결제한 클립 길이)을 줄이면 완성 영상이 그만큼 트리밍돼 짧아진다.
+  //   compose.js 가 cut.seconds 로 완성 길이를 합산하므로, 여기서 줄이면 그 값이 바로 샌다.
+  it("새 실측이 배분된 화면 시간보다 짧아도 화면 시간은 줄지 않는다", async () => {
+    const p = await withCut({ idx: 0, sentence: "문장", spoken_seconds: 3, seconds: 8, image: { url: "i0" } });
+    await pipeline.regenVoice(p.id, OWNER, 0, {
+      speak: async () => ({ url: "http://a.mp3", seconds: 4.3 }),
+    });
+    const cut = (await projects.getProject(p.id, OWNER)).cuts[0];
+    expect(cut.audio.url).toBe("http://a.mp3");
+    expect(cut.spoken_seconds).toBe(4.3);
+    expect(cut.seconds).toBe(8); // 배분된 화면 시간이 살아 있다 — 이미 산 클립을 트리밍하지 않는다
+  });
+
+  it("새 실측이 화면 시간보다 길면 화면 시간이 따라 올라간다", async () => {
+    const p = await withCut({ idx: 0, sentence: "긴 문장", spoken_seconds: 3, seconds: 4, image: { url: "i0" } });
+    await pipeline.regenVoice(p.id, OWNER, 0, {
+      speak: async () => ({ url: "http://a.mp3", seconds: 9 }),
+    });
+    const cut = (await projects.getProject(p.id, OWNER)).cuts[0];
+    expect(cut.spoken_seconds).toBe(9);
+    expect(cut.seconds).toBe(9); // 말은 자르지 않는다
   });
 });
 
