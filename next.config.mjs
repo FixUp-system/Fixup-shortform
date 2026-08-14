@@ -22,8 +22,16 @@ const nextConfig = {
   //   덮는다 — 합성을 부르는 라우트가 여럿이고(render·subtitle·clips…) 새 라우트가 생길
   //   때 빠뜨리기 때문이다. 네이티브 바이너리를 싣는 문서의 권장 패턴도 이 모양이다
   //   (`'/*': ['node_modules/sharp/**/*']`).
+  // ★ assets/ (자막 폰트)도 같은 이유로 같이 실어야 한다.
+  //
+  // lib/compose.js 의 fontsDir()이 `path.join(process.cwd(), "assets", …)` 로
+  // 동적으로 경로를 만들어 연다 — import 문이 아니라 문자열 조합이라 @vercel/nft
+  // 의 파일 추적(import 를 따라간다)이 이 참조를 못 본다. ffmpeg-static 바이너리와
+  // 정확히 같은 실패 모양(2026-08-13 프로덕션)이지만, 이쪽은 **에러조차 안 난다** —
+  // libass 는 지정한 폰트가 없으면 조용히 기본 폰트로 대체할 뿐이라, 배포에서 폰트
+  // 파일이 빠져도 합성은 "성공"하고 자막 글자만 두부(□□□)나 엉뚱한 글꼴로 나온다.
   outputFileTracingIncludes: {
-    "/*": ["node_modules/ffmpeg-static/**/*"],
+    "/*": ["node_modules/ffmpeg-static/**/*", "assets/**/*"],
   },
 };
 
