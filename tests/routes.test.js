@@ -496,6 +496,22 @@ describe("POST /api/projects/[id]/script — 원고", () => {
     expect((await getProject(p.id, OWNER)).script.text).toBe(되풀이.script);
   });
 
+  // 스키마 거절 한 번은 그 라운드를 포기시키지 않는다 — 유료 호출이라 라운드당 한 번만
+  // 다시 시도하고, 그것도 스키마를 못 지키면 그 라운드만 버리고 남은 라운드를 계속 돈다.
+  it("되돌리기가 스키마를 거절하면 한 번 다시 시도하고, 그래도 안 되면 이 라운드만 버리고 다음 라운드를 돈다", async () => {
+    const p = await projectWithBriefing();
+    llmMock.callJson
+      .mockResolvedValueOnce(되풀이) // 초안
+      .mockResolvedValueOnce({})    // 되돌리기 1회차 시도1 — 스키마 거절
+      .mockResolvedValueOnce({})    // 되돌리기 1회차 재시도 — 스키마 거절 → 1회차 버림
+      .mockResolvedValueOnce(고침)  // 되돌리기 2회차 — 성공, 채택
+      .mockResolvedValueOnce(고침); // 교정
+    const res = await scriptPOST(patchReq({}), ctx(p.id));
+    expect(res.status).toBe(200);
+    expect(llmMock.callJson).toHaveBeenCalledTimes(5);
+    expect((await getProject(p.id, OWNER)).script.text).toBe(고침.script);
+  });
+
   it("version을 올리고 브리핑 버전을 붙여 저장한다", async () => {
     const p = await projectWithScript(); // 이미 version 1
     llmMock.callJson.mockResolvedValue(plain);

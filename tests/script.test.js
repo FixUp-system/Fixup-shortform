@@ -291,6 +291,40 @@ describe("editKeptContent", () => {
   });
 });
 
+describe("editKeptContent — 큰 축소가 늘 파괴인 것은 아니다", () => {
+  // ⚠️ 2026-08-14 측정이 만든 테스트다. 실측 로그:
+  //   [b52c32e1] 교정 41자 → 최종 106자  — 41자는 목표 밴드 안인데 가드가 버렸다.
+  // 가드 자체는 옳다(교정이 원고를 뭉텅 지우면 안 된다). 빠진 것은 **목표를 함께 보는 것**이다.
+  const at = (secs) => ({ ...project, settings: { target_seconds: secs } });
+
+  it("초안이 목표를 크게 넘을 때, 밴드 안으로 데려온 교정은 받는다", () => {
+    const p = at(15);                       // 목표 37자
+    const draft = { text: "가".repeat(106) };
+    const edited = { text: "나".repeat(41) }; // 밴드(31~43) 안
+    expect(editKeptContent(draft, edited, p)).toBe(true);
+  });
+
+  it("초안이 이미 밴드 안이면 큰 축소는 여전히 파괴다", () => {
+    const p = at(15);
+    const draft = { text: "가".repeat(40) };  // 이미 밴드 안
+    const edited = { text: "나".repeat(12) };
+    expect(editKeptContent(draft, edited, p)).toBe(false);
+  });
+
+  it("초안이 넘쳐도 목표 아래로 깎아 오면 받지 않는다", () => {
+    const p = at(15);
+    const draft = { text: "가".repeat(106) };
+    const edited = { text: "나".repeat(10) }; // 밴드 아래
+    expect(editKeptContent(draft, edited, p)).toBe(false);
+  });
+
+  // 프로젝트를 안 넘기면 옛 규칙 그대로다 — 호출처를 다 못 고쳤을 때 조용히 느슨해지지 않게
+  it("프로젝트 없이 부르면 옛 80% 규칙만 쓴다", () => {
+    expect(editKeptContent({ text: "가".repeat(100) }, { text: "나".repeat(85) })).toBe(true);
+    expect(editKeptContent({ text: "가".repeat(100) }, { text: "나".repeat(41) })).toBe(false);
+  });
+});
+
 describe("copyRatio · repeatsWithin", () => {
   it("수사만 덧대고 사실을 더하지 않은 문장은 임계 위다", () => {
     expect(copyRatio("이곳은 동네 작은 세탁소다", "이곳은 평범한 동네에 자리한 작은 세탁소입니다.")).toBeGreaterThan(0.5);
