@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
 import {
   STEPS, stepsFor, currentStepKey, isReachable, areCutsStale, stepFromPathname, stepHref,
   clipKey, renderKey, isAudioStale, isImageStale, isClipStale, isRenderStale, toneKey,
@@ -662,5 +663,38 @@ describe("stepsFor — 말하는 프로젝트에는 목소리 단계가 없다",
   it("TTS 프로젝트는 지금처럼 목소리로 간다", () => {
     expect(currentStepKey({ ...tts, briefing: { confirmed: true }, status: "cuts" }))
       .toBe("voice");
+  });
+
+  // ★ 2026-08-14 리뷰에서 잡힌 어긋남 — isReachable 이 raw STEPS 로 순위를 매기면
+  //   목록에 없는 "voice" 도 index -1 이 나와 "-1 <= 아무 index" 가 참이 되어 새어 나온다.
+  //   목록에 없는 단계는 애초에 열릴 수 없다고 먼저 끊는다.
+  it("말하는 프로젝트에서는 voice 자체가 열려 있지 않다", () => {
+    const p = { ...speaking, briefing: { confirmed: true }, status: "cuts" };
+    expect(isReachable("voice", p)).toBe(false);
+    expect(isReachable("images", p)).toBe(true);
+  });
+});
+
+// ★★ 2026-08-14 리뷰에서 잡힌 결함 — layout.js의 import 를 STEPS→stepsFor 로 바꾸면서
+//   본문의 `STEPS.find(...)`를 stepsFor(project).find(...) 로 못 고쳐 ReferenceError 가
+//   났다(가드의 리다이렉트 갈래가 돌 때마다, 즉 모든 프로젝트에서 터진다). 이 저장소에는
+//   "use client" 화면을 렌더하는 테스트 도구가 없다(react-testing-library 미설치,
+//   tests/staleness-ui.test.js 와 같은 이유) — 그래서 소스를 직접 훑어 어긋남을 잡는다.
+describe("app/create/[id]/layout.js — 가드가 STEPS 가 아니라 stepsFor 를 쓰는가(소스 스캔)", () => {
+  const path = "app/create/[id]/layout.js";
+  const src = readFileSync(path, "utf8");
+  const importLine = src.split("\n").find((l) => l.includes('from "../../../lib/steps"'));
+
+  it("STEPS 를 더는 import 하지 않는다 — stepsFor 로 바꿨다", () => {
+    expect(importLine).toBeTruthy();
+    expect(importLine).toContain("stepsFor");
+    expect(importLine).not.toMatch(/\bSTEPS\b/);
+  });
+
+  it("가드의 목표 단계 계산이 stepsFor(project) 를 쓴다 — import 를 바꿔 놓고 본문을 놓치면 안 된다", () => {
+    expect(src).toContain("stepsFor(project).find");
+    // import 줄을 뺀 본문에 bare STEPS 식별자가 남아 있으면 스코프 밖 참조라 ReferenceError 다
+    const body = src.split("\n").filter((l) => l !== importLine).join("\n");
+    expect(body).not.toMatch(/\bSTEPS\b/);
   });
 });

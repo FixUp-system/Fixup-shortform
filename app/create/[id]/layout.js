@@ -24,7 +24,7 @@ export default function ProjectLayout({ children }) {
   useEffect(() => {
     if (!project || project.id !== id) return;
     if (step && (step.soon || isReachable(step.key, project))) return;
-    const target = STEPS.find((s) => s.key === currentStepKey(project));
+    const target = stepsFor(project).find((s) => s.key === currentStepKey(project));
     router.replace(stepHref(target, id));
   }, [project, id, step, router]);
 
