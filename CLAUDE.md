@@ -8,13 +8,19 @@
 >
 > ⚠️ **새로 클론했으면 `npm install` 이 먼저다.** 안 하면 `npx vitest run` 이 테스트가 아니라
 > `Cannot find module 'vitest/config'` 로 죽는다 — 테스트 실패로 오해하기 쉽다.
-> ⚠️ **이 저장소에는 Vercel 프로젝트가 없다** — `main` 에 푸시해도 배포되는 것이 없다.
+> ⚠️ **배포는 라이브다**(2026-08-14) — Vercel `fixup-shortform-service`(팀 FixUp).
+> 다만 **푸시로 자동 배포되지 않는다**: 커밋 작성자 이메일(`system@fix-up.kr`)이 GitHub 계정과
+> 매칭 안 돼 Git 트리거 빌드가 **0ms 에서 멈춘다**. 저장소를 연결한 뒤로는 CLI 배포에도 같은
+> 검사가 붙어서, 지금은 **git 없는 폴더에서** 올린다:
+> `git archive --format=tar HEAD | tar -x -C <빈폴더>` → `.vercel` 만 복사해 넣고
+> `npx vercel deploy --prod --yes`. 근본 해결은 그 이메일을 GitHub 계정에 인증 등록하는 것이다
+> (기존 커밋까지 한꺼번에 인정된다).
 > ⚠️ **`next.config.mjs` 는 의도적 미커밋**이다(주석에 "커밋하지 않는다"). `git add -A` 금지.
 > ⚠️ **dev 서버를 둘 이상 띄우려면 `SHOTFORM_DIST_DIR` 로 빌드 디렉터리를 갈라라.** 안 가르면
 > 같은 `.next` 를 덮어써 돌아가던 서버가 404 가 된다(2026-08-13 실측).
 >
 > ★ **이어서 하는 세션은 wiki 부터 읽어라** — 지금 상태와 남은 일이 한 장에 있다:
-> `C:\Users\fixup\obsidian_jaechan\sources\shotform-ad-merge-and-ux-2026-08-13.md`
+> `C:\Users\fixup\obsidian_jaechan\sources\shotform-deploy-and-qa-2026-08-14.md`
 
 > ## ★★ 화면 파일을 손댔으면 **한 번 굽는다**
 >
@@ -31,6 +37,11 @@
 > 영원히 안 맞는 단정이 됐다. 역슬래시가 필요하면 `chr(92)` 로 만들어라.
 
 > ## 라이브 검증이 아직 안 된 것 (2026-08-12~13)
+>
+> ⚠️ **2026-08-14 갱신** — 아래 셋 중 **2·3 은 확인됐다**: Seedance 엔드포인트는 실호출로
+> 영상이 나왔고, 크레딧 차감·지급도 실물로 봤다. **1(목소리 일관성)만 여전히 미검증**이다.
+> 그리고 지금은 **내부 QA 모드**라 크레딧이 꺼져 있다(`SHOTFORM_NO_CREDITS=1`) —
+> ★ **그 동안 지출을 막는 그물이 0 이다**(전역 상한은 08-13 폐지, 잔액·체험은 이 스위치가 내린다).
 >
 > 1. **컷 간 목소리 일관성** — 설계가 "무너지면 구현하지 않는다"로 건 **정지 게이트**인데
 >    통과된 적이 없다. `bash scripts/measure/seedance-voice.sh`(fal 직접 $3.63) 또는
