@@ -603,6 +603,87 @@ describe("clipKey — 프롬프트에 실리는 것은 각인에도 있다", () 
   });
 });
 
+// 세 축(camera·subject·ambient)은 buildClipPrompt 가 싣는다 — 각인에 없으면 움직임을
+// 고쳐도 클립이 안 낡아 화면과 영상이 조용히 갈린다.
+//
+// ★ 축은 **컷별 값**이라 project 와 무관하다 — 프롬프트도 project 없이 축을 싣는다
+//   (lib/cuts.js 의 axesOf(cut)). 그래서 위 stage·cast·subject·tone 과 달리 project 가
+//   없어도 붙는 것이 "각인은 프롬프트에 실린 것만 담는다"를 지키는 쪽이다.
+describe("clipKey — 움직임 축", () => {
+  it("축을 고치면 클립이 낡는다", () => {
+    const a = { shows: "미디엄 샷", camera: "천천히 뒤로 물러난다" };
+    const b = { shows: "미디엄 샷", camera: "빠르게 다가간다" };
+    expect(clipKey(a)).not.toBe(clipKey(b));
+  });
+
+  it("축을 더하면 낡는다", () => {
+    const a = { shows: "미디엄 샷", camera: "물러난다" };
+    const b = { shows: "미디엄 샷", camera: "물러난다", ambient: "사람들이 지나간다" };
+    expect(clipKey(a)).not.toBe(clipKey(b));
+  });
+
+  it("세 축이 전부 각인에 닿는다 — 하나씩 바꿔 본다", () => {
+    const base = { shows: "미디엄 샷", camera: "물러난다", subject: "컵을 든다", ambient: "김이 오른다" };
+    for (const id of ["camera", "subject", "ambient"]) {
+      expect(clipKey({ ...base, [id]: "달라진 움직임" })).not.toBe(clipKey(base));
+    }
+  });
+
+  it("축 순서는 목록이 정한다 — 적는 순서를 바꿔도 각인이 같다", () => {
+    const a = { camera: "물러난다", subject: "컵을 든다", ambient: "김이 오른다" };
+    const b = { ambient: "김이 오른다", camera: "물러난다", subject: "컵을 든다" };
+    expect(clipKey(a)).toBe(clipKey(b));
+  });
+
+  it("빈 축·공백 축은 없는 것으로 본다", () => {
+    expect(clipKey({ shows: "미디엄 샷", camera: "   ", subject: "" }))
+      .toBe(clipKey({ shows: "미디엄 샷" }));
+  });
+
+  // ⚠️ 축 텍스트는 자유 서술 한국어라 `|` 나 `:` 가 들어갈 수 있다. 구분자를 그대로 이으면
+  //    서로 다른 두 컷이 같은 각인이 되어 **바꿨는데 안 낡는다**(A단계 리뷰 Minor).
+  it("★ 구분자가 섞여도 서로 다른 컷이 같은 각인이 되지 않는다", () => {
+    const a = { camera: "물러난다|subject:컵을 든다" };
+    const b = { camera: "물러난다", subject: "컵을 든다" };
+    expect(clipKey(a)).not.toBe(clipKey(b));
+    const c = { camera: "커피:진한" };
+    const d = { camera: "커피", subject: "진한" };
+    expect(clipKey(c)).not.toBe(clipKey(d));
+  });
+
+  it("★ 축이 없는 컷의 각인은 골든과 바이트 동일이다", () => {
+    // 구현 **전** 코드로 아래 입력을 실행해 얻은 실측값이다(git show 로 잡지 않는다 —
+    // squash-merge 되면 도달 불가가 되어 진짜 회귀와 구분이 안 된다).
+    const GOLDEN = "||회전한다|slow";
+    expect(clipKey({ shows: "미디엄 샷", motion: "회전한다", speed: "slow" })).toBe(GOLDEN);
+  });
+
+  it("★ project 를 안 주면 프롬프트와 똑같이 침묵한다", () => {
+    // A단계 최종 리뷰 I-3 과 같은 불변이다 — 각인이 프롬프트보다 더 말하면 거짓 낡음이 되고,
+    // 거짓 낡음은 유료 버튼을 연다. 축은 컷별 값이라 project 유무로 값이 갈리면 안 된다.
+    const cut = { shows: "미디엄 샷", camera: "물러난다" };
+    expect(clipKey(cut)).toBe(clipKey(cut, undefined));
+    expect(clipKey(cut)).toBe(clipKey(cut, null));
+    expect(clipKey(cut)).toBe(clipKey(cut, 3));
+  });
+
+  it("★ 다른 컷의 축이 바뀌어도 이 컷은 안 낡는다", () => {
+    const p1 = { settings: {}, briefing: {}, cast: [], cuts: [{ idx: 1, camera: "물러난다" }] };
+    const p2 = { settings: {}, briefing: {}, cast: [], cuts: [{ idx: 1, camera: "다가간다" }] };
+    const cut = { idx: 0, image: { url: "u" }, seconds: 5, camera: "올려본다" };
+    expect(clipKey(cut, p1)).toBe(clipKey(cut, p2));
+  });
+
+  it("★ 그림 각인은 축을 안 본다 — 세 축은 클립 전용이다", () => {
+    const p = { settings: { aspect_ratio: "9:16" }, briefing: { topic: "커피" }, cast: [] };
+    const a = { idx: 0, shows: "미디엄 샷", camera: "물러난다" };
+    const b = { idx: 0, shows: "미디엄 샷", camera: "다가간다", ambient: "김이 오른다" };
+    expect(imageContextKey(a, p)).toBe(imageContextKey(b, p));
+    expect(isImageStale({ ...a, image: { url: "i", of: a.shows, context_of: imageContextKey(a, p) } }, p)).toBe(false);
+    expect(isImageStale({ ...b, image: { url: "i", of: b.shows, context_of: imageContextKey(a, p) } }, p)).toBe(false);
+  });
+});
+
 describe("자막 위치와 완성본 각인", () => {
   const withCuts = (settings) => ({
     settings,
