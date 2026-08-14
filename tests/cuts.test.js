@@ -373,6 +373,22 @@ describe("buildImagePrompt — 화면 근거", () => {
     expect(p).not.toContain("옛 문장");
   });
 
+  // ★ 최종 리뷰가 찾은 문제(2026-08-14): 폴백 사슬의 마지막 칸이 `cut.sentence` 인데
+  //   **무음 컷에는 문장이 없다.** 화면 설계가 통째로 실패하면(validateShows 는 shows 가
+  //   한 칸이라도 비면 null 을 준다) 말하는 컷은 문장으로 내려앉지만 무음 컷은 빈손으로
+  //   내려앉아 `Scene: .` 이 된다 — 주어 없는 그림 한 장($0.08)과 클립을 그걸로 산다.
+  it("무음 컷은 화면 설계가 실패해도 그릴 대상이 남는다 — 문장이 없다", () => {
+    const cut = { idx: 0, sentence: "", silent: true };
+    const p = buildImagePrompt(cut, project);
+    expect(p).not.toMatch(/Scene:\s*\./);
+    expect(p).toContain("생딸기라떼"); // briefing.topic 이 마지막 버팀목이다
+  });
+
+  it("무음 컷도 shows 가 있으면 그것을 그대로 쓴다", () => {
+    const cut = { idx: 0, sentence: "", silent: true, shows: "빈 매장 풀 샷" };
+    expect(buildImagePrompt(cut, project)).toContain("빈 매장 풀 샷");
+  });
+
   it("컷 비율·레퍼런스 지시가 반영된다", () => {
     const cut = { idx: 0, sentence: "문장", shows: "화면", source: "ai", ref_ids: ["p1"] };
     const prompt = buildImagePrompt(cut, project, [{ path: "/x/라떼.jpg", kind: "thing" }]);
@@ -582,6 +598,31 @@ describe("explodeLongRanges — 8초를 넘고 두 조각 이상이면 푼다", 
       expected = r.to + 1;
     }
     expect(expected).toBe(units.length + 1);
+  });
+
+  // ★★ 최종 리뷰가 찾은 Critical(2026-08-14): 모델이 무음 컷을 하나라도 내면
+  //   explodeLongRanges 가 빈 배열을 돌려주고, 파이프라인이 "분해 결과가 검사를 통과하지
+  //   못해…"를 console.warn 하며 **분해 안 된 경계를 그대로 쓴다.** 8초 강제 분해가
+  //   조용히 꺼진다 — 되묻기가 실패해서 만든 그 보장이, 새 기능을 쓰는 바로 그때 열린다.
+  //   validateCutRanges 는 무음을 배웠는데 여기는 안 배웠고 둘은 같은 배열을 받는다.
+  it("모델이 낸 무음 컷은 그대로 통과시킨다 — 분해 보장이 꺼지면 안 된다", () => {
+    // 1~3 = 66자 = 12초(초과) · 사이에 무음 컷 하나
+    const out = explodeLongRanges(
+      [{ from: 1, to: 3 }, { silent: true }, { from: 4, to: 4 }],
+      units
+    );
+    expect(out).toEqual([
+      { from: 1, to: 1 }, { from: 2, to: 2 }, { from: 3, to: 3 },
+      { silent: true },
+      { from: 4, to: 4 },
+    ]);
+  });
+
+  it("무음 컷은 조각을 먹지 않는다 — 맨 앞·맨 뒤에 와도 경계가 안 밀린다", () => {
+    expect(explodeLongRanges([{ silent: true }, { from: 1, to: 1 }], [LONE]))
+      .toEqual([{ silent: true }, { from: 1, to: 1 }]);
+    expect(explodeLongRanges([{ from: 1, to: 1 }, { silent: true }], [LONE]))
+      .toEqual([{ from: 1, to: 1 }, { silent: true }]);
   });
 
   it("망가진 입력은 빈 배열로 떨어뜨린다 — 부르는 쪽이 폴백을 쥔다", () => {
@@ -1578,6 +1619,36 @@ describe("fillSilentCuts — 배분된 초가 8초를 넘는 컷이 남지 않�
         }
       }
     }
+  });
+
+  // ★★ 최종 리뷰가 찾은 문제(2026-08-14): 채우기가 **고른 초를 넘겨 버린다.**
+  //   바닥이 섞인 배치(말하는 컷 5개 × 바닥 8초, 45초)에서 컷을 하나 더 넣으면
+  //   바닥 합이 44 → 48 이 되어, 사장님이 산 45초를 3초 넘겨 우리가 문다(클립은 초당 과금).
+  //   나아지는 것이 있어도 값을 더 쓰면서 사는 것이면 안 산다.
+  it("채워서 고른 초를 넘기지 않는다 — 넘는 초는 사장님이 아니라 우리가 문다", () => {
+    const cuts = [8, 8, 8, 8, 8].map((s, i) => ({ idx: i, sentence: `문장${i}.`, spoken_seconds: s }));
+    const out = fillSilentCuts(cuts, 45, seedance);
+    const secs = allocateCutSeconds(out, 45, seedance);
+    expect(secs.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(45);
+  });
+
+  // ★ 제자리걸음 완화의 근거를 못 박는다(2026-08-14 실측). 배분이 남는 초를 앞에서부터
+  //   얹으므로 첫 컷이 모델 상한(15)에 붙어 한 걸음 안 움직인다: 컷 4개 [15,15,15,15] 에서
+  //   5개로 늘려도 [15,12,11,11,11] 이라 가장 긴 컷이 그대로 15다. 완화가 없으면 여기서
+  //   멈춰 **정지 이미지 한 장이 15초 머문 채** 나간다.
+  it("가장 긴 컷이 상한에 붙어 제자리여도 계속 걸어간다 — Seedance 60초·낭독 8초", () => {
+    const cuts = [{ idx: 0, sentence: "문장.", spoken_seconds: 8 }];
+    // 완화가 없을 때의 정지점을 먼저 확인한다: 4개일 때 전부 15초다
+    const four = allocateCutSeconds(
+      [cuts[0], { silent: true, spoken_seconds: 0 }, { silent: true, spoken_seconds: 0 }, { silent: true, spoken_seconds: 0 }],
+      60, seedance
+    );
+    expect(four).toEqual([15, 15, 15, 15]);
+
+    const out = fillSilentCuts(cuts, 60, seedance);
+    const secs = allocateCutSeconds(out, 60, seedance);
+    expect(secs.reduce((a, b) => a + b, 0)).toBe(60);
+    secs.forEach((s) => expect(s).toBeLessThanOrEqual(CONTENT_MAX_SECONDS));
   });
 
   it("모델이 제안한 무음 컷은 그 자리를 지킨다", () => {
