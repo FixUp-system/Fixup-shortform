@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { validateScript, validateCutRanges, validateShows, validateCast, validateBriefing, validateDevelopQuestions, dropAnsweredQuestions, validateProps } from "../lib/validate.js";
+import { secondsForText } from "../lib/script.js";
 
 describe("validateScript — 하나로 흐르는 원고", () => {
   it("원고 문자열을 받아 다듬어 돌려준다", () => {
@@ -78,6 +79,21 @@ describe("validateCutRanges — 경계만 받고 텍스트는 코드가 자른�
     expect(validateCutRanges({ cuts: [] }, sentences)).toBeNull();
     expect(validateCutRanges({ cuts: [{ from: 1, to: 1 }] }, [])).toBeNull();
     expect(validateCutRanges(null, sentences)).toBeNull();
+  });
+
+  // ★ 값 하나가 두 가지 뜻을 겸하고 있었다: cut.seconds 가 "낭독 시간"이면서 동시에
+  //   "이 컷이 화면에 있는 시간"이었다. 여백을 넣으려면 둘이 갈라져야 한다 —
+  //   자막은 말하는 동안만 떠야 하고, 클립은 화면 시간만큼 주문해야 한다.
+  it("말하는 시간을 spoken_seconds 로 따로 적는다", () => {
+    const cuts = validateCutRanges(
+      { cuts: [{ from: 1, to: 1 }, { from: 2, to: 2 }] },
+      ["매일 아침 직접 갈아 만듭니다.", "하루 40잔이면 끝납니다."]
+    );
+    expect(cuts).toHaveLength(2);
+    for (const c of cuts) {
+      expect(c.spoken_seconds).toBe(secondsForText(c.sentence));
+      expect(c.spoken_seconds).toBeGreaterThan(0);
+    }
   });
 });
 
