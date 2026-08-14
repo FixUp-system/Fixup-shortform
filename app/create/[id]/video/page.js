@@ -132,6 +132,24 @@ export default function VideoStepPage() {
   const staleCount = cuts.filter((c) => isClipStale(c, project)).length;
   const selected = cuts.find((c) => c.idx === selectedIdx) || cuts.find((c) => c.video) || cuts[0];
 
+  // ★ 프로젝트 단위 video_error 는 **스스로 지워지지 않는다.** 컷별 [다시 만들기] 라우트는
+  //   그 필드를 건드리지 않고, 지우는 것은 POST /clips(아래 만들기 버튼) 하나뿐이다.
+  //   그런데 마지막 빠진 컷을 컷별로 되살리면 remainingCount 가 0 이 되어 그 버튼이 아예
+  //   렌더되지 않는다 — 전부 성공한 프로젝트에 실패 경고가 영영 붙어 있게 된다.
+  //   그래서 **만들 것이 하나도 안 남았으면** 그 오류는 이미 해결된 옛 기록으로 본다.
+  //
+  //   조건을 `cuts.every((c) => c.video)` 로 잡으면 구멍이 난다: 낡은 클립만 남은 상태에서
+  //   다시 돌렸다가 실패하면 컷마다 옛 클립은 그대로라 **방금 난 실패가 가려진다.**
+  //   remainingCount(=없거나 낡은 컷)로 재면 그 경우 0 이 아니라 경고가 제대로 뜬다.
+  //   그리고 이 값은 아래 만들기 버튼이 그려지는 조건과 정확히 같다 — 즉 "지울 길이 아직
+  //   있으면 그대로 보여주고, 지울 길이 사라졌을 때만 옛 기록으로 본다".
+  //
+  //   숨기는 것(dismiss)이 아니다. 사실 판정이라 저절로 되돌아온다 — 컷이 하나라도 빠지거나
+  //   낡는 순간 경고가 다시 뜬다. 그래서 ④이미지에서 났던 사고(감추기 플래그가 다음 진짜
+  //   실패까지 걸어 잠근 것)가 여기서는 안 난다. 무엇을 다시 잠그지도 않는다: 아래 잠금
+  //   둘은 gen.kind 만 보기 때문이다.
+  const nothingLeftToMake = cuts.length > 0 && remainingCount === 0;
+
   // "안 눌렀다 / 되고 있다 / 멈춘 것 같다 / 실패했다 / 끝났다" — 판정은 lib 한 벌이 한다.
   const gen = generationState({
     // ★ `doneCount` 를 넘기지 않는다 — 그것은 **성공한** 클립 수라 화면 문구
@@ -140,7 +158,7 @@ export default function VideoStepPage() {
     //   영원히 "만드는 중"으로 남는다). 그래서 파이프라인과 같은 함수를 쓴다.
     done: cuts.filter((c) => isCutDone(c, "video")).length,
     total: cuts.length,
-    error: firstError({ ...project, ...(status || {}) }, "video"),
+    error: nothingLeftToMake ? null : firstError({ ...project, ...(status || {}) }, "video"),
     phase: status?.progress?.phase ?? project?.progress?.phase ?? null,
     stepPhase: "video",
     // ★ 멈춘 시간은 서버가 재서 실어 보낸다. 브라우저가 자기 시계로 빼면 사장님 PC 가
@@ -170,8 +188,11 @@ export default function VideoStepPage() {
       )}
       {gen.kind === "stalled" && (
         <p className="pgsub warn">
+          {/* ★ 컷별 [다시 만들기]를 가리키면 안 된다 — 그 버튼은 클립이나 오류가 남은 컷에만
+              그려지고, **멈춘 컷에는 둘 다 없어** 아예 렌더되지 않는다. 지금 확실히 있는
+              길은 아래 만들기 버튼 하나다(멈춤이면 남은 컷이 있으니 반드시 그려진다). */}
           ⚠ 진행이 멈춰 있는 것 같아요 — 컷 {gen.done}/{gen.total}에서 더 나아가지 않고 있어요.
-          아래에서 컷별로 다시 만들 수 있어요.
+          아래 만들기 버튼을 다시 누르면 남은 컷부터 이어서 만들어요.
         </p>
       )}
       {gen.kind === "failed" && <p className="pgsub warn">⚠ {gen.reason.message}</p>}
@@ -200,7 +221,14 @@ export default function VideoStepPage() {
                 ) : c.video_error ? (
                   <div className="script-src warn">{c.video_error}</div>
                 ) : !c.video ? (
-                  <div className="script-src">{busy ? "만드는 중…" : "아직 만들지 않았어요"}</div>
+                  // ★ 카드도 머리말과 같은 판정을 본다. busy 를 보면 멈춤 동안(busy 는 5분
+                  //   상한까지 참이다) 머리말은 "멈춰 있는 것 같아요", 카드는 "만드는 중…"
+                  //   이라 한 화면이 서로 다른 말을 한다.
+                  <div className="script-src">
+                    {gen.kind === "running"
+                      ? "만드는 중…"
+                      : gen.kind === "stalled" ? "멈춰 있어요" : "아직 만들지 않았어요"}
+                  </div>
                 ) : null}
                 {/* 길이·재생성 횟수·[다시 만들기]를 한 줄에 — 목소리 단계와 같은 배치.
                     남은 횟수는 항상 보인다: 3회 상한에 언제 닿는지 누르기 전에 알아야 한다. */}
@@ -277,8 +305,13 @@ export default function VideoStepPage() {
                   ? `남은 컷 ${remainingCount}개를 만들어요 — 이미 만든 ${doneCount}개는 그대로 씁니다`
                   : `컷 ${cuts.length}개를 각각 움직이는 영상으로 만들어요`}
               </span>
-              <button className="cta" disabled={busy} onClick={start}>
-                {busy ? "만드는 중…" : doneCount > 0 ? `남은 ${remainingCount}개 만들기` : "영상 만들기"}
+              {/* ★ busy 가 아니라 **실제로 도는 중**일 때만 잠근다. 멈춤·실패에서도 busy 는
+                  참인 채로 남는데(멈춤은 5분 상한에 닿아야 풀린다), 그동안 이 버튼이
+                  멈춘 컷을 이어 만들 유일한 길이다 — 잠가 두면 할 수 있는 일이 없다. */}
+              <button className="cta" disabled={gen.kind === "running"} onClick={start}>
+                {gen.kind === "running"
+                  ? "만드는 중…"
+                  : doneCount > 0 ? `남은 ${remainingCount}개 만들기` : "영상 만들기"}
               </button>
             </>
           ) : (
