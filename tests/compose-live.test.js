@@ -252,3 +252,211 @@ describe("배경음악 — 실제 ffmpeg", () => {
     expect(after - before, "normalize=0 을 빠뜨리면 약 -6 dB 가 된다").toBeGreaterThan(-1);
   }, 120000);
 });
+
+// ── 자막 언어 — **글자가 실제로 보이는가** ─────────────────────────────────────
+//
+// ★★ 이 블록이 자막 언어 기능의 판정이다. 앞의 단위 테스트가 전부 그린이어도
+//   여기서 두부(□)가 나오면 기능은 실패다.
+//
+// 이 기능이 무너지는 방식은 **조용하다**: libass 가 폰트 폴더에서 Fontname 을 못 찾으면
+// 오류도 경고도 없이 다른 폰트로 대체하고 ffmpeg 는 **exit 0** 으로 끝난다. 로그에도
+// 아무것도 안 남는다. 완성본만 한자·가나가 전부 □ 다. 그래서 판정은 종료 코드가 아니라
+// **픽셀**로 해야 한다.
+//
+// 두부를 어떻게 재는가 — 두부의 본질은 모양이 아니라 **모든 글자가 같은 모양**이라는 것이다.
+// (.notdef 는 폰트마다 빈 사각형이거나 ×가 그어진 사각형이라 "단순한가"로는 못 가른다.
+//  실제로 이 하네스로 재 보니 ×가 있는 두부는 줄마다 무늬가 달라 '줄 서명 반복'류 지표를
+//  전부 빠져나갔다.) 그래서 자막 영역의 이진 마스크를 가로로 한 글자 폭만큼 **밀어서
+//  자기 자신과 겹쳐 본다.** 두부는 글자가 전부 같으니 그대로 포개져 상관계수가 1 에 붙고,
+//  진짜 글자는 글자마다 달라 낮게 나온다.
+//
+// 실측(2026-08-14, 이 하네스):
+//   진짜 글자  ja 0.282 · zh 0.246 · ja 0.153 · zh 0.262 · ko 0.285
+//   진짜 두부  .notdef 0.979 · 0.983 · □반복 0.979
+// 두 무리가 0.29 와 0.98 로 갈라져 경계(0.6)가 어느 쪽에서도 세 배 넘게 떨어져 있다.
+describe("자막 언어 — 진짜로 구워서 글자를 본다", () => {
+  // 사람이 눈으로 볼 프레임을 여기에 남긴다. **저장소 밖**이라 커밋될 일이 없다.
+  const FRAMES = path.join(os.tmpdir(), "shotform-subtitle-frames");
+
+  const KO = "매일 아침 생딸기를 직접 갈아 씁니다.";
+  // 두부를 만드는 글자 — 어느 폰트에도 없는 코드포인트(U+ABFF, 미할당)라
+  // 시스템 폰트 대체까지 실패해 libass 가 .notdef 를 그린다. 진짜 두부다.
+  const NOTDEF = "꯿";
+
+  // 프레임 한 장을 **회색 원시 픽셀**로 받는다. PNG 디코더가 필요 없다.
+  async function grayFrame(video, t, dir, name) {
+    const raw = path.join(dir, `${name}.gray`);
+    const { code, tail } = await run(["-y", "-ss", String(t), "-i", video, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "gray", raw]);
+    expect(code, `프레임 추출 실패:\n${tail}`).toBe(0);
+    return fs.readFile(raw);
+  }
+
+  // 사람이 볼 그림. 자막 띠만 잘라 둔다 — 1080×1920 을 통째로 열면 글자가 너무 작다.
+  async function savePng(video, t, name) {
+    await fs.mkdir(FRAMES, { recursive: true });
+    const png = path.join(FRAMES, `${name}.png`);
+    await run(["-y", "-ss", String(t), "-i", video, "-frames:v", "1", "-vf", "crop=1080:240:0:1380", png]);
+    return png;
+  }
+
+  // 밝은 픽셀(흰 자막)만 남긴 이진 마스크와 그 경계상자.
+  function inkMask(buf, thr = 140) {
+    const m = new Uint8Array(W * H);
+    let minX = W, maxX = -1, minY = H, maxY = -1, ink = 0;
+    const rows = [];
+    for (let y = 0; y < H; y++) {
+      let any = false;
+      for (let x = 0; x < W; x++) {
+        if (buf[y * W + x] > thr) {
+          m[y * W + x] = 1; ink++; any = true;
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+      if (any) rows.push(y);
+    }
+    // 줄 띠 — 글자가 있는 행이 8px 넘게 끊기면 다른 줄이다.
+    const bands = [];
+    let start = null, last = null;
+    for (const y of rows) {
+      if (start === null) { start = y; last = y; continue; }
+      if (y - last > 8) { bands.push([start, last]); start = y; }
+      last = y;
+    }
+    if (start !== null) bands.push([start, last]);
+    return { m, minX, maxX, minY, maxY, ink, bands };
+  }
+
+  // 가로로 L 픽셀 밀어 겹쳤을 때의 상관계수 최대값. 두부면 1 에 붙는다.
+  // 값이 0/1 뿐이라 분산은 p(1-p) 로 바로 나온다.
+  function tofuScore(box) {
+    const { m, minX, maxX, minY, maxY } = box;
+    let best = 0, bestLag = 0;
+    for (let L = 40; L <= 220; L++) {
+      if (maxX - minX < L + 40) break;
+      let n = 0, sa = 0, sb = 0, sab = 0;
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x + L <= maxX; x++) {
+          const a = m[y * W + x], b = m[y * W + x + L];
+          n++; sa += a; sb += b; sab += a * b;
+        }
+      }
+      if (!n) continue;
+      const ma = sa / n, mb = sb / n;
+      const va = ma - ma * ma, vb = mb - mb * mb;
+      if (va <= 0 || vb <= 0) continue;
+      const r = (sab / n - ma * mb) / Math.sqrt(va * vb);
+      if (r > best) { best = r; bestLag = L; }
+    }
+    return { score: +best.toFixed(3), lag: bestLag };
+  }
+
+  // 두부와 진짜 글자를 가르는 경계. 실측 0.29 : 0.98 의 한가운데다.
+  const TOFU_LIMIT = 0.6;
+
+  // 소재(색 클립 + 무음)는 케이스마다 다시 만들 필요가 없다 — 한 번 만들어 돌려 쓴다.
+  let baseDir;
+  async function base() {
+    if (baseDir) return baseDir;
+    baseDir = await fs.mkdtemp(path.join(os.tmpdir(), "compose-lang-"));
+    await run(["-y", "-f", "lavfi", "-i", "color=c=0x2A3040:s=1080x1920:d=4,format=yuv420p", "-c:v", "libx264", path.join(baseDir, "v0.mp4")]);
+    await run(["-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-t", "4", "-c:a", "aac", path.join(baseDir, "a0.m4a")]);
+    return baseDir;
+  }
+
+  // 한 컷짜리 완성본을 실제로 굽는다. familyOverride 는 **테스트 전용 대조군**이다 —
+  // 제품 코드가 만든 ASS 의 Fontname 만 바꿔 libass 의 대체 동작을 관찰한다.
+  async function burn(name, lang, text, familyOverride) {
+    const dir = await base();
+    const cuts = [{ idx: 0, sentence: KO, seconds: 4, subtitles: { [lang]: { text, of: KO } } }];
+    let ass = toAss(buildCues(cuts, { width: W, height: H, lang }), { width: W, height: H, lang });
+    if (familyOverride) ass = ass.replace(/^(Style: Main,)[^,]+/m, `$1${familyOverride}`);
+    const assPath = path.join(dir, `${name}.ass`);
+    await fs.writeFile(assPath, ass, "utf8");
+
+    const out = path.join(dir, `${name}.mp4`);
+    const local = [{ video: path.join(dir, "v0.mp4"), audio: path.join(dir, "a0.m4a"), wantSeconds: 4, haveSeconds: 4 }];
+    const { code, tail } = await run(buildFfmpegArgs({ local, assPath, out, width: W, height: H, lang }));
+    // ★ 여기서 0 이 나오는 것은 **아무것도 증명하지 않는다.** 두부일 때도 0 이다.
+    expect(code, `ffmpeg stderr:\n${tail}`).toBe(0);
+
+    const box = inkMask(await grayFrame(out, 2, dir, name));
+    const png = await savePng(out, 2, name);
+    const t = tofuScore(box);
+    console.log(
+      `[${name}] 두부점수=${t.score}(lag ${t.lag}) 잉크=${box.ink} 줄=${box.bands.length} ` +
+      `x=[${box.minX},${box.maxX}] → ${png}`
+    );
+    return { ...box, ...t, png, ass };
+  }
+
+  it("일본어 자막이 실제로 그려지고 두부가 아니다", async () => {
+    const r = await burn("ja-japanese", "ja", "毎朝、生の苺を自分で挽いて使っています。");
+    expect(r.ink, "자막이 아예 안 그려졌다").toBeGreaterThan(3000);
+    expect(r.score, "글자가 전부 같은 모양이다 = 두부(□)").toBeLessThan(TOFU_LIMIT);
+  }, 180000);
+
+  it("중국어 자막이 실제로 그려지고 두부가 아니다", async () => {
+    const r = await burn("zh-chinese", "zh", "每天早上亲手研磨新鲜草莓。");
+    expect(r.ink, "자막이 아예 안 그려졌다").toBeGreaterThan(3000);
+    expect(r.score, "글자가 전부 같은 모양이다 = 두부(□)").toBeLessThan(TOFU_LIMIT);
+  }, 180000);
+
+  // ★★ 판정자를 판정한다. 진짜 두부를 한 번도 본 적 없는 지표는 아무것도 증명하지 않는다.
+  //   어느 폰트에도 없는 코드포인트를 구우면 libass 가 실제로 .notdef 를 그린다 —
+  //   이 기능이 무너졌을 때 나올 바로 그 화면이다.
+  it("두부 판정자가 진짜 두부를 잡는다 — 없는 글자를 구워 확인", async () => {
+    const r = await burn("TOFU-control", "ja", NOTDEF.repeat(12));
+    expect(r.ink, "두부라도 픽셀은 많다 — 빈 화면과 다르다").toBeGreaterThan(3000);
+    expect(r.score, "진짜 두부는 1 에 붙어야 한다").toBeGreaterThan(0.9);
+    // 경계가 어느 쪽에서도 넉넉히 떨어져 있는가
+    expect(r.score - TOFU_LIMIT).toBeGreaterThan(0.3);
+  }, 180000);
+
+  // ★ 이 기계(Windows)에는 시스템에 일본어 폰트가 있어, **폰트를 못 찾아도** 글자가
+  //   그려진다(대체된다). 즉 위의 두 케이스만으로는 "번들한 Noto 를 썼다"가 아니라
+  //   "어떤 폰트든 썼다"까지만 증명된다. 리눅스 함수 환경에는 시스템 CJK 폰트가 없어
+  //   거기서는 바로 두부가 된다.
+  //
+  //   그래서 여기서 **없는 폰트 이름**으로 한 번 더 굽는다. libass 는 그때 반드시
+  //   대체 폰트를 쓴다. 그 결과가 제품 경로(Noto Sans JP)와 **픽셀이 다르면**
+  //   제품 경로는 대체가 아니라 지정한 폰트를 실제로 찾아 쓴 것이다.
+  it("libass 가 조용히 대체하지 않았다 — 번들 폰트가 실제로 매치된다", async () => {
+    const JA = "毎朝、生の苺を自分で挽いて使っています。";
+    const real = await burn("ja-bundled", "ja", JA);
+    const sub = await burn("ja-fallback", "ja", JA, "ShotformNoSuchFont");
+    // 두 마스크가 얼마나 다른가 — 같은 글자·같은 크기라 폰트가 같으면 거의 포갠다.
+    let diff = 0, total = 0;
+    for (let y = 1380; y < 1620; y++) {
+      for (let x = 0; x < W; x++) {
+        const a = real.m[y * W + x], b = sub.m[y * W + x];
+        if (a || b) total++;
+        if (a !== b) diff++;
+      }
+    }
+    const ratio = diff / (total || 1);
+    console.log(`번들 vs 대체 픽셀 차이: ${(ratio * 100).toFixed(1)}% (잉크 ${real.ink} vs ${sub.ink})`);
+    expect(ratio, "대체 폰트로 구운 것과 픽셀이 같다 = 지정한 폰트를 못 찾았다는 뜻").toBeGreaterThan(0.15);
+  }, 300000);
+
+  it("긴 CJK 문장이 두 줄로 나뉘고 화면 폭 안에 있다", async () => {
+    const marginH = Math.round(W * 0.08);
+    for (const [name, lang, text] of [
+      ["wrap-ja", "ja", "毎朝、生の苺を自分で挽いて使っています。"],
+      ["wrap-zh", "zh", "每天早上亲手研磨新鲜草莓。"],
+    ]) {
+      const r = await burn(name, lang, text);
+      // 각인에도 줄바꿈이 있어야 한다(\N)
+      expect(r.ass, `${name}: ASS 에 줄바꿈이 없다`).toContain("\\N");
+      // 화면에도 두 줄로 보여야 한다
+      expect(r.bands.length, `${name}: 줄 수`).toBe(2);
+      // 폭 — 세이프존(좌우 8%) 안이어야 한다. 넘치면 libass 가 자기 방식으로 또 접어
+      // 세 줄이 되거나 글자가 잘린다.
+      expect(r.minX, `${name}: 왼쪽이 넘쳤다`).toBeGreaterThanOrEqual(marginH - 10);
+      expect(r.maxX, `${name}: 오른쪽이 넘쳤다`).toBeLessThanOrEqual(W - marginH + 10);
+      expect(r.score, `${name}: 두부다`).toBeLessThan(TOFU_LIMIT);
+    }
+  }, 300000);
+});
