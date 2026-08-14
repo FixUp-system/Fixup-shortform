@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import {
   STEPS, stepsFor, currentStepKey, isReachable, areCutsStale, stepFromPathname, stepHref,
-  clipKey, renderKey, isAudioStale, isImageStale, isClipStale, isRenderStale, toneKey,
+  clipKey, renderKey, isAudioStale, isImageStale, isClipStale, isRenderStale, toneKey, imageContextKey,
   isSubtitlePositionOnlyStale, isSubtitleOnlyStale, subtitleHead, renderKeyBody,
 } from "../lib/steps.js";
 import { DEFAULT_SUBTITLE } from "../lib/subtitles.js";
@@ -238,6 +238,91 @@ describe("낡음 판정 — 산출물마다 무엇에서 나왔는지 각인한�
       it("톤과 전환을 한 줄로 굳힌다", () => {
         expect(toneKey({ tone: "질감", transition: "구도" })).toBe("질감\n구도");
         expect(toneKey({ tone: "질감" })).toBe("질감\n");
+      });
+    });
+
+    // 무대·인물 외형·제품 외형은 **이미지 프롬프트에 이미 실린다**(buildImagePrompt).
+    // 그런데 그림 각인은 화면 설명·톤·화풍만 봤다 — 클립 각인(clipKey)이 같은 셋을 보게 된
+    // 2026-08-14 이후로는 **무대를 고치면 클립만 낡고 그림은 조용한** 상태였다.
+    // 그러면 사장님은 옛 무대 그림을 첫 프레임으로 두고 새 무대 지시로 클립을 산다(유료).
+    describe("무대·인물 외형·제품 외형 각인 — 이미지 프롬프트가 싣는 것과 같다", () => {
+      const project = (over = {}) => ({
+        cast: [{ who: "여성", look: "긴 머리", cuts: [0] }],
+        briefing: { focus: { mode: "물건", subject: "키체인", look: "리본" } },
+        ...over,
+      });
+      const cut = (over = {}) => ({ idx: 0, shows: "가", environment: "실내 스튜디오", ...over });
+
+      it("이미지 프롬프트와 같은 순서로 담는다 — 무대→인물→제품", () => {
+        expect(imageContextKey(cut(), project())).toBe("stage:실내 스튜디오|cast:여성: 긴 머리|subject:키체인:리본");
+      });
+
+      it("톤·화풍은 여기 안 담는다 — tone_of·style_of 가 이미 본다(값이 두 벌이면 갈린다)", () => {
+        expect(imageContextKey(cut({ tone: "따뜻" }), project({ settings: { style: { preset: "anime" } } })))
+          .toBe("stage:실내 스튜디오|cast:여성: 긴 머리|subject:키체인:리본");
+      });
+
+      it("무대를 고치면 그림이 낡는다", () => {
+        const c = cut({ image: { url: "u", of: "가", context_of: "stage:해안 도로|cast:여성: 긴 머리|subject:키체인:리본" } });
+        expect(isImageStale(c, project())).toBe(true);
+      });
+
+      it("그대로면 안 낡는다", () => {
+        const c = cut({ image: { url: "u", of: "가", context_of: imageContextKey(cut(), project()) } });
+        expect(isImageStale(c, project())).toBe(false);
+      });
+
+      it("제품 외형만 다듬어도 낡는다 — 그 문장이 프롬프트에 실린다", () => {
+        const c = cut({ image: { url: "u", of: "가", context_of: imageContextKey(cut(), project()) } });
+        const edited = project({ briefing: { focus: { mode: "물건", subject: "키체인", look: "리본과 금속 키링" } } });
+        expect(isImageStale(c, edited)).toBe(true);
+      });
+
+      it("다른 컷의 인물이 바뀌어도 이 컷은 안 낡는다", () => {
+        const c = cut({ image: { url: "u", of: "가", context_of: imageContextKey(cut(), project()) } });
+        const other = project({
+          cast: [{ who: "여성", look: "긴 머리", cuts: [0] }, { who: "남성", look: "새 외형", cuts: [1] }],
+        });
+        expect(isImageStale(c, other)).toBe(false);
+      });
+
+      // ★ 이 축은 각인이 없으면 **낡았다**로 본다 — style_of·tone_of 와 극성이 반대다.
+      //   근거는 실측이다(2026-08-15): 저장된 프로젝트 44편에 이미 산 그림이 10장뿐이고
+      //   그 10장이 전부 이 맥락을 갖고 있다($0.80). 각인 없음을 "안 낡음"으로 두면
+      //   바로 그 10장에서 위 결함(클립만 낡는다)이 그대로 살아 있다.
+      it("맥락이 있는데 각인이 없는 옛 그림은 낡는다", () => {
+        const c = cut({ image: { url: "u", of: "가" } });
+        expect(isImageStale(c, project())).toBe(true);
+      });
+
+      // 값이 하나도 없는 컷까지 낡게 만들면 옛 프로젝트가 통째로 재구매가 된다.
+      it("맥락이 하나도 없으면 각인이 없어도 안 낡는다", () => {
+        const c = { idx: 0, shows: "가", image: { url: "u", of: "가" } };
+        expect(imageContextKey(c, { settings: { style: { preset: "photo" } } })).toBe("");
+        expect(isImageStale(c, { settings: { style: { preset: "photo" } } })).toBe(false);
+      });
+
+      // ⚠️ 화면비(orientOf)는 이 각인에 안 넣는다. 이미지 프롬프트가 그것을 싣는 것은 맞지만
+      //    orientOf 는 **늘 값이 있어**("horizontal 16:9" 기본값) "값이 있을 때만" 규칙을
+      //    못 지킨다 — 넣어서 돌려 보니 기존 계약 6건이 깨졌다(2026-08-15 실측). 화면비가
+      //    어느 각인에도 없는 것은 이 브랜치보다 앞선 결함이고(최종 리뷰 Minor 5) 클립·완성
+      //    각인까지 함께 봐야 한다.
+      it("화면비는 이 각인에 안 담는다", () => {
+        const p = project({ settings: { aspect_ratio: "9:16" } });
+        expect(imageContextKey(cut(), p)).toBe(imageContextKey(cut(), project({ settings: { aspect_ratio: "16:9" } })));
+      });
+
+      // cuts.filter(isImageStale) 처럼 함수를 그대로 넘기면 배열 번호가 project 자리에 온다.
+      it("프로젝트를 안 주면 이 축을 건너뛴다 — 덜 알리는 쪽이 안전하다", () => {
+        const c = cut({ image: { url: "u", of: "가" } });
+        expect(imageContextKey(cut(), undefined)).toBe("");
+        expect(isImageStale(c)).toBe(false);
+        expect(isImageStale(c, 3)).toBe(false);
+      });
+
+      // 그림이 아직 없는 컷을 낡음으로 세면 ④화면이 만들지도 않은 그림을 "낡았다"고 말한다.
+      it("그림이 없으면 판정하지 않는다", () => {
+        expect(isImageStale(cut(), project())).toBe(false);
       });
     });
   });

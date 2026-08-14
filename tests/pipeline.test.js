@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { isAudioStale, isImageStale, isClipStale, isRenderStale, renderKey, toneKey } from "../lib/steps.js";
+import { isAudioStale, isImageStale, isClipStale, isRenderStale, renderKey, toneKey, imageContextKey } from "../lib/steps.js";
 import { splitUnits, buildImagePrompt } from "../lib/cuts.js";
 
 const llmMock = vi.hoisted(() => ({ callJson: vi.fn() }));
@@ -371,6 +371,29 @@ describe("분할 → 이미지 (이어 부르면 갈라지기 전과 같다)", (
     // 판정에 들어오고, 각인이 없던 옛 그림까지 같은 문으로 낡는다
     expect("tone_of" in cuts[1].image).toBe(false);
     expect(isImageStale(cuts[1])).toBe(false);
+  });
+
+  // ⚠️ 이 자리를 테스트가 안 보면 각인만 판정에 들어오고 **찍는 쪽이 없어** 방금 산 그림이
+  //    저장되자마자 낡음이 된다 — ④화면이 값을 치른 직후 재구매를 권한다.
+  it("무대·인물·제품 외형도 함께 각인한다 — 그 셋이 이미지 프롬프트에 실린다", async () => {
+    const p = await makeProject();
+    await projects.updateProject(p.id, OWNER, (proj) => ({
+      ...proj,
+      briefing: { ...proj.briefing, focus: { mode: "물건", subject: "키체인", look: "리본" } },
+    }));
+    await runBoth(p.id, {
+      ...deps(),
+      splitCuts: async () => [
+        { idx: 0, sentence: "컷", shows: "딸기라떼", seconds: 6, source: "ai", regen_count: 0, environment: "실내 스튜디오" },
+      ],
+    });
+    const saved = await projects.getProject(p.id, OWNER);
+    const cut = saved.cuts[0];
+    expect(cut.image.context_of).toBe(imageContextKey(cut, saved));
+    expect(cut.image.context_of).toContain("stage:실내 스튜디오");
+    expect(isImageStale(cut, saved)).toBe(false);
+    // 무대를 고치면 그 자리에서 낡는다 — 예전에는 클립만 낡고 그림은 조용했다
+    expect(isImageStale({ ...cut, environment: "해안 도로" }, saved)).toBe(true);
   });
 
   it("컷마다 그림을 한 장만 만든다 — 후보 2장이던 것을 줄였다", async () => {
