@@ -15,11 +15,20 @@ const SCREENS = [["③목소리", voice], ["②대본", script], ["⑥완성", d
 
 // 컷 분할 대기 루프 한 토막만 잘라낸다. 주소로 닻을 내리는 이유: ③목소리에는 루프가
 // 둘이고(본 루프는 `/voice/status`), 파일 전체를 재면 어느 루프의 옵션인지 못 가른다.
+//
+// ★ 글자 수로 자르지 않는다. 900자 창을 쓰던 때 `await load(` 이 이미 827번째에 있어서,
+//   주석 두 줄만 더 늘어도 창 밖으로 밀려났다. 아래 부정 단정(`.catch` 가 없어야 한다)은
+//   창 밖으로 밀리면 **조용히 초록**이 된다 — 얼어붙음 회귀를 지키는 바로 그 단정이라
+//   거짓말을 할 수 있으면 안 된다. 그래서 코드를 따라가는 닫는 괄호를 끝으로 삼는다.
 const SPLIT_WAIT_URL = "`/api/projects/${id}/status`";
 function splitWaitBlock(src, name) {
   const at = src.indexOf(SPLIT_WAIT_URL);
   if (at < 0) throw new Error(`${name} 에서 컷 분할 대기 루프를 못 찾겠다`);
-  return src.slice(at, at + 900);
+  const rest = src.slice(at);
+  // startPolling({ … }) 를 닫는 줄. 안쪽 콜백들은 `},` 로 닫히므로 이것이 처음 만나는 `});` 다.
+  const end = rest.search(/\n\s*\}\);/);
+  if (end < 0) throw new Error(`${name} 의 컷 분할 대기 루프가 어디서 끝나는지 못 찾겠다`);
+  return rest.slice(0, end);
 }
 
 describe("남은 화면 — 폴링 한 벌", () => {
