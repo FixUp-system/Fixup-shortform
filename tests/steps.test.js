@@ -580,6 +580,27 @@ describe("clipKey — 프롬프트에 실리는 것은 각인에도 있다", () 
     const p2 = { ...base, cast: [{ who: "B", look: "y", cuts: [1] }] };
     expect(clipKey(cut, p1)).toBe(clipKey(cut, p2));
   });
+
+  // ⚠️ project 를 안 주면 **프롬프트는 절을 하나도 안 붙인다**(clipContextClause 가
+  //    `if (!project) return ""` 이다). 각인이 그보다 더 말하면 파일이 스스로 적어 둔
+  //    불변("안 주면 덜 알린다 — 낡음을 더 알리면 유료 호출을 부른다")이 깨진다:
+  //    저장된 각인은 무대·인물·제품·톤을 담고 있는데 계산값은 무대·톤만 담아
+  //    **거짓 낡음**이 되고, 그 자리에 컷당 8크레딧짜리 [다시 만들기]가 열린다.
+  describe("project 를 안 주면 각인도 프롬프트와 똑같이 침묵한다", () => {
+    const rich = { idx: 0, image: { url: "u" }, seconds: 5, motion: "달린다", environment: "해변", tone: "따뜻" };
+
+    // 손으로 적은 기대값이다 — 형식이 바뀌면 옛 각인이 전부 불일치가 된다
+    it("무대도 톤도 안 붙는다", () => {
+      expect(clipKey(rich)).toBe("u|5|달린다");
+      expect(clipKey(rich, 3)).toBe("u|5|달린다");
+      expect(clipKey(rich, null)).toBe("u|5|달린다");
+    });
+
+    it("project 를 주면 넷 다 붙는다 — 침묵은 project 가 없을 때뿐이다", () => {
+      const p = { ...base, cast: [{ who: "A", look: "긴 머리", cuts: [0] }], briefing: { topic: "커피" } };
+      expect(clipKey(rich, p)).toBe("u|5|달린다|stage:해변|cast:A: 긴 머리|subject:커피|tone:따뜻");
+    });
+  });
 });
 
 describe("자막 위치와 완성본 각인", () => {
