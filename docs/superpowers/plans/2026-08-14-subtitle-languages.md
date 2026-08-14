@@ -659,6 +659,72 @@ Run: `npx vitest run tests/compose-live.test.js`
 
 ---
 
+### Task 8: 한국어 자막 폰트의 라이선스도 기록한다 — **사용자 지시로 추가**
+
+> ★ 이 태스크는 계획에 없었다. Task 1 리뷰가 "기존 한국어 폰트 3종에 라이선스 기록이
+> 저장소 어디에도 없다"를 확인했고, 사용자가 함께 넣으라고 지시했다(2026-08-14).
+
+**Files:**
+- Modify: `assets/SUBTITLE-FONTS-LICENSE-NOTE.md` (또는 필요하면 폰트별 파일 추가)
+- Modify: `tests/subtitle-fonts.test.js`
+
+**대상:** `assets/subtitle-font.otf`(Pretendard) · `assets/subtitle-impact.ttf`(Black Han Sans) ·
+`assets/subtitle-soft.ttf`(Gowun Dodum) — 전부 이 저장소가 재배포하는 폰트인데 라이선스가 없다.
+
+⚠️ **라이선스를 기억이나 짐작으로 적지 마라. 폰트 파일이 답을 갖고 있다.**
+`name` 테이블의 **nameID 13(라이선스 설명)** 과 **nameID 14(라이선스 URL)** 을 읽어라.
+Task 1 의 cmap 파서가 이미 `name` 테이블을 찾는 법을 보여 준다 — 같은 방식으로 파싱한다.
+셋 다 그 필드가 비어 있으면 **거기서 멈추고 보고한다** — 출처를 모른 채 라이선스를 적는 것이
+기록이 없는 것보다 나쁘다.
+
+⚠️ **OFL 전문을 직접 타이핑하지 마라.** 이미 `assets/SUBTITLE-FONTS-LICENSE.txt` 에 OFL-1.1 이
+있다(Task 1 이 내려받았다). 셋 다 OFL-1.1 로 확인되면 **그 파일이 다섯 폰트를 함께 덮는다**고
+노트에 적으면 된다. 다른 라이선스가 나오면 그때는 그 라이선스 원문을 **내려받아** 넣는다.
+(1차 시도가 전문을 타이핑하려다 콘텐츠 필터로 중단됐다.)
+
+- [ ] **Step 1: 실패하는 테스트를 쓴다**
+
+`tests/subtitle-fonts.test.js` 에 추가한다 — 라이선스 기록이 **다섯 폰트 전부**를 덮는지 코드가 판정한다:
+
+```js
+import { readFileSync } from "node:fs";
+
+// ★ 재배포하는 폰트는 라이선스를 동봉해야 한다(OFL-1.1 의 조건이다).
+//   CJK 만 적어 두고 한국어 폰트를 빠뜨리면 "왜 절반만 있지"를 다음 사람이 다시 조사한다.
+it("자막 폰트 다섯 개가 모두 라이선스 노트에 적혀 있다", () => {
+  const note = readFileSync("assets/SUBTITLE-FONTS-LICENSE-NOTE.md", "utf8");
+  for (const f of [
+    "subtitle-font.otf", "subtitle-impact.ttf", "subtitle-soft.ttf",
+    "subtitle-ja.otf", "subtitle-zh.otf",
+  ]) {
+    expect(note, `${f} 가 라이선스 노트에 없다`).toContain(f);
+  }
+});
+```
+
+- [ ] **Step 2: 실패를 확인한다**
+
+Run: `npx vitest run tests/subtitle-fonts.test.js`
+Expected: FAIL — 노트에 한국어 폰트 셋이 없다.
+
+- [ ] **Step 3: 폰트에서 라이선스를 읽고 기록한다**
+
+세 폰트의 `name` 테이블 nameID 13·14 를 읽어 **실제 값을 보고서에 그대로 적는다.**
+그 값에 근거해 노트를 채운다: 파일명 · 폰트 이름 · 라이선스 · 출처(가능하면 URL).
+
+- [ ] **Step 4: 통과를 확인한다**
+
+Run: `npx vitest run`
+
+- [ ] **Step 5: 커밋**
+
+```bash
+git add assets/SUBTITLE-FONTS-LICENSE-NOTE.md tests/subtitle-fonts.test.js
+git commit -m "docs(assets): 한국어 자막 폰트의 라이선스도 기록한다"
+```
+
+---
+
 ## 마무리
 
 - wiki 반영(저장소 세션 마무리 규칙)
