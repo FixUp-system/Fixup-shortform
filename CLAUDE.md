@@ -297,13 +297,19 @@ readable if not configured"** 이고 보관 기간 과금도 문서에 없다. �
 `idle`/`running`/`stalled`/`failed`/`done`(`lib/progress.js` 의 `generationState`).
 그 장치를 다시 무너뜨리지 않으려면:
 
-- **상태 라우트는 다섯이고, 값을 하나 더 실으면 다섯을 다 고친다** — `projects/[id]/status` ·
-  `cuts/status` · `voice/status` · `clips/status` · `render/status`. 애초의 버그가 이것이다:
-  `selectProjectCuts` 가 오류 필드 넷 중 셋만 싣고 `images_error` 를 빠뜨려, 이미지 실패가
-  몇 달 동안 화면에 한 번도 안 닿았다(같은 식으로 `voice_error`·`video_error` 도 새고 있었다).
-  지금은 다섯 다 `progress` 와 `stalled_for_ms` 를 싣는다
+- **단계별 흐름의 상태 라우트는 다섯이고, 값을 하나 더 실으면 다섯을 다 고친다** —
+  `projects/[id]/status` · `cuts/status` · `voice/status` · `clips/status` · `render/status`.
+  애초의 버그가 이것이다: 스토어의 `selectProjectCuts` 가 `images_error` 를 안 실어서 이미지
+  실패가 몇 달 동안 화면에 한 번도 안 닿았다. **그 위에 라우트가 한 겹 더 흘리고 있었다** —
+  `cuts/status` 는 스토어가 주던 `voice_error`·`video_error` 마저 응답에서 버렸다(같은 종류의
+  구멍 둘). 지금은 다섯 다 `progress` 와 `stalled_for_ms` 를 싣는다.
+  ⚠️ **광고 흐름의 `api/ads/[id]/status` 는 여섯째지만 이 계약 밖이다** — `progress` 도
+  `stalled_for_ms` 도 안 싣는다(광고는 컷별 진척이 없는 단일 굽기다)
 - **어느 단계가 어느 오류 필드를 읽는지는 `lib/step-errors.js` 의 표 하나가 정한다.**
-  화면도 라우트도 그 표를 본다 — 조합을 손으로 적는 순간 위 버그가 그 자리에 다시 난다
+  ⚠️ 지금 그 표를 읽는 것은 **화면 셋뿐이다**(③목소리·④이미지·⑤영상). **라우트와 스토어는
+  아직 필드를 손으로 적는다** — 예: `app/api/projects/[id]/cuts/status/route.js`.
+  **라우트를 고칠 때는 반드시 이 표와 대조하라.** 손으로 적은 목록이 표와 갈리는 순간
+  위 버그가 그 자리에 다시 난다
 - **사유 문구는 `lib/failure.js` 의 `classifyFailure` 가 만든다** — 뒷단 문구 안의 HTTP 상태
   (`이미지 생성 실패 (429) …`)를 보고 고른다. **못 알아본 것은 원문 그대로 내보낸다** —
   "알 수 없는 오류"로 뭉개면 예전보다 정보가 줄어든다(사장님이 그 문구를 읽어 줘야 고친다)
@@ -312,8 +318,8 @@ readable if not configured"** 이고 보관 기간 과금도 문서에 없다. �
   않으니 스스로 낫지도 않는다
 - **판정에 쓰는 수와 사장님에게 보여 주는 수는 다르다.** `generationState` 에 넘기는 수는
   "아직 기다릴 것이 남았는가"를 묻는 것이라 **실패한 컷도 끝난 것으로 센다.**
-  "N개 만들었어요" 문구는 성공만 센다. 둘을 하나로 합치면 실패한 컷 하나 때문에 화면이
-  영원히 "만드는 중"이다
+  사장님이 보는 문구(⑤영상의 `` `${doneCount}/${cuts.length}개 컷을 만들었어요` ``)는
+  성공만 센다. 둘을 하나로 합치면 실패한 컷 하나 때문에 화면이 영원히 "만드는 중"이다
 - **멈춘 경과(`stalledFor`)는 서버가 잰다.** 브라우저가 서버 시각을 자기 시계로 빼면
   PC 시계가 빠른 사장님에게는 시작하자마자 "멈췄어요"가 뜬다
 - **임계는 `lib/progress.js` 의 `STALL_MS`(2분) 하나**이고, 합성은 `STALL_EXEMPT_PHASES`
@@ -331,9 +337,14 @@ readable if not configured"** 이고 보관 기간 과금도 문서에 없다. �
   를 얹는다 — 쓰기를 늘리지 않는다. 생성 라우트 셋은 시작할 때 한 번 찍는다).
   제대로 막으려면 작업 큐·워커가 필요하고 그것은 별개 프로젝트다
 
-**폴링 루프는 `lib/poll.js` 한 벌이다**(2초 간격 · 5분 상한 · 연속 5회 실패면 중단).
-화면에서 `setInterval` 을 직접 돌리지 마라 — `tests/generation-status-ui.test.js` 가 막는다.
-쓸 때 밟았던 것 셋:
+**단계별 흐름(①~⑥)의 폴링 루프는 `lib/poll.js` 한 벌이다**(2초 간격 · 5분 상한 ·
+연속 5회 실패면 중단). 화면에서 `setInterval` 을 직접 돌리지 마라.
+⚠️ **남은 예외 하나** — 광고 화면(`app/ads/[id]/page.js`)은 아직 자기 `setInterval` 루프를
+들고 있다(상한이 영상 길이에 딸린 `adPollTimeoutMs` 라 그냥 못 옮긴다). 거기를 손대게 되면
+같이 옮겨라.
+⚠️ 그리고 **그물이 한 화면만 덮는다** — `tests/generation-status-ui.test.js` 는
+`app/create/[id]/images/page.js` 만 읽는다. ④이미지에 `setInterval` 이 돌아오면 잡히지만
+나머지 넷은 안 막힌다. 눈으로 봐야 한다. 쓸 때 밟았던 것 셋:
 
 - **화면은 `onStop` 안에서 자기 ref 를 스스로 null 로 비운다.** `poll.js` 가 비우는 것은
   자기 내부 handle 뿐이라, 돌려받은 `stop` 을 쥔 화면 ref 는 계속 truthy 다 — 스스로 멈춘
