@@ -1555,6 +1555,31 @@ describe("fillSilentCuts — 배분된 초가 8초를 넘는 컷이 남지 않�
     expect(out.slice(1).every((c) => c.silent)).toBe(true);
   });
 
+  // ★★ 재리뷰가 찾은 Critical(2026-08-14): 15초만 맞고 30·45·60초는 전부 **15초짜리로
+  //   나가고 있었다.** 컷 하나가 모델 상한(15)에 걸려 멈추는데 그 컷이 "가장 긴 컷"이라
+  //   콘텐츠 판정만으로는 더 넣을 이유가 안 생겼다 — 60초에 100크레딧을 낸 사장님이
+  //   15초 영상을 받는다. 컷을 더 넣는 이유는 **둘**이고(길이 약속·콘텐츠 약속),
+  //   여기서는 개수가 아니라 **합**을 단언한다.
+  describe("고른 초를 실제로 채운다 — 15/30/45/60 전부", () => {
+    for (const [name, profile] of [["Seedance", seedance], ["Kling", kling]]) {
+      for (const spoken of [[6], [6, 6]]) {
+        for (const target of [15, 30, 45, 60]) {
+          it(`${name} ${target}초 · 낭독 ${spoken.join("+")}초 → 합이 ${target}초다`, () => {
+            const cuts = spoken.map((s, i) => ({ idx: i, sentence: `문장${i}.`, spoken_seconds: s }));
+            const out = fillSilentCuts(cuts, target, profile);
+            const secs = allocateCutSeconds(out, target, profile);
+            expect(secs.reduce((a, b) => a + b, 0)).toBe(target);
+            // 8초 약속도 함께 지켜진다 — 이 조합에서는 지킬 수 있다(바닥이 전부 8초 이하다)
+            secs.forEach((s) => expect(s).toBeLessThanOrEqual(CONTENT_MAX_SECONDS));
+            // 원고는 한 글자도 안 바뀐다
+            expect(out.filter((c) => !c.silent).map((c) => c.sentence))
+              .toEqual(cuts.map((c) => c.sentence));
+          });
+        }
+      }
+    }
+  });
+
   it("모델이 제안한 무음 컷은 그 자리를 지킨다", () => {
     const cuts = [
       { idx: 0, sentence: "가.", spoken_seconds: 6 },
