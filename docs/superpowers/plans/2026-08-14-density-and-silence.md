@@ -747,7 +747,36 @@ git commit -m "feat(speaks): 의도한 무음 컷을 판정에서 건너뛴다"
 
 **설계 — 구조적 보장을 지키는 방법.** 무음 컷은 **문장을 소비하지 않는다.** LLM 응답에서 `silent: true` 인 항목은 `from`/`to` 를 갖지 않고, 나머지 항목들이 원고의 모든 문장을 빈틈없이 덮어야 한다는 규칙은 그대로다. 그래서 **문장을 가진 컷을 이어붙이면 원고와 글자 그대로 같다** 는 보장이 유지된다.
 
-**개수 상한은 코드가 쥔다 — 최대 1개.** 광고 실측에서도 편당 최대 1개였다(12장면 중 2개, 각 편 1개 이하). 지문으로만 말하면 모델이 분량을 무음으로 때운다.
+**★★ 개수 규칙이 2026-08-14 재측정으로 바뀌었다 — "최대 1개"가 아니다.**
+
+원래 이 태스크는 무음 컷을 **최대 1개**로 잡았다(광고 실측에서 편당 1개 이하였다). 그런데 Task 10
+뒤 재측정이 그 전제를 무너뜨렸다:
+
+```
+c09f9311 원고 27자 → 컷 1개 → 15초    511c5afe 원고 37자 → 컷 1개 → 15초
+8a20e426 원고 36자 → 컷 1개 → 15초    3683d140 원고 34자 → 컷 1개 → 15초
+```
+
+길이는 정확히 맞았지만 **컷이 1개로 줄었다.** 원고가 34~37자로 짧아지니 분할이 컷 하나만 만들고
+배분이 거기에 15초를 다 준다 — **정지 이미지 한 장이 화면에 15초 머문다.** 이 저장소가
+`CONTENT_MAX_SECONDS = 8`("이미지 한 장이 화면에 머무는 시간")으로 막아 온 바로 그것이고,
+지금 그 상한은 **낭독 초로만 판정**돼 배분된 초를 보지 않는다. 사용자가 만족한다는 광고는 15초에
+장면이 **4개**다.
+
+→ **무음 컷은 개수 상한이 아니라 `CONTENT_MAX_SECONDS` 를 지키는 코드 보장이 된다**(사용자 결정).
+
+| 무엇 | 누가 |
+|---|---|
+| 무음 컷을 **어디에 둘지**(연출) | 컷 분할 LLM 이 제안한다 |
+| 무음 컷을 **몇 개 둘지**(보장) | **코드가 정한다** — 배분된 초가 8초를 넘는 컷이 없을 때까지 |
+
+이 저장소의 규율 그대로다: 창작은 모델, **지켜져야 하는 것은 코드**.
+
+★ **모델 하한이 개수의 천장이다.** Seedance 하한 4초라 15초에 컷은 최대 3개(4+4+4=12 ≤ 15),
+Kling 하한 3초면 최대 5개다. 8초 상한을 지키려면 15초에 최소 2개다. 즉 **2~3개**로 수렴한다.
+
+★ **클립 값은 안 는다** — 클립은 초당 과금이고 총 초가 고정이라 몇 조각으로 나누든 같다.
+**늘어나는 것은 이미지뿐**(컷당 $0.08). 15초가 컷 1개 → 3개면 이미지가 $0.08 → $0.24 다.
 
 - [ ] **Step 1: 실패하는 테스트를 쓴다**
 
@@ -766,11 +795,13 @@ git commit -m "feat(speaks): 의도한 무음 컷을 판정에서 건너뛴다"
       .toBe("첫 문장입니다. 둘째 문장입니다.");
   });
 
-  it("무음 컷이 둘 이상이면 통째로 버린다 — 분량을 무음으로 때우지 못하게", () => {
-    expect(validateCutRanges(
+  it("무음 컷을 여럿 받는다 — 개수 상한은 여기서 걸지 않는다", () => {
+    const cuts = validateCutRanges(
       { cuts: [{ silent: true }, { from: 1, to: 1 }, { silent: true }] },
       ["첫 문장입니다."]
-    )).toBe(null);
+    );
+    expect(cuts).toHaveLength(3);
+    expect(cuts.filter((c) => c.silent)).toHaveLength(2);
   });
 
   it("무음 컷만 있으면 버린다 — 원고가 통째로 사라진다", () => {
@@ -781,19 +812,57 @@ git commit -m "feat(speaks): 의도한 무음 컷을 판정에서 건너뛴다"
 `tests/cuts.test.js` 에 추가:
 
 ```js
-  it("분할 지문이 무음 컷을 최대 하나로 못 박는다", () => {
-    const { system } = buildSplitMessages({ ...project }, ["문장 하나."]);
-    expect(system).toContain("무음");
-    expect(system).toContain("하나");
-  });
-
   it("화면 설계 목록에서 무음 컷이 자기 자리를 갖는다", () => {
     const cuts = [{ idx: 0, silent: true, sentence: "" }, { idx: 1, sentence: "말하는 컷." }];
     const { messages } = buildShowsMessages({ ...project }, cuts);
     expect(messages[0].content).toContain("(말 없는 장면)");
     expect(messages[0].content).toContain("말하는 컷.");
   });
+
+  // ★★ 이것이 이 태스크의 핵심 보장이다(2026-08-14 재측정이 요구했다).
+  //   원고가 짧아지자 컷이 1개가 되고 배분이 거기에 15초를 다 줬다 — 이미지 한 장이 15초 머문다.
+  //   CONTENT_MAX_SECONDS 는 "이미지 한 장이 화면에 머무는 시간"인데 낭독 초로만 판정돼
+  //   배분된 초를 안 봤다. 모델이 지문을 따르든 말든 **코드가 채운다.**
+  describe("fillSilentCuts — 배분된 초가 8초를 넘는 컷이 남지 않는다", () => {
+    const seedance = { min: 4, max: 15 };
+    const kling = { min: 3, max: 15 };
+
+    it("말하는 컷 하나에 15초가 배분되면 무음 컷으로 쪼갠다", () => {
+      const cuts = [{ idx: 0, sentence: "짧은 원고입니다.", spoken_seconds: 6 }];
+      const out = fillSilentCuts(cuts, 15, seedance);
+      expect(out.length).toBeGreaterThan(1);
+      const secs = allocateCutSeconds(out, 15, seedance);
+      expect(secs.reduce((a, b) => a + b, 0)).toBe(15);
+      secs.forEach((s) => expect(s).toBeLessThanOrEqual(CONTENT_MAX_SECONDS));
+      // 원고는 한 글자도 안 바뀐다
+      expect(out.filter((c) => !c.silent).map((c) => c.sentence).join(" ")).toBe("짧은 원고입니다.");
+    });
+
+    it("모델 하한이 개수의 천장이다 — 하한을 깨면서까지 쪼개지 않는다", () => {
+      const cuts = [{ idx: 0, sentence: "문장.", spoken_seconds: 4 }];
+      const out = fillSilentCuts(cuts, 15, seedance); // 하한 4 → 최대 3개
+      expect(out.length).toBeLessThanOrEqual(3);
+      const outK = fillSilentCuts(cuts, 15, kling);   // 하한 3 → 최대 5개
+      expect(outK.length).toBeLessThanOrEqual(5);
+    });
+
+    it("이미 8초 이하로 나뉘어 있으면 아무것도 더하지 않는다", () => {
+      const cuts = [
+        { idx: 0, sentence: "가.", spoken_seconds: 5 },
+        { idx: 1, sentence: "나.", spoken_seconds: 5 },
+        { idx: 2, sentence: "다.", spoken_seconds: 5 },
+      ];
+      expect(fillSilentCuts(cuts, 15, seedance)).toHaveLength(3);
+    });
+
+    it("idx 를 다시 매긴다 — 캐스팅·화면 설계가 컷 번호로 짝을 짓는다", () => {
+      const out = fillSilentCuts([{ idx: 0, sentence: "가.", spoken_seconds: 6 }], 15, seedance);
+      expect(out.map((c) => c.idx)).toEqual(out.map((_, i) => i));
+    });
+  });
 ```
+
+⚠️ `fillSilentCuts` 는 **새 함수**다(`lib/cuts.js`). `CONTENT_MAX_SECONDS` 는 그 파일에 이미 있다.
 
 ⚠️ `project` 는 그 파일에 이미 있는 프로젝트 픽스처 이름으로 바꾼다.
 
@@ -809,11 +878,9 @@ Expected: FAIL — `silent` 항목이 `from`/`to` 정수 검사에서 `null` 로
 ```js
   // ★ 무음 컷 — 연출로 말하지 않는 컷(2026-08-14). 문장을 소비하지 않으므로
   //   "컷을 이어붙이면 원고와 같다"는 보장이 유지된다.
-  //   개수를 코드가 쥔다: 최대 하나. 지문으로만 말하면 분량을 무음으로 때운다
-  //   (광고 실측에서도 편당 하나 이하였다).
-  const silentCount = obj.cuts.filter((c) => c?.silent === true).length;
-  if (silentCount > 1) return null;
-  if (silentCount === obj.cuts.length) return null; // 원고가 통째로 사라진다
+  //   ★ 개수 상한은 여기서 걸지 않는다 — fillSilentCuts(lib/cuts.js)가 배분된 초를 보고
+  //     필요한 만큼 채우고, 모델 하한이 천장 노릇을 한다. 여기서 세면 두 자리가 갈린다.
+  if (obj.cuts.every((c) => c?.silent === true)) return null; // 원고가 통째로 사라진다
 ```
 
 루프 안, `Number.isInteger` 검사 **앞**에:
@@ -832,10 +899,58 @@ Expected: FAIL — `silent` 항목이 `from`/`to` 정수 검사에서 `null` 로
 `lib/cuts.js` 의 `splitSystem` 이 만드는 지문 끝에 한 문단을 더한다:
 
 ```
-- **말 없는 장면을 하나까지 넣을 수 있다.** 원고의 문장을 쓰지 않고 화면만 보여주는 컷이다.
-  넣으려면 그 항목에 from·to 대신 {"silent": true} 를 적는다. 열거나 닫는 자리에 어울린다.
-  **하나를 넘기지 마라** — 넘기면 응답 전체가 버려진다. 필요 없으면 넣지 않아도 된다.
+- **말 없는 장면을 넣을 수 있다.** 원고의 문장을 쓰지 않고 화면만 보여주는 컷이다.
+  넣으려면 그 항목에 from·to 대신 {"silent": true} 를 적는다. 여는 자리와 닫는 자리에 어울린다.
+  넣지 않아도 된다 — 화면이 한 장면에 너무 오래 머물면 코드가 알아서 채운다.
 ```
+
+★ 지문은 **어디에 둘지만** 말한다. 개수는 코드가 정한다(`fillSilentCuts`) — 지문에 개수를 적으면
+같은 값이 두 군데가 되고 언젠가 갈린다.
+
+`lib/cuts.js` 에 `fillSilentCuts` 를 새로 만든다:
+
+```js
+// 배분된 초가 CONTENT_MAX_SECONDS 를 넘는 컷이 남지 않도록 **무음 컷을 채운다.**
+//
+// ★ 왜 필요한가(2026-08-14 재측정): 밀도 계수로 원고가 짧아지자 컷 분할이 컷 하나만 만들고
+//   배분이 거기에 15초를 다 줬다 — **정지 이미지 한 장이 화면에 15초 머문다.**
+//   CONTENT_MAX_SECONDS 는 "이미지 한 장이 화면에 머무는 시간"인데, 그 판정이 낭독 초만 보고
+//   배분된 초를 안 봐서 이 구멍이 열려 있었다.
+//
+// ★ 모델이 지문을 따르든 말든 여기서 보장한다 — 이 저장소의 규율대로 창작은 모델,
+//   **지켜져야 하는 것은 코드**다.
+//
+// ★ 하한이 천장이다. 컷 n 개를 만들려면 n × min ≤ target 이어야 한다(Seedance min 4 →
+//   15초에 최대 3개). 그래서 8초 상한을 못 지키는 경우가 남을 수 있다 — 그때는 지킬 수
+//   있는 데까지만 쪼갠다. 하한을 깨면 fal 이 거절한다.
+//
+// 무음 컷은 **말하는 컷 사이와 끝**에 넣는다. 맨 앞은 두지 않는다 — 첫 화면이 말 없이
+// 시작하면 스크롤을 멈추게 할 문장이 늦게 나온다(대본 규칙이 첫 문장에 가장 센 것을 둔다).
+export function fillSilentCuts(cuts, targetSeconds, profile) {
+  const list = Array.isArray(cuts) ? cuts : [];
+  if (!list.length) return [];
+  const min = minSecondsFor(profile);
+  const target = Math.round(Number(targetSeconds) || 0);
+  const maxCuts = Math.max(1, Math.floor(target / min));
+  const out = list.slice();
+  // 배분해 보고, 8초를 넘는 컷이 있으면 하나 더 넣고 다시 배분한다.
+  let guard = 0;
+  while (out.length < maxCuts && guard++ < 32) {
+    const secs = allocateCutSeconds(out, target, profile);
+    if (!secs.some((s) => s > CONTENT_MAX_SECONDS)) break;
+    out.push({ idx: out.length, sentence: "", silent: true, spoken_seconds: 0, seconds: 0, source: "code", regen_count: 0 });
+  }
+  // idx 를 다시 매긴다 — 캐스팅(cast[].cuts)과 화면 설계가 컷 번호로 짝을 짓는다
+  return out.map((c, i) => ({ ...c, idx: i }));
+}
+```
+
+⚠️ **`lib/pipeline.js` 의 `splitCuts` 에서 `allocateCutSeconds` 를 부르기 직전에 `fillSilentCuts` 를 부른다.**
+순서가 뒤집히면 채운 컷이 배분을 못 받는다.
+
+⚠️ **캐스팅은 `fillSilentCuts` 뒤에 돌아야 한다.** 캐스팅이 컷 번호로 인물을 꽂으므로
+(`cast[].cuts`), 컷을 더 넣은 뒤 번호가 밀리면 사람이 엉뚱한 컷에 붙는다. `splitCuts` 안에서
+캐스팅보다 앞인지 확인하고, 아니면 **멈추고 보고한다.**
 
 `lib/cuts.js` 의 `buildShowsMessages` 에서 목록을 만드는 줄을 바꾼다:
 
@@ -859,7 +974,7 @@ Expected: PASS 전부.
 
 ```bash
 git add lib/validate.js lib/cuts.js lib/pipeline.js tests/validate.test.js tests/cuts.test.js tests/pipeline.test.js
-git commit -m "feat(cuts): 말 없는 장면을 하나까지 — 컷 분할이 정한다"
+git commit -m "feat(cuts): 말 없는 장면 — 어디에 둘지는 모델, 몇 개일지는 코드"
 ```
 
 ---
