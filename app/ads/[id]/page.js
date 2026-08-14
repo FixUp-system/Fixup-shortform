@@ -217,7 +217,22 @@ export default function AdDetailPage() {
   // ★ 화질(resolution)까지 넘긴다. 안 넘기면 이 화면만 **720p 값**을 말한다 —
   //   실제 청구는 세 인자를 다 넘기므로(app/api/ads/[id]/render/route.js·lib/charges.js)
   //   1080p 를 고른 사장님이 화면에서 본 값보다 더 많이 빠져나간다(2026-08-13 실사용에서 잡힘).
-  const price = priceLabel(adVideoPrice(settings?.seconds, settings?.model, settings?.resolution));
+  // ★ 값을 못 구해도 **화면은 살아야 한다**(2026-08-13 실측).
+  //
+  // 모델 목록에서 사라진 id 를 가진 옛 문서가 있다(2026-08-13 에 "기본/저가" 등급을
+  // 걷어냈다). adVideoPrice 는 모르는 모델에 던지는데 — 그게 맞다, 틀린 금액으로 청구하는
+  // 것보다 낫다 — 렌더 도중 던지면 React 가 **화면 전체를 버린다.** 실제로 보관함에서
+  // 그 프로젝트를 누르면 "Application error" 만 뜨고 시나리오도 완성본도 못 봤다.
+  //
+  // 값을 못 구하는 것과 화면이 사라지는 것은 전혀 다른 일이다. 여기서 받아 내고,
+  // 아래에서 **모른다고 말하고 유료 버튼을 잠근다**(얼마 나갈지 모르는 채로 누르게 하지 않는다).
+  // 모델 목록은 앞으로도 바뀐다 — 이 보호는 그때마다 다시 필요하다.
+  let price = null;
+  try {
+    price = priceLabel(adVideoPrice(settings?.seconds, settings?.model, settings?.resolution));
+  } catch {
+    price = null;
+  }
 
   // 아래 네 갈래(draft·scenario·rendering·done+video) 중 어디에도 안 걸리는 경우 —
   // 모르는 status 이거나(나중에 상태가 하나 늘 수 있다), status 는 "done"인데 videos 가
@@ -353,9 +368,15 @@ export default function AdDetailPage() {
                 열려 있으면, 아직 반영도 안 된 화면을 보고 [이대로 만들기]를 누른다. */}
             {!editing && (
               <div className="fwd">
-                <span className="hint">이대로 만들면 크레딧이 나가요 — 되돌릴 수 없어요</span>
-                {/* 이대로 만들기 — 비싼 문. .cta .cr 이 버튼 안에서 값을 강조한다(app/ads/new/page.js 와 같은 자리). */}
-                <button className="cta" disabled={busy} onClick={startRender}>
+                {/* 값을 못 구했으면 그렇게 말한다 — 숫자를 지어내지 않는다(위 price 주석 참고) */}
+                <span className="hint">
+                  {price === null
+                    ? "이 영상의 가격을 알 수 없어요 — 지금은 만들 수 없습니다"
+                    : "이대로 만들면 크레딧이 나가요 — 되돌릴 수 없어요"}
+                </span>
+                {/* 이대로 만들기 — 비싼 문. .cta .cr 이 버튼 안에서 값을 강조한다(app/ads/new/page.js 와 같은 자리).
+                    ★ 정가를 모르면 잠근다 — 얼마 나갈지 모르는 채로 누르게 하지 않는다. */}
+                <button className="cta" disabled={busy || price === null} onClick={startRender}>
                   {busy ? "시작하는 중…" : "이대로 만들기 →"} <span className="cr">{price}</span>
                 </button>
               </div>
@@ -387,8 +408,10 @@ export default function AdDetailPage() {
           <div className="step-actions">
             <div className="fwd">
               {/* 다시 만들기 — 이것도 같은 유료 라우트다. 정가가 또 나간다는 것을 문구로 밝힌다. */}
-              <button className="mini" disabled={busy} onClick={startRender}>
-                {busy ? "만드는 중…" : `다시 만들기 · ${price}`}
+              {/* ★ [다시 만들기]도 같은 유료 문이다 — 정가를 모르면 같이 잠근다.
+                  완성본은 그대로 재생·내려받기 할 수 있다(그건 값이 안 드는 일이다). */}
+              <button className="mini" disabled={busy || price === null} onClick={startRender}>
+                {busy ? "만드는 중…" : price === null ? "가격을 알 수 없어요" : `다시 만들기 · ${price}`}
               </button>
               {/* ?dl=1 — ⑥완성과 같은 이유(서명 URL 302 뒤에는 그 속성이 안 먹는다) */}
               <a className="cta" href={`${video.url}?dl=1`} download>
