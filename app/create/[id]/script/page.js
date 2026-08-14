@@ -14,6 +14,9 @@ import {
 } from "../../../../lib/clip-limits";
 import { videoPrice } from "../../../../lib/pricing";
 import { SPEEDS, DEFAULT_SPEED_ID } from "../../../../lib/speeds";
+// 두드리는 루프는 화면마다 복붙하지 않는다 — 복붙본이 조금씩 갈려 ④이미지가
+// images_error 를 영영 못 보던 버그가 났다(2026-08-14). 한 벌에서 온다.
+import { startPolling } from "../../../../lib/poll";
 
 export default function ScriptStepPage() {
   const { id } = useParams();
@@ -80,20 +83,23 @@ export default function ScriptStepPage() {
   //   15회 × 35B + 1회 × 13KB 가 된다.
   useEffect(() => {
     const splitting = project?.status === "cuts" && (project?.cuts || []).length === 0 && !project?.cuts_error;
-    if (!splitting) { clearInterval(splitPollRef.current); splitPollRef.current = null; return; }
+    if (!splitting) { splitPollRef.current?.(); splitPollRef.current = null; return; }
     if (splitPollRef.current) return;
-    splitPollRef.current = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/projects/${id}/status`);
-        if (!res.ok) return;
-        const st = await res.json();
-        // 컷이 생겼거나 실패로 끝났으면 그때 전체를 받는다
-        if (st.cut_count > 0 || st.cuts_error) load(id).catch(() => {});
-      } catch {
-        // 한 번 실패는 다음 주기가 다시 본다 — 여기서 폴링을 끊지 않는다
-      }
-    }, 2000);
-    return () => { clearInterval(splitPollRef.current); splitPollRef.current = null; };
+    splitPollRef.current = startPolling({
+      url: `/api/projects/${id}/status`,
+      // ★ 이 대기 루프에는 지금 **상한도 실패 카운트도 없다**(실측: startedAt·failures 가
+      //    아예 없었다). 기본값을 그대로 받으면 5분 상한과 연속 5회 중단이 새로 생긴다 —
+      //    이 자리는 동작을 옮기기만 하는 곳이라 그러면 안 된다. 컷 분할이 5분을 넘기면
+      //    화면이 조용히 멈춘 채 영영 안 갱신된다(알릴 onStop 도 없다).
+      timeoutMs: Infinity,
+      maxFailures: Infinity,
+      onTick: (st) => {
+        // 컷이 생겼거나 실패로 끝났으면 그때 전체를 받고 두드리기를 멈춘다
+        if (st.cut_count > 0 || st.cuts_error) { load(id).catch(() => {}); return true; }
+        return false;
+      },
+    });
+    return () => { splitPollRef.current?.(); splitPollRef.current = null; };
   }, [project?.status, project?.cuts?.length, project?.cuts_error, id]);
 
   async function splitCuts() {
