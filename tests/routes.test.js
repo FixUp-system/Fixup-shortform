@@ -512,6 +512,36 @@ describe("POST /api/projects/[id]/script — 원고", () => {
     expect((await getProject(p.id, OWNER)).script.text).toBe(고침.script);
   });
 
+  // 재시도가 성공하면 정상 경로로 돌아간다 — 실패 경로만 덮으면 재시도 성공이
+  // 점수 비교·채택 로직까지 제대로 이어지는지 못 잡는다.
+  it("스키마 거절 뒤 재시도가 성공하면 그 라운드 안에서 채택된다", async () => {
+    const p = await projectWithBriefing();
+    llmMock.callJson
+      .mockResolvedValueOnce(되풀이) // 초안
+      .mockResolvedValueOnce({})    // 되돌리기 1회차 시도1 — 스키마 거절
+      .mockResolvedValueOnce(고침)  // 되돌리기 1회차 재시도 — 성공, 채택
+      .mockResolvedValueOnce(고침); // 교정
+    const res = await scriptPOST(patchReq({}), ctx(p.id));
+    expect(res.status).toBe(200);
+    expect(llmMock.callJson).toHaveBeenCalledTimes(4); // 2회차로 넘어가지 않는다
+    expect((await getProject(p.id, OWNER)).script.text).toBe(고침.script);
+  });
+
+  // 호출 실패(네트워크 등)도 스키마 거절과 같은 정책을 받는다 — 첫 시도가 죽어도
+  // 루프를 통째로 포기하지 않고 한 번 재시도한다.
+  it("되돌리기 호출이 네트워크로 죽어도 라운드를 포기하지 않고 재시도한다", async () => {
+    const p = await projectWithBriefing();
+    llmMock.callJson
+      .mockResolvedValueOnce(되풀이)              // 초안
+      .mockRejectedValueOnce(new Error("네트워크")) // 되돌리기 1회차 시도1 — 호출 실패
+      .mockResolvedValueOnce(고침)                 // 되돌리기 1회차 재시도 — 성공, 채택
+      .mockResolvedValueOnce(고침);                // 교정
+    const res = await scriptPOST(patchReq({}), ctx(p.id));
+    expect(res.status).toBe(200);
+    expect(llmMock.callJson).toHaveBeenCalledTimes(4);
+    expect((await getProject(p.id, OWNER)).script.text).toBe(고침.script);
+  });
+
   it("version을 올리고 브리핑 버전을 붙여 저장한다", async () => {
     const p = await projectWithScript(); // 이미 version 1
     llmMock.callJson.mockResolvedValue(plain);
