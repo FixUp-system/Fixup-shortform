@@ -563,3 +563,40 @@ describe("초점에 외형을 담는다", () => {
     expect(out.focus).toEqual({ mode: "물건", subject: "하이톱 농구화" });
   });
 });
+
+describe("validateShows — 움직임 축", () => {
+  const base = (extra) => ({ shots: [{ shows: "미디엄 샷, 커피잔", ...extra }] });
+
+  it("세 축을 받아 컷에 싣는다", () => {
+    const out = validateShows(base({
+      camera: "천천히 뒤로 물러난다",
+      subject: "컵을 들어 입으로 가져간다",
+      ambient: "창밖으로 사람들이 지나간다",
+    }), 1);
+    expect(out[0].camera).toBe("천천히 뒤로 물러난다");
+    expect(out[0].subject).toBe("컵을 들어 입으로 가져간다");
+    expect(out[0].ambient).toBe("창밖으로 사람들이 지나간다");
+  });
+
+  it("빈 축은 싣지 않는다 — 키 자체가 없어야 한다", () => {
+    const out = validateShows(base({ camera: "  ", subject: "컵을 든다" }), 1);
+    expect("camera" in out[0]).toBe(false);
+    expect(out[0].subject).toBe("컵을 든다");
+  });
+
+  it("축이 하나도 없어도 컷을 버리지 않는다", () => {
+    const out = validateShows(base({}), 1);
+    expect(out).toHaveLength(1);
+    expect(out[0].shows).toBe("미디엄 샷, 커피잔");
+  });
+
+  it("옛 motion 도 계속 받는다 — 저장된 프로젝트가 그것을 갖고 있다", () => {
+    const out = validateShows(base({ motion: "천천히 회전한다" }), 1);
+    expect(out[0].motion).toBe("천천히 회전한다");
+  });
+
+  it("목록 밖 축은 무시한다", () => {
+    const out = validateShows(base({ lighting: "빛이 밝아진다" }), 1);
+    expect("lighting" in out[0]).toBe(false);
+  });
+});
