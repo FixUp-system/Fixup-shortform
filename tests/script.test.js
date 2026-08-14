@@ -9,7 +9,6 @@ import {
   repeatsWithin,
   scriptFaults,
   sayableFacts,
-  buildScriptMessages,
   overTarget,
   underTarget,
   unusedFacts,
@@ -461,7 +460,9 @@ describe("scriptFaults — 원고가 스스로 판정되는 셋", () => {
 });
 
 describe("scriptScore — 되돌리기를 받을지 가르는 자", () => {
-  const target = targetChars(project); // 60자
+  // 27자 — 자료 기준 하한 60자에 밀도 계수(SPEECH_DENSITY 0.45)를 곱한 값이다.
+  // 예전 주석은 60자라고 적혀 있었다: 밀도 계수가 들어오기 전의 값이다.
+  const target = targetChars(project); // 27자
 
   it("결함 개수를 먼저 본다", () => {
     const clean = { text: "가".repeat(target) };

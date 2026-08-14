@@ -195,11 +195,14 @@ export default function VoiceStepPage() {
   }
 
   // 말하는 프로젝트에는 이 단계가 없다(lib/steps.js 의 stepsFor). 주소를 직접 치고
-  // 들어온 경우만 여기 닿으므로, 화면을 보여주지 말고 제자리로 보낸다.
-  if (projectSpeaks(project)) {
-    router.replace(`/create/${project.id}/images`);
-    return null;
-  }
+  // 들어온 경우만 여기 닿으므로 화면을 그리지 않는다.
+  //
+  // ★ 되돌려보내는 것은 **여기가 아니라 레이아웃 가드**다(app/create/[id]/layout.js).
+  //   stepFromPathname 이 /voice 를 짚고 isReachable("voice", project) 가 이제 거짓이라
+  //   (stepsFor 가 목록에서 뺀다) 가드가 effect 안에서 replace 한다.
+  //   여기서 또 부르면 **그리는 중에 이동**하는 꼴이라 App Router 가 경고하고 개발 모드에서
+  //   맴돌 수 있다. 판정은 그대로 두고 화면만 접는다.
+  if (projectSpeaks(project)) return null;
 
   return (
     <section className="panel panel--narrow">
