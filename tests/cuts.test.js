@@ -1521,4 +1521,49 @@ describe("fillSilentCuts — 배분된 초가 8초를 넘는 컷이 남지 않�
     const out = fillSilentCuts([{ idx: 0, sentence: "가.", spoken_seconds: 6 }], 15, seedance);
     expect(out.map((c) => c.idx)).toEqual(out.map((_, i) => i));
   });
+
+  // ★ 리뷰 지적(2026-08-14): 못 내리는 컷 때문에 채우면 **8초는 그대로인 채 값만 나간다.**
+  //   낭독 10초짜리는 어떻게 쪼개도 10초다(바닥이다). 그런데도 하나 넣으면 총 초가
+  //   고른 초를 넘어(클립은 초당 과금) 이미지 $0.08 까지 더 사고 보장은 하나도 안 는다.
+  it("바닥이 8초를 넘는 컷 때문에는 채우지 않는다 — 값만 나가고 보장은 그대로다", () => {
+    const cuts = [
+      { idx: 0, sentence: "끊을 자리가 없는 긴 문장.", spoken_seconds: 10 },
+      { idx: 1, sentence: "짧다.", spoken_seconds: 2 },
+    ];
+    const out = fillSilentCuts(cuts, 20, seedance);
+    expect(out).toHaveLength(2);
+    expect(out.some((c) => c.silent)).toBe(false);
+  });
+
+  // ★ 리뷰 지적(2026-08-14): 채운 컷을 전부 끝에 붙이면 영상이 **언제나 침묵으로 끝난다.**
+  //   말이 앞에서 끝나고 남은 초가 통째로 말 없는 화면이 된다. 짧은 원고가 이 함수가
+  //   존재하는 이유라 그것은 가끔이 아니라 매번이다 — 말하는 컷 뒤에 돌아가며 끼운다.
+  it("채운 컷을 말하는 컷 뒤에 하나씩 끼운다 — 끝에 몰아붙이지 않는다", () => {
+    const cuts = [
+      { idx: 0, sentence: "가.", spoken_seconds: 6 },
+      { idx: 1, sentence: "나.", spoken_seconds: 6 },
+    ];
+    const out = fillSilentCuts(cuts, 24, seedance);
+    expect(out.map((c) => !!c.silent)).toEqual([false, true, false, true]);
+    expect(out.filter((c) => !c.silent).map((c) => c.sentence).join(" ")).toBe("가. 나.");
+  });
+
+  it("말하는 컷이 하나뿐이면 뒤로 갈 수밖에 없다 — 맨 앞에는 두지 않는다", () => {
+    const out = fillSilentCuts([{ idx: 0, sentence: "가.", spoken_seconds: 6 }], 15, seedance);
+    expect(out.length).toBeGreaterThan(1);
+    expect(out[0].silent).toBeFalsy();          // 첫 화면은 가장 센 문장이 가진다
+    expect(out.slice(1).every((c) => c.silent)).toBe(true);
+  });
+
+  it("모델이 제안한 무음 컷은 그 자리를 지킨다", () => {
+    const cuts = [
+      { idx: 0, sentence: "가.", spoken_seconds: 6 },
+      { idx: 1, sentence: "", silent: true, spoken_seconds: 0 },
+      { idx: 2, sentence: "나.", spoken_seconds: 6 },
+    ];
+    const out = fillSilentCuts(cuts, 24, seedance);
+    expect(out[0].sentence).toBe("가.");
+    expect(out[1]).toMatchObject({ silent: true });
+    expect(out.filter((c) => !c.silent).map((c) => c.sentence)).toEqual(["가.", "나."]);
+  });
 });
