@@ -64,6 +64,7 @@ const { POST: voiceRegenPOST } = await import("../app/api/projects/[id]/voice/[i
 const { POST: voicePOST } = await import("../app/api/projects/[id]/voice/route.js");
 const { POST: clipRegenPOST } = await import("../app/api/projects/[id]/clips/[idx]/regen/route.js");
 const { POST: subtitlePOST } = await import("../app/api/projects/[id]/subtitle/route.js");
+const { POST: subtitleLangPOST } = await import("../app/api/projects/[id]/subtitle-lang/route.js");
 
 const ctx = (id) => ({ params: Promise.resolve({ id }) });
 const idxCtx = (id, idx) => ({ params: Promise.resolve({ id, idx: String(idx) }) });
@@ -634,6 +635,101 @@ describe("POST /api/projects/[id]/subtitle — 자막만 다시 굽기", () => {
 
   it("없는 프로젝트는 404 다", async () => {
     const res = await subtitlePOST(patchReq({}), ctx("없는id"));
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("POST /subtitle-lang", () => {
+  it("모르는 언어는 400 — 조용히 저장되면 안 된다", async () => {
+    const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "가", photos: [] } });
+    const res = await subtitleLangPOST(patchReq({ lang: "fr" }), ctx(p.id));
+    expect(res.status).toBe(400);
+    const after = await getProject(p.id, OWNER);
+    expect(after.settings?.subtitle_lang).toBeUndefined();
+    expect(llmMock.callJson).not.toHaveBeenCalled();
+  });
+
+  it("한국어를 고르면 번역을 안 부른다 — 원문이 곧 자막이다", async () => {
+    const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "가", photos: [] } });
+    await updateProject(p.id, OWNER, (proj) => ({
+      ...proj, status: "cuts", cuts: [{ idx: 0, sentence: "문장 하나" }],
+    }));
+    const res = await subtitleLangPOST(patchReq({ lang: "ko" }), ctx(p.id));
+    expect(res.status).toBe(200);
+    expect(llmMock.callJson).not.toHaveBeenCalled();
+    const after = await getProject(p.id, OWNER);
+    expect(after.settings.subtitle_lang).toBe("ko");
+  });
+
+  it("각인이 맞는 컷은 다시 번역하지 않는다", async () => {
+    const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "가", photos: [] } });
+    await updateProject(p.id, OWNER, (proj) => ({
+      ...proj, status: "cuts",
+      cuts: [
+        { idx: 0, sentence: "이미 옮긴 문장", subtitles: { ja: { text: "翻訳済み", of: "이미 옮긴 문장" } } },
+        { idx: 1, sentence: "새 문장" },
+      ],
+    }));
+    llmMock.callJson.mockResolvedValue({ lines: ["新しい文"] });
+    const res = await subtitleLangPOST(patchReq({ lang: "ja" }), ctx(p.id));
+    expect(res.status).toBe(200);
+    expect(llmMock.callJson).toHaveBeenCalledTimes(1);
+    const sentUser = llmMock.callJson.mock.calls[0][0].messages[0].content;
+    expect(sentUser).toContain("새 문장");
+    expect(sentUser).not.toContain("이미 옮긴 문장");
+    const after = await getProject(p.id, OWNER);
+    expect(after.cuts[0].subtitles.ja.text).toBe("翻訳済み"); // 안 바뀜
+    expect(after.cuts[1].subtitles.ja).toEqual({ text: "新しい文", of: "새 문장" });
+  });
+
+  it("무음 컷은 번역 대상에서 뺀다", async () => {
+    const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "가", photos: [] } });
+    await updateProject(p.id, OWNER, (proj) => ({
+      ...proj, status: "cuts",
+      cuts: [
+        { idx: 0, sentence: "", silent: true },
+        { idx: 1, sentence: "말하는 문장" },
+      ],
+    }));
+    llmMock.callJson.mockResolvedValue({ lines: ["話す文"] });
+    const res = await subtitleLangPOST(patchReq({ lang: "ja" }), ctx(p.id));
+    expect(res.status).toBe(200);
+    expect(llmMock.callJson).toHaveBeenCalledTimes(1);
+    const sentUser = llmMock.callJson.mock.calls[0][0].messages[0].content;
+    expect(sentUser).toContain("말하는 문장");
+    const after = await getProject(p.id, OWNER);
+    expect(after.cuts[0].subtitles).toBeUndefined();
+    expect(after.cuts[1].subtitles.ja.text).toBe("話す文");
+  });
+
+  it("개수가 안 맞는 응답은 통째로 버리고 저장하지 않는다", async () => {
+    const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "가", photos: [] } });
+    await updateProject(p.id, OWNER, (proj) => ({
+      ...proj, status: "cuts", cuts: [{ idx: 0, sentence: "문장 하나" }, { idx: 1, sentence: "문장 둘" }],
+    }));
+    llmMock.callJson.mockResolvedValue({ lines: ["한 줄만"] }); // 2개인데 1개
+    const res = await subtitleLangPOST(patchReq({ lang: "ja" }), ctx(p.id));
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    const after = await getProject(p.id, OWNER);
+    expect(after.cuts[0].subtitles).toBeUndefined();
+    expect(after.cuts[1].subtitles).toBeUndefined();
+    expect(after.settings?.subtitle_lang).toBeUndefined();
+  });
+
+  it("성공하면 컷마다 text 와 of 가 찍힌다", async () => {
+    const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "가", photos: [] } });
+    await updateProject(p.id, OWNER, (proj) => ({
+      ...proj, status: "cuts", cuts: [{ idx: 0, sentence: "옮길 문장" }],
+    }));
+    llmMock.callJson.mockResolvedValue({ lines: ["翻訳された文"] });
+    const res = await subtitleLangPOST(patchReq({ lang: "ja" }), ctx(p.id));
+    expect(res.status).toBe(200);
+    const after = await getProject(p.id, OWNER);
+    expect(after.cuts[0].subtitles.ja).toEqual({ text: "翻訳された文", of: "옮길 문장" });
+  });
+
+  it("없는 프로젝트는 404 다", async () => {
+    const res = await subtitleLangPOST(patchReq({ lang: "ko" }), ctx("없는id"));
     expect(res.status).toBe(404);
   });
 });
