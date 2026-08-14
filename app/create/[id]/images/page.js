@@ -32,7 +32,9 @@ export default function ImagesStepPage() {
   // ★ 잔액이 여기서 움직인다(정가·재생성). 상단바는 공유본을 보므로 다시 읽어 줘야
   // 옛 숫자가 안 남는다 — 안 읽으면 크레딧이 나갔는데 화면은 그대로다.
   // 실패해도 넘어간다: 만들기는 이미 시작됐고, 잔액 표시 하나 때문에 막을 일이 아니다.
-  const { load: reloadMe } = useMe();
+  const { me, load: reloadMe } = useMe();
+  // 크레딧을 끈 동안에는 값 이야기를 안 한다(gated).
+  const showCredits = me?.gated !== false;
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [pollTimedOut, setPollTimedOut] = useState(false);
@@ -228,7 +230,9 @@ export default function ImagesStepPage() {
                       ? "그리는 중…"
                       : project.charged
                         ? "이미지 만들기"
-                        : `이미지 만들기 · ${videoPrice(project.settings?.target_seconds, modelIdForProject(project), resolutionForProject(project))} 크레딧`}
+                        : !showCredits
+                          ? "이미지 만들기"
+                          : `이미지 만들기 · ${videoPrice(project.settings?.target_seconds, modelIdForProject(project), resolutionForProject(project))} 크레딧`}
                   </button>
                 </>
               ) : (
@@ -293,6 +297,8 @@ function PreviewPane({ cut, url, photoName, aspect, stalled, onRegen }) {
   // ★ 모델을 안 넘긴다 — 이미지 재생성 값은 영상 모델과 무관하다(REGEN_PRICE.image 는 표가
   //   아니라 숫자 하나다). 넘기려면 project 를 이 컴포넌트까지 끌고 와야 하는데, 값이 갈릴
   //   일이 없는 자리에 배선을 늘리지 않는다. 갈리게 되는 날 표가 먼저 바뀐다.
+  const { me: meForPrice } = useMe();
+  const showCredits = meForPrice?.gated !== false;
   const regenLabel = priceLabel(regenPrice("image", cut.regen_count || 0));
 
   return (
@@ -326,7 +332,7 @@ function PreviewPane({ cut, url, photoName, aspect, stalled, onRegen }) {
               disabled={atLimit || busyCut || !instr.trim()}
               onClick={() => onRegen(cut.idx, instr.trim())}
             >
-              {busyCut ? "만드는 중…" : `이 지시로 다시 만들기 · ${regenLabel}`}
+              {busyCut ? "만드는 중…" : showCredits ? `이 지시로 다시 만들기 · ${regenLabel}` : "이 지시로 다시 만들기"}
             </button>
             <button className="mini" disabled={atLimit || busyCut} onClick={() => onRegen(cut.idx)}>
               {busyCut ? "만드는 중…" : `그냥 다시 · ${regenLabel}`}

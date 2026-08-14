@@ -24,7 +24,9 @@ export default function VoiceStepPage() {
   // ★ 잔액이 여기서 움직인다(정가·재생성). 상단바는 공유본을 보므로 다시 읽어 줘야
   // 옛 숫자가 안 남는다 — 안 읽으면 크레딧이 나갔는데 화면은 그대로다.
   // 실패해도 넘어간다: 만들기는 이미 시작됐고, 잔액 표시 하나 때문에 막을 일이 아니다.
-  const { load: reloadMe } = useMe();
+  const { me, load: reloadMe } = useMe();
+  // 크레딧을 끈 동안(내부 QA)에는 값 이야기를 안 한다 — 판정은 서버가 내려 준 gated 하나다.
+  const showCredits = me?.gated !== false;
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [pollTimedOut, setPollTimedOut] = useState(false);
@@ -294,7 +296,7 @@ export default function VoiceStepPage() {
                     >
                       {regening === c.idx
                         ? "읽는 중…"
-                        : `다시 읽기 · ${priceLabel(regenPrice("voice", c.voice_regen_count || 0))}`}
+                        : showCredits ? `다시 읽기 · ${priceLabel(regenPrice("voice", c.voice_regen_count || 0))}` : "다시 읽기"}
                     </button>
                   </div>
                 </>
@@ -324,10 +326,10 @@ export default function VoiceStepPage() {
                   에는 적지 않는다: 또 받는 것처럼 읽힌다. charged 는 서버가 장부에서 판정한다. */}
               <span className="hint">
                 컷 {cuts.length}개를 골라주신 목소리로 읽어요
-                {!project.charged && ` · 여기서 영상 정가 ${price} 크레딧이 나가요`}
+                {showCredits && !project.charged && ` · 여기서 영상 정가 ${price} 크레딧이 나가요`}
               </span>
               <button className="cta" disabled={busy} onClick={start}>
-                {busy ? "읽는 중…" : project.charged ? "목소리 만들기" : `목소리 만들기 · ${price} 크레딧`}
+                {busy ? "읽는 중…" : !showCredits || project.charged ? "목소리 만들기" : `목소리 만들기 · ${price} 크레딧`}
               </button>
             </>
           ) : (

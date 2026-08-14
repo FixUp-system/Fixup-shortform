@@ -204,9 +204,9 @@ describe("상단 계정 바", () => {
     // 이 숫자를 함께 고쳐라 — 세는 것이 목적이 아니라 "조용히 늘지 않게" 하는 것이 목적이다.
     expect(
       meMentions(menu, "UserMenu"),
-      "UserMenu 본문의 `me` 언급이 넷(선언·크레딧 조건·잔액·이름)에서 달라졌다 — " +
+      "UserMenu 본문의 `me` 언급이 다섯(선언·크레딧 조건·gated 조건·잔액·이름)에서 달라졌다 — " +
       "새로 쓴 자리가 로그아웃을 가리는지 눈으로 확인하고, 정당하면 이 숫자를 함께 고쳐라"
-    ).toHaveLength(4);
+    ).toHaveLength(5);
     // ★ 위 카운트는 **총합만** 본다. 그래서 정당한 `me` 하나를 빼고(잔액을 별도 state 로 옮김)
     // 가리는 `me` 하나를 넣으면 합이 그대로라 지나간다 — `me` 를 오히려 쓰는데도 통과한다.
     // 그래서 로그아웃이 사는 드롭다운의 **게이트 자체를 형태로 못 박는다**: 여는 조건은
@@ -219,7 +219,9 @@ describe("상단 계정 바", () => {
     // 표현으로 한 번 더 문다.
     expect(body(menu, "UserMenu")).not.toMatch(/return\s+null/);
     // 데이터가 있어야 하는 것만 가린다.
-    expect(menu).toMatch(/me\s*&&\s*\(?\s*<span className="um-credit"/);
+    // 2026-08-14: 크레딧을 끈 동안 감추려고 gated 조건이 사이에 붙었다.
+    // 계약은 그대로다 — me 가 있어야 그리고, 없으면 안 그린다.
+    expect(menu).toMatch(/me\s*&&[^<]*<span className="um-credit"/);
     expect(menu).toMatch(/me\?\.name\s*\|\|/);
   });
 

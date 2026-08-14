@@ -23,6 +23,7 @@ import { adPollTimeoutMs, adEstimatedMinutes } from "../../../lib/ad/timing";
 // 사이드바와 공유하는 광고 프로젝트(components/AdProjectContext) — 사이드바의 하위 단계
 // 표시가 여기서 읽어들인 값을 그대로 본다. 사이드바가 따로 fetch·폴링하지 않아도 되는 이유.
 import { useAdProject } from "../../../components/AdProjectContext";
+import { useMe } from "../../../components/MeContext";
 
 // 폴링 주기 — 기존 단계 화면들(app/create/[id]/*/page.js)과 같다. ★ 이건 "화면이 서버
 // 상태를 몇 초마다 묻는가"고, fal 큐 폴링 간격(서버 쪽, lib/ad/generate.js 의 4초)과는
@@ -60,6 +61,9 @@ export default function AdDetailPage() {
   // project·setProject·load 는 컨텍스트에서 온다(null = 아직 못 불러왔다) — 사이드바가
   // 같은 값을 읽어 하위 단계를 그린다. 이 화면이 유일한 발신자이고, 사이드바는 수신만 한다.
   const { project, setProject, load, setView } = useAdProject();
+  // 크레딧을 끈 동안(내부 QA)에는 값 이야기를 안 한다 — 판정은 서버가 내려 준 gated 하나다.
+  const { me } = useMe();
+  const showCredits = me?.gated !== false;
   const [loadErr, setLoadErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -372,12 +376,14 @@ export default function AdDetailPage() {
                 <span className="hint">
                   {price === null
                     ? "이 영상의 가격을 알 수 없어요 — 지금은 만들 수 없습니다"
-                    : "이대로 만들면 크레딧이 나가요 — 되돌릴 수 없어요"}
+                    : showCredits
+                      ? "이대로 만들면 크레딧이 나가요 — 되돌릴 수 없어요"
+                      : "이대로 만들면 되돌릴 수 없어요"}
                 </span>
                 {/* 이대로 만들기 — 비싼 문. .cta .cr 이 버튼 안에서 값을 강조한다(app/ads/new/page.js 와 같은 자리).
                     ★ 정가를 모르면 잠근다 — 얼마 나갈지 모르는 채로 누르게 하지 않는다. */}
                 <button className="cta" disabled={busy || price === null} onClick={startRender}>
-                  {busy ? "시작하는 중…" : "이대로 만들기 →"} <span className="cr">{price}</span>
+                  {busy ? "시작하는 중…" : "이대로 만들기 →"}{showCredits && <span className="cr">{price}</span>}
                 </button>
               </div>
             )}
@@ -411,7 +417,7 @@ export default function AdDetailPage() {
               {/* ★ [다시 만들기]도 같은 유료 문이다 — 정가를 모르면 같이 잠근다.
                   완성본은 그대로 재생·내려받기 할 수 있다(그건 값이 안 드는 일이다). */}
               <button className="mini" disabled={busy || price === null} onClick={startRender}>
-                {busy ? "만드는 중…" : price === null ? "가격을 알 수 없어요" : `다시 만들기 · ${price}`}
+                {busy ? "만드는 중…" : price === null ? "가격을 알 수 없어요" : showCredits ? `다시 만들기 · ${price}` : "다시 만들기"}
               </button>
               {/* ?dl=1 — ⑥완성과 같은 이유(서명 URL 302 뒤에는 그 속성이 안 먹는다) */}
               <a className="cta" href={`${video.url}?dl=1`} download>

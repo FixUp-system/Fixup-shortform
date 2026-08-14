@@ -3,7 +3,8 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { memoryStore, resetMemoryStore } from "../lib/store/memory.js";
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
 
-vi.mock("../lib/charges.js", () => ({ balanceFor: async () => 85.18 }));
+// creditsEnabled 도 함께 준다 — 라우트가 gated 를 그것으로 판정한다(2026-08-14).
+vi.mock("../lib/charges.js", () => ({ balanceFor: async () => 85.18, creditsEnabled: () => true }));
 
 const { GET, PATCH } = await import("../app/api/me/route.js");
 

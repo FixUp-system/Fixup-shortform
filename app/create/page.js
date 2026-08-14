@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useProject } from "../../components/ProjectContext";
+import { useMe } from "../../components/MeContext";
 import { TARGET_CHOICES } from "../../lib/script";
 import { DEFAULT_STYLE_ID } from "../../lib/styles";
 import { ASPECTS, DEFAULT_ASPECT_ID, aspectFor } from "../../lib/aspects";
@@ -23,6 +24,11 @@ import StylePicker from "../../components/StylePicker";
 export default function CreatePage() {
   const router = useRouter();
   const { setProject } = useProject();
+  // 크레딧을 끈 동안(내부 QA)에는 값 이야기를 안 한다 — 판정은 서버가 내려 준 gated 하나다.
+  // ★ `!== false` 로 본다: me 를 아직 못 읽은 동안(null)에는 지금까지처럼 값을 보여준다.
+  //   반대로 두면 크레딧이 켜진 정상 배포에서 값이 잠깐 사라졌다 나타난다.
+  const { me } = useMe();
+  const showCredits = me?.gated !== false;
   const [text, setText] = useState("");
   const [photos, setPhotos] = useState([]); // {id, filename, url}
   const [seconds, setSeconds] = useState(null); // null = 자동(자료가 정함)
@@ -155,7 +161,7 @@ export default function CreatePage() {
                       {/* ★ 화질은 여기서 안 고른다 — 프로젝트가 생긴 뒤 ②대본에서 고른다.
                           그래서 값은 **기본 화질** 기준이고, 그것을 인자로 명시한다
                           (비우면 다음 사람이 "해상도를 안 보는 자리"로 읽는다). */}
-                      {m.label} · {videoPrice(seconds, m.id, DEFAULT_RESOLUTION)} 크레딧
+                      {m.label}{showCredits && ` · ${videoPrice(seconds, m.id, DEFAULT_RESOLUTION)} 크레딧`}
                     </button>
                   ))}
                 </div>

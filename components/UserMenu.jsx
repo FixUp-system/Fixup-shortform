@@ -53,7 +53,9 @@ export default function UserMenu() {
   // 하는 것(크레딧)만 가리고, 이름 자리는 기본 라벨로 채워 빈 버튼을 만들지 않는다.
   return (
     <div className="um" ref={box}>
-      {me && <span className="um-credit">크레딧 <b>{me.balance}</b></span>}
+      {/* ★ 크레딧을 끈 동안(내부 QA)에는 안 보여준다 — 판정은 서버가 내려 준 gated
+          하나다(/api/me). 화면이 스스로 판정하면 두 벌이 되어 언젠가 어긋난다. */}
+      {me && me.gated !== false && <span className="um-credit">크레딧 <b>{me.balance}</b></span>}
       <button
         className="um-btn"
         onClick={() => setOpen((v) => !v)}

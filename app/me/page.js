@@ -246,6 +246,10 @@ export default function MePage() {
         {pwMsg && <p className="pgsub">{pwMsg}</p>}
       </section>
 
+      {/* ★ 크레딧을 끈 동안(내부 QA)에는 이 묶음을 통째로 안 그린다 — 안 쓰는 값을
+          계속 말하면 혼란만 준다. 기록은 DB 에 그대로 쌓인다(사용자 결정): 나중에
+          얼마 썼는지 운영자 화면(/admin·/costs)에서 볼 수 있다. */}
+      {me?.gated !== false && (
       <section className="panel me-panel">
         <h2 className="me-h">크레딧 내역</h2>
         <p className="pgsub">지금 {me ? <b>{me.balance}</b> : "…"} 크레딧이 남았어요.</p>
@@ -286,6 +290,7 @@ export default function MePage() {
           </button>
         )}
       </section>
+      )}
 
 
     </>

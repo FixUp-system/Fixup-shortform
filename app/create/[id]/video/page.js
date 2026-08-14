@@ -24,7 +24,9 @@ export default function VideoStepPage() {
   // ★ 잔액이 여기서 움직인다(정가·재생성). 상단바는 공유본을 보므로 다시 읽어 줘야
   // 옛 숫자가 안 남는다 — 안 읽으면 크레딧이 나갔는데 화면은 그대로다.
   // 실패해도 넘어간다: 만들기는 이미 시작됐고, 잔액 표시 하나 때문에 막을 일이 아니다.
-  const { load: reloadMe } = useMe();
+  const { me, load: reloadMe } = useMe();
+  // 크레딧을 끈 동안에는 값 이야기를 안 한다(gated).
+  const showCredits = me?.gated !== false;
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [pollTimedOut, setPollTimedOut] = useState(false);
@@ -197,7 +199,9 @@ export default function VideoStepPage() {
                           ? "만드는 중…"
                           // ★ 화질까지 넘긴다 — 1080p 는 25 가 아니라 57 이다.
                           //   라우트(clips/[idx]/regen)가 걷는 값과 같은 출처를 본다.
-                          : `다시 만들기 · ${priceLabel(regenPrice("clip", c.clip_regen_count || 0, modelIdForProject(project), resolutionForProject(project)))}`}
+                          : !showCredits
+                            ? "다시 만들기"
+                            : `다시 만들기 · ${priceLabel(regenPrice("clip", c.clip_regen_count || 0, modelIdForProject(project), resolutionForProject(project)))}`}
                       </button>
                     </>
                   )}

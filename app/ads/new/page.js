@@ -26,6 +26,7 @@ import { priceLabel, adVideoPrice } from "../../../lib/pricing";
 // app/create/page.js 와 같은 이유로 쓴다 — 새 광고를 시작하는 자리에서 이전 광고의
 // 단계가 사이드바에 남지 않게 비운다(components/AdProjectContext).
 import { useAdProject } from "../../../components/AdProjectContext";
+import { useMe } from "../../../components/MeContext";
 
 // 화풍 라벨은 styles.js 에 있지만, 고를 수 있는 것은 AD_STYLE_LINES 에 영상용 문구가 있는
 // id 뿐이어야 한다 — 둘이 어긋나면 화면에는 있는데 서버(normalizeAdOptions)가 400 을 낸다.
@@ -38,6 +39,9 @@ const MAX_PHOTOS = 4;
 export default function AdNewPage() {
   const router = useRouter();
   const { setProject } = useAdProject();
+  // 크레딧을 끈 동안(내부 QA)에는 값 이야기를 안 한다 — 판정은 서버가 내려 준 gated 하나다.
+  const { me } = useMe();
+  const showCredits = me?.gated !== false;
   const [text, setText] = useState("");
   const [photos, setPhotos] = useState([]); // {id, filename, url}
   const [format, setFormat] = useState(DEFAULT_AD_OPTIONS.format);
@@ -238,7 +242,7 @@ export default function AdNewPage() {
                   {adResolutionsFor(model).map((r) => (
                     <button key={r} className={`chip${resolution === r ? " on" : ""}`}
                       onClick={() => setResolution(r)}>
-                      {r} · {priceLabel(adVideoPrice(seconds, model, r))}
+                      {r}{showCredits && ` · ${priceLabel(adVideoPrice(seconds, model, r))}`}
                     </button>
                   ))}
                 </div>
@@ -254,7 +258,7 @@ export default function AdNewPage() {
                   {adSecondsFor(model).map((s) => (
                     <button key={s} className={`chip${seconds === s ? " on" : ""}`}
                       onClick={() => setSeconds(s)}>
-                      {s}초 · {priceLabel(adVideoPrice(s, model, resolution))}
+                      {s}초{showCredits && ` · ${priceLabel(adVideoPrice(s, model, resolution))}`}
                     </button>
                   ))}
                 </div>
