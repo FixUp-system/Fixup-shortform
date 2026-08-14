@@ -197,7 +197,10 @@ export default function VideoStepPage() {
               컷별 [다시 만들기]도 가리키면 안 된다 — 멈춘 컷에는 클립도 오류도 없어
               그 버튼 자체가 렌더되지 않는다. */}
           ⚠ 컷 {gen.done}/{gen.total}에서 한동안 진행이 없어요 — 아직 만들고 있을 수도 있어요.
-          잠시 기다렸다가 새로고침하면 지금 상태를 다시 확인할 수 있어요.
+          {/* ★ "기다리라"는 말은 아직 지켜보는 동안만 맞다. 5분 상한을 넘기면 위쪽 오류줄이
+              "새로고침하거나 다시 시도해 주세요"라고 말하는데, 그 옆에서 계속 기다리라고
+              하면 두 줄이 서로 싸운다(게다가 그때는 만들기 버튼이 이미 열려 있다). */}
+          {!pollTimedOut && " 잠시 기다렸다가 새로고침하면 지금 상태를 다시 확인할 수 있어요."}
         </p>
       )}
       {gen.kind === "failed" && <p className="pgsub warn">⚠ {gen.reason.message}</p>}
@@ -316,10 +319,15 @@ export default function VideoStepPage() {
                   다시 과금하고 파이프라인을 하나 더 띄운다. 살아 있을지 모르는 실행 위에
                   돈을 한 번 더 쓰게 두느니 잠가 둔다.
                   실패(failed)는 다르다: 프로젝트 단위 video_error 는 라우트의 catch 에서만
-                  쓰이므로 그때는 파이프라인이 이미 끝난 뒤다 — 그래서 열어 둔다. */}
+                  쓰이므로 그때는 파이프라인이 이미 끝난 뒤다 — 그래서 열어 둔다.
+                  ★ 다만 **폴링이 포기할 때까지만** 잠근다. 멈춤은 저절로 풀리지 않아서
+                  (심장박동이 멎은 채로 stalled_for_ms 는 계속 커지므로 generationState 는
+                  idle 로 안 떨어진다) 조건 없이 잠그면 정말로 죽은 실행에서 사장님이
+                  프로젝트 단위 재시도에 영영 못 닿는다 — 멈춘 컷에는 컷별 버튼도 없다.
+                  5분 상한은 바꾸기 전과 똑같은 경계다: 그 안에서는 잠기고, 넘으면 열린다. */}
               <button
                 className="cta"
-                disabled={gen.kind === "running" || gen.kind === "stalled"}
+                disabled={gen.kind === "running" || (gen.kind === "stalled" && !pollTimedOut)}
                 onClick={start}
               >
                 {gen.kind === "running"

@@ -121,6 +121,9 @@ describe("⑤영상 — 생성 상태 표시", () => {
     expect(copy, "렌더되지 않는 컷별 버튼을 가리킨다").not.toContain("컷별로 다시 만들");
     // 대신 공짜이고 언제나 되는 길을 준다
     expect(copy, "멈춤일 때 할 수 있는 공짜 행동을 안 알려준다").toContain("새로고침");
+    // 다만 "기다리라"는 말은 아직 지켜보는 동안만 맞다 — 상한을 넘기면 위쪽 오류줄이
+    // "다시 시도해 주세요"라고 하므로 그 옆에서 계속 기다리라고 하면 두 줄이 싸운다
+    expect(copy, "상한을 넘긴 뒤에도 기다리라고 해 오류줄과 어긋난다").toContain("!pollTimedOut");
   });
 
   // 문구뿐 아니라 버튼 자체가 잠겨 있어야 한다 — 말리면서 열어 두면 눌린다.
@@ -139,6 +142,36 @@ describe("⑤영상 — 생성 상태 표시", () => {
     // ★ 실패는 반대로 **열려 있어야** 한다. 프로젝트 단위 video_error 는 라우트의 catch
     //   에서만 쓰이므로 그때는 파이프라인이 이미 끝난 뒤라 다시 눌러도 겹치지 않는다.
     expect(disabled[1], "실패까지 잠그면 정상 재시도 경로가 막힌다").not.toContain("failed");
+  });
+
+  // ★ 낱말이 있는지가 아니라 **실제로 어떻게 갈리는지**를 잰다. 소스에서 disabled 식을
+  //   그대로 떼어내 값을 넣어 본다 — 렌더 인프라 없이 동작을 재는 유일한 길이고,
+  //   "멈춤이면 무조건 잠금"이 사장님을 영영 가두는 것을 잡아내는 것이 이 표다.
+  //
+  //   왜 상한 뒤에는 열려야 하나: 멈춤은 저절로 안 풀린다. 심장박동이 멎은 채로
+  //   stalled_for_ms 는 계속 커지므로 generationState 는 idle 로 안 떨어지고 stalled 에
+  //   머문다(5분 상한으로 폴링이 멎어 busy 가 false 가 돼도 마찬가지다). 그러니 조건 없이
+  //   잠그면 정말로 죽은 실행에서 프로젝트 단위 재시도에 **영영 못 닿는다** —
+  //   멈춘 컷에는 클립도 오류도 없어 컷별 버튼조차 안 그려진다.
+  it("잠금이 갈리는 방식 — 도는 중·멈춤은 잠기고, 폴링이 포기하면 열린다", () => {
+    const startIdx = video.indexOf("onClick={start}");
+    const btn = video.slice(video.lastIndexOf("<button", startIdx), startIdx);
+    const expr = btn.match(/disabled=\{([\s\S]*?)\}\s*$/m)?.[1] ?? btn.match(/disabled=\{([^}]*)\}/)[1];
+    const locked = new Function("gen", "pollTimedOut", `return !!(${expr});`);
+
+    const CASES = [
+      { 상황: "도는 중", gen: { kind: "running" }, pollTimedOut: false, 잠김: true },
+      { 상황: "멈춤 — 아직 보고 있다", gen: { kind: "stalled" }, pollTimedOut: false, 잠김: true },
+      // ↓ 이 한 줄이 사장님을 가두지 않는다는 보증이다
+      { 상황: "멈춤 — 폴링이 포기했다", gen: { kind: "stalled" }, pollTimedOut: true, 잠김: false },
+      { 상황: "실패", gen: { kind: "failed" }, pollTimedOut: false, 잠김: false },
+      { 상황: "안 눌렀다", gen: { kind: "idle" }, pollTimedOut: false, 잠김: false },
+      { 상황: "끝났다", gen: { kind: "done" }, pollTimedOut: false, 잠김: false },
+    ];
+
+    for (const { 상황, gen, pollTimedOut, 잠김 } of CASES) {
+      expect(locked(gen, pollTimedOut), `${상황} 일 때 잠금이 ${잠김} 여야 한다`).toBe(잠김);
+    }
   });
 
   // ★ 멈춤 동안에도 busy 는 참이다(5분 상한에 닿아야 풀린다). 카드가 busy 를 보면
