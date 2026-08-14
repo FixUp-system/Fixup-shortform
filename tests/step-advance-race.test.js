@@ -31,7 +31,10 @@ describe("단계 전진 — 화면이 가드보다 앞서가지 않는다", () =
   it("③목소리 폴링이 status 까지 보고 끝낸다 — cuts 만 보면 창이 열린다", () => {
     // ★ 종료 **조건 자체**를 잰다. 주변 몇 줄을 훑으면 위쪽 setProject 의 st.status 가
     // 걸려 우연히 통과한다(처음에 그렇게 썼다가 거짓 초록을 봤다).
-    const line = voice.split(/\r?\n/).find((l) => l.includes("stop(false)") && l.includes("pending"));
+    //
+    // 폴링이 lib/poll.js 한 벌로 옮겨간 뒤로 종료는 `stop(false)` 호출이 아니라
+    // onTick 이 참을 **돌려주는** 것이다(2026-08-14). 재는 것은 그대로 그 한 줄이다.
+    const line = voice.split(/\r?\n/).find((l) => l.includes("return !pending"));
     expect(line, "폴링 종료 한 줄을 못 찾겠다").toBeTruthy();
     expect(line, "종료 판정이 status 를 안 본다 — audio 만 보면 창이 열린다")
       .toMatch(/st\.status/);

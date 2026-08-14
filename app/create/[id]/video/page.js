@@ -16,6 +16,11 @@ import { isClipStale } from "../../../../lib/steps";
 import { aspectFor } from "../../../../lib/aspects";
 // 상한과 값은 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다).
 import { MAX_REGEN_PER_CUT, priceLabel, regenPrice } from "../../../../lib/pricing";
+// 폴링 루프·진행 판정·오류 필드 표는 전부 lib 한 벌이다. 화면마다 복붙해 두었더니
+// 조금씩 다르게 틀렸다(④이미지가 images_error 를 영영 못 보던 버그가 그것이다).
+import { startPolling } from "../../../../lib/poll";
+import { generationState, isCutDone } from "../../../../lib/progress";
+import { firstError } from "../../../../lib/step-errors";
 
 export default function VideoStepPage() {
   const { id } = useParams();
@@ -32,49 +37,45 @@ export default function VideoStepPage() {
   const [pollTimedOut, setPollTimedOut] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState(null);
   const [regening, setRegening] = useState(null); // 다시 만드는 중인 컷 idx
-  const pollRef = useRef(null);
+  // 상태 라우트가 돌려준 마지막 응답 그대로. 진행 판정에 필요한 심장박동(progress)과
+  // 멈춘 시간(stalled_for_ms)은 프로젝트 문서가 아니라 여기에만 실려 온다.
+  const [status, setStatus] = useState(null);
+  const stopRef = useRef(null);
 
-  useEffect(() => () => { clearInterval(pollRef.current); pollRef.current = null; }, []);
+  useEffect(() => () => { stopRef.current?.(); stopRef.current = null; }, []);
 
-  function startPolling() {
-    clearInterval(pollRef.current);
+  function beginPolling() {
+    stopRef.current?.();
     setPollTimedOut(false);
-    let failures = 0;
-    const startedAt = Date.now();
-    const stop = (timedOut) => {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-      setBusy(false);
-      if (timedOut) {
-        setPollTimedOut(true);
-        setErr("상태 확인이 오래 걸리고 있어요 — 새로고침하거나 다시 시도해 주세요");
-      }
-    };
-    pollRef.current = setInterval(async () => {
-      if (Date.now() - startedAt > 5 * 60 * 1000) return stop(true);
-      try {
-        const res = await fetch(`/api/projects/${id}/clips/status`);
-        if (!res.ok) throw new Error();
-        failures = 0;
-        const st = await res.json();
+    stopRef.current = startPolling({
+      url: `/api/projects/${id}/clips/status`,
+      onTick: (st) => {
+        setStatus(st);
         setProject((p) => ({ ...p, status: st.status, cuts: st.cuts, video_error: st.video_error }));
-        if (st.video_error) { stop(false); setErr(st.video_error); return; }
-        const pending = (st.cuts || []).some((c) => !c.video && !c.video_error);
-        if (!pending) stop(false);
-      } catch {
-        failures += 1;
-        if (failures >= 5) stop(true);
-      }
-    }, 2000);
+        if (firstError(st, "video")) return true;
+        return !(st.cuts || []).some((c) => !c.video && !c.video_error);
+      },
+      onStop: ({ timedOut }) => {
+        // ★ 반드시 여기서 비운다. startPolling 이 돌려주는 것은 "떼기"라 스스로 끝난
+        //   폴링에서는 안 불리고, 안 비우면 손잡이가 영원히 truthy 라 아래 복원
+        //   useEffect 가 "이미 돌고 있다"고 오인해 폴링이 다시 살아나지 않는다.
+        stopRef.current = null;
+        setBusy(false);
+        if (timedOut) {
+          setPollTimedOut(true);
+          setErr("상태 확인이 오래 걸리고 있어요 — 새로고침하거나 다시 시도해 주세요");
+        }
+      },
+    });
   }
 
   // 진입·새로고침 복원 — 아직 만들지 않은 컷이 남아 있으면 폴링을 잇는다
   useEffect(() => {
     const cuts = project?.cuts || [];
     const waiting = cuts.length > 0 && cuts.some((c) => !c.video && !c.video_error);
-    if (project?.status === "video" && !pollRef.current && !pollTimedOut && waiting) {
+    if (project?.status === "video" && !stopRef.current && !pollTimedOut && waiting) {
       setBusy(true);
-      startPolling();
+      beginPolling();
     }
   }, [project?.status, project?.cuts]);
 
@@ -88,7 +89,7 @@ export default function VideoStepPage() {
     }
     await load(id).catch(() => {});
     await reloadMe().catch(() => {});
-    startPolling();
+    beginPolling();
   }
 
   // 다시 만드는 동안 그 컷을 잠근다.
@@ -131,6 +132,41 @@ export default function VideoStepPage() {
   const staleCount = cuts.filter((c) => isClipStale(c, project)).length;
   const selected = cuts.find((c) => c.idx === selectedIdx) || cuts.find((c) => c.video) || cuts[0];
 
+  // ★ 프로젝트 단위 video_error 는 **스스로 지워지지 않는다.** 컷별 [다시 만들기] 라우트는
+  //   그 필드를 건드리지 않고, 지우는 것은 POST /clips(아래 만들기 버튼) 하나뿐이다.
+  //   그런데 마지막 빠진 컷을 컷별로 되살리면 remainingCount 가 0 이 되어 그 버튼이 아예
+  //   렌더되지 않는다 — 전부 성공한 프로젝트에 실패 경고가 영영 붙어 있게 된다.
+  //   그래서 **만들 것이 하나도 안 남았으면** 그 오류는 이미 해결된 옛 기록으로 본다.
+  //
+  //   조건을 `cuts.every((c) => c.video)` 로 잡으면 구멍이 난다: 낡은 클립만 남은 상태에서
+  //   다시 돌렸다가 실패하면 컷마다 옛 클립은 그대로라 **방금 난 실패가 가려진다.**
+  //   remainingCount(=없거나 낡은 컷)로 재면 그 경우 0 이 아니라 경고가 제대로 뜬다.
+  //   그리고 이 값은 아래 만들기 버튼이 그려지는 조건과 정확히 같다 — 즉 "지울 길이 아직
+  //   있으면 그대로 보여주고, 지울 길이 사라졌을 때만 옛 기록으로 본다".
+  //
+  //   숨기는 것(dismiss)이 아니다. 사실 판정이라 저절로 되돌아온다 — 컷이 하나라도 빠지거나
+  //   낡는 순간 경고가 다시 뜬다. 그래서 ④이미지에서 났던 사고(감추기 플래그가 다음 진짜
+  //   실패까지 걸어 잠근 것)가 여기서는 안 난다. 무엇을 다시 잠그지도 않는다: 아래 잠금
+  //   둘은 gen.kind 만 보기 때문이다.
+  const nothingLeftToMake = cuts.length > 0 && remainingCount === 0;
+
+  // "안 눌렀다 / 되고 있다 / 멈춘 것 같다 / 실패했다 / 끝났다" — 판정은 lib 한 벌이 한다.
+  const gen = generationState({
+    // ★ `doneCount` 를 넘기지 않는다 — 그것은 **성공한** 클립 수라 화면 문구
+    //   ("N/M개 컷을 만들었어요")의 값이다. 진행 판정이 원하는 것은 **더 기다릴 것이
+    //   남았는가**이므로 실패로 끝난 컷도 끝난 것으로 세야 한다(안 그러면 실패 컷 하나가
+    //   영원히 "만드는 중"으로 남는다). 그래서 파이프라인과 같은 함수를 쓴다.
+    done: cuts.filter((c) => isCutDone(c, "video")).length,
+    total: cuts.length,
+    error: nothingLeftToMake ? null : firstError({ ...project, ...(status || {}) }, "video"),
+    phase: status?.progress?.phase ?? project?.progress?.phase ?? null,
+    stepPhase: "video",
+    // ★ 멈춘 시간은 서버가 재서 실어 보낸다. 브라우저가 자기 시계로 빼면 사장님 PC 가
+    //   3분 빠를 때 시작하자마자 "멈췄어요"가 뜬다.
+    stalledForMs: status?.stalled_for_ms ?? null,
+    busy,
+  });
+
   if (!cuts.length) return <p className="pgsub">대본을 먼저 만들어 주세요.</p>;
   // ★ 말하는 모델은 예외다 — 목소리를 클립이 만드니 낭독이 아예 없다.
   //   컷 길이는 분할 때 잡은 추정 초가 그대로 최종값이다(lib/subtitles.js 의 cutSeconds).
@@ -143,6 +179,31 @@ export default function VideoStepPage() {
     <section className="panel">
       <h2>컷을 영상으로 만듭니다 <span className="badge vlm">영상</span></h2>
       {err && <p className="pgsub warn">{err}</p>}
+      {/* 되는 중·멈춤·실패를 서로 다른 말로 알린다 — 셋을 뭉뚱그리면 사장님이 기다려야
+          하는지 손을 써야 하는지 알 수 없다. */}
+      {gen.kind === "running" && (
+        <p className="pgsub">
+          <span className="spinner" aria-hidden="true" /> 컷 {gen.done}/{gen.total} 만드는 중이에요
+        </p>
+      )}
+      {gen.kind === "stalled" && (
+        <p className="pgsub warn">
+          {/* ★ 여기서 **돈 드는 길을 권하지 않는다.** 멈춤은 "죽었다"가 아니라 "심장박동이
+              2분 없었다"는 의심이고, 파이프라인은 아직 살아 움직이는 중일 수 있다.
+              POST /clips 에는 진행 중 잠금이 없어(유일한 가드가 "남은 것이 있나"인데
+              멈춤이면 그것은 언제나 참이다) 두 번째 누름이 남은 낡은 컷을 **다음 등급 값으로
+              다시 과금하고** 3회 상한까지 깎으며, 같은 컷에 파이프라인을 하나 더 띄운다.
+              그래서 공짜이고 언제나 되는 것(기다리기·새로고침)만 알린다.
+              컷별 [다시 만들기]도 가리키면 안 된다 — 멈춘 컷에는 클립도 오류도 없어
+              그 버튼 자체가 렌더되지 않는다. */}
+          ⚠ 컷 {gen.done}/{gen.total}에서 한동안 진행이 없어요 — 아직 만들고 있을 수도 있어요.
+          {/* ★ "기다리라"는 말은 아직 지켜보는 동안만 맞다. 5분 상한을 넘기면 위쪽 오류줄이
+              "새로고침하거나 다시 시도해 주세요"라고 말하는데, 그 옆에서 계속 기다리라고
+              하면 두 줄이 서로 싸운다(게다가 그때는 만들기 버튼이 이미 열려 있다). */}
+          {!pollTimedOut && " 잠시 기다렸다가 새로고침하면 지금 상태를 다시 확인할 수 있어요."}
+        </p>
+      )}
+      {gen.kind === "failed" && <p className="pgsub warn">⚠ {gen.reason.message}</p>}
       <p className="pgsub">
         {doneCount > 0
           ? `${doneCount}/${cuts.length}개 컷을 만들었어요`
@@ -168,7 +229,14 @@ export default function VideoStepPage() {
                 ) : c.video_error ? (
                   <div className="script-src warn">{c.video_error}</div>
                 ) : !c.video ? (
-                  <div className="script-src">{busy ? "만드는 중…" : "아직 만들지 않았어요"}</div>
+                  // ★ 카드도 머리말과 같은 판정을 본다. busy 를 보면 멈춤 동안(busy 는 5분
+                  //   상한까지 참이다) 머리말은 "멈춰 있는 것 같아요", 카드는 "만드는 중…"
+                  //   이라 한 화면이 서로 다른 말을 한다.
+                  <div className="script-src">
+                    {gen.kind === "running"
+                      ? "만드는 중…"
+                      : gen.kind === "stalled" ? "멈춰 있어요" : "아직 만들지 않았어요"}
+                  </div>
                 ) : null}
                 {/* 길이·재생성 횟수·[다시 만들기]를 한 줄에 — 목소리 단계와 같은 배치.
                     남은 횟수는 항상 보인다: 3회 상한에 언제 닿는지 누르기 전에 알아야 한다. */}
@@ -190,7 +258,10 @@ export default function VideoStepPage() {
                       </span>
                       <button
                         className="mini"
-                        disabled={busy || regening !== null || (c.clip_regen_count || 0) >= MAX_REGEN_PER_CUT}
+                        // ★ busy 가 아니라 **실제로 도는 중**일 때만 잠근다. 멈췄거나
+                        //   실패했을 때도 busy 는 참인 채로 남을 수 있는데, 그때 이 버튼이
+                        //   사장님의 유일한 탈출구다 — 잠가 두면 할 수 있는 일이 없다.
+                        disabled={gen.kind === "running" || regening !== null || (c.clip_regen_count || 0) >= MAX_REGEN_PER_CUT}
                         onClick={() => regen(c.idx)}
                       >
                         {/* 컷마다 첫 회는 공짜다. 클립은 다시 만드는 값이 가장 비싸므로
@@ -242,8 +313,26 @@ export default function VideoStepPage() {
                   ? `남은 컷 ${remainingCount}개를 만들어요 — 이미 만든 ${doneCount}개는 그대로 씁니다`
                   : `컷 ${cuts.length}개를 각각 움직이는 영상으로 만들어요`}
               </span>
-              <button className="cta" disabled={busy} onClick={start}>
-                {busy ? "만드는 중…" : doneCount > 0 ? `남은 ${remainingCount}개 만들기` : "영상 만들기"}
+              {/* ★ busy 가 아니라 gen.kind 를 본다. 다만 **멈춤도 함께 잠근다** —
+                  멈춤은 확신이 아니라 의심이라 파이프라인이 아직 살아 있을 수 있고,
+                  이 버튼(POST /clips)에는 진행 중 잠금이 없어 두 번째 누름이 남은 낡은 컷을
+                  다시 과금하고 파이프라인을 하나 더 띄운다. 살아 있을지 모르는 실행 위에
+                  돈을 한 번 더 쓰게 두느니 잠가 둔다.
+                  실패(failed)는 다르다: 프로젝트 단위 video_error 는 라우트의 catch 에서만
+                  쓰이므로 그때는 파이프라인이 이미 끝난 뒤다 — 그래서 열어 둔다.
+                  ★ 다만 **폴링이 포기할 때까지만** 잠근다. 멈춤은 저절로 풀리지 않아서
+                  (심장박동이 멎은 채로 stalled_for_ms 는 계속 커지므로 generationState 는
+                  idle 로 안 떨어진다) 조건 없이 잠그면 정말로 죽은 실행에서 사장님이
+                  프로젝트 단위 재시도에 영영 못 닿는다 — 멈춘 컷에는 컷별 버튼도 없다.
+                  5분 상한은 바꾸기 전과 똑같은 경계다: 그 안에서는 잠기고, 넘으면 열린다. */}
+              <button
+                className="cta"
+                disabled={gen.kind === "running" || (gen.kind === "stalled" && !pollTimedOut)}
+                onClick={start}
+              >
+                {gen.kind === "running"
+                  ? "만드는 중…"
+                  : doneCount > 0 ? `남은 ${remainingCount}개 만들기` : "영상 만들기"}
               </button>
             </>
           ) : (

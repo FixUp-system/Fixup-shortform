@@ -26,6 +26,9 @@ import { aspectFor } from "../../../../lib/aspects";
 import { isRenderStale, isClipStale, isImageStale, isSubtitleOnlyStale } from "../../../../lib/steps";
 import { SUBTITLE_LANGS, DEFAULT_SUBTITLE_LANG } from "../../../../lib/subtitle-langs";
 import { isSubtitleStale } from "../../../../lib/translate";
+// 두드리는 루프는 화면마다 복붙하지 않는다 — 복붙본이 조금씩 갈려 ④이미지가
+// images_error 를 영영 못 보던 버그가 났다(2026-08-14). 한 벌에서 온다.
+import { startPolling } from "../../../../lib/poll";
 
 // 옛 프로젝트가 쥔 자막 위치(위·중간·아래)를 자유 위치 비율로 옮기는 일은 lib 이 한다
 // (posFromLegacyPosition). 정렬 기준마다 marginV 의 뜻이 달라 글자 블록 높이까지 봐야 하는데,
@@ -68,7 +71,7 @@ export default function DoneStepPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [pollTimedOut, setPollTimedOut] = useState(false);
-  const pollRef = useRef(null);
+  const stopRef = useRef(null);
 
   // ★ 미리보기는 **자막 없는 원본** 위에 브라우저가 자막을 그린다. 자막이 구워진 완성본 위에
   // 얹으면 자막이 둘로 보인다. 원본이 없는 옛 프로젝트에서는 완성본을 재생하고 조절 UI 를 숨긴다.
@@ -89,7 +92,7 @@ export default function DoneStepPage() {
   // 드래그 중에 잡은 지점과 자막 자리의 차이. null 이면 드래그 중이 아니다.
   const dragRef = useRef(null);
 
-  useEffect(() => () => { clearInterval(pollRef.current); pollRef.current = null; }, []);
+  useEffect(() => () => { stopRef.current?.(); stopRef.current = null; }, []);
 
   // 서버가 준 설정이 바뀌면 따라간다(불러오기·저장 뒤). 문자열로 비교하는 이유는 객체가
   // 매 렌더 새로 오기 때문이다 — 참조로 걸면 사장님이 만지는 중에도 계속 덮어쓴다.
@@ -216,41 +219,40 @@ export default function DoneStepPage() {
     }
   }
 
-  function startPolling() {
-    clearInterval(pollRef.current);
+  function beginPolling() {
+    stopRef.current?.();
     setPollTimedOut(false);
-    let failures = 0;
-    const startedAt = Date.now();
-    const stop = (timedOut) => {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-      setBusy(false);
-      if (timedOut) {
-        setPollTimedOut(true);
-        setErr("합성이 오래 걸리고 있어요 — 새로고침하거나 다시 시도해 주세요");
-      }
-    };
-    pollRef.current = setInterval(async () => {
-      // 인코딩은 이미지 생성보다 오래 걸릴 수 있어 10분까지 기다린다
-      if (Date.now() - startedAt > 10 * 60 * 1000) return stop(true);
-      try {
-        const res = await fetch(`/api/projects/${id}/render/status`);
-        if (!res.ok) throw new Error();
-        failures = 0;
-        const st = await res.json();
+    stopRef.current = startPolling({
+      url: `/api/projects/${id}/render/status`,
+      // ★★ 여기만 상한이 **10분**이다(다른 넷은 모듈 기본값 5분). 인코딩은 이미지 생성보다
+      //    오래 걸릴 수 있어 원래 그렇게 잡혀 있었다. 이 줄을 빠뜨리면 상한이 반토막 나서
+      //    정상적으로 6~9분 걸리는 합성이 "상태를 확인하지 못했어요"로 끝난다.
+      //    합성이 멈춤 판정에서 빠져 있는 것(STALL_EXEMPT_PHASES)과 같은 이유다.
+      timeoutMs: 10 * 60 * 1000,
+      onTick: (st) => {
         setProject((p) => ({ ...p, status: st.status, render: st.render, render_error: st.render_error }));
-        if (st.render_error) { stop(false); setErr(st.render_error); return; }
-        if (st.render) stop(false);
-      } catch {
-        failures += 1;
-        if (failures >= 5) stop(true);
-      }
-    }, 2000);
+        if (st.render_error) { setErr(st.render_error); return true; }
+        // 완료 판정은 옮기기 전 그대로다 — 완성본이 붙었으면 끝이다.
+        return !!st.render;
+      },
+      onStop: ({ timedOut }) => {
+        // ★ ref 를 여기서 비운다. 아래 복원 effect 가 ref 의 참 여부로 "이미 돌고 있나"를
+        //   판정하는데, 모듈은 자기 내부 handle 만 비운다 — 화면 ref 는 반환받은 중단
+        //   함수를 계속 쥐어 항상 참이 되고, 스스로 끝난 폴링이 다시는 안 살아난다.
+        stopRef.current = null;
+        setBusy(false);
+        if (timedOut) {
+          setPollTimedOut(true);
+          // ★ "오래 걸린다"가 아니다 — 상태를 못 읽은 것이다. 둘은 다른 사건이다.
+          setErr("상태를 확인하지 못했어요 — 새로고침해 주세요");
+        }
+      },
+    });
   }
 
   // 진입·새로고침 복원 — 합성 중이면 폴링을 잇는다
   useEffect(() => {
-    if (busy && !pollRef.current && !pollTimedOut) startPolling();
+    if (busy && !stopRef.current && !pollTimedOut) beginPolling();
   }, [busy]);
 
   async function start() {
@@ -262,7 +264,7 @@ export default function DoneStepPage() {
       return;
     }
     await load(id).catch(() => {});
-    startPolling();
+    beginPolling();
   }
 
   // 자막 언어 — 화면이 앞서가지 않는다. 켜진 칩은 **서버가 저장한 값**에서만 나온다.

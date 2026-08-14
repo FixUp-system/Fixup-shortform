@@ -16,6 +16,11 @@ import { isAudioStale, isReachable } from "../../../../lib/steps";
 // 상한과 정가는 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다).
 import { MAX_REGEN_PER_CUT, priceLabel, regenPrice, videoPrice } from "../../../../lib/pricing";
 import { modelIdForProject, projectSpeaks, resolutionForProject } from "../../../../lib/clip-limits";
+// 폴링과 판정은 화면이 다시 적지 않는다 — 복붙본이 조금씩 갈려 ④이미지가 images_error 를
+// 영영 못 보던 버그가 났다(2026-08-14). 한 벌에서 온다.
+import { startPolling } from "../../../../lib/poll";
+import { generationState, isCutDone } from "../../../../lib/progress";
+import { firstError } from "../../../../lib/step-errors";
 
 export default function VoiceStepPage() {
   const { id } = useParams();
@@ -32,7 +37,8 @@ export default function VoiceStepPage() {
   const [pollTimedOut, setPollTimedOut] = useState(false);
   const [picked, setPicked] = useState(project?.voice_label || VOICES[0].label);
   const [regening, setRegening] = useState(null); // 다시 읽는 중인 컷 idx
-  const pollRef = useRef(null);
+  const [status, setStatus] = useState(null); // 마지막 상태 응답 — 심장박동이 여기 온다
+  const stopRef = useRef(null);
 
   // 컷 분할이 끝나기 전 — 대본 승인 직후 이 화면에 도착하면 여기부터 보인다.
   // 훅 순서가 어긋나지 않게 이른 return 보다 위에서 정한다.
@@ -40,31 +46,19 @@ export default function VoiceStepPage() {
     (project?.cuts || []).length === 0 && project?.status === "cuts" && !project?.cuts_error;
 
   // 언마운트 정리 — ref까지 비운다(이미지 화면과 같은 이유: 재마운트 시 폴링이 되살아나게)
-  useEffect(() => () => { clearInterval(pollRef.current); pollRef.current = null; }, []);
+  useEffect(() => () => { stopRef.current?.(); stopRef.current = null; }, []);
 
-  function startPolling() {
-    clearInterval(pollRef.current);
+  function beginPolling() {
+    stopRef.current?.();
     setPollTimedOut(false);
-    let failures = 0;
-    const startedAt = Date.now();
-    const stop = (timedOut) => {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-      setBusy(false);
-      if (timedOut) {
-        setPollTimedOut(true);
-        setErr("상태 확인이 오래 걸리고 있어요 — 새로고침하거나 다시 시도해 주세요");
-      }
-    };
-    pollRef.current = setInterval(async () => {
-      if (Date.now() - startedAt > 5 * 60 * 1000) return stop(true);
-      try {
-        const res = await fetch(`/api/projects/${id}/voice/status`);
-        if (!res.ok) throw new Error();
-        failures = 0;
-        const st = await res.json();
+    stopRef.current = startPolling({
+      url: `/api/projects/${id}/voice/status`,
+      onTick: (st) => {
+        setStatus(st);
         setProject((p) => ({ ...p, status: st.status, cuts: st.cuts, voice_error: st.voice_error }));
-        if (st.voice_error) { stop(false); setErr(st.voice_error); return; }
+        // 실패했으면 더 두드릴 것이 없다. 볼 필드는 표(lib/step-errors)가 정한다.
+        const e = firstError(st, "voice");
+        if (e) { setErr(e.message); return true; }
         // 컷마다 소리가 붙었거나 실패 표시가 남았으면 끝난 것이다.
         //
         // ★ status 까지 본다. 파이프라인은 컷마다 audio 를 따로 저장하고 status 는
@@ -73,12 +67,21 @@ export default function VoiceStepPage() {
         //   "넘어가다가 돌아오는" 그 증상이다(2026-08-13 프로덕션 실측).
         //   로컬은 그 창이 밀리초라 거의 안 보이고, 배포 환경은 저장이 왕복이라 넓게 열린다.
         const pending = (st.cuts || []).some((c) => !c.audio && !c.voice_error);
-        if (!pending && st.status === "voice") stop(false);
-      } catch {
-        failures += 1;
-        if (failures >= 5) stop(true);
-      }
-    }, 2000);
+        return !pending && st.status === "voice";
+      },
+      onStop: ({ timedOut }) => {
+        // ★ 여기서 ref 를 비워야 한다. 아래 복원 effect 가 ref 의 참 여부로 "이미 돌고
+        //   있나"를 판정하는데, 모듈은 자기 내부 handle 만 비운다 — 화면 ref 는 반환받은
+        //   중단 함수를 계속 쥐어 항상 참이 되고, 스스로 끝난 폴링이 다시는 안 살아난다.
+        stopRef.current = null;
+        setBusy(false);
+        if (timedOut) {
+          setPollTimedOut(true);
+          // ★ "오래 걸린다"가 아니다 — 상태를 못 읽은 것이다. 둘은 다른 사건이다.
+          setErr("상태를 확인하지 못했어요 — 새로고침해 주세요");
+        }
+      },
+    });
   }
 
   // 진입·새로고침 복원 — 아직 읽지 않은 컷이 남아 있으면 폴링을 잇는다.
@@ -91,9 +94,9 @@ export default function VoiceStepPage() {
     const cuts = project?.cuts || [];
     const waiting =
       !projectSpeaks(project) && cuts.length > 0 && cuts.some((c) => !c.audio && !c.voice_error);
-    if (project?.status === "voice" && !pollRef.current && !pollTimedOut && waiting) {
+    if (project?.status === "voice" && !stopRef.current && !pollTimedOut && waiting) {
       setBusy(true);
-      startPolling();
+      beginPolling();
     }
   }, [project?.status, project?.cuts]);
 
@@ -102,17 +105,24 @@ export default function VoiceStepPage() {
   // load(id) 로 통짜를 받는다(실측 13,236 → 35 bytes).
   useEffect(() => {
     if (!splitting) return;
-    const t = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/projects/${id}/status`);
-        if (!res.ok) return;
-        const st = await res.json();
-        if (st.cut_count > 0 || st.cuts_error) load(id).catch(() => {});
-      } catch {
-        // 한 번 실패는 다음 주기가 다시 본다
-      }
-    }, 2000);
-    return () => clearInterval(t);
+    const stop = startPolling({
+      url: `/api/projects/${id}/status`,
+      // ★ 이 가벼운 대기 루프에는 지금 **상한도 실패 카운트도 없다**(실측: startedAt·
+      //    failures 가 아예 없었다). 기본값을 그대로 받으면 5분 상한과 연속 5회 중단이
+      //    새로 생긴다 — 이 자리는 동작을 옮기기만 하는 곳이라 그러면 안 된다.
+      //    컷 분할이 5분을 넘기면 화면이 조용히 멈춘 채 영영 안 갱신된다(알릴 onStop 도 없다).
+      timeoutMs: Infinity,
+      maxFailures: Infinity,
+      // ★ 통짜를 **실제로 받아온 뒤에만** 끝낸다. 받아오기가 거절당했는데(네트워크 한 번
+      //    끊김) 그 회차에 끝내 버리면 project 가 그대로라 splitting 도 그대로고, effect
+      //    deps 도 안 바뀌고, 이 루프를 되살릴 사람도 없다 — 화면이 "나누는 중이에요"에서
+      //    영영 안 움직인다. 거절하면 false 를 돌려 다음 주기가 다시 받아 온다.
+      onTick: async (st) => {
+        if (!(st.cut_count > 0 || st.cuts_error)) return false;
+        try { await load(id); return true; } catch { return false; }
+      },
+    });
+    return stop;
   }, [splitting, id]);
 
   // 분할이 실패한 뒤의 다시 시도 — 컷이 비어 있을 때만 서버가 받아 준다
@@ -138,7 +148,7 @@ export default function VoiceStepPage() {
     }
     await load(id).catch(() => {});
     await reloadMe().catch(() => {});
-    startPolling();
+    beginPolling();
   }
 
   // 다시 읽는 동안 잠근다 — 표시가 없으면 눌러도 아무 일이 없어 보여 한 번 더 누르게 된다
@@ -172,6 +182,23 @@ export default function VoiceStepPage() {
     modelIdForProject(project),
     resolutionForProject(project),
   );
+
+  // 판정은 lib/progress 하나가 낸다 — 화면은 그린다.
+  const gen = generationState({
+    // ★ 여기의 done 은 "아직 기다릴 것이 남았나"의 답이다 — 그래서 **실패로 끝난 컷도
+    //   끝난 것으로 센다**(isCutDone 이 audio ‖ voice_error 를 본다). 위의 doneCount 는
+    //   사장님께 "몇 개를 읽었는지" 말하는 다른 숫자라 성공만 센다. 둘을 합치면
+    //   실패 컷 하나 때문에 정상 종료한 낭독이 영영 "멈춤"으로 읽힌다.
+    done: cuts.filter((c) => isCutDone(c, "voice")).length,
+    total: cuts.length,
+    error: firstError({ ...project, ...(status || {}) }, "voice"),
+    phase: status?.progress?.phase ?? project?.progress?.phase ?? null,
+    stepPhase: "voice",
+    // 임계까지의 시간은 **서버가 뺀 값**을 읽는다 — 브라우저가 자기 시계로 빼면
+    // 시계가 어긋난 PC 에서 시작하자마자 "멈췄어요"가 뜬다.
+    stalledForMs: status?.stalled_for_ms ?? null,
+    busy,
+  });
 
   // 대본 승인 직후 이 화면에 도착하면 컷이 아직 없다 — 분할이 도는 중이다.
   // 분할은 대본 승인이 띄우고(POST /cuts), 여기서는 컷이 생기기를 기다리기만 한다.
@@ -208,6 +235,27 @@ export default function VoiceStepPage() {
     <section className="panel panel--narrow">
       <h2>목소리를 입힙니다 <span className="badge vlm">목소리</span></h2>
       {err && <p className="pgsub warn">{err}</p>}
+
+      {/* 되는 중·멈춘 것 같음·실패를 서로 다른 말로 알린다 — 전에는 셋이 다 침묵이라
+          사장님이 무슨 일이 나는지 알 수 없었다. 판정은 위의 gen 하나가 이미 냈다. */}
+      {gen.kind === "running" && (
+        <p className="pgsub">
+          <span className="spinner" aria-hidden="true" /> 컷 {gen.done}/{gen.total} 읽는 중이에요
+        </p>
+      )}
+
+      {gen.kind === "stalled" && (
+        <p className="pgsub warn">
+          ⚠ 읽기가 멈춰 있는 것 같아요 — 컷 {gen.done}/{gen.total}에서 더 나아가지 않고 있어요.
+          {" "}아래에서 컷별로 다시 읽혀 보세요.
+        </p>
+      )}
+
+      {/* err 에 이미 같은 말이 떠 있으면 두 번 말하지 않는다. 새로고침으로 들어와
+          err 이 빈 채 문서에만 실패가 남아 있는 경우가 이 문단이 필요한 자리다. */}
+      {gen.kind === "failed" && !err && (
+        <p className="pgsub warn">⚠ {gen.reason.message}</p>
+      )}
 
       {!madeAny ? (
         <>

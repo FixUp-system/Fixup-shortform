@@ -13,6 +13,12 @@ import { isImageStale, isReachable } from "../../../../lib/steps";
 // 상한과 값은 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다).
 import { MAX_REGEN_PER_CUT, priceLabel, regenPrice, videoPrice } from "../../../../lib/pricing";
 import { modelIdForProject, resolutionForProject } from "../../../../lib/clip-limits";
+// 폴링 한 벌·판정 한 벌·오류 필드 표 한 벌. 화면은 그리기만 한다 —
+// 같은 판정을 화면마다 손으로 적었을 때 조용히 갈렸고, 그 어긋남이 이 화면이
+// images_error 를 영영 못 보던 버그였다(2026-08-14).
+import { startPolling } from "../../../../lib/poll";
+import { generationState, isCutDone } from "../../../../lib/progress";
+import { firstError } from "../../../../lib/step-errors";
 
 // 그림이 아직 없는 자리에 뭐라고 쓸지.
 // "생성 중…"은 **실제로 도는 동안에만** 쓴다 — 누르기 전에도 그렇게 적혀 있으면
@@ -38,44 +44,48 @@ export default function ImagesStepPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [pollTimedOut, setPollTimedOut] = useState(false);
-  const [dismissed, setDismissed] = useState(false); // 컷이 남은 채 난 실패를 화면에서 접었는가
+  // 접어 둔 실패의 **문구**를 들고 있는다(접었는가/아닌가의 boolean 이 아니다).
+  // boolean 빗장이면 한 번 접은 뒤에 도착한 진짜 실패가 영영 안 뜬다 — 이 계획이
+  // 드러내려는 바로 그 실패가 조용히 묻힌다. 무엇을 접었는지 알아야 그것만 감춘다.
+  const [dismissedMsg, setDismissedMsg] = useState(null);
   const [selectedIdx, setSelectedIdx] = useState(null); // 우측 큰 미리보기로 볼 컷
-  const pollRef = useRef(null);
+  const [status, setStatus] = useState(null); // 마지막 상태 응답 — 심장박동이 여기 온다
+  const stopRef = useRef(null);
 
   // 언마운트 정리 — ref까지 비운다. 비우지 않으면 (dev StrictMode의 재마운트처럼) 다시 마운트됐을 때
   // "이미 돌고 있음"으로 오인해 폴링이 되살아나지 않는다.
-  useEffect(() => () => { clearInterval(pollRef.current); pollRef.current = null; }, []);
+  useEffect(() => () => { stopRef.current?.(); stopRef.current = null; }, []);
 
-  function startPolling() {
-    clearInterval(pollRef.current);
+  function beginPolling() {
+    stopRef.current?.();
     setPollTimedOut(false);
-    let failures = 0;
-    const startedAt = Date.now();
-    const stop = (timedOut) => {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-      setBusy(false);
-      if (timedOut) {
-        setPollTimedOut(true);
-        setErr("생성 상태 확인이 오래 걸리고 있어요 — 새로고침하거나 다시 시도해 주세요");
-      }
-    };
-    pollRef.current = setInterval(async () => {
-      if (Date.now() - startedAt > 5 * 60 * 1000) return stop(true);
-      try {
-        const res = await fetch(`/api/projects/${id}/cuts/status`);
-        if (!res.ok) throw new Error();
-        failures = 0;
-        const st = await res.json();
-        setProject((p) => ({ ...p, status: st.status, cuts: st.cuts, cuts_error: st.cuts_error }));
-        if (st.cuts_error) { stop(false); setErr(st.cuts_error); return; }
+    stopRef.current = startPolling({
+      url: `/api/projects/${id}/cuts/status`,
+      onTick: (st) => {
+        setStatus(st);
+        setProject((p) => ({
+          ...p, status: st.status, cuts: st.cuts,
+          cuts_error: st.cuts_error, images_error: st.images_error,
+        }));
+        // 실패했으면 더 두드릴 것이 없다
+        if (firstError(st, "images")) return true;
         const pending = (st.cuts || []).some((c) => ["pending", "generating"].includes(c.state));
-        if (st.cuts?.length && !pending) stop(false);
-      } catch {
-        failures += 1;
-        if (failures >= 5) stop(true);
-      }
-    }, 2000);
+        return !!st.cuts?.length && !pending;
+      },
+      onStop: ({ timedOut }) => {
+        // ★ 여기서 반드시 비운다. startPolling 이 돌려주는 것은 **떼는 함수**라 영원히
+        //   truthy 다 — 안 비우면 스스로 끝난 폴링을 "아직 돌고 있음"으로 오인해
+        //   다시 시작할 수 없다.
+        stopRef.current = null;
+        setBusy(false);
+        if (timedOut) {
+          setPollTimedOut(true);
+          // ★ "오래 걸린다"가 아니다 — 상태를 못 읽은 것이다. 둘은 다른 사건이고,
+          //   전에는 같은 문구를 써서 사장님이 생성이 느린 줄 알았다.
+          setErr("상태를 확인하지 못했어요 — 새로고침해 주세요");
+        }
+      },
+    });
   }
 
   // 진입·새로고침 복원: **만드는 중인** 컷이 남아 있으면 폴링을 잇는다.
@@ -86,15 +96,16 @@ export default function ImagesStepPage() {
   useEffect(() => {
     const cuts = project?.cuts || [];
     const running = cuts.some((c) => c.state === "generating");
-    if (running && !project.images_error && !pollRef.current && !pollTimedOut) {
+    if (running && !project.images_error && !stopRef.current && !pollTimedOut) {
       setBusy(true);
-      startPolling();
+      beginPolling();
     }
   }, [project?.status, project?.cuts, project?.images_error]);
 
   // 그림 만들기 시작 — 컷당 후보 2장이라 가장 비싼 단계다. 눌러야 나간다.
   async function start() {
-    setErr(""); setPollTimedOut(false); setBusy(true);
+    // 다시 만들기를 시작하면 접어 둔 것은 무효다 — 안 풀면 같은 문구의 실패가 또 나도 안 뜬다.
+    setErr(""); setPollTimedOut(false); setDismissedMsg(null); setBusy(true);
     const res = await fetch(`/api/projects/${id}/images`, { method: "POST" });
     if (!res.ok) {
       setErr((await res.json().catch(() => ({}))).error || "시작하지 못했어요");
@@ -103,14 +114,21 @@ export default function ImagesStepPage() {
     }
     await load(id).catch(() => {});
     await reloadMe().catch(() => {});
-    startPolling();
+    beginPolling();
   }
 
   // 실패가 남은 경우의 빠져나갈 길. 다시 [이미지 만들기]를 누르면 409로 막힌다(만든 그림을
   // 지우지 않으려고). images_error를 지우는 서버 경로도 없다 — load만으로는 같은 실패가 돌아온다.
   // 그래서 화면에서 접고, 최신 상태를 한 번 받아온 뒤 컷별 [다시 생성]으로 이어가게 한다.
+  //
+  // ★ 접기가 하는 일은 **띠지를 감추는 것 하나**다. 판정(stalled)은 건드리지 않는다 —
+  //   건드리면 아직 generating 인 컷이 다시 잠겨, 이 버튼이 약속한 "컷별로 다시 만들기"를
+  //   바로 그 버튼이 막는다. 그리고 지금 접은 문구만 기억한다: 그 뒤에 새로 난 실패는
+  //   그대로 보여야 한다.
   async function dismiss() {
-    setErr(""); setDismissed(true);
+    // 띠지에 실제로 적힌 문구(분류를 거친 쪽)를 기억한다 — 날 문구를 넣으면 비교가 어긋나
+    // 접었는데도 그대로 남는다.
+    setErr(""); setDismissedMsg(gen.kind === "failed" ? gen.reason.message : null);
     await load(id).catch(() => {});
     await reloadMe().catch(() => {});
   }
@@ -150,11 +168,36 @@ export default function ImagesStepPage() {
   // busy 는 방금 [이미지 만들기]를 누른 경우다 — 그때는 아직 컷이 pending 이라 generating 이 없다.
   // busy 없이 pending 만으로 판단하면 시작 전과 구별되지 않는다.
   const generating = cuts.some((c) => c.state === "generating") || (busy && cuts.some((c) => c.state === "pending"));
+  // 판정은 lib/progress 하나가 낸다 — 화면은 그린다.
   // 새로고침·재진입으로 들어오면 실패는 화면 상태가 아니라 프로젝트에 남아 있다 — 둘 다 본다.
-  // 접기(dismiss)는 프로젝트에 남은 실패에만 적용한다 — 그 뒤에 새로 난 실패는 그대로 보여야 한다.
-  const shownErr = err || (dismissed ? "" : project.images_error || "");
-  // 실패가 남아 있으면 파이프라인은 이미 죽었다 — 폴링을 기다릴 게 없으니 컷별 [다시 생성]을 열어준다
-  const stalled = pollTimedOut || !!project.images_error;
+  // 접기(dismiss)는 남은 실패를 화면에서만 접는 길이다(서버에 지우는 경로가 없다).
+  const err0 = firstError({ ...project, ...(status || {}) }, "images");
+  const gen = generationState({
+    // ★ 술어를 여기 손으로 적지 않는다 — 파이프라인의 심장박동과 **같은 함수**를 쓴다.
+    //   손으로 적었을 때 실제로 갈렸다: 실패한 컷(image 없이 needs_attention)을 안 세서
+    //   정상 종료한 실행이 영구히 "멈춤"으로 읽혔다. 한 곳에서 오면 그 표류가 불가능하다.
+    //   ⚠️ 이 done 은 "더 기다릴 것이 남았는가"의 답이다 — 사장님께 보이는
+    //      "N개 만들었어요"(성공만 센 수)와는 다른 숫자다. 섞지 말 것.
+    done: cuts.filter((c) => isCutDone(c, "images")).length,
+    total: cuts.length,
+    // ★ 접기를 여기 섞지 않는다. 판정은 실제 상태 그대로여야 한다 — 접었다고 오류를 null 로
+    //   주면 판정이 running 으로 되살아나, 이미 죽은 파이프라인 옆에서 스피너가 돈다.
+    //   감추는 일은 아래 띠지에서만 한다.
+    error: err0,
+    phase: status?.progress?.phase ?? project.progress?.phase ?? null,
+    stepPhase: "images",
+    // ★ 서버가 잰 값을 그대로 읽는다. 브라우저가 자기 시계로 빼면 사장님 PC 가
+    //   3분 빠를 때 시작하자마자 "멈췄어요"가 뜬다.
+    stalledForMs: status?.stalled_for_ms ?? null,
+    busy,
+  });
+  // 파이프라인이 더 안 도는 상태(멈춤·실패)이거나 상태를 아예 못 읽었으면 기다릴 게 없다 —
+  // 컷별 [다시 생성]을 열어준다.
+  //
+  // ★ 접기가 여기 끼어들면 안 된다. 서버에는 images_error 를 지우는 경로가 없어 접어도
+  //   파이프라인은 여전히 죽어 있는데, 접기로 이 값이 false 가 되면 아직 generating 인 컷이
+  //   busyCut 으로 다시 잠겨 "닫고 컷별로 다시 만들기"가 약속한 바로 그 일을 막는다.
+  const stalled = pollTimedOut || gen.kind === "stalled" || gen.kind === "failed";
   // 아직 한 장도 만들지 않았는가 — 시작 버튼을 보일지 가른다
   const madeAny = cuts.some((c) => c.image || c.source === "photo");
   // 구성이 없는 영상에서는 컷의 문장이 곧 그림을 만드는 글이다(lib/cuts.js buildImagePrompt).
@@ -172,10 +215,39 @@ export default function ImagesStepPage() {
             그림을 누르면 크게 보고 고칠 수 있어요
           </p>
         )}
-        {shownErr && (
+        {/* 네 가지는 사장님에게 서로 다른 사건이다 — 도는 중 / 멈춤 / 실패 / 상태 못 읽음.
+            전에는 전부 한 문단이라 무엇을 해야 할지 알 수 없었다. */}
+        {err && <p className="pgsub warn">{err}</p>}
+
+        {gen.kind === "running" && (
+          <p className="pgsub">
+            <span className="spinner" aria-hidden="true" /> 컷 {gen.done}/{gen.total} 만드는 중이에요
+          </p>
+        )}
+
+        {gen.kind === "stalled" && (
           <p className="pgsub warn">
-            {shownErr}{" "}
-            <button className="mini" onClick={dismiss} disabled={busy}>닫고 컷별로 다시 만들기</button>
+            {/* ★ 여기에는 버튼을 두지 않는다. 살아 있는 탈출구는 이미 오른쪽에 있고
+                (멈춤 동안 stalled 가 참이라 컷별 버튼의 busyCut 잠금이 풀린다), 여기 하나 더
+                두면 죽은 버튼이 된다 — 폴링이 도는 동안이라 busy 로 잠기거나, 눌러도 보이는
+                변화가 없다. 무엇을 해 준다고 하고 안 하는 것이 이 화면이 고치려던 병이다. */}
+            ⚠ 진행이 멈춰 있어요 — 컷 {gen.done}/{gen.total}에서 한참째 그대로예요.
+            {/* ★ 가리키는 조작은 **멈춤 중에 실제로 눌리는 것**이어야 한다. 지시를 적어야
+                열리는 쪽은 글을 쓰기 전에는 회색이고, 컷을 안 고르면 오른쪽에 사진 컷이
+                올라와 버튼이 아예 없을 수도 있다 — 그래서 고르는 단계까지 말한다.
+                (대괄호로 부르는 이름은 테스트가 실제 버튼과 대조한다) */}
+            {" "}멈춘 컷을 눌러 오른쪽에서 [그냥 다시]로 이어가실 수 있어요.
+          </p>
+        )}
+
+        {/* 접기는 **이 띠지 하나**만 감춘다. 접어 둔 문구와 다른 실패가 오면 접힌 적 없다는
+            듯 뜬다 — 그 뒤에 새로 난 실패는 그대로 보여야 하기 때문이다. */}
+        {gen.kind === "failed" && gen.reason.message !== dismissedMsg && (
+          <p className="pgsub warn">
+            ⚠ {gen.reason.message}{" "}
+            {gen.reason.retryable && (
+              <button className="mini" onClick={dismiss} disabled={busy}>닫고 컷별로 다시 만들기</button>
+            )}
           </p>
         )}
         {cuts.map((c) => {

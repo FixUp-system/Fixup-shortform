@@ -262,6 +262,10 @@ readable if not configured"** 이고 보관 기간 과금도 문서에 없다. �
 |---|---|
 | 단계 표(①~⑥)·라우팅 가드 | `lib/steps.js` 의 `STEPS` |
 | 낡음 판정(각인 `of`) | `lib/steps.js` 하단 — `isImageStale`·`isClipStale`·`isRenderStale`… |
+| 단계별로 봐야 할 오류 필드 | `lib/step-errors.js` 의 `STEP_ERROR_FIELDS`·`ALL_ERROR_FIELDS` |
+| "끝난 컷" 판정·멈춤 임계·생성 상태 | `lib/progress.js` 의 `isCutDone`·`STALL_MS`·`generationState` |
+| 실패 사유를 사장님 말로 옮기기 | `lib/failure.js` 의 `classifyFailure` |
+| 상태 폴링 루프 | `lib/poll.js` 의 `startPolling` |
 | 크레딧 가격·재생성 상한·체험 한도 | `lib/pricing.js` |
 | 클립 모델 엔드포인트·길이 눈금·모델별 필드 | `lib/clip-limits.js` 의 `CLIP_PROFILES` |
 | 원가 단가·예산 축·원장 기록 | `lib/costs.js` |
@@ -277,13 +281,82 @@ readable if not configured"** 이고 보관 기간 과금도 문서에 없다. �
 
 ★ **화면("use client")이 import 하는 모듈은 `fs` 를 끌면 안 된다.** 그래서 순수 데이터·순수
 함수만 두는 파일이 따로 있다: `pricing.js` · `clip-limits.js` · `aspects.js` · `voices.js` ·
-`styles.js` · `steps.js` · `auth/paths.js`. 이 저장소는 화면이 서버 전용 모듈을 끌고 와 빌드가
+`styles.js` · `steps.js` · `auth/paths.js` · `step-errors.js` · `failure.js` · `progress.js` ·
+`poll.js`. 이 저장소는 화면이 서버 전용 모듈을 끌고 와 빌드가
 깨진 사고를 세 번 겪었다 — 이 파일들에 import 를 더할 때는 그 사슬 끝에 `fs` 가 없는지 본다.
 
-★ **오래 걸리는 라우트는 fire-and-forget 이다** — `/images`·`/voice`·`/clips`·`/auto` 는
-파이프라인을 띄우고 바로 응답한다. 그래서 그쪽 실패는 HTTP 코드가 아니라 프로젝트 문서의
+### ★ 오래 걸리는 라우트는 fire-and-forget 이다 — 그래서 "보이게 하는 장치"가 따로 있다
+
+`/images`·`/voice`·`/clips`·`/auto` 는 파이프라인을 띄우고 **기다리지 않고** 응답한다
+(서버리스라 응답이 먼저 나가야 한다). 그래서 그쪽 실패는 HTTP 코드가 아니라 프로젝트 문서의
 `images_error`·`voice_error`·`video_error`·`auto.state` 로만 보이고, 화면은 짝이 되는
 `…/status` 를 2초마다 폴링해 읽는다. `withUser` 의 402/503 변환도 그 자리에는 못 닿는다.
+
+2026-08-14 이전에는 그 폴링이 **아무것도 구분하지 못했다.** 돌고 있든 멎었든 실패했든 화면은
+"만드는 중…"이었고 5분 뒤 "확인이 오래 걸리고 있어요"였다. 지금은 다섯으로 가른다 —
+`idle`/`running`/`stalled`/`failed`/`done`(`lib/progress.js` 의 `generationState`).
+그 장치를 다시 무너뜨리지 않으려면:
+
+- **단계별 흐름의 상태 라우트는 다섯이고, 값을 하나 더 실으면 다섯을 다 고친다** —
+  `projects/[id]/status` · `cuts/status` · `voice/status` · `clips/status` · `render/status`.
+  애초의 버그가 이것이다: 스토어의 `selectProjectCuts` 가 `images_error` 를 안 실어서 이미지
+  실패가 몇 달 동안 화면에 한 번도 안 닿았다. **그 위에 라우트가 한 겹 더 흘리고 있었다** —
+  `cuts/status` 는 스토어가 주던 `voice_error`·`video_error` 마저 응답에서 버렸다(같은 종류의
+  구멍 둘). 지금은 다섯 다 `progress` 와 `stalled_for_ms` 를 싣는다.
+  ⚠️ **광고 흐름의 `api/ads/[id]/status` 는 여섯째지만 이 계약 밖이다** — `progress` 도
+  `stalled_for_ms` 도 안 싣는다(광고는 컷별 진척이 없는 단일 굽기다)
+- **어느 단계가 어느 오류 필드를 읽는지는 `lib/step-errors.js` 의 표 하나가 정한다.**
+  ⚠️ 지금 그 표를 읽는 것은 **화면 셋뿐이다**(③목소리·④이미지·⑤영상). **라우트와 스토어는
+  아직 필드를 손으로 적는다** — 예: `app/api/projects/[id]/cuts/status/route.js`.
+  **라우트를 고칠 때는 반드시 이 표와 대조하라.** 손으로 적은 목록이 표와 갈리는 순간
+  위 버그가 그 자리에 다시 난다
+- **사유 문구는 `lib/failure.js` 의 `classifyFailure` 가 만든다** — 뒷단 문구 안의 HTTP 상태
+  (`이미지 생성 실패 (429) …`)를 보고 고른다. **못 알아본 것은 원문 그대로 내보낸다** —
+  "알 수 없는 오류"로 뭉개면 예전보다 정보가 줄어든다(사장님이 그 문구를 읽어 줘야 고친다)
+- **"끝난 컷"의 정의는 `isCutDone` 하나다.** 손으로 적던 시절 두 곳 다 실패 표시를
+  빠뜨려서, 정상적으로 끝난 생성이 영원히 "멈췄어요"였다 — 실패한 컷은 다시 저장되지
+  않으니 스스로 낫지도 않는다
+- **판정에 쓰는 수와 사장님에게 보여 주는 수는 다르다.** `generationState` 에 넘기는 수는
+  "아직 기다릴 것이 남았는가"를 묻는 것이라 **실패한 컷도 끝난 것으로 센다.**
+  사장님이 보는 문구(⑤영상의 `` `${doneCount}/${cuts.length}개 컷을 만들었어요` ``)는
+  성공만 센다. 둘을 하나로 합치면 실패한 컷 하나 때문에 화면이 영원히 "만드는 중"이다
+- **멈춘 경과(`stalledFor`)는 서버가 잰다.** 브라우저가 서버 시각을 자기 시계로 빼면
+  PC 시계가 빠른 사장님에게는 시작하자마자 "멈췄어요"가 뜬다
+- **임계는 `lib/progress.js` 의 `STALL_MS`(2분) 하나**이고, 합성은 `STALL_EXEMPT_PHASES`
+  로 빠져 있다 — ffmpeg 단일 작업이라 중간 진척 없이 정상적으로 10분까지 간다
+- **`done >= total` 을 멈춤 검사보다 먼저 본다.** 단계가 끝날 때 `progress` 를 지우는 곳이
+  없어서 `progress.at` 은 정상 완료 뒤 그대로 낡는다. 순서를 뒤집으면 멀쩡히 끝난 생성이
+  시간이 지나 전부 "멈췄어요"가 된다
+- **"멈춘 것 같다"는 의심이지 종료가 아니다.** 파이프라인이 아직 살아 있을 수 있다.
+  그것을 근거로 **돈 쓰는 버튼을 열거나 권하지 마라** — `POST /clips` 에는 진행 중 잠금이
+  없어서 한 번 더 누르면 낡은 컷을 다음 가격대로 **다시 청구**하고 fal 비용도 이중이다.
+  `failed` 는 다르다 — 거기서는 파이프라인이 이미 결론을 냈다
+- ★ **조용한 죽음은 여전히 못 막는다 — 감지해서 알릴 뿐이다.** 함수가 응답을 보낸 뒤 얼어붙으면
+  오류를 적는 코드조차 안 돈다. 심장박동이 그 침묵을 보이게 하는 유일한 장치다
+  (`lib/pipeline.js` 의 `withProgress` 가 원래 하던 컷별 저장에 `progress: {at, phase, done, total}`
+  를 얹는다 — 쓰기를 늘리지 않는다. 생성 라우트 셋은 시작할 때 한 번 찍는다).
+  제대로 막으려면 작업 큐·워커가 필요하고 그것은 별개 프로젝트다
+
+**단계별 흐름(①~⑥)의 폴링 루프는 `lib/poll.js` 한 벌이다**(2초 간격 · 5분 상한 ·
+연속 5회 실패면 중단). 화면에서 `setInterval` 을 직접 돌리지 마라.
+⚠️ **남은 예외 하나** — 광고 화면(`app/ads/[id]/page.js`)은 아직 자기 `setInterval` 루프를
+들고 있다(상한이 영상 길이에 딸린 `adPollTimeoutMs` 라 그냥 못 옮긴다). 거기를 손대게 되면
+같이 옮겨라. 쓸 때 밟았던 것 셋:
+
+- **화면은 `onStop` 안에서 자기 ref 를 스스로 null 로 비운다.** `poll.js` 가 비우는 것은
+  자기 내부 handle 뿐이라, 돌려받은 `stop` 을 쥔 화면 ref 는 계속 truthy 다 — 스스로 멈춘
+  폴링이 영영 다시 시작되지 않는다
+- **기본값을 그대로 받지 마라.** ⑥완성은 10분 상한이 필요하고, 쪼개기 대기 루프 둘은
+  상한도 실패 횟수도 없어야 한다(`Infinity`/`Infinity`) — 원래 그런 제한이 없던 자리라
+  5분에 조용히 멈추면 화면이 굳는다
+- **`onTick` 은 await 된다.** async `onTick` 을 안 기다리면 항상 truthy 인 Promise 가
+  돌아와 첫 회차에 폴링이 죽는다
+
+`setInterval` 금지는 **단계 화면 다섯 전부**가 소스 문자열 검사로 막혀 있다. 다만 **그물이
+세 파일에 흩어져 있다** — ④이미지는 `tests/generation-status-ui.test.js`, ⑤영상은
+`tests/video-status-ui.test.js`, ②대본·③목소리·⑥완성은 `tests/poll-migration-ui.test.js`.
+⚠️ 그래서 **단계 화면을 새로 더하면 어디에도 안 걸린다** — 세 파일 중 하나(대개
+`poll-migration-ui`, 화면 목록을 배열로 돌린다)에 그 화면을 손으로 넣어야 그물이 덮는다.
 
 ## 이어서 할 일
 

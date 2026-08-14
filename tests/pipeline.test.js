@@ -1418,3 +1418,106 @@ describe("재생성 상한 판정이 낙관적 락 재시도를 견딘다", () =
     }
   });
 });
+
+// 심장박동 — 파이프라인이 컷을 저장할 때마다 progress 를 함께 남기는가.
+// 순수 함수(withProgress·isCutDone)는 따로 보고, 여기서는 **파이프라인이 실제로 찍는가**를
+// 본다. 감싸는 것을 하나 빼먹어도 순수 테스트는 전부 통과하기 때문이다.
+describe("심장박동 — 파이프라인이 컷 저장에 진척을 남긴다", () => {
+  // 인메모리 저장소에 쓰기 카운터가 따로 없어, 낙관적 락의 version 을 센다 —
+  // updateProjectRow 가 성공할 때만 1 오르므로 저장 횟수와 같은 값이다.
+  const writes = async (id) => (await getStore().selectProject(id, OWNER)).version;
+
+  async function withCuts(cuts, status) {
+    const p = await makeProject();
+    await projects.updateProject(p.id, OWNER, (proj) => ({ ...proj, status, cuts, voice_id: "v1" }));
+    return p;
+  }
+
+  it("runImagesPipeline 뒤에 images 단계 표식이 남는다", async () => {
+    const p = await makeProject();
+    await runBoth(p.id, deps());
+
+    const saved = await projects.getProject(p.id, OWNER);
+    expect(saved.progress.phase).toBe("images");
+    expect(saved.progress.total).toBe(2);
+    expect(saved.progress.done).toBe(2); // ai 컷 + 사진 컷 둘 다 끝났다
+    expect(saved.progress.at).toBeGreaterThan(0);
+  });
+
+  // ★ 회귀 방지(끝남 판정에 needs_attention 이 빠졌을 때 잡히는 자리):
+  // 그림 생성이 죽은 컷은 image 없이 needs_attention 으로 끝난다. 그 컷을 안 세면
+  // 문서가 done:1/total:2 로 굳어 정상 종료한 생성이 영영 "멈춤"으로 읽힌다.
+  it("이미지 단계에서 죽은 컷이 있어도 끝나면 done 이 total 까지 찬다", async () => {
+    const p = await makeProject();
+    await pipeline.runSplitPipeline(p.id, OWNER, deps());
+    await pipeline.runImagesPipeline(p.id, OWNER, {
+      ...deps(),
+      genImage: async () => { throw new Error("그림 생성이 죽었다"); },
+    });
+
+    const saved = await projects.getProject(p.id, OWNER);
+    expect(saved.cuts[0].state).toBe("needs_attention");
+    expect(saved.cuts[0].image).toBeUndefined(); // 산 그림이 없어 남길 것이 없었다
+    expect(saved.progress).toMatchObject({ phase: "images", done: 2, total: 2 });
+  });
+
+  it("runVoicePipeline 뒤에 voice 단계 표식이 남는다", async () => {
+    const p = await withCuts([
+      { idx: 0, sentence: "첫", seconds: 3, image: { url: "i0" } },
+      { idx: 1, sentence: "둘", seconds: 3, image: { url: "i1" } },
+    ], "cuts");
+
+    await pipeline.runVoicePipeline(p.id, OWNER, { speak: async () => ({ url: "a", seconds: 2 }) });
+
+    const saved = await projects.getProject(p.id, OWNER);
+    expect(saved.progress).toMatchObject({ phase: "voice", done: 2, total: 2 });
+  });
+
+  it("낭독이 실패한 컷도 끝난 것으로 세어 진척이 멈추지 않는다", async () => {
+    const p = await withCuts([
+      { idx: 0, sentence: "실패", seconds: 3 },
+      { idx: 1, sentence: "성공", seconds: 3 },
+    ], "cuts");
+
+    await pipeline.runVoicePipeline(p.id, OWNER, {
+      speak: async ({ text }) => {
+        if (text === "실패") throw new Error("못 읽었다");
+        return { url: "a", seconds: 2 };
+      },
+    });
+
+    const saved = await projects.getProject(p.id, OWNER);
+    expect(saved.progress).toMatchObject({ phase: "voice", done: 2, total: 2 });
+  });
+
+  it("runVideoPipeline 뒤에 video 단계 표식이 남는다", async () => {
+    const p = await withCuts([
+      { idx: 0, sentence: "첫", seconds: 4, image: { url: "i0" }, audio: { url: "a0", seconds: 4 } },
+      { idx: 1, sentence: "둘", seconds: 4, image: { url: "i1" }, audio: { url: "a1", seconds: 4 } },
+    ], "voice");
+
+    await pipeline.runVideoPipeline(p.id, OWNER, {
+      clip: async () => ({ url: "v", seconds: 4, truncated: false }),
+    });
+
+    const saved = await projects.getProject(p.id, OWNER);
+    expect(saved.progress).toMatchObject({ phase: "video", done: 2, total: 2 });
+  });
+
+  it("표식을 얹어도 저장 횟수는 늘지 않는다 — 기존 저장에 얹기 때문이다", async () => {
+    const p = await withCuts([
+      { idx: 0, sentence: "첫", seconds: 4, image: { url: "i0" }, audio: { url: "a0", seconds: 4 } },
+      { idx: 1, sentence: "둘", seconds: 4, image: { url: "i1" }, audio: { url: "a1", seconds: 4 } },
+    ], "voice");
+    const before = await writes(p.id);
+
+    await pipeline.runVideoPipeline(p.id, OWNER, {
+      clip: async () => ({ url: "v", seconds: 4, truncated: false }),
+    });
+
+    // 컷 2개 × 클립 저장 1번 + 마지막 status 저장 1번 = 3. 심장박동은 그 3번에 얹히므로
+    // 표식이 붙기 전과 같은 수다 — 4가 되면 어딘가에서 저장을 새로 하고 있다는 뜻이다.
+    expect((await writes(p.id)) - before).toBe(3);
+    expect((await projects.getProject(p.id, OWNER)).progress.phase).toBe("video");
+  });
+});

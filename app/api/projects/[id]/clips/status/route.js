@@ -1,5 +1,6 @@
 import { getProjectCuts } from "../../../../../../lib/projects";
 import { withUser } from "../../../../../../lib/auth/require-user.js";
+import { stalledFor } from "../../../../../../lib/progress.js";
 
 // 클립 진행 상태 — doc 통짜 대신 cuts 만 읽는다(실측 13,236 → 9,417 bytes).
 //
@@ -15,5 +16,13 @@ export const GET = withUser(async (_req, { params }, user) => {
   // ★ 광고 문서(kind:"ad")는 이 경로가 다루지 않는다 — /api/ads/* 가 다룬다.
   // 없는 것과 같이 404 다: 남의 것이 아니라 "이 문 뒤에 없는 것"이라서다.
   if (!st || st.kind === "ad") return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
-  return Response.json({ status: st.status, cuts: st.cuts, video_error: st.video_error });
+  return Response.json({
+    status: st.status,
+    cuts: st.cuts,
+    video_error: st.video_error,
+    // 심장박동. 시간 차는 **서버가 뺀다** — 브라우저 시계로 빼면 시계가 어긋난 PC 에서
+    // 시작하자마자 "멈췄어요"가 뜬다(lib/progress.js stalledFor 주석).
+    progress: st.progress,
+    stalled_for_ms: stalledFor(st, Date.now()),
+  });
 });

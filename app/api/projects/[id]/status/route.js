@@ -1,5 +1,6 @@
 import { getProjectProgress } from "../../../../../lib/projects";
 import { withUser } from "../../../../../lib/auth/require-user.js";
+import { stalledFor } from "../../../../../lib/progress.js";
 
 // 진행 상태만 묻는 자리 — "컷이 생겼나"를 2초마다 확인하는 ②대본·③목소리가 쓴다.
 //
@@ -17,5 +18,8 @@ export const GET = withUser(async (_req, { params }, user) => {
   if (!progress || progress.kind === "ad") {
     return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
   }
-  return Response.json(progress);
+  // 심장박동(progress)은 셀렉터가 이미 실어 준다. 시간 차는 **서버가 뺀다** —
+  // 브라우저 시계로 빼면 시계가 어긋난 PC 에서 시작하자마자 "멈췄어요"가 뜬다
+  // (lib/progress.js stalledFor 주석).
+  return Response.json({ ...progress, stalled_for_ms: stalledFor(progress, Date.now()) });
 });
