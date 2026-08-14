@@ -1905,3 +1905,77 @@ describe("speed — intensity 통합은 문구를 바꾸지 않는다", () => {
     ]);
   });
 });
+
+describe("buildClipPrompt — 움직임 축", () => {
+  it("세 축이 목록 순서로 실린다", () => {
+    const p = buildClipPrompt({
+      ambient: "창밖으로 사람들이 지나간다",
+      camera: "천천히 뒤로 물러난다",
+      subject: "컵을 들어 입으로 가져간다",
+      speed: "slow",
+    });
+    const iCam = p.indexOf("천천히 뒤로 물러난다");
+    const iSub = p.indexOf("컵을 들어 입으로 가져간다");
+    const iAmb = p.indexOf("창밖으로 사람들이 지나간다");
+    expect(iCam).toBeGreaterThan(-1);
+    expect(iCam).toBeLessThan(iSub);
+    expect(iSub).toBeLessThan(iAmb);
+  });
+
+  it("축 하나만 있어도 된다", () => {
+    const p = buildClipPrompt({ camera: "천천히 다가간다" });
+    expect(p).toContain("천천히 다가간다");
+  });
+
+  it("★ 축이 하나도 없으면 옛 motion 을 쓴다 — 저장된 프로젝트", () => {
+    const p = buildClipPrompt({ motion: "천천히 회전한다" });
+    expect(p).toContain("천천히 회전한다");
+  });
+
+  it("★ 축도 motion 도 없을 때만 폴백이 나온다", () => {
+    expect(buildClipPrompt({})).toContain("거의 정지");
+    expect(buildClipPrompt({ camera: "다가간다" })).not.toContain("거의 정지");
+    expect(buildClipPrompt({ motion: "회전한다" })).not.toContain("거의 정지");
+  });
+
+  // 이음새 — 축 텍스트는 한국어 문장이라 마침표가 있을 수도 없을 수도 있다.
+  // 둘 다 같은 모양("… . … . … .")으로 나와야 한다: 이중 공백도, 부유 마침표도 없다.
+  it("★ 마침표가 없는 축들이 문장으로 갈린다 — 붙어 버리지 않는다", () => {
+    const p = buildClipPrompt({
+      camera: "천천히 뒤로 물러난다",
+      subject: "컵을 들어 입으로 가져간다",
+    });
+    expect(p.startsWith("천천히 뒤로 물러난다. 컵을 들어 입으로 가져간다. ")).toBe(true);
+  });
+
+  it("★ 이미 마침표로 끝난 축이 마침표를 둘 만들지 않는다", () => {
+    const p = buildClipPrompt({
+      camera: "천천히 뒤로 물러난다.",
+      subject: "컵을 들어 입으로 가져간다.",
+    });
+    expect(p.startsWith("천천히 뒤로 물러난다. 컵을 들어 입으로 가져간다. ")).toBe(true);
+    expect(p).not.toContain("..");
+  });
+
+  it("★ 이중 공백도 부유 구분자도 없다", () => {
+    const p = buildClipPrompt({
+      camera: "천천히 뒤로 물러난다.",
+      subject: "컵을 들어 입으로 가져간다",
+      ambient: "창밖으로 사람들이 지나간다.",
+      speed: "slow",
+    });
+    expect(p).not.toMatch(/ {2}/);
+    expect(p).not.toContain("..");
+    expect(p).not.toMatch(/\.\s*\./);
+  });
+});
+
+describe("buildClipPrompt — 옛 컷은 한 글자도 안 바뀐다", () => {
+  it("축 없는 컷의 출력이 골든과 바이트 동일이다", () => {
+    // 축을 넣기 **전** 코드로 이 입력을 실제로 실행해 얻은 출력이다(git show 로 잡지 않는다 —
+    // squash-merge 되면 그 커밋이 도달 불가라 진짜 회귀와 구분이 안 된다).
+    const GOLDEN =
+      "천천히 회전한다. slow, deliberate motion. The attached image is the first frame — continue naturally from it. Keep the subject and style unchanged. No text or letters. No talking faces or lip sync.";
+    expect(buildClipPrompt({ motion: "천천히 회전한다", speed: "slow" })).toBe(GOLDEN);
+  });
+});
