@@ -560,6 +560,65 @@ describe("buildClipPrompt — 이 그림이 어떻게 움직이는가", () => {
   });
 });
 
+describe("buildClipPrompt — 클립도 무대와 인물을 받는다", () => {
+  const project = {
+    settings: { aspect_ratio: "9:16", i2v_model: "kling-v3" },
+    briefing: { topic: "스포츠카", focus: { mode: "물건", subject: "빨간 스포츠카", look: "매끈한 2도어 쿠페" } },
+    cast: [{ who: "20대 남성", look: "검정 재킷", cuts: [0] }],
+  };
+  const cut = { idx: 0, motion: "빠른 속도로 도로를 질주한다", speed: "fast", environment: "해질녘 해안 도로", tone: "차가운 색감" };
+
+  it("움직임이 맨 앞에 그대로 남는다 — 이 단계는 motion 을 안 건드린다", () => {
+    expect(buildClipPrompt(cut, project).startsWith("빠른 속도로 도로를 질주한다. fast, explosive motion.")).toBe(true);
+  });
+
+  it("무대·인물·제품·톤·화면비가 실린다", () => {
+    const p = buildClipPrompt(cut, project);
+    expect(p).toContain("해질녘 해안 도로");
+    expect(p).toContain("20대 남성: 검정 재킷");
+    expect(p).toContain("빨간 스포츠카");
+    expect(p).toContain("매끈한 2도어 쿠페");
+    expect(p).toContain("차가운 색감");
+    expect(p).toContain("vertical 9:16");
+  });
+
+  it("첫 프레임 유지와 금지문은 맨 뒤에 그대로 남는다", () => {
+    const p = buildClipPrompt(cut, project);
+    expect(p).toContain("The attached image is the first frame");
+    expect(p).toContain("No text or letters.");
+    expect(p.indexOf("The attached image")).toBeGreaterThan(p.indexOf("해질녘 해안 도로"));
+  });
+
+  // ★ 값이 없는 옛 컷의 프롬프트가 길어지면 안 된다
+  it("값이 없으면 절이 안 붙는다 — 옛 컷은 지금과 같다", () => {
+    const bare = { settings: {}, briefing: {} };
+    const p = buildClipPrompt({ idx: 0, motion: "천천히 움직인다" }, bare);
+    expect(p).not.toContain("Setting");
+    expect(p).not.toContain("Characters");
+    expect(p).not.toContain("subject is");
+  });
+
+  it("말하는 경로의 대사·목소리 문구가 안 바뀐다", () => {
+    // 말하는-경로 픽스처 — 위 "말하는 모델(Seedance)" 블록과 같은 형태다(projectSpeaks 는
+    // 모든 컷에 말할 사람과 대사가 있어야 하므로 project.cuts 도 채운다).
+    const speaking = {
+      settings: { aspect_ratio: "9:16", i2v_model: "seedance-2.0" },
+      briefing: { topic: "스포츠카", focus: { mode: "물건", subject: "빨간 스포츠카", look: "매끈한 2도어 쿠페" } },
+      cuts: [{ idx: 0, sentence: "안녕하세요" }],
+      cast: [{ id: "c1", who: "20대 동양인 남성 농구 선수", voice: "중저음, 차분하고 단단한 톤", look: "검정 재킷", cuts: [0] }],
+    };
+    const speakingCut = { idx: 0, sentence: "안녕하세요", motion: "천천히", environment: "해질녘 해안 도로", tone: "차가운 색감" };
+    const p = buildClipPrompt(speakingCut, speaking);
+    // 대사·목소리는 바이트 그대로 실린다 — 자막(ffmpeg)이 태우는 원고와 갈리면 안 된다
+    expect(p).toContain('Says exactly, in Korean: "안녕하세요"');
+    expect(p).toContain("중저음, 차분하고 단단한 톤");
+    // 그리고 이 경로도 같은 맥락 절을 받는다
+    expect(p).toContain("해질녘 해안 도로");
+    expect(p).toContain("차가운 색감");
+    expect(p).toContain("vertical 9:16");
+  });
+});
+
 describe("explodeLongRanges — 8초를 넘고 두 조각 이상이면 푼다", () => {
   // secondsForText 는 공백을 빼고 5.5자/초로 센다(2~15초로 묶임).
   // 22자 → 4초, 44자 → 8초, 66자 → 12초, 55자 → 10초.
