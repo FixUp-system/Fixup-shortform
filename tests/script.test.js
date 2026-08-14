@@ -21,6 +21,7 @@ import {
   BOOKEND_MIN_CHARS,
   wantsBookend,
   bookendBlock,
+  SPEECH_DENSITY,
 } from "../lib/script.js";
 
 const project = {
@@ -190,37 +191,40 @@ describe("buildScriptMessages — 하나로 흐르는 원고", () => {
 describe("targetChars — 장면별 초 배분을 대신하는 숫자 하나", () => {
   const withPoints = (n) => ({ ...project, briefing: { key_points: Array.from({ length: n }, (_, i) => `사실${i}`), asked: [] } });
 
+  // ★ 아래 targetChars 기대값은 모두 SPEECH_DENSITY(0.45)를 곱한 값이다.
+  //   capacitySeconds·materialChars는 밀도와 무관하다(자료가 감당하는 길이는 자료만 본다) —
+  //   그래서 이 describe 안에서도 capacitySeconds 검증 값만은 밀도 반영 전 그대로다.
   it("사장님이 고른 길이가 있으면 그것이 목표다", () => {
     const p = { ...withPoints(2), settings: { target_seconds: 30 } };
-    expect(targetChars(p)).toBe(165); // 30초 × 5.5자
+    expect(targetChars(p)).toBe(74); // 30초 × 5.5자 × 0.45 = 74.25 → 74
   });
 
   it("고른 길이는 자료가 얇아도 깎지 않는다 — 10초를 고른 사람에게 5초를 주면 실패다", () => {
     const p = { ...withPoints(1), settings: { target_seconds: 45 } };
-    expect(targetChars(p)).toBe(248);
+    expect(targetChars(p)).toBe(111); // 45 × 5.5 × 0.45 = 111.375 → 111
   });
 
   it("목록에 없는 값은 무시하고 자동으로 돌아간다", () => {
     for (const bad of [7, "30", null, undefined]) {
-      expect(targetChars({ ...withPoints(2), settings: { target_seconds: bad } })).toBe(60);
+      expect(targetChars({ ...withPoints(2), settings: { target_seconds: bad } })).toBe(27); // 60 × 0.45 = 27
     }
   });
 
   it("자료가 감당하는 길이는 고른 값과 무관하게 자료만 본다", () => {
     const p = { ...withPoints(2), settings: { target_seconds: 60 } };
-    expect(capacitySeconds(p)).toBe(11); // 사실 2개 → 60자 → 11초
+    expect(capacitySeconds(p)).toBe(11); // 사실 2개 → 60자 → 11초(밀도 무관 — capacitySeconds는 자료만 본다)
   });
 
-  it("사실 수에 비례하되 40초(220자)를 넘지 않는다", () => {
-    expect(targetChars(withPoints(20))).toBe(220);
+  it("사실 수에 비례하되 40초(220자, 밀도 반영 전) 상한 위에 밀도가 걸린다", () => {
+    expect(targetChars(withPoints(20))).toBe(99); // 220 × 0.45 = 99
   });
 
   it("자료가 얇아도 최소 분량은 준다", () => {
-    expect(targetChars(withPoints(1))).toBe(60);
+    expect(targetChars(withPoints(1))).toBe(27); // 60 × 0.45 = 27
   });
 
   it("자료로 만들 수 있는 길이를 초로 돌려준다 — 사실 하나에 약 5초", () => {
-    expect(capacitySeconds(withPoints(1))).toBe(11);  // 하한 60자
+    expect(capacitySeconds(withPoints(1))).toBe(11);  // 하한 60자(밀도 무관)
     expect(capacitySeconds(withPoints(4))).toBe(22);  // 120자
     expect(capacitySeconds(withPoints(20))).toBe(40); // 상한 220자
   });
@@ -230,7 +234,7 @@ describe("targetChars — 장면별 초 배분을 대신하는 숫자 하나", (
       ...project,
       briefing: { key_points: ["ㄱ", "ㄴ"], asked: [{ question: "가격은?", answer: "5천원" }, { question: "언제?", answer: "" }] },
     };
-    expect(targetChars(p)).toBe(90); // 사실 3개 × 30
+    expect(targetChars(p)).toBe(41); // 사실 3개 × 30 = 90 → 90 × 0.45 = 40.5 → 41
   });
 });
 
@@ -319,7 +323,9 @@ describe("scriptFaults — 원고가 스스로 판정되는 셋", () => {
   });
 
   it("조금 넘긴 것은 잡지 않는다 — 목표는 눈금이지 자가 아니다", () => {
-    expect(overTarget(project, "가".repeat(targetChars(project) + 5))).toBe(false);
+    // 고정 +5자가 아니라 목표에 비례한 여유로 잰다 — 밀도로 목표가 작아지면(27자)
+    // 고정 오프셋은 더 이상 "조금"이 아니게 된다.
+    expect(overTarget(project, "가".repeat(Math.round(targetChars(project) * 1.05)))).toBe(false);
   });
 
   // 1.3배였을 때 30초 요청에 39초짜리가 결함 없음으로 통과했다 — 추정 오차(±15%)까지만 봐준다.
@@ -338,13 +344,29 @@ describe("scriptFaults — 원고가 스스로 판정되는 셋", () => {
     expect(scriptFaults(project, { text: half })).toContain("분량 미달");
   });
 
-  // 두 줄짜리 자료에서 하한만 요구했더니 "직접 삶아 세탁"·"고객 만족도" 같은
-  // 자료에 없는 말을 지어내 채웠다. 더 쓸 게 없으면 짧은 것이 정답이다.
+  // ⚠️ 2026-08-14 오전에 한 번 뒤집었다가 같은 날 되돌린 자리다.
+  // 뒤집은 이유(15초 요청에 11초)는 진짜였지만, 원인은 판정이 아니라 **목표 자체**였다 —
+  // 목표가 83자라 얕은 자료가 닿을 수 없었다. 밀도 계수로 목표를 37자로 내리면
+  // 그 자료도 목표에 닿으므로, 지어내기 위험을 감수하며 판정을 열 이유가 없다.
+  // (지어내기는 실측된 실패다: 두 줄짜리 자료에서 하한을 요구했더니 "직접 삶아 세탁"이 나왔다.)
   it("자료의 사실을 이미 다 썼으면 짧아도 잡지 않는다 — 지어내게 만들면 안 된다", () => {
     const usedAll = "매일 아침 직접 갈아 만듭니다. 하루 40잔이면 끝납니다.";
     expect(unusedFacts(project, usedAll)).toEqual([]);
     expect(underTarget(project, usedAll)).toBe(false);
     expect(scriptFaults(project, { text: usedAll })).toEqual([]);
+  });
+
+  // 채울 재료가 없을 때 "채워라"고만 하면 지어낸다 — 무엇으로 채울지를 지문이 말해야 한다.
+  // 안 쓴 사실이 있을 때와 없을 때가 서로 다른 말이어야 하는 자리다.
+  it("안 쓴 사실이 없으면 되돌리기 지문이 '이미 쓴 사실을 더 깊이'로 안내한다", () => {
+    const usedAll = "매일 아침 직접 갈아 만듭니다. 하루 40잔이면 끝납니다.";
+    const { messages } = buildScriptRewriteMessages(
+      project, { text: usedAll }, ["분량 미달"]
+    );
+    const content = messages[0].content;
+    expect(content).toContain("[더 깊이 갈 자리]");
+    expect(content).not.toContain("[아직 안 쓴 사실]"); // 없는 것을 있다고 적지 않는다
+    expect(content).toContain("지어내지");
   });
 
   it("안 쓴 사실만 골라낸다", () => {
@@ -372,14 +394,35 @@ describe("scriptFaults — 원고가 스스로 판정되는 셋", () => {
   });
 
   it("멀쩡하면 빈 배열", () => {
-    // 목표(사실 2개 → 60자) 안에 드는 길이여야 한다 — 짧으면 이제 '분량 미달'로 잡힌다
-    const ok = "매일 아침 딸기를 직접 갈아서 그날 쓸 만큼만 만듭니다. 그래서 하루 40잔이면 그날 치는 끝납니다. 오후 세 시쯤이면 대개 떨어집니다.";
+    // 자료의 사실을 다 쓴 글이면 짧아도 미달로 잡히지 않는다(unusedFacts 기준으로 되돌아갔다) —
+    // 목표(밀도 반영 27자) 안에 억지로 맞출 필요가 없다.
+    const ok = "매일 아침 직접 갈아 만듭니다. 하루 40잔이면 끝납니다.";
     expect(scriptFaults(project, { text: ok })).toEqual([]);
   });
 
   it("원고가 없으면 판정하지 않는다", () => {
     expect(scriptFaults(project, null)).toEqual([]);
     expect(scriptFaults(project, { text: "  " })).toEqual([]);
+  });
+
+  // 광고 실측(2026-08-14, 3편): 15초에 대사가 31~39자뿐이었다(밀도 37~47%).
+  // 분할생성은 컷 초 = 낭독 초라 정의상 100% 였다 — 쉬는 자리가 구조적으로 없었다.
+  it("고른 초에 밀도 계수를 곱해 목표를 낸다", () => {
+    const p15 = { ...project, settings: { target_seconds: 15 } };
+    const p30 = { ...project, settings: { target_seconds: 30 } };
+    // 15 × 5.5 × 0.45 = 37.125 → 37
+    expect(targetChars(p15)).toBe(37);
+    expect(targetChars(p30)).toBe(74);
+    expect(SPEECH_DENSITY).toBe(0.45);
+  });
+
+  // 자동 길이(자료가 정하는 쪽)에도 같은 밀도가 걸려야 한다 — 한쪽만 걸면 모드마다 다른 영상이 나온다
+  it("길이를 안 고른 프로젝트에도 밀도가 걸린다", () => {
+    const auto = { ...project, settings: {} };
+    const withDensity = targetChars(auto);
+    expect(withDensity).toBeGreaterThan(0);
+    // 자료 기준 자수(사실 2개 → 하한 60자)에 0.45 를 곱한 값
+    expect(withDensity).toBe(Math.round(60 * SPEECH_DENSITY));
   });
 });
 
@@ -420,6 +463,9 @@ describe("buildScriptRewriteMessages", () => {
     expect(system).toContain("지적되지 않은 자리는 그대로 둔다");
   });
 
+  // 2026-08-14: "그럴 바에는 짧은 채로 둔다"를 지웠다. 그 한 줄이 얕은 자료에서
+  // 빠져나갈 문이 되어 15초 요청에 11초가 나왔다. 지어내기 금지는 남기되(아래 두 줄),
+  // 짧게 끝내는 것이 정답이라고는 더 이상 말하지 않는다.
   it("분량 미달에는 채우는 방법까지 지정한다 — 지어내기·되풀이로 채우면 안 된다", () => {
     const { system } = buildScriptRewriteMessages(project, draft, ["분량 미달"]);
     expect(system).toContain("분량 미달");
@@ -633,24 +679,37 @@ describe("수미상관 — 짧은 편에는 걸지 않는다", () => {
     for (const s of [30, 45, 60]) expect(wantsBookend(withSeconds(s))).toBe(true);
   });
 
+  // SPEECH_DENSITY 도입(2026-08-14, Task 1)으로 targetChars가 밀도만큼 줄었다.
+  // wantsBookend가 BOOKEND_MIN_CHARS(밀도 반영 전 자수)를 그대로 비교하면 30·45초까지
+  // 경계 아래로 내려가 수미상관을 조용히 잃는다 — 그래서 비교식도 같은 배수로 내린다
+  // (BOOKEND_MIN_CHARS * SPEECH_DENSITY). 이 테스트는 그 배선이 유지됨을 못박는다:
+  // 15초는 여전히 안 걸리고 30초는 여전히 걸린다.
+  it("밀도 계수가 걸려도 15초는 여전히 안 걸리고 30초는 여전히 건다", () => {
+    expect(targetChars(withSeconds(15))).toBeLessThanOrEqual(BOOKEND_MIN_CHARS * SPEECH_DENSITY);
+    expect(wantsBookend(withSeconds(15))).toBe(false);
+    expect(targetChars(withSeconds(30))).toBeGreaterThan(BOOKEND_MIN_CHARS * SPEECH_DENSITY);
+    expect(wantsBookend(withSeconds(30))).toBe(true);
+  });
+
   // 사장님이 길이를 안 고르면 자료가 길이를 정한다 — 고른 초만 보면 이 경로가 통째로 빠진다
   it("자동(길이 미선택)이면 자료 양으로 갈린다", () => {
     const few = { ...project, settings: { aspect_ratio: "9:16" }, briefing: { ...project.briefing, key_points: ["하나", "둘"], asked: [] } };
     const many = { ...project, settings: { aspect_ratio: "9:16" }, briefing: { ...project.briefing, key_points: ["하나", "둘", "셋", "넷", "다섯"], asked: [] } };
-    expect(targetChars(few)).toBeLessThanOrEqual(BOOKEND_MIN_CHARS);
+    expect(targetChars(few)).toBeLessThanOrEqual(BOOKEND_MIN_CHARS * SPEECH_DENSITY);
     expect(wantsBookend(few)).toBe(false);
-    expect(targetChars(many)).toBeGreaterThan(BOOKEND_MIN_CHARS);
+    expect(targetChars(many)).toBeGreaterThan(BOOKEND_MIN_CHARS * SPEECH_DENSITY);
     expect(wantsBookend(many)).toBe(true);
   });
 
-  // 사실 4개 × 30자 = 정확히 120자. 경계는 **넘어야** 켜진다(> 이지 >= 가 아니다).
-  it("딱 120자면 끈다", () => {
+  // 사실 4개 × 30자 = 정확히 120자(밀도 반영 전). 밀도를 곱한 뒤에도(54자) 경계는
+  // **넘어야** 켜진다(> 이지 >= 가 아니다) — wantsBookend 쪽 경계도 같은 배수로 내렸기 때문이다.
+  it("딱 120자(밀도 반영 전)면 끈다", () => {
     const exact = {
       ...project,
       settings: { aspect_ratio: "9:16" },
       briefing: { ...project.briefing, key_points: ["하나", "둘", "셋", "넷"], asked: [] },
     };
-    expect(targetChars(exact)).toBe(BOOKEND_MIN_CHARS);
+    expect(targetChars(exact)).toBe(BOOKEND_MIN_CHARS * SPEECH_DENSITY);
     expect(wantsBookend(exact)).toBe(false);
   });
 });

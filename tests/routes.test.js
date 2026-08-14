@@ -411,10 +411,10 @@ describe("POST /api/projects/[id]/briefing — 재추출", () => {
 });
 
 describe("POST /api/projects/[id]/script — 원고", () => {
-  // 목표 분량(사실 1개 → 60자) 안에 드는 길이로 둔다 — 짧으면 '분량 미달' 되돌리기가 끼어들어
-  // 호출 순서가 밀린다(그 동작 자체는 아래 되돌리기 테스트에서 따로 본다)
-  const cliche = { script: "특별한 라떼를 만나보세요. 지금 바로 오시면 매일 아침 직접 갈아 만든 생딸기를 경험해보세요. 오늘도 신선하게 준비했습니다." };
-  const plain = { script: "시럽을 쓰지 않습니다. 매일 아침 딸기를 직접 갈아서 그날 쓸 만큼만 만듭니다. 하루 40잔이면 끝납니다. 오후 세 시면 대개 떨어집니다." };
+  // 목표 분량(사실 1개 → 밀도 반영 27자) 안에 드는 길이로 둔다 — 짧거나 길면 되돌리기가
+  // 끼어들어 호출 순서가 밀린다(그 동작 자체는 아래 되돌리기 테스트에서 따로 본다)
+  const cliche = { script: "특별한 라떼를 오늘 만나보세요. 지금 바로 오시면 좋습니다." };
+  const plain = { script: "시럽을 쓰지 않습니다. 매일 아침 딸기를 갈아서 만듭니다." };
 
   it("없는 프로젝트면 404", async () => {
     const res = await scriptPOST(patchReq({}), ctx("없는id"));
@@ -461,18 +461,21 @@ describe("POST /api/projects/[id]/script — 원고", () => {
 
   it("교정본이 분량을 흘리면 초안으로 폴백한다", async () => {
     const p = await projectWithBriefing();
-    const long = { script: "가".repeat(70) };   // 목표 분량 안 — 되돌리기가 끼어들지 않는다
-    const gutted = { script: "나".repeat(20) }; // 초안의 80% 미만
+    const long = { script: "가".repeat(27) };   // 목표(밀도 반영 27자) 안 — 되돌리기가 끼어들지 않는다
+    const gutted = { script: "나".repeat(15) }; // 초안의 80% 미만
     llmMock.callJson.mockResolvedValueOnce(long).mockResolvedValue(gutted);
     await scriptPOST(patchReq({}), ctx(p.id));
     expect((await getProject(p.id, OWNER)).script.text).toBe(long.script);
   });
 
+  // 초안은 겹치는 두 문장(같은 말 되풀이) 하나만 결함으로 걸리게 목표 분량(밀도 반영 27자) 안에 둔다 —
+  // 밀도 계수 도입 전에는 60자 기준으로 여유가 있었지만, 27자에서는 조금만 길어도 '분량 초과'까지 겹쳐 걸린다.
+  const 되풀이 = { script: "손님들이 신발을 맡기러 옵니다. 손님들이 신발을 자주 맡깁니다." };
+  // 고쳐 온 원고는 목표 분량(27자) 안에 들어오고, 되풀이도 없어야 한다
+  const 고침 = { script: "손님들이 신발을 맡기러 옵니다. 흰 신발은 하루 걸립니다." };
+
   it("되풀이가 있으면 한 번 다시 쓰게 부르고, 나아지면 받는다", async () => {
     const p = await projectWithBriefing();
-    const 되풀이 = { script: "손님들이 운동화를 맡기기 위해 세탁소를 방문합니다. 최근 들어 많은 손님들이 운동화를 맡기고 있습니다." };
-    // 고쳐 온 원고는 목표 분량(60자) 안에 들어와야 한다 — 짧으면 '분량 미달'로 또 돌아간다
-    const 고침 = { script: "손님들이 운동화를 맡기러 옵니다. 흰 운동화는 하루면 다 마릅니다. 굽이 닳은 신발은 이틀 걸립니다. 밑창은 직접 손으로 솔질합니다." };
     llmMock.callJson
       .mockResolvedValueOnce(되풀이)   // 초안
       .mockResolvedValueOnce(고침)     // 되돌리기
@@ -484,7 +487,6 @@ describe("POST /api/projects/[id]/script — 원고", () => {
 
   it("되돌리기가 실패해도 초안을 안고 간다", async () => {
     const p = await projectWithBriefing();
-    const 되풀이 = { script: "손님들이 운동화를 맡기기 위해 세탁소를 방문합니다. 최근 들어 많은 손님들이 운동화를 맡기고 있습니다." };
     llmMock.callJson
       .mockResolvedValueOnce(되풀이)
       .mockRejectedValueOnce(new Error("네트워크"))
