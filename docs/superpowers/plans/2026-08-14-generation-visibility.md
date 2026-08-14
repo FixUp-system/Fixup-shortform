@@ -1720,6 +1720,16 @@ git commit -m "feat(video): 되는 중·멈춤·실패를 구분해 말한다"
 
 ### Task 11: ③목소리·②대본·⑥완성 폴링 이관
 
+> **★ 루프는 다섯이 아니라 일곱이다** (Task 8 구현자가 실측해 올렸고 나도 확인했다).
+> ②대본·③목소리에는 컷이 생기길 기다리는 **가벼운 `/status` 루프가 하나씩 더** 있고, 그 둘은
+> 상한도 실패 카운트도 없다. 그리고 ⑥완성만 상한이 10분이다. 아래 코드에 그 셋이 반영돼 있다 —
+> 옵션을 지우면 동작이 조용히 바뀐다.
+>
+> **★ 또 하나의 함정**: 화면은 `pollRef.current` 의 참 여부를 "이미 돌고 있나"의 판정으로 쓴다.
+> 모듈은 자기 내부 `handle` 만 null 로 만들 뿐이라, 화면 ref 는 반환받은 `halt` 함수를 계속
+> 쥔다(항상 참). 그래서 **`onStop` 안에서 화면 ref 를 반드시 null 로 되돌려야** 한다 —
+> 안 하면 스스로 끝난 폴링이 다시는 안 살아난다. 아래 코드와 Task 9·10 이 그렇게 돼 있다.
+
 남은 세 화면을 같은 한 벌로 옮긴다. **표시는 최소로** — ③목소리만 네 상태를 그리고, ②대본(컷 분할 대기)과 ⑥완성(합성)은 폴링만 옮긴다. 이유: 컷 분할은 OpenAI 한 번이라 컷 단위 진척이 없고, 합성은 멈춤 판정에서 제외되기 때문이다(Global Constraints).
 
 **Files:**
@@ -1776,6 +1786,12 @@ Expected: FAIL — 남은 화면 블록 5건
 ```js
     const stop = startPolling({
       url: `/api/projects/${id}/status`,
+      // ★ 이 가벼운 대기 루프는 지금 **상한도 실패 카운트도 없다**(실측: script/page.js 에
+      //    startedAt·failures 가 아예 없다). 기본값을 그대로 받으면 5분 상한과 연속 5회
+      //    중단이 새로 생긴다 — 이 태스크는 동작을 옮기기만 하는 자리라 그러면 안 된다.
+      //    컷 분할이 5분을 넘기면 화면이 조용히 멈춘 채 영영 안 갱신된다(onStop 이 기본 noop).
+      timeoutMs: Infinity,
+      maxFailures: Infinity,
       onTick: (st) => {
         if (st.cut_count > 0 || st.cuts_error) { load(id).catch(() => {}); return true; }
         return false;
@@ -1797,6 +1813,11 @@ Expected: FAIL — 남은 화면 블록 5건
 ```js
     stopRef.current = startPolling({
       url: `/api/projects/${id}/render/status`,
+      // ★★ ⑥완성만 상한이 **10분**이다(실측: done/page.js 의 `10 * 60 * 1000`). 다른 넷은 5분.
+      //    이 줄을 빠뜨리면 모듈 기본값 5분이 걸려 상한이 반토막 나고, 정상적으로 6~9분 걸리는
+      //    합성이 "상태를 확인하지 못했어요"로 끝난다. 합성이 멈춤 판정에서 빠져 있는 것과
+      //    같은 이유다 — 합성은 원래 오래 걸린다.
+      timeoutMs: 10 * 60 * 1000,
       onTick: (st) => {
         setProject((p) => ({ ...p, status: st.status, render: st.render, render_error: st.render_error }));
         if (st.render_error) { setErr(st.render_error); return true; }
