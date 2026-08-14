@@ -482,6 +482,20 @@ describe("runVoicePipeline — 컷마다 따로 읽힌다", () => {
     expect(saved.cuts[0].seconds).toBe(9);
   });
 
+  // 무음 컷은 읽을 것이 없다 — 빈 문자열을 보내면 값만 나가고 소리는 안 온다
+  it("무음 컷은 읽지 않는다", async () => {
+    const p = await withCuts([
+      { idx: 0, sentence: "첫 문장", spoken_seconds: 3, seconds: 6 },
+      { idx: 1, sentence: "", silent: true, spoken_seconds: 0, seconds: 5 },
+    ]);
+    const speak = vi.fn(async () => ({ url: "a", seconds: 3 }));
+    await pipeline.runVoicePipeline(p.id, OWNER, { speak });
+    expect(speak).toHaveBeenCalledTimes(1);
+    const saved = await projects.getProject(p.id, OWNER);
+    expect(saved.cuts[1].audio).toBeUndefined();
+    expect(saved.cuts[1].seconds, "배분된 화면 시간은 그대로다").toBe(5);
+  });
+
   it("고른 목소리를 그대로 넘긴다", async () => {
     const p = await withCuts([{ idx: 0, sentence: "문장", seconds: 3 }]);
     let got;
@@ -1222,6 +1236,35 @@ describe("컷 길이 — 쪼갤 수 있으면 코드가 되돌린다", () => {
     const cuts = await pipeline.defaultDeps.splitCuts(await projects.getProject(p.id, OWNER), OWNER);
     expect(cuts).toHaveLength(1);
     expect(cuts[0].seconds).toBeLessThanOrEqual(8);
+  });
+
+  // ★★ 2026-08-14 재측정이 연 구멍: 원고가 34~37자로 짧아지자 분할이 컷 하나만 만들고
+  //    배분이 거기에 15초를 다 줬다 — 정지 이미지 한 장이 15초 머문다.
+  //    splitCuts 안에서 fillSilentCuts 가 **배분보다도, 캐스팅보다도 앞**에 돌아야 막힌다.
+  it("짧은 원고에 15초를 고르면 무음 컷으로 채워 8초 넘는 컷을 남기지 않는다", async () => {
+    const SHORT = "손끝이 갈라져 아팠어요.";
+    const p = await projects.createProject({ ownerId: OWNER,
+      settings: { aspect_ratio: "9:16", target_seconds: 15 },
+      material: { text: "자료", photos: [] },
+    });
+    await projects.updateProject(p.id, OWNER, (proj) => ({
+      ...proj, briefing: { topic: "핸드크림" }, script: { text: SHORT },
+    }));
+    llmMock.callJson
+      .mockResolvedValueOnce({ cuts: [{ from: 1, to: 1 }] })  // 모델은 컷 하나만 냈다
+      .mockResolvedValueOnce({ shots: [] })
+      .mockResolvedValueOnce({ cast: [] });
+    const cuts = await pipeline.defaultDeps.splitCuts(await projects.getProject(p.id, OWNER), OWNER);
+
+    expect(cuts.length, "코드가 무음 컷을 채운다").toBeGreaterThan(1);
+    cuts.forEach((c) => expect(c.seconds).toBeLessThanOrEqual(8));
+    expect(cuts.reduce((a, c) => a + c.seconds, 0)).toBe(15);
+    // 원고는 한 글자도 안 바뀐다 — 무음 컷은 문장을 소비하지 않는다
+    expect(cuts.filter((c) => !c.silent).map((c) => c.sentence).join(" ")).toBe(SHORT);
+    // 채우기가 화면 설계·캐스팅보다 앞이었는가 — 뒤였다면 목록이 컷 하나짜리로 나갔고,
+    // 캐스팅이 답한 컷 번호가 한 칸씩 밀린 컷에 붙는다(cast[].cuts).
+    const shows = llmMock.callJson.mock.calls.find((c) => c[0]?.stage === "화면 설계");
+    expect(shows[0].messages[0].content).toContain(`[컷 ${cuts.length}개`);
   });
 });
 

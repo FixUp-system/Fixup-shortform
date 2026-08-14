@@ -95,6 +95,31 @@ describe("validateCutRanges — 경계만 받고 텍스트는 코드가 자른�
       expect(c.spoken_seconds).toBeGreaterThan(0);
     }
   });
+
+  // ★ 무음 컷은 문장을 소비하지 않는다 — 그래서 "컷을 이어붙이면 원고와 같다"가 유지된다
+  it("무음 컷을 받되 문장 덮기 규칙은 그대로다", () => {
+    const cuts = validateCutRanges(
+      { cuts: [{ silent: true }, { from: 1, to: 1 }, { from: 2, to: 2 }] },
+      ["첫 문장입니다.", "둘째 문장입니다."]
+    );
+    expect(cuts).toHaveLength(3);
+    expect(cuts[0]).toMatchObject({ idx: 0, silent: true, sentence: "", spoken_seconds: 0 });
+    expect(cuts.filter((c) => !c.silent).map((c) => c.sentence).join(" "))
+      .toBe("첫 문장입니다. 둘째 문장입니다.");
+  });
+
+  it("무음 컷을 여럿 받는다 — 개수 상한은 여기서 걸지 않는다", () => {
+    const cuts = validateCutRanges(
+      { cuts: [{ silent: true }, { from: 1, to: 1 }, { silent: true }] },
+      ["첫 문장입니다."]
+    );
+    expect(cuts).toHaveLength(3);
+    expect(cuts.filter((c) => c.silent)).toHaveLength(2);
+  });
+
+  it("무음 컷만 있으면 버린다 — 원고가 통째로 사라진다", () => {
+    expect(validateCutRanges({ cuts: [{ silent: true }] }, ["첫 문장입니다."])).toBe(null);
+  });
 });
 
 describe("validateShows — 화면 패스", () => {

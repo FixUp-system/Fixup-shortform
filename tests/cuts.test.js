@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { splitSentences, splitUnits, explodeLongRanges, buildSplitMessages, buildShowsMessages, buildImagePrompt, buildClipPrompt, stillOnly, clauseBoundaries, usableTone, usableTransition, allocateCutSeconds } from "../lib/cuts.js";
+import { splitSentences, splitUnits, explodeLongRanges, buildSplitMessages, buildShowsMessages, buildImagePrompt, buildClipPrompt, stillOnly, clauseBoundaries, usableTone, usableTransition, allocateCutSeconds, fillSilentCuts, CONTENT_MAX_SECONDS } from "../lib/cuts.js";
 import { clipProfileForProject, minSecondsFor, maxSecondsFor } from "../lib/clip-limits.js";
 import { STYLE_PRESETS } from "../lib/styles.js";
 // 관통 테스트라 파일 경계를 넘는다 — 화면 설계(validate) → 그림 프롬프트(cuts) → 각인(steps).
@@ -166,6 +166,13 @@ describe("buildShowsMessages", () => {
     expect(user).toContain("1. 매일 아침 딸기를 갈아 씁니다.");
     expect(user).toContain("id:p1");
     expect(user).toContain("생딸기라떼");                   // 주제
+  });
+
+  it("화면 설계 목록에서 무음 컷이 자기 자리를 갖는다", () => {
+    const cuts = [{ idx: 0, silent: true, sentence: "" }, { idx: 1, sentence: "말하는 컷." }];
+    const { messages } = buildShowsMessages({ ...project }, cuts);
+    expect(messages[0].content).toContain("(말 없는 장면)");
+    expect(messages[0].content).toContain("말하는 컷.");
   });
 
   it("shows 작법을 지시한다 — 샷 크기·앵글·조명, 부정형 금지, 삽화 금지", () => {
@@ -1471,5 +1478,47 @@ describe("allocateCutSeconds — 고른 초를 컷에 배분한다", () => {
     const target = cuts.reduce((a, c) => a + c.spoken_seconds, 0); // 12
     const out = allocateCutSeconds(cuts, target, profile);
     expect(out).toEqual([4, 3, 6]);
+  });
+});
+
+// ★★ 이것이 이 태스크의 핵심 보장이다(2026-08-14 재측정이 요구했다).
+//   원고가 짧아지자 컷이 1개가 되고 배분이 거기에 15초를 다 줬다 — 이미지 한 장이 15초 머문다.
+//   CONTENT_MAX_SECONDS 는 "이미지 한 장이 화면에 머무는 시간"인데 낭독 초로만 판정돼
+//   배분된 초를 안 봤다. 모델이 지문을 따르든 말든 **코드가 채운다.**
+describe("fillSilentCuts — 배분된 초가 8초를 넘는 컷이 남지 않는다", () => {
+  const seedance = { min: 4, max: 15 };
+  const kling = { min: 3, max: 15 };
+
+  it("말하는 컷 하나에 15초가 배분되면 무음 컷으로 쪼갠다", () => {
+    const cuts = [{ idx: 0, sentence: "짧은 원고입니다.", spoken_seconds: 6 }];
+    const out = fillSilentCuts(cuts, 15, seedance);
+    expect(out.length).toBeGreaterThan(1);
+    const secs = allocateCutSeconds(out, 15, seedance);
+    expect(secs.reduce((a, b) => a + b, 0)).toBe(15);
+    secs.forEach((s) => expect(s).toBeLessThanOrEqual(CONTENT_MAX_SECONDS));
+    // 원고는 한 글자도 안 바뀐다
+    expect(out.filter((c) => !c.silent).map((c) => c.sentence).join(" ")).toBe("짧은 원고입니다.");
+  });
+
+  it("모델 하한이 개수의 천장이다 — 하한을 깨면서까지 쪼개지 않는다", () => {
+    const cuts = [{ idx: 0, sentence: "문장.", spoken_seconds: 4 }];
+    const out = fillSilentCuts(cuts, 15, seedance); // 하한 4 → 최대 3개
+    expect(out.length).toBeLessThanOrEqual(3);
+    const outK = fillSilentCuts(cuts, 15, kling);   // 하한 3 → 최대 5개
+    expect(outK.length).toBeLessThanOrEqual(5);
+  });
+
+  it("이미 8초 이하로 나뉘어 있으면 아무것도 더하지 않는다", () => {
+    const cuts = [
+      { idx: 0, sentence: "가.", spoken_seconds: 5 },
+      { idx: 1, sentence: "나.", spoken_seconds: 5 },
+      { idx: 2, sentence: "다.", spoken_seconds: 5 },
+    ];
+    expect(fillSilentCuts(cuts, 15, seedance)).toHaveLength(3);
+  });
+
+  it("idx 를 다시 매긴다 — 캐스팅·화면 설계가 컷 번호로 짝을 짓는다", () => {
+    const out = fillSilentCuts([{ idx: 0, sentence: "가.", spoken_seconds: 6 }], 15, seedance);
+    expect(out.map((c) => c.idx)).toEqual(out.map((_, i) => i));
   });
 });
