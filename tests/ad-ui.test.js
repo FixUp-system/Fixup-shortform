@@ -157,17 +157,20 @@ describe("/ads/[id] 화면", () => {
 });
 
 describe("보관함 카드", () => {
-  it("종류를 실제로 갈라 그린다 — kind 값 비교가 href 를 가른다", () => {
+  // ⚠️ 2026-08-14 에 **가는 곳이 바뀌었다.** 카드는 이제 종류와 무관하게 보관함 상세
+  //    (/archive/[id])로 간다 — 확인하러 들어간 자리에 유료 버튼이 있으면 안 되기 때문이다.
+  //    종류를 가르는 일은 사라지지 않았다: 라벨 표와 상세의 [이어서 작업하기]가 그것을 쓴다.
+  it("종류를 실제로 갈라 그린다 — kind 값 비교가 라벨을 가른다", () => {
     // "kind"라는 낱말은 주석에도 나올 수 있어 그것만으로는 증거가 안 된다.
-    // kind 값을 실제로 비교하는 조건이 있고, 광고 문서용 경로와 기존 경로가 둘 다
-    // 남아 있는지(기존 동작을 안 지웠는지)까지 구조로 확인한다.
     expect(cardsSrc).toMatch(/kind\s*===\s*["']ad["']/);
-    expect(cardsSrc).toContain("/ads/${p.id}");
-    expect(cardsSrc).toContain("/create/${p.id}");
+    // 라벨 표가 둘 다 남아 있는지(기존 동작을 안 지웠는지)까지 구조로 확인한다
+    expect(cardsSrc).toContain("AD_STATUS_LABEL");
+    expect(cardsSrc).toContain("STATUS_LABEL[p.status]");
   });
 
-  it("광고 카드는 /ads/ 로 간다", () => {
-    expect(cardsSrc).toContain("/ads/");
+  it("카드는 보관함 상세로 간다 — 제작 화면으로 직행하지 않는다", () => {
+    expect(cardsSrc).toContain("/archive/${p.id}");
+    expect(cardsSrc, "아직 제작 화면으로 직행한다").not.toMatch(/href = .*\/ads\/\$\{p\.id\}/);
   });
 
   it("kind 가 없는(=옛) 문서는 기존 라벨 표(STATUS_LABEL)를 그대로 쓴다 — 새 표로 안 바꿔치기했다", () => {

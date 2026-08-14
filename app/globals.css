@@ -420,14 +420,19 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
 
 /* 제목이 남는 폭을 다 먹고, 넘치면 말줄임한다. min-width:0 이 없으면 flex 항목의
    기본 min-width:auto 때문에 줄지 않아 배지를 밀어낸다. */
+/* 제목은 **두 줄까지** 보여준다(2026-08-14). 한 줄(nowrap)이면 자료 첫 문장에서 끊겨
+   어느 영상인지 구별이 안 됐다. 두 줄을 넘으면 말줄임표로 접는다 — 카드 높이는 그대로 둔다. */
 .project-meta .title {
   flex: 1;
   min-width: 0;
   font-weight: 600;
   font-size: 14px;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  line-height: 1.35;
 }
 /* 배지는 제 크기를 지킨다 — 없으면 "완성"이 "완/성" 두 줄로 찌그러진다(실측) */
 .project-meta .badge { flex: none; white-space: nowrap; }

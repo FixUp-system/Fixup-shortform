@@ -31,7 +31,10 @@ export default function CreatePage() {
   const showCredits = me?.gated !== false;
   const [text, setText] = useState("");
   const [photos, setPhotos] = useState([]); // {id, filename, url}
-  const [seconds, setSeconds] = useState(null); // null = 자동(자료가 정함)
+  // ★ 기본 30초. 예전에는 null(자동 · 자료가 정함)이 기본이었는데, 길이가 **정가를 정하는
+  //   축**이라 자동이면 사장님이 만들기 전에 얼마인지 모른다 — 화면도 "값은 30초 기준"이라고
+  //   에둘러 말하고 있었다. 2026-08-14 사용자 요청으로 자동을 뺐다.
+  const [seconds, setSeconds] = useState(30);
   const [aspect, setAspect] = useState(DEFAULT_ASPECT_ID);
   // ★ 영상 모델은 **여기서 한 번** 고른다 — 만든 뒤에는 못 바꾼다(서버도 400 으로 막는다).
   // 모델이 정가를 정하는데(길이 × 모델) 정가는 ③목소리·④이미지에서 걷히므로, 뒤에서
@@ -119,9 +122,6 @@ export default function CreatePage() {
               <span className="tray-label">길이</span>
               <div className="tray-col">
                 <div className="chips">
-                  <button className={`chip${seconds === null ? " on" : ""}`} onClick={() => setSeconds(null)}>
-                    자동 · 자료에 맞춰
-                  </button>
                   {TARGET_CHOICES.map((s) => (
                     <button key={s} className={`chip${seconds === s ? " on" : ""}`} onClick={() => setSeconds(s)}>
                       {s}초
@@ -165,14 +165,11 @@ export default function CreatePage() {
                     </button>
                   ))}
                 </div>
-                {/* ★ 길이를 안 고르면(자동) 가격표가 30초 값으로 떨어진다 — 그 숫자를 확정처럼
-                    적으면 자료가 짧아 15초로 나왔을 때 사장님이 다른 값을 본다. 기준을 말한다. */}
                 {/* ★ 값은 **기본 화질** 기준이다 — ②대본에서 더 높은 화질을 고르면 올라간다.
                     화질을 안 고르는 모델(Kling·LTX)에는 그 말을 안 붙인다: 여기 없는 선택을
                     있는 것처럼 말하는 것이 "고를 수 있는 척"과 같은 잘못이다. */}
                 <div className="tray-note">
                   {I2V_MODELS.find((m) => m.id === model)?.hint} · 만든 뒤에는 바꿀 수 없어요
-                  {seconds === null && " · 값은 30초 기준이고 길이에 따라 달라져요"}
                   {resolutionsForModel(model).length > 0 && " · 화질에 따라서도 달라져요"}
                 </div>
               </div>

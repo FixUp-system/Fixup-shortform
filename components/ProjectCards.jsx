@@ -109,7 +109,10 @@ export default function ProjectCards({ projects, limit, onDeleted, selecting, se
         const isAd = p.kind === "ad";
         // 광고는 자기 화면으로 간다. 고르는 중에는 어느 쪽이든 이동을 막는다 —
         // 막지 않으면 두 번째 카드를 고르려는 순간 그 프로젝트로 들어가 버린다.
-        const href = isAd ? `/ads/${p.id}` : `/create/${p.id}`;
+        // ★ 보관함에서는 **보는 화면**으로 간다(2026-08-14). 예전에는 제작 화면으로
+        //   직행했는데, 확인하러 들어간 자리에 유료 버튼이 있었다. 이어서 작업하는
+        //   길은 그 화면 안의 [이어서 작업하기]다 — 종류에 맞는 제작 화면으로 보낸다.
+        const href = `/archive/${p.id}`;
         const label = isAd ? (AD_STATUS_LABEL[p.status] || p.status) : (STATUS_LABEL[p.status] || p.status);
         return (
           <li key={p.id}>
