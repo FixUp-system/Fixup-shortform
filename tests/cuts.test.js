@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { splitSentences, splitUnits, explodeLongRanges, buildSplitMessages, buildShowsMessages, buildImagePrompt, buildClipPrompt, stillOnly, clauseBoundaries, usableTone, usableTransition, allocateCutSeconds, fillSilentCuts, CONTENT_MAX_SECONDS } from "../lib/cuts.js";
+import { splitSentences, splitUnits, explodeLongRanges, buildSplitMessages, buildShowsMessages, buildImagePrompt, buildClipPrompt, stillOnly, clauseBoundaries, usableTone, usableTransition, allocateCutSeconds, fillSilentCuts, CONTENT_MAX_SECONDS, stageOf, castLooksOf, subjectOf, orientOf } from "../lib/cuts.js";
 import { clipProfileForProject, minSecondsFor, maxSecondsFor } from "../lib/clip-limits.js";
 import { STYLE_PRESETS } from "../lib/styles.js";
 // 관통 테스트라 파일 경계를 넘는다 — 화면 설계(validate) → 그림 프롬프트(cuts) → 각인(steps).
@@ -1661,5 +1661,73 @@ describe("fillSilentCuts — 배분된 초가 8초를 넘는 컷이 남지 않�
     expect(out[0].sentence).toBe("가.");
     expect(out[1]).toMatchObject({ silent: true });
     expect(out.filter((c) => !c.silent).map((c) => c.sentence)).toEqual(["가.", "나."]);
+  });
+});
+
+// ★ 이 태스크는 기능을 안 늘린다. 선택 로직만 뽑아낸다.
+//   문구가 한 글자라도 달라지면 이미 산 그림이 낡아 사장님에게 재구매가 제시된다
+//   (buildImagePrompt 안의 stage·tone·noteClause 주석이 같은 규칙을 반복한다).
+describe("buildImagePrompt — 재료를 뽑아내도 출력은 그대로다", () => {
+  const rich = {
+    settings: { aspect_ratio: "9:16" },
+    briefing: { topic: "생딸기라떼", focus: { mode: "물건", subject: "생딸기라떼", look: "유리컵에 담긴 분홍 음료" } },
+    cast: [{ who: "20대 여성", look: "긴 머리, 캐주얼한 옷차림", cuts: [0] }],
+  };
+  const cut = { idx: 0, shows: "여성이 컵을 든 미디엄 샷", environment: "실내 스튜디오, 한낮", tone: "따뜻한 색감" };
+
+  it("풍부한 프로젝트의 프롬프트가 기대 문자열과 같다", () => {
+    const p = buildImagePrompt(cut, rich);
+    // 절이 다 실렸는지 문구 그대로 확인한다
+    expect(p).toContain("vertical 9:16 composition");
+    expect(p).toContain("Scene: 여성이 컵을 든 미디엄 샷.");
+    expect(p).toContain(" Setting (same in every scene of this video): 실내 스튜디오, 한낮.");
+    expect(p).toContain(" Characters in this frame (keep them identical across every scene) — 20대 여성: 긴 머리, 캐주얼한 옷차림.");
+    expect(p).toContain(" The video's subject is: 생딸기라떼. Keep this exact product/subject consistent in every scene.");
+    expect(p).toContain(" Its appearance, identical in every scene: 유리컵에 담긴 분홍 음료.");
+    expect(p).toContain(" Overall look and color treatment, keep identical across all cuts: 따뜻한 색감.");
+  });
+
+  it("값이 없으면 절이 아예 안 붙는다", () => {
+    const bare = { settings: { aspect_ratio: "9:16" }, briefing: {} };
+    const p = buildImagePrompt({ idx: 0, shows: "빈 방" }, bare);
+    expect(p).not.toContain("Setting (same in every scene");
+    expect(p).not.toContain("Characters in this frame");
+    expect(p).not.toContain("The video's subject is:");
+    expect(p).not.toContain("Overall look and color treatment");
+  });
+});
+
+describe("절의 재료를 고르는 함수", () => {
+  const project = {
+    settings: { aspect_ratio: "9:16" },
+    briefing: { topic: "생딸기라떼", focus: { mode: "물건", subject: "생딸기라떼", look: "유리컵" } },
+    cast: [
+      { who: "20대 여성", look: "긴 머리", cuts: [0] },
+      { who: "40대 남성", look: "짧은 머리", cuts: [1] },
+      { who: "이름만", cuts: [0] }, // look 이 없으면 안 센다
+    ],
+  };
+
+  it("이 컷에 배정된 인물만 고른다", () => {
+    expect(castLooksOf({ idx: 0 }, project)).toEqual(["20대 여성: 긴 머리"]);
+    expect(castLooksOf({ idx: 1 }, project)).toEqual(["40대 남성: 짧은 머리"]);
+    expect(castLooksOf({ idx: 9 }, project)).toEqual([]);
+  });
+
+  // ★ 앵커는 **제품**이어야 한다 — topic 은 자료가 기획서면 기획 문구가 된다(주석의 실측).
+  it("초점이 물건이면 그 대상이 제품이고, 사람 초점의 subject 는 안 쓴다", () => {
+    expect(subjectOf(project).anchor).toBe("생딸기라떼");
+    expect(subjectOf(project).look).toBe("유리컵");
+    const person = { briefing: { topic: "사장님 이야기", focus: { mode: "사람", subject: "사장님", look: "앞치마" } } };
+    expect(subjectOf(person).anchor).toBe("사장님 이야기"); // topic 으로 떨어진다
+    expect(subjectOf(person).look).toBe("");               // 사람의 look 은 제품 외형이 아니다
+  });
+
+  it("무대와 화면비", () => {
+    expect(stageOf({ environment: "  실내 스튜디오  " })).toBe("실내 스튜디오");
+    expect(stageOf({})).toBe("");
+    expect(orientOf({ settings: { aspect_ratio: "1:1" } })).toBe("square 1:1");
+    expect(orientOf({ settings: { aspect_ratio: "16:9" } })).toBe("horizontal 16:9");
+    expect(orientOf({ settings: {} })).toBe("horizontal 16:9"); // 지금 동작 그대로
   });
 });
