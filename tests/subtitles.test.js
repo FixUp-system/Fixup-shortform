@@ -154,6 +154,29 @@ describe("buildCues", () => {
     ]);
     expect(cues[2]).toEqual({ start: 3.3, end: 6.6, text: "다" });
   });
+
+  // ★ 여백에는 자막이 없다(2026-08-14). 컷이 5초인데 대사가 2초면 자막은 2초만 뜬다.
+  //   컷 사이 누적은 여전히 화면 시간(5초)이라야 다음 컷이 제자리에서 시작한다.
+  it("자막은 말하는 동안만 뜨고, 다음 컷은 화면 시간 뒤에 시작한다", () => {
+    const cuts = [
+      { idx: 0, sentence: "짧게 말합니다.", spoken_seconds: 2, seconds: 5, video: { seconds: 5 } },
+      { idx: 1, sentence: "다음 문장입니다.", spoken_seconds: 2, seconds: 5, video: { seconds: 5 } },
+    ];
+    const cues = buildCues(cuts);
+    expect(cues).toHaveLength(2);
+    expect(cues[0].start).toBe(0);
+    expect(cues[0].end).toBe(2);   // 5 가 아니다 — 뒤 3초는 여백이다
+    expect(cues[1].start).toBe(5); // 누적은 화면 시간
+    expect(cues[1].end).toBe(7);
+  });
+
+  // spoken_seconds 가 없는 옛 문서는 지금처럼 화면 시간을 쓴다 — 회귀 0
+  it("옛 컷(spoken_seconds 없음)은 지금과 같게 흐른다", () => {
+    const cuts = [{ idx: 0, sentence: "옛 컷입니다.", seconds: 4, video: { seconds: 4 } }];
+    const cues = buildCues(cuts);
+    expect(cues[0].start).toBe(0);
+    expect(cues[0].end).toBe(4);
+  });
 });
 
 describe("toAss", () => {
