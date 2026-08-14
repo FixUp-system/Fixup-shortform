@@ -990,6 +990,141 @@ git commit -m "feat(steps): 말하는 프로젝트에서 목소리 단계를 숨
 
 ---
 
+### Task 10: 길이를 코드가 강제한다 — **측정이 요구한 추가 태스크**
+
+> ★ 이 태스크는 계획에 없었다. **Task 6 측정이 만들어 냈다.** 실행 순서는 6 → **10** → 7 → 8 → 9 다.
+
+**Files:**
+- Modify: `lib/script.js` (`editKeptContent`)
+- Modify: 되돌리기 라운드에서 스키마 거절을 다루는 자리 (`app/api/projects/[id]/script/route.js` 또는 `lib/llm.js` — `grep -rn "스키마 거절"` 로 찾는다)
+- Test: `tests/script.test.js` · 해당 라우트 테스트
+
+**측정이 보여 준 것(2026-08-14, shallow 자료 3회, 목표 15초 = 37자):**
+
+```
+[b52c32e1] 교정 41자 → 최종 106자      ← 41자면 목표 밴드(33~43) 안인데 버려졌다
+[39db25fb] 교정 108자 → 최종 147자
+[39db25fb] 1회차 스키마 거절 → 중단     ← 되돌리기가 3회 중 1회만 쓰고 포기
+```
+
+원고가 목표의 286%·397%인 채로 채택돼, 15초 요청에 19초·27초가 나왔다.
+
+**원인 1 — `editKeptContent` 가 목표를 모른다.**
+
+```js
+export function editKeptContent(draft, edited) {
+  return chars(edited) >= chars(draft) * 0.8;
+}
+```
+
+교정이 원고를 뭉텅 지우는 것을 막는 가드다. **원래 문맥에서는 옳았다** — 교정은 다듬는 자리지 줄이는
+자리가 아니었고, 목표가 83자일 때는 초안도 그 근처라 큰 축소가 곧 파괴였다. 밀도로 목표가 37자가 되자
+초안이 목표의 3~4배가 되고, **목표에 맞추려는 정상적인 큰 축소가 파괴로 오판**된다.
+
+**원인 2 — 스키마 거절이 라운드를 통째로 포기시킨다.** 되돌리기 3회가 보장이 아니라 상한일 뿐이다.
+
+- [ ] **Step 1: 실패하는 테스트를 쓴다**
+
+`tests/script.test.js` 에 추가한다:
+
+```js
+describe("editKeptContent — 큰 축소가 늘 파괴인 것은 아니다", () => {
+  // ⚠️ 2026-08-14 측정이 만든 테스트다. 실측 로그:
+  //   [b52c32e1] 교정 41자 → 최종 106자  — 41자는 목표 밴드 안인데 가드가 버렸다.
+  // 가드 자체는 옳다(교정이 원고를 뭉텅 지우면 안 된다). 빠진 것은 **목표를 함께 보는 것**이다.
+  const at = (secs) => ({ ...project, settings: { target_seconds: secs } });
+
+  it("초안이 목표를 크게 넘을 때, 밴드 안으로 데려온 교정은 받는다", () => {
+    const p = at(15);                       // 목표 37자
+    const draft = { text: "가".repeat(106) };
+    const edited = { text: "나".repeat(41) }; // 밴드(31~43) 안
+    expect(editKeptContent(draft, edited, p)).toBe(true);
+  });
+
+  it("초안이 이미 밴드 안이면 큰 축소는 여전히 파괴다", () => {
+    const p = at(15);
+    const draft = { text: "가".repeat(40) };  // 이미 밴드 안
+    const edited = { text: "나".repeat(12) };
+    expect(editKeptContent(draft, edited, p)).toBe(false);
+  });
+
+  it("초안이 넘쳐도 목표 아래로 깎아 오면 받지 않는다", () => {
+    const p = at(15);
+    const draft = { text: "가".repeat(106) };
+    const edited = { text: "나".repeat(10) }; // 밴드 아래
+    expect(editKeptContent(draft, edited, p)).toBe(false);
+  });
+
+  // 프로젝트를 안 넘기면 옛 규칙 그대로다 — 호출처를 다 못 고쳤을 때 조용히 느슨해지지 않게
+  it("프로젝트 없이 부르면 옛 80% 규칙만 쓴다", () => {
+    expect(editKeptContent({ text: "가".repeat(100) }, { text: "나".repeat(85) })).toBe(true);
+    expect(editKeptContent({ text: "가".repeat(100) }, { text: "나".repeat(41) })).toBe(false);
+  });
+});
+```
+
+- [ ] **Step 2: 실패를 확인한다**
+
+Run: `npx vitest run tests/script.test.js -t "editKeptContent"`
+Expected: FAIL — 첫 테스트가 `false` 를 받는다(41 < 106 × 0.8).
+
+- [ ] **Step 3: 구현한다**
+
+```js
+// 교정본을 받을 것인가.
+//
+// 기본 규칙은 "많이 줄었으면 교정이 원고를 뭉텅 지운 것"이다. 교정은 다듬는 자리지 줄이는
+// 자리가 아니기 때문이다.
+//
+// ⚠️ 그 규칙만으로는 부족하다(2026-08-14 측정). 밀도 계수가 목표를 낮추면서 초안이 목표의
+// 3~4배로 나오는 일이 흔해졌고, 그때 **목표에 맞추려는 정상적인 큰 축소**가 파괴로 오판됐다:
+//   [b52c32e1] 교정 41자(목표 밴드 안) → 버려지고 106자가 남았다 → 15초 요청에 19초
+// 그래서 목표를 함께 본다. 판정의 순서가 곧 의미다:
+//   1) 조금만 줄었으면 받는다(옛 규칙 그대로)
+//   2) 초안이 이미 밴드 안인데 크게 줄었으면 파괴다 — 줄일 이유가 없었다
+//   3) 초안이 밴드를 넘었고 교정이 밴드 아래로 안 떨어뜨렸으면 받는다 — 교정이 제 일을 한 것이다
+export function editKeptContent(draft, edited, project) {
+  if (!edited?.text) return false;
+  const chars = (s) => (s?.text || "").replace(/\s/g, "").length;
+  const d = chars(draft);
+  const e = chars(edited);
+  if (e >= d * 0.8) return true;
+  // 목표를 모르면 옛 규칙에서 멈춘다 — 호출처를 다 못 고쳤을 때 조용히 느슨해지면 안 된다
+  if (!project) return false;
+  const t = targetChars(project);
+  if (d <= t * LENGTH_SLACK) return false;
+  return e >= t * UNDER_LIMIT;
+}
+```
+
+호출처에 `project` 를 넘기도록 고친다(`grep -rn "editKeptContent" app/ lib/`).
+
+- [ ] **Step 4: 스키마 거절이 라운드를 포기시키지 않게 한다**
+
+`grep -rn "스키마 거절"` 로 자리를 찾는다. 되돌리기 응답이 스키마에 안 맞으면 지금은 루프를 **중단**한다.
+그 라운드를 **한 번 다시 시도**하고, 그래도 안 되면 그 라운드만 버리고 **남은 라운드를 계속 돈다.**
+로그 문구도 무슨 일이 있었는지 그대로 적는다(`스키마 거절 → 재시도` · `스키마 거절 2회 → 이 라운드 버림`).
+
+⚠️ 재시도는 유료 호출이다. **라운드당 한 번만** 재시도한다 — 무한 재시도를 만들지 마라.
+
+- [ ] **Step 5: 통과를 확인한다**
+
+Run: `npx vitest run`
+Expected: 전부 그린.
+
+- [ ] **Step 6: 커밋**
+
+```bash
+git add lib/script.js tests/script.test.js <호출처 파일들>
+git commit -m "fix(script): 목표를 넘긴 초안을 밴드로 데려온 교정을 버리지 않는다"
+```
+
+- [ ] **Step 7: 다시 잰다 — Task 6 과 같은 방법으로**
+
+컷 초 합이 고른 초의 95~105% 에 들어오는지 3회 이상 확인한다. 안 들어오면 멈추고 보고한다.
+
+---
+
 ## 마무리 — 전체 측정
 
 Task 6 과 같은 방법으로 다시 재고, **무음 컷 비율**을 표에 더한다(목표: 광고 실측 17% 근처). 결과를 사용자에게 보고하고 wiki 에 반영한다(저장소 세션 마무리 규칙).
