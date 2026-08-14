@@ -1,8 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { execSync } from "node:child_process";
-import { writeFileSync, unlinkSync } from "node:fs";
-import path from "node:path";
-import { pathToFileURL } from "node:url";
 import { splitSentences, splitUnits, explodeLongRanges, buildSplitMessages, buildShowsMessages, buildImagePrompt, buildClipPrompt, stillOnly, clauseBoundaries, usableTone, usableTransition, allocateCutSeconds, fillSilentCuts, CONTENT_MAX_SECONDS, stageOf, castLooksOf, subjectOf, orientOf } from "../lib/cuts.js";
 import { clipProfileForProject, minSecondsFor, maxSecondsFor } from "../lib/clip-limits.js";
 import { STYLE_PRESETS } from "../lib/styles.js";
@@ -592,25 +588,24 @@ describe("buildClipPrompt — 클립도 무대와 인물을 받는다", () => {
     expect(p).toContain("The attached image is the first frame");
     expect(p).toContain("No text or letters.");
     expect(p.indexOf("The attached image")).toBeGreaterThan(p.indexOf("해질녘 해안 도로"));
+    // ★ 앞의 두 assertion은 맥락이 지시보다 "앞"이라는 것만 본다 — 프롬프트가 정말
+    // 금지문에서 "끝나는지"는 안 본다. 나중에 누가 이 뒤에 절을 하나 더 붙이면
+    // 위 assertion 은 여전히 통과하므로 여기서 끝을 못 박는다.
+    expect(p.endsWith("No talking faces or lip sync.")).toBe(true);
   });
 
   // ★ 값이 없는 옛 컷의 프롬프트가 길어지면 안 된다 — not.toContain 은 몇 낱말만 가리키므로
-  // 이 태스크 이전 코드(866ba61, 맥락 절을 더하기 전)가 내던 값과 **바이트 그대로** 같은지
-  // 직접 비교한다. Task 1 리뷰어가 신·구 출력을 비교하던 방식과 같다.
-  it("값이 없으면 절이 안 붙는다 — 옛 컷은 이 태스크 이전 코드와 바이트 그대로 같다", async () => {
-    const oldSrc = execSync("git show 866ba61:lib/cuts.js", { encoding: "utf8" });
-    const tmpPath = path.resolve("lib", `__pre-clip-context-${process.pid}-${Date.now()}.mjs`);
-    writeFileSync(tmpPath, oldSrc, "utf8");
-    try {
-      const old = await import(pathToFileURL(tmpPath).href);
-      const bare = { settings: {}, briefing: {} };
-      const cutInput = { idx: 0, motion: "천천히 움직인다" };
-      const before = old.buildClipPrompt(cutInput, bare);
-      const after = buildClipPrompt(cutInput, bare);
-      expect(after).toBe(before);
-    } finally {
-      unlinkSync(tmpPath);
-    }
+  // 골든 문자열로 통째로 고정한다. 이 문자열은 이미 값을 치른 클립들이 각인(clipKey)될 때
+  // 찍힌 값 그대로다 — 한 글자라도 바뀌면 그 클립들이 전부 낡아 다시 사게 된다.
+  // (커밋 SHA 를 harness 에서 git show 로 불러와 비교하는 방식은 쓰지 않는다 — 이 브랜치가
+  // squash 되거나 리베이스되면 그 커밋이 사라져, 회귀가 아닌 실패가 회귀처럼 보인다.)
+  it("값이 없으면 절이 안 붙는다 — 옛 컷은 지금과 바이트 그대로 같다(골든 문자열)", () => {
+    const bare = { settings: {}, briefing: {} };
+    const p = buildClipPrompt({ idx: 0, motion: "천천히 움직인다" }, bare);
+    expect(p).toBe(
+      "천천히 움직인다. The attached image is the first frame — continue naturally from it. " +
+      "Keep the subject and style unchanged. No text or letters. No talking faces or lip sync."
+    );
   });
 
   it("말하는 경로의 대사·목소리 문구가 안 바뀐다", () => {
