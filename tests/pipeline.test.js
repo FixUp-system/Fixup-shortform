@@ -168,6 +168,75 @@ describe("defaultDeps.splitCuts — 두 패스", () => {
     expect(toneKey(cuts[1])).toContain("발끝이 화면 아래에 걸린 로우 앵글");
   });
 
+  // ★ 판정만 하고 강제하지 않으면 안 된다 — motionVariety 가 **실제로 재시도를 일으키는지**를
+  // 잰다. 단위 테스트는 함수가 false 를 돌려주는 것까지만 증명하므로, 파이프라인이 그것을
+  // 부르지 않으면(혹은 누가 그 한 줄을 지우면) 단위 테스트는 전부 초록인 채 판정이 죽는다.
+  //
+  // 화면 문자열에 샷 크기 낱말을 안 넣고 speed 도 안 준다 — shotBalance·speedContrast 를
+  // 통과시켜야 재시도 사유가 **축 쏠림 하나**임을 확정할 수 있다.
+  describe("축 쏠림이 화면 설계를 다시 부른다", () => {
+    const leaning = {
+      shots: [
+        { shows: "딸기를 가는 손", camera: "천천히 다가간다" },
+        { shows: "골목을 걷는 발", camera: "천천히 물러난다" },
+      ],
+    };
+    const mixed = {
+      shots: [
+        { shows: "딸기를 가는 손", camera: "천천히 다가간다" },
+        { shows: "골목을 걷는 발", ambient: "창밖으로 사람들이 지나간다" },
+      ],
+    };
+    const designCalls = () => llmMock.callJson.mock.calls.filter((c) => c[0]?.stage === "화면 설계");
+
+    it("전 컷이 한 축뿐이면 사유를 주고 한 번 더 부른다", async () => {
+      llmMock.callJson
+        .mockResolvedValueOnce(ranges)
+        .mockResolvedValueOnce(leaning)
+        .mockResolvedValueOnce(mixed)
+        .mockResolvedValueOnce(noCast);
+      const cuts = await pipeline.defaultDeps.splitCuts(await saved(), OWNER);
+
+      const calls = designCalls();
+      expect(calls).toHaveLength(2);
+      const redo = calls[1][0].messages.at(-1).content;
+      expect(redo).toContain("[다시]");
+      expect(redo).toContain("카메라");
+      // 그리고 두 번째 답이 실제로 쓰인다
+      expect(cuts[1].ambient).toBe("창밖으로 사람들이 지나간다");
+      expect(cuts[1].camera).toBeUndefined();
+    });
+
+    it("축이 섞여 있으면 다시 부르지 않는다 — 값을 치를 이유가 없다", async () => {
+      llmMock.callJson.mockResolvedValueOnce(ranges).mockResolvedValueOnce(mixed).mockResolvedValueOnce(noCast);
+      await pipeline.defaultDeps.splitCuts(await saved(), OWNER);
+      expect(designCalls()).toHaveLength(1);
+    });
+
+    it("★ 축이 하나도 없는 답도 다시 부르지 않는다 — 옛 프로젝트에 LLM 값을 더 치르지 않는다", async () => {
+      llmMock.callJson
+        .mockResolvedValueOnce(ranges)
+        .mockResolvedValueOnce({ shots: [{ shows: "딸기를 가는 손" }, { shows: "골목을 걷는 발" }] })
+        .mockResolvedValueOnce(noCast);
+      await pipeline.defaultDeps.splitCuts(await saved(), OWNER);
+      expect(designCalls()).toHaveLength(1);
+    });
+
+    it("두 번째도 쏠려 있으면 그대로 간다 — 아쉬운 화면이 화면 없는 것보다 낫다", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      llmMock.callJson
+        .mockResolvedValueOnce(ranges)
+        .mockResolvedValueOnce(leaning)
+        .mockResolvedValueOnce(leaning)
+        .mockResolvedValueOnce(noCast);
+      const cuts = await pipeline.defaultDeps.splitCuts(await saved(), OWNER);
+      expect(designCalls()).toHaveLength(2);   // 세 번은 안 부른다
+      expect(cuts[0].camera).toBe("천천히 다가간다");   // 화면은 버리지 않는다
+      expect(warn.mock.calls.flat().join(" ")).toContain("카메라");
+      warn.mockRestore();
+    });
+  });
+
   it("원고가 없으면 컷 분할 실패를 던진다", async () => {
     await expect(pipeline.defaultDeps.splitCuts({ ...(await saved()), script: null }, OWNER)).rejects.toThrow("컷 분할 실패");
   });

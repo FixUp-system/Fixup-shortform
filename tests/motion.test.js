@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { MOTION_AXES, isMotionAxis, motionAxisFor, axesOf } from "../lib/motion.js";
+import { MOTION_AXES, isMotionAxis, motionAxisFor, axesOf, motionVariety } from "../lib/motion.js";
 
 describe("MOTION_AXES — 축 목록", () => {
   it("셋이고 순서가 카메라·피사체·배경이다", () => {
@@ -37,5 +37,54 @@ describe("axesOf — 컷이 실제로 가진 축", () => {
   it("컷이 없어도 던지지 않는다", () => {
     expect(axesOf(null)).toEqual([]);
     expect(axesOf(undefined)).toEqual([]);
+  });
+});
+
+describe("motionVariety — 축이 한쪽으로 쏠렸는가", () => {
+  const cuts = (...specs) => specs.map((s) => s);
+
+  it("전 컷이 카메라 하나만 쓰면 되돌린다", () => {
+    const v = motionVariety(cuts(
+      { camera: "물러난다" }, { camera: "다가간다" }, { camera: "올려본다" }
+    ));
+    expect(v.ok).toBe(false);
+    expect(v.reason).toContain("카메라");
+  });
+
+  it("전 컷이 피사체 하나뿐이어도 되돌린다 — 사유가 그 축을 가리킨다", () => {
+    const v = motionVariety(cuts({ subject: "컵을 든다" }, { subject: "잔을 내려놓는다" }));
+    expect(v.ok).toBe(false);
+    expect(v.reason).toContain("피사체");
+  });
+
+  it("축이 섞이면 통과다", () => {
+    expect(motionVariety(cuts(
+      { camera: "물러난다" }, { subject: "컵을 든다" }, { ambient: "사람들이 지나간다" }
+    )).ok).toBe(true);
+  });
+
+  it("한 컷이 여러 축을 쓰면 그것만으로도 다양하다", () => {
+    expect(motionVariety(cuts(
+      { camera: "물러난다", ambient: "김이 오른다" }, { camera: "다가간다" }
+    )).ok).toBe(true);
+  });
+
+  it("컷이 둘 미만이면 판정하지 않는다", () => {
+    expect(motionVariety([{ camera: "물러난다" }]).ok).toBe(true);
+    expect(motionVariety([]).ok).toBe(true);
+    expect(motionVariety(undefined).ok).toBe(true);
+  });
+
+  it("★ 축이 없는 컷은 셈에서 빠진다 — 옛 프로젝트가 재시도를 유발하면 안 된다", () => {
+    expect(motionVariety(cuts({ motion: "회전한다" }, { motion: "흔들린다" })).ok).toBe(true);
+  });
+
+  it("축을 적은 컷이 하나뿐이면 판정하지 않는다 — 분포를 요구할 수 없다", () => {
+    expect(motionVariety(cuts({ camera: "물러난다" }, { motion: "회전한다" })).ok).toBe(true);
+  });
+
+  it("통과할 때는 사유가 없다 — speedContrast·shotBalance 와 같은 반환형이다", () => {
+    expect(motionVariety(cuts({ camera: "물러난다" }, { subject: "컵을 든다" })))
+      .toEqual({ ok: true, reason: null });
   });
 });
