@@ -448,10 +448,10 @@ describe("runVoicePipeline — 컷마다 따로 읽힌다", () => {
     return p;
   }
 
-  it("컷마다 audio를 채우고 seconds를 실측으로 덮어쓴다", async () => {
+  it("컷마다 audio를 채우고 말하는 시간을 실측으로 덮는다", async () => {
     const p = await withCuts([
-      { idx: 0, sentence: "첫 문장", seconds: 3, state: "done", image: { url: "i0" } },
-      { idx: 1, sentence: "둘째 문장", seconds: 9, state: "done", image: { url: "i1" } },
+      { idx: 0, sentence: "첫 문장", spoken_seconds: 3, seconds: 8, state: "done", image: { url: "i0" } },
+      { idx: 1, sentence: "둘째 문장", spoken_seconds: 9, seconds: 9, state: "done", image: { url: "i1" } },
     ]);
 
     await pipeline.runVoicePipeline(p.id, OWNER, {
@@ -461,9 +461,24 @@ describe("runVoicePipeline — 컷마다 따로 읽힌다", () => {
     const saved = await projects.getProject(p.id, OWNER);
     expect(saved.status).toBe("voice");
     expect(saved.cuts[0].audio).toEqual({ url: "a/첫 문장", seconds: 4.3, of: "첫 문장" });
-    // 추정치 3초·9초가 실측 4.3초로 덮인다 — 소리와 그림이 어긋나지 않게
-    expect(saved.cuts[0].seconds).toBe(4.3);
-    expect(saved.cuts[1].seconds).toBe(4.3);
+    // ★ 2026-08-14: 실측이 덮는 것은 **말하는 시간**이다. 화면에 있는 시간(seconds)은
+    //   allocateCutSeconds 가 배분한 값이라 지킨다 — 덮으면 여백이 통째로 사라진다.
+    expect(saved.cuts[0].spoken_seconds).toBe(4.3);
+    expect(saved.cuts[0].seconds).toBe(8);   // 배분된 여백이 살아 있다
+    // 말이 화면 시간보다 길면 화면 시간이 따라 올라간다 — 말은 자르지 않는다
+    expect(saved.cuts[1].spoken_seconds).toBe(4.3);
+    expect(saved.cuts[1].seconds).toBe(9);
+  });
+
+  // 말이 배분된 화면 시간보다 길면 화면 시간이 말을 따라간다
+  it("실측이 화면 시간보다 길면 화면 시간을 늘린다", async () => {
+    const p = await withCuts([{ idx: 0, sentence: "긴 문장", spoken_seconds: 3, seconds: 4 }]);
+    await pipeline.runVoicePipeline(p.id, OWNER, {
+      speak: async () => ({ url: "a", seconds: 9 }),
+    });
+    const saved = await projects.getProject(p.id, OWNER);
+    expect(saved.cuts[0].spoken_seconds).toBe(9);
+    expect(saved.cuts[0].seconds).toBe(9);
   });
 
   it("고른 목소리를 그대로 넘긴다", async () => {
