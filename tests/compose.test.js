@@ -61,6 +61,34 @@ describe("composeVideo", () => {
     expect(calls[1]?.join(" ") ?? "").not.toContain("amix");
   });
 
+  // ★★ 최종 리뷰가 찾은 Critical(2026-08-14): 무음 컷은 TTS 도 없고 Kling 클립에는
+  //   오디오 스트림도 없어 [i:a] 가 매치에 실패한다 — ffmpeg 가 ⑥완성에서 통째로 죽는다.
+  //   판정은 **컷 하나**로 한다(프로젝트 모델로 가르면 옛 Kling 클립이 남은 혼합
+  //   프로젝트에서 똑같이 죽는다).
+  it("무음 컷은 정적을 만들어 넣는다 — 클립에서 소리를 꺼내려 들지 않는다", async () => {
+    const calls = [];
+    await composeVideo({
+      projectId: "p1", aspect_ratio: "9:16",
+      cuts: [
+        { idx: 0, sentence: "말하는 컷.", seconds: 6, video: { url: "/v0", seconds: 6 }, audio: { url: "/a0", seconds: 6 } },
+        { idx: 1, sentence: "", silent: true, seconds: 8, video: { url: "/v1", seconds: 8 } },
+      ],
+      runFfmpeg: async (args) => { calls.push(args); },
+      downloadImpl: async (_url, dest) => dest,
+      writeFileImpl: async () => {},
+      mkdirImpl: async () => {},
+      readFileImpl: async () => Buffer.from("mp4"),
+      putObjectImpl: async () => {},
+    });
+    const graph = calls[0][calls[0].indexOf("-filter_complex") + 1];
+    // 무음 컷의 소리는 입력이 아니라 필터 소스에서 온다
+    expect(graph).toContain("anullsrc=r=44100:cl=stereo,atrim=duration=8.00[a1]");
+    // 클립(2번 입력)에서 오디오를 꺼내려 들지 않는다 — 거기에는 스트림이 없다
+    expect(graph).not.toContain("[2:a]");
+    // 말하는 컷은 그대로 소리 파일을 쓴다
+    expect(graph).toContain("[1:a]anull[a0]");
+  });
+
   it("로컬 ffmpeg 로 만들고 우리 서버 경로를 돌려준다", async () => {
     const r = await composeVideo({
       projectId: "p1", cuts: CUTS, aspect_ratio: "9:16",
@@ -373,8 +401,17 @@ describe("buildFfmpegArgs — 배경음악", () => {
     const graph = graphOf(args);
     // 컷이 둘이라도 amix 는 하나다
     expect(graph.split("amix").length).toBe(2);
-    expect(graph, "concat 결과에 걸려야 한다").toMatch(/\[ca\]\[bg\]amix/);
+    // concat 결과([ca])를 전체 길이로 늘린 뒤([cap]) 그것에 섞는다 — 여백이 생기면서
+    // 소리가 영상보다 짧아졌고(마지막 컷의 여백만큼) duration=first 가 그 길이를 본다.
+    expect(graph, "concat 결과를 늘린 것에 걸려야 한다").toMatch(/\[ca\]apad,atrim=duration=10\.00\[cap\];\[cap\]\[bg\]amix/);
     expect(args[args.indexOf("-map") + 1], "자막은 여전히 영상 쪽").toBe("[outv]");
+  });
+
+  // 길이를 모르면 늘리지 않는다 — 옛 동작 그대로다(잘못된 길이는 소리를 통째로 자른다)
+  it("전체 길이를 모르면 나레이션을 늘리지 않는다", () => {
+    const graph = graphOf(buildFfmpegArgs({ ...base, musicPath: "/t/bgm.mp3" }));
+    expect(graph).not.toContain("apad");
+    expect(graph).toMatch(/\[ca\]\[bg\]amix/);
   });
 
   it("나레이션 볼륨을 깎지 않는다", () => {

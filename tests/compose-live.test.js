@@ -107,6 +107,85 @@ describe("로컬 합성 — 실제 ffmpeg", () => {
     expect(seconds).toBeGreaterThan(2.7);
     expect(seconds).toBeLessThan(3.4);
   }, 120000);
+
+  // ★★ 최종 리뷰가 찾은 Critical(2026-08-14): 무음 컷(말 없는 장면)에는 TTS 가 없고,
+  //   Kling 클립은 generate_audio:false 라 **오디오 스트림이 아예 없다.** 예전에는 모든
+  //   컷에 문장이 있어 TTS 파일이 붙었으므로 이 조합이 존재하지 않았다 —
+  //   무음 컷이 그 문을 열었다. 여기서 [i:a] 가 매치에 실패하면 ffmpeg 가 통째로 죽고,
+  //   그것은 ⑥완성 즉 그림·클립 값을 다 치른 뒤다.
+  it("소리 없는 클립의 무음 컷이 있어도 죽지 않는다 — Kling+무음 컷", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "compose-silent-"));
+    // Kling 클립 흉내 — **오디오 스트림이 없는** mp4 둘
+    await run(["-y", "-f", "lavfi", "-i", "color=c=0x2A3040:s=540x960:d=6,format=yuv420p", "-c:v", "libx264", path.join(dir, "v0.mp4")]);
+    await run(["-y", "-f", "lavfi", "-i", "color=c=0x40302A:s=540x960:d=8,format=yuv420p", "-c:v", "libx264", path.join(dir, "v1.mp4")]);
+    // 말하는 컷의 TTS — 눈금이 다른 소리(24kHz 모노)로 둔다. 무음 채움이 만드는 소리와
+    // 규격이 달라도 concat 이 협상으로 붙여야 한다.
+    await run(["-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=6:sample_rate=24000", "-ac", "1", "-c:a", "aac", path.join(dir, "a0.m4a")]);
+
+    const local = [
+      { video: path.join(dir, "v0.mp4"), audio: path.join(dir, "a0.m4a"), wantSeconds: 6, haveSeconds: 6 },
+      // 무음 컷 — 소리 파일이 없고 클립에도 오디오가 없다
+      { video: path.join(dir, "v1.mp4"), wantSeconds: 8, haveSeconds: 8, silentAudio: true },
+    ];
+    const out = path.join(dir, "out.mp4");
+    const { code, tail } = await run(buildFfmpegArgs({ local, out, width: 540, height: 960, seconds: 14 }));
+    expect(code, `ffmpeg stderr:\n${tail}`).toBe(0);
+
+    const probe = await run(["-i", out]);
+    const m = probe.tail.match(/Duration:\s*(\d+):(\d+):([\d.]+)/);
+    const seconds = m ? Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) : 0;
+    console.log("무음 컷 합성 길이:", seconds, "초 (6 + 8)");
+    expect(seconds).toBeGreaterThan(13.5);
+    expect(seconds).toBeLessThan(14.5);
+  }, 120000);
+
+  // ★★ 최종 리뷰의 물음(2026-08-14): 이 브랜치는 컷마다 **영상 길이 ≠ 소리 길이**를 만든다
+  //   (화면 8초 · 낭독 3.5초). buildFfmpegArgs 는 영상만 맞추고 소리는 안 맞춘다 —
+  //   concat 이 소리를 **여백만큼 비워 두는지**(맞다) 아니면 **이어붙여 버리는지**(나레이션이
+  //   갈수록 그림보다 앞선다) 아무도 잰 적이 없었다. 여기서 못 박는다.
+  it("여백이 있어도 나레이션이 컷 시작에 붙는다 — 밀리지 않는다", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "compose-gap-"));
+    // 컷 둘 다 화면 8초, 낭독 3초 — 여백 5초씩
+    await run(["-y", "-f", "lavfi", "-i", "color=c=0x2A3040:s=540x960:d=8,format=yuv420p", "-c:v", "libx264", path.join(dir, "v0.mp4")]);
+    await run(["-y", "-f", "lavfi", "-i", "color=c=0x40302A:s=540x960:d=8,format=yuv420p", "-c:v", "libx264", path.join(dir, "v1.mp4")]);
+    await run(["-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=3", "-c:a", "aac", path.join(dir, "a0.m4a")]);
+    await run(["-y", "-f", "lavfi", "-i", "sine=frequency=880:duration=3", "-c:a", "aac", path.join(dir, "a1.m4a")]);
+
+    const local = [
+      { video: path.join(dir, "v0.mp4"), audio: path.join(dir, "a0.m4a"), wantSeconds: 8, haveSeconds: 8 },
+      { video: path.join(dir, "v1.mp4"), audio: path.join(dir, "a1.m4a"), wantSeconds: 8, haveSeconds: 8 },
+    ];
+    const out = path.join(dir, "out.mp4");
+    const { code, tail } = await run(buildFfmpegArgs({ local, out, width: 540, height: 960, seconds: 16 }));
+    expect(code, `ffmpeg stderr:\n${tail}`).toBe(0);
+
+    const probe = await run(["-i", out]);
+    const m = probe.tail.match(/Duration:\s*(\d+):(\d+):([\d.]+)/);
+    const seconds = m ? Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) : 0;
+    expect(seconds).toBeGreaterThan(15.5);
+    expect(seconds).toBeLessThan(16.5);
+
+    // 1초 창마다 소리 크기를 재서 나레이션이 어디에 있는지 본다.
+    const vol = async (t) => {
+      const seg = path.join(dir, `s${t}.wav`);
+      await run(["-y", "-ss", String(t), "-i", out, "-t", "1", "-vn", seg]);
+      const { tail: vt } = await run(["-i", seg, "-af", "volumedetect", "-f", "null", "-"]);
+      const mm = vt.match(/mean_volume:\s*(-?[\d.]+) dB/);
+      return mm ? Number(mm[1]) : -91; // 소리가 아예 없으면 무음으로 읽는다
+    };
+    const at = [];
+    for (let t = 0; t < 16; t++) at.push(await vol(t));
+    console.log("여백 실측 dB:", at.map((v, i) => `${i}:${v}`).join(" "));
+
+    // 첫 컷 낭독(0~3초)
+    for (const t of [0, 1, 2]) expect(at[t], `t=${t}`).toBeGreaterThan(-50);
+    // 첫 컷 여백(4~7초) — 이어붙이면 여기에 둘째 컷 낭독이 들어와 있다
+    for (const t of [4, 5, 6, 7]) expect(at[t], `t=${t}`).toBeLessThan(-50);
+    // 둘째 컷 낭독은 컷이 시작하는 8초에 붙는다
+    for (const t of [8, 9, 10]) expect(at[t], `t=${t}`).toBeGreaterThan(-50);
+    // 둘째 컷 여백
+    for (const t of [12, 13, 14]) expect(at[t], `t=${t}`).toBeLessThan(-50);
+  }, 300000);
 });
 
 // 배경음악 — 단위 테스트는 필터 **문자열**만 본다. 문법이 틀렸는지, amix 가 실제로
