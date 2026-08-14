@@ -1,5 +1,5 @@
 import { getProject, updateProject } from "../../../../../lib/projects";
-import { runVoicePipeline } from "../../../../../lib/pipeline";
+import { runVoicePipeline, withProgress } from "../../../../../lib/pipeline";
 import { VOICES } from "../../../../../lib/voices";
 import { fakeFal } from "../../../../../lib/fake";
 import { withUser } from "../../../../../lib/auth/require-user.js";
@@ -66,9 +66,23 @@ export const POST = withUser(async (req, { params }, user) => {
     }
   }
 
-  await updateProject(id, user.id, (proj) => ({
-    ...proj, voice_id: voiceId, voice_label: body.voiceLabel, voice_error: null,
-  }));
+  // 시작 시각을 여기서 찍는다 — 첫 컷이 끝나기 전에 함수가 얼면 progress 가 아예 없어
+  // "멈췄다"를 판정할 근거가 없다(컷마다 찍는 심장박동은 첫 컷이 끝나야 처음 뛴다).
+  //
+  // ★ done 은 손으로 0 을 박지 않고 withProgress 가 문서에서 센다 — 표식의 모양을
+  //   두 곳에서 지으면 언젠가 조용히 어긋난다(끝남 판정을 lib/progress.js 한 벌로 모은 이유).
+  // ★ 시각은 락 밖에서 잰다 — CAS 재시도로 patchFn 이 다시 불리기 때문이다(lib/projects.js).
+  //
+  // 위쪽 말하는 모델 분기(skipped)에는 찍지 않는다 — 거기서는 파이프라인을 던지지 않아
+  // 뛸 심장이 없고, 찍어 두면 아무것도 안 도는 자리가 "살아 있음"으로 읽힌다.
+  const startedAt = Date.now();
+  await updateProject(id, user.id, (proj) =>
+    withProgress(
+      { ...proj, voice_id: voiceId, voice_label: body.voiceLabel, voice_error: null },
+      "voice",
+      startedAt
+    )
+  );
 
   // 비동기 시작 — 완료를 기다리지 않고 폴링으로 확인 (컷 파이프라인과 같은 방식)
   runVoicePipeline(id, user.id).catch(async (e) => {

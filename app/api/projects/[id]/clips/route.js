@@ -1,5 +1,5 @@
 import { getProject, updateProject } from "../../../../../lib/projects";
-import { runVideoPipeline } from "../../../../../lib/pipeline";
+import { runVideoPipeline, withProgress } from "../../../../../lib/pipeline";
 import { isClipStale } from "../../../../../lib/steps";
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { requireVideoCharge, assertCanAfford, chargeRegen, NoCredits } from "../../../../../lib/charges.js";
@@ -129,7 +129,17 @@ export const POST = withUser(async (req, { params }, user) => {
     }
   }
 
-  await updateProject(id, user.id, (proj) => ({ ...proj, video_error: null }));
+  // 시작 시각을 여기서 찍는다 — 첫 컷이 끝나기 전에 함수가 얼면 progress 가 아예 없어
+  // "멈췄다"를 판정할 근거가 없다(컷마다 찍는 심장박동은 첫 컷이 끝나야 처음 뛴다).
+  //
+  // ★ done 을 0 으로 박지 않고 withProgress 가 문서에서 세게 한다. 이 라우트에는
+  //   [남은 N개 만들기]가 있어 **이미 끝난 클립을 쥔 채로** 시작하는 길이 있다 —
+  //   거기서 0 은 일어난 적 없는 뒷걸음이다. 표식의 모양을 두 곳에서 지으면 어긋난다.
+  // ★ 시각은 락 밖에서 잰다 — CAS 재시도로 patchFn 이 다시 불리기 때문이다(lib/projects.js).
+  const startedAt = Date.now();
+  await updateProject(id, user.id, (proj) =>
+    withProgress({ ...proj, video_error: null }, "video", startedAt)
+  );
 
   runVideoPipeline(id, user.id).catch(async (e) => {
     console.error("video pipeline error:", e);

@@ -1,5 +1,5 @@
 import { getProject, updateProject } from "../../../../../lib/projects";
-import { runImagesPipeline } from "../../../../../lib/pipeline";
+import { runImagesPipeline, withProgress } from "../../../../../lib/pipeline";
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { requireVideoCharge, NoCredits } from "../../../../../lib/charges.js";
 import { fakeFal } from "../../../../../lib/fake";
@@ -48,11 +48,27 @@ export const POST = withUser(async (req, { params }, user) => {
     }
   }
 
-  await updateProject(id, user.id, (proj) => ({
-    ...proj,
-    images_error: null,
-    cuts: proj.cuts.map((c) => ({ ...c, state: "pending" })),
-  }));
+  // 시작 시각을 여기서 찍는다 — 첫 컷이 끝나기 전에 함수가 얼면 progress 가 아예 없어
+  // "멈췄다"를 판정할 근거가 없다(컷마다 찍는 심장박동은 첫 컷이 끝나야 처음 뛴다).
+  //
+  // ★ 표식은 손으로 짓지 않고 withProgress 로 만든다. done 을 0 으로 박으면 이미 끝난 컷이
+  //   있는 자리에서 **일어난 적 없는 뒷걸음**을 기록하게 되고(/clips 의 "남은 N개 만들기"),
+  //   표식의 모양을 만드는 곳이 둘이 되면 언젠가 조용히 어긋난다 — 끝남 판정을
+  //   lib/progress.js 한 벌로 모은 것과 같은 이유다.
+  // ★ 시각은 락 밖에서 잰다 — updateProject 는 CAS 에 지면 같은 patchFn 을 다시 부른다
+  //   (lib/projects.js). patchFn 안에서 Date.now() 를 부르면 시도마다 값이 달라진다.
+  const startedAt = Date.now();
+  await updateProject(id, user.id, (proj) =>
+    withProgress(
+      {
+        ...proj,
+        images_error: null,
+        cuts: proj.cuts.map((c) => ({ ...c, state: "pending" })),
+      },
+      "images",
+      startedAt
+    )
+  );
 
   // 비동기 시작 — 완료를 기다리지 않고 폴링으로 확인 (컷 파이프라인과 같은 방식)
   runImagesPipeline(id, user.id).catch(async (e) => {

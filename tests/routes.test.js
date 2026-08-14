@@ -35,7 +35,10 @@ const pipelineMock = vi.hoisted(() => ({
 }));
 // 자막 재굽기는 따로 센다 — 라우트가 **어느** 파이프라인을 불렀는지 구별해야 한다
 const subtitleMock = vi.hoisted(() => ({ run: vi.fn(async () => ({})) }));
-vi.mock("../lib/pipeline.js", () => ({
+// withProgress 는 **진짜를 쓴다** — 라우트가 시작 표식을 이것으로 짓는다(lib/pipeline.js).
+// 여기서 흉내를 내면 표식의 모양이 두 벌이 되어 조용히 어긋난다.
+vi.mock("../lib/pipeline.js", async (importOriginal) => ({
+  withProgress: (await importOriginal()).withProgress,
   runSplitPipeline: (...a) => pipelineMock.run(...a),
   runImagesPipeline: (...a) => pipelineMock.run(...a),
   runVoicePipeline: (...a) => pipelineMock.run(...a),
