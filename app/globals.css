@@ -677,6 +677,24 @@ a.side-item { text-decoration: none; }
    덮는다(그 클래스 자체는 대본·구성·브리핑이 함께 써서 건드리면 안 된다). */
 .panel--stage { width: fit-content; max-width: 960px; }
 .panel--wide { max-width: 880px; }
+/* 보관함 상세 — 정보가 많은 화면이라 넓게 쓴다(2026-08-14 사용자 요청).
+   ★ panel--stage(960)를 늘리지 않는다 — 그것은 ⑥완성 무대의 폭이고, 그 폭은 조절판+영상의
+     합이 정한다(늘리면 그 화면이 함께 어긋난다). 본문 기둥(main.work 1160)은 안 넘는다. */
+.panel--library { width: 100%; max-width: 1160px; }
+/* 접었다 펴는 자리 — 긴 글(시나리오·원고·컷 목록)이 여기 들어간다 */
+.lib-fold { border-top: 1px solid var(--line); padding: 12px 0; }
+.lib-fold > summary {
+  cursor: pointer;
+  /* 눈금은 12·14·16·18·28 뿐이다(tests/design-system.test.js). 누르는 자리라 14 를 쓴다 */
+  font-size: 14px;
+  color: var(--ink-soft);
+  list-style: none;
+}
+.lib-fold > summary::-webkit-details-marker { display: none; }
+.lib-fold > summary::before { content: "▸ "; color: var(--ink-faint); }
+.lib-fold[open] > summary::before { content: "▾ "; }
+.lib-fold > summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.lib-fold > *:not(summary) { margin-top: 10px; }
 
 .eyebrow {
   font-size: 14px;

@@ -118,6 +118,33 @@ export default function CreatePage() {
 
           {/* 고른 것들은 늘 펼쳐 둔다 — 접으면 무엇이 골라져 있는지 보려고 한 번 더 눌러야 한다 */}
           <div className="composer-tray">
+            {/* 영상 모델 — 움직임을 만드는 방식이자 **정가를 정하는 값**이다. 만든 뒤에는
+                못 바꾸므로(모델이 값을 정하고 그 값은 ③④에서 걷힌다) 여기가 유일한 자리다.
+                이름·설명·값은 화면이 적지 않는다 — lib/clip-limits 의 표와 가격표에서 온다. */}
+            <div className="tray-row">
+              <span className="tray-label">영상 모델</span>
+              <div className="tray-col">
+                <div className="chips">
+                  {I2V_MODELS.map((m) => (
+                    <button key={m.id} className={`chip${model === m.id ? " on" : ""}`}
+                      onClick={() => setModel(m.id)}>
+                      {/* ★ 화질은 여기서 안 고른다 — 프로젝트가 생긴 뒤 ②대본에서 고른다.
+                          그래서 값은 **기본 화질** 기준이고, 그것을 인자로 명시한다
+                          (비우면 다음 사람이 "해상도를 안 보는 자리"로 읽는다). */}
+                      {m.label}{showCredits && ` · ${videoPrice(seconds, m.id, DEFAULT_RESOLUTION)} 크레딧`}
+                    </button>
+                  ))}
+                </div>
+                {/* ★ 값은 **기본 화질** 기준이다 — ②대본에서 더 높은 화질을 고르면 올라간다.
+                    화질을 안 고르는 모델(Kling·LTX)에는 그 말을 안 붙인다: 여기 없는 선택을
+                    있는 것처럼 말하는 것이 "고를 수 있는 척"과 같은 잘못이다. */}
+                <div className="tray-note">
+                  {I2V_MODELS.find((m) => m.id === model)?.hint} · 만든 뒤에는 바꿀 수 없어요
+                  {resolutionsForModel(model).length > 0 && " · 화질에 따라서도 달라져요"}
+                </div>
+              </div>
+            </div>
+
             <div className="tray-row">
               <span className="tray-label">길이</span>
               <div className="tray-col">
@@ -148,32 +175,6 @@ export default function CreatePage() {
               </div>
             </div>
 
-            {/* 영상 모델 — 움직임을 만드는 방식이자 **정가를 정하는 값**이다. 만든 뒤에는
-                못 바꾸므로(모델이 값을 정하고 그 값은 ③④에서 걷힌다) 여기가 유일한 자리다.
-                이름·설명·값은 화면이 적지 않는다 — lib/clip-limits 의 표와 가격표에서 온다. */}
-            <div className="tray-row">
-              <span className="tray-label">영상 모델</span>
-              <div className="tray-col">
-                <div className="chips">
-                  {I2V_MODELS.map((m) => (
-                    <button key={m.id} className={`chip${model === m.id ? " on" : ""}`}
-                      onClick={() => setModel(m.id)}>
-                      {/* ★ 화질은 여기서 안 고른다 — 프로젝트가 생긴 뒤 ②대본에서 고른다.
-                          그래서 값은 **기본 화질** 기준이고, 그것을 인자로 명시한다
-                          (비우면 다음 사람이 "해상도를 안 보는 자리"로 읽는다). */}
-                      {m.label}{showCredits && ` · ${videoPrice(seconds, m.id, DEFAULT_RESOLUTION)} 크레딧`}
-                    </button>
-                  ))}
-                </div>
-                {/* ★ 값은 **기본 화질** 기준이다 — ②대본에서 더 높은 화질을 고르면 올라간다.
-                    화질을 안 고르는 모델(Kling·LTX)에는 그 말을 안 붙인다: 여기 없는 선택을
-                    있는 것처럼 말하는 것이 "고를 수 있는 척"과 같은 잘못이다. */}
-                <div className="tray-note">
-                  {I2V_MODELS.find((m) => m.id === model)?.hint} · 만든 뒤에는 바꿀 수 없어요
-                  {resolutionsForModel(model).length > 0 && " · 화질에 따라서도 달라져요"}
-                </div>
-              </div>
-            </div>
 
             <div className="tray-row">
               <span className="tray-label">컨셉</span>

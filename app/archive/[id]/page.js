@@ -80,7 +80,7 @@ export default function ArchiveDetailPage() {
       <h1 className="pgtitle">{isAd ? "광고 영상" : "영상 만들기 (단계별)"}</h1>
       <p className="pgsub">이 영상이 어떻게 만들어졌는지 볼 수 있어요.</p>
 
-      <section className="panel panel--stage">
+      <section className="panel panel--library">
         <div className="done-stage">
           <div className="sub-eyebrow">만든 정보</div>
 
@@ -100,26 +100,29 @@ export default function ArchiveDetailPage() {
               <Row label="비율">{s.aspect_ratio || null}</Row>
               <Row label="화풍">{s.style?.preset || s.style || null}</Row>
 
-              {/* 영상을 만든 글 — 광고는 시나리오 지시문 하나, 단계별은 원고와 컷이다.
-                  이게 이 화면의 핵심이다: 무엇을 넣었더니 이런 영상이 나왔는지가 여기서 보인다. */}
-              {isAd && doc.scenario?.text && (
-                <Row label="시나리오(영상 모델에 넘긴 글)">
-                  <span className="script-src">{doc.scenario.text}</span>
-                </Row>
-              )}
-              {!isAd && doc.script?.text && (
-                <Row label="원고(낭독한 글)">
-                  <span className="script-src">{doc.script.text}</span>
-                </Row>
-              )}
             </div>
+
+            {/* 영상을 만든 글 — 광고는 시나리오 지시문 하나, 단계별은 원고다.
+                ★ **접어 둔다.** 시나리오는 4,000자까지라 펼쳐 두면 위의 짧은 정보(모델·길이)가
+                  저 아래로 밀린다. <details> 를 쓰는 이유: 키보드·스크린리더 동작이 이미
+                  붙어 있다 — useState 로 흉내 내면 그것을 직접 만들어야 하고 대개 빠뜨린다. */}
+            {isAd && doc.scenario?.text && (
+              <details className="lib-fold">
+                <summary>시나리오 — 영상 모델에 넘긴 글</summary>
+                <p className="script-src">{doc.scenario.text}</p>
+              </details>
+            )}
+            {!isAd && doc.script?.text && (
+              <details className="lib-fold">
+                <summary>원고 — 낭독한 글</summary>
+                <p className="script-src">{doc.script.text}</p>
+              </details>
+            )}
 
             {/* 장면·컷 — 광고는 shots, 단계별은 cuts. 이름만 다르고 사장님이 보는 것은 같다. */}
             {(isAd ? doc.scenario?.shots : doc.cuts)?.length > 0 && (
-              <>
-                <div className="eyebrow mt-lg">
-                  장면 {(isAd ? doc.scenario.shots : doc.cuts).length}개
-                </div>
+              <details className="lib-fold">
+                <summary>장면 {(isAd ? doc.scenario.shots : doc.cuts).length}개 — 컷별 지시</summary>
                 <div className="plan-list">
                   {(isAd ? doc.scenario.shots : doc.cuts).map((c, i) => (
                     <div className="plan-row" key={i}>
@@ -143,7 +146,7 @@ export default function ArchiveDetailPage() {
                     </div>
                   ))}
                 </div>
-              </>
+              </details>
             )}
           </div>
 
