@@ -13,6 +13,7 @@ const OWNER = "33333333-3333-3333-3333-333333333333";
 import { getStore } from "../lib/store/index.js";
 import { chargeVideo } from "../lib/charges.js";
 import { isAudioStale, isImageStale, isClipStale, isRenderStale, renderKey } from "../lib/steps.js";
+import { isSubtitleStale } from "../lib/translate.js";
 
 // 시작 게이트가 붙은 뒤로, 영상 정가(30초 = 50 크레딧)가 없는 사용자는 유료 시작 라우트에서 402 다.
 // 이 파일이 재는 것은 각 라우트의 가드·배선이므로, 유료 시작을 부르는 테스트는 충전해 두고
@@ -905,6 +906,62 @@ describe("무효화 관통 — 고치면 낡고, 안 고친 것은 살아남는�
     expect(isRenderStale(await getProject(p.id, OWNER))).toBe(false);
     await PATCH(patchReq({ cut: { idx: 0, sentence: "고친 문장." } }), ctx(p.id));
     expect(isRenderStale(await getProject(p.id, OWNER))).toBe(true);
+  });
+});
+
+// ⑥완성 화면에서 사장님이 번역을 눌러서 손으로 고친다(Task 6). 대본 화면의 문장 손보기와
+// 같은 길(PATCH cut)을 쓰되, 자막은 언어별로 여러 벌이라 sentence/shows/motion 과 같은
+// 자리에 못 담는다 — subtitleLang·subtitleText 로 어느 언어의 무엇을 고쳤는지 함께 싣는다.
+describe("PATCH /api/projects/[id] — 컷 자막 번역을 손으로 고친다", () => {
+  async function projectWithTranslatedCut() {
+    const p = await createProject({ ownerId: OWNER, settings: { subtitle_lang: "ja" }, material: { text: "자료", photos: [] } });
+    return updateProject(p.id, OWNER, (proj) => ({
+      ...proj,
+      status: "cuts",
+      cuts: [
+        { idx: 0, sentence: "문장", subtitles: { ja: { text: "文", of: "문장" } } },
+        { idx: 1, sentence: "다른 문장", subtitles: { zh: { text: "别的句子", of: "다른 문장" } } },
+      ],
+    }));
+  }
+
+  // ★ of 를 지금 문장으로 다시 찍지 않으면 isSubtitleStale(lib/translate.js) 이 방금 손으로
+  // 고친 번역을 여전히 낡음으로 잡아, 사장님이 고친 것을 굽는 순간 모델이 다시 덮어쓴다.
+  it("고친 번역을 저장하고 of 를 지금 문장으로 다시 찍는다", async () => {
+    const p = await projectWithTranslatedCut();
+    const res = await PATCH(patchReq({ cut: { idx: 0, subtitleLang: "ja", subtitleText: "손으로 고친 번역" } }), ctx(p.id));
+    expect(res.status).toBe(200);
+    const saved = await getProject(p.id, OWNER);
+    expect(saved.cuts[0].subtitles.ja).toEqual({ text: "손으로 고친 번역", of: "문장" });
+    expect(isSubtitleStale(saved.cuts[0], "ja")).toBe(false);
+  });
+
+  it("다른 언어·다른 컷의 번역은 건드리지 않는다", async () => {
+    const p = await projectWithTranslatedCut();
+    await PATCH(patchReq({ cut: { idx: 0, subtitleLang: "ja", subtitleText: "손으로 고친 번역" } }), ctx(p.id));
+    const saved = await getProject(p.id, OWNER);
+    expect(saved.cuts[1].subtitles.zh).toEqual({ text: "别的句子", of: "다른 문장" });
+  });
+
+  it("한국어는 번역이 아니다 — subtitles.ko 를 만들지 않는다", async () => {
+    const p = await projectWithTranslatedCut();
+    await PATCH(patchReq({ cut: { idx: 0, subtitleLang: "ko", subtitleText: "손댐" } }), ctx(p.id));
+    const saved = await getProject(p.id, OWNER);
+    expect(saved.cuts[0].subtitles?.ko).toBeUndefined();
+  });
+
+  it("모르는 언어는 무시한다", async () => {
+    const p = await projectWithTranslatedCut();
+    await PATCH(patchReq({ cut: { idx: 0, subtitleLang: "fr", subtitleText: "x" } }), ctx(p.id));
+    const saved = await getProject(p.id, OWNER);
+    expect(saved.cuts[0].subtitles?.fr).toBeUndefined();
+  });
+
+  it("빈 문자열은 저장하지 않는다 — 지우려던 것이 아니라 실수로 지운 것일 수 있다", async () => {
+    const p = await projectWithTranslatedCut();
+    await PATCH(patchReq({ cut: { idx: 0, subtitleLang: "ja", subtitleText: "   " } }), ctx(p.id));
+    const saved = await getProject(p.id, OWNER);
+    expect(saved.cuts[0].subtitles.ja.text).toBe("文"); // 안 바뀜
   });
 });
 

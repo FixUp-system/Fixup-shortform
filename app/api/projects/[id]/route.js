@@ -10,6 +10,7 @@ import { getStore } from "../../../../lib/store/index.js";
 import { alreadyChargedVideo } from "../../../../lib/charges.js";
 import { TARGET_CHOICES } from "../../../../lib/script";
 import { SUBTITLE_POSITIONS, normalizeSubtitle } from "../../../../lib/subtitles.js";
+import { isSubtitleLang } from "../../../../lib/subtitle-langs.js";
 
 // 결제 뒤 화질 잠금이 **락 안에서** 걸렸다는 표식.
 //
@@ -260,6 +261,20 @@ export const PATCH = withUser(async (req, { params }, user) => {
         // 속도는 닫힌 목록이라 위 문자열 검사와 따로 본다 — 아무 낱말이나 들어가면
         // 클립 프롬프트에 모르는 값이 실리고, 대비 판정도 거짓이 된다.
         if (isSpeed(body.cut.speed)) patch.speed = body.cut.speed;
+        // 번역 손보기(⑥완성 화면) — 사장님이 눌러서 고친 자막 번역. 한국어는 원문이 곧
+        // 자막이라 대상이 아니다(lib/translate.js isSubtitleStale 도 같은 전제).
+        // ★ of 를 **지금 문장**으로 다시 찍는다 — 안 그러면 isSubtitleStale 이 방금 고친
+        // 번역을 여전히 낡음으로 잡아, 다음에 자막을 구울 때 모델이 손으로 고친 것을 덮어쓴다.
+        const currentCut = proj.cuts.find((c) => c.idx === body.cut.idx);
+        if (
+          isSubtitleLang(body.cut.subtitleLang) && body.cut.subtitleLang !== "ko" &&
+          typeof body.cut.subtitleText === "string" && body.cut.subtitleText.trim() && currentCut
+        ) {
+          patch.subtitles = {
+            ...currentCut.subtitles,
+            [body.cut.subtitleLang]: { text: body.cut.subtitleText.trim(), of: currentCut.sentence },
+          };
+        }
         if (Object.keys(patch).length) {
           next.cuts = proj.cuts.map((c) => (c.idx === body.cut.idx ? { ...c, ...patch } : c));
           // 문장을 고쳤으면 원고도 함께 따라온다.

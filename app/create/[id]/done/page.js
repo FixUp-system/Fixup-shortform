@@ -17,12 +17,15 @@ import {
   outlineFor,
   rimFor,
   buildCues,
+  subtitleTextFor,
   subtitleStyle,
   posFromLegacyPosition,
   SUBTITLE_LINE_HEIGHT,
 } from "../../../../lib/subtitles";
 import { aspectFor } from "../../../../lib/aspects";
 import { isRenderStale, isClipStale, isImageStale, isSubtitleOnlyStale } from "../../../../lib/steps";
+import { SUBTITLE_LANGS, DEFAULT_SUBTITLE_LANG } from "../../../../lib/subtitle-langs";
+import { isSubtitleStale } from "../../../../lib/translate";
 
 // 옛 프로젝트가 쥔 자막 위치(위·중간·아래)를 자유 위치 비율로 옮기는 일은 lib 이 한다
 // (posFromLegacyPosition). 정렬 기준마다 marginV 의 뜻이 달라 글자 블록 높이까지 봐야 하는데,
@@ -262,6 +265,50 @@ export default function DoneStepPage() {
     startPolling();
   }
 
+  // 자막 언어 — 화면이 앞서가지 않는다. 켜진 칩은 **서버가 저장한 값**에서만 나온다.
+  // 낙관적으로 먼저 켜 두면, 라우트가 번역을 못 쓰는 답을 받아 저장을 접었을 때(502)
+  // 화면은 이미 "일본어"를 켠 채라 사장님이 안 바뀐 것을 바뀐 것으로 믿는다.
+  const [langErr, setLangErr] = useState("");
+  const [langBusy, setLangBusy] = useState(false);
+  const lang = project?.settings?.subtitle_lang || DEFAULT_SUBTITLE_LANG;
+
+  // 언어를 고르거나(첫 인자) 낡은 컷을 [다시 번역]할 때(같은 언어를 다시 부른다) 쓴다 —
+  // 라우트가 낡은 컷만 골라 다시 옮기므로 재호출이 곧 "다시 번역"이다.
+  async function pickLang(langId) {
+    if (langBusy) return;
+    setLangBusy(true);
+    setLangErr("");
+    try {
+      const res = await fetch(`/api/projects/${id}/subtitle-lang`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lang: langId }),
+      });
+      if (!res.ok) {
+        throw new Error((await res.json().catch(() => ({}))).error || "번역이 안 돼서 언어를 저장하지 못했어요");
+      }
+      await load(id).catch(() => {});
+    } catch (e) {
+      setLangErr(e.message || "언어를 저장하지 못했어요 — 자막 언어는 그대로예요");
+    } finally {
+      setLangBusy(false);
+    }
+  }
+
+  // 번역 손보기 — ②대본 화면의 contentEditable 방식 그대로다(새 편집 UI를 만들지 않는다).
+  // 라우트가 저장하며 of 를 지금 문장으로 다시 찍어 isSubtitleStale 이 손으로 고친
+  // 번역을 낡음으로 잡지 않게 한다.
+  async function saveTranslation(idx, text) {
+    const res = await fetch(`/api/projects/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cut: { idx, subtitleLang: lang, subtitleText: text } }),
+    }).catch(() => null);
+    if (!res || !res.ok) { setLangErr("번역을 저장하지 못했어요"); return; }
+    setLangErr("");
+    await load(id).catch(() => {});
+  }
+
   const cuts = project?.cuts || [];
   const render = project?.render;
   const clipCount = cuts.filter((c) => c.video?.url).length;
@@ -327,10 +374,14 @@ export default function DoneStepPage() {
   // ★ 문장을 통째로 흘리면 상자 폭에 따라 여섯 줄이 되는데 완성본은 두 줄이다. pos 가 글자
   // 블록의 아랫변 기준이라 줄 수가 다르면 자막이 차지하는 자리가 통째로 달라지고, 낱말도
   // 아무 데서나 잘린다("하/이톱"). 나누는 규칙은 lib 하나여야 한다.
+  // ★ 언어를 싣는다 — 안 실으면 사장님은 한국어 원문을 검토하는데 구워지는 것은
+  // 일본어·중국어라 검토와 결과가 갈린다(리뷰가 잡은 결함). buildCues 안의
+  // subtitleTextFor 가 번역이 없거나 낡았으면 한국어로 떨어지므로, 번역이 아직
+  // 안 된 컷도 빈칸이 아니라 원문으로 뜬다.
   const sampleCut = cuts.find((c) => (c.sentence || "").trim());
   const sampleText = (box.height && sampleCut
-    ? buildCues([sampleCut], { width: box.width, height: box.height, subtitle: sub })[0]?.text
-    : sampleCut?.sentence) || "자막 미리보기";
+    ? buildCues([sampleCut], { width: box.width, height: box.height, subtitle: sub, lang })[0]?.text
+    : sampleCut && subtitleTextFor(sampleCut, lang)) || "자막 미리보기";
   const font = SUBTITLE_FONTS.find((f) => f.id === sub.font) || SUBTITLE_FONTS[0];
   // ★ 완성본과 **같은 함수**로 잰다. 여기서 따로 곱하면 미리보기와 최종이 갈린다.
   const previewFontSize = box.height
@@ -449,6 +500,25 @@ export default function DoneStepPage() {
                   라벨 없이 두 줄로 붙어 있어, 어느 줄이 무엇을 고르는 줄인지 알 수 없었다. */}
               <div className="subpanel">
                 <div className="sub-row">
+                  <span className="sub-label">언어</span>
+                  {/* 켜진 칩은 project.settings.subtitle_lang(서버가 저장한 값)에서만 나온다 —
+                      고르는 순간 낙관적으로 켜면, 라우트가 번역을 못 써 저장을 접었을 때(502)
+                      화면만 바뀐 채로 남는다. */}
+                  <div className="chips">
+                    {SUBTITLE_LANGS.map((l) => (
+                      <button
+                        key={l.id}
+                        className={`chip${lang === l.id ? " on" : ""}`}
+                        disabled={langBusy || applying}
+                        onClick={() => pickLang(l.id)}
+                      >
+                        {l.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {langErr && <p className="pgsub warn">{langErr}</p>}
+                <div className="sub-row">
                   <span className="sub-label">위치</span>
                   {/* 고른 값은 pos 에서 거꾸로 판정한다 — 끌어서 옮기면 어느 자리와도 안 맞으므로
                       "직접 옮김"으로 떨어진다(그때 목록을 비우면 화면이 거짓말을 한다). */}
@@ -470,30 +540,38 @@ export default function DoneStepPage() {
                     </select>
                   </div>
                 </div>
-                <div className="sub-row">
-                  <span className="sub-label">글꼴</span>
-                  {/* ★ 고른 글꼴을 **그 글꼴로** 보여 준다 — 이름만 보고 고르면 "부드럽게"가 어떤
-                      글씨인지 모른 채 고르게 된다. 이름(label)·글꼴 이름(cssFamily) 둘 다 lib 에서
-                      온다. 브라우저용 이름이라야 한다(ffmpeg 의 family 가 아니다).
-                      목록 안 글자까지 그 글꼴로 그릴지는 브라우저가 정한다 — 못 그려도 닫힌
-                      상태에서는 늘 제 글꼴로 보이므로 고르는 근거가 사라지지 않는다. */}
-                  <div className="sub-select-wrap">
-                    <select
-                      className="sub-select face"
-                      aria-label="자막 글꼴"
-                      style={{ fontFamily: font.cssFamily }}
-                      value={sub.font}
-                      disabled={applying}
-                      onChange={(e) => setSub((s) => ({ ...s, font: e.target.value }))}
-                    >
-                      {SUBTITLE_FONTS.map((f) => (
-                        <option key={f.id} value={f.id} style={{ fontFamily: f.cssFamily }}>
-                          {f.label}
-                        </option>
-                      ))}
-                    </select>
+                {lang === "ko" ? (
+                  <div className="sub-row">
+                    <span className="sub-label">글꼴</span>
+                    {/* ★ 고른 글꼴을 **그 글꼴로** 보여 준다 — 이름만 보고 고르면 "부드럽게"가 어떤
+                        글씨인지 모른 채 고르게 된다. 이름(label)·글꼴 이름(cssFamily) 둘 다 lib 에서
+                        온다. 브라우저용 이름이라야 한다(ffmpeg 의 family 가 아니다).
+                        목록 안 글자까지 그 글꼴로 그릴지는 브라우저가 정한다 — 못 그려도 닫힌
+                        상태에서는 늘 제 글꼴로 보이므로 고르는 근거가 사라지지 않는다. */}
+                    <div className="sub-select-wrap">
+                      <select
+                        className="sub-select face"
+                        aria-label="자막 글꼴"
+                        style={{ fontFamily: font.cssFamily }}
+                        value={sub.font}
+                        disabled={applying}
+                        onChange={(e) => setSub((s) => ({ ...s, font: e.target.value }))}
+                      >
+                        {SUBTITLE_FONTS.map((f) => (
+                          <option key={f.id} value={f.id} style={{ fontFamily: f.cssFamily }}>
+                            {f.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  // 말없이 사라지면 고장으로 보인다 — 이유를 한 줄 남긴다. 일본어·중국어는
+                  // 폰트가 한 벌뿐이라(lib/subtitle-langs.js) 기본·강조·부드럽게를 고를 게 없다.
+                  <p className="hint">
+                    {SUBTITLE_LANGS.find((l) => l.id === lang)?.label}는 폰트가 한 벌이라 글꼴 칩을 감췄어요
+                  </p>
+                )}
                 <div className="sub-row">
                   <span className="sub-label">색</span>
                   {/* 테두리 색은 사장님이 고르는 것이 아니다 — 미리보기가 이미 보여 주므로
@@ -544,6 +622,48 @@ export default function DoneStepPage() {
                   </button>
                 </div>
               </div>
+              {/* 번역 검토 — 한국어에서는 자막이 곧 원문이라 검토할 것이 없다.
+                  ②대본 화면의 문장 손보기와 같은 방식(contentEditable + onBlur)을 그대로
+                  쓴다 — 새 편집 UI를 만들지 않는다. */}
+              {lang !== "ko" && (
+                <div className="plan-list sub-translations">
+                  <div className="eyebrow">번역 검토 <small>눌러서 고쳐요 — 고치면 지금 원문 기준으로 다시 낡지 않아요</small></div>
+                  {cuts.filter((c) => !c.silent).map((c) => {
+                    const stale = isSubtitleStale(c, lang);
+                    const translated = c.subtitles?.[lang]?.text || "";
+                    return (
+                      <div className="plan-row" key={c.idx}>
+                        <span className="num">{c.idx + 1}</span>
+                        <div className="plan-body">
+                          <div className="preview-sentence">“{c.sentence}”</div>
+                          <div className="plan-field">
+                            <b>번역</b>
+                            <span
+                              contentEditable
+                              suppressContentEditableWarning
+                              className="editable"
+                              onBlur={(e) => {
+                                const v = e.currentTarget.textContent.trim();
+                                if (v && v !== translated) saveTranslation(c.idx, v);
+                              }}
+                            >
+                              {translated || "(아직 번역이 없어요)"}
+                            </span>
+                          </div>
+                          {stale && (
+                            <div className="badges">
+                              <span className="badge warn">번역이 낡았어요</span>
+                              <button className="mini" disabled={langBusy} onClick={() => pickLang(lang)}>
+                                다시 번역
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
               </div>
           )}
           {/* ★ 자막 없는 원본을 재생하고 그 위에 브라우저가 자막을 그린다 — 구워진 자막 위에
