@@ -57,9 +57,15 @@ describe("자막을 절 경계에서 고르게 나눈다", () => {
     for (const p of pieces) expect(textUnits(p.trim())).toBeLessThanOrEqual(MAX);
   });
 
-  it("낱말 하나가 두 줄을 넘으면 그대로 둔다 — 글자 중간에서 자르지 않는다", () => {
+  // ★ 2026-08-14 갱신: 어절 경계가 없으면(공백 없는 언어) 이제 글자 단위로 나눈다.
+  //   옛 기대(통째로 반환)는 중국어처럼 공백이 아예 없는 문장을 화면 밖으로 넘기는
+  //   버그였다 — task-2-brief.md 참고. 원문 보존과 두 줄 규칙은 여전히 지킨다.
+  it("낱말 하나가 두 줄을 넘으면 글자 단위로 나눈다 — 원문은 잃지 않는다", () => {
     const s = "가".repeat(40);
-    expect(splitSubtitleText(s, MAX)).toEqual([s]);
+    const pieces = splitSubtitleText(s, MAX);
+    expect(pieces.join("")).toBe(s);
+    expect(pieces.length).toBeGreaterThan(1);
+    for (const p of pieces) expect(textUnits(p.trim())).toBeLessThanOrEqual(MAX);
   });
 
   // 손으로 지어낸 동거리 사례다 — 실제 소재 문장에서 부동소수점이 정확히 같은 자리로
@@ -409,9 +415,13 @@ describe("splitSubtitleText — 두 줄을 넘으면 나눈다", () => {
     expect(splitSubtitleText(s, MAX).join("")).toBe(s);
   });
 
-  it("어절 경계가 없는 덩어리는 한계를 넘어도 그대로 둔다 — 글자 중간을 자르지 않는다", () => {
+  // ★ 2026-08-14 갱신: packWords 도 어절 경계가 없으면 글자 단위로 떨어진다(위와 같은 이유).
+  it("어절 경계가 없는 덩어리는 글자 단위로 나눈다 — 원문은 잃지 않는다", () => {
     const s = "아주아주아주긴한덩어리로이어져서끊을자리가전혀없는말입니다";
-    expect(splitSubtitleText(s, MAX)).toEqual([s]);
+    const pieces = splitSubtitleText(s, MAX);
+    expect(pieces.join("")).toBe(s);
+    expect(pieces.length).toBeGreaterThan(1);
+    for (const p of pieces) expect(textUnits(p.trim())).toBeLessThanOrEqual(MAX);
   });
 
   it("빈 글은 빈 배열", () => {
@@ -447,9 +457,13 @@ describe("breakTwoLines — 줄바꿈을 코드가 넣는다", () => {
     expect(Math.abs(a - b)).toBeLessThan(LINE);
   });
 
-  it("낱말이 하나면 넘쳐도 자르지 않는다", () => {
+  // ★ 2026-08-14 갱신: 어절 경계가 없으면(공백 없는 언어) 글자 사이에서 가른다 —
+  //   그래야 중국어·일본어 자막도 두 줄로 접힌다. task-2-brief.md 참고.
+  it("낱말이 하나면 글자 사이에서 나눈다 — 원문은 잃지 않는다", () => {
     const s = "아주아주아주긴한덩어리로이어져서";
-    expect(breakTwoLines(s, LINE)).toBe(s);
+    const out = breakTwoLines(s, LINE);
+    expect(out).toContain("\n");
+    expect(out.replace("\n", "")).toBe(s);
   });
 });
 
@@ -828,5 +842,46 @@ describe("테두리는 글자를 따라간다 — 어떤 배경에서도 읽히�
       .split(/\r?\n/).find((l) => l.startsWith("Style: Main,"));
     const f = line.slice("Style: ".length).split(",");
     expect([Number(f[8]), Number(f[9])]).toEqual([3, 0]);
+  });
+});
+
+describe("공백 없는 언어의 폭과 줄바꿈", () => {
+  // ★ WIDE 에 가나가 빠져 있었다(2026-08-14). 반각으로 세면 일본어가 계산보다 넓어져 넘친다.
+  it("가나를 전각으로 센다", () => {
+    expect(textUnits("あ")).toBe(1.0);
+    expect(textUnits("ア")).toBe(1.0);
+    expect(textUnits("漢")).toBe(1.0); // 한자는 원래 됐다 — 회귀 확인
+    expect(textUnits("A")).toBe(0.5);  // 라틴은 그대로
+  });
+
+  // ★ 중국어는 공백이 없어 토큰이 늘 1개다 → 옛 코드는 통째로 반환해 화면을 넘겼다
+  it("공백 없는 문장도 두 줄로 나눈다", () => {
+    const zh = "这款跑车的设计线条非常流畅而且动力强劲令人印象深刻";
+    const out = breakTwoLines(zh, 10);
+    expect(out).toContain("\n");
+    const [a, b] = out.split("\n");
+    expect(a.length).toBeGreaterThan(0);
+    expect(b.length).toBeGreaterThan(0);
+    expect(a + b).toBe(zh); // 글자를 잃지 않는다
+  });
+
+  it("일본어도 나눈다", () => {
+    const ja = "このスポーツカーはとても速くてデザインも美しいです";
+    const out = breakTwoLines(ja, 10);
+    expect(out).toContain("\n");
+    expect(out.replace("\n", "")).toBe(ja);
+  });
+
+  // 회귀 0 — 한국어는 지금 그대로 공백에서 나뉜다
+  it("한국어는 지금처럼 공백에서 나눈다", () => {
+    const ko = "이 스포츠카는 빠르고 역동적인 디자인으로 자유를 줍니다";
+    const out = breakTwoLines(ko, 10);
+    expect(out).toContain("\n");
+    for (const line of out.split("\n")) expect(line.startsWith(" ")).toBe(false);
+  });
+
+  it("나눌 만큼 길지 않으면 그대로 둔다", () => {
+    expect(breakTwoLines("짧다", 10)).toBe("짧다");
+    expect(breakTwoLines("短", 10)).toBe("短");
   });
 });
