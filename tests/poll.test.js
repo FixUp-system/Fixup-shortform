@@ -44,6 +44,28 @@ describe("폴링 한 벌", () => {
     expect(t.alive()).toBe(false);
   });
 
+  // ★ 지뢰 하나를 여기서 막는다. 예전에는 `if (onTick(data))` 였다 — 기다리지 않았다.
+  //   그래서 onTick 을 async 로 쓰면 Promise 가 돌아오고, Promise 는 **언제나 참**이라
+  //   첫 회차에 아무 말 없이 폴링이 끝났다. 아무것도 안 끝났는데.
+  //   실제로 필요해졌다: 컷 분할 대기 루프가 "전체를 받아온 뒤에" 끝내야 한다.
+  it("onTick 이 async 로 false 를 주면 안 멈춘다 — Promise 는 참이다", async () => {
+    const t = fakeTimers();
+    const onStop = vi.fn();
+    startPolling({ url: "/x", fetchImpl: ok({}), onTick: async () => false, onStop, ...t });
+    await t.run();
+    expect(onStop).not.toHaveBeenCalled();
+    expect(t.alive()).toBe(true);
+  });
+
+  it("onTick 이 async 로 true 를 주면 멈춘다", async () => {
+    const t = fakeTimers();
+    const onStop = vi.fn();
+    startPolling({ url: "/x", fetchImpl: ok({}), onTick: async () => true, onStop, ...t });
+    await t.run();
+    expect(onStop).toHaveBeenCalledWith({ timedOut: false });
+    expect(t.alive()).toBe(false);
+  });
+
   it("연속 실패가 상한에 닿으면 시간초과로 멈춘다", async () => {
     const t = fakeTimers();
     const onStop = vi.fn();

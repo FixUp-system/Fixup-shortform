@@ -93,10 +93,16 @@ export default function ScriptStepPage() {
       //    화면이 조용히 멈춘 채 영영 안 갱신된다(알릴 onStop 도 없다).
       timeoutMs: Infinity,
       maxFailures: Infinity,
-      onTick: (st) => {
-        // 컷이 생겼거나 실패로 끝났으면 그때 전체를 받고 두드리기를 멈춘다
-        if (st.cut_count > 0 || st.cuts_error) { load(id).catch(() => {}); return true; }
-        return false;
+      // 컷이 생겼거나 실패로 끝났으면 그때 전체를 받고 두드리기를 멈춘다.
+      //
+      // ★ 통짜를 **실제로 받아온 뒤에만** 끝낸다. 받아오기가 거절당했는데(네트워크 한 번
+      //    끊김 — ProjectContext 는 non-ok 에 거절한다) 그 회차에 끝내 버리면 project 가
+      //    그대로라 splitting 도 그대로고, effect deps 도 안 바뀌고, 재시작 가드
+      //    (`if (splitPollRef.current) return`)까지 막는다 — 화면이 "나누는 중이에요"에서
+      //    영영 안 움직인다. 거절하면 false 를 돌려 다음 주기가 다시 받아 온다.
+      onTick: async (st) => {
+        if (!(st.cut_count > 0 || st.cuts_error)) return false;
+        try { await load(id); return true; } catch { return false; }
       },
     });
     return () => { splitPollRef.current?.(); splitPollRef.current = null; };

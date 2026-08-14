@@ -13,6 +13,15 @@ const done = readFileSync("app/create/[id]/done/page.js", "utf8");
 
 const SCREENS = [["③목소리", voice], ["②대본", script], ["⑥완성", done]];
 
+// 컷 분할 대기 루프 한 토막만 잘라낸다. 주소로 닻을 내리는 이유: ③목소리에는 루프가
+// 둘이고(본 루프는 `/voice/status`), 파일 전체를 재면 어느 루프의 옵션인지 못 가른다.
+const SPLIT_WAIT_URL = "`/api/projects/${id}/status`";
+function splitWaitBlock(src, name) {
+  const at = src.indexOf(SPLIT_WAIT_URL);
+  if (at < 0) throw new Error(`${name} 에서 컷 분할 대기 루프를 못 찾겠다`);
+  return src.slice(at, at + 900);
+}
+
 describe("남은 화면 — 폴링 한 벌", () => {
   for (const [name, src] of SCREENS) {
     it(`${name} 이 setInterval 을 직접 돌리지 않는다`, () => {
@@ -42,10 +51,31 @@ describe("남은 화면 — 폴링 한 벌", () => {
   // ★ 옮기기만 하는 자리다. 지금 이 두 대기 루프에는 상한도 실패 카운트도 없다 —
   //   기본값을 그대로 받으면 5분 상한과 연속 5회 중단이 **새로** 생기고, 컷 분할이
   //   길어지면 화면이 아무 말 없이 얼어붙는다(onStop 이 없어 알릴 사람도 없다).
+  //
+  // ★ 파일 전체를 훑으면 안 된다. ③목소리에는 루프가 둘이라, Infinity 를 **본 루프**에
+  //   달고 대기 루프를 기본값에 둬도 초록이 난다 — 이 단정이 막으려던 것과 정확히 반대다.
+  //   그래서 대기 루프의 주소 뒤 한 토막만 잘라 잰다.
   it("컷 분할 대기 루프에는 상한도 실패 카운트도 없다", () => {
     for (const [name, src] of [["③목소리", voice], ["②대본", script]]) {
-      expect(src, `${name} 대기 루프에 상한이 새로 생긴다`).toMatch(/timeoutMs:\s*Infinity/);
-      expect(src, `${name} 대기 루프에 실패 중단이 새로 생긴다`).toMatch(/maxFailures:\s*Infinity/);
+      const block = splitWaitBlock(src, name);
+      expect(block, `${name} 대기 루프에 상한이 새로 생긴다`).toMatch(/timeoutMs:\s*Infinity/);
+      expect(block, `${name} 대기 루프에 실패 중단이 새로 생긴다`).toMatch(/maxFailures:\s*Infinity/);
+    }
+  });
+
+  // ★ 여기서 true 를 돌려주면 폴링이 **끝난다**. load(id) 가 거절당했는데(네트워크 한 번
+  //   끊김 — ProjectContext 는 non-ok 에 거절한다) 그 회차에 끝내 버리면, project 가
+  //   그대로라 splitting 도 그대로고, effect deps 도 안 바뀌고, 재시작 가드
+  //   (`if (splitPollRef.current) return`)까지 막는다(기본 onStop 이 noop 이라 ref 를
+  //   비울 사람이 없다). 화면은 "대본을 컷으로 나누는 중이에요"에서 영영 안 움직인다.
+  //   옮기기 전에는 다음 주기가 load 를 그냥 다시 불렀다 — 그 회복을 되돌려 놓는다.
+  it("컷 분할 대기 루프는 전체를 실제로 받아온 뒤에만 끝난다", () => {
+    for (const [name, src] of [["③목소리", voice], ["②대본", script]]) {
+      const block = splitWaitBlock(src, name);
+      expect(block, `${name} 대기 루프의 onTick 이 비동기가 아니다`).toMatch(/onTick:\s*async\b/);
+      expect(block, `${name} 대기 루프가 load 를 기다리지 않고 끝낸다`).toMatch(/await load\(/);
+      expect(block, `${name} 대기 루프가 load 실패를 삼킨 채 끝낸다`)
+        .not.toMatch(/load\([^)]*\)\.catch/);
     }
   });
 

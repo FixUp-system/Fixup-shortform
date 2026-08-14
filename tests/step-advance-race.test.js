@@ -34,7 +34,7 @@ describe("단계 전진 — 화면이 가드보다 앞서가지 않는다", () =
     //
     // 폴링이 lib/poll.js 한 벌로 옮겨간 뒤로 종료는 `stop(false)` 호출이 아니라
     // onTick 이 참을 **돌려주는** 것이다(2026-08-14). 재는 것은 그대로 그 한 줄이다.
-    const line = voice.split(/\r?\n/).find((l) => l.includes("return") && l.includes("pending"));
+    const line = voice.split(/\r?\n/).find((l) => l.includes("return !pending"));
     expect(line, "폴링 종료 한 줄을 못 찾겠다").toBeTruthy();
     expect(line, "종료 판정이 status 를 안 본다 — audio 만 보면 창이 열린다")
       .toMatch(/st\.status/);
