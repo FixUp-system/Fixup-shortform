@@ -249,8 +249,31 @@ describe("음성을 누가 만드는가 — 모델이 정한다", () => {
       expect(projectSpeaks(seed(person([0]), cuts2))).toBe(false);
     });
 
-    it("한 컷이라도 대사가 비면 말하지 않는다", () => {
-      expect(projectSpeaks(seed(person([0, 1]), [{ idx: 0, sentence: "가" }, { idx: 1, sentence: "  " }]))).toBe(false);
+    // ⚠️ 이 단언은 **의도적으로 뒤집혔다**(2026-08-15, 사용자 지시 "모든 컷에 문장이 있어야
+    // 해라는 판단을 제거해줘"). 원래는 "한 컷이라도 대사가 비면 말하지 않는다"였다.
+    //
+    // 왜 틀렸나: 컷 분할이 **대사 없는 컷을 정상적으로 만든다**(`silent: true`, 빈 문장).
+    // 프로덕션 실측 810d2361 — 컷 3개 중 둘이 silent 다. 말할 것이 없는 컷에까지 말할 사람을
+    // 요구하니, 그 컷 하나 때문에 한 편 전체가 TTS 경로로 떨어졌다.
+    // 원래 규칙의 취지("원고 일부가 안 들리면 안 된다")는 **대사가 있는 컷**에만 해당한다 —
+    // 빈 컷에는 안 들릴 원고가 없다.
+    it("대사가 없는 컷은 판정에서 뺀다 — 말할 것이 없는 컷에 말할 사람을 요구하지 않는다", () => {
+      // 대사 있는 컷(0)은 캐스팅돼 있다. 컷1은 빈 문장이라 검사 대상이 아니다.
+      expect(projectSpeaks(seed(person([0]), [{ idx: 0, sentence: "가" }, { idx: 1, sentence: "  " }]))).toBe(true);
+      // 빈 컷을 누가 맡고 있든 상관없다 — 애초에 안 본다
+      expect(projectSpeaks(seed(person([0, 1]), [{ idx: 0, sentence: "가" }, { idx: 1, sentence: "  " }]))).toBe(true);
+      // sentence 키가 아예 없는 컷도 같다(silent 컷이 그렇게 저장된 경우)
+      expect(projectSpeaks(seed(person([0]), [{ idx: 0, sentence: "가" }, { idx: 1 }]))).toBe(true);
+    });
+
+    it("★ 대사 있는 컷에 맡은 사람이 없으면 여전히 말하지 않는다 — 걷어낸 것은 문장 조건뿐이다", () => {
+      // 화면 밖 내레이션 설계는 아직 없다. 이 조건까지 풀면 원고가 소리 없이 사라진다.
+      expect(projectSpeaks(seed(person([1]), [{ idx: 0, sentence: "가" }, { idx: 1, sentence: "  " }]))).toBe(false);
+    });
+
+    it("★ 대사 있는 컷이 하나도 없으면 말하지 않는다 — every() 가 빈 목록에 참을 주는 함정", () => {
+      // 전 컷이 무음이면 읽을 원고가 없다. 말하는 프로젝트가 아니다.
+      expect(projectSpeaks(seed(person([0, 1]), [{ idx: 0, sentence: "  " }, { idx: 1 }]))).toBe(false);
     });
 
     it("인물이 아예 없으면 말하지 않는다", () => {
