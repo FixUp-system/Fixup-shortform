@@ -40,6 +40,39 @@ describe("axesOf — 컷이 실제로 가진 축", () => {
   });
 });
 
+// ★ 정규화가 **여기** 있는 이유: 프롬프트(buildClipPrompt)·각인(clipKey)·화면이 전부 이
+//   함수를 쓴다. 정규화를 프롬프트 쪽에만 두면 "마침표만 고쳐도 프롬프트는 그대로인데
+//   각인만 달라져" 픽셀이 같은 mp4 를 다시 사게 된다(Task 3 리뷰 I-1).
+describe("axesOf — 축 텍스트 정규화", () => {
+  const textOf = (cut) => axesOf(cut).map((a) => a.text);
+
+  it("끝 마침표를 걷어낸다 — 여러 개도 런 전체를 걷는다", () => {
+    expect(textOf({ camera: "물러난다." })).toEqual(["물러난다"]);
+    expect(textOf({ camera: "물러난다..." })).toEqual(["물러난다"]);
+  });
+
+  it("앞뒤 공백을 **먼저** 걷는다 — 그래야 '물러난다. .' 이 '물러난다..' 를 안 만든다", () => {
+    expect(textOf({ camera: "물러난다. ." })).toEqual(["물러난다"]);
+    expect(textOf({ camera: "  물러난다. .  " })).toEqual(["물러난다"]);
+    expect(textOf({ camera: "물러난다.  " })).toEqual(["물러난다"]);
+  });
+
+  it("★ 마침표만 고친 값은 같은 텍스트로 수렴한다 — 각인이 흔들리지 않는다", () => {
+    expect(textOf({ camera: "천천히 물러난다." })).toEqual(textOf({ camera: "천천히 물러난다" }));
+  });
+
+  it("! 와 ? 는 걷어내지 않는다 — 옛 motion 시절과 같아 회귀가 아니다", () => {
+    expect(textOf({ camera: "확 다가간다!" })).toEqual(["확 다가간다!"]);
+    expect(textOf({ camera: "다가갈까?" })).toEqual(["다가갈까?"]);
+  });
+
+  it("걷어내면 아무것도 안 남는 축은 없는 것으로 본다", () => {
+    expect(axesOf({ camera: "." })).toEqual([]);
+    expect(axesOf({ camera: " . . " })).toEqual([]);
+    expect(textOf({ camera: ".", subject: "컵을 든다" })).toEqual(["컵을 든다"]);
+  });
+});
+
 describe("motionVariety — 축이 한쪽으로 쏠렸는가", () => {
   const cuts = (...specs) => specs.map((s) => s);
 

@@ -7,7 +7,7 @@ import { motionFields, motionRules, speedRule } from "../lib/cuts.js";
 import { SPEEDS } from "../lib/speeds.js";
 // 관통 테스트라 파일 경계를 넘는다 — 화면 설계(validate) → 그림 프롬프트(cuts) → 각인(steps).
 import { validateShows } from "../lib/validate.js";
-import { toneKey } from "../lib/steps.js";
+import { toneKey, clipKey } from "../lib/steps.js";
 
 const project = {
   settings: { aspect_ratio: "9:16" },
@@ -1977,5 +1977,42 @@ describe("buildClipPrompt — 옛 컷은 한 글자도 안 바뀐다", () => {
     const GOLDEN =
       "천천히 회전한다. slow, deliberate motion. The attached image is the first frame — continue naturally from it. Keep the subject and style unchanged. No text or letters. No talking faces or lip sync.";
     expect(buildClipPrompt({ motion: "천천히 회전한다", speed: "slow" })).toBe(GOLDEN);
+  });
+});
+
+// ★★ 프롬프트와 각인이 **같은 정규화**를 본다 — 파일 경계를 넘는 관통 테스트다
+//    (lib/motion.js 의 axesOf → lib/cuts.js buildClipPrompt · lib/steps.js clipKey).
+//
+// 터졌던 것: 프롬프트만 끝 마침표를 걷어내고 각인은 원문을 굳혀서, 저장된 축에 **마침표만**
+// 더하면 프롬프트는 바이트 동일인데 각인만 갈렸다 → 거짓 낡음 → 유료 [다시 만들기]가 열려
+// 픽셀이 같은 mp4 를 다시 산다.
+describe("축 정규화 — 프롬프트와 각인이 같은 값을 본다", () => {
+  const same = [
+    ["끝 마침표", { camera: "천천히 물러난다" }, { camera: "천천히 물러난다." }],
+    ["마침표 여럿", { camera: "천천히 물러난다" }, { camera: "천천히 물러난다..." }],
+    ["앞뒤 공백", { camera: "천천히 물러난다" }, { camera: "  천천히 물러난다  " }],
+    ["마침표 → 공백 → 마침표", { camera: "천천히 물러난다" }, { camera: "천천히 물러난다. ." }],
+    ["축 여럿", { camera: "물러난다", subject: "컵을 든다" }, { camera: "물러난다.", subject: "컵을 든다. " }],
+  ];
+
+  for (const [what, a, b] of same) {
+    it(`★ ${what}만 고치면 프롬프트도 각인도 바이트 동일이다`, () => {
+      expect(buildClipPrompt(b)).toBe(buildClipPrompt(a));
+      expect(clipKey(b)).toBe(clipKey(a));
+    });
+  }
+
+  it("정말 다른 움직임은 둘 다 갈린다 — 정규화가 실제 변경을 삼키지 않는다", () => {
+    const a = { camera: "천천히 물러난다" };
+    const b = { camera: "빠르게 다가간다" };
+    expect(buildClipPrompt(b)).not.toBe(buildClipPrompt(a));
+    expect(clipKey(b)).not.toBe(clipKey(a));
+  });
+
+  it("걷어내면 빈 값이 되는 축은 프롬프트에서도 각인에서도 없는 것으로 본다", () => {
+    expect(buildClipPrompt({ camera: ".", subject: "컵을 든다" }))
+      .toBe(buildClipPrompt({ subject: "컵을 든다" }));
+    expect(clipKey({ camera: ".", subject: "컵을 든다" }))
+      .toBe(clipKey({ subject: "컵을 든다" }));
   });
 });
