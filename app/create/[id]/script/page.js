@@ -13,6 +13,9 @@ import {
 } from "../../../../lib/clip-limits";
 import { videoPrice } from "../../../../lib/pricing";
 import { SPEEDS, DEFAULT_SPEED_ID } from "../../../../lib/speeds";
+// 움직임 축 목록은 한 벌이다 — 화면이 축 이름을 손으로 적으면 목록에서 축 한 줄을 빼도
+// 화면에는 남는다(lib/speeds 를 이렇게 쓰고 있다. 그래서 lib/motion 에 import 가 없다).
+import { axesOf, motionAxisFor } from "../../../../lib/motion";
 // 두드리는 루프는 화면마다 복붙하지 않는다 — 복붙본이 조금씩 갈려 ④이미지가
 // images_error 를 영영 못 보던 버그가 났다(2026-08-14). 한 벌에서 온다.
 import { startPolling } from "../../../../lib/poll";
@@ -384,14 +387,38 @@ export default function ScriptStepPage() {
                       if (v && v !== c.shows) saveCut(c.idx, { shows: v });
                     }}>{c.shows || "(아직 없음)"}</span>
                 </div>
-                <div className="plan-field">
-                  <b>움직임</b>
-                  <span contentEditable suppressContentEditableWarning className="editable"
-                    onBlur={(e) => {
-                      const v = e.currentTarget.textContent.trim();
-                      if (v && v !== c.motion) saveCut(c.idx, { motion: v });
-                    }}>{c.motion || "거의 정지, 아주 느린 카메라 이동"}</span>
-                </div>
+                {/* 움직임 — ★ 순서가 lib/cuts.js 의 buildClipPrompt 와 같아야 한다:
+                    축이 있으면 축을, 없으면 옛 motion 을, 그것도 없으면 폴백 문구를.
+                    화면과 프롬프트가 다른 것을 보여 주면 사장님이 고친 것과 실제로
+                    만들어지는 것이 갈린다.
+                    이름표는 MOTION_AXES 의 label 에서 온다 — 목록에서 축 한 줄을 빼면
+                    화면에서도 함께 사라진다. */}
+                {(() => {
+                  const axes = axesOf(c);
+                  if (axes.length > 0) {
+                    // ⚠️ 축은 **읽기 전용이다.** PATCH /api/projects/[id] 의 컷 허용 목록이
+                    //    ["sentence","shows","motion"] 이라 축 이름으로 보낸 값은 조용히
+                    //    버려진다 — 고칠 수 있는 척하는 칸이 못 고치는 칸보다 나쁘다
+                    //    (사장님은 고쳤다고 믿고 값을 치른다). 그 목록이 MOTION_AXES 를
+                    //    받게 되면 여기를 다른 칸들처럼 contentEditable 로 바꾼다.
+                    return axes.map((a) => (
+                      <div className="plan-field" key={a.id}>
+                        <b>{motionAxisFor(a.id)?.label}</b>
+                        <span>{a.text}</span>
+                      </div>
+                    ));
+                  }
+                  return (
+                    <div className="plan-field">
+                      <b>움직임</b>
+                      <span contentEditable suppressContentEditableWarning className="editable"
+                        onBlur={(e) => {
+                          const v = e.currentTarget.textContent.trim();
+                          if (v && v !== c.motion) saveCut(c.idx, { motion: v });
+                        }}>{c.motion || "거의 정지, 아주 느린 카메라 이동"}</span>
+                    </div>
+                  );
+                })()}
                 </>
                 )}
                 <div className="badges">
