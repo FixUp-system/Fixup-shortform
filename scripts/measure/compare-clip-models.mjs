@@ -20,6 +20,7 @@ import path from "path";
 import { buildClipPrompt } from "../../lib/cuts.js";
 import { profileFor, fitDurationFor } from "../../lib/clip-limits.js";
 import { runWithActor } from "../../lib/actor.js";
+import { axesOf, motionAxisFor } from "../../lib/motion.js";
 
 const [projectId, cutArg, modelA = "fal-ai/ltx-2.3/image-to-video/fast",
        modelB = "fal-ai/kling-video/v3/standard/image-to-video"] = process.argv.slice(2);
@@ -63,7 +64,15 @@ async function generate(endpoint) {
 }
 
 console.log(`프로젝트 ${projectId} · 컷 ${cutArg} · 낭독 ${cut.seconds}초 · ${aspect}`);
-console.log(`움직임: ${cut.motion || "(없음 — 기본값)"}`);
+// 머리말은 **실제로 보낸 지시**와 같아야 한다 — 순서도 buildClipPrompt 와 같다
+// (축 → 옛 motion → 기본값). 이름표는 MOTION_AXES 에서 온다: 목록에서 축 한 줄을 빼면
+// 여기서도 함께 사라진다.
+const axes = axesOf(cut);
+if (axes.length) {
+  for (const a of axes) console.log(`${motionAxisFor(a.id)?.label}: ${a.text}`);
+} else {
+  console.log(`움직임: ${cut.motion || "(없음 — 기본값)"}`);
+}
 console.log(`화면:   ${cut.shows || "(없음)"}`);
 console.log(`이미지: ${cut.image.url}\n`);
 

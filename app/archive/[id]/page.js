@@ -16,6 +16,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { adModel } from "../../../lib/ad/models";
 import { I2V_MODELS, modelIdForProject, resolutionForProject } from "../../../lib/clip-limits";
+import { axesOf, motionAxisFor } from "../../../lib/motion";
 
 // 한 줄짜리 정보. 값이 없으면 줄째 안 그린다 — 빈 칸을 늘어놓으면 무엇이 없는지가 아니라
 // 화면이 덜 만들어진 것처럼 보인다.
@@ -144,7 +145,31 @@ export default function ArchiveDetailPage() {
                           <>
                             <div className="plan-field"><b>문장</b><span>{c.sentence || "-"}</span></div>
                             <div className="plan-field"><b>화면</b><span>{c.shows || "-"}</span></div>
-                            {c.motion && <div className="plan-field"><b>움직임</b><span>{c.motion}</span></div>}
+                            {/* 움직임 — ★ 순서가 lib/cuts.js 의 buildClipPrompt 와 같아야 한다:
+                                축이 있으면 축을, 없으면 옛 motion 을, 그것도 없으면 폴백 문구를.
+                                여기가 보여 주는 것은 "이 영상이 어떻게 만들어졌는가"라서,
+                                프롬프트가 안 쓰는 값을 적으면 그 자리에서 거짓말이 된다
+                                (옛 motion 만 그리던 시절이 그랬다 — 축을 가진 컷은 안 쓰는
+                                 값을 보여 주고, 축만 있는 컷은 움직임 줄이 통째로 사라졌다).
+                                이름표는 MOTION_AXES 의 label 에서 온다 — 목록에서 축 한 줄을
+                                빼면 여기서도 함께 사라진다.
+                                ⚠️ 편집 칸을 두지 않는다. 고치는 자리는 ②대본이고 여기는 보는
+                                   자리다 — 그 성격을 바꾸지 않는다. */}
+                            {(() => {
+                              const axes = axesOf(c);
+                              if (axes.length > 0) {
+                                return axes.map((a) => (
+                                  <div className="plan-field" key={a.id}>
+                                    <b>{motionAxisFor(a.id)?.label}</b><span>{a.text}</span>
+                                  </div>
+                                ));
+                              }
+                              return (
+                                <div className="plan-field">
+                                  <b>움직임</b><span>{c.motion || "거의 정지, 아주 느린 카메라 이동"}</span>
+                                </div>
+                              );
+                            })()}
                           </>
                         )}
                       </div>
