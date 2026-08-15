@@ -58,6 +58,19 @@ describe("②대본 — 움직임 세 축", () => {
     }
   });
 
+  it("★ 라우트의 컷 허용 목록이 MOTION_AXES 에서 파생된다 — 축 이름이 두 벌이 되지 않는다", () => {
+    // 손으로 적으면 목록에서 축 한 줄을 빼도 이 문만 계속 열려 있다(되돌리기가 안 된다).
+    // 값이 실제로 저장되는가는 tests/routes.test.js 가 라우트를 통과시켜 잰다 —
+    // 여기는 **어디서 이름을 파는가**만 본다.
+    const route = read("app/api/projects/[id]/route.js");
+    expect(route).toMatch(/import\s*\{[^}]*\bMOTION_AXES\b[^}]*\}\s*from\s*["'][^"']*lib\/motion/);
+    expect(route).toMatch(/for\s*\(const key of\s*\[[^\]]*MOTION_AXES/);
+    for (const a of MOTION_AXES) {
+      expect(route, `축 id("${a.id}")를 라우트에 박았다 — MOTION_AXES 에서 파생시켜라`)
+        .not.toMatch(new RegExp(`["'\`]${a.id}["'\`]`));
+    }
+  });
+
   it("★ 순서가 buildClipPrompt 와 같다 — 축 → 옛 motion → 폴백", () => {
     // 화면과 프롬프트가 다른 것을 보여 주면 사장님이 고친 것과 만들어지는 것이 갈린다.
     // 프롬프트 쪽 순서(lib/cuts.js)를 여기서 함께 잰다 — 한쪽만 바뀌는 것을 막는다.

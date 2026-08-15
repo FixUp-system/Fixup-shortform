@@ -14,6 +14,8 @@ import { getStore } from "../lib/store/index.js";
 import { chargeVideo } from "../lib/charges.js";
 import { isAudioStale, isImageStale, isClipStale, isRenderStale, renderKey } from "../lib/steps.js";
 import { isSubtitleStale } from "../lib/translate.js";
+// 축 이름을 여기에 손으로 적지 않는다 — 목록에서 한 줄을 빼면 이 테스트도 함께 줄어야 한다.
+import { MOTION_AXES } from "../lib/motion.js";
 
 // 시작 게이트가 붙은 뒤로, 영상 정가(30초 = 50 크레딧)가 없는 사용자는 유료 시작 라우트에서 402 다.
 // 이 파일이 재는 것은 각 라우트의 가드·배선이므로, 유료 시작을 부르는 테스트는 충전해 두고
@@ -898,6 +900,42 @@ describe("무효화 관통 — 고치면 낡고, 안 고친 것은 살아남는�
     const p = await projectWithCuts();
     await PATCH(patchReq({ cut: { idx: 0, motion: "정지" } }), ctx(p.id));
     expect(isClipStale((await getProject(p.id, OWNER)).cuts[0])).toBe(true);
+  });
+
+  // ★ 축이 **실제로 저장되는가** — 이 결함의 본질은 200 을 주면서 조용히 버리던 것이다.
+  //
+  // 화면이 축 줄을 고칠 수 있게 만들어도, 라우트의 컷 허용 목록이 축을 안 받으면 사장님은
+  // 고쳤다고 믿고 ③에서 정가를 낸다. 그래서 소스를 훑는 것이 아니라 **라우트를 실제로
+  // 통과시켜** 저장된 값을 다시 읽는다.
+  //
+  // 축 이름을 손으로 적지 않는다 — MOTION_AXES 에서 돌린다. 목록에서 한 줄을 빼면
+  // 이 판정도 함께 줄어든다(이 브랜치의 되돌리기 안전장치).
+  for (const a of MOTION_AXES) {
+    it(`움직임 축(${a.id})을 고치면 저장되고 클립이 낡는다`, async () => {
+      const p = await projectWithCuts();
+      const text = `${a.example} (고침)`;
+      const res = await PATCH(patchReq({ cut: { idx: 0, [a.id]: text } }), ctx(p.id));
+      expect(res.status).toBe(200);
+      const saved = await getProject(p.id, OWNER);
+      expect(saved.cuts[0][a.id]).toBe(text);
+      // 축이 클립 프롬프트에 실리므로(buildClipPrompt) 클립은 낡아야 한다.
+      expect(isClipStale(saved.cuts[0])).toBe(true);
+      // 그림·소리는 축과 무관하다 — 축 하나를 고쳤다고 이미지까지 다시 사면 안 된다.
+      expect(isImageStale(saved.cuts[0])).toBe(false);
+      expect(isAudioStale(saved.cuts[0])).toBe(false);
+      // 원고도 건드리지 않는다(화면·움직임과 같다).
+      expect(saved.script.text).toBe(p.script.text);
+    });
+  }
+
+  it("축은 준 것만 바꾼다 — 안 준 축은 그대로 남는다", async () => {
+    const p = await projectWithCuts();
+    const [first, second] = MOTION_AXES;
+    await PATCH(patchReq({ cut: { idx: 0, [first.id]: "먼저 넣은 값" } }), ctx(p.id));
+    await PATCH(patchReq({ cut: { idx: 0, [second.id]: "나중에 넣은 값" } }), ctx(p.id));
+    const cut = (await getProject(p.id, OWNER)).cuts[0];
+    expect(cut[first.id]).toBe("먼저 넣은 값");
+    expect(cut[second.id]).toBe("나중에 넣은 값");
   });
 
   it("컷을 고치면 완성본이 낡는다", async () => {

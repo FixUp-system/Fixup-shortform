@@ -396,15 +396,20 @@ export default function ScriptStepPage() {
                 {(() => {
                   const axes = axesOf(c);
                   if (axes.length > 0) {
-                    // ⚠️ 축은 **읽기 전용이다.** PATCH /api/projects/[id] 의 컷 허용 목록이
-                    //    ["sentence","shows","motion"] 이라 축 이름으로 보낸 값은 조용히
-                    //    버려진다 — 고칠 수 있는 척하는 칸이 못 고치는 칸보다 나쁘다
-                    //    (사장님은 고쳤다고 믿고 값을 치른다). 그 목록이 MOTION_AXES 를
-                    //    받게 되면 여기를 다른 칸들처럼 contentEditable 로 바꾼다.
+                    // 축도 문장·화면과 **같은 모양으로** 고친다 — 사장님이 못 읽으면 고칠
+                    // 수도 없다가 이 칸의 이유고, 읽기만 되면 그 절반이다.
+                    // 저장 경로는 PATCH /api/projects/[id] 의 컷 허용 목록이고, 그 목록도
+                    // MOTION_AXES 에서 판다(축 이름이 두 벌이 되지 않는다).
+                    // ⚠️ 고치면 클립이 낡는다(clipKey 가 axesOf 를 본다) — 값이 바뀌었으니
+                    //    맞다. 영상 전에 고쳐야 값이 안 든다(속도 칸과 같다).
                     return axes.map((a) => (
                       <div className="plan-field" key={a.id}>
                         <b>{motionAxisFor(a.id)?.label}</b>
-                        <span>{a.text}</span>
+                        <span contentEditable suppressContentEditableWarning className="editable"
+                          onBlur={(e) => {
+                            const v = e.currentTarget.textContent.trim();
+                            if (v && v !== a.text) saveCut(c.idx, { [a.id]: v });
+                          }}>{a.text}</span>
                       </div>
                     ));
                   }

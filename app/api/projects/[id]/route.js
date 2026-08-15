@@ -4,6 +4,7 @@ import { clipLimitsForProject, I2V_MODEL_IDS, isResolutionFor, resolutionForProj
 import { normalizeStyle } from "../../../../lib/styles";
 import { isAspect } from "../../../../lib/aspects";
 import { isSpeed } from "../../../../lib/speeds";
+import { MOTION_AXES } from "../../../../lib/motion.js";
 import { ownedPhotoKeys } from "../../../../lib/refs-io.js";
 import { withUser } from "../../../../lib/auth/require-user.js";
 import { getStore } from "../../../../lib/store/index.js";
@@ -249,11 +250,18 @@ export const PATCH = withUser(async (req, { params }, user) => {
           next.cuts_error = null;
         }
       }
-      // 컷 한 줄 고치기 — 문장·화면·움직임. 준 것만 바꾼다(빈 값으로 지우지 않게).
+      // 컷 한 줄 고치기 — 문장·화면·움직임(옛 motion 과 세 축). 준 것만 바꾼다(빈 값으로 지우지 않게).
       // 사장님이 구성 단계에서 손보는 자리다. 이미지·클립은 이 값들을 읽어 만든다.
+      //
+      // ★ 축 이름을 손으로 적지 않는다 — MOTION_AXES 에서 판다. 이 브랜치의 되돌리기
+      //   안전장치가 "목록에서 축 한 줄을 빼면 지문·검증·프롬프트·각인·판정·화면이 함께
+      //   줄어든다"이고, 여기에 "camera" 를 박으면 그 줄이 빠져도 이 문만 계속 열려 있다.
+      //
+      // ⚠️ 축을 고치면 클립이 낡는다(clipKey 가 axesOf 를 본다) — 값이 바뀌었으니 맞다.
+      //    낡음은 자동 청구가 아니라 "다시 만들기" 표시다.
       if (body.cut && Number.isInteger(body.cut.idx)) {
         const patch = {};
-        for (const key of ["sentence", "shows", "motion"]) {
+        for (const key of ["sentence", "shows", "motion", ...MOTION_AXES.map((a) => a.id)]) {
           if (typeof body.cut[key] === "string" && body.cut[key].trim()) {
             patch[key] = body.cut[key].trim();
           }
