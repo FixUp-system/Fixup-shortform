@@ -160,10 +160,10 @@ npx vitest run -t "낡음"                      # 이름으로 골라서
 
 측정:
 ```bash
-node scripts/measure/run-pipeline.mjs tailor 3 30   # 자료·반복·목표초
+node scripts/measure/run-pipeline.mjs tailor 3 30   # 자료·반복·목표초 (자료→시나리오→컷)
 node scripts/measure/run-pipeline.mjs thin 1 --cuts # 컷·화면까지(가짜 모드 권장)
 node scripts/measure/shows-motion-leak.mjs 3        # shows 에 움직임이 섞이는 빈도
-node scripts/measure/ab-briefing.mjs setup|b        # 프롬프트 A/B
+node scripts/measure/scenario.mjs 1 15              # 시나리오 규칙 위반율·장면 분포·내레이션 비율
 ```
 서버 로그에 `[대본 xxxxxxxx]`로 되돌리기 라운드별 글자 수·결함·점수·채택 여부가 남는다.
 

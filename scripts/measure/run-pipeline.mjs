@@ -1,11 +1,19 @@
-// 자료 → 브리핑 → 원고 → 컷 → 화면까지 실제로 태우고 지표를 뽑는다.
+// 자료 → 시나리오 → 컷 → 화면까지 실제로 태우고 지표를 뽑는다.
 //
 //   node scripts/measure/run-pipeline.mjs [자료키] [반복] [초]
 //   node scripts/measure/run-pipeline.mjs tailor 3 30    수선집 자료, 3회, 30초 목표
-//   node scripts/measure/run-pipeline.mjs thin           두 줄짜리 자료, 1회, 자동 길이
+//   node scripts/measure/run-pipeline.mjs thin           두 줄짜리 자료, 1회
 //
 // 서버가 localhost:3000에 떠 있어야 한다. 이미지 비용을 안 쓰려면 SHOTFORM_FAKE_IMAGES=1로 띄운다.
 // 컷까지 보려면 --cuts를 붙인다(이미지 생성이 돌므로 가짜 이미지 모드 권장).
+//
+// ★ 2026-08-16 — 흐름이 바뀌었다. 브리핑·원고 라우트가 없어지고 **시나리오 하나**가 그
+//   자리를 대신한다. 그래서 여기서 재던 원고 지표(글자 수·되풀이·목표 대비 %)도 함께
+//   사라졌다 — 잴 원고가 없다. 시나리오 자체의 품질은 scripts/measure/scenario.mjs 가 잰다.
+//   여기는 **관통**(자료에서 컷·화면까지 실제로 나오는가)을 재는 자리로 남는다.
+//
+// ★ 길이를 반드시 고른다(기본 15초). 시나리오 확정 라우트가 target_seconds 없는 프로젝트를
+//   막는다 — "영상 길이를 먼저 골라 주세요". 옛 "자동 길이"는 원고 시절의 개념이다.
 import { runWithActor } from "../../lib/actor.js";
 
 const BASE = process.env.MEASURE_BASE || "http://localhost:3000";
@@ -57,13 +65,11 @@ const MATERIALS = {
 가게는 망원시장 안쪽, 생선가게 옆 골목입니다. 아침 열 시부터 저녁 일곱 시까지 하고 일요일은 쉽니다. 포장만 되고 배달은 안 합니다 — 국물 있는 반찬은 흔들리면 맛이 달라져서요.`,
 };
 
-const CHARS_PER_SEC = 5.5;
 const key = process.argv[2] || "tailor";
 const reps = Number(process.argv[3]) || 1;
-const seconds = Number(process.argv[4]) || null;
+const seconds = Number(process.argv[4]) || 15;
 const withCuts = process.argv.includes("--cuts");
 
-const noSpace = (s) => (s || "").replace(/\s/g, "").length;
 const strip = (s) => (s || "").replace(/[\s.,!?~'"·]/g, "");
 
 // 최장 공통 부분수열 / 결과물 길이 — "이 문장이 제 몫을 얼마나 말하는가"(lib/script.js와 같은 자)
@@ -79,13 +85,6 @@ function ratio(src, text) {
   return +(prev[b.length] / b.length).toFixed(2);
 }
 
-function repeats(text) {
-  const ss = (text || "").split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter((s) => strip(s).length >= 10);
-  for (let i = 0; i < ss.length; i++)
-    for (let j = i + 1; j < ss.length; j++) if (ratio(ss[i], ss[j]) > 0.5) return true;
-  return false;
-}
-
 async function call(path, opts = {}) {
   const res = await fetch(BASE + path, { ...opts, headers: { "Content-Type": "application/json", ...(opts.headers || {}) } });
   const data = await res.json().catch(() => ({}));
@@ -98,25 +97,27 @@ async function once(text) {
     method: "POST",
     body: JSON.stringify({ material: { text, photos: [] }, settings: { target_seconds: seconds } }),
   });
-  const b = await call(`/api/projects/${p.id}/briefing`, { method: "POST" });
-  const brief = b.briefing || b;
-  // 질문에는 답하지 않고 건너뛴다 — 답을 넣으면 사실 수가 늘어 목표 길이가 달라진다
-  const asked = (brief.asked || []).map((a) => ({ ...a, answer: "", done: true }));
-  await call(`/api/projects/${p.id}`, { method: "PATCH", body: JSON.stringify({ briefing: { asked, confirmed: true } }) });
+  const sc = await call(`/api/projects/${p.id}/scenario`, { method: "POST", body: JSON.stringify({}) });
+  const scenario = sc.scenario;
+  const problems = sc.problems || [];
 
-  const sc = await call(`/api/projects/${p.id}/script`, { method: "POST", body: JSON.stringify({}) });
-  const script = (sc.script || sc).text;
-
-  console.log(`\n[${p.id.slice(0, 8)}] 사실 ${brief.key_points.length}개 · 질문 ${(brief.asked || []).length}개`);
-  (brief.asked || []).forEach((a) => console.log(`   Q: ${a.question}`));
-  const target = seconds ? Math.round(seconds * CHARS_PER_SEC) : null;
-  console.log(`원고 ${noSpace(script)}자 ≈ ${(noSpace(script) / CHARS_PER_SEC).toFixed(1)}초` +
-    (target ? ` · 목표 ${target}자(${Math.round(noSpace(script) / target * 100)}%)` : "") +
-    ` · 되풀이 ${repeats(script) ? "있음" : "없음"}`);
-  console.log(`첫 문장: ${script.split(/(?<=[.!?])\s+/)[0]}`);
-  console.log(`--- 원고 ---\n${script}`);
+  console.log(`\n[${p.id.slice(0, 8)}] ${scenario.topic}`);
+  console.log(`focus ${scenario.focus?.mode || "-"}/${scenario.focus?.subject || "-"} · angle ${scenario.angle}`);
+  const total = scenario.shots.reduce((a, s) => a + s.seconds, 0);
+  console.log(`장면 ${scenario.shots.length}개 · 초 합 ${total}(목표 ${seconds}) · 규칙 ${problems.length ? `걸림: ${problems.join(" ")}` : "이상 없음"}`);
+  scenario.shots.forEach((s, i) => {
+    console.log(`  [${i + 1}] ${s.seconds}초 · ${s.speaker || "(무음)"} — ${s.beat}`);
+    console.log(`      ${s.line || "(대사 없음)"}`);
+  });
 
   if (!withCuts) return;
+
+  // 컷은 **확정된** 시나리오에서만 나온다(cuts 라우트가 그것으로 막는다).
+  // 규칙에 걸린 시나리오는 확정이 400 이라 여기서 멈춘다 — 사장님도 같은 자리에서 멈춘다.
+  await call(`/api/projects/${p.id}/scenario`, {
+    method: "PATCH",
+    body: JSON.stringify({ scenario, confirmed: true }),
+  });
 
   await call(`/api/projects/${p.id}/cuts`, { method: "POST", body: JSON.stringify({ aspect_ratio: "9:16" }) });
   let cuts = [];
@@ -127,9 +128,11 @@ async function once(text) {
     if (cuts.length && cuts.every((c) => c.state === "done" || c.state === "needs_attention")) break;
     await new Promise((r) => setTimeout(r, 1500));
   }
-  const intact = cuts.length > 0 &&
-    cuts.map((c) => c.sentence).join(" ").replace(/\s/g, "") === script.replace(/\s/g, "");
-  console.log(`--- 컷 ${cuts.length}개 · 무결성 ${intact ? "✅ 원고와 일치" : "❌ 어긋남"} ---`);
+  // 무결성의 원본이 원고에서 **시나리오**로 옮겨졌다 — 컷 문장은 장면의 line 그대로여야
+  // 한다(lib/cuts.js 의 shotsToCuts). 어긋나면 사장님이 확정한 대사가 아닌 것이 낭독된다.
+  const lines = scenario.shots.map((s) => s.line || "").join("").replace(/\s/g, "");
+  const intact = cuts.length > 0 && cuts.map((c) => c.sentence || "").join("").replace(/\s/g, "") === lines;
+  console.log(`--- 컷 ${cuts.length}개 · 무결성 ${intact ? "✅ 시나리오 대사와 일치" : "❌ 어긋남"} ---`);
   for (const c of cuts) {
     console.log(`  [${c.idx}] ${c.seconds}초 · 화면전사 ${ratio(c.shows, c.sentence)} · ${c.state || "-"}`);
     console.log(`    문장: ${c.sentence}`);
@@ -142,7 +145,7 @@ if (!text) {
   console.log(`자료키: ${Object.keys(MATERIALS).join(", ")}`);
   process.exit(1);
 }
-console.log(`자료 ${key} · ${reps}회 · 목표 ${seconds ? seconds + "초" : "자동"}`);
+console.log(`자료 ${key} · ${reps}회 · 목표 ${seconds}초`);
 // 측정이 낸 비용은 운영자 지출이다. uuid 가 아닌 문자열이라 사장님 계정과 별개
 // 버킷이 된다 — 프롬프트를 재던 날 측정이 사장님의 사용자별 상한을 잡아먹으면
 // 화면에서 영상이 안 만들어진다. 전역 상한에는 둘 다 함께 잡힌다.
