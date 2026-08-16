@@ -1278,6 +1278,28 @@ if (!project.scenario?.confirmed || !(project.scenario.shots || []).length) {
 언제나 1 이고, `areCutsStale` 은 `project.script?.version` 이 없으면 false 라 멱등 가드(409)가
 그대로 돈다.
 
+★★ **`subjectOf` 도 시나리오를 봐야 한다.** 그 함수는 `briefing.focus`·`briefing.topic`
+만 읽는데, **넷**이 그것을 쓴다: `buildImagePrompt`(이미지 프롬프트의 제품 앵커) ·
+`clipContextClause`(클립 프롬프트의 `The subject is:`) · `clipKey`(클립 각인) ·
+`imageContextKey`(이미지 각인). 새 흐름에는 브리핑 추출이 없으므로 **새 프로젝트는 두
+프롬프트 모두에서 제품 정체를 잃는다** — 컷마다 딴 물건이 나오던 그 결함으로 되돌아간다.
+
+```js
+export function subjectOf(project) {
+  // 초점·주제는 이제 시나리오가 답한다. 옛 프로젝트는 브리핑에만 있으므로 **뒤로 떨어진다** —
+  // 그래야 이미 값을 치른 그림·클립의 각인(imageContextKey·clipKey)이 안 흔들린다.
+  const focus = project.scenario?.focus || project.briefing?.focus;
+  const topic = project.scenario?.topic || project.briefing?.topic || "";
+  const focusThing = focus?.mode === "물건" ? focus.subject : "";
+  const anchor = focusThing || topic;
+  const look = focusThing && typeof focus?.look === "string" ? focus.look.trim() : "";
+  return { anchor, look };
+}
+```
+
+★ **폴백 순서가 곧 안전장치다.** 시나리오를 먼저 보고 없으면 브리핑으로 떨어지므로, 옛
+프로젝트의 각인은 글자 하나 안 바뀐다(새 프로젝트에는 애초에 각인이 없다).
+
 ⚠️ `project.briefing?.focus` 를 읽던 자리가 `splitCuts` 안에 **둘** 있다(`lead` 와 `wantsThing`). 둘 다 `scenario.focus` 로 바꾼다. `grep -n "briefing" lib/pipeline.js` 로 전부 확인한다.
 
 - [ ] **Step 4: 테스트 통과를 확인한다**
