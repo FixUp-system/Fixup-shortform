@@ -50,7 +50,12 @@ describe("checkScenario", () => {
     const three = { shots: [shot(5), shot(5), shot(5)] };
     expect(checkScenario(three, proj(15)).ok).toBe(true);
     const four = { shots: [shot(4), shot(4), shot(4), shot(3)] };
-    expect(checkScenario(four, proj(15)).ok).toBe(false);
+    const got = checkScenario(four, proj(15));
+    expect(got.ok).toBe(false);
+    // ★ ok:false 만 보면 이 규칙에는 그물이 없다 — 15초를 넷으로 나누면 하나는 반드시
+    //   하한(4초)보다 짧아져서, 개수 규칙을 통째로 지워도 하한 규칙이 대신 걸린다.
+    //   그래서 개수 규칙만 낼 수 있는 말("3개까지")을 직접 확인한다.
+    expect(got.problems.join(" ")).toContain("3개");
   });
 
   it("★ 대사가 있는 컷에 화자가 없으면 걸린다", () => {
@@ -74,6 +79,18 @@ describe("checkScenario", () => {
     const p = { settings: { i2v_model: "kling-v3", target_seconds: 30 } };
     const s = { shots: [shot(3), shot(8), shot(8), shot(8), shot(3)] };
     expect(checkScenario(s, p).ok).toBe(true);
+  });
+
+  // ★ 의도한 동작이다 — 버그가 아니다.
+  //   목표 길이가 없으면 합도 컷 개수도 **잴 기준이 없다**(무엇에 맞추라고 말할 수 없다).
+  //   그래서 이 두 규칙만 조용히 빠지고, 나머지(상한·하한·화자)는 그대로 문다.
+  //   ⚠️ 이 함수를 저장·확정 게이트로 쓰는 쪽은 **길이를 먼저 고르게 하는 책임이 자기에게
+  //      있다** — 여기서 통과했다는 말이 "길이가 정해졌다"는 뜻이 아니기 때문이다.
+  //   이 테스트는 그 구멍을 덮는 게 아니라 **어디에 있는지 못 박아 둔다.**
+  it("길이를 안 고른 프로젝트는 합·개수를 검사하지 않는다 — 확정 게이트는 라우트가 따로 막는다", () => {
+    const noTarget = { settings: { i2v_model: "seedance-2.0" } };
+    const s = { shots: [shot(8), shot(8)] };            // 합 16 — 목표가 없으니 잴 수 없다
+    expect(checkScenario(s, noTarget)).toEqual({ ok: true, problems: [] });
   });
 
   it("문제가 여럿이면 전부 모은다 — 하나 고치고 또 걸리는 일이 없게", () => {
