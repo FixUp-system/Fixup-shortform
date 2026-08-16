@@ -1838,3 +1838,48 @@ POST 가 502 다.
 
 **검증:** `npx vitest run` 그린 · `SHOTFORM_DIST_DIR=.next-verify npx next build` 성공 ·
 ①자료에 화질 칩이 보이는지 라우트 목록과 소스로 확인.
+
+---
+
+### Task 12: 측정 하네스를 새 흐름으로
+
+Task 11 이 브리핑 라우트를 지우면서 측정 스크립트 둘이 404 로 죽었다. 구현자가 지시대로
+고치지 않고 멈췄다 — 무엇을 재야 하는지가 설계 질문이라서다. 여기서 답한다.
+
+**Files:**
+- Modify: `scripts/measure/run-pipeline.mjs`
+- Delete: `scripts/measure/ab-briefing.mjs`
+- Create: `scripts/measure/scenario.mjs`
+- Modify: `CLAUDE.md` (측정 절의 명령 목록)
+
+#### 12-1. `run-pipeline.mjs` 를 새 흐름으로
+
+지금 `POST /briefing` 을 부른다(:101). 그 라우트는 없다. 새 흐름은 **자료 → 시나리오 → 컷**
+이므로 브리핑 단계를 빼고 `POST /scenario` 로 바꾼다. 나머지(컷·화면 설계 출력)는 그대로다.
+
+#### 12-2. `ab-briefing.mjs` 는 은퇴시킨다
+
+그것이 재던 것은 **브리핑 지문의 A/B** 다. 브리핑 지문이 없어졌으므로 잴 대상이 없다.
+파일을 지우고 `CLAUDE.md` 의 측정 절에서 그 줄을 뺀다.
+
+#### 12-3. `scenario.mjs` — 시나리오가 규칙을 얼마나 지키는가
+
+계획 마무리가 이미 요구한 것이다. **이 파이프라인에서 유일하게 자동 장치가 없는 자리가
+시나리오**라(원고에는 되돌리기·채점이 있었다), 그 품질을 아는 방법이 이것뿐이다.
+
+`node scripts/measure/scenario.mjs [반복] [길이]` 로 돌고, 회차마다 재는 것:
+- **규칙 위반율** — `checkScenario` 가 무엇을 몇 번 잡는가(규칙별로 나눠 센다).
+  ★ `generateScenario` 는 한 번 재시도하므로 **1차 답과 최종 답을 따로** 센다. 재시도가
+  실제로 고치는지가 이 수치의 핵심이다
+- **장면 수 분포**와 **장면 길이 분포**
+- **내레이션 비율** — `speaker` 가 `"내레이션"` 인 컷의 비율. 지문이 "내레이션은 최소로"를
+  요구하는데 지켜지는지 아무도 모른다. ★ 이 수치가 높으면 **화면 밖 목소리 미검증 위험**
+  (Seedance 가 사람 없는 화면에서 내레이션을 하는지 확인된 적 없다)에 그대로 노출된다
+- 마지막에 시나리오 하나를 통째로 출력한다 — 수치가 아니라 눈으로 볼 것이 있다
+
+⚠️ `scripts/measure/motion-axes.mjs` 와 같은 규율을 따른다: 원장(cost_records)에 기록을
+남기지 않도록 HTTP 를 직접 부르거나, 부른다면 그 사실을 머리 주석에 적는다. 예상 비용을
+회차마다 출력한다(OpenAI 만, fal 0원).
+
+**검증:** `npx vitest run` 그린 · `node scripts/measure/scenario.mjs 1 15` 가 실제로 돌아
+수치를 낸다(LLM 호출 승인됨 — 사용자 지시상 LLM 은 묻지 않고 진행). fal 호출 0.
