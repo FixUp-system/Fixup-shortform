@@ -900,6 +900,7 @@ import { getProject, updateProject } from "../../../../../lib/projects";
 import { generateScenario, validateScenario } from "../../../../../lib/scenario.js";
 import { checkScenario } from "../../../../../lib/scenario-rules.js";
 import { withUser } from "../../../../../lib/auth/require-user.js";
+import { BudgetExceeded } from "../../../../../lib/costs.js";
 
 // 광고 문서(kind:"ad")는 이 경로가 다루지 않는다 — 없는 것과 같이 404 다.
 async function load(id, userId) {
@@ -915,7 +916,18 @@ export const POST = withUser(async (req, { params }, user) => {
     return Response.json({ error: "만들고 싶은 영상을 먼저 적어 주세요" }, { status: 400 });
   }
 
-  const { scenario, problems } = await generateScenario(project);
+  // ★ 예산 오류는 삼키지 않는다 — withUser 까지 올라가야 402 가 된다(브리핑 라우트와 같은
+  //   처방). 그 밖의 실패(LLM 장애·네트워크)는 502 로 사장님 말로 답한다. 안 잡으면
+  //   프레임워크가 한국어 안내 없이 500 을 낸다.
+  let generated;
+  try {
+    generated = await generateScenario(project);
+  } catch (e) {
+    if (e instanceof BudgetExceeded) throw e;
+    console.error("시나리오 생성 실패:", e);
+    return Response.json({ error: "시나리오를 만들지 못했어요. 다시 시도해 주세요." }, { status: 502 });
+  }
+  const { scenario, problems } = generated;
   if (!scenario) {
     return Response.json({ error: "시나리오를 만들지 못했어요. 다시 시도해 주세요." }, { status: 502 });
   }
