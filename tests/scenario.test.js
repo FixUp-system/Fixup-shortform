@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { buildScenarioMessages, validateScenario } from "../lib/scenario.js";
+import { buildScenarioMessages, validateScenario, fakeScenario } from "../lib/scenario.js";
+import { checkScenario } from "../lib/scenario-rules.js";
 
 const project = {
   id: "aaaaaaaa-0000-4000-8000-000000000001",
@@ -41,6 +42,20 @@ describe("buildScenarioMessages", () => {
     const s = buildScenarioMessages(project).system;
     expect(s).not.toContain('"camera"');
     expect(s).not.toContain('"lighting"');
+  });
+});
+
+// SHOTFORM_FAKE=all 이 받는 답. 규칙을 실제로 통과해야 하고(합·하한·상한·화자),
+// 검증기를 통과해 라우트가 저장하는 모양이어야 한다.
+describe("fakeScenario — 가짜 모드", () => {
+  it("★ checkScenario 를 통과한다", () => {
+    const got = validateScenario(fakeScenario(project));
+    expect(checkScenario(got, project)).toEqual({ ok: true, problems: [] });
+  });
+
+  // ★ 이 값이 라우트·화면·각인까지 흐르는지를 가짜 관통으로 보려면 값이 있어야 한다.
+  it("★ narrator_voice 를 들고 있다", () => {
+    expect(validateScenario(fakeScenario(project)).narrator_voice).not.toBe("");
   });
 });
 
@@ -87,6 +102,18 @@ describe("validateScenario — 모양만 본다", () => {
       shots: [{ beat: "카페 문이 열린다", line: "", speaker: "내레이션", seconds: 6 }],
     });
     expect(got.shots[0].speaker).toBe("");
+  });
+
+  // ★★ 2026-08-17 — narrator_voice 를 여기서 버리면 화면의 칸이 "고칠 수 있는 척하는 칸"이
+  //    된다(라우트의 PATCH 가 이 함수를 통과시킨 값만 저장한다). Task 5 가 네 필드로 겪은 자리다.
+  it("★ narrator_voice 를 보존한다", () => {
+    const got = validateScenario({ ...good, narrator_voice: "  차분한 30대 남성, 낮고 단단한 톤  " });
+    expect(got.narrator_voice).toBe("차분한 30대 남성, 낮고 단단한 톤");
+  });
+
+  it("narrator_voice 가 없으면 빈 문자열이다 — 없는 것과 빈 것을 가르지 않는다", () => {
+    expect(validateScenario(good).narrator_voice).toBe("");
+    expect(validateScenario({ ...good, narrator_voice: 42 }).narrator_voice).toBe("");
   });
 
   it("모르는 focus.mode 는 focus 를 통째로 비운다", () => {

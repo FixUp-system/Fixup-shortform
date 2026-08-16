@@ -148,4 +148,34 @@ describe("PATCH /scenario", () => {
     expect(saved.shots[0].speaker).toBe("40대 남성 사장");
     expect(saved.shots[0].seconds).toBe(30);
   });
+
+  // ★★ 2026-08-17 — 화면에 칸을 하나 더 놓았다(내레이터 목소리). 같은 함정을 다시 파지
+  //    않으려면 **왕복**을 여기서 못 박아야 한다: 화면이 보낸 값이 문서에 남고, 그 값이
+  //    클립 프롬프트까지 간다(lib/cuts.js speechFor). 라우트가 버리면 사장님은 목소리를
+  //    고쳤다고 믿고 ⑤에서 컷마다 다른 사람이 읽는 영상을 산다.
+  it("★ 내레이터 목소리도 왕복한다", async () => {
+    const narrated = {
+      ...good,
+      narrator_voice: "차분한 30대 남성, 낮고 단단한 톤",
+      shots: [{ beat: "문을 연다", line: "하루를 엽니다.", speaker: "내레이션", seconds: 30 }],
+    };
+    const res = await PATCH(patch({ scenario: narrated }), { params: Promise.resolve({ id }) });
+    expect(res.status).toBe(200);
+    expect((await res.json()).scenario.narrator_voice).toBe("차분한 30대 남성, 낮고 단단한 톤");
+    expect((await getProject(id, OWNER)).scenario.narrator_voice).toBe("차분한 30대 남성, 낮고 단단한 톤");
+  });
+
+  // ★ 내레이션이 있는데 목소리가 비면 **확정**이 막힌다(저장은 된다 — 고치는 도중이니까).
+  it("★ 내레이터 목소리가 비면 확정할 수 없다", async () => {
+    const narrated = {
+      ...good,
+      narrator_voice: "",
+      shots: [{ beat: "문을 연다", line: "하루를 엽니다.", speaker: "내레이션", seconds: 30 }],
+    };
+    const blocked = await PATCH(patch({ scenario: narrated, confirmed: true }), { params: Promise.resolve({ id }) });
+    expect(blocked.status).toBe(400);
+    expect((await blocked.json()).error).toContain("내레이터 목소리");
+    // 임시저장은 된다 — 한 자리에서 다 맞추지 못해도 고친 것이 남아야 한다
+    expect((await PATCH(patch({ scenario: narrated }), { params: Promise.resolve({ id }) })).status).toBe(200);
+  });
 });

@@ -22,6 +22,14 @@ describe("②시나리오 화면", () => {
     }
   });
 
+  // ★★ 2026-08-17 — 내레이터 목소리 칸. 컷마다 fal 을 따로 부르므로 이 한 줄이 없으면
+  //    내레이터가 컷마다 다른 사람이 된다. 화면에 칸이 있으면 라우트가 그 값을 받아야 한다
+  //    (tests/scenario-route.test.js 의 왕복 테스트가 짝이다).
+  it("★ 내레이터 목소리를 고칠 수 있다 — 내레이션이 있을 때만 보인다", () => {
+    expect(page, "narrator_voice 를 고치는 칸이 없다").toContain("narrator_voice");
+    expect(page, "판정을 화면이 손으로 다시 적었다").toContain("hasNarration");
+  });
+
   it("★ 장면을 더하고 지울 수 있다", () => {
     expect(page).toMatch(/장면 추가|추가하기/);
     expect(page).toMatch(/삭제|지우기/);

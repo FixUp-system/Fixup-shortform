@@ -6,13 +6,14 @@
 //   **사장님이 여기서 고치는 것**뿐이다. 그래서 이 화면의 칸은 전부 진짜여야 한다.
 // ★ 판정을 화면이 손으로 다시 적지 않는다(checkScenario 한 벌). 두 벌이면 화면은
 //   통과라는데 라우트가 400 을 준다.
-// ★ 여기 있는 칸 넷은 라우트가 전부 저장한다(tests/scenario-route.test.js 가 박아 둔다).
+// ★ 여기 있는 칸은 라우트가 전부 저장한다(tests/scenario-route.test.js 가 박아 둔다) —
+//   장면의 넷(beat·line·speaker·seconds)에 전체 단위의 angle·narrator_voice 까지.
 //   "고칠 수 있는 척하는 칸"을 만들면 사장님은 고쳤다고 믿고 다음 단계에서 돈을 낸다.
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 import BackButton from "../../../../components/BackButton";
-import { checkScenario, scenarioSeconds } from "../../../../lib/scenario-rules";
+import { checkScenario, scenarioSeconds, hasNarration } from "../../../../lib/scenario-rules";
 // 낡음 판정과 다음 단계 주소 — 다시 나누면 산 그림·영상이 사라지므로 반드시 물어본다.
 // 다음 주소도 이 표에서 판다: 화면이 주소를 손으로 적으면 말하는 프로젝트(목소리 단계가
 // 없는 흐름)를 없어진 단계로 밀어 넣고, 가드가 되돌려 보내는 깜빡임이 남는다.
@@ -176,6 +177,20 @@ export default function ScenarioStepPage() {
           칸"이 된다 — 사장님은 고쳤다고 믿고 다음 단계에서 돈을 낸다(2026-08-16 Important 5). */}
       {(project?.cuts || []).length > 0 && (
         <p className="pgsub">이 칸은 <b>다음에 컷을 나눌 때</b>부터 반영돼요 — 이미 만든 컷은 그대로예요</p>
+      )}
+
+      {/* ★ 내레이터 목소리 — 화면 밖 목소리를 쓰는 장면이 있을 때만 보인다.
+          컷마다 영상을 따로 만들기 때문에 이 한 줄이 없으면 컷마다 다른 사람이 읽는다.
+          angle 과 달리 이 값은 **클립 프롬프트에 실린다** — 고치면 그 컷의 영상이 낡는다
+          (lib/cuts.js speechFor · lib/steps.js clipKey). 그래서 "반영은 다음에"가 아니다. */}
+      {hasNarration(scenario) && (
+        <>
+          <div className="eyebrow">내레이터 목소리</div>
+          <input className="field" value={scenario.narrator_voice || ""}
+            placeholder="예: 차분한 30대 남성, 낮고 단단한 톤"
+            onChange={(e) => edit({ narrator_voice: e.target.value })} />
+          <p className="pgsub">화면 밖에서 읽는 목소리예요 — 비워 두면 컷마다 다른 사람이 읽어요</p>
+        </>
       )}
 
       {/* 합계는 늘 보인다 — 고치는 동안 목표에서 얼마나 벗어났는지가 이 화면의 유일한 눈금이다 */}

@@ -14,9 +14,10 @@
 //     ★ generateScenario 는 **한 번 재시도**한다. 그래서 **1차 답과 최종 답을 따로** 센다 —
 //       재시도가 실제로 고치는지가 이 수치의 핵심이다(고치지 않으면 값·시간만 치른다).
 //  ② **장면 수 분포**와 **장면 길이 분포**
-//  ③ **내레이션 비율** — speaker 가 "내레이션" 인 장면의 비율. 지문은 "내레이션은 최소로"를
-//     요구하는데 지켜지는지 아무도 모른다. ★ 이 값이 높으면 **미검증 능력에 그대로 노출**된다
-//     — Seedance 가 사람 없는 화면에서 내레이션을 하는지 확인된 적이 없다.
+//  ③ **내레이션 비율** — speaker 가 "내레이션" 인 장면의 비율, 그리고 **narrator_voice 가
+//     실제로 오는지**. 2026-08-17 에 전제가 정정됐다: Seedance 는 내레이션을 한다(광고에서
+//     흔한 기법). 그래서 높은 비율은 이제 결함이 아니다 — 대신 내레이션이 있는데
+//     narrator_voice 가 비면 **컷마다 다른 사람이 읽는다**(그것이 지금 재야 할 위험이다).
 //  ④ 마지막에 **시나리오 하나를 통째로** 출력한다. 수치는 나쁜 장면을 보여 주지 않는다.
 //
 // ⚠️ 원장(cost_records)에 기록을 남기지 않는다 — motion-axes.mjs·shows-motion-leak.mjs 와
@@ -91,6 +92,7 @@ const RULES = [
   ["장면 길이 상한", /그림 한 장은/],
   ["장면 길이 하한", /짧은 장면을 만들지 못해요/],
   ["화자 없음", /말하는 사람이 없어요/],
+  ["내레이터 목소리 없음", /내레이터 목소리가 비어 있어요/],
   ["장면 0개", /장면이 하나도 없어요/],
 ];
 
@@ -248,11 +250,17 @@ console.log(`화자: ${[...speakers.entries()].map(([k, v]) => `${k} ${v}`).join
 for (const run of ok) {
   const ss = run.scenario?.shots || [];
   const nn = ss.filter((s) => s.speaker === "내레이션").length;
-  console.log(`   [${run.key} 회차${run.round}] ${nn}/${ss.length} (${share(nn, ss.length)}%) · focus ${run.scenario?.focus?.mode || "-"}`);
+  const nv = run.scenario?.narrator_voice || "";
+  console.log(`   [${run.key} 회차${run.round}] ${nn}/${ss.length} (${share(nn, ss.length)}%) · focus ${run.scenario?.focus?.mode || "-"} · narrator_voice ${nv ? `"${nv}"` : "(없음)"}`);
 }
-if (narration.length && narration.length / Math.max(1, speaking.length) > 0.5) {
-  console.log(`⚠️ 내레이션이 대사의 절반을 넘는다 — 지문의 "내레이션은 최소로"가 안 지켜진다.`);
-  console.log(`   이 상태는 **화면 밖 목소리 미검증 위험**(사람 없는 화면에서 Seedance 가 말하는지 확인된 적 없음)에 그대로 노출된다.`);
+// ★ 재는 것이 바뀌었다(2026-08-17) — 비율이 아니라 **내레이터 목소리의 유무**다.
+//   비율이 높은 것은 정상(광고 기법)이고, 목소리가 비는 것이 컷마다 사람이 바뀌는 원인이다.
+const needVoice = ok.filter((x) => (x.scenario?.shots || []).some((s) => s.line && /내레이[션터]|나레이[션터]/.test(String(s.speaker || "").replace(/\s+/g, ""))));
+const gotVoice = needVoice.filter((x) => String(x.scenario?.narrator_voice || "").trim());
+console.log(`\n내레이션이 있는 회차 ${needVoice.length}개 중 narrator_voice 가 온 회차 ${gotVoice.length}개`);
+if (needVoice.length && gotVoice.length < needVoice.length) {
+  console.log(`⚠️ 내레이션이 있는데 목소리가 빈 회차가 있다 — 그 편은 컷마다 다른 사람이 읽는다.`);
+  console.log(`   화면에 칸이 있어 사장님이 채울 수 있고, 확정은 checkScenario 가 막는다.`);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -264,6 +272,7 @@ if (sample) {
   console.log(`topic: ${sample.scenario.topic}`);
   console.log(`focus: ${JSON.stringify(sample.scenario.focus)}`);
   console.log(`angle: ${sample.scenario.angle}`);
+  console.log(`narrator_voice: ${sample.scenario.narrator_voice || "(없음)"}`);
   sample.scenario.shots.forEach((s, i) => {
     console.log(`  [${i + 1}] ${s.seconds}초 · 화자 ${s.speaker || "(무음)"}`);
     console.log(`      beat: ${s.beat}`);

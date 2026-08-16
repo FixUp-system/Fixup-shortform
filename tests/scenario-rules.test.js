@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { scenarioSeconds, checkScenario } from "../lib/scenario-rules.js";
+import { scenarioSeconds, checkScenario, hasNarration } from "../lib/scenario-rules.js";
 
 // Seedance(하한 4초) 30초 프로젝트. 소재는 베이커리 — 지문 예시와 안 겹친다.
 const proj = (target = 30) => ({ settings: { i2v_model: "seedance-2.0", target_seconds: target } });
@@ -97,5 +97,44 @@ describe("checkScenario", () => {
     const s = { shots: [shot(20)] };
     const got = checkScenario(s, proj());
     expect(got.problems.length).toBeGreaterThanOrEqual(2);
+  });
+
+  // ★★ 2026-08-17 — 내레이터 목소리. 컷마다 fal 을 따로 부르므로 설명이 없으면 모델이
+  //    컷마다 다른 사람을 고른다("누구보다 빠르게"와 "그리고 편안하게"가 다른 목소리가 된다).
+  describe("내레이터 목소리", () => {
+    const narrated = (voice) => ({
+      narrator_voice: voice,
+      shots: [shot(8), shot(8), shot(8), { ...shot(6), speaker: "내레이션" }],
+    });
+
+    it("★ 내레이션이 있는데 목소리가 비면 걸린다", () => {
+      const got = checkScenario(narrated(""), proj());
+      expect(got.ok).toBe(false);
+      expect(got.problems.join(" ")).toContain("내레이터 목소리");
+    });
+
+    it("목소리가 있으면 통과한다", () => {
+      expect(checkScenario(narrated("차분한 30대 남성, 낮고 단단한 톤"), proj())).toEqual({ ok: true, problems: [] });
+    });
+
+    it("★ 내레이션이 없으면 요구하지 않는다 — 안 쓰는 값으로 확정을 막지 않는다", () => {
+      const s = { shots: [shot(8), shot(8), shot(8), shot(6)] };
+      expect(checkScenario(s, proj())).toEqual({ ok: true, problems: [] });
+    });
+
+    it("★ 대사 없는 장면의 화자가 내레이션이어도 요구하지 않는다 — 읽을 것이 없다", () => {
+      const s = { shots: [shot(8), shot(8), shot(8), { ...shot(6), line: "", speaker: "내레이션" }] };
+      expect(checkScenario(s, proj()).ok).toBe(true);
+    });
+
+    // 화자 칸은 사장님이 고치는 자유 서술이다 — 표기 흔들림을 같은 판정이 받는다
+    // (판정은 lib/cuts.js 의 isNarrationSpeaker 한 자리, 컷이 받는 표시와 같은 것을 본다)
+    it("★ 표기가 흔들려도 같은 것으로 본다", () => {
+      for (const w of ["내레이션", "나레이션 (여성)", " 내레이터 "]) {
+        expect(hasNarration({ shots: [{ ...shot(8), speaker: w }] }), w).toBe(true);
+      }
+      expect(hasNarration({ shots: [shot(8)] })).toBe(false);
+      expect(hasNarration(null)).toBe(false);
+    });
   });
 });
