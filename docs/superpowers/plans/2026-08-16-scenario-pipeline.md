@@ -1084,6 +1084,7 @@ git commit -m "feat(steps): ②대본을 ②시나리오로 바꾸고 게이트�
 - Modify: `lib/pipeline.js` (`defaultDeps.splitCuts` 앞부분 · 캐스팅 호출)
 - Modify: `lib/cuts.js` (`buildShowsMessages` 에 `angle`·`beat` 싣기)
 - Modify: `lib/cast.js` (`buildCastMessages` 가 `speaker` 를 받는다)
+- Modify: `app/api/projects/[id]/cuts/route.js` (선행 조건을 원고 → 시나리오 확정으로)
 - Test: `tests/scenario-pipeline.test.js`
 
 **Interfaces:**
@@ -1259,6 +1260,23 @@ export function buildCastMessages(cuts, avatars, lead, things, opts = {}) {
     const lead = focus?.mode === "사람" ? focus.subject : "";
     const msgs = buildCastMessages(withShows, avatars, lead, things, { speakers });
 ```
+
+★★ **`POST /cuts` 의 선행 조건도 바꿔야 한다.** 그 라우트는 지금
+`if (!project.script?.text) return 400 "대본을 먼저 만들어 주세요"` 로 막는다 — 새 흐름에는
+원고가 없으므로 **시나리오를 확정해도 컷 분할이 매번 400 이 된다.** 파이프라인 전체가 막힌다.
+
+```js
+// 컷은 시나리오에서 나온다 — 확정된 시나리오가 없으면 나눌 것이 없다(2026-08-16).
+// 예전에는 원고(script.text)를 봤다. 옛 프로젝트는 시나리오가 없어 여기서 걸린다 —
+// 그 프로젝트들은 ②로 돌아가 시나리오를 만들면 된다.
+if (!project.scenario?.confirmed || !(project.scenario.shots || []).length) {
+  return Response.json({ error: "시나리오를 먼저 확정해 주세요" }, { status: 400 });
+}
+```
+
+같은 파일의 `cuts_script_version: proj.script?.version || 1` 은 그대로 둔다 — 원고가 없으면
+언제나 1 이고, `areCutsStale` 은 `project.script?.version` 이 없으면 false 라 멱등 가드(409)가
+그대로 돈다.
 
 ⚠️ `project.briefing?.focus` 를 읽던 자리가 `splitCuts` 안에 **둘** 있다(`lead` 와 `wantsThing`). 둘 다 `scenario.focus` 로 바꾼다. `grep -n "briefing" lib/pipeline.js` 로 전부 확인한다.
 
