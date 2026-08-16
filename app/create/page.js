@@ -128,14 +128,15 @@ export default function CreatePage() {
                   {I2V_MODELS.map((m) => (
                     <button key={m.id} className={`chip${model === m.id ? " on" : ""}`}
                       onClick={() => setModel(m.id)}>
-                      {/* ★ 화질은 여기서 안 고른다 — 고르는 칩은 ②대본과 함께 사라졌고(2026-08-16) 아직 새 자리로 안 옴겼다.
+                      {/* ★ 화질은 여기서 안 고른다 — 아직 프로젝트가 없어 저장할 자리가 없다.
+                          고르는 칩은 프로젝트가 생긴 뒤 ①자료(create/[id]/briefing)에 있다.
                           그래서 값은 **기본 화질** 기준이고, 그것을 인자로 명시한다
                           (비우면 다음 사람이 "해상도를 안 보는 자리"로 읽는다). */}
                       {m.label}{showCredits && ` · ${videoPrice(seconds, m.id, DEFAULT_RESOLUTION)} 크레딧`}
                     </button>
                   ))}
                 </div>
-                {/* ★ 값은 **기본 화질** 기준이다 — 더 높은 화질을 고르면 올라간다(고르는 칩은 지금 없다 — 위 주석).
+                {/* ★ 값은 **기본 화질** 기준이다 — 더 높은 화질을 고르면 올라간다(고르는 칩은 ①자료에 있다).
                     화질을 안 고르는 모델(Kling·LTX)에는 그 말을 안 붙인다: 여기 없는 선택을
                     있는 것처럼 말하는 것이 "고를 수 있는 척"과 같은 잘못이다. */}
                 <div className="tray-note">

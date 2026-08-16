@@ -4,7 +4,7 @@
 // ★ 왜 앞쪽 화면인가: 정가는 ③목소리에서 걷힌다. 화질이 값을 바꾸므로(720p 160 vs 1080p 360)
 //   고르는 자리는 반드시 **결제 앞**이어야 한다. 모델 칩이 ⑤에 있어 사고가 났던 전례가
 //   CLAUDE.md 에 남아 있다. 그 자리는 ②대본이었고 그 화면은 2026-08-16 에 사라졌다
-//   — 아래 묶음이 꺼져 있는 이유다.
+//   — 그래서 칩은 ①자료로 옮겼다(아래 묶음).
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 
@@ -15,15 +15,14 @@ const voice = read("app/create/[id]/voice/page.js");
 const images = read("app/create/[id]/images/page.js");
 const video = read("app/create/[id]/video/page.js");
 const create = read("app/create/page.js");
+const material = read("app/create/[id]/briefing/page.js");
 const quick = read("components/QuickCreate.jsx");
 
-// ⚠ 이 묶음은 **잠시 꺼져 있다**(2026-08-16).
-// 화질 칩을 들고 있던 화면이 ②대본 하나뿐이었고, 그 화면을 이번에 지웠다(원고 걷어내기).
-// 칩을 ②시나리오로 옮기는 것은 **다음 태스크**다 — 그까지는 재는 대상이 없다.
-// 파일을 지우지 않고 꺼 둔 이유: 여기 열일곱이 그 이사의 유일한 그물이다.
-// 옮긴 뒤에 `const script = ...` 자리에 **새 호스트 화면을 읽어** skip 을 푸는 것으로 끝난다.
-describe.skip("②시나리오 — 화질 선택(화면 이사 대기)", () => {
-  const script = "";
+// 이사 완료(2026-08-16) — 칩은 **①자료**(create/[id]/briefing)로 갔다. ②시나리오가 아니라
+// ①인 이유: 길이·비율·모델·화풍이 이미 거기 모여 있고, 잠금 기준이 결제라 ③목소리 앞이면
+// 어디든 성립한다. 아래 여섯이 그 이사의 유일한 그물이다.
+describe("①자료 — 화질 선택", () => {
+  const script = material;
   it("화질 목록을 lib/clip-limits 에서 읽는다 — 화면이 해상도 문자열을 적지 않는다", () => {
     expect(script).toMatch(/resolutionsForProject\(project\)/);
     // 큰따옴표만 잡으면 작은따옴표·백틱·JSX 텍스트로 박아 넣고 빠져나간다.
