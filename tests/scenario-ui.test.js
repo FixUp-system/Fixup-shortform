@@ -54,4 +54,37 @@ describe("②시나리오 화면", () => {
   it("★ setInterval 을 직접 돌리지 않는다", () => {
     expect(page).not.toContain("setInterval");
   });
+
+  // 다음 주소를 손으로 적으면 말하는 프로젝트(③목소리가 없는 흐름)를 없어진 단계로 민다.
+  it("★ 다음 주소를 가드와 같은 표에서 판다", () => {
+    expect(page).toContain("currentStepKey");
+    expect(page).toContain("stepHref");
+    expect(page, "없어질 수 있는 단계 주소를 손으로 적었다").not.toMatch(/\/voice`/);
+  });
+});
+
+// ★ 말하는 모델(기본 Seedance)에는 ③목소리가 없다 — ②에서 확정하면 컷이 나뉘는 중인 채로
+//   ④이미지에 온다. 그 화면이 기다려 주지 않으면 "컷이 없다"는 안내가 뜨고, 그 안내가
+//   가리키던 단계는 이제 저장소에 없다. 곁길이 아니라 주경로다.
+describe("④이미지 — 컷 분할을 기다린다", () => {
+  const images = readFileSync("app/create/[id]/images/page.js", "utf8");
+
+  it("★ 나누는 중이면 그렇게 말한다", () => {
+    expect(images).toMatch(/splitting/);
+    expect(images).toMatch(/나누/);
+  });
+
+  it("★ 없어진 ②대본으로 사장님을 돌려보내지 않는다", () => {
+    expect(images, "화면이 대본 단계를 시킨다").not.toContain("대본을 먼저 만들어 주세요");
+  });
+
+  it("★ 분할이 실패하면 사유와 다시 시도를 보여 준다", () => {
+    expect(images).toContain("cuts_error");
+    expect(images).toMatch(/다시 시도/);
+  });
+
+  it("★ 폴링은 한 벌에서 온다(setInterval 금지)", () => {
+    expect(images).toMatch(/startPolling/);
+    expect(images).not.toMatch(/setInterval\(/);
+  });
 });

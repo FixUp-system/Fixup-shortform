@@ -10,6 +10,9 @@ import { readFileSync } from "fs";
 const voice = readFileSync("app/create/[id]/voice/page.js", "utf8");
 const script = readFileSync("app/create/[id]/script/page.js", "utf8");
 const done = readFileSync("app/create/[id]/done/page.js", "utf8");
+// ④이미지도 컷 분할을 기다린다 — 말하는 모델에는 ③목소리가 없어서 확정 뒤 바로 여기 온다.
+// 이 파일이 재는 것은 그 **대기 루프**뿐이다(본 루프는 tests/generation-status-ui.test.js).
+const images = readFileSync("app/create/[id]/images/page.js", "utf8");
 
 const SCREENS = [["③목소리", voice], ["②대본", script], ["⑥완성", done]];
 
@@ -65,7 +68,7 @@ describe("남은 화면 — 폴링 한 벌", () => {
   //   달고 대기 루프를 기본값에 둬도 초록이 난다 — 이 단정이 막으려던 것과 정확히 반대다.
   //   그래서 대기 루프의 주소 뒤 한 토막만 잘라 잰다.
   it("컷 분할 대기 루프에는 상한도 실패 카운트도 없다", () => {
-    for (const [name, src] of [["③목소리", voice], ["②대본", script]]) {
+    for (const [name, src] of [["③목소리", voice], ["②대본", script], ["④이미지", images]]) {
       const block = splitWaitBlock(src, name);
       expect(block, `${name} 대기 루프에 상한이 새로 생긴다`).toMatch(/timeoutMs:\s*Infinity/);
       expect(block, `${name} 대기 루프에 실패 중단이 새로 생긴다`).toMatch(/maxFailures:\s*Infinity/);
@@ -79,7 +82,7 @@ describe("남은 화면 — 폴링 한 벌", () => {
   //   비울 사람이 없다). 화면은 "대본을 컷으로 나누는 중이에요"에서 영영 안 움직인다.
   //   옮기기 전에는 다음 주기가 load 를 그냥 다시 불렀다 — 그 회복을 되돌려 놓는다.
   it("컷 분할 대기 루프는 전체를 실제로 받아온 뒤에만 끝난다", () => {
-    for (const [name, src] of [["③목소리", voice], ["②대본", script]]) {
+    for (const [name, src] of [["③목소리", voice], ["②대본", script], ["④이미지", images]]) {
       const block = splitWaitBlock(src, name);
       expect(block, `${name} 대기 루프의 onTick 이 비동기가 아니다`).toMatch(/onTick:\s*async\b/);
       expect(block, `${name} 대기 루프가 load 를 기다리지 않고 끝낸다`).toMatch(/await load\(/);

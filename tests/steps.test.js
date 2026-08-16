@@ -68,9 +68,27 @@ describe("currentStepKey", () => {
   it("프로젝트가 없으면 자료 단계", () => {
     expect(currentStepKey(null)).toBe("material");
   });
-  it("시나리오 확정 전에는 상태와 무관하게 자료 단계", () => {
+  it("설명을 아직 안 적었으면 상태와 무관하게 자료 단계 — 시나리오는 그 설명에서 나온다", () => {
     expect(currentStepKey({ status: "draft", scenario: null })).toBe("material");
     expect(currentStepKey({ status: "briefing", scenario: { shots: [{ beat: "가" }], confirmed: false } })).toBe("material");
+  });
+  // ★ 잠금 고리 회귀 테스트 — 확정으로 ①자료를 닫으면 ②시나리오는 **영영 안 열린다**:
+  //   확정이 없으면 현재 단계가 ①이라 가드가 ②를 막는데, 확정은 ②에서만 할 수 있다.
+  //   그 단계에서만 나오는 것으로 그 단계를 닫지 않는다(⑥완성이 겪은 것과 같은 고리).
+  it("★ 잠금 고리: 설명을 적었고 아직 확정 전이면 ②시나리오가 열려 있다", () => {
+    const p = { status: "briefing", material: { text: "동네 카페를 소개하고 싶어요" }, scenario: null };
+    expect(currentStepKey(p)).toBe("scenario");
+    expect(isReachable("scenario", p)).toBe(true);
+    // 만들어는 뒀지만 아직 확정 안 한 경우도 같다 — 고치는 자리가 ②다
+    const editing = { ...p, scenario: { shots: [{ beat: "가" }], confirmed: false } };
+    expect(currentStepKey(editing)).toBe("scenario");
+    expect(isReachable("scenario", editing)).toBe(true);
+    // 그렇다고 뒷 단계가 함께 열리지는 않는다 — 돈이 나가는 자리는 확정 뒤다
+    expect(isReachable("voice", p)).toBe(false);
+    expect(isReachable("images", p)).toBe(false);
+  });
+  it("확정한 프로젝트는 자료로 끌려 내려가지 않는다 — 설명이 비어도 앞으로 간다", () => {
+    expect(currentStepKey({ status: "cuts", scenario: confirmed })).toBe("voice");
   });
   it("확정하면 바로 시나리오 단계 — 구성 게이트가 사라졌다", () => {
     expect(currentStepKey({ status: "briefing", scenario: confirmed })).toBe("scenario");

@@ -2,7 +2,8 @@
 
 // ④ 이미지 — 승인 게이트 (컷별 이미지 확인·재생성)
 //
-// 컷 분할은 여기가 아니라 대본 승인이 한다. 이 화면에 올 때는 컷도 낭독 길이도 이미 있다 —
+// 컷 분할은 여기가 아니라 ②시나리오 확정이 한다. 다만 **분할이 끝나기 전에 이 화면에 올 수
+// 있다** — 말하는 모델에는 ③목소리가 없어 확정 뒤 곧장 여기다(아래 대기 루프).
 // 그림은 컷당 후보 2장이라 가장 비싸므로, 사장님이 버튼을 눌러야 시작한다.
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -101,6 +102,44 @@ export default function ImagesStepPage() {
       beginPolling();
     }
   }, [project?.status, project?.cuts, project?.images_error]);
+
+  // 컷 분할이 끝나기를 기다린다 — ③목소리의 같은 루프와 **같은 모양**이다
+  // (app/create/[id]/voice/page.js 의 "분할이 끝나기를 기다린다").
+  //
+  // ★ 왜 ④에도 필요한가: 말하는 모델(기본 Seedance)에는 ③목소리 단계가 아예 없다
+  //   (lib/steps.js stepsFor). 그래서 ②시나리오에서 확정하면 컷이 아직 나뉘는 중인 채로
+  //   **곧장 이 화면**에 온다 — 기다리지 않으면 "컷이 없다"는 화면이 떠서, 사라진 단계를
+  //   하라고 시키는 안내가 된다. 곁길이 아니라 이제 이쪽이 주경로다.
+  const splitting =
+    project?.status === "cuts" && (project?.cuts || []).length === 0 && !project?.cuts_error;
+  useEffect(() => {
+    if (!splitting) return;
+    const stop = startPolling({
+      url: `/api/projects/${id}/status`,
+      // ★ 이 대기 루프에는 상한도 실패 카운트도 두지 않는다 — 기본값을 받으면 5분 상한과
+      //   연속 5회 중단이 새로 생겨, 분할이 길어지면 화면이 아무 말 없이 얼어붙는다
+      //   (알릴 onStop 도 없다). ③목소리·②대본의 같은 루프와 같은 값이다.
+      timeoutMs: Infinity,
+      maxFailures: Infinity,
+      // ★ 통짜를 **실제로 받아온 뒤에만** 끝낸다. 받아오기가 거절당했는데(네트워크 한 번
+      //   끊김) 그 회차에 끝내 버리면 project 가 그대로라 splitting 도 그대로고, deps 도
+      //   안 바뀌어 이 루프를 되살릴 사람이 없다 — "나누는 중"에서 영영 안 움직인다.
+      onTick: async (st) => {
+        if (!(st.cut_count > 0 || st.cuts_error)) return false;
+        try { await load(id); return true; } catch { return false; }
+      },
+    });
+    return stop;
+  }, [splitting, id]);
+
+  // 분할이 실패한 뒤의 다시 시도 — 컷이 비어 있을 때만 서버가 받아 준다(③목소리와 같다)
+  async function retrySplit() {
+    setErr(""); setBusy(true);
+    const res = await fetch(`/api/projects/${id}/cuts`, { method: "POST" });
+    if (!res.ok) setErr((await res.json().catch(() => ({}))).error || "다시 시도하지 못했어요");
+    await load(id).catch(() => {});
+    setBusy(false);
+  }
 
   // 그림 만들기 시작 — 컷당 후보 2장이라 가장 비싼 단계다. 눌러야 나간다.
   async function start() {
@@ -206,7 +245,11 @@ export default function ImagesStepPage() {
   return (
     <div className="images-layout">
       <section className="panel images-col">
-        <h2>{cuts.length === 0 ? "대본을 먼저 만들어 주세요"
+        {/* 컷이 없는 자리를 셋으로 가른다 — 나누는 중 / 나누다 실패 / 아직 확정 전.
+            전에는 셋 다 없어진 ②대본 단계를 하라고 시키는 한 문장이었다. */}
+        <h2>{splitting ? "컷을 나누는 중이에요"
+          : cuts.length === 0 && project.cuts_error ? "컷을 나누지 못했어요"
+          : cuts.length === 0 ? "시나리오를 먼저 확정해 주세요"
           : generating ? "컷별 이미지를 만들고 있어요"
           : !madeAny ? "컷마다 그림을 그립니다"
           : "컷별 이미지를 확인해 주세요"}</h2>
@@ -218,6 +261,18 @@ export default function ImagesStepPage() {
         {/* 네 가지는 사장님에게 서로 다른 사건이다 — 도는 중 / 멈춤 / 실패 / 상태 못 읽음.
             전에는 전부 한 문단이라 무엇을 해야 할지 알 수 없었다. */}
         {err && <p className="pgsub warn">{err}</p>}
+
+        {splitting && (
+          <p className="pgsub">
+            <span className="spinner" aria-hidden="true" /> 장면을 컷으로 나누고 있어요 — 잠시만요
+          </p>
+        )}
+        {cuts.length === 0 && project.cuts_error && (
+          <p className="pgsub warn">
+            {project.cuts_error}{" "}
+            <button className="mini" disabled={busy} onClick={retrySplit}>다시 시도</button>
+          </p>
+        )}
 
         {gen.kind === "running" && (
           <p className="pgsub">
