@@ -95,6 +95,18 @@ async function projectWithScript() {
     status: "script",
     briefing: { topic: "주제", key_points: ["ㄱ"], asked: [], confirmed: true, version: 2 },
     script: { text: SCRIPT_TEXT, version: 1, briefing_version: 2 },
+    // ★ 컷의 선행 조건이 원고에서 **확정된 시나리오**로 바뀌었다(2026-08-16).
+    //    이 fixture 를 쓰는 컷 라우트 테스트가 전부 그 문을 지나야 한다.
+    scenario: {
+      topic: "주제",
+      focus: { mode: "물건", subject: "생딸기라떼" },
+      angle: "아침 준비를 따라간다",
+      shots: [
+        { beat: "딸기를 간다", line: "매일 아침 딸기를 갈아 씁니다.", speaker: "30대 남성 사장", seconds: 8 },
+        { beat: "잔을 내민다", line: "시럽은 쓰지 않습니다.", speaker: "30대 남성 사장", seconds: 7 },
+      ],
+      confirmed: true,
+    },
   }));
 }
 
@@ -192,9 +204,20 @@ describe("POST /api/projects/[id]/cuts", () => {
     expect((await getProject(p.id, OWNER)).status).not.toBe("cuts");
   });
 
-  it("구성 시절 대본(문단만 있는)도 400 — 원고를 다시 써야 자를 수 있다", async () => {
+  // ★ 선행 조건이 원고가 아니라 **확정된 시나리오**다(2026-08-16). 원고가 멀쩡히 있어도
+  //   시나리오를 안 확정했으면 나눌 것이 없다 — 컷은 시나리오 장면에서 나온다.
+  it("시나리오를 확정하지 않았으면 400 — 원고가 있어도 마찬가지다", async () => {
     const p = await projectWithScript();
-    await updateProject(p.id, OWNER, (proj) => ({ ...proj, script: { paragraphs: [{ text: "옛 문단" }], version: 1 } }));
+    await updateProject(p.id, OWNER, (proj) => ({ ...proj, scenario: { ...proj.scenario, confirmed: false } }));
+    const res = await cutsPOST(patchReq({}), ctx(p.id));
+    expect(res.status).toBe(400);
+    expect(pipelineMock.run).not.toHaveBeenCalled();
+  });
+
+  // 옛 프로젝트(시나리오가 아예 없는)도 같은 문에서 걸린다 — ②로 돌아가 만들면 된다.
+  it("시나리오가 없는 옛 프로젝트도 400", async () => {
+    const p = await projectWithScript();
+    await updateProject(p.id, OWNER, (proj) => ({ ...proj, scenario: null }));
     const res = await cutsPOST(patchReq({}), ctx(p.id));
     expect(res.status).toBe(400);
     expect(pipelineMock.run).not.toHaveBeenCalled();

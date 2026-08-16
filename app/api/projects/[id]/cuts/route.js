@@ -10,10 +10,11 @@ export const POST = withUser(async (req, { params }, user) => {
   // ★ 광고 문서(kind:"ad")는 이 경로가 다루지 않는다 — /api/ads/* 가 다룬다.
   // 없는 것과 같이 404 다: 남의 것이 아니라 "이 문 뒤에 없는 것"이라서다.
   if (!project || project.kind === "ad") return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
-  // 컷은 원고를 잘라서 만든다 — 원고가 없으면 자를 것도, 그릴 근거도 없다.
-  // 구성 시절 프로젝트(paragraphs만 있는)도 여기서 걸린다: 대본을 다시 쓰면 원고가 생긴다.
-  if (!project.script?.text) {
-    return Response.json({ error: "대본을 먼저 만들어 주세요" }, { status: 400 });
+  // 컷은 시나리오에서 나온다 — 확정된 시나리오가 없으면 나눌 것이 없다(2026-08-16).
+  // 예전에는 원고(script.text)를 봤다. 옛 프로젝트는 시나리오가 없어 여기서 걸린다 —
+  // 그 프로젝트들은 ②로 돌아가 시나리오를 만들면 된다.
+  if (!project.scenario?.confirmed || !(project.scenario.shots || []).length) {
+    return Response.json({ error: "시나리오를 먼저 확정해 주세요" }, { status: 400 });
   }
 
   // 화면 비율 — 이미지 생성이 이 값을 쓴다. 보내지 않으면 기존 설정(기본 9:16)을 유지한다.
