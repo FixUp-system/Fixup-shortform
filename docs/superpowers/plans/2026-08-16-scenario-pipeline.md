@@ -1423,6 +1423,14 @@ describe("②시나리오 화면", () => {
     expect(page, "409(이미 나눈 컷)를 정상으로 봐야 한다").toContain("409");
   });
 
+  // ★ 다시 나누면 그 컷의 그림·영상이 사라진다. 서버의 409 는 이제 낡은 컷을 막지 않으므로
+  //   (Task 7 의 각인) 여기서 안 물어보면 산 것이 말없이 날아간다.
+  it("★ 낡은 컷을 다시 나누기 전에 물어본다", () => {
+    expect(page).toContain("areCutsStale");
+    expect(page).toMatch(/useDialog|confirm\(\{/);
+    expect(page, "무엇을 잃는지 말해야 한다").toMatch(/사라져요|사라집니다/);
+  });
+
   it("★ setInterval 을 직접 돌리지 않는다", () => {
     expect(page).not.toContain("setInterval");
   });
@@ -1452,11 +1460,15 @@ import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 import BackButton from "../../../../components/BackButton";
 import { checkScenario, scenarioSeconds } from "../../../../lib/scenario-rules";
+// 낡음 판정과 확인 대화 — 다시 나누면 산 그림·영상이 사라지므로 반드시 물어본다
+import { areCutsStale } from "../../../../lib/steps";
+import { useDialog } from "../../../../components/DialogProvider";
 
 export default function ScenarioStepPage() {
   const { id } = useParams();
   const router = useRouter();
   const { project, setProject, load } = useProject();
+  const { confirm: ask } = useDialog();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const madeFor = useRef(null);
@@ -1497,6 +1509,18 @@ export default function ScenarioStepPage() {
   };
 
   async function confirm() {
+    // ★ 이미 만든 컷이 시나리오와 어긋나면 다시 나눠야 하고, 그때 그 컷에 딸린 그림·클립이
+    //   사라진다. 막는 것은 서버(409)가 아니라 여기다 — 서버가 막으면 고쳐도 반영이 안 되고,
+    //   안 물어보면 산 것이 말없이 날아간다.
+    if (areCutsStale(project)) {
+      const ok = await ask({
+        title: "고친 시나리오로 다시 나눌까요?",
+        body: "이미 만든 컷과 거기 딸린 그림·영상이 사라져요.
+쓴 크레딧은 돌아오지 않아요.",
+        confirmLabel: "다시 나누기",
+      });
+      if (!ok) return;
+    }
     setBusy(true); setErr("");
     const res = await fetch(`/api/projects/${id}/scenario`, {
       method: "PATCH",
