@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { generateScenario } from "../lib/scenario.js";
+import { buildScenarioMessages, generateScenario } from "../lib/scenario.js";
 
 const project = {
   id: "aaaaaaaa-0000-4000-8000-000000000002",
@@ -17,6 +17,20 @@ describe("generateScenario", () => {
     expect(call).toHaveBeenCalledTimes(1);
     expect(got.problems).toEqual([]);
     expect(got.scenario.shots).toHaveLength(4);
+    // calls 는 반환 계약이다 — mock 호출 수만 세면 이 필드가 틀려도 아무도 모른다
+    expect(got.calls).toBe(1);
+  });
+
+  // 원장에 남는 이름과 지문·주인이 실제로 실리는가.
+  // stage 가 "대본" 으로 바뀌어도 위 테스트들은 전부 그린이다 — 그러면 돈이 어디로 갔는지
+  // 원장이 거짓말을 한다.
+  it("★ 부를 때 원장 이름(시나리오)·지문·프로젝트 id 를 함께 싣는다", async () => {
+    const call = vi.fn(async () => good);
+    await generateScenario(project, { call });
+    const first = call.mock.calls[0][0];
+    expect(first.stage).toBe("시나리오");
+    expect(first.system).toBe(buildScenarioMessages(project).system);
+    expect(first.projectId).toBe(project.id);
   });
 
   it("★ 규칙에 걸리면 사유를 붙여 한 번 더 부른다", async () => {
@@ -29,6 +43,7 @@ describe("generateScenario", () => {
     expect(last.content).toContain("[다시]");
     expect(last.content).toContain("25");
     expect(got.problems).toEqual([]);
+    expect(got.calls).toBe(2);
   });
 
   it("★ 두 번째도 걸리면 그대로 돌려준다 — 코드가 초를 주무르지 않는다", async () => {
@@ -39,6 +54,7 @@ describe("generateScenario", () => {
     expect(got.problems.length).toBeGreaterThan(0);
     // 초를 몰래 고치지 않았다
     expect(got.scenario.shots.map((s) => s.seconds)).toEqual([8, 8, 5, 4]);
+    expect(got.calls).toBe(2);
   });
 
   it("★ 모양이 깨진 답은 다시 부른다", async () => {
@@ -46,6 +62,7 @@ describe("generateScenario", () => {
     const got = await generateScenario(project, { call });
     expect(call).toHaveBeenCalledTimes(2);
     expect(got.scenario.shots).toHaveLength(4);
+    expect(got.calls).toBe(2);
   });
 
   it("★ 두 번 다 모양이 깨지면 scenario 가 null 이다", async () => {
@@ -53,5 +70,6 @@ describe("generateScenario", () => {
     const got = await generateScenario(project, { call });
     expect(got.scenario).toBe(null);
     expect(got.problems.length).toBeGreaterThan(0);
+    expect(got.calls).toBe(2);
   });
 });
