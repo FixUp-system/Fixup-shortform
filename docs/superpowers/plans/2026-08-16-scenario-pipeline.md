@@ -514,7 +514,7 @@ describe("generateScenario", () => {
     const got = await generateScenario(project, { call });
     expect(call).toHaveBeenCalledTimes(1);
     expect(got.problems).toEqual([]);
-    expect(got.scenario.shots).toHaveLength(3);
+    expect(got.scenario.shots).toHaveLength(4);
   });
 
   it("★ 규칙에 걸리면 사유를 붙여 한 번 더 부른다", async () => {
@@ -533,7 +533,7 @@ describe("generateScenario", () => {
     const call = vi.fn(async () => bad);
     const got = await generateScenario(project, { call });
     expect(call).toHaveBeenCalledTimes(2);
-    expect(got.scenario.shots).toHaveLength(3);
+    expect(got.scenario.shots).toHaveLength(4);
     expect(got.problems.length).toBeGreaterThan(0);
     // 초를 몰래 고치지 않았다
     expect(got.scenario.shots.map((s) => s.seconds)).toEqual([8, 8, 5, 4]);
@@ -543,7 +543,7 @@ describe("generateScenario", () => {
     const call = vi.fn().mockResolvedValueOnce({ shots: [] }).mockResolvedValueOnce(good);
     const got = await generateScenario(project, { call });
     expect(call).toHaveBeenCalledTimes(2);
-    expect(got.scenario.shots).toHaveLength(3);
+    expect(got.scenario.shots).toHaveLength(4);
   });
 
   it("★ 두 번 다 모양이 깨지면 scenario 가 null 이다", async () => {
@@ -805,7 +805,7 @@ describe("POST /scenario", () => {
     const res = await POST(req(), { params: Promise.resolve({ id }) });
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.scenario.shots).toHaveLength(3);
+    expect(body.scenario.shots).toHaveLength(4);
     expect(body.problems).toEqual([]);
     expect((await getProject(id, OWNER)).scenario.confirmed).toBe(false);
   });
@@ -839,7 +839,7 @@ describe("PATCH /scenario", () => {
     const res = await PATCH(patch({ scenario: bad }), { params: Promise.resolve({ id }) });
     expect(res.status).toBe(200);
     expect((await res.json()).problems.length).toBeGreaterThan(0);
-    expect((await getProject(id, OWNER)).scenario.shots).toHaveLength(3);
+    expect((await getProject(id, OWNER)).scenario.shots).toHaveLength(4);
   });
 
   it("★ 확정은 규칙을 지켜야 한다 — 걸리면 400", async () => {
