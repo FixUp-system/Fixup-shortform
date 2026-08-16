@@ -849,6 +849,15 @@ describe("PATCH /scenario", () => {
     expect((await getProject(id, OWNER)).scenario?.confirmed).toBeFalsy();
   });
 
+  it("★ 길이를 안 고른 프로젝트는 확정할 수 없다 — ok:true 가 안전과 같지 않다", async () => {
+    const p = await createProject({ settings: { i2v_model: "seedance-2.0" }, material: { text: "동네 카페 소개", photos: [] }, ownerId: OWNER });
+    // checkScenario 는 목표가 없으면 합·개수를 안 재므로 ok:true 다 — 그래도 막혀야 한다
+    const res = await PATCH(patch({ scenario: good, confirmed: true }), { params: Promise.resolve({ id: p.id }) });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain("길이");
+    expect((await getProject(p.id, OWNER)).scenario?.confirmed).toBeFalsy();
+  });
+
   it("규칙을 지키면 확정된다", async () => {
     const res = await PATCH(patch({ scenario: good, confirmed: true }), { params: Promise.resolve({ id }) });
     expect(res.status).toBe(200);
@@ -926,6 +935,13 @@ export const PATCH = withUser(async (req, { params }, user) => {
 
   const { ok, problems } = checkScenario(scenario, project);
   const confirming = body?.confirmed === true;
+  // ★ 길이를 안 고른 프로젝트는 확정할 수 없다. checkScenario 는 목표가 없으면 합·개수를
+  //   아예 안 재고 ok:true 를 준다(tests/scenario-rules.test.js 가 그 동작을 못 박아 뒀다) —
+  //   즉 **ok:true 가 "확정해도 안전"과 같지 않다.** 여기가 그 차이를 메우는 자리이고,
+  //   ③목소리부터 돈이 나가므로 이 문이 마지막 무료 관문이다.
+  if (confirming && !Number(project?.settings?.target_seconds)) {
+    return Response.json({ error: "영상 길이를 먼저 골라 주세요" }, { status: 400 });
+  }
   if (confirming && !ok) {
     return Response.json({ error: problems.join(" "), problems }, { status: 400 });
   }
@@ -941,7 +957,7 @@ export const PATCH = withUser(async (req, { params }, user) => {
 - [ ] **Step 4: 테스트 통과를 확인한다**
 
 Run: `npx vitest run tests/scenario-route.test.js`
-Expected: PASS (8 tests)
+Expected: PASS (9 tests)
 
 - [ ] **Step 5: 변이 실험**
 
@@ -1303,6 +1319,13 @@ describe("②시나리오 화면", () => {
   });
 
   // 이 저장소는 setInterval 을 화면에서 직접 돌리는 것을 금지한다(lib/poll.js 한 벌)
+  // ★ 옛 ②대본 화면이 POST /cuts 를 불렀다. 그 화면이 지워지므로 이 자리가 물려받지 않으면
+  //   컷을 만드는 자리가 저장소에서 사라진다.
+  it("★ 확정한 뒤 컷 분할을 시작한다", () => {
+    expect(page).toMatch(/\/cuts`/);
+    expect(page, "409(이미 나눈 컷)를 정상으로 봐야 한다").toContain("409");
+  });
+
   it("★ setInterval 을 직접 돌리지 않는다", () => {
     expect(page).not.toContain("setInterval");
   });
@@ -1385,6 +1408,18 @@ export default function ScenarioStepPage() {
     });
     setBusy(false);
     if (!res.ok) { setErr((await res.json().catch(() => ({}))).error || "저장하지 못했어요"); return; }
+    // ★ 컷 분할을 여기서 시작한다. 옛 ②대본 화면이 하던 일이다(app/create/[id]/script/page.js
+    //   의 approve). 그 화면이 없어지므로 이 자리가 물려받지 않으면 **컷을 만드는 자리가
+    //   저장소에서 사라진다** — 사장님이 ③목소리에서 "분할 실패" 안내를 거쳐 [다시 시도]를
+    //   눌러야만 진행되는 흐름이 된다.
+    //   409(이미 나눈 컷이 있음)는 정상이다 — 되돌아와 다시 확정한 경우다.
+    const split = await fetch(`/api/projects/${id}/cuts`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: "{}",
+    }).catch(() => null);
+    if (split && !split.ok && split.status !== 409) {
+      setErr((await split.json().catch(() => ({}))).error || "컷을 나누지 못했어요");
+      return;
+    }
     await load(id).catch(() => {});
     // 화면에서 바로 다음 주소로 밀지 않는다 — 가드가 되돌려보낸다(③목소리 화면과 같은 규칙)
     router.push(`/create/${id}/voice`);
