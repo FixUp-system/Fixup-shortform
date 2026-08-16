@@ -505,6 +505,57 @@ describe("isReachable", () => {
   });
 });
 
+// ★★ 2026-08-16 최종 리뷰 Important 2 — 이 브랜치 앞의 프로젝트에는 scenario 가 아예 없다.
+//    확정만을 기준으로 삼으면 컷·그림·클립까지 값을 치른 프로젝트가 ②시나리오로 되튕기고,
+//    그 화면은 들어서자마자 유료 LLM 을 부르며 거기서 확정하면 컷이 지워진다.
+//    **유일한 출구가 산 것을 부수는** 상태였다.
+describe("옛 프로젝트(시나리오가 없는 프로젝트)는 갇히지 않는다", () => {
+  // 컷마다 소리가 다 있다 = ③목소리를 지났다
+  const old = {
+    status: "voice",
+    cuts: [
+      { idx: 0, sentence: "가", audio: { url: "a0" } },
+      { idx: 1, sentence: "나", audio: { url: "a1" } },
+    ],
+  };
+
+  it("④이미지가 열린다 — 산출물이 있으면 지나온 것이다", () => {
+    expect(isReachable("images", old)).toBe(true);
+  });
+
+  it("현재 단계도 ②시나리오가 아니다 — 이어서 만들기가 유료 화면으로 끌고 가지 않는다", () => {
+    expect(currentStepKey(old)).toBe("images");
+  });
+
+  it("그림까지 있으면 ⑤영상이 열린다", () => {
+    const withImages = {
+      ...old,
+      status: "images",
+      cuts: old.cuts.map((c) => ({ ...c, image: { url: `i${c.idx}` } })),
+    };
+    expect(isReachable("video", withImages)).toBe(true);
+  });
+
+  // ★ 반대 방향 — 이 브랜치에서 만든 프로젝트는 확정 없이 못 넘어간다.
+  //   그쪽은 시나리오가 **있고** 확정만 안 된 것이라, 확정이 마지막 무료 관문이다.
+  it("★ 시나리오가 있는데 확정을 안 했으면 여전히 안 열린다", () => {
+    const editing = {
+      status: "voice",
+      scenario: { shots: [{ beat: "문을 연다" }], confirmed: false },
+      cuts: old.cuts,
+      material: { text: "자료" },
+    };
+    expect(isReachable("images", editing)).toBe(false);
+    expect(currentStepKey(editing)).toBe("scenario");
+  });
+
+  it("컷이 하나도 없으면 옛 프로젝트로 치지 않는다 — 산출물이 없으면 지나온 근거가 없다", () => {
+    const fresh = { status: "briefing", material: { text: "자료" } };
+    expect(currentStepKey(fresh)).toBe("scenario");
+    expect(isReachable("images", fresh)).toBe(false);
+  });
+});
+
 describe("clipKey — 속도가 바뀌면 클립이 낡는다", () => {
   const base = { image: { url: "i0" }, seconds: 6, motion: "천천히" };
 
@@ -1082,8 +1133,11 @@ describe("②시나리오 — 대본을 대신한다", () => {
   //   둘을 한 테스트가 다 잡는 것처럼 이름 붙이면, 나중에 한쪽이 지워져도 아무도 모른다.
   it("★ 산출물 탈출구도 시나리오 확정을 요구한다 — 확정 없이 산출물만으로 열리지 않는다", () => {
     const cuts = [{ idx: 0, audio: { url: "a" } }];
-    const noScenario = { briefing: { confirmed: true }, status: "draft", cuts };
-    expect(isReachable("images", noScenario)).toBe(false);
+    // ★ 픽스처는 **시나리오를 들고 있되 확정만 안 한** 모양이다 — 시나리오가 아예 없는
+    //   프로젝트는 이 브랜치 앞의 것이라 이제 탈출구가 열린다(2026-08-16 Important 2,
+    //   위 "옛 프로젝트는 갇히지 않는다" 참고). 여기서 재는 것은 확정 게이트다.
+    const unconfirmed = { scenario: { shots: [{ beat: "가" }], confirmed: false }, status: "draft", cuts };
+    expect(isReachable("images", unconfirmed)).toBe(false);
     const withScenario = { scenario: { confirmed: true }, status: "draft", cuts };
     expect(isReachable("images", withScenario)).toBe(true);
   });

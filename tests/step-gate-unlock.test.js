@@ -80,14 +80,18 @@ describe("잠금 탈출 — 산출물이 다 있으면 다음 단계가 열린�
 
   // ①자료를 끝냈다는 신호는 2026-08-16 부터 시나리오 확정이다 — 픽스처가 briefing 을 들고
   // 있으면 게이트가 아직 거기 있는 것처럼 읽힌다(재는 불변은 그대로다).
+  //
+  // ★ 픽스처가 **시나리오를 들고 있되 확정만 안 한** 모양이어야 한다(2026-08-16 최종 리뷰
+  //   Important 2). `scenario: null` 은 이 브랜치 **앞의** 프로젝트라 이제 열리는 것이 맞다 —
+  //   그 모양으로 재면 이 테스트는 "확정 게이트"가 아니라 옛 프로젝트의 탈출구를 막게 된다.
   it("★ 시나리오를 확정 안 했으면 산출물이 있어도 안 연다 — currentStepKey 의 불변을 지킨다", () => {
-    const noScenario = {
-      scenario: null,
+    const unconfirmed = {
+      scenario: { shots: [{ beat: "문을 연다" }], confirmed: false },
       status: "voice",
       cuts: [{ idx: 0, image: { url: "a" }, state: "done" }],
     };
-    expect(currentStepKey(noScenario)).toBe("material");
-    expect(isReachable("video", noScenario)).toBe(false);
+    expect(currentStepKey(unconfirmed)).toBe("material");
+    expect(isReachable("video", unconfirmed)).toBe(false);
   });
 
   it("실패로 끝난 컷도 끝난 것으로 센다 — 파이프라인이 단계를 넘기는 규칙과 같다", () => {
