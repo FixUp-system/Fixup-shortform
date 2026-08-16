@@ -1278,6 +1278,49 @@ if (!project.scenario?.confirmed || !(project.scenario.shots || []).length) {
 언제나 1 이고, `areCutsStale` 은 `project.script?.version` 이 없으면 false 라 멱등 가드(409)가
 그대로 돈다.
 
+★★ **컷이 어느 시나리오에서 나왔는지 각인해야 한다.** `areCutsStale` 은 `script.version`
+이 없으면 언제나 `false` 인데 시나리오 프로젝트는 늘 그렇다 — 그래서 사장님이 시나리오를
+고치고 다시 확정해도 `POST /cuts` 가 **409 로 영구 차단**하고 컷은 옛 시나리오 그대로 남는다.
+**시나리오를 고칠 수 있게 하는 것이 이 기능의 전부인데 고쳐도 반영이 안 된다.**
+
+버전 번호가 아니라 각인으로 판정한다(이 저장소 규율):
+
+```js
+// lib/steps.js — 컷이 어느 시나리오에서 나왔는가.
+// 각인에 넣는 것은 **컷과 그 뒤 두 패스가 실제로 읽는 값**이다: 대사·초(컷 자체) 와
+// beat·speaker(화면 설계·캐스팅의 입력). 넷 중 하나라도 바뀌면 컷을 다시 나눠야 한다.
+export function scenarioCutsKey(scenario) {
+  const shots = Array.isArray(scenario?.shots) ? scenario.shots : [];
+  return shots
+    .map((s) => [
+      (s?.line || "").trim(),
+      Math.round(Number(s?.seconds) || 0),
+      (s?.beat || "").trim(),
+      (s?.speaker || "").trim(),
+    ].join("|"))
+    .join("//");
+}
+
+export function areCutsStale(project) {
+  if (!(project?.cuts || []).length) return false;
+  // 시나리오에서 나온 컷 — 시나리오를 고치면 낡는다
+  if ((project?.scenario?.shots || []).length) {
+    return project.cuts_scenario_of !== scenarioCutsKey(project.scenario);
+  }
+  // 옛 프로젝트(원고에서 나온 컷)는 지금까지와 같다
+  const version = project?.script?.version;
+  if (!version) return false;
+  return project.cuts_script_version !== version;
+}
+```
+
+`POST /cuts` 는 컷을 비울 때 그 각인을 함께 적는다:
+`cuts_scenario_of: scenarioCutsKey(project.scenario)`.
+
+⚠️ **다시 나누면 그 컷에 딸린 그림·클립이 사라진다.** 그것이 맞다 — 사장님이 계획을 고쳤으면
+옛 계획에서 나온 산출물은 무효다(원고를 다시 쓰던 시절과 같은 규칙). 실수로 날리는 것을 막는
+것은 409 가 아니라 화면의 확인이다.
+
 ★★ **`subjectOf` 도 시나리오를 봐야 한다.** 그 함수는 `briefing.focus`·`briefing.topic`
 만 읽는데, **넷**이 그것을 쓴다: `buildImagePrompt`(이미지 프롬프트의 제품 앵커) ·
 `clipContextClause`(클립 프롬프트의 `The subject is:`) · `clipKey`(클립 각인) ·
