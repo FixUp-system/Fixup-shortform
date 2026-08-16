@@ -276,13 +276,38 @@ describe("음성을 누가 만드는가 — 모델이 정한다", () => {
       expect(projectSpeaks(seed(person([0, 1]), [{ idx: 0, sentence: "  " }, { idx: 1 }]))).toBe(false);
     });
 
-    // ★★ 2026-08-16 최종 리뷰 Critical 1 — 시나리오가 "화면 밖 목소리"라고 적은 컷은
-    //    캐스팅 결과와 **무관하게** 이 프로젝트를 말하지 않는 쪽으로 내린다.
-    //    예전에는 캐스팅이 그 컷에 사람을 붙였는지로 갈렸다(같은 시나리오가 두 결과를 냈다).
-    it("★ 화면 밖 목소리 컷이 하나라도 있으면 말하지 않는다 — 캐스팅이 붙어 있어도", () => {
+    // ★★ 2026-08-17 전제 정정 — **Seedance 는 내레이션을 한다**(광고에서 흔한 기법:
+    //    자동차 광고에서 화면 중간에 "누구보다 빠르게. 그리고 편안하게." 가 들어가는 그것).
+    //    2026-08-16 웨이브는 그 능력이 미검증이라고 보고 내레이션 컷 하나로 한 편을 통째로
+    //    TTS 로 내렸다. 그 전제가 틀렸으므로 되돌린다.
+    it("★ 화면 밖 목소리 컷이 있어도 프로젝트는 말한다 — 그 대사는 내레이터가 읽는다", () => {
       const narrated = [{ idx: 0, sentence: "가", narration: true }, { idx: 1, sentence: "나" }];
-      // 두 컷 다 캐스팅돼 있다 — 옛 판정이었다면 true 였다
-      expect(projectSpeaks(seed(person([0, 1]), narrated))).toBe(false);
+      expect(projectSpeaks(seed(person([0, 1]), narrated))).toBe(true);
+    });
+
+    // ★★ 함정: 바일아웃만 걷으면 아무것도 안 바뀐다. 내레이션 컷은 **정의상 화면에 사람이
+    //    없어** 캐스팅에 들어갈 수가 없고, 그러면 "대사 있는 컷마다 화면 속 화자" 조건에
+    //    대신 걸려 결과가 같다. 그래서 그 조건에서 면제한다.
+    it("★ 내레이션 컷은 캐스팅에 없어도 통과한다 — 면제하지 않으면 바일아웃을 걷어도 같은 결과다", () => {
+      const narrated = [{ idx: 0, sentence: "가", narration: true }, { idx: 1, sentence: "나" }];
+      // 컷1(화면 속 대사)만 캐스팅돼 있다. 컷0 은 내레이션이라 아무도 안 맡는다.
+      expect(projectSpeaks(seed(person([1]), narrated))).toBe(true);
+    });
+
+    // ★ 전부 내레이션인 영상(제품·정보물에서 흔하다)은 캐스팅이 비어 있다 —
+    //   `!cast.length` 가드가 남아 있으면 이 편이 여전히 통째로 TTS 로 간다.
+    it("★ 전부 내레이션이면 캐스팅이 비어 있어도 말한다", () => {
+      const allNarration = [
+        { idx: 0, sentence: "가", narration: true },
+        { idx: 1, sentence: "나", narration: true },
+      ];
+      expect(projectSpeaks(seed([], allNarration))).toBe(true);
+    });
+
+    it("★ 화면 속 대사가 하나라도 섞이면 그 컷에는 여전히 사람이 필요하다", () => {
+      const mixed = [{ idx: 0, sentence: "가", narration: true }, { idx: 1, sentence: "나" }];
+      // 컷1 을 맡은 사람이 없다 — 그 대사는 소리가 될 길이 없다
+      expect(projectSpeaks(seed([], mixed))).toBe(false);
     });
 
     it("★ 표시가 없는 옛 컷은 지금까지와 똑같이 판정한다", () => {

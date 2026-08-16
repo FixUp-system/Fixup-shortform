@@ -561,17 +561,40 @@ describe("buildClipPrompt — 이 그림이 어떻게 움직이는가", () => {
       expect(p).toContain("No talking faces or lip sync");
     });
 
-    // ★★ 2026-08-16 최종 리뷰 Critical 1 — 화면 밖 목소리로 표시된 컷.
-    //    클립에게 "보이지 않는 목소리로 읽어라"를 시키지 않는다: 그 능력은 검증된 적이 없고,
-    //    실패해도 mp4 는 나오므로 대사만 조용히 사라진다. 그 대사는 ③목소리(TTS)가 읽는다.
-    it("★ 화면 밖 목소리 컷은 립싱크를 시키지 않는다 — 그 대사는 TTS 가 읽는다", () => {
+    // ★★ 2026-08-17 전제 정정 — 화면 밖 목소리는 **클립이 읽는다**(광고에서 흔한 기법).
+    //    2026-08-16 웨이브는 미검증 능력이라 보고 이 컷을 침묵시켰다. 그 전제가 틀렸다.
+    describe("★ 화면 밖 목소리(내레이션) 갈래", () => {
       const narrated = {
         ...project,
+        scenario: { narrator_voice: "차분한 30대 남성, 낮고 단단한 톤" },
         cuts: [{ idx: 0, sentence: "안녕하세요", narration: true }],
       };
-      const p = buildClipPrompt({ idx: 0, sentence: "안녕하세요", narration: true, motion: "천천히" }, narrated);
-      expect(p).toContain("No talking faces or lip sync");
-      expect(p).not.toContain("speaks to the camera");
+      const cut = { idx: 0, sentence: "안녕하세요", narration: true, motion: "천천히" };
+
+      it("보이스오버로 읽게 하고 입모양은 요구하지 않는다", () => {
+        const p = buildClipPrompt(cut, narrated);
+        expect(p).toContain("A narrator speaks in voiceover, off-screen");
+        expect(p).toContain("no one in frame speaks or moves their lips");
+        // 화면에 사람이 없는데 립싱크를 시키면 모델이 없는 사람을 만들어 넣는다
+        expect(p).not.toContain("speaks to the camera");
+      });
+
+      it("대사를 원문 그대로, 내레이터 목소리와 함께 싣는다", () => {
+        const p = buildClipPrompt(cut, narrated);
+        expect(p).toContain('Says exactly, in Korean: "안녕하세요"');
+        expect(p).toContain("Voice: 차분한 30대 남성, 낮고 단단한 톤.");
+        // 캐스팅 인물의 목소리가 아니다 — 화면에 없는 사람이다
+        expect(p).not.toContain("중저음, 차분하고 단단한 톤");
+        expect(p).not.toContain("20대 동양인 남성 농구 선수: ");
+      });
+
+      // 옛 프로젝트(narrator_voice 가 없다)도 대사는 실린다 — 목소리 절만 안 붙는다
+      it("내레이터 목소리가 없으면 그 절만 빠진다", () => {
+        const p = buildClipPrompt(cut, { ...narrated, scenario: null });
+        expect(p).toContain("A narrator speaks in voiceover, off-screen");
+        expect(p).toContain('Says exactly, in Korean: "안녕하세요"');
+        expect(p).not.toContain("Voice:");
+      });
     });
   });
 });

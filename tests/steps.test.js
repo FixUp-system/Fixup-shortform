@@ -652,18 +652,47 @@ describe("clipKey — 말하는 컷은 대사·목소리에서 파생된다", ()
     expect(isClipStale(saved, withVoice("높은 톤"))).toBe(true);
   });
 
-  // ★★ 2026-08-16 최종 리뷰 Critical 1 — 화면 밖 목소리(narration)를 각인에 **따로 안 넣는** 근거.
-  //    각인에 담는 기준은 "그 값이 프롬프트에 실렸는가" 하나다. narration 이 프롬프트에 닿는
-  //    길은 speechFor 뿐이고 그 결과는 위 대사·목소리 절의 유무로 이미 각인된다 — 프롬프트가
-  //    같은데 각인만 달라지면 거짓 낡음이 유료 [다시 만들기]를 연다.
-  it("★ 화면 밖 목소리 컷은 프롬프트도 각인도 안 말하는 컷과 같다 — 각인이 프롬프트를 따라간다", async () => {
+  // ★★ 2026-08-17 — 화면 밖 목소리도 이제 클립이 읽는다. 그래서 프롬프트가 갈리고,
+  //    **프롬프트가 갈리면 각인도 갈려야 한다**. 안 갈리면 옛 클립이 새 프롬프트의 얼굴로
+  //    그대로 서빙된다(같은 대사인데 하나는 립싱크, 하나는 보이스오버다).
+  const narratedCut = { ...cut, narration: true };
+  const narrated = {
+    ...speaking,
+    scenario: { narrator_voice: "차분한 30대 남성" },
+    cuts: [{ idx: 0, sentence: "안녕하세요", narration: true }],
+  };
+
+  it("★ 같은 대사라도 화면 속 대사와 내레이션은 각인이 다르다", async () => {
     const { buildClipPrompt } = await import("../lib/cuts.js");
-    const narratedCut = { ...cut, narration: true };
-    const narrated = { ...speaking, cuts: [{ idx: 0, sentence: "안녕하세요", narration: true }] };
-    // 말하는 모델인데도 안 말하는 가지로 간다(projectSpeaks 가 false)
-    expect(buildClipPrompt(narratedCut, narrated)).toContain("No talking faces or lip sync");
-    // 각인은 그 프롬프트와 같은 것을 본다 — 말하는 절이 아예 안 붙는다
-    expect(clipKey(narratedCut, narrated)).toBe(clipKey(cut));
+    // 프롬프트가 실제로 갈린다 — 각인이 따라가야 할 근거
+    expect(buildClipPrompt(cut, speaking)).not.toBe(buildClipPrompt(narratedCut, narrated));
+    expect(clipKey(narratedCut, narrated)).not.toBe(clipKey(cut, speaking));
+    // 안 말하는 컷과도 다르다 — 내레이션 컷은 말한다
+    expect(clipKey(narratedCut, narrated)).not.toBe(clipKey(cut));
+    // ★ 목소리 설명이 **우연히 같아도** 갈려야 한다. 목소리가 다르니까 갈리는 것에
+    //   기대면, 사장님이 내레이터 목소리를 캐스팅 인물과 같게 적는 순간 각인이 겹쳐
+    //   립싱크 클립이 보이스오버 프롬프트의 얼굴로 서빙된다.
+    //   who 까지 비는 캐스팅(지금 validateCast 는 그런 인물을 버리므로 방어적 단언이다)에서는
+    //   `|narration` 표시가 **유일한 차이**다 — 그 표시를 걷으면 이 단언이 무너진다.
+    const sameVoice = { ...narrated, scenario: { narrator_voice: "중저음" } };
+    const noWho = { ...speaking, cast: [{ id: "c1", who: "", voice: "중저음", cuts: [0] }] };
+    expect(buildClipPrompt(narratedCut, sameVoice)).not.toBe(buildClipPrompt(cut, noWho));
+    expect(clipKey(narratedCut, sameVoice)).not.toBe(clipKey(cut, noWho));
+  });
+
+  it("★ 내레이터 목소리를 고치면 그 컷의 클립이 낡는다 — 목소리가 프롬프트에 실린다", () => {
+    const other = { ...narrated, scenario: { narrator_voice: "밝은 20대 여성" } };
+    expect(clipKey(narratedCut, narrated)).not.toBe(clipKey(narratedCut, other));
+    const saved = { ...narratedCut, video: { url: "v", of: clipKey(narratedCut, narrated) } };
+    expect(isClipStale(saved, narrated)).toBe(false);
+    expect(isClipStale(saved, other)).toBe(true);
+  });
+
+  // ★ 옛 컷(narration 필드가 없는 컷)의 각인은 **글자 그대로** 그대로여야 한다 —
+  //   바뀌면 이미 값을 치른 클립이 통째로 낡아 다시 산다(~$9/편).
+  it("★ narration 이 없는 컷의 각인은 한 글자도 안 바뀐다", () => {
+    expect(clipKey(cut, speaking)).toBe("u|5|천천히|안녕하세요|중저음|20대 남성");
+    expect(clipKey(cut)).toBe("u|5|천천히");
   });
 });
 
