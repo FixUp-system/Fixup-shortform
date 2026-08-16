@@ -276,6 +276,19 @@ describe("음성을 누가 만드는가 — 모델이 정한다", () => {
       expect(projectSpeaks(seed(person([0, 1]), [{ idx: 0, sentence: "  " }, { idx: 1 }]))).toBe(false);
     });
 
+    // ★★ 2026-08-16 최종 리뷰 Critical 1 — 시나리오가 "화면 밖 목소리"라고 적은 컷은
+    //    캐스팅 결과와 **무관하게** 이 프로젝트를 말하지 않는 쪽으로 내린다.
+    //    예전에는 캐스팅이 그 컷에 사람을 붙였는지로 갈렸다(같은 시나리오가 두 결과를 냈다).
+    it("★ 화면 밖 목소리 컷이 하나라도 있으면 말하지 않는다 — 캐스팅이 붙어 있어도", () => {
+      const narrated = [{ idx: 0, sentence: "가", narration: true }, { idx: 1, sentence: "나" }];
+      // 두 컷 다 캐스팅돼 있다 — 옛 판정이었다면 true 였다
+      expect(projectSpeaks(seed(person([0, 1]), narrated))).toBe(false);
+    });
+
+    it("★ 표시가 없는 옛 컷은 지금까지와 똑같이 판정한다", () => {
+      expect(projectSpeaks(seed(person([0, 1]), cuts2))).toBe(true);
+    });
+
     it("인물이 아예 없으면 말하지 않는다", () => {
       expect(projectSpeaks(seed([], cuts2))).toBe(false);
       expect(projectSpeaks({ settings: { i2v_model: "seedance-2.0" }, cuts: cuts2 })).toBe(false);

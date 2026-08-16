@@ -54,3 +54,29 @@ describe("shotsToCuts", () => {
     expect(cut.speaker).toBeUndefined();
   });
 });
+
+// ★★ 화면 밖 목소리는 시나리오가 정하고 코드가 읽는다(2026-08-16 최종 리뷰 Critical 1).
+//    예전에는 이 결정이 컷에 안 남아 "캐스팅이 그 컷에 사람을 붙였는가"로 추론됐다.
+describe("shotsToCuts — 화면 밖 목소리(narration)", () => {
+  const of = (speaker, line = "국산 딸기를 씁니다.") =>
+    shotsToCuts({ shots: [{ beat: "딸기를 간다", line, speaker, seconds: 8 }] })[0];
+
+  it("화자가 내레이션이면 narration 을 남긴다", () => {
+    expect(of("내레이션").narration).toBe(true);
+  });
+
+  it("표기가 흔들려도 같은 것으로 본다 — 사장님이 직접 고치는 칸이다", () => {
+    expect(of("나레이션").narration).toBe(true);
+    expect(of("내레이션 (여성)").narration).toBe(true);
+    expect(of(" 내레이터 ").narration).toBe(true);
+  });
+
+  it("★ 화면에 보이는 사람이 말하면 필드가 아예 없다 — 옛 컷과 모양이 글자 그대로 같다", () => {
+    const cut = of("40대 남성 제빵사");
+    expect("narration" in cut).toBe(false);
+  });
+
+  it("★ 대사가 없으면 화자를 보지 않는다 — 말하지 않는 컷에 표시할 것이 없다", () => {
+    expect("narration" in of("내레이션", "")).toBe(false);
+  });
+});

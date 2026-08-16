@@ -560,6 +560,20 @@ describe("clipKey — 말하는 컷은 대사·목소리에서 파생된다", ()
     expect(isClipStale(saved, speaking)).toBe(false);
     expect(isClipStale(saved, withVoice("높은 톤"))).toBe(true);
   });
+
+  // ★★ 2026-08-16 최종 리뷰 Critical 1 — 화면 밖 목소리(narration)를 각인에 **따로 안 넣는** 근거.
+  //    각인에 담는 기준은 "그 값이 프롬프트에 실렸는가" 하나다. narration 이 프롬프트에 닿는
+  //    길은 speechFor 뿐이고 그 결과는 위 대사·목소리 절의 유무로 이미 각인된다 — 프롬프트가
+  //    같은데 각인만 달라지면 거짓 낡음이 유료 [다시 만들기]를 연다.
+  it("★ 화면 밖 목소리 컷은 프롬프트도 각인도 안 말하는 컷과 같다 — 각인이 프롬프트를 따라간다", async () => {
+    const { buildClipPrompt } = await import("../lib/cuts.js");
+    const narratedCut = { ...cut, narration: true };
+    const narrated = { ...speaking, cuts: [{ idx: 0, sentence: "안녕하세요", narration: true }] };
+    // 말하는 모델인데도 안 말하는 가지로 간다(projectSpeaks 가 false)
+    expect(buildClipPrompt(narratedCut, narrated)).toContain("No talking faces or lip sync");
+    // 각인은 그 프롬프트와 같은 것을 본다 — 말하는 절이 아예 안 붙는다
+    expect(clipKey(narratedCut, narrated)).toBe(clipKey(cut));
+  });
 });
 
 describe("clipKey — 해상도", () => {

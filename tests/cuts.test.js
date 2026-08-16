@@ -560,6 +560,19 @@ describe("buildClipPrompt — 이 그림이 어떻게 움직이는가", () => {
       const p = buildClipPrompt({ idx: 0, motion: "천천히" }, project);
       expect(p).toContain("No talking faces or lip sync");
     });
+
+    // ★★ 2026-08-16 최종 리뷰 Critical 1 — 화면 밖 목소리로 표시된 컷.
+    //    클립에게 "보이지 않는 목소리로 읽어라"를 시키지 않는다: 그 능력은 검증된 적이 없고,
+    //    실패해도 mp4 는 나오므로 대사만 조용히 사라진다. 그 대사는 ③목소리(TTS)가 읽는다.
+    it("★ 화면 밖 목소리 컷은 립싱크를 시키지 않는다 — 그 대사는 TTS 가 읽는다", () => {
+      const narrated = {
+        ...project,
+        cuts: [{ idx: 0, sentence: "안녕하세요", narration: true }],
+      };
+      const p = buildClipPrompt({ idx: 0, sentence: "안녕하세요", narration: true, motion: "천천히" }, narrated);
+      expect(p).toContain("No talking faces or lip sync");
+      expect(p).not.toContain("speaks to the camera");
+    });
   });
 });
 
