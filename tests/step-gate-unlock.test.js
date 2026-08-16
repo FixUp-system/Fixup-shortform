@@ -20,7 +20,9 @@
 import { describe, it, expect } from "vitest";
 import { isReachable, currentStepKey } from "../lib/steps.js";
 
-const confirmed = { briefing: { confirmed: true } };
+// ①자료를 끝냈다는 신호는 2026-08-16 부터 시나리오 확정이다(lib/steps.js) — 여기서 재는 것은
+// 그 게이트가 아니라 **산출물 탈출구**라, 확정만 실물 자리로 옮기고 나머지는 그대로 둔다.
+const confirmed = { scenario: { shots: [{ beat: "가" }], confirmed: true } };
 
 describe("잠금 탈출 — 산출물이 다 있으면 다음 단계가 열린다", () => {
   it("★ ④→⑤: 그림이 컷마다 다 있는데 status 가 뒤처져도 ⑤영상이 열린다 (810d2361 재현)", () => {

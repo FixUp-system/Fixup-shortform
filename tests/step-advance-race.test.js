@@ -32,7 +32,9 @@ describe("단계 전진 — 화면이 가드보다 앞서가지 않는다", () =
     // 아래 폴링 그물들은 그대로 둔다 — 화면이 status 를 기다리는 것은 여전히 옳다
     // (이 탈출구는 신호가 **유실됐을 때**의 문이지, 정상 경로의 순서를 바꾸는 것이 아니다).
     const midFlight = {
-      briefing: { confirmed: true },
+      // ①자료를 끝냈다는 신호는 이제 시나리오 확정이다(2026-08-16) — 재는 것은 그 게이트가
+      // 아니라 산출물 탈출구라, 확정 자리만 옮긴다.
+      scenario: { shots: [{ beat: "가" }], confirmed: true },
       status: "cuts",
       cuts: [{ idx: 0, audio: { url: "a" } }, { idx: 1, audio: { url: "b" } }],
     };
