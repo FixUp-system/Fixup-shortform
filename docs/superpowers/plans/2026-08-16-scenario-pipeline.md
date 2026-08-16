@@ -1050,7 +1050,9 @@ export function currentStepKey(project) {
   if (project.status === "video") return "video";
   if (project.status === "images") return "video";
   if (project.status === "voice") return "images";
-  if (project.status === "cuts") return "voice";
+  // ★ 말하는 프로젝트에는 목소리 단계가 없다 — 컷이 끝나면 바로 이미지다.
+  //   이 분기를 **떨어뜨리지 마라**: 떨어뜨리면 Seedance 프로젝트가 ③목소리로 들어간다.
+  if (project.status === "cuts") return projectSpeaks(project) ? "images" : "voice";
   return "scenario";
 }
 ```
