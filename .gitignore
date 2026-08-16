@@ -8,3 +8,6 @@ npm-debug.log*
 .DS_Store
 # dev 서버 로그 — `npm run dev > dev.log` 로 띄울 때 생긴다. 저장소에 남길 것이 아니다.
 dev.log
+
+# SDD 작업 공간 — 원장·브리프·리뷰 꾸러미. 기록은 git 이력이 남긴다
+.superpowers/
