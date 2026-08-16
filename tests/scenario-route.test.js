@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { resetMemoryStore } from "../lib/store/memory.js";
 import { createProject, getProject } from "../lib/projects.js";
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
+import { BudgetExceeded } from "../lib/costs.js";
 
 const OWNER = "44444444-4444-4444-4444-444444444444";
 const AUTH = { [USER_HEADER]: OWNER, [STATUS_HEADER]: "approved", [ROLE_HEADER]: "user" };
@@ -50,11 +51,27 @@ describe("POST /scenario", () => {
     const res = await POST(req(), { params: Promise.resolve({ id }) });
     expect(res.status).toBe(200);
     expect((await res.json()).problems[0]).toContain("25");
+    // 사유만 돌려주고 저장은 안 하면 사장님은 고칠 것을 화면에서 못 연다 — 저장까지가 계약이다
+    expect((await getProject(id, OWNER)).scenario.shots).toHaveLength(4);
   });
 
-  it("★ 만들지 못하면 502 다", async () => {
+  it("★ 만들지 못하면 502 다 — 그리고 아무것도 안 쓴다", async () => {
     gen.run.mockResolvedValue({ scenario: null, problems: ["형식이 맞지 않았어요."], calls: 2 });
     expect((await POST(req(), { params: Promise.resolve({ id }) })).status).toBe(502);
+    // 실패한 회차가 문서에 무엇이든 남기면 다음 단계가 그것을 시나리오로 읽는다
+    expect((await getProject(id, OWNER)).scenario).toBeFalsy();
+  });
+
+  it("★ LLM 이 던지면 502 다 — 프레임워크 500 이 아니라 사장님 말로 답한다", async () => {
+    gen.run.mockRejectedValue(new Error("fetch failed"));
+    const res = await POST(req(), { params: Promise.resolve({ id }) });
+    expect(res.status).toBe(502);
+    expect((await res.json()).error).toContain("다시 시도해");
+  });
+
+  it("★ 예산 오류는 삼키지 않는다 — withUser 가 402 로 바꿔야 한다", async () => {
+    gen.run.mockRejectedValue(new BudgetExceeded(1, 1, "user"));
+    expect((await POST(req(), { params: Promise.resolve({ id }) })).status).toBe(402);
   });
 
   it("자료가 없으면 400 이다", async () => {
@@ -83,10 +100,36 @@ describe("PATCH /scenario", () => {
     expect((await getProject(id, OWNER)).scenario?.confirmed).toBeFalsy();
   });
 
+  it("★ 길이를 안 고른 프로젝트는 확정할 수 없다 — ok:true 가 안전과 같지 않다", async () => {
+    const p = await createProject({ settings: { i2v_model: "seedance-2.0" }, material: { text: "동네 카페 소개", photos: [] }, ownerId: OWNER });
+    // checkScenario 는 목표가 없으면 합·개수를 안 재므로 ok:true 다 — 그래도 막혀야 한다
+    const res = await PATCH(patch({ scenario: good, confirmed: true }), { params: Promise.resolve({ id: p.id }) });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain("길이");
+    expect((await getProject(p.id, OWNER)).scenario?.confirmed).toBeFalsy();
+  });
+
+  it("시나리오 모양이 아니면 400 이다", async () => {
+    const res = await PATCH(patch({ scenario: { shots: "여덟" } }), { params: Promise.resolve({ id }) });
+    expect(res.status).toBe(400);
+    expect((await getProject(id, OWNER)).scenario).toBeFalsy();
+  });
+
   it("규칙을 지키면 확정된다", async () => {
     const res = await PATCH(patch({ scenario: good, confirmed: true }), { params: Promise.resolve({ id }) });
     expect(res.status).toBe(200);
     expect((await getProject(id, OWNER)).scenario.confirmed).toBe(true);
+  });
+
+  // ★ 고치면 확정이 풀려야 한다 — 안 풀면 사장님이 통과한 시나리오를 확정한 뒤 깨진 것으로
+  //   갈아끼울 수 있고, 그 깨진 것이 확정된 채 돈 나가는 단계로 흘러간다
+  it("★ 확정한 뒤 다시 고치면 확정이 풀린다", async () => {
+    await PATCH(patch({ scenario: good, confirmed: true }), { params: Promise.resolve({ id }) });
+    expect((await getProject(id, OWNER)).scenario.confirmed).toBe(true);
+    const bad = { ...good, shots: [shot(8), shot(8), shot(5), shot(4)] };
+    const res = await PATCH(patch({ scenario: bad }), { params: Promise.resolve({ id }) });
+    expect(res.status).toBe(200);
+    expect((await getProject(id, OWNER)).scenario.confirmed).toBe(false);
   });
 
   // ★ "고칠 수 있는 척하는 칸"을 막는다 — 화면에 칸이 있는데 라우트가 그 필드를 버리면
