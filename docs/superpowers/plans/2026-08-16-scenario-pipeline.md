@@ -79,12 +79,12 @@ describe("scenarioSeconds", () => {
 
 describe("checkScenario", () => {
   it("규칙을 다 지키면 통과한다", () => {
-    const s = { shots: [shot(10), shot(10), shot(10)] };
+    const s = { shots: [shot(8), shot(8), shot(8), shot(6)] };
     expect(checkScenario(s, proj())).toEqual({ ok: true, problems: [] });
   });
 
   it("★ 초의 합이 목표와 다르면 걸린다", () => {
-    const s = { shots: [shot(10), shot(10), shot(8)] };
+    const s = { shots: [shot(8), shot(8), shot(8), shot(4)] };
     const got = checkScenario(s, proj());
     expect(got.ok).toBe(false);
     expect(got.problems.join(" ")).toContain("28");
@@ -115,14 +115,14 @@ describe("checkScenario", () => {
   });
 
   it("★ 대사가 있는 컷에 화자가 없으면 걸린다", () => {
-    const s = { shots: [shot(10), { ...shot(10), speaker: "  " }, shot(10)] };
+    const s = { shots: [shot(8), { ...shot(8), speaker: "  " }, shot(8), shot(6)] };
     const got = checkScenario(s, proj());
     expect(got.ok).toBe(false);
     expect(got.problems.join(" ")).toContain("2번");
   });
 
   it("대사가 빈 컷은 화자를 요구하지 않는다 — 무음 컷이다", () => {
-    const s = { shots: [shot(10), { ...shot(10), line: "", speaker: "" }, shot(10)] };
+    const s = { shots: [shot(8), { ...shot(8), line: "", speaker: "" }, shot(8), shot(6)] };
     expect(checkScenario(s, proj()).ok).toBe(true);
   });
 
@@ -221,7 +221,7 @@ export function checkScenario(scenario, project) {
 - [ ] **Step 4: 테스트 통과를 확인한다**
 
 Run: `npx vitest run tests/scenario-rules.test.js`
-Expected: PASS (11 tests)
+Expected: PASS (12 tests)
 
 - [ ] **Step 5: 변이 실험 — 그물이 무는지 확인한다**
 
@@ -465,7 +465,7 @@ export function validateScenario(obj) {
 - [ ] **Step 4: 테스트 통과를 확인한다**
 
 Run: `npx vitest run tests/scenario.test.js`
-Expected: PASS (11 tests)
+Expected: PASS (12 tests)
 
 - [ ] **Step 5: 변이 실험**
 
@@ -505,8 +505,8 @@ const project = {
   material: { text: "동네 카페를 소개하는 영상", photos: [] },
 };
 const shot = (seconds, line = "오늘도 문을 엽니다.") => ({ beat: "문을 연다", line, speaker: "20대 여성 바리스타", seconds });
-const good = { topic: "카페 소개", focus: { mode: "물건", subject: "핸드드립 커피" }, angle: "아침의 준비", shots: [shot(10), shot(10), shot(10)] };
-const bad = { ...good, shots: [shot(10), shot(10), shot(5)] }; // 합 25 ≠ 30
+const good = { topic: "카페 소개", focus: { mode: "물건", subject: "핸드드립 커피" }, angle: "아침의 준비", shots: [shot(8), shot(8), shot(8), shot(6)] };
+const bad = { ...good, shots: [shot(8), shot(8), shot(5), shot(4)] }; // 합 25 ≠ 30 (컷 길이는 전부 유효 — 합 규칙 하나만 어긴다)
 
 describe("generateScenario", () => {
   it("첫 답이 규칙을 지키면 한 번만 부른다", async () => {
@@ -536,7 +536,7 @@ describe("generateScenario", () => {
     expect(got.scenario.shots).toHaveLength(3);
     expect(got.problems.length).toBeGreaterThan(0);
     // 초를 몰래 고치지 않았다
-    expect(got.scenario.shots.map((s) => s.seconds)).toEqual([10, 10, 5]);
+    expect(got.scenario.shots.map((s) => s.seconds)).toEqual([8, 8, 5, 4]);
   });
 
   it("★ 모양이 깨진 답은 다시 부른다", async () => {
@@ -781,7 +781,7 @@ vi.mock("../lib/scenario.js", async (orig) => ({
 const { POST, PATCH } = await import("../app/api/projects/[id]/scenario/route.js");
 
 const shot = (seconds, line = "오늘도 문을 엽니다.") => ({ beat: "문을 연다", line, speaker: "20대 여성 바리스타", seconds });
-const good = { topic: "카페", focus: { mode: "물건", subject: "커피" }, angle: "아침", shots: [shot(10), shot(10), shot(10)] };
+const good = { topic: "카페", focus: { mode: "물건", subject: "커피" }, angle: "아침", shots: [shot(8), shot(8), shot(8), shot(6)] };
 
 const req = (body) => new Request("http://x", {
   method: "POST", headers: { ...AUTH, "content-type": "application/json" }, body: JSON.stringify(body || {}),
@@ -811,7 +811,7 @@ describe("POST /scenario", () => {
   });
 
   it("★ 규칙에 걸린 시나리오도 저장하고 problems 를 함께 준다", async () => {
-    const bad = { ...good, shots: [shot(10), shot(10), shot(5)] };
+    const bad = { ...good, shots: [shot(8), shot(8), shot(5), shot(4)] };
     gen.run.mockResolvedValue({ scenario: bad, problems: ["장면 초의 합이 25초예요 — 30초에 맞춰 주세요."], calls: 2 });
     const res = await POST(req(), { params: Promise.resolve({ id }) });
     expect(res.status).toBe(200);
@@ -835,7 +835,7 @@ describe("PATCH /scenario", () => {
   });
 
   it("★ 규칙에 걸려도 저장한다 — 고치는 중일 수 있다", async () => {
-    const bad = { ...good, shots: [shot(10), shot(10), shot(5)] };
+    const bad = { ...good, shots: [shot(8), shot(8), shot(5), shot(4)] };
     const res = await PATCH(patch({ scenario: bad }), { params: Promise.resolve({ id }) });
     expect(res.status).toBe(200);
     expect((await res.json()).problems.length).toBeGreaterThan(0);
@@ -843,7 +843,7 @@ describe("PATCH /scenario", () => {
   });
 
   it("★ 확정은 규칙을 지켜야 한다 — 걸리면 400", async () => {
-    const bad = { ...good, shots: [shot(10), shot(10), shot(5)] };
+    const bad = { ...good, shots: [shot(8), shot(8), shot(5), shot(4)] };
     const res = await PATCH(patch({ scenario: bad, confirmed: true }), { params: Promise.resolve({ id }) });
     expect(res.status).toBe(400);
     expect((await getProject(id, OWNER)).scenario?.confirmed).toBeFalsy();
