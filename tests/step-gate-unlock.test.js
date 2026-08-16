@@ -78,14 +78,16 @@ describe("잠금 탈출 — 산출물이 다 있으면 다음 단계가 열린�
     expect(isReachable("done", { ...confirmed, status: "cuts", cuts: [] })).toBe(false);
   });
 
-  it("★ ①자료를 안 끝냈으면 산출물이 있어도 안 연다 — currentStepKey 의 불변을 지킨다", () => {
-    const noBriefing = {
-      briefing: null,
+  // ①자료를 끝냈다는 신호는 2026-08-16 부터 시나리오 확정이다 — 픽스처가 briefing 을 들고
+  // 있으면 게이트가 아직 거기 있는 것처럼 읽힌다(재는 불변은 그대로다).
+  it("★ 시나리오를 확정 안 했으면 산출물이 있어도 안 연다 — currentStepKey 의 불변을 지킨다", () => {
+    const noScenario = {
+      scenario: null,
       status: "voice",
       cuts: [{ idx: 0, image: { url: "a" }, state: "done" }],
     };
-    expect(currentStepKey(noBriefing)).toBe("material");
-    expect(isReachable("video", noBriefing)).toBe(false);
+    expect(currentStepKey(noScenario)).toBe("material");
+    expect(isReachable("video", noScenario)).toBe(false);
   });
 
   it("실패로 끝난 컷도 끝난 것으로 센다 — 파이프라인이 단계를 넘기는 규칙과 같다", () => {

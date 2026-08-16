@@ -988,9 +988,14 @@ describe("②시나리오 — 대본을 대신한다", () => {
     expect(stepHref(STEPS[1], "abc")).toBe("/create/abc/scenario");
   });
 
-  // ★ 게이트가 두 자리다 — isReachable 의 산출물 탈출구도 같은 값을 봐야 한다.
-  //   한쪽만 옮기면 확정 없이 산출물만 있는 프로젝트가 뒷 단계를 연다.
-  it("★ 확정 없이 산출물만 있으면 탈출구도 열리지 않는다", () => {
+  // ★ 재는 것은 **산출물 탈출구 한 자리**다(lib/steps.js isReachable 안의
+  //   `phase && project.scenario?.confirmed && produced(...)`). 그 읽기를 briefing 으로
+  //   되돌리면 아래 둘째 단정이 깨진다. 첫째 단정은 되돌려도 순서 검사에 걸려 어차피
+  //   거짓이라 탈출구를 재지 못한다 — 둘째가 이 테스트의 그물이다.
+  // ★ 짝이 되는 다른 읽기(currentStepKey 의 게이트)는 여기서 안 잰다. 그쪽은 같은 파일의
+  //   "확정하면 바로 시나리오 단계" 와 "★ 시나리오를 확정해야 다음이 열린다" 가 잡는다.
+  //   둘을 한 테스트가 다 잡는 것처럼 이름 붙이면, 나중에 한쪽이 지워져도 아무도 모른다.
+  it("★ 산출물 탈출구도 시나리오 확정을 요구한다 — 확정 없이 산출물만으로 열리지 않는다", () => {
     const cuts = [{ idx: 0, audio: { url: "a" } }];
     const noScenario = { briefing: { confirmed: true }, status: "draft", cuts };
     expect(isReachable("images", noScenario)).toBe(false);
