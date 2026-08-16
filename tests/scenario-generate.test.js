@@ -1,5 +1,8 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { buildScenarioMessages, generateScenario } from "../lib/scenario.js";
+import { checkScenario } from "../lib/scenario-rules.js";
+import { TARGET_CHOICES } from "../lib/script.js";
+import { I2V_MODEL_IDS } from "../lib/clip-limits.js";
 
 const project = {
   id: "aaaaaaaa-0000-4000-8000-000000000002",
@@ -71,5 +74,42 @@ describe("generateScenario", () => {
     expect(got.scenario).toBe(null);
     expect(got.problems.length).toBeGreaterThan(0);
     expect(got.calls).toBe(2);
+  });
+});
+
+// SHOTFORM_FAKE=all 은 **돈 한 푼 안 쓰고 관통을 확인하는 유일한 길**이다. 여기서 막히면
+// 그 길 자체가 없다 — 예전에 fakeResponse() 의 `shots: []` 가 502 를 냈다.
+// 주입 없이 진짜 callJson 을 태운다: 가짜 판정(lib/fake.js)부터 값 만들기까지 통째로 잰다.
+describe("가짜 모드(SHOTFORM_FAKE=all)에서 ②시나리오가 통과한다", () => {
+  const prev = process.env.SHOTFORM_FAKE;
+  afterEach(() => {
+    if (prev === undefined) delete process.env.SHOTFORM_FAKE;
+    else process.env.SHOTFORM_FAKE = prev;
+  });
+
+  // 길이 넷 × 모델 전부 — 하한이 모델마다 달라(Seedance 4 · Kling 3) 한 길이만 재면
+  // 다른 모델에서 조용히 깨진다.
+  for (const target of TARGET_CHOICES) {
+    for (const i2v_model of I2V_MODEL_IDS) {
+      it(`${target}초 · ${i2v_model}`, async () => {
+        process.env.SHOTFORM_FAKE = "all";
+        const p = { ...project, settings: { i2v_model, target_seconds: target } };
+        const got = await generateScenario(p);
+        expect(got.problems).toEqual([]);
+        expect(got.calls).toBe(1);
+        expect(got.scenario.shots.length).toBeGreaterThan(0);
+        // 합이 정확히 목표다 — 1초만 새도 checkScenario 가 결함을 낸다
+        expect(got.scenario.shots.reduce((a, s) => a + s.seconds, 0)).toBe(target);
+        // 규칙 판정을 한 번 더 직접 태운다(problems 가 비었다는 것과 같은 말인지 못 박는다)
+        expect(checkScenario(got.scenario, p).ok).toBe(true);
+      });
+    }
+  }
+
+  it("길이를 안 고른 프로젝트도 관통한다 — 합 규칙이 아예 안 걸린다", async () => {
+    process.env.SHOTFORM_FAKE = "all";
+    const p = { ...project, settings: { i2v_model: "seedance-2.0" } };
+    const got = await generateScenario(p);
+    expect(got.problems).toEqual([]);
   });
 });
