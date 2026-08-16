@@ -59,7 +59,6 @@ vi.mock("../lib/llm.js", () => ({ callJson: (...a) => llmMock.callJson(...a) }))
 const { POST: cutsPOST } = await import("../app/api/projects/[id]/cuts/route.js");
 const { POST: imagesPOST } = await import("../app/api/projects/[id]/images/route.js");
 const { GET, PATCH } = await import("../app/api/projects/[id]/route.js");
-const { POST: briefingPOST } = await import("../app/api/projects/[id]/briefing/route.js");
 const { POST: renderPOST } = await import("../app/api/projects/[id]/render/route.js");
 const { POST: clipsPOST } = await import("../app/api/projects/[id]/clips/route.js");
 const { GET: renderFileGET } = await import("../app/api/renders/[name]/route.js");
@@ -312,25 +311,10 @@ describe("POST /api/projects/[id]/images", () => {
   });
 });
 
-describe("PATCH /api/projects/[id] — 브리핑 버전은 내용 변경에 묶인다", () => {
-  it("확정만 다시 눌러도 버전은 그대로다(거짓 stale 안내 방지)", async () => {
-    const p = await projectWithScript();
-    await PATCH(patchReq({ briefing: { confirmed: true } }), ctx(p.id));
-    expect((await getProject(p.id, OWNER)).briefing.version).toBe(2);
-  });
-
-  it("내용을 고쳐 저장하면 버전이 오른다", async () => {
-    const p = await projectWithScript();
-    await PATCH(patchReq({ briefing: { topic: "새 주제" } }), ctx(p.id));
-    expect((await getProject(p.id, OWNER)).briefing.version).toBe(3);
-  });
-
-  it("질문에 답하면 내용이 바뀐 것으로 본다(답변은 대본 프롬프트에 들어간다)", async () => {
-    const p = await projectWithScript();
-    await PATCH(patchReq({ briefing: { asked: [{ question: "가격은?", answer: "5천원", done: true }] } }), ctx(p.id));
-    expect((await getProject(p.id, OWNER)).briefing.version).toBe(3);
-  });
-
+// ★ 브리핑 버전 묶음은 걷어냈다(2026-08-16) — 그 번호를 읽던 ②대본 화면이 사라졌고,
+//   아무도 안 보는 번호를 올리는 코드가 라우트에서 함께 없어졌다.
+//   ⚠️ 옛 프로젝트에 저장된 briefing.version 값 자체는 지우지 않는다(그대로 남는다).
+describe("PATCH /api/projects/[id] — 브리핑 저장", () => {
   it("초점을 바꾸면 컷을 비운다 — 화면과 캐스팅이 함께 달라져야 한다", async () => {
     const p = await projectWithScript();
     await updateProject(p.id, OWNER, (proj) => ({
@@ -404,53 +388,10 @@ describe("PATCH script_text — 원고 손편집", () => {
   });
 });
 
-describe("POST /api/projects/[id]/briefing — 재추출", () => {
-  it("이미 진행된 프로젝트의 status·confirmed를 되감지 않는다", async () => {
-    const p = await projectWithScript();
-    await updateProject(p.id, OWNER, (proj) => ({ ...proj, status: "cuts", cuts: [{ idx: 0, sentence: "컷", state: "done" }] }));
-    llmMock.callJson.mockResolvedValue({ topic: "새 주제", key_points: ["새 내용"], questions: [] });
-
-    const res = await briefingPOST(patchReq({}), ctx(p.id));
-    expect(res.status).toBe(200);
-    const after = await getProject(p.id, OWNER);
-    expect(after.status).toBe("cuts"); // 되감기면 만든 이미지가 잠긴다
-    expect(after.briefing.confirmed).toBe(true);
-    expect(after.briefing.version).toBe(3); // 내용이 바뀌었으므로 오른다
-  });
-
-  it("내용이 그대로면 재추출해도 버전은 오르지 않는다", async () => {
-    const p = await projectWithScript();
-    llmMock.callJson.mockResolvedValue({ topic: "주제", key_points: ["ㄱ"], questions: [] });
-    await briefingPOST({}, ctx(p.id));
-    expect((await getProject(p.id, OWNER)).briefing.version).toBe(2);
-  });
-
-  // (kind:"develop" — 이야기 소재를 되묻던 경로는 2026-08-16 에 사라졌다. ①자료가 되묻지
-  //  않으므로 그 라운드 자체가 없다)
-
-  it("호출이 예외로 죽어도 원시 에러를 흘리지 않고 한국어 502를 준다", async () => {
-    const p = await projectWithScript();
-    const raw = 'LLM 호출 실패 (429) {"error":{"message":"You exceeded your current quota"}}';
-    llmMock.callJson.mockRejectedValue(new Error(raw));
-    const res = await briefingPOST(patchReq({}), ctx(p.id));
-    expect(res.status).toBe(502);
-    const body = await res.json();
-    expect(body.error).toBe("자료를 정리하지 못했어요. 직접 채우거나 다시 시도해 주세요.");
-    expect(JSON.stringify(body)).not.toContain(raw);
-    expect(llmMock.callJson).toHaveBeenCalledTimes(2); // 예외도 재시도한다
-  });
-
-  // ★ 리뷰 M1 — `typeof req?.json === "function" ? … : {}` 의 false 분기.
-  // patchReq 를 전부 헤더 실은 버전으로 바꾸면서(Task 8) json() 있는 요청만 남아 이 분기를
-  // 아무도 안 밟게 됐었다. 여기서 json 메서드가 없는(헤더만 있는) 요청으로 되살린다.
-  it("json 메서드가 없는 요청도 받아넘긴다(본문 없이 부르는 자리가 있다)", async () => {
-    const p = await projectWithScript();
-    llmMock.callJson.mockResolvedValue({ topic: "주제", key_points: ["ㄱ"], questions: [] });
-    const bare = { headers: new Headers(AUTH_HEADERS) }; // json 메서드가 없다
-    const res = await briefingPOST(bare, ctx(p.id));
-    expect(res.status).toBe(200);
-  });
-});
+// ★ POST /api/projects/[id]/briefing 묶음은 라우트와 함께 지웠다(2026-08-16).
+//   화면에서 도달불가인데 유료 LLM(extractBriefing)을 들고 있어 소유자가 직접 POST 하면
+//   돈이 나갔다. 추출 루프 자체는 lib/briefing-extract.js 에 남아 tests/auto.test.js
+//   ·tests/llm-gate.test.js 가 그대로 재고 있다.
 
 // ★ POST /api/projects/[id]/script 묶음은 라우트와 함께 지웠다(2026-08-16).
 //   초안→되돌리기→교정 루프를 재던 것인데 그 루프(lib/script-gen.js)가 사라졌다.

@@ -17,7 +17,7 @@ import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js"
 
 import { GET as getProjectRoute, PATCH as patchProjectRoute } from "../app/api/projects/[id]/route.js";
 import { POST as autoPOST } from "../app/api/projects/[id]/auto/route.js";
-import { POST as briefingPOST } from "../app/api/projects/[id]/briefing/route.js";
+import { POST as scenarioPOST } from "../app/api/projects/[id]/scenario/route.js";
 import { POST as cutsPOST } from "../app/api/projects/[id]/cuts/route.js";
 import { POST as cutRegenPOST } from "../app/api/projects/[id]/cuts/[idx]/regen/route.js";
 import { POST as voicePOST } from "../app/api/projects/[id]/voice/route.js";
@@ -100,7 +100,7 @@ describe("기존 라우트는 광고 문서를 모른다 — A 그룹(getProject
   // 가드가 다른 판정(자료 없음 400·컷 없음 400 등)보다 먼저 걸리는지가 요지다.
   it.each([
     ["auto", autoPOST],
-    ["briefing", briefingPOST],
+    ["scenario", scenarioPOST],
     ["cuts", cutsPOST],
     ["images", imagesPOST],
     ["voice", voicePOST],

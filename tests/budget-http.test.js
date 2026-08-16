@@ -27,7 +27,6 @@ const { POST: cutRegenPOST } = await import("../app/api/projects/[id]/cuts/[idx]
 const { POST: voiceRegenPOST } = await import("../app/api/projects/[id]/voice/[idx]/regen/route.js");
 const { POST: clipRegenPOST } = await import("../app/api/projects/[id]/clips/[idx]/regen/route.js");
 const { POST: scenarioPOST } = await import("../app/api/projects/[id]/scenario/route.js");
-const { POST: briefingPOST } = await import("../app/api/projects/[id]/briefing/route.js");
 
 const req = () =>
   new Request("http://localhost/api/x", {
@@ -169,38 +168,8 @@ describe("시나리오 생성 — 예산 오류는 삼키지 않는다", () => {
 });
 
 
-// ★ 브리핑이 시나리오보다 **먼저**다 — 체험 사장님이 밟는 첫 LLM 호출이라, 여기서 502 가
-// 나오면 한도 안내(402)를 **아무도 못 본다**. 추출 루프(lib/briefing-extract.js)와
-// 소재 질문 루프(이 라우트 안)가 같은 모양의 삼키는 catch 였다.
-describe("브리핑 — 예산 오류는 502 가 아니다", () => {
-  const budget = () => new BudgetExceeded(1, 1, "trial");
-  let project;
-
-  beforeEach(async () => {
-    resetMemoryStore();
-    vi.clearAllMocks();
-    project = await projects.createProject({
-      ownerId: A,
-      settings: { aspect_ratio: "9:16", target_seconds: 30 },
-      material: { text: "성수동 수선집. 신메뉴 출시.", photos: [] },
-    });
-    await grant(500);
-  });
-
-  it("자료 정리에서 나면 402 다", async () => {
-    llmMock.call.mockImplementation(() => { throw budget(); });
-    const res = await briefingPOST(post(`http://localhost/api/projects/${project.id}/briefing`), ctx(project.id));
-    expect(res.status).toBe(402);
-    expect((await res.json()).error).toMatch(/체험/);
-  });
-
-  // (소재 질문 루프는 2026-08-16 에 사라졌다 — ①자료가 되묻지 않는다. 남은 삼키는 catch 는
-  //  추출 루프 하나이고 위 테스트가 그것을 잰다)
-
-  // 502 계약은 그대로 둔다 — 일시적 호출 실패까지 402 로 만들면 안 된다.
-  it("예산과 무관한 실패는 여전히 502 다", async () => {
-    llmMock.call.mockImplementation(() => { throw new Error("일시적 실패"); });
-    const res = await briefingPOST(post(`http://localhost/api/projects/${project.id}/briefing`), ctx(project.id));
-    expect(res.status).toBe(502);
-  });
-});
+// ★ 브리핑 라우트(POST /api/projects/[id]/briefing)는 2026-08-16 에 지웠다 — 화면에서
+// 도달불가인데 유료 LLM 을 들고 있어 직접 POST 로 돈이 나갔다. 그래서 그 라우트의
+// 402/502 계약도 함께 사라졌다. 체험 사장님이 밟는 첫 LLM 호출은 이제 ②시나리오고,
+// 그 자리는 바로 위 묶음이 재고 있다. 추출 루프(lib/briefing-extract.js)가 예산 오류를
+// 삼키지 않는 것은 tests/llm-gate.test.js 가 lib 쪽에서 그대로 재고 있다.

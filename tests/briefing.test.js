@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildBriefingMessages, mergeAsked, briefingContentChanged } from "../lib/briefing.js";
+import { buildBriefingMessages, mergeAsked } from "../lib/briefing.js";
 
 const project = {
   material: {
@@ -42,11 +42,15 @@ describe("buildBriefingMessages", () => {
   });
 
   // 후보 목록을 주자 모델이 자료를 대조하는 대신 목록을 채웠다 — 자료에 답이 있는
-  // "손님 반응"·"차별점"을 그대로 물었다. 이야기 소재는 대본을 써 본 뒤에 따로 청한다.
+  // "손님 반응"·"차별점"을 그대로 물었다.
+  // ★ 옛 지문은 "그런 소재는 대본을 써 보고 모자랄 때 따로 청한다"고 약속했는데 그 라운드가
+  //   사라졌다(2026-08-16). 있지도 않은 뒷일을 약속하지 않는다 — 그래서 그 자리를 재는 말이
+  //   바뀌었다.
   it("이야기 소재는 여기서 묻지 않는다 — 자료에 없는 사실만 묻는다", () => {
     const { system } = buildBriefingMessages(project);
     expect(system).toContain("자료에 없는 사실'만 묻는다");
-    expect(system).toContain("길이가 모자랄 때 따로 청한다");
+    expect(system, "없어진 라운드를 지문이 약속한다").not.toContain("따로 청한다 —");
+    expect(system).toContain("나중에 따로 청하는 라운드는 없다");
     expect(system).not.toContain("훅");
     expect(system).not.toContain("홍보");
     expect(system).toContain("빈 배열이 정답"); // 풍부하면 여전히 빈 배열
@@ -139,13 +143,9 @@ describe("연출 바람이 브리핑의 일부다", () => {
     expect(system).toContain("낭독");
   });
 
-  // 연출 바람을 고치면 화면이 달라진다. 버전이 안 오르면 화면 설계가 옛 것으로 남는다.
-  it("연출 바람이 바뀌면 브리핑이 바뀐 것으로 본다", () => {
-    const a = { topic: "ㄱ", key_points: ["ㄴ"], direction: "로우 앵글" };
-    const b = { topic: "ㄱ", key_points: ["ㄴ"], direction: "하이 앵글" };
-    expect(briefingContentChanged(a, b)).toBe(true);
-    expect(briefingContentChanged(a, { ...a })).toBe(false);
-  });
+  // (연출 바람이 바뀌었는가를 재던 briefingContentChanged 는 2026-08-16 에 걷어냈다 —
+  //  그 판정이 올리던 briefing.version 을 읽던 ②대본 화면이 없다. 연출 바람이 그림을
+  //  낡게 만드는 일은 각인(lib/steps.js)이 산출물마다 따로 한다)
 });
 
 describe("연출은 어느 순간에 쓸 것인지와 함께 뽑는다", () => {
