@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { isAudioStale, isImageStale, isClipStale, isRenderStale, renderKey, toneKey, imageContextKey } from "../lib/steps.js";
-import { splitUnits, buildImagePrompt } from "../lib/cuts.js";
+import { buildImagePrompt } from "../lib/cuts.js";
 
 const llmMock = vi.hoisted(() => ({ callJson: vi.fn() }));
 vi.mock("../lib/llm.js", () => ({ callJson: (...a) => llmMock.callJson(...a) }));
@@ -58,10 +58,20 @@ const runBoth = async (id, d) => {
   await pipeline.runImagesPipeline(id, OWNER, d);
 };
 
-// 주입 deps가 전부 우회하는 자리 — buildCutsMessages와 validateCuts(obj, scenes)가
-// 실제로 맞물리는 유일한 지점이라 여기만 직접 부른다.
+// 주입 deps가 전부 우회하는 자리 — 화면 설계와 캐스팅이 실제로 맞물리는 유일한 지점이라
+// 여기만 직접 부른다. 컷은 이제 시나리오에서 나오므로 fixture 도 시나리오다(2026-08-16).
 describe("defaultDeps.splitCuts — 두 패스", () => {
-  const SCRIPT = "매일 아침 딸기를 갈아 씁니다. 시럽은 쓰지 않습니다. 성수역에서 2분입니다.";
+  const LINES = ["매일 아침 딸기를 갈아 씁니다. 시럽은 쓰지 않습니다.", "성수역에서 2분입니다."];
+  const SCENARIO = {
+    topic: "생딸기라떼",
+    focus: { mode: "물건", subject: "생딸기라떼" },
+    angle: "아침 준비를 따라간다",
+    shots: [
+      { beat: "딸기를 간다", line: LINES[0], speaker: "30대 남성 사장", seconds: 8 },
+      { beat: "골목을 걷는다", line: LINES[1], speaker: "30대 남성 사장", seconds: 5 },
+    ],
+    confirmed: true,
+  };
   // 실제로 저장된 프로젝트를 쓴다 — splitCuts 가 캐스팅 결과를 프로젝트에 남기기 때문이다.
   // 껍데기 객체로는 그 저장이 갈 곳이 없다.
   async function saved() {
@@ -72,40 +82,38 @@ describe("defaultDeps.splitCuts — 두 패스", () => {
     return projects.updateProject(p.id, OWNER, (proj) => ({
       ...proj,
       briefing: { topic: "생딸기라떼" },
-      script: { text: SCRIPT },
+      scenario: SCENARIO,
     }));
   }
-  const ranges = { cuts: [{ from: 1, to: 2 }, { from: 3, to: 3 }] };
   const noCast = { cast: [] };
   // 화면 설계는 사진을 고르지 않는다 — 사진은 props 로 온다
   const shots = { shots: [{ shows: "딸기를 가는 손 클로즈업" }, { shows: "골목을 걷는 시점 샷" }] };
 
-  it("경계로 자른 컷에 화면을 붙여 돌려준다", async () => {
-    llmMock.callJson.mockResolvedValueOnce(ranges).mockResolvedValueOnce(shots).mockResolvedValueOnce(noCast);
+  it("시나리오 장면이 컷이 되고 그 위에 화면이 붙는다", async () => {
+    llmMock.callJson.mockResolvedValueOnce(shots).mockResolvedValueOnce(noCast);
     const cuts = await pipeline.defaultDeps.splitCuts(await saved(), OWNER);
     expect(cuts).toHaveLength(2);
-    // 텍스트는 코드가 원고에서 자른다 — 모델이 문장을 다시 쓰지 못한다
-    expect(cuts[0].sentence).toBe("매일 아침 딸기를 갈아 씁니다. 시럽은 쓰지 않습니다.");
-    expect(cuts[1].sentence).toBe("성수역에서 2분입니다.");
+    // 대사는 코드가 시나리오에서 옮긴다 — 모델이 문장을 다시 쓰지 못한다
+    expect(cuts[0].sentence).toBe(LINES[0]);
+    expect(cuts[1].sentence).toBe(LINES[1]);
     expect(cuts[0].shows).toBe("딸기를 가는 손 클로즈업");
     expect(cuts[0].ref_ids).toBeUndefined();   // 화면 설계는 사진을 고르지 않는다
     expect(cuts[1].ref_ids).toBeUndefined();
-    expect(cuts[0].source).toBe("ai");
-    expect(cuts[0].seconds).toBeGreaterThan(1);
+    expect(cuts[0].source).toBe("scenario");
+    expect(cuts[0].seconds).toBe(8);
   });
 
-  it("컷을 이어붙이면 원고와 같다 — 승인한 문장이 글자 그대로 살아남는다", async () => {
-    llmMock.callJson.mockResolvedValueOnce(ranges).mockResolvedValueOnce(shots).mockResolvedValueOnce(noCast);
+  it("컷을 이어붙이면 시나리오 대사와 같다 — 승인한 문장이 글자 그대로 살아남는다", async () => {
+    llmMock.callJson.mockResolvedValueOnce(shots).mockResolvedValueOnce(noCast);
     const cuts = await pipeline.defaultDeps.splitCuts(await saved(), OWNER);
     const joined = cuts.map((c) => c.sentence).join(" ").replace(/\s/g, "");
-    expect(joined).toBe(SCRIPT.replace(/\s/g, ""));
+    expect(joined).toBe(LINES.join(" ").replace(/\s/g, ""));
   });
 
   it("화면에서 뽑은 인물이 프로젝트에 남고, 코드가 컷에 꽂는다", async () => {
     const p = await saved();
     // 순서가 요점이다 — 화면 설계가 먼저 돌고, 캐스팅은 그 화면을 읽는다
     llmMock.callJson
-      .mockResolvedValueOnce(ranges)
       .mockResolvedValueOnce(shots)
       .mockResolvedValueOnce({ cast: [{ who: "10세 전후 남자아이", cuts: [1] }] });
     const cuts = await pipeline.defaultDeps.splitCuts(p, OWNER);
@@ -117,18 +125,19 @@ describe("defaultDeps.splitCuts — 두 패스", () => {
   });
 
   it("화면 패스가 실패해도 컷은 남는다 — 그림은 문장으로 폴백한다", async () => {
-    llmMock.callJson.mockResolvedValueOnce(ranges).mockResolvedValue({ shots: [] }); // 개수 불일치
+    llmMock.callJson.mockResolvedValue({ shots: [] }); // 개수 불일치
     const cuts = await pipeline.defaultDeps.splitCuts(await saved(), OWNER);
     expect(cuts).toHaveLength(2);
     expect(cuts[0].shows).toBeUndefined();
   });
 
-  it("경계를 못 받으면 한 문장에 한 컷으로 떨어진다 — 대본은 살아 있다", async () => {
-    // 빈틈이 있는 경계(2번 문장을 건너뜀)는 거절된다
-    llmMock.callJson.mockResolvedValue({ cuts: [{ from: 1, to: 1 }, { from: 3, to: 3 }] });
+  // ★ 컷은 이제 LLM 이 아니라 시나리오에서 나온다 — 화면 설계가 형식조차 못 맞춰도
+  //   컷과 초는 사장님이 확정한 그대로다(예전에는 경계를 못 받으면 폴백으로 다시 잘랐다).
+  it("화면 설계가 형식을 못 맞춰도 컷과 초는 시나리오 그대로다", async () => {
+    llmMock.callJson.mockResolvedValue({ shots: [] });
     const cuts = await pipeline.defaultDeps.splitCuts(await saved(), OWNER);
-    expect(cuts).toHaveLength(3);
-    expect(cuts[1].sentence).toBe("시럽은 쓰지 않습니다.");
+    expect(cuts.map((c) => c.seconds)).toEqual([8, 5]);
+    expect(cuts.map((c) => c.sentence)).toEqual(LINES);
   });
 
   // ★ 관통의 이음매 — 화면 설계가 답한 톤·전환이 **컷에 꽂히는 그 한 줄**을 잰다.
@@ -142,7 +151,6 @@ describe("defaultDeps.splitCuts — 두 패스", () => {
   it("화면 설계가 답한 톤·전환이 컷에 꽂혀 그림 프롬프트와 각인까지 간다", async () => {
     const p = await saved();
     llmMock.callJson
-      .mockResolvedValueOnce(ranges)
       .mockResolvedValueOnce({
         tone: "채도를 올린 시네마틱 질감",
         environment: "성수동 골목, 골든아워",
@@ -191,8 +199,7 @@ describe("defaultDeps.splitCuts — 두 패스", () => {
 
     it("전 컷이 한 축뿐이면 사유를 주고 한 번 더 부른다", async () => {
       llmMock.callJson
-        .mockResolvedValueOnce(ranges)
-        .mockResolvedValueOnce(leaning)
+          .mockResolvedValueOnce(leaning)
         .mockResolvedValueOnce(mixed)
         .mockResolvedValueOnce(noCast);
       const cuts = await pipeline.defaultDeps.splitCuts(await saved(), OWNER);
@@ -208,15 +215,14 @@ describe("defaultDeps.splitCuts — 두 패스", () => {
     });
 
     it("축이 섞여 있으면 다시 부르지 않는다 — 값을 치를 이유가 없다", async () => {
-      llmMock.callJson.mockResolvedValueOnce(ranges).mockResolvedValueOnce(mixed).mockResolvedValueOnce(noCast);
+      llmMock.callJson.mockResolvedValueOnce(mixed).mockResolvedValueOnce(noCast);
       await pipeline.defaultDeps.splitCuts(await saved(), OWNER);
       expect(designCalls()).toHaveLength(1);
     });
 
     it("★ 축이 하나도 없는 답도 다시 부르지 않는다 — 옛 프로젝트에 LLM 값을 더 치르지 않는다", async () => {
       llmMock.callJson
-        .mockResolvedValueOnce(ranges)
-        .mockResolvedValueOnce({ shots: [{ shows: "딸기를 가는 손" }, { shows: "골목을 걷는 발" }] })
+          .mockResolvedValueOnce({ shots: [{ shows: "딸기를 가는 손" }, { shows: "골목을 걷는 발" }] })
         .mockResolvedValueOnce(noCast);
       await pipeline.defaultDeps.splitCuts(await saved(), OWNER);
       expect(designCalls()).toHaveLength(1);
@@ -225,8 +231,7 @@ describe("defaultDeps.splitCuts — 두 패스", () => {
     it("두 번째도 쏠려 있으면 그대로 간다 — 아쉬운 화면이 화면 없는 것보다 낫다", async () => {
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       llmMock.callJson
-        .mockResolvedValueOnce(ranges)
-        .mockResolvedValueOnce(leaning)
+          .mockResolvedValueOnce(leaning)
         .mockResolvedValueOnce(leaning)
         .mockResolvedValueOnce(noCast);
       const cuts = await pipeline.defaultDeps.splitCuts(await saved(), OWNER);
@@ -237,8 +242,9 @@ describe("defaultDeps.splitCuts — 두 패스", () => {
     });
   });
 
-  it("원고가 없으면 컷 분할 실패를 던진다", async () => {
-    await expect(pipeline.defaultDeps.splitCuts({ ...(await saved()), script: null }, OWNER)).rejects.toThrow("컷 분할 실패");
+  // 컷의 원본이 시나리오다 — 없으면 만들 것이 없다. 사장님 화면에 그대로 뜨는 문구다.
+  it("시나리오가 없으면 던진다", async () => {
+    await expect(pipeline.defaultDeps.splitCuts({ ...(await saved()), scenario: null }, OWNER)).rejects.toThrow("시나리오가 없어요");
   });
 });
 
@@ -1151,15 +1157,24 @@ describe("사물 레퍼런스 — 캐스팅이 답하고 코드가 꽂는다", (
     });
     return projects.updateProject(p.id, OWNER, (proj) => ({
       ...proj,
-      briefing: { topic: "앰플", focus: { mode: focusMode, subject: "VT 앰플" } },
-      script: { text: "앰플이 있습니다. 얼굴에 바릅니다." },
+      briefing: { topic: "앰플" },
+      // ★ 초점은 시나리오가 답한다(2026-08-16) — 재질문 판정이 이 값을 본다
+      scenario: {
+        topic: "앰플",
+        focus: { mode: focusMode, subject: "VT 앰플" },
+        angle: "바르는 순간을 따라간다",
+        shots: [
+          { beat: "병을 든다", line: "앰플이 있습니다.", speaker: "20대 여성", seconds: 6 },
+          { beat: "바른다", line: "얼굴에 바릅니다.", speaker: "20대 여성", seconds: 6 },
+        ],
+        confirmed: true,
+      },
     }));
   }
 
-  // 분할 → 화면 설계 → 캐스팅 순서로 응답을 준다
+  // 화면 설계 → 캐스팅 순서로 응답을 준다(컷 분할은 이제 LLM 을 안 부른다)
   function answer({ props }) {
     llmMock.callJson
-      .mockResolvedValueOnce({ cuts: [{ from: 1, to: 1 }, { from: 2, to: 2 }] })
       .mockResolvedValueOnce({ shots: [{ shows: "앰플 병 클로즈업" }, { shows: "바르는 손" }] })
       .mockResolvedValueOnce({ cast: [], props });
   }
@@ -1175,26 +1190,24 @@ describe("사물 레퍼런스 — 캐스팅이 답하고 코드가 꽂는다", (
   it("초점이 물건인데 사물이 0개면 한 번 더 묻는다", async () => {
     const p = await projectWithThingPhoto("물건");
     llmMock.callJson
-      .mockResolvedValueOnce({ cuts: [{ from: 1, to: 1 }, { from: 2, to: 2 }] })
       .mockResolvedValueOnce({ shots: [{ shows: "앰플 병 클로즈업" }, { shows: "바르는 손" }] })
       .mockResolvedValueOnce({ cast: [], props: [] })            // 1차 — 빈손
       .mockResolvedValueOnce({ cast: [], props: [{ photo_id: "p1", cuts: [1] }] }); // 2차
     const cuts = await pipeline.defaultDeps.splitCuts(await projects.getProject(p.id, OWNER), OWNER);
     expect(cuts[0].ref_ids).toEqual(["p1"]);
-    expect(llmMock.callJson).toHaveBeenCalledTimes(4); // 분할·화면·캐스팅 두 번
+    expect(llmMock.callJson).toHaveBeenCalledTimes(3); // 화면·캐스팅 두 번
   });
 
   it("초점이 물건이 아니면 0개라도 다시 묻지 않는다 — 값을 치를 이유가 없다", async () => {
     const p = await projectWithThingPhoto("정보");
     answer({ props: [] });
     await pipeline.defaultDeps.splitCuts(await projects.getProject(p.id, OWNER), OWNER);
-    expect(llmMock.callJson).toHaveBeenCalledTimes(3);
+    expect(llmMock.callJson).toHaveBeenCalledTimes(2);
   });
 
   it("재시도 2차에 인물이 빠져도 1차에서 뽑은 인물을 잃지 않는다", async () => {
     const p = await projectWithThingPhoto("물건");
     llmMock.callJson
-      .mockResolvedValueOnce({ cuts: [{ from: 1, to: 1 }, { from: 2, to: 2 }] })
       .mockResolvedValueOnce({ shots: [{ shows: "앰플 병 클로즈업" }, { shows: "바르는 손" }] })
       .mockResolvedValueOnce({ cast: [{ who: "20대 여성", cuts: [1] }], props: [] })  // 1차 — 인물 있음, 제품 0개
       .mockResolvedValueOnce({ cast: [], props: [{ photo_id: "p1", cuts: [1] }] });   // 2차 — 인물 사라짐
@@ -1207,7 +1220,6 @@ describe("사물 레퍼런스 — 캐스팅이 답하고 코드가 꽂는다", (
   it("재시도 2차가 예외로 죽어도 1차 답을 지킨다", async () => {
     const p = await projectWithThingPhoto("물건");
     llmMock.callJson
-      .mockResolvedValueOnce({ cuts: [{ from: 1, to: 1 }, { from: 2, to: 2 }] })
       .mockResolvedValueOnce({ shots: [{ shows: "앰플 병 클로즈업" }, { shows: "바르는 손" }] })
       .mockResolvedValueOnce({ cast: [{ who: "20대 여성", cuts: [1] }], props: [] })
       .mockRejectedValueOnce(new Error("네트워크"));
@@ -1225,10 +1237,9 @@ describe("사진 판정 실패는 저장하지 않는다 — 다음 실행이 �
     });
     const saved = await projects.updateProject(p.id, OWNER, (proj) => ({
       ...proj,
-      script: { text: "문장 하나입니다." },
+      scenario: { shots: [{ beat: "가", line: "문장 하나입니다.", speaker: "", seconds: 6 }] },
     }));
     llmMock.callJson
-      .mockResolvedValueOnce({ cuts: [{ from: 1, to: 1 }] })
       .mockResolvedValueOnce({ shots: [{ shows: "화면" }] })
       .mockResolvedValueOnce({ cast: [], props: [] });
     return saved;
@@ -1273,10 +1284,9 @@ describe("사진 판정 실패는 저장하지 않는다 — 다음 실행이 �
     });
     const saved = await projects.updateProject(p.id, OWNER, (proj) => ({
       ...proj,
-      script: { text: "문장 하나입니다." },
+      scenario: { shots: [{ beat: "가", line: "문장 하나입니다.", speaker: "", seconds: 6 }] },
     }));
     llmMock.callJson
-      .mockResolvedValueOnce({ cuts: [{ from: 1, to: 1 }] })
       .mockResolvedValueOnce({ shots: [{ shows: "화면" }] })
       .mockResolvedValueOnce({ cast: [], props: [] });
     await pipeline.defaultDeps.splitCuts(saved, OWNER);
@@ -1285,109 +1295,59 @@ describe("사진 판정 실패는 저장하지 않는다 — 다음 실행이 �
   });
 });
 
-describe("컷 길이 — 쪼갤 수 있으면 코드가 되돌린다", () => {
-  // 판정만 하고 되묻는 방식은 실패했다 — 모델이 같은 답을 다시 냈고 코드가 받았다.
-  // 이제 되묻지 않고 그 자리에서 푼다.
-  const LONG = "이 앰플은 PDRN과 엑소좀, 시카가 함께 들어 있어 자기 전에 토너를 바른 후, 2~3방울을 얼굴에 펴 바르고 자면 다음 날 아침 당김이 덜하다는 후기가 많습니다.";
-
-  async function projectWithLongSentence() {
+// ★ 컷 길이는 이제 **시나리오가 정하고 코드는 옮기기만 한다**(2026-08-16).
+//
+// 예전에는 이 자리에 되돌리기가 있었다 — 모델이 긴 컷을 내면 explodeLongRanges 가 조각으로
+// 풀고, 짧은 원고면 fillSilentCuts 가 무음 컷을 채우고, allocateCutSeconds 가 고른 초를
+// 다시 배분했다. 그 셋은 **원고를 자르던 시절의 되돌리기**다. 지금은 컷도 초도 사장님이
+// 시나리오 화면에서 보고 확정한 값이라, 여기서 다시 자르거나 다시 배분하면 승인한 것과
+// 달라진다(그리고 클립은 초당 과금이라 그 차이가 곧 돈이다).
+// 길이 관문은 시나리오 확정(lib/scenario-rules.js)이 맡는다.
+describe("컷 길이 — 시나리오가 정한 대로 나간다", () => {
+  async function projectWithScenario(shots, target = 15) {
     const p = await projects.createProject({ ownerId: OWNER,
-      settings: { aspect_ratio: "9:16" },
+      settings: { aspect_ratio: "9:16", target_seconds: target },
       material: { text: "자료", photos: [] },
     });
     return projects.updateProject(p.id, OWNER, (proj) => ({
-      ...proj, briefing: { topic: "앰플" }, script: { text: LONG },
+      ...proj,
+      briefing: { topic: "앰플" },
+      scenario: { topic: "앰플", angle: "따라간다", shots, confirmed: true },
     }));
   }
+  const design = () => llmMock.callJson
+    .mockResolvedValueOnce({ shots: [] })
+    .mockResolvedValueOnce({ cast: [] });
 
-  const splitCallCount = () =>
-    llmMock.callJson.mock.calls.filter((c) => c[0]?.stage === "컷 분할").length;
-
-  it("한 컷에 다 몰아넣으면 되묻지 않고 코드가 푼다", async () => {
-    const p = await projectWithLongSentence();
-    const units = splitUnits(LONG);
-    expect(units.length, "이 문장이 여러 조각으로 나뉘어야 이 테스트가 의미가 있다").toBeGreaterThan(1);
-    llmMock.callJson
-      .mockResolvedValueOnce({ cuts: [{ from: 1, to: units.length }] })   // 통째로 몰아넣은 답
-      .mockResolvedValueOnce({ shots: [] })                               // 화면 설계
-      .mockResolvedValueOnce({ cast: [] });                               // 캐스팅
+  it("★ 초를 다시 배분하지 않는다 — 사장님이 확정한 값이 그대로 나간다", async () => {
+    const p = await projectWithScenario([
+      { beat: "가", line: "앰플이 있습니다.", speaker: "20대 여성", seconds: 5 },
+      { beat: "나", line: "얼굴에 바릅니다.", speaker: "20대 여성", seconds: 4 },
+    ]);
+    design();
     const cuts = await pipeline.defaultDeps.splitCuts(await projects.getProject(p.id, OWNER), OWNER);
-    expect(splitCallCount(), "분할은 한 번만 묻는다").toBe(1);
-    expect(cuts.length, "조각 수만큼 풀린다").toBe(units.length);
+    // 합이 고른 초(15)에 못 미쳐도 늘리지 않는다 — 늘리던 것이 배분이었다
+    expect(cuts.map((c) => c.seconds)).toEqual([5, 4]);
   });
 
-  it("컷을 이어붙이면 원고와 같다 — 풀어도 보장은 그대로다", async () => {
-    const p = await projectWithLongSentence();
-    const units = splitUnits(LONG);
-    llmMock.callJson
-      .mockResolvedValueOnce({ cuts: [{ from: 1, to: units.length }] })
-      .mockResolvedValueOnce({ shots: [] })
-      .mockResolvedValueOnce({ cast: [] });
-    const cuts = await pipeline.defaultDeps.splitCuts(await projects.getProject(p.id, OWNER), OWNER);
-    const joined = cuts.map((c) => c.sentence).join(" ").replace(/\s/g, "");
-    expect(joined).toBe(LONG.replace(/\s/g, ""));
-  });
-
-  it("쪼갤 수 없는 문장은 그대로 둔다 — 영영 실패하지 않게", async () => {
-    const NO_BREAK = "아주아주아주긴한덩어리로이어져서끊을자리가전혀없는문장이길게이어지고또이어져서마침내끝납니다.";
-    const p = await projects.createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
-    await projects.updateProject(p.id, OWNER, (proj) => ({
-      ...proj, briefing: { topic: "t" }, script: { text: NO_BREAK },
-    }));
-    const units = splitUnits(NO_BREAK);
-    expect(units.length, "이 문장은 나눌 자리가 없어야 한다").toBe(1);
-    llmMock.callJson
-      .mockResolvedValueOnce({ cuts: [{ from: 1, to: 1 }] })
-      .mockResolvedValueOnce({ shots: [] })
-      .mockResolvedValueOnce({ cast: [] });
+  it("★ 무음 컷을 채우지 않는다 — 컷 수를 코드가 늘리지 않는다", async () => {
+    const p = await projectWithScenario([
+      { beat: "가", line: "손끝이 갈라져 아팠어요.", speaker: "20대 여성", seconds: 15 },
+    ]);
+    design();
     const cuts = await pipeline.defaultDeps.splitCuts(await projects.getProject(p.id, OWNER), OWNER);
     expect(cuts).toHaveLength(1);
-    expect(cuts[0].seconds, "8초를 넘지만 더 쪼갤 수 없다").toBeGreaterThan(8);
-    expect(splitCallCount()).toBe(1);
+    expect(cuts[0].seconds).toBe(15);
   });
 
-  it("8초 이하로 묶은 답은 건드리지 않는다", async () => {
-    const TWO = "매일 아침 딸기를 갈아 씁니다. 시럽은 쓰지 않습니다.";
-    const p = await projects.createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
-    await projects.updateProject(p.id, OWNER, (proj) => ({
-      ...proj, briefing: { topic: "t" }, script: { text: TWO },
-    }));
-    llmMock.callJson
-      .mockResolvedValueOnce({ cuts: [{ from: 1, to: 2 }] })   // 둘을 한 컷으로 — 8초 이하다
-      .mockResolvedValueOnce({ shots: [] })
-      .mockResolvedValueOnce({ cast: [] });
+  it("★ 8초를 넘는 장면도 다시 쪼개지 않는다 — 길이 관문은 시나리오 확정이 맡는다", async () => {
+    const LONG = "이 앰플은 PDRN과 엑소좀, 시카가 함께 들어 있어 자기 전에 토너를 바른 후, 2~3방울을 얼굴에 펴 바릅니다.";
+    const p = await projectWithScenario([{ beat: "가", line: LONG, speaker: "20대 여성", seconds: 12 }]);
+    design();
     const cuts = await pipeline.defaultDeps.splitCuts(await projects.getProject(p.id, OWNER), OWNER);
     expect(cuts).toHaveLength(1);
-    expect(cuts[0].seconds).toBeLessThanOrEqual(8);
-  });
-
-  // ★★ 2026-08-14 재측정이 연 구멍: 원고가 34~37자로 짧아지자 분할이 컷 하나만 만들고
-  //    배분이 거기에 15초를 다 줬다 — 정지 이미지 한 장이 15초 머문다.
-  //    splitCuts 안에서 fillSilentCuts 가 **배분보다도, 캐스팅보다도 앞**에 돌아야 막힌다.
-  it("짧은 원고에 15초를 고르면 무음 컷으로 채워 8초 넘는 컷을 남기지 않는다", async () => {
-    const SHORT = "손끝이 갈라져 아팠어요.";
-    const p = await projects.createProject({ ownerId: OWNER,
-      settings: { aspect_ratio: "9:16", target_seconds: 15 },
-      material: { text: "자료", photos: [] },
-    });
-    await projects.updateProject(p.id, OWNER, (proj) => ({
-      ...proj, briefing: { topic: "핸드크림" }, script: { text: SHORT },
-    }));
-    llmMock.callJson
-      .mockResolvedValueOnce({ cuts: [{ from: 1, to: 1 }] })  // 모델은 컷 하나만 냈다
-      .mockResolvedValueOnce({ shots: [] })
-      .mockResolvedValueOnce({ cast: [] });
-    const cuts = await pipeline.defaultDeps.splitCuts(await projects.getProject(p.id, OWNER), OWNER);
-
-    expect(cuts.length, "코드가 무음 컷을 채운다").toBeGreaterThan(1);
-    cuts.forEach((c) => expect(c.seconds).toBeLessThanOrEqual(8));
-    expect(cuts.reduce((a, c) => a + c.seconds, 0)).toBe(15);
-    // 원고는 한 글자도 안 바뀐다 — 무음 컷은 문장을 소비하지 않는다
-    expect(cuts.filter((c) => !c.silent).map((c) => c.sentence).join(" ")).toBe(SHORT);
-    // 채우기가 화면 설계·캐스팅보다 앞이었는가 — 뒤였다면 목록이 컷 하나짜리로 나갔고,
-    // 캐스팅이 답한 컷 번호가 한 칸씩 밀린 컷에 붙는다(cast[].cuts).
-    const shows = llmMock.callJson.mock.calls.find((c) => c[0]?.stage === "화면 설계");
-    expect(shows[0].messages[0].content).toContain(`[컷 ${cuts.length}개`);
+    expect(cuts[0].sentence).toBe(LONG);   // 문장이 조각으로 흩어지지 않는다
+    expect(cuts[0].seconds).toBe(12);
   });
 });
 
