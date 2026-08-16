@@ -53,7 +53,9 @@ describe("fakeScenario — 가짜 모드", () => {
     expect(checkScenario(got, project)).toEqual({ ok: true, problems: [] });
   });
 
-  // ★ 이 값이 라우트·화면·각인까지 흐르는지를 가짜 관통으로 보려면 값이 있어야 한다.
+  // ★ 이 값이 **저장까지 살아남는지**(validateScenario → PATCH)를 가짜 관통으로 보려면
+  //   값이 있어야 한다. 그 이상은 못 본다 — 가짜 화자가 화면 속 인물이라 내레이션 장면이
+  //   없고, 화면의 칸도 숨겨지고 컷도 narration 표시를 안 받아 클립 프롬프트·각인에 안 닿는다.
   it("★ narrator_voice 를 들고 있다", () => {
     expect(validateScenario(fakeScenario(project)).narrator_voice).not.toBe("");
   });

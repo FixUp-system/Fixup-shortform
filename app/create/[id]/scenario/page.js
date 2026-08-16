@@ -190,6 +190,15 @@ export default function ScenarioStepPage() {
             placeholder="예: 차분한 30대 남성, 낮고 단단한 톤"
             onChange={(e) => edit({ narrator_voice: e.target.value })} />
           <p className="pgsub">화면 밖에서 읽는 목소리예요 — 비워 두면 컷마다 다른 사람이 읽어요</p>
+          {/* ★ angle 칸의 안내와 짝이다 — 다만 방향이 반대다. angle 은 이미 만든 컷에
+              **반영이 안 돼서** 말해 주고, 이 칸은 **곧바로 반영돼서** 말해 준다:
+              이 값은 클립 프롬프트에 실리므로(lib/cuts.js speechFor) 고치면 그 장면의
+              영상이 낡는다(lib/steps.js clipKey). 임시저장은 규칙을 안 물으므로 비워 둔 채로도
+              저장된다 — 그때 Voice 절이 통째로 빠져 다시 만들면 컷마다 다른 사람이 읽는다.
+              말 안 하면 사장님은 무엇을 잃는지 모른 채 ⑤에서 유료 버튼을 누른다. */}
+          {(project?.cuts || []).some((c) => c?.video?.url) && (
+            <p className="pgsub warn">고치면 그 장면의 영상을 <b>다시 만들어야 해요</b> — 크레딧이 들어요</p>
+          )}
         </>
       )}
 
