@@ -3,7 +3,7 @@
 //
 // 아랫절들은 **withUser 보다 안쪽에서 예산 오류를 삼키던 자리**를 못 박는다.
 // 위의 그물만으로는 아무것도 안 잡혔다 — 오늘 BudgetExceeded 를 던지는 자리가 전부
-// 안쪽 catch 뒤에 있었기 때문이다(재생성 3종의 400, lib/script-gen.js 의 null → 502).
+// 안쪽 catch 뒤에 있었기 때문이다(재생성 3종의 400, 생성 라우트들의 502).
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { withUser } from "../lib/auth/require-user.js";
 import { BudgetExceeded } from "../lib/costs.js";
@@ -11,7 +11,6 @@ import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js"
 import { resetMemoryStore } from "../lib/store/memory.js";
 import { getStore } from "../lib/store/index.js";
 import * as projects from "../lib/projects.js";
-import { generateScript } from "../lib/script-gen.js";
 
 // 재생성 3종은 파이프라인을 모킹한다 — 볼 것은 "던진 예산 오류가 어떤 코드로 나가는가"다.
 const pipelineMock = vi.hoisted(() => ({ regen: vi.fn() }));
@@ -20,14 +19,14 @@ vi.mock("../lib/pipeline.js", () => ({
   regenVoice: (...a) => pipelineMock.regen(...a),
   regenClip: (...a) => pipelineMock.regen(...a),
 }));
-// 대본 라우트는 llm 을 모킹한다 — script-gen 은 **진짜**로 둔다(삼키는 자리가 거기다).
+// 시나리오 라우트는 llm 만 모킹한다 — 생성 루프(lib/scenario.js)는 **진짜**로 둔다.
 const llmMock = vi.hoisted(() => ({ call: vi.fn() }));
 vi.mock("../lib/llm.js", () => ({ callJson: (...a) => llmMock.call(...a) }));
 
 const { POST: cutRegenPOST } = await import("../app/api/projects/[id]/cuts/[idx]/regen/route.js");
 const { POST: voiceRegenPOST } = await import("../app/api/projects/[id]/voice/[idx]/regen/route.js");
 const { POST: clipRegenPOST } = await import("../app/api/projects/[id]/clips/[idx]/regen/route.js");
-const { POST: scriptPOST } = await import("../app/api/projects/[id]/script/route.js");
+const { POST: scenarioPOST } = await import("../app/api/projects/[id]/scenario/route.js");
 const { POST: briefingPOST } = await import("../app/api/projects/[id]/briefing/route.js");
 
 const req = () =>
@@ -136,17 +135,10 @@ describe("재생성 3종 — 예산 오류는 400 이 아니다", () => {
   }
 });
 
-// lib/script-gen.js 의 세 catch 가 llm 예외를 통째로 삼키고 null 을 돌려주면,
-// 라우트는 502 "대본 생성에 실패했어요"를 낸다 — 체험 한도에 걸린 사장님이
-// 이유를 모른 채 계속 다시 누르게 된다.
-describe("대본 생성 — 예산 오류는 삼키지 않는다", () => {
-  const SHORT = { script: "우리 가게 신메뉴를 소개합니다. 오늘부터 맛보세요." };
-  // 되돌리기 라운드는 결함이 있을 때만 돈다 — "약한 오프닝"으로 걸리는 원고를 쓴다.
-  const WEAK = { script: "성수동에서 12년째 옷 수선집을 운영합니다. 오늘부터 새 서비스를 시작합니다." };
-  const stageThrows = (stage, err, draft = SHORT) => (args) => {
-    if (args.stage === stage) throw err;
-    return draft;
-  };
+// 시나리오 라우트는 실패를 통째 502 "시나리오를 만들지 못했어요"로 답한다.
+// 그 catch 가 예산 오류까지 샯키면 체험 한도에 걸린 사장님은 이유를 모른 채 계속 다시 누른다.
+// (2026-08-16 이전에는 같은 자리가 ②대본이었다 — lib/script-gen.js 의 세 catch.)
+describe("시나리오 생성 — 예산 오류는 삼키지 않는다", () => {
   let project;
 
   beforeEach(async () => {
@@ -157,53 +149,27 @@ describe("대본 생성 — 예산 오류는 삼키지 않는다", () => {
       settings: { aspect_ratio: "9:16", target_seconds: 30 },
       material: { text: "성수동 수선집. 신메뉴 출시.", photos: [] },
     });
-    project = await projects.updateProject(project.id, A, (proj) => ({
-      ...proj, briefing: { ...(proj.briefing || {}), confirmed: true, version: 1 },
-    }));
     await grant(500);
   });
 
   const budget = () => new BudgetExceeded(1, 1, "trial");
 
-  it("초안 단계에서 나면 그대로 던진다", async () => {
-    llmMock.call.mockImplementation(stageThrows("대본", budget()));
-    await expect(generateScript(project, project.id, { llm: llmMock.call }))
-      .rejects.toBeInstanceOf(BudgetExceeded);
-  });
-
-  it("되돌리기 단계에서 나면 그대로 던진다", async () => {
-    llmMock.call.mockImplementation(stageThrows("대본 되돌리기", budget(), WEAK));
-    await expect(generateScript(project, project.id, { llm: llmMock.call }))
-      .rejects.toBeInstanceOf(BudgetExceeded);
-  });
-
-  it("교정 단계에서 나면 그대로 던진다 — 초안 폴백으로 감추지 않는다", async () => {
-    llmMock.call.mockImplementation(stageThrows("대본 교정", budget()));
-    await expect(generateScript(project, project.id, { llm: llmMock.call }))
-      .rejects.toBeInstanceOf(BudgetExceeded);
-  });
-
-  // 폴백·재시도 구조는 그대로 둔다 — 일시적 호출 실패까지 402 로 만들면 안 된다.
-  it("예산과 무관한 실패는 여전히 null 로 알린다", async () => {
-    llmMock.call.mockImplementation(() => { throw new Error("일시적 실패"); });
-    await expect(generateScript(project, project.id, { llm: llmMock.call })).resolves.toBeNull();
-  });
-
   it("라우트까지 보면 502 가 아니라 402 다", async () => {
-    llmMock.call.mockImplementation(stageThrows("대본", budget()));
-    const res = await scriptPOST(post(`http://localhost/api/projects/${project.id}/script`), ctx(project.id));
+    llmMock.call.mockImplementation(() => { throw budget(); });
+    const res = await scenarioPOST(post(`http://localhost/api/projects/${project.id}/scenario`), ctx(project.id));
     expect(res.status).toBe(402);
     expect((await res.json()).error).toMatch(/체험/);
   });
 
   it("라우트의 502 계약은 예산과 무관한 실패에서 그대로다", async () => {
     llmMock.call.mockImplementation(() => { throw new Error("일시적 실패"); });
-    const res = await scriptPOST(post(`http://localhost/api/projects/${project.id}/script`), ctx(project.id));
+    const res = await scenarioPOST(post(`http://localhost/api/projects/${project.id}/scenario`), ctx(project.id));
     expect(res.status).toBe(502);
   });
 });
 
-// ★ 브리핑이 대본보다 **먼저**다 — 체험 사장님이 밟는 첫 LLM 호출이라, 여기서 502 가
+
+// ★ 브리핑이 시나리오보다 **먼저**다 — 체험 사장님이 밟는 첫 LLM 호출이라, 여기서 502 가
 // 나오면 한도 안내(402)를 **아무도 못 본다**. 추출 루프(lib/briefing-extract.js)와
 // 소재 질문 루프(이 라우트 안)가 같은 모양의 삼키는 catch 였다.
 describe("브리핑 — 예산 오류는 502 가 아니다", () => {

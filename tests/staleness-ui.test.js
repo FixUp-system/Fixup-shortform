@@ -117,17 +117,12 @@ describe("⑥ 완성", () => {
 // 상한은 모델마다 다르다. 화면이 lib 의 기본값으로 판정하면 브라우저에는 서버 env 가 없어
 // Kling(15초)에서 경고가 사라진다. 서버가 실어 보낸 clip_limits 를 봐야 한다.
 describe("화면이 활성 모델의 상한을 본다", () => {
-  for (const path of ["app/create/[id]/script/page.js", "app/create/[id]/video/page.js"]) {
+  // ②대본도 이 목록에 있었다 — 그 화면이 사라졌다(2026-08-16).
+  for (const path of ["app/create/[id]/video/page.js"]) {
     it(`${path} 가 clip_limits 를 읽는다`, () => {
       expect(read(path)).toContain("clip_limits");
     });
   }
-
-  it("②대본 화면의 경고 판정이 실려 온 상한을 쓴다 — 기본 상수로 재지 않는다", () => {
-    const src = read("app/create/[id]/script/page.js");
-    // 판정식에 I2V_MAX_SECONDS 가 남아 있으면 브라우저 기본값(20)으로 재게 된다
-    expect(src).not.toContain("c.seconds > I2V_MAX_SECONDS");
-  });
 });
 
 // 컷 하나만 있는 중간 상태가 실제로 생겼고, 그때 만들기 버튼이 사라졌다.
@@ -208,7 +203,7 @@ describe("클립 낡음 판정에 프로젝트를 넘긴다 — 대사·목소�
 describe("영상 컨셉은 자료 쪽에서 고른다", () => {
   const createSrc = read("app/create/page.js");
   const briefSrc = read("app/create/[id]/briefing/page.js");
-  const scriptSrc = read("app/create/[id]/script/page.js");
+  const scenarioSrc = read("app/create/[id]/scenario/page.js");
   const pickerSrc = read("components/StylePicker.jsx");
 
   it("칩을 프리셋 표에서 그린다 — 컨셉 이름을 화면에 박지 않는다", () => {
@@ -222,9 +217,10 @@ describe("영상 컨셉은 자료 쪽에서 고른다", () => {
     }
   });
 
-  it("②대본에는 컨셉 고르기가 없다", () => {
-    expect(scriptSrc).not.toContain("StylePicker");
-    expect(scriptSrc).not.toContain("STYLE_PRESETS");
+  // 자리만 ②대본에서 ②시나리오로 바뀌었고 규칙은 같다 — 컨셉은 그림의 근거라 자료 쪽에 있어야 한다.
+  it("②시나리오에는 컨셉 고르기가 없다", () => {
+    expect(scenarioSrc).not.toContain("StylePicker");
+    expect(scenarioSrc).not.toContain("STYLE_PRESETS");
   });
 
   // 재던 것은 "보이는 모든 상태에 컨셉 고르기가 있는가"다 — 한 상태에라도 빠지면 그 흐름을
@@ -245,27 +241,13 @@ describe("영상 컨셉은 자료 쪽에서 고른다", () => {
   });
 });
 
-// 컷 문장은 낭독·자막·이미지 프롬프트가 읽는 값이다(원고가 아니라 컷이다).
-// 그래서 사장님이 여기서 고칠 수 있어야 하고, 고치면 원고도 따라와야 한다.
-describe("②대본의 구성에서 문장을 고칠 수 있다", () => {
-  const src = read("app/create/[id]/script/page.js");
-
-  it("문장이 읽기 전용이 아니다 — saveCut 으로 sentence 를 보낸다", () => {
-    expect(src).toMatch(/saveCut\(c\.idx,\s*\{\s*sentence:/);
-    // 편집 대상은 따옴표 밖이어야 한다 — 안에 넣으면 textContent 에 따옴표가 섞인다
-    expect(src).toMatch(/“<span contentEditable/);
-  });
-
-  // 원고 칸은 컷 문장을 이어 붙여 보여준다. 저장 안 된 초안이 남아 있으면 방금 고친 문장이
-  // 화면에 안 보이고, 원고 칸 밖을 누르는 순간 낡은 초안이 그것을 덮는다.
-  it("문장을 고치면 원고 칸의 저장 안 된 초안을 버린다", () => {
-    expect(src).toMatch(/if \(patch\.sentence\) setDraft\(null\)/);
-  });
-
-  it("문장도 고칠 수 있다는 것을 라벨이 알린다", () => {
-    expect(src).toContain("눌러서 고칠 수 있어요");
-  });
-});
+// ★ 여기 있던 묶음 셋을 지웠다(2026-08-16) — 전부 ②대본 화면 하나를 재던 것이고,
+// 그 화면이 원고와 함께 사라졌다: 컷 문장 손편집 · [이야기 더 들려주기]를 뻐다는 확인 · 촬영 용어를
+// 안 보여 준다는 확인.
+//
+// ⚠ **지금 단계별 흐름에는 컷을 고치는 화면이 없다**(saveCut 호출처 0). 사장님이 고치는
+//   자리는 ②시나리오로 옮겨갔고(대사·초), 컷은 그것을 코드가 옮겨 담는 산출물이 됐다.
+//   화면·움직임·속도를 손으로 고치는 길은 다시 열지 않았다 — 열 것인지는 제품 결정이라 여기 적어 둔다.
 
 // 글 쓰는 칸은 규칙이 한 벌이다(textarea.field). 두 벌로 두면 한쪽만 고치는 날이 오고,
 // 그때 같은 일을 하는 칸이 화면마다 다르게 보인다.
@@ -276,8 +258,6 @@ describe("글 쓰는 칸은 공용 규칙을 쓴다", () => {
   const FIELDS = [
     { 자리: "자료 넣는 화면", path: "app/create/page.js", cls: "composer-text" },
     { 자리: "컨셉 보정", path: "components/StylePicker.jsx", cls: "tray-input" },
-    { 자리: "대본 원고", path: "app/create/[id]/script/page.js", cls: "script-draft" },
-    { 자리: "수정 지시", path: "app/create/[id]/script/page.js", cls: "fix-input" },
   ];
 
   for (const { 자리, path, cls } of FIELDS) {
@@ -295,53 +275,5 @@ describe("글 쓰는 칸은 공용 규칙을 쓴다", () => {
     expect(block).toContain("background: var(--deep)");
     expect(block).toContain("overflow-y: hidden");
     expect(block).toContain("resize: none");
-  });
-});
-
-// 대본 화면 아래쪽이 길어 사장님이 읽기 어려웠다. 분량 부족 안내와 [이야기 더 들려주기]를 뺐다.
-describe("②대본에서 이야기 더 들려주기를 뺐다", () => {
-  const src = read("app/create/[id]/script/page.js");
-
-  it("버튼도 그것을 부르는 함수도 남아 있지 않다", () => {
-    expect(src).not.toContain("이야기 더 들려주기");
-    expect(src).not.toContain("askMore");
-    expect(src).not.toContain("needsMore");
-  });
-
-  it("수정 지시 줄이 세로로 쌓인다 — 칸이 대본 칸과 같은 너비를 쓴다", () => {
-    const css = read("app/globals.css");
-    const rule = css.slice(css.indexOf(".fix-row {"), css.indexOf(".fix-row .mini"));
-    expect(rule).toContain("flex-direction: column");
-  });
-});
-
-// 사장님이 로컬에서 눈으로 확인할 자리 — 뽑힌 연출과 컷마다의 속도가 화면에 보여야 한다.
-// 값이 코드 안에만 있으면 잘 됐는지 알 방법이 없다.
-// ★ 연출 바람·초점은 **화면에서 걷어냈다**(2026-08-13 사용자 결정). "로우 앵글 트래킹",
-// "역광 실루엣" 같은 촬영 용어는 사장님이 읽어야 할 말이 아니고, 둘 다 읽기만 하는
-// 자리라 할 일이 없었다. 값은 그대로 흐른다 — 브리핑이 자료에서 뽑고(briefing.test.js)
-// 화면 설계가 지문으로 받는다(cuts.test.js 의 "화면 설계가 연출 바람을 받는다").
-describe("②대본은 촬영 용어를 보여주지 않는다", () => {
-  const src = read("app/create/[id]/script/page.js");
-
-  it("연출 바람을 화면에 그리지 않는다", () => {
-    expect(src).not.toContain("briefing?.direction");
-  });
-
-  it("초점(물건·사람·장소)을 화면에 그리지 않는다", () => {
-    expect(src).not.toContain("focus.mode");
-    expect(src).not.toContain("따라가는 것");
-  });
-
-  // 그림의 재료라 고칠 길은 남긴다 — 다만 접어 두고, 펴야 보인다.
-  it("화면·움직임은 접어 두되 고칠 수 있다", () => {
-    expect(src).toMatch(/showShots/);
-    expect(src).toMatch(/saveCut\(c\.idx,\s*\{\s*shows:/);
-    expect(src).toMatch(/saveCut\(c\.idx,\s*\{\s*motion:/);
-  });
-
-  it("컷마다 속도를 보여주고 고칠 수 있다", () => {
-    expect(src).toMatch(/from ["'][./]*lib\/speeds["']/);
-    expect(src).toMatch(/saveCut\(c\.idx,\s*\{\s*speed:/);
   });
 });

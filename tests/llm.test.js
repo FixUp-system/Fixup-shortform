@@ -55,17 +55,19 @@ describe("SHOTFORM_FAKE=all", () => {
       apiKey: undefined,
     });
     expect(called).toBe(false);
-    expect(out.script).toBeTruthy();
+    expect(out.topic).toBeTruthy();
   });
 
-  it("검증기 네 개가 요구하는 키를 모두 담는다", async () => {
+  it("검증기 셋이 요구하는 키를 모두 담는다", async () => {
     process.env.SHOTFORM_FAKE = "all";
     const out = await callJson({ system: "s", messages: [], apiKey: undefined });
     // 어느 호출부가 받아도 통과하도록 — 프롬프트로 갈라 주지 않는다
     expect(typeof out.topic).toBe("string");
     expect(Array.isArray(out.key_points)).toBe(true);
-    expect(out.script.replace(/\s/g, "").length).toBeGreaterThanOrEqual(20);
     expect(Array.isArray(out.cuts)).toBe(true);   // 빈 배열 → 문장당 한 컷 폴백
     expect(Array.isArray(out.shots)).toBe(true);  // 빈 배열 → 화면 설계 없이 진행
+    // ★ 시나리오(validateScenario)는 이 응답으로 통과하지 못한다 — 장면 초의 합이 사장님이
+    //   고른 길이와 같아야 해서 상수 하나로는 못 맞춘다(lib/llm.js 의 fakeResponse 주석).
+    expect(out).not.toHaveProperty("script"); // 원고는 걷어냈다(2026-08-16)
   });
 });

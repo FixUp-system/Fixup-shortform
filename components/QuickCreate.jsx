@@ -16,12 +16,14 @@ import { lastConfirmIndex, clearConfirms, restoreConfirm } from "../lib/quick-cr
 
 const GREETING = "안녕하세요! 어떤 영상을 만들까요? 한 줄로 편하게 알려주세요.";
 const POLL_INTERVAL_MS = 5000;
-// 전체 파이프라인(대본→목소리→그림→클립→합성)이라 t2v 시절 3분으로는 모자라다.
+// 전체 파이프라인(시나리오→목소리→그림→클립→합성)이라 t2v 시절 3분으로는 모자라다.
 const POLL_TIMEOUT_MS = 15 * 60 * 1000;
 
+// 키는 lib/auto.js 가 auto.stage 로 찍는 값이다. 모르는 값이 오면 "만드는 중"으로
+// 뭉개지므로 조용히 눈금을 잃는다 — 단계를 고치면 이 표도 같이 고친다.
 const STAGE_LABELS = {
-  briefing: "자료를 정리하는 중",
-  script: "대본을 쓰는 중",
+  // 원고를 걷어내면서 브리핑·대본 두 자리가 시나리오 하나로 합쳐졌다(2026-08-16).
+  scenario: "시나리오를 짜는 중",
   cuts: "장면을 나누는 중",
   voice: "목소리를 만드는 중",
   images: "그림을 그리는 중",

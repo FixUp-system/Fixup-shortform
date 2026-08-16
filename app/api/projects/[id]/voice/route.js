@@ -14,9 +14,9 @@ export const POST = withUser(async (req, { params }, user) => {
   if (!project || project.kind === "ad") return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
 
   // 읽을 컷이 있어야 한다 — 목소리는 컷별로 만든다.
-  // 컷은 대본 승인이 나눈다(POST /cuts).
+  // 컷은 시나리오 확정이 나눈다(POST /cuts).
   if (!(project.cuts || []).length) {
-    return Response.json({ error: "대본을 먼저 만들어 주세요" }, { status: 400 });
+    return Response.json({ error: "시나리오를 먼저 확정해 주세요" }, { status: 400 });
   }
 
   // ★ 말하는 모델에서는 클립이 목소리를 만든다 — 여기서 살 것이 없다.

@@ -60,7 +60,6 @@ const { POST: cutsPOST } = await import("../app/api/projects/[id]/cuts/route.js"
 const { POST: imagesPOST } = await import("../app/api/projects/[id]/images/route.js");
 const { GET, PATCH } = await import("../app/api/projects/[id]/route.js");
 const { POST: briefingPOST } = await import("../app/api/projects/[id]/briefing/route.js");
-const { POST: scriptPOST } = await import("../app/api/projects/[id]/script/route.js");
 const { POST: renderPOST } = await import("../app/api/projects/[id]/render/route.js");
 const { POST: clipsPOST } = await import("../app/api/projects/[id]/clips/route.js");
 const { GET: renderFileGET } = await import("../app/api/renders/[name]/route.js");
@@ -257,7 +256,7 @@ describe("POST /api/projects/[id]/images", () => {
     const p = await projectWithScript();
     const res = await imagesPOST(patchReq({}), ctx(p.id));
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/대본/);
+    expect((await res.json()).error).toMatch(/시나리오/);
     expect(pipelineMock.run).not.toHaveBeenCalled();
   });
 
@@ -453,175 +452,10 @@ describe("POST /api/projects/[id]/briefing — 재추출", () => {
   });
 });
 
-describe("POST /api/projects/[id]/script — 원고", () => {
-  // 목표 분량(사실 1개 → 밀도 반영 27자) 안에 드는 길이로 둔다 — 짧거나 길면 되돌리기가
-  // 끼어들어 호출 순서가 밀린다(그 동작 자체는 아래 되돌리기 테스트에서 따로 본다)
-  const cliche = { script: "특별한 라떼를 오늘 만나보세요. 지금 바로 오시면 좋습니다." };
-  const plain = { script: "시럽을 쓰지 않습니다. 매일 아침 딸기를 갈아서 만듭니다." };
+// ★ POST /api/projects/[id]/script 묶음은 라우트와 함께 지웠다(2026-08-16).
+//   초안→되돌리기→교정 루프를 재던 것인데 그 루프(lib/script-gen.js)가 사라졌다.
+//   시나리오 쪽의 같은 자리는 tests/scenario-*.test.js 가 재고 있다.
 
-  it("없는 프로젝트면 404", async () => {
-    const res = await scriptPOST(patchReq({}), ctx("없는id"));
-    expect(res.status).toBe(404);
-  });
-
-  it("브리핑이 확정되지 않았으면 400", async () => {
-    const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
-    const res = await scriptPOST(patchReq({}), ctx(p.id));
-    expect(res.status).toBe(400);
-  });
-
-  it("구성이 없어도 쓴다 — 원고가 곧 설계다", async () => {
-    const p = await projectWithBriefing();
-    llmMock.callJson.mockResolvedValue(plain);
-    const res = await scriptPOST(patchReq({}), ctx(p.id));
-    expect(res.status).toBe(200);
-    expect((await getProject(p.id, OWNER)).script.text).toBe(plain.script);
-  });
-
-  it("초안→교정을 거쳐 교정본을 저장한다", async () => {
-    const p = await projectWithBriefing();
-    llmMock.callJson.mockResolvedValueOnce(cliche).mockResolvedValueOnce(plain);
-    await scriptPOST(patchReq({}), ctx(p.id));
-    expect((await getProject(p.id, OWNER)).script.text).toBe(plain.script);
-    expect(llmMock.callJson).toHaveBeenCalledTimes(2); // 멀쩡한 초안에 되돌리기를 부르지 않는다
-  });
-
-  it("교정이 실패하면 초안으로 폴백한다", async () => {
-    const p = await projectWithBriefing();
-    llmMock.callJson.mockResolvedValueOnce(cliche).mockResolvedValue({}); // 교정 스키마 불일치
-    await scriptPOST(patchReq({}), ctx(p.id));
-    expect((await getProject(p.id, OWNER)).script.text).toBe(cliche.script);
-  });
-
-  it("교정본이 분량을 불려 놓으면 초안을 지킨다", async () => {
-    const p = await projectWithBriefing();                    // 목표(밀도 반영) 27자
-    const fit = { script: "가".repeat(27) };                  // 목표 안, 결함 없음 — 되돌리기가 끼어들지 않는다
-    const bloated = { script: "나".repeat(54) };              // 교정이 두 배로 불림(목표 27자를 넘긴다)
-    llmMock.callJson.mockResolvedValueOnce(fit).mockResolvedValue(bloated);
-    await scriptPOST(patchReq({}), ctx(p.id));
-    expect((await getProject(p.id, OWNER)).script.text).toBe(fit.script);
-  });
-
-  it("교정본이 분량을 흘리면 초안으로 폴백한다", async () => {
-    const p = await projectWithBriefing();
-    const long = { script: "가".repeat(27) };   // 목표(밀도 반영 27자) 안 — 되돌리기가 끼어들지 않는다
-    const gutted = { script: "나".repeat(15) }; // 초안의 80% 미만
-    llmMock.callJson.mockResolvedValueOnce(long).mockResolvedValue(gutted);
-    await scriptPOST(patchReq({}), ctx(p.id));
-    expect((await getProject(p.id, OWNER)).script.text).toBe(long.script);
-  });
-
-  // 초안은 겹치는 두 문장(같은 말 되풀이) 하나만 결함으로 걸리게 목표 분량(밀도 반영 27자) 안에 둔다 —
-  // 밀도 계수 도입 전에는 60자 기준으로 여유가 있었지만, 27자에서는 조금만 길어도 '분량 초과'까지 겹쳐 걸린다.
-  const 되풀이 = { script: "손님들이 신발을 맡기러 옵니다. 손님들이 신발을 자주 맡깁니다." };
-  // 고쳐 온 원고는 목표 분량(27자) 안에 들어오고, 되풀이도 없어야 한다
-  const 고침 = { script: "손님들이 신발을 맡기러 옵니다. 흰 신발은 하루 걸립니다." };
-
-  it("되풀이가 있으면 한 번 다시 쓰게 부르고, 나아지면 받는다", async () => {
-    const p = await projectWithBriefing();
-    llmMock.callJson
-      .mockResolvedValueOnce(되풀이)   // 초안
-      .mockResolvedValueOnce(고침)     // 되돌리기
-      .mockResolvedValueOnce(고침);    // 교정
-    await scriptPOST(patchReq({}), ctx(p.id));
-    expect(llmMock.callJson).toHaveBeenCalledTimes(3);
-    expect((await getProject(p.id, OWNER)).script.text).toBe(고침.script);
-  });
-
-  it("되돌리기가 실패해도 초안을 안고 간다", async () => {
-    const p = await projectWithBriefing();
-    llmMock.callJson
-      .mockResolvedValueOnce(되풀이)
-      .mockRejectedValueOnce(new Error("네트워크"))
-      .mockResolvedValueOnce(되풀이);
-    const res = await scriptPOST(patchReq({}), ctx(p.id));
-    expect(res.status).toBe(200);
-    expect((await getProject(p.id, OWNER)).script.text).toBe(되풀이.script);
-  });
-
-  // 스키마 거절 한 번은 그 라운드를 포기시키지 않는다 — 유료 호출이라 라운드당 한 번만
-  // 다시 시도하고, 그것도 스키마를 못 지키면 그 라운드만 버리고 남은 라운드를 계속 돈다.
-  it("되돌리기가 스키마를 거절하면 한 번 다시 시도하고, 그래도 안 되면 이 라운드만 버리고 다음 라운드를 돈다", async () => {
-    const p = await projectWithBriefing();
-    llmMock.callJson
-      .mockResolvedValueOnce(되풀이) // 초안
-      .mockResolvedValueOnce({})    // 되돌리기 1회차 시도1 — 스키마 거절
-      .mockResolvedValueOnce({})    // 되돌리기 1회차 재시도 — 스키마 거절 → 1회차 버림
-      .mockResolvedValueOnce(고침)  // 되돌리기 2회차 — 성공, 채택
-      .mockResolvedValueOnce(고침); // 교정
-    const res = await scriptPOST(patchReq({}), ctx(p.id));
-    expect(res.status).toBe(200);
-    expect(llmMock.callJson).toHaveBeenCalledTimes(5);
-    expect((await getProject(p.id, OWNER)).script.text).toBe(고침.script);
-  });
-
-  // 재시도가 성공하면 정상 경로로 돌아간다 — 실패 경로만 덮으면 재시도 성공이
-  // 점수 비교·채택 로직까지 제대로 이어지는지 못 잡는다.
-  it("스키마 거절 뒤 재시도가 성공하면 그 라운드 안에서 채택된다", async () => {
-    const p = await projectWithBriefing();
-    llmMock.callJson
-      .mockResolvedValueOnce(되풀이) // 초안
-      .mockResolvedValueOnce({})    // 되돌리기 1회차 시도1 — 스키마 거절
-      .mockResolvedValueOnce(고침)  // 되돌리기 1회차 재시도 — 성공, 채택
-      .mockResolvedValueOnce(고침); // 교정
-    const res = await scriptPOST(patchReq({}), ctx(p.id));
-    expect(res.status).toBe(200);
-    expect(llmMock.callJson).toHaveBeenCalledTimes(4); // 2회차로 넘어가지 않는다
-    expect((await getProject(p.id, OWNER)).script.text).toBe(고침.script);
-  });
-
-  // 호출 실패(네트워크 등)도 스키마 거절과 같은 정책을 받는다 — 첫 시도가 죽어도
-  // 루프를 통째로 포기하지 않고 한 번 재시도한다.
-  it("되돌리기 호출이 네트워크로 죽어도 라운드를 포기하지 않고 재시도한다", async () => {
-    const p = await projectWithBriefing();
-    llmMock.callJson
-      .mockResolvedValueOnce(되풀이)              // 초안
-      .mockRejectedValueOnce(new Error("네트워크")) // 되돌리기 1회차 시도1 — 호출 실패
-      .mockResolvedValueOnce(고침)                 // 되돌리기 1회차 재시도 — 성공, 채택
-      .mockResolvedValueOnce(고침);                // 교정
-    const res = await scriptPOST(patchReq({}), ctx(p.id));
-    expect(res.status).toBe(200);
-    expect(llmMock.callJson).toHaveBeenCalledTimes(4);
-    expect((await getProject(p.id, OWNER)).script.text).toBe(고침.script);
-  });
-
-  it("version을 올리고 브리핑 버전을 붙여 저장한다", async () => {
-    const p = await projectWithScript(); // 이미 version 1
-    llmMock.callJson.mockResolvedValue(plain);
-    await scriptPOST(patchReq({}), ctx(p.id));
-    const after = await getProject(p.id, OWNER);
-    expect(after.script.version).toBe(2);
-    expect(after.script.briefing_version).toBe(2);
-    expect(after.status).toBe("script");
-  });
-
-  it("초안 호출이 예외로 죽어도 원시 에러를 흘리지 않고 한국어 502를 준다", async () => {
-    const p = await projectWithScript();
-    llmMock.callJson.mockRejectedValue(new Error("네트워크"));
-    const res = await scriptPOST(patchReq({}), ctx(p.id));
-    expect(res.status).toBe(502);
-    expect((await res.json()).error).toBe("대본 생성에 실패했어요. 다시 시도해 주세요.");
-    expect(llmMock.callJson).toHaveBeenCalledTimes(2); // 예외도 재시도한다
-    expect((await getProject(p.id, OWNER)).script.text).toBe(SCRIPT_TEXT); // 기존 원고를 덮지 않는다
-  });
-
-  it("두 번 다 스키마가 깨지면 502", async () => {
-    const p = await projectWithBriefing();
-    llmMock.callJson.mockResolvedValue({ paragraphs: [{ text: "옛 형식" }] });
-    const res = await scriptPOST(patchReq({}), ctx(p.id));
-    expect(res.status).toBe(502);
-    expect(llmMock.callJson).toHaveBeenCalledTimes(2);
-  });
-
-  it("수정 지시가 있으면 기존 원고와 함께 프롬프트에 실린다", async () => {
-    const p = await projectWithScript();
-    llmMock.callJson.mockResolvedValue(plain);
-    await scriptPOST(patchReq({ instruction: "더 짧게" }), ctx(p.id));
-    const user = llmMock.callJson.mock.calls[0][0].messages[0].content;
-    expect(user).toContain(SCRIPT_TEXT);
-    expect(user).toContain("더 짧게");
-  });
-});
 
 describe("완성 라우트", () => {
   it("클립이 없으면 합성을 시작하지 않는다", async () => {

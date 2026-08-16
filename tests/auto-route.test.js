@@ -49,7 +49,7 @@ describe("POST /api/projects/[id]/auto", () => {
     const saved = await projects.getProject(p.id, A);
     expect(saved.voice_id).toBe("Laura");           // lib/voices.js 실물 매핑
     expect(saved.voice_label).toBe("밝은 여성");
-    expect(saved.auto).toEqual({ stage: "briefing", state: "running", error: null });
+    expect(saved.auto).toEqual({ stage: "scenario", state: "running", error: null });
     expect(runAutoPipeline).toHaveBeenCalledWith(p.id, A);
   });
 

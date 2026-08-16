@@ -10,14 +10,19 @@ import { readFileSync } from "fs";
 const strip = (t) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 const read = (p) => strip(readFileSync(p, "utf8"));
 
-const script = read("app/create/[id]/script/page.js");
 const voice = read("app/create/[id]/voice/page.js");
 const images = read("app/create/[id]/images/page.js");
 const video = read("app/create/[id]/video/page.js");
 const create = read("app/create/page.js");
 const quick = read("components/QuickCreate.jsx");
 
-describe("②대본 — 화질 선택", () => {
+// ⚠ 이 묶음은 **잠시 꺼져 있다**(2026-08-16).
+// 화질 칩을 들고 있던 화면이 ②대본 하나뿐이었고, 그 화면을 이번에 지웠다(원고 걷어내기).
+// 칩을 ②시나리오로 옮기는 것은 **다음 태스크**다 — 그까지는 재는 대상이 없다.
+// 파일을 지우지 않고 꺼 둔 이유: 여기 열일곱이 그 이사의 유일한 그물이다.
+// 옮긴 뒤에 `const script = ...` 자리에 **새 호스트 화면을 읽어** skip 을 푸는 것으로 끝난다.
+describe.skip("②시나리오 — 화질 선택(화면 이사 대기)", () => {
+  const script = "";
   it("화질 목록을 lib/clip-limits 에서 읽는다 — 화면이 해상도 문자열을 적지 않는다", () => {
     expect(script).toMatch(/resolutionsForProject\(project\)/);
     // 큰따옴표만 잡으면 작은따옴표·백틱·JSX 텍스트로 박아 넣고 빠져나간다.

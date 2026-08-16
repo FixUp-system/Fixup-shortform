@@ -1,32 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { validateScript, validateCutRanges, validateShows, validateCast, validateBriefing, validateDevelopQuestions, dropAnsweredQuestions, validateProps } from "../lib/validate.js";
+import { validateCutRanges, validateShows, validateCast, validateBriefing, dropAnsweredQuestions, validateProps } from "../lib/validate.js";
 import { secondsForText } from "../lib/script.js";
-
-describe("validateScript — 하나로 흐르는 원고", () => {
-  it("원고 문자열을 받아 다듬어 돌려준다", () => {
-    expect(validateScript({ script: "  매일 아침 딸기를 갈아 씁니다. 하루 40잔이면 끝입니다.  " })).toEqual({
-      text: "매일 아침 딸기를 갈아 씁니다. 하루 40잔이면 끝입니다.",
-    });
-  });
-
-  it("문단 배열은 더 이상 받지 않는다 — 원고가 원본이다", () => {
-    expect(validateScript({ paragraphs: [{ text: "문장" }] })).toBeNull();
-  });
-
-  it("너무 짧으면 null — 한 마디는 대본이 아니다", () => {
-    expect(validateScript({ script: "짧다." })).toBeNull();
-  });
-
-  it("파이프라인이 감당 못 할 크기는 막는다", () => {
-    expect(validateScript({ script: "가".repeat(2001) })).toBeNull();
-  });
-
-  it("비었거나 문자열이 아니면 null", () => {
-    expect(validateScript({ script: "   " })).toBeNull();
-    expect(validateScript({ script: 123 })).toBeNull();
-    expect(validateScript(null)).toBeNull();
-  });
-});
 
 describe("validateCutRanges — 경계만 받고 텍스트는 코드가 자른다", () => {
   const sentences = ["첫 문장입니다.", "둘째 문장입니다.", "셋째 문장입니다."];
@@ -191,30 +165,6 @@ describe("validateShows — tone·transition", () => {
     const out = validateShows({ tone: "   ", shots: [{ shows: "가", transition: "" }] }, 1);
     expect(out[0]).not.toHaveProperty("tone");
     expect(out[0]).not.toHaveProperty("transition");
-  });
-});
-
-describe("validateDevelopQuestions", () => {
-  it("질문만 받아 답변 자리와 함께 돌려준다", () => {
-    const qs = validateDevelopQuestions({ questions: [{ question: "왜 시작하셨어요?" }] });
-    expect(qs).toEqual([{ question: "왜 시작하셨어요?", options: [], answer: null, done: false, kind: "develop" }]);
-  });
-
-  it("보기를 보내와도 버린다 — 사장님만 아는 이야기에 보기를 만들면 없는 사실이 굳는다", () => {
-    const qs = validateDevelopQuestions({ questions: [{ question: "왜요?", options: ["가", "나"] }] });
-    expect(qs[0].options).toEqual([]);
-  });
-
-  it("3개까지만 남기고 망가진 질문은 버린다", () => {
-    const many = Array.from({ length: 5 }, (_, i) => ({ question: `질문${i}` }));
-    expect(validateDevelopQuestions({ questions: many })).toHaveLength(3);
-    expect(validateDevelopQuestions({ questions: [{ question: "  " }, { question: "정상?" }] })).toHaveLength(1);
-  });
-
-  it("쓸 질문이 하나도 없으면 null — 빈 배열로 조용히 넘기지 않는다", () => {
-    expect(validateDevelopQuestions({ questions: [] })).toBeNull();
-    expect(validateDevelopQuestions({})).toBeNull();
-    expect(validateDevelopQuestions(null)).toBeNull();
   });
 });
 

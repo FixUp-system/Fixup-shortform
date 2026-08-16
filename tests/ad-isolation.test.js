@@ -18,7 +18,6 @@ import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js"
 import { GET as getProjectRoute, PATCH as patchProjectRoute } from "../app/api/projects/[id]/route.js";
 import { POST as autoPOST } from "../app/api/projects/[id]/auto/route.js";
 import { POST as briefingPOST } from "../app/api/projects/[id]/briefing/route.js";
-import { POST as scriptPOST } from "../app/api/projects/[id]/script/route.js";
 import { POST as cutsPOST } from "../app/api/projects/[id]/cuts/route.js";
 import { POST as cutRegenPOST } from "../app/api/projects/[id]/cuts/[idx]/regen/route.js";
 import { POST as voicePOST } from "../app/api/projects/[id]/voice/route.js";
@@ -84,12 +83,6 @@ describe("기존 라우트는 광고 문서를 모른다 — A 그룹(getProject
     const p = await makeOld();
     const res = await patchProjectRoute(jsonReqAs(U, { settings: { target_seconds: 30 } }), ctx(p.id));
     expect(res.status).toBe(200);
-  });
-
-  it("POST /api/projects/[id]/script — 광고 문서는 404", async () => {
-    const p = await makeAd();
-    const res = await scriptPOST(jsonReqAs(U, {}), ctx(p.id));
-    expect(res.status).toBe(404);
   });
 
   // regen 3형제는 getProject 호출이 `if (!fakeFal())` 안에 있고, 그 자리에 기존

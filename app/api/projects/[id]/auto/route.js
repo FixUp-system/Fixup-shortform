@@ -80,7 +80,7 @@ export const POST = withUser(async (req, { params }, user) => {
     return {
       ...proj,
       voice_id: voice.id, voice_label: voice.label, voice_error: null,
-      auto: { stage: "briefing", state: "running", error: null },
+      auto: { stage: "scenario", state: "running", error: null },
     };
   });
   if (blocked) return Response.json({ error: blocked }, { status: 409 });

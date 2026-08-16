@@ -4,7 +4,7 @@ import { getStore } from "../lib/store/index.js";
 import { createProject, updateProject } from "../lib/projects.js";
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
 import { GET as getProjectRoute, PATCH as patchProjectRoute } from "../app/api/projects/[id]/route.js";
-import { POST as scriptPOST } from "../app/api/projects/[id]/script/route.js";
+import { POST as scenarioPOST } from "../app/api/projects/[id]/scenario/route.js";
 import { POST as cutsPOST } from "../app/api/projects/[id]/cuts/route.js";
 import { POST as imagesPOST } from "../app/api/projects/[id]/images/route.js";
 import { POST as clipsPOST } from "../app/api/projects/[id]/clips/route.js";
@@ -92,9 +92,11 @@ describe("변이 라우트 — 남의 id 로 부르면 실패한다", () => {
     expect(res.status).toBe(404);
   });
 
-  it("POST script — 남의 id 는 404", async () => {
+  // 자리가 ②대본에서 ②시나리오로 바뀌었다(2026-08-16). 재는 것은 그대로다 —
+  // 남의 프로젝트에 LLM 을 부를 수 있으면 그것만으로 우리 돈이 나간다.
+  it("POST scenario — 남의 id 는 404", async () => {
     const p = await make(A);
-    const res = await scriptPOST(jsonReqAs(B, {}), ctx(p.id));
+    const res = await scenarioPOST(jsonReqAs(B, {}), ctx(p.id));
     expect(res.status).toBe(404);
   });
 

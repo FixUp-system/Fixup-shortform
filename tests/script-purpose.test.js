@@ -10,13 +10,16 @@
 //      자료 원문·사실 목록·분량뿐이다. 목적은 한 글자도 안 갔다.
 //
 // 그래서 대본 작가는 "무엇을 위해 고르는지" 없이 사실 중에서 고르게 된다.
+//
+// ⚠️ 2026-08-16: 원고가 사라지면서 ②(대본이 목적을 받는가)를 재던 것들은 지웠다 — 잴 대상이
+//    없어졌다. 남긴 것은 ①쪽, 즉 **브리핑이 목적을 비워 두지 않는가**와 purposeOf 의 폴백이다.
+//    ★ 지금 purposeOf 를 부르는 코드는 없다(시나리오 지문은 자료 원문을 직접 읽는다).
+//      목적을 다시 지문에 실을 때 이 폴백이 살아 있어야 하므로 판정만 남겨 둔다.
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { buildScriptMessages } from "../lib/script.js";
 import { purposeOf } from "../lib/briefing.js";
 
 const briefingSrc = readFileSync("lib/briefing.js", "utf8");
-const scriptSrc = readFileSync("lib/script.js", "utf8");
 
 const project = (briefing) => ({
   id: "p1",
@@ -62,25 +65,5 @@ describe("목적 — 비면 코드가 정한다", () => {
     expect(typeof purposeOf(project({}))).toBe("string");
     expect(purposeOf({}).length).toBeGreaterThan(0);
     expect(purposeOf(null).length).toBeGreaterThan(0);
-  });
-});
-
-describe("목적 — 대본이 실제로 받는다", () => {
-  it("★ 프롬프트에 목적이 실린다 — 이 배선이 끊겨 있었다", () => {
-    const { messages } = buildScriptMessages(project({ takeaway: "이 핸드폰을 사고 싶어지게" }));
-    const user = messages[0].content;
-    expect(user, "목적이 프롬프트에 없다").toContain("이 핸드폰을 사고 싶어지게");
-    expect(user).toMatch(/목적/);
-  });
-
-  it("목적이 없던 옛 프로젝트도 프롬프트가 깨지지 않는다 — 기본값이 실린다", () => {
-    const { messages } = buildScriptMessages(project({ focus: { mode: "물건", subject: "핸드폰" } }));
-    expect(messages[0].content).toMatch(/목적/);
-  });
-
-  it("고르는 기준을 목적으로 준다 — 가장 센 것이 빠지지 않게", () => {
-    // 이번 실패의 핵심: 브리핑이 1번으로 뽑은 '카메라'가 대본에서 통째로 빠졌다.
-    // "이 중에서 고른다"만 있고 **무엇을 기준으로 고르는지**가 없었다.
-    expect(scriptSrc, "고르는 기준이 목적이라는 지시가 없다").toMatch(/목적[\s\S]{0,120}(닿|고른)/);
   });
 });

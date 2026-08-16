@@ -3,8 +3,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { resetMemoryStore } from "../lib/store/memory.js";
 import { extractBriefing } from "../lib/briefing-extract.js";
-import { generateScript } from "../lib/script-gen.js";
 import { runAutoPipeline } from "../lib/auto.js";
+import { scenarioCutsKey } from "../lib/steps.js";
 import * as projects from "../lib/projects.js";
 import { chargeVideo, balanceFor, alreadyChargedVideo } from "../lib/charges.js";
 import { VIDEO_PRICE } from "../lib/pricing.js";
@@ -47,32 +47,16 @@ describe("extractBriefing", () => {
   });
 });
 
-// validateScript 를 통과하는 최소 형태 — 검증기가 읽는 키는 `script` 다(lib/validate.js:7).
-// 돌려주는 것은 { text } 이므로 픽스처(LLM 원응답)와 결과의 키가 다르다.
-const RAW_SCRIPT = { script: "국산 딸기를 쓴 딸기라떼가 이번 주에 나옵니다. 매장에서 만나 보세요." };
-
-const PROJECT = {
-  id: "p1",
-  // 실물 프로젝트는 항상 photos 배열을 가진다(lib/projects.js 의 기본값) — 픽스처도 그에 맞춘다
-  material: { text: "국산 딸기 딸기라떼 이번 주 출시", photos: [] },
-  briefing: { topic: "딸기라떼", key_points: ["국산 딸기"], confirmed: true, version: 1 },
-  settings: { target_seconds: 15 },
+// 시나리오 픽스처 — 15초 한 편. 장면 초의 합이 정확히 15 이라 checkScenario 가 통과시킨다.
+const SCENARIO = {
+  topic: "딸기라떼 신메뉴",
+  focus: { mode: "물건", subject: "딸기라떼", look: "" },
+  angle: "만드는 손을 따라간다",
+  shots: [
+    { beat: "딸기를 갈아 넣는다", line: "국산 딸기를 매일 걁니다.", speaker: "내레이션", seconds: 8 },
+    { beat: "잔을 건네는다", line: "", speaker: "", seconds: 7 },
+  ],
 };
-
-describe("generateScript", () => {
-  it("초안이 검증을 통과하면 대본을 돌려준다", async () => {
-    const script = await generateScript(PROJECT, "p1", { llm: async () => RAW_SCRIPT });
-    expect(script).toBeTruthy();
-    expect(typeof script.text).toBe("string");
-  });
-
-  it("모든 시도가 실패하면 null", async () => {
-    const script = await generateScript(PROJECT, "p1", {
-      llm: async () => { throw new Error("죽음"); },
-    });
-    expect(script).toBeNull();
-  });
-});
 
 const OWNER = "00000000-0000-4000-8000-000000000001";
 
@@ -92,8 +76,7 @@ function happyDeps(calls) {
     if (patch) await projects.updateProject(id, ownerId, patch);
   };
   return {
-    extractBriefing: async () => { calls.push("briefing"); return { topic: "딸기라떼", key_points: [], questions: [] }; },
-    generateScript: async () => { calls.push("script"); return { text: "문장 하나." }; },
+    generateScenario: async () => { calls.push("scenario"); return { scenario: SCENARIO, problems: [] }; },
     runSplitPipeline: mark("split", (p) => ({ ...p, status: "cuts",
       cuts: [{ idx: 0, sentence: "문장 하나.", seconds: 3, state: "pending", regen_count: 0 }] })),
     runVoicePipeline: mark("voice", (p) => ({ ...p, status: "voice",
@@ -116,11 +99,13 @@ describe("runAutoPipeline", () => {
     const p = await makeProject();
     const calls = [];
     await runAutoPipeline(p.id, OWNER, happyDeps(calls));
-    expect(calls).toEqual(["briefing", "script", "split", "voice", "images", "clips", "render"]);
+    expect(calls).toEqual(["scenario", "split", "voice", "images", "clips", "render"]);
     const done = await projects.getProject(p.id, OWNER);
     expect(done.auto).toEqual({ stage: "render", state: "done", error: null });
-    expect(done.briefing.confirmed).toBe(true);   // 자동 확정
-    expect(done.script.version).toBe(1);
+    // 검토가 없는 경로라 확정을 코드가 찍는다
+    expect(done.scenario.confirmed).toBe(true);
+    expect(done.scenario.shots).toHaveLength(2);
+    expect(done.script, "원고를 여전히 만든다").toBeFalsy();
     expect(done.status).toBe("done");
   });
 
@@ -140,10 +125,10 @@ describe("runAutoPipeline", () => {
     expect(done.auto.state).toBe("done"); // 재시도가 실패해도(스텁이라 상태 그대로) 멈추지 않는다
   });
 
-  it("브리핑 추출이 끝내 실패하면 auto.state=failed 를 남기고 던진다", async () => {
+  it("시나리오를 끝내 못 만들면 auto.state=failed 를 남기고 던진다", async () => {
     const p = await makeProject();
     const deps = happyDeps([]);
-    deps.extractBriefing = async () => null;
+    deps.generateScenario = async () => ({ scenario: null, problems: ["형식이 맞지 않았어요."] });
     await expect(runAutoPipeline(p.id, OWNER, deps)).rejects.toThrow();
     const failed = await projects.getProject(p.id, OWNER);
     expect(failed.auto.state).toBe("failed");
@@ -176,6 +161,63 @@ describe("runAutoPipeline", () => {
   });
 });
 
+// ★★ 이 묶음이 없어서 **빠른 생성이 통째로 깨진 채 그린이었다**(2026-08-16).
+//
+// 이 파일의 모든 테스트가 runSplitPipeline 을 주입한다. 그래서 auto 가 무엇을 **저장했는지**
+// 는 아무도 안 봤고, auto 가 시나리오 대신 원고를 쓰고 있던 동안 진짜 분할은 첫 줄에서
+// "시나리오가 없어요"로 죽었다(lib/pipeline.js 의 splitCuts). 테스트는 전부 초록이었다.
+//
+// 그래서 여기서는 **주입한 함수가 진짜 분할과 같은 전제를 확인한다.** 화면이나 라우트가
+// 아니라 저장된 문서를 본다 — 그것이 다음 단계에 실제로 넘어가는 유일한 것이다.
+describe("빠른 생성이 분할에 넘기는 것 — 주입이 가려 주던 자리", () => {
+  beforeEach(() => resetMemoryStore());
+
+  it("분할이 시작될 때 문서에 확정된 시나리오가 들어 있다", async () => {
+    const p = await makeProject();
+    const deps = happyDeps([]);
+    let seen = null;
+    const real = deps.runSplitPipeline;
+    deps.runSplitPipeline = async (id, ownerId) => {
+      const proj = await projects.getProject(id, ownerId);
+      // lib/pipeline.js 의 splitCuts 가 맨 앞에서 하는 바로 그 판정을 그대로 옮겼다.
+      // 문구까지 같게 두는 이유: 갈리면 여기가 통과해도 실제로는 죽는다.
+      if (!proj?.scenario?.shots?.length) throw new Error("시나리오가 없어요");
+      seen = proj;
+      await real(id, ownerId);
+    };
+    await runAutoPipeline(p.id, OWNER, deps);
+    expect(seen.scenario.confirmed, "확정을 안 찍었다 — POST /cuts 라면 400 이다").toBe(true);
+    expect(seen.scenario.shots).toHaveLength(2);
+  });
+
+  it("각인이 그 시나리오를 가리킨다 — 만들자마자 낡은 컷이 되지 않는다", async () => {
+    const p = await makeProject();
+    await runAutoPipeline(p.id, OWNER, happyDeps([]));
+    const done = await projects.getProject(p.id, OWNER);
+    expect(done.cuts_scenario_of).toBe(scenarioCutsKey(done.scenario));
+  });
+
+  it("규칙에 어긋난 시나리오면 멈춘다 — 사유를 사장님 말로 남긴다", async () => {
+    // 검토 게이트가 없는 경로라 여기서 안 막으면 **주문한 길이와 다른 영상**이 나온다.
+    // 단계별 흐름에서는 PATCH /scenario 가 확정을 막아 같은 일을 한다.
+    const p = await makeProject();
+    const calls = [];
+    const deps = happyDeps(calls);
+    deps.generateScenario = async () => {
+      calls.push("scenario");
+      return { scenario: SCENARIO, problems: ["장면 초의 합이 22초예요 — 15초에 맞춰 주세요."] };
+    };
+    await expect(runAutoPipeline(p.id, OWNER, deps)).rejects.toThrow(/22초/);
+    const failed = await projects.getProject(p.id, OWNER);
+    expect(failed.auto.state).toBe("failed");
+    expect(failed.auto.error).toContain("장면 초의 합이 22초예요");
+    // 돈이 나가는 단계는 하나도 안 부른다 — 멈추는 자리가 ③목소리 앞이라는 것이 요점이다
+    expect(calls).toEqual(["scenario"]);
+    // 어긋난 시나리오를 확정으로 저장해 두지도 않는다
+    expect(failed.scenario?.confirmed).toBeFalsy();
+  });
+});
+
 // 완성본을 못 준 값은 되돌린다 — 장부에 음수 행으로 남는다.
 // (청구는 auto 라우트가 시작 전에 한다. 여기서는 lib/charges.js 로 직접 심어
 //  "실패가 환불을 부르는가"만 본다.)
@@ -189,7 +231,7 @@ describe("자동 관통 실패는 환불한다", () => {
     expect(await balanceFor(OWNER)).toBe(-VIDEO_PRICE["kling-v3"]["720p"][15]);
 
     const deps = happyDeps([]);
-    deps.extractBriefing = async () => null;
+    deps.generateScenario = async () => ({ scenario: null, problems: [] });
     await expect(runAutoPipeline(p.id, OWNER, deps)).rejects.toThrow();
 
     expect(await balanceFor(OWNER)).toBe(0);
@@ -207,7 +249,7 @@ describe("자동 관통 실패는 환불한다", () => {
   it("청구가 없었으면(가짜 모드) 환불도 조용히 지나간다", async () => {
     const p = await makeProject();
     const deps = happyDeps([]);
-    deps.extractBriefing = async () => null;
+    deps.generateScenario = async () => ({ scenario: null, problems: [] });
     await expect(runAutoPipeline(p.id, OWNER, deps)).rejects.toThrow();
     expect(await balanceFor(OWNER)).toBe(0);
   });

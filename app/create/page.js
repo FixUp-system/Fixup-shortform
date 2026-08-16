@@ -94,7 +94,7 @@ export default function CreatePage() {
   return (
     <>
       <h1 className="pgtitle">영상 만들기 (단계별)</h1>
-      <p className="pgsub">자료를 주시면 기계가 정리해 보여드려요 — 확인 → 대본 → 목소리 → 이미지 → 영상 → 완성</p>
+      <p className="pgsub">자료를 주시면 기계가 정리해 보여드려요 — 확인 → 시나리오 → 목소리 → 이미지 → 영상 → 완성</p>
 
       <section className="panel--wide">
         <div className="composer">

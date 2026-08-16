@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildBriefingMessages, buildDevelopMessages, mergeAsked, briefingContentChanged } from "../lib/briefing.js";
+import { buildBriefingMessages, mergeAsked, briefingContentChanged } from "../lib/briefing.js";
 
 const project = {
   material: {
@@ -82,33 +82,6 @@ describe("buildBriefingMessages", () => {
   it("사람이 중심이 아닌 영상에 사람을 만들지 말라고 못 박는다", () => {
     // 칸이 있으면 모델이 채운다 — 정보 전달 영상에 억지 주인공이 생기는 것을 막는다
     expect(buildBriefingMessages(project).system).toContain("억지로");
-  });
-});
-
-describe("buildDevelopMessages — 대본을 써 보고 모자랄 때만", () => {
-  const withScript = {
-    ...project,
-    briefing: { topic: "주제", key_points: ["ㄱ"], asked: [{ question: "가격은?", answer: "5천원" }] },
-    script: { text: "지금까지 쓴 원고입니다." },
-  };
-
-  it("자료·정리된 내용·이미 물은 것·지금 대본·모자란 초를 모두 준다", () => {
-    const user = buildDevelopMessages(withScript, 12).messages[0].content;
-    expect(user).toContain("성수동 카페 미영"); // 자료 원문
-    expect(user).toContain("가격은? → 5천원");   // 이미 물어본 것(다시 묻지 않게)
-    expect(user).toContain("지금까지 쓴 원고입니다.");
-    expect(user).toContain("약 12초");
-  });
-
-  it("사실이 아니라 이야기를 청하고, 보기는 붙이지 않는다", () => {
-    const { system } = buildDevelopMessages(withScript, 5);
-    expect(system).toContain("이야기를 청하는 질문");
-    expect(system).toContain("보기는 붙이지 않는다");
-    expect(system).toContain("답이 있는 것은 묻지 않는다");
-  });
-
-  it("후보를 그대로 옮기지 말라고 지시한다 — 목록을 주면 목록을 채운다", () => {
-    expect(buildDevelopMessages(withScript, 5).system).toContain("후보를 그대로 옮기지 말고");
   });
 });
 

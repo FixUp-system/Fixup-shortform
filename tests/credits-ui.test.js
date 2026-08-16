@@ -13,7 +13,6 @@ const create = strip(readFileSync("app/create/page.js", "utf8"));
 const voice = strip(readFileSync("app/create/[id]/voice/page.js", "utf8"));
 const images = strip(readFileSync("app/create/[id]/images/page.js", "utf8"));
 const video = strip(readFileSync("app/create/[id]/video/page.js", "utf8"));
-const script = strip(readFileSync("app/create/[id]/script/page.js", "utf8"));
 
 describe("화면 — 크레딧", () => {
   it("편수로 말하지 않는다 — 정가가 길이마다 달라 'N편'은 거짓말이 된다", () => {
@@ -51,7 +50,7 @@ describe("화면 — 크레딧", () => {
 // 클라이언트 번들을 오염시킨다 — pricing 은 import 0 개의 순수 모듈이라 안전하다.
 describe("화면 — 가격표만 가져온다", () => {
   for (const [name, src] of [["QuickCreate", quick], ["admin", admin],
-    ["voice", voice], ["images", images], ["video", video], ["script", script]]) {
+    ["voice", voice], ["images", images], ["video", video]]) {
     it(`${name} 는 lib/charges 를 import 하지 않는다`, () => {
       expect(src).not.toMatch(/from\s+["'][^"']*lib\/charges/);
     });
@@ -116,11 +115,6 @@ describe("영상 모델은 만들 때 한 번 고른다", () => {
 
   // ★ 뒤 단계는 모델을 **말하지도 않는다**(2026-08-13). 자료 화면에서 이미 골랐고,
   // 사장님에게 "Seedance 2.0" 이라는 이름은 아무 뜻이 없다 — 할 일 없는 줄을 지웠다.
-  it("②대본은 모델을 말하지 않는다", () => {
-    expect(script).not.toMatch(/saveModel/);
-    expect(script).not.toMatch(/I2V_MODELS/);
-  });
-
   it("⑤영상도 모델을 말하지 않는다", () => {
     expect(video).not.toMatch(/saveModel/);
     expect(video).not.toMatch(/i2v_model/);

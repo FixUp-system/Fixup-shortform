@@ -53,7 +53,6 @@ describe("비율 목록이 한 곳에만 있다", () => {
     "app/api/projects/route.js",
     "app/api/projects/[id]/cuts/route.js",
     "app/create/page.js",
-    "app/create/[id]/script/page.js",
     "lib/compose.js",
   ];
 

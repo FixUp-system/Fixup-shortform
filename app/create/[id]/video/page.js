@@ -167,7 +167,7 @@ export default function VideoStepPage() {
     busy,
   });
 
-  if (!cuts.length) return <p className="pgsub">대본을 먼저 만들어 주세요.</p>;
+  if (!cuts.length) return <p className="pgsub">시나리오를 먼저 확정해 주세요.</p>;
   // ★ 말하는 모델은 예외다 — 목소리를 클립이 만드니 낭독이 아예 없다.
   //   컷 길이는 분할 때 잡은 추정 초가 그대로 최종값이다(lib/subtitles.js 의 cutSeconds).
   if (!projectSpeaks(project) && !cuts.some((c) => c.audio))

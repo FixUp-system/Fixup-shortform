@@ -4,7 +4,7 @@ import { ALL_ERROR_FIELDS, STEP_ERROR_FIELDS, firstError } from "../lib/step-err
 describe("단계별 오류 필드 표", () => {
   it("다섯 단계를 모두 덮는다", () => {
     expect(Object.keys(STEP_ERROR_FIELDS).sort())
-      .toEqual(["done", "images", "script", "video", "voice"]);
+      .toEqual(["done", "images", "scenario", "video", "voice"]);
   });
 
   // ★ 이 자리가 이번 버그의 회귀 방어다 — 이미지 단계가 images_error 를 본다는 사실.

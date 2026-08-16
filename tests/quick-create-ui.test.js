@@ -4,8 +4,20 @@ import { readFileSync } from "fs";
 import { lastConfirmIndex, clearConfirms, restoreConfirm } from "../lib/quick-create-state.js";
 
 const src = readFileSync("components/QuickCreate.jsx", "utf8");
+const auto = readFileSync("lib/auto.js", "utf8");
 
 describe("QuickCreate — 자동 관통 배선", () => {
+  // ★ 단계 이름이 두 벌이다 — lib/auto.js 가 찍고 이 화면이 읽는다.
+  //   갈리면 화면은 오류 없이 "만드는 중"으로 뜻을 잃고, 그것은 아무도 못 알아본다.
+  //   (2026-08-16 에 실제로 갈렸다 — stage:"script" 가 "scenario" 로 바뀌었다.)
+  it("auto 가 찍는 단계를 빠짐없이 말로 옮긴다", () => {
+    const stages = [...auto.matchAll(/setAuto\(\{\s*stage:\s*"([a-z]+)"/g)].map((m) => m[1]);
+    expect(stages.length, "auto 에서 stage 를 하나도 못 찾았다").toBeGreaterThan(3);
+    for (const stage of new Set(stages)) {
+      expect(src, `${stage} 단계의 말이 화면에 없다`).toMatch(new RegExp(`^  ${stage}: "`, "m"));
+    }
+  });
+
   it("t2v 경로를 더는 부르지 않는다", () => {
     expect(src).not.toMatch(/api\/video/);
   });

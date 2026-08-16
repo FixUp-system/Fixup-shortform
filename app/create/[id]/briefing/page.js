@@ -45,7 +45,7 @@ export default function BriefingStepPage() {
   }
 
   // 컨셉 저장. 컷을 비우지 않는다 — 컨셉은 글이 아니라 그림의 근거다.
-  // 원고·컷·소리는 살아남고 ④이미지만 낡는다(image.style_of 각인이 판정한다).
+  // 시나리오·컷·소리는 살아남고 ④이미지만 낡는다(image.style_of 각인이 판정한다).
   async function saveStyle(preset, note) {
     setBusy(true);
     const res = await fetch(`/api/projects/${id}`, {

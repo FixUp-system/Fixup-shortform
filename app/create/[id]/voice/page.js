@@ -40,7 +40,7 @@ export default function VoiceStepPage() {
   const [status, setStatus] = useState(null); // 마지막 상태 응답 — 심장박동이 여기 온다
   const stopRef = useRef(null);
 
-  // 컷 분할이 끝나기 전 — 대본 승인 직후 이 화면에 도착하면 여기부터 보인다.
+  // 컷 분할이 끝나기 전 — 시나리오 확정 직후 이 화면에 도착하면 여기부터 보인다.
   // 훅 순서가 어긋나지 않게 이른 return 보다 위에서 정한다.
   const splitting =
     (project?.cuts || []).length === 0 && project?.status === "cuts" && !project?.cuts_error;
@@ -200,13 +200,13 @@ export default function VoiceStepPage() {
     busy,
   });
 
-  // 대본 승인 직후 이 화면에 도착하면 컷이 아직 없다 — 분할이 도는 중이다.
-  // 분할은 대본 승인이 띄우고(POST /cuts), 여기서는 컷이 생기기를 기다리기만 한다.
+  // 시나리오 확정 직후 이 화면에 도착하면 컷이 아직 없다 — 분할이 도는 중이다.
+  // 분할은 시나리오 확정이 띄우고(POST /cuts), 여기서는 컷이 생기기를 기다리기만 한다.
   if (!cuts.length) {
     if (splitting) {
       return (
         <section className="panel panel--narrow">
-          <h2>대본을 컷으로 나누는 중이에요</h2>
+          <h2>시나리오를 컷으로 나누는 중이에요</h2>
           <p className="pgsub">잠시만요 — 나뉜 컷부터 차례로 읽어 드립니다</p>
         </section>
       );

@@ -12,9 +12,9 @@ export const POST = withUser(async (req, { params }, user) => {
   // 없는 것과 같이 404 다: 남의 것이 아니라 "이 문 뒤에 없는 것"이라서다.
   if (!project || project.kind === "ad") return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
 
-  // 컷은 대본 승인이 나눈다(POST /cuts) — 컷이 없으면 그릴 대상이 없다
+  // 컷은 시나리오 확정이 나눈다(POST /cuts) — 컷이 없으면 그릴 대상이 없다
   const cuts = project.cuts || [];
-  if (!cuts.length) return Response.json({ error: "대본을 먼저 만들어 주세요" }, { status: 400 });
+  if (!cuts.length) return Response.json({ error: "시나리오를 먼저 확정해 주세요" }, { status: 400 });
 
   // 낭독이 있어야 컷 길이가 확정된다. 길이를 모르는 채로 그리면
   // 10초를 넘는 컷을 뒤늦게 알고 그림 값을 두 번 치른다.

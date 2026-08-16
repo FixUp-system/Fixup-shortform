@@ -26,7 +26,7 @@ export const POST = withUser(async (req, { params }, user) => {
   if (!project || project.kind === "ad") return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
 
   const cuts = project.cuts || [];
-  if (!cuts.length) return Response.json({ error: "대본을 먼저 만들어 주세요" }, { status: 400 });
+  if (!cuts.length) return Response.json({ error: "시나리오를 먼저 확정해 주세요" }, { status: 400 });
   // 클립 길이는 낭독 길이에서 나온다 — 소리가 없으면 몇 초를 만들지 알 수 없다.
   // ★ 말하는 모델은 예외다 — 목소리를 클립이 만드니 낭독이 없고, 컷 길이는 분할 때 잡은
   //   추정 초가 그대로 최종값이다(lib/subtitles.js 의 cutSeconds).
