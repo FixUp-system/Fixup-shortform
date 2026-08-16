@@ -1769,3 +1769,72 @@ git commit -m "refactor: 원고를 걷어낸다 — 컷의 원본은 이제 시�
 - [ ] `SHOTFORM_FAKE=all npm run dev` 로 ①자료 → ②시나리오 → 확정까지 **0원으로 관통**해 본다. 시나리오를 손으로 고쳐 초 합계가 어긋나게 만들고 다음 버튼이 잠기는지 눈으로 본다
 - [ ] 측정 스크립트를 커밋한다 — `scripts/measure/scenario.mjs` 로 시나리오를 n회 뽑아 규칙 위반율·장면 수·내레이션 비율을 낸다. 일회용 하네스로 재고 버리면 수치가 보고서에만 남는다
 - [ ] 유료 fal 관통은 **사장님 승인 후에만**
+
+---
+
+### Task 11: 남은 문(화질·가짜 모드·브리핑 라우트)
+
+원고를 걷어내면서 세 자리가 주인을 잃었다. 셋 다 **사장님이 실제로 막히는 자리**다.
+
+**Files:**
+- Modify: `app/create/[id]/briefing/page.js` (화질 선택기를 여기로)
+- Modify: `lib/scenario.js` 또는 `lib/llm.js` (가짜 모드가 ②를 통과하게)
+- Delete: `app/api/projects/[id]/briefing/route.js`
+- Modify: `tests/resolution-ui.test.js` · `tests/ad-isolation.test.js` · `lib/briefing.js` · `lib/validate.js`
+
+#### 11-1. 화질 선택기가 집을 잃었다
+
+화질은 **②대본 화면에만** 있었고 그 화면은 지워졌다. 그래서 지금 **아무도 화질을 못 고른다** —
+`app/create/page.js` 는 `target_seconds`·`aspect_ratio`·`i2v_model`·`style` 만 보내고 화질은 안
+보낸다(리뷰 실측). 그리고 **화질은 정가를 바꾼다**(Seedance 30초: 720p 160 · 1080p 360 크레딧).
+
+①자료로 옮긴다 — 길이·비율·모델·화풍이 이미 거기 있고, 화질 잠금 기준은 **결제**라 ③목소리
+전이면 어디든 성립한다(`app/api/projects/[id]/route.js` 의 잠금 주석 참고).
+
+지워진 원본은 `git show 0298d7e^:"app/create/[id]/script/page.js"` 의 `resolutions.length > 0`
+블록이다. 그대로 옮긴다 — 칩에 값(크레딧)을 적고, 잠겼으면 **사유를 남긴다**("이미 값을 치러서
+바꿀 수 없어요"). 사유를 지우면 눌리지 않는 칩만 남아 고장으로 보인다.
+
+`tests/resolution-ui.test.js` 의 `describe.skip` 을 되살려 ①자료를 겨누게 한다.
+
+#### 11-2. 가짜 모드가 ②시나리오를 통과하지 못한다
+
+`SHOTFORM_FAKE=all` 은 **돈 한 푼 안 쓰고 관통을 확인하는 유일한 길**이다. 지금은 ②에서 죽는다 —
+`lib/llm.js` 의 `fakeResponse()` 가 `shots: []` 를 주므로 `validateScenario` 가 `null` 을 내고
+POST 가 502 다.
+
+가짜 시나리오는 **`checkScenario` 를 실제로 통과해야** 한다: 초의 합 = `target_seconds`,
+컷마다 모델 하한 이상 `CONTENT_MAX_SECONDS` 이하, 대사 있는 컷에 화자.
+
+★ 그러려면 목표 초와 모델 하한을 알아야 하는데 `callJson` 은 프로젝트를 안 받는다. 방법은
+구현자가 정한다. 지켜야 할 것 둘:
+- **`lib/fake.js` 가 판정의 유일한 자리**라는 규율을 깨지 말 것(판정은 거기, 만들어 내는 값은
+  다른 곳이어도 된다)
+- **주입된 `call` 로 도는 기존 테스트가 그대로 살아야** 한다(`tests/scenario-generate.test.js`)
+
+테스트: 가짜 모드에서 `generateScenario` 가 `problems: []` 인 시나리오를 준다는 것을 15·30·45·60
+전부에 대해 잰다.
+
+#### 11-3. 아무도 안 부르는 라우트가 LLM 을 부를 수 있다
+
+`app/api/projects/[id]/briefing/route.js` 는 화면에서 도달 불가인데 `extractBriefing`(유료 LLM)을
+그대로 들고 있다. 소유자가 직접 POST 하면 돈이 나간다.
+
+지우기 전에 옮겨야 할 것:
+- `tests/ad-isolation.test.js` 의 "광고 문서는 404" 행 — 브리핑 라우트 자리를 **`/scenario` 로
+  바꾼다**(그 라우트도 `kind === "ad"` 를 404 로 답한다)
+- 그 라우트를 겨누는 다른 테스트 계약들(구현자가 grep 으로 찾는다)
+- `scripts/measure/run-pipeline.mjs` · `ab-briefing.mjs` 가 이 라우트를 부른다 — 측정 스크립트가
+  깨지면 **보고에 적고 멈춘다**(고치는 것은 별개 판단이다)
+
+같이 죽는 것: `lib/briefing.js` 의 `buildDevelopMessages` 잔재·`purposeOf`(소비자 0)·
+`briefingSignature` 가 올리는 브리핑 버전(이제 아무도 안 본다) · `lib/briefing.js:56-57` 의
+"대본을 실제로 써 보고 길이가 모자랄 때 따로 청한다" 지문(그 라운드가 없어졌다).
+**각각 grep 으로 소비자를 확인하고 지운다. 살아 있는 소비자가 있으면 남기고 보고한다.**
+
+#### 11-4. 오타
+
+`app/create/page.js:119` "안 옴겼다" → "안 옮겼다".
+
+**검증:** `npx vitest run` 그린 · `SHOTFORM_DIST_DIR=.next-verify npx next build` 성공 ·
+①자료에 화질 칩이 보이는지 라우트 목록과 소스로 확인.
