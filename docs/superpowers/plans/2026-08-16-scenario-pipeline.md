@@ -1883,3 +1883,71 @@ Task 11 이 브리핑 라우트를 지우면서 측정 스크립트 둘이 404 �
 
 **검증:** `npx vitest run` 그린 · `node scripts/measure/scenario.mjs 1 15` 가 실제로 돌아
 수치를 낸다(LLM 호출 승인됨 — 사용자 지시상 LLM 은 묻지 않고 진행). fal 호출 0.
+
+---
+
+### Task 13: 내레이션은 Seedance 가 읽는다 (전제 정정)
+
+★ **앞선 판단이 틀린 전제 위에 있었다.** 최종 수정 웨이브는 "화면 밖 목소리는 검증된 적 없는
+능력"이라고 보고 내레이션 컷을 **침묵**시키고 프로젝트 전체를 TTS 로 보냈다(Ruling 38).
+**사용자가 정정했다(2026-08-17): Seedance 는 내레이션을 한다** — 자동차 광고에서 영상 중간에
+"누구보다 빠르게. 그리고 편안하게." 가 들어가는 그 방식이다. 되돌린다.
+
+**Files:** `lib/clip-limits.js` · `lib/cuts.js` · `lib/scenario.js` · `lib/scenario-rules.js` ·
+`app/create/[id]/scenario/page.js` · `app/api/projects/[id]/scenario/route.js`(필요하면) · 각 테스트
+
+#### 13-1. 내레이션 컷이 프로젝트를 TTS 로 끌어내리지 않는다
+
+`lib/clip-limits.js` 의 `if (cuts.some((c) => c?.narration === true)) return false;` 를 걷는다.
+그리고 "대사 있는 컷마다 화면 속 화자가 있어야 한다"는 조건에서 **내레이션 컷을 면제**한다 —
+정의상 화면에 사람이 없다. 면제하지 않으면 내레이션 컷이 그 조건에 걸려 같은 결과가 된다.
+
+#### 13-2. 내레이터 목소리를 시나리오가 제안하고 사장님이 고친다
+
+컷마다 Seedance 를 **따로** 부른다. 그 호출에 목소리 설명이 없으면 모델이 컷마다 알아서 고르고,
+이어 붙이면 **내레이터가 컷마다 다른 사람**이 된다. 화면 속 인물은 `cast[].voice` 한 줄을 전
+컷에 실어 이미 그것을 막고 있다 — 내레이터에만 그 자리가 없었다.
+
+시나리오 JSON 에 최상위 한 줄을 더한다:
+
+```json
+{ "topic": …, "focus": …, "angle": …,
+  "narrator_voice": "차분한 30대 남성, 낮고 단단한 톤",
+  "shots": [ … ] }
+```
+
+- 지문이 그 줄을 요구한다(내레이션 컷이 하나라도 있을 때). 목소리 **설명**이지 id 가 아니다 —
+  Seedance 는 글로 쓴 설명을 받는다(`lib/voices.js` 의 TTS id 목록과 다른 것이다)
+- `validateScenario` 가 보존한다
+- `checkScenario` 에 규칙 하나: **내레이션 컷이 있는데 `narrator_voice` 가 비면 문제로 잡는다**
+- ②시나리오 화면에 칸 하나(전체 단위, `angle` 옆). 내레이션 컷이 없으면 안 보여도 된다
+- 라우트가 저장한다 — ★ **"고칠 수 있는 척하는 칸"을 또 만들지 말 것.** 화면에 칸이 있으면
+  `validateScenario` 와 PATCH 가 그 값을 반드시 받아야 한다(Task 5 가 네 필드로 겪은 그 자리)
+
+#### 13-3. 클립 프롬프트에 내레이션 갈래
+
+`speechFor` 가 내레이션 컷에 대해 대사를 돌려주되 **캐스팅 인물이 아니라 내레이터**로 준다
+(`voice` 는 `scenario.narrator_voice`). `buildClipPrompt` 는 그때 화면 밖 갈래를 쓴다:
+
+```
+A narrator speaks in voiceover, off-screen — no one in frame speaks or moves their lips.
+Voice: <narrator_voice>. Says exactly, in Korean: "<line>".
+```
+
+⚠️ **각인**: 프롬프트가 갈리므로 `spokenOf` 도 갈려야 한다. 내레이션 컷은 지금 `spokenOf` 가
+`null` 이므로(speechFor 가 null) 값이 생기는 것 자체가 차이를 만든다 — 다만 **화면 속 대사와
+내레이션이 서로 다른 각인을 내는지** 테스트로 못 박는다. 옛 컷(narration 없음)은 무변경이어야 한다.
+
+#### 13-4. 지문에서 "내레이션은 최소로" 를 걷는다
+
+광고에서 정상 기법인데 지문이 억누르고 있었다. 그 문장을 넣은 근거가 "미검증 능력"이었고
+그 전제가 정정됐다. 실측(내레이션 100% on 제품 소재)은 이제 **문제가 아니라 정상**이다.
+
+#### 13-5. 가짜 모드
+
+가짜 시나리오에 `narrator_voice` 를 넣고, 화자를 다시 내레이션으로 되돌릴지는 구현자가 정한다 —
+다만 `SHOTFORM_FAKE=all` 이 **말하는 배선을 실제로 밟는지**를 보고에 적는다(직전 재리뷰가
+"캐스팅 호출에 fake 인자가 없어 fake 모드에서는 cast:[] 라 말하기 경로에 도달 못 한다"고 지적했다).
+
+**검증:** `npx vitest run` 그린 · `next build` 성공 · 변이(내레이션 면제·각인 분리) 각각 확인 ·
+`node scripts/measure/scenario.mjs 1 30` 으로 `narrator_voice` 가 실제로 나오는지 실측.
