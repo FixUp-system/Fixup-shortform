@@ -227,11 +227,12 @@ describe("영상 컨셉은 자료 쪽에서 고른다", () => {
     expect(scriptSrc).not.toContain("STYLE_PRESETS");
   });
 
-  // ①자료 화면은 되물을 것이 없으면 자동으로 지나간다. 보이는 상태가 둘인데 한쪽에만
-  // 두면 그 흐름을 탄 사장님은 컨셉을 바꿀 자리를 영원히 못 만난다.
-  it("①자료의 보이는 두 상태 모두에 있다", () => {
+  // 재던 것은 "보이는 모든 상태에 컨셉 고르기가 있는가"다 — 한 상태에라도 빠지면 그 흐름을
+  // 탄 사장님은 컨셉을 바꿀 자리를 영원히 못 만난다. 되묻기를 걷어낸 뒤(Task 9) ①자료의
+  // 보이는 상태는 하나뿐이라 자리도 하나다.
+  it("①자료의 보이는 모든 상태에 있다", () => {
     const uses = [...briefSrc.matchAll(/\{stylePicker\}/g)];
-    expect(uses.length, "①자료가 stylePicker 를 한 자리에만 그린다").toBe(2);
+    expect(uses.length, "①자료가 stylePicker 를 안 그린다").toBe(1);
   });
 
   it("/create 가 만들 때 컨셉을 함께 보낸다", () => {

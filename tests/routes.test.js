@@ -426,23 +426,8 @@ describe("POST /api/projects/[id]/briefing — 재추출", () => {
     expect((await getProject(p.id, OWNER)).briefing.version).toBe(2);
   });
 
-  it("kind:develop이면 브리핑을 다시 뽑지 않고 질문만 덧붙인다", async () => {
-    const p = await projectWithScript();
-    await updateProject(p.id, OWNER, (proj) => ({
-      ...proj,
-      settings: { ...proj.settings, target_seconds: 30 },
-      briefing: { ...proj.briefing, asked: [{ question: "가격은?", answer: "5천원", done: true }] },
-    }));
-    llmMock.callJson.mockResolvedValue({ questions: [{ question: "왜 시작하셨어요?" }] });
-
-    const res = await briefingPOST(patchReq({ kind: "develop" }), ctx(p.id));
-    expect(res.status).toBe(200);
-    const after = await getProject(p.id, OWNER);
-    expect(after.briefing.topic).toBe("주제");            // 정리된 내용을 다시 뽑지 않는다
-    expect(after.briefing.asked).toHaveLength(2);          // 이미 받은 답을 지우지 않는다
-    expect(after.briefing.asked[0].answer).toBe("5천원");
-    expect(after.briefing.asked[1]).toMatchObject({ question: "왜 시작하셨어요?", kind: "develop", options: [] });
-  });
+  // (kind:"develop" — 이야기 소재를 되묻던 경로는 2026-08-16 에 사라졌다. ①자료가 되묻지
+  //  않으므로 그 라운드 자체가 없다)
 
   it("호출이 예외로 죽어도 원시 에러를 흘리지 않고 한국어 502를 준다", async () => {
     const p = await projectWithScript();

@@ -208,8 +208,6 @@ describe("대본 생성 — 예산 오류는 삼키지 않는다", () => {
 // 소재 질문 루프(이 라우트 안)가 같은 모양의 삼키는 catch 였다.
 describe("브리핑 — 예산 오류는 502 가 아니다", () => {
   const budget = () => new BudgetExceeded(1, 1, "trial");
-  const postJson = (url, body) =>
-    new Request(url, { method: "POST", headers: headers(), body: JSON.stringify(body) });
   let project;
 
   beforeEach(async () => {
@@ -230,14 +228,8 @@ describe("브리핑 — 예산 오류는 502 가 아니다", () => {
     expect((await res.json()).error).toMatch(/체험/);
   });
 
-  it("소재 질문에서 나도 402 다", async () => {
-    llmMock.call.mockImplementation(() => { throw budget(); });
-    const res = await briefingPOST(
-      postJson(`http://localhost/api/projects/${project.id}/briefing`, { kind: "develop" }),
-      ctx(project.id)
-    );
-    expect(res.status).toBe(402);
-  });
+  // (소재 질문 루프는 2026-08-16 에 사라졌다 — ①자료가 되묻지 않는다. 남은 삼키는 catch 는
+  //  추출 루프 하나이고 위 테스트가 그것을 잰다)
 
   // 502 계약은 그대로 둔다 — 일시적 호출 실패까지 402 로 만들면 안 된다.
   it("예산과 무관한 실패는 여전히 502 다", async () => {

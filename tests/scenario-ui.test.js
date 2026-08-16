@@ -63,6 +63,23 @@ describe("②시나리오 화면", () => {
   });
 });
 
+// ★ ①자료는 더 이상 되묻지 않는다(Task 9). 되묻던 자리가 남아 있으면 사장님은 시나리오를
+//   보기도 전에 빈칸을 채우라는 요구를 먼저 받는다 — 무엇이 부족한지는 시나리오를 만들어
+//   봐야 알 수 있는데도.
+describe("①자료 — 되묻지 않는다", () => {
+  const briefing = readFileSync("app/create/[id]/briefing/page.js", "utf8");
+
+  it("★ 되물어 답을 받던 칸이 없다", () => {
+    expect(briefing).not.toContain("asked");
+    expect(briefing).not.toMatch(/여쭤|질문/);
+  });
+
+  it("★ 다음 버튼이 시나리오로 간다 — 없어질 ②대본이 아니라", () => {
+    expect(briefing).toContain("/scenario");
+    expect(briefing, "없어질 ②대본 화면으로 민다").not.toMatch(/\/script`/);
+  });
+});
+
 // ★ 말하는 모델(기본 Seedance)에는 ③목소리가 없다 — ②에서 확정하면 컷이 나뉘는 중인 채로
 //   ④이미지에 온다. 그 화면이 기다려 주지 않으면 "컷이 없다"는 안내가 뜨고, 그 안내가
 //   가리키던 단계는 이제 저장소에 없다. 곁길이 아니라 주경로다.

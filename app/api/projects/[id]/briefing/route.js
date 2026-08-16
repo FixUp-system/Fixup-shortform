@@ -1,11 +1,10 @@
+// ①자료는 되묻지 않는다(2026-08-16) — 사장님은 설명 하나를 적고 바로 ②시나리오로 간다.
+// 그래서 이야기 소재를 청하던 `kind:"develop"` 경로는 통째로 사라졌다. 빈칸을 미리 캐물어야
+// 할지는 시나리오를 만들어 봐야 알 수 있는 것이었고, 실제로 부르는 화면도 이미 없었다.
 import { getProject, updateProject } from "../../../../../lib/projects";
-import { callJson } from "../../../../../lib/llm";
-import { validateDevelopQuestions } from "../../../../../lib/validate";
-import { buildDevelopMessages, mergeAsked, briefingContentChanged } from "../../../../../lib/briefing";
+import { mergeAsked, briefingContentChanged } from "../../../../../lib/briefing";
 import { extractBriefing } from "../../../../../lib/briefing-extract";
-import { estimateSeconds, targetChars, CHARS_PER_SEC } from "../../../../../lib/script";
 import { withUser } from "../../../../../lib/auth/require-user.js";
-import { BudgetExceeded } from "../../../../../lib/costs.js";
 
 export const POST = withUser(async (req, { params }, user) => {
   const { id } = await params;
@@ -15,34 +14,6 @@ export const POST = withUser(async (req, { params }, user) => {
   if (!project || project.kind === "ad") return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
   if (!project.material?.text?.trim()) {
     return Response.json({ error: "정리할 자료가 없어요" }, { status: 400 });
-  }
-
-  // 이야기 소재 청하기 — 대본을 써 보고 길이가 모자랄 때만 온다.
-  // 브리핑 전체를 다시 뽑지 않고 질문만 덧붙인다(정리된 내용과 이미 받은 답을 지우지 않게).
-  // 브리핑 라우트는 본문 없이도 불린다(첫 추출·재추출) — json()이 없는 요청도 받아넘긴다
-  const body = typeof req?.json === "function" ? await req.json().catch(() => ({})) : {};
-  if (body?.kind === "develop") {
-    const short = Math.max(1, Math.round((targetChars(project) / CHARS_PER_SEC) - estimateSeconds(project.script)));
-    const msg = buildDevelopMessages(project, short);
-    let questions = null;
-    for (let attempt = 0; attempt < 2 && !questions; attempt++) {
-      try {
-        questions = validateDevelopQuestions(await callJson({ system: msg.system, messages: msg.messages, stage: "브리핑", projectId: id }));
-      } catch (e) {
-        // 예산 오류는 삼키지 않는다 — 아래 502 로 나가면 한도에 걸린 사장님이
-        // 고장으로 읽는다. withUser 까지 올라가야 402 가 된다(추출 루프와 같은 처방).
-        if (e instanceof BudgetExceeded) throw e;
-        console.error("소재 질문 생성 실패:", e);
-      }
-    }
-    if (!questions) {
-      return Response.json({ error: "여쭤볼 것을 찾지 못했어요. 자료를 직접 더 적어 주세요." }, { status: 502 });
-    }
-    const updated = await updateProject(id, user.id, (proj) => ({
-      ...proj,
-      briefing: { ...proj.briefing, asked: [...(proj.briefing?.asked || []), ...questions] },
-    }));
-    return Response.json({ briefing: updated.briefing });
   }
 
   // 추출 루프는 lib 로 옮겼다 — 자동 관통(lib/auto.js)이 같은 함수를 부른다.
