@@ -183,6 +183,31 @@ describe("areCutsStale — 시나리오에서 나온 컷은 시나리오 각인�
     expect(areCutsStale({ scenario: speaker, cuts, cuts_scenario_of: of })).toBe(true);
   });
 
+  // ★★ 2026-08-16 최종 리뷰 Important 4 — 대사·하는 일·화자는 사장님이 쓰는 자유 서술이라
+  //    구분자가 그대로 들어온다. 이어 붙이면 옆 칸과 섞여 "고쳤는데 안 낡는" 각인이 된다.
+  //    그러면 화면이 확인을 안 묻고, POST /cuts 는 409 로 거절하고, 화면은 그 409 를 정상으로
+  //    읽어 옛 컷 그대로 그림·클립을 사게 한다.
+  it("★ 칸 사이 구분자가 섞여도 옆 칸과 안 겹친다 — 고쳤으면 낡아야 한다", () => {
+    // 하는 일에 "|" 가 들어가면, 이어 붙이던 시절에는 옆 칸(말하는 사람)과 자리를 나눠 가져
+    // **글자 그대로 같은 각인**이 됐다.
+    const a = { shots: [{ line: "오늘도 엽니다.", seconds: 5, beat: "문을연다|사장", speaker: "20대 여성" }] };
+    const b = { shots: [{ line: "오늘도 엽니다.", seconds: 5, beat: "문을연다", speaker: "사장|20대 여성" }] };
+    expect(scenarioCutsKey(a)).not.toBe(scenarioCutsKey(b));
+
+    // 대사에 "|" 와 장면 경계("//")가 함께 들어오면 **장면 수까지** 삼켰다 —
+    // 장면 둘짜리 시나리오와 장면 하나짜리 시나리오의 각인이 같아진다.
+    const one = { shots: [{ line: "가|5|나|다//라", seconds: 6, beat: "마", speaker: "바" }] };
+    const two = { shots: [
+      { line: "가", seconds: 5, beat: "나", speaker: "다" },
+      { line: "라", seconds: 6, beat: "마", speaker: "바" },
+    ] };
+    expect(scenarioCutsKey(one)).not.toBe(scenarioCutsKey(two));
+
+    // 낡음 판정까지 이어진다 — 각인이 겹치면 이 자리가 조용히 false 였고,
+    // 화면은 확인을 안 묻고 POST /cuts 의 409 를 정상으로 읽었다.
+    expect(areCutsStale({ scenario: a, cuts, cuts_scenario_of: scenarioCutsKey(b) })).toBe(true);
+  });
+
   it("장면을 더하거나 빼면 낡는다", () => {
     expect(areCutsStale({ scenario: { ...scenario, shots: [shots[0]] }, cuts, cuts_scenario_of: of })).toBe(true);
   });
