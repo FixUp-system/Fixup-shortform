@@ -47,14 +47,14 @@ describe("extractBriefing", () => {
   });
 });
 
-// 시나리오 픽스처 — 15초 한 편. 장면 초의 합이 정확히 15 이라 checkScenario 가 통과시킨다.
+// 시나리오 픽스처 — 15초 한 편. 장면 초의 합이 정확히 15라 checkScenario 가 통과시킨다.
 const SCENARIO = {
   topic: "딸기라떼 신메뉴",
   focus: { mode: "물건", subject: "딸기라떼", look: "" },
   angle: "만드는 손을 따라간다",
   shots: [
-    { beat: "딸기를 갈아 넣는다", line: "국산 딸기를 매일 걁니다.", speaker: "내레이션", seconds: 8 },
-    { beat: "잔을 건네는다", line: "", speaker: "", seconds: 7 },
+    { beat: "딸기를 갈아 넣는다", line: "국산 딸기를 매일 갈아 씁니다.", speaker: "내레이션", seconds: 8 },
+    { beat: "잔을 건넨다", line: "", speaker: "", seconds: 7 },
   ],
 };
 

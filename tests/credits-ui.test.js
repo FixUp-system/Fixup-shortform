@@ -13,6 +13,8 @@ const create = strip(readFileSync("app/create/page.js", "utf8"));
 const voice = strip(readFileSync("app/create/[id]/voice/page.js", "utf8"));
 const images = strip(readFileSync("app/create/[id]/images/page.js", "utf8"));
 const video = strip(readFileSync("app/create/[id]/video/page.js", "utf8"));
+// ②시나리오 — ②대본이 서 있던 자리다(2026-08-16). 지금은 깨끗하다 — 더러워지기 전에 그물에 넣는다.
+const scenario = strip(readFileSync("app/create/[id]/scenario/page.js", "utf8"));
 
 describe("화면 — 크레딧", () => {
   it("편수로 말하지 않는다 — 정가가 길이마다 달라 'N편'은 거짓말이 된다", () => {
@@ -50,7 +52,7 @@ describe("화면 — 크레딧", () => {
 // 클라이언트 번들을 오염시킨다 — pricing 은 import 0 개의 순수 모듈이라 안전하다.
 describe("화면 — 가격표만 가져온다", () => {
   for (const [name, src] of [["QuickCreate", quick], ["admin", admin],
-    ["voice", voice], ["images", images], ["video", video]]) {
+    ["scenario", scenario], ["voice", voice], ["images", images], ["video", video]]) {
     it(`${name} 는 lib/charges 를 import 하지 않는다`, () => {
       expect(src).not.toMatch(/from\s+["'][^"']*lib\/charges/);
     });

@@ -38,8 +38,9 @@ const POLL_MS = 2000;
 //
 // ★ contentEditable 을 값(v)으로 다시 그리지 않는다. React 가 편집 중인 노드의 자식을
 // 갈아끼우면 커서가 맨 앞으로 튄다 — 그래서 초기 내용만 넣고(children) 이후는 브라우저에
-// 맡긴 뒤, 보낼 때 DOM 에서 걷는다(rewriteWithEdits). app/create/[id]/script/page.js 와
-// 같은 방식이다.
+// 맡긴 뒤, 보낼 때 DOM 에서 걷는다(rewriteWithEdits).
+// (이 수법을 물려받았던 app/create/[id]/script/page.js 는 2026-08-16 에 사라졌다 —
+//  같은 방식을 쓰는 단계별 화면은 지금 ⑥완성의 자막 손보기다.)
 // ★ key 를 editing 으로 가른다 — 편집을 껐다 켜면 저장된 값으로 새로 그린다([취소]가
 // 실제로 되돌리는 자리다).
 function Field({ editing, name, v }) {
@@ -165,7 +166,7 @@ export default function AdDetailPage() {
   //
   // ★ DOM 에서 걷는다(useState 로 매 글자를 붙들지 않는다). contentEditable 을 제어
   // 컴포넌트로 만들면 한 글자마다 리렌더가 돌아 커서가 맨 끝으로 튄다 — 이 저장소가
-  // app/create/[id]/script/page.js 에서 이미 같은 방식을 쓴다.
+  // ⑥완성 화면(app/create/[id]/done/page.js)의 자막 손보기에서 이미 같은 방식을 쓴다.
   function rewriteWithEdits() {
     const rows = editRef.current?.querySelectorAll("[data-shot]") || [];
     const edited = Array.from(rows).map((row) => {

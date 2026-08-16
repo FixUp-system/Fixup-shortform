@@ -153,7 +153,7 @@ export default function ArchiveDetailPage() {
                                  값을 보여 주고, 축만 있는 컷은 움직임 줄이 통째로 사라졌다).
                                 이름표는 MOTION_AXES 의 label 에서 온다 — 목록에서 축 한 줄을
                                 빼면 여기서도 함께 사라진다.
-                                ⚠️ 편집 칸을 두지 않는다. 고치는 자리는 ②대본이고 여기는 보는
+                                ⚠️ 편집 칸을 두지 않는다. 여기는 보는
                                    자리다 — 그 성격을 바꾸지 않는다. */}
                             {(() => {
                               const axes = axesOf(c);

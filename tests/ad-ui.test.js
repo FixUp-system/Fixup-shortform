@@ -363,7 +363,7 @@ describe("/ads/[id] — 컷 편집", () => {
 
   it("★ 필드가 실제로 열린다 — contentEditable 없이 .editable 만 붙이면 모양만 편집이다", () => {
     // 이 화면은 편집 기능 이전에도 className="editable" 을 쓰고 있었다(스타일만).
-    // 진짜 편집은 contentEditable 이 가른다 — app/create/[id]/script/page.js 와 같은 패턴.
+    // 진짜 편집은 contentEditable 이 가른다 — ⑥완성의 자막 손보기와 같은 패턴.
     expect(detailSrc, "contentEditable 이 없다 — 모양만 편집이다").toContain("contentEditable");
     expect(detailSrc).toContain("suppressContentEditableWarning");
   });

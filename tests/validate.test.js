@@ -2,6 +2,42 @@ import { describe, it, expect } from "vitest";
 import { validateCutRanges, validateShows, validateCast, validateBriefing, dropAnsweredQuestions, validateProps } from "../lib/validate.js";
 import { secondsForText } from "../lib/script.js";
 
+// ★ 이 묶음은 tests/script.test.js 에 있었고, 그 파일이 원고와 함께 통째로 지워졌다(2026-08-16).
+//   그런데 secondsForText 는 **살아 있다** — lib/validate.js 가 컷의 spoken_seconds 를 이 자로
+//   재고, lib/cuts.js 가 문장을 묶을지 이 자로 판정한다.
+//
+// ⚠️ 아래 아랫집(`말하는 시간을 spoken_seconds 로 따로 적는다`)이 대신할 수 없다 —
+//    그쪽은 `expect(c.spoken_seconds).toBe(secondsForText(c.sentence))` 라 같은 함수를 양변에
+//    둔 항등식이다. 초당 글자수를 9 로 바꿔도, 2초 바닥이나 15초 천장을 지워도 **그린인 채
+//    모든 컷의 낭독 초가 움직인다.**
+//    그래서 여기서는 **숫자를 손으로 적는다.** 함수에서 끌어오지 않는다 — 끌어오는 순간
+//    같은 항등식이 된다.
+describe("secondsForText — 컷의 낭독 초를 재는 자", () => {
+  it("공백을 뺀 글자수를 초당 5.5자로 센다", () => {
+    expect(secondsForText("가".repeat(55))).toBe(10);   // 55 / 5.5
+    expect(secondsForText("가".repeat(33))).toBe(6);    // 33 / 5.5
+    expect(secondsForText("가".repeat(44))).toBe(8);    // 44 / 5.5
+  });
+
+  it("공백은 세지 않는다 — 띄어쓰기를 늘려도 낭독 시간은 그대로다", () => {
+    // 글자 33개 + 공백 32개. 공백을 세면 12초가 되어 컷이 둘로 쪼개진다.
+    expect(secondsForText("가 ".repeat(33))).toBe(6);
+    expect(secondsForText("  가".repeat(33))).toBe(6);
+  });
+
+  it("바닥은 2초다 — 한 글자짜리 컷도 화면에 머물 시간이 필요하다", () => {
+    expect(secondsForText("가")).toBe(2);
+    expect(secondsForText("가나다")).toBe(2);   // 3 / 5.5 = 0.5 → 1 이 아니라 2
+    expect(secondsForText("")).toBe(2);
+    expect(secondsForText(null)).toBe(2);
+  });
+
+  it("천장은 15초다 — 클립 모델의 상한을 넘는 값을 만들지 않는다", () => {
+    expect(secondsForText("가".repeat(200))).toBe(15);
+    expect(secondsForText("가".repeat(2000))).toBe(15);
+  });
+});
+
 describe("validateCutRanges — 경계만 받고 텍스트는 코드가 자른다", () => {
   const sentences = ["첫 문장입니다.", "둘째 문장입니다.", "셋째 문장입니다."];
 
