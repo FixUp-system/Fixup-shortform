@@ -51,6 +51,30 @@ describe("②시나리오 화면", () => {
     expect(page, "무엇을 잃는지 말해야 한다").toMatch(/사라져요|사라집니다/);
   });
 
+  // ★★ 2026-08-16 최종 리뷰 Important 3 — 이 화면은 시나리오 단계의 **유일한 품질 관문**이다
+  //    (원고 시절의 되돌리기·채점이 없다). 그런데 규칙이 어긋나면 [확정]이 잠기고, 그것이
+  //    유일한 저장 경로라 고친 것을 남길 방법이 하나도 없었다 — 자리를 뜨면 통째로 사라졌다.
+  it("★ 확정하지 않고도 저장할 수 있다 — 한 자리에서 다 맞추지 못해도 된다", () => {
+    expect(page, "임시저장 버튼이 없다").toMatch(/임시저장/);
+    // 라우트의 PATCH 는 confirmed 없이 부르면 저장만 한다(확정만 규칙을 강제한다)
+    expect(page).toMatch(/body: JSON\.stringify\(\{ scenario \}\)/);
+    // 규칙이 어긋나도 눌려야 한다 — ok 로 잠그면 저장할 길이 다시 없어진다
+    expect(page).toMatch(/onClick=\{saveDraft\} disabled=\{busy\}/);
+  });
+
+  // ★★ 같은 리뷰 Important 3 — 생성이 실패하면 오류 문구만 남고, madeFor 각인 때문에
+  //    자동 생성도 다시 안 돈다. 새로고침이 유일한 복구였다.
+  it("★ 생성이 실패하면 다시 시도할 수 있다", () => {
+    expect(page).toMatch(/다시 시도/);
+    expect(page, "madeFor 를 풀지 않으면 버튼이 아무 일도 못 한다").toMatch(/madeFor\.current = null/);
+  });
+
+  // ★★ 같은 리뷰 Important 5 — angle 은 컷 각인에 안 들어간다(산 그림·클립을 지킨다).
+  //    그래서 컷이 이미 있으면 고쳐도 아무 일도 안 일어난다. 말 안 하면 "고칠 수 있는 척하는 칸"이다.
+  it("★ 컷이 있으면 전달 방식 칸이 언제 반영되는지 말한다", () => {
+    expect(page).toMatch(/다음에 컷을 나눌 때/);
+  });
+
   it("★ setInterval 을 직접 돌리지 않는다", () => {
     expect(page).not.toContain("setInterval");
   });

@@ -574,6 +574,21 @@ describe("옛 프로젝트(시나리오가 없는 프로젝트)는 갇히지 않
     expect(currentStepKey(editing)).toBe("scenario");
   });
 
+  // ★★ 임시저장(확정 없이 저장)은 확정을 푼다 — 그것이 이미 컷을 나눈 프로젝트를 다시
+  //    가두면 안 된다. 컷 각인(cuts_scenario_of)이 붙는 자리는 컷 분할 하나뿐이라
+  //    "이 프로젝트는 ②를 한 번 통과했다"는 증거다.
+  it("★ 한 번 컷을 나눈 프로젝트는 임시저장으로 확정이 풀려도 안 갇힌다", () => {
+    const saved = {
+      status: "voice",
+      scenario: { shots: [{ beat: "문을 연다" }], confirmed: false },
+      cuts_scenario_of: "옛 각인",
+      cuts: old.cuts,
+      material: { text: "자료" },
+    };
+    expect(isReachable("images", saved)).toBe(true);
+    expect(currentStepKey(saved)).toBe("images");
+  });
+
   it("컷이 하나도 없으면 옛 프로젝트로 치지 않는다 — 산출물이 없으면 지나온 근거가 없다", () => {
     const fresh = { status: "briefing", material: { text: "자료" } };
     expect(currentStepKey(fresh)).toBe("scenario");
