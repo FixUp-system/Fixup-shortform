@@ -51,6 +51,47 @@ describe("화면 설계가 시나리오를 읽는다", () => {
   });
 });
 
+// ★ 제품 정체(앵커·외형)는 이미지·클립 두 프롬프트와 각인 둘(imageContextKey·clipKey)이
+//   함께 읽는다. 브리핑 추출이 없는 새 흐름에서 여기가 안 옮겨지면 두 프롬프트 모두에서
+//   제품이 사라진다 — 컷마다 딴 물건이 나오던 결함이다.
+describe("제품 정체도 시나리오에서 읽는다", () => {
+  it("★ 시나리오 초점이 물건이면 그것이 앵커·외형이다", async () => {
+    const { subjectOf } = await import("../lib/cuts.js");
+    const p = { scenario: { topic: "카페", focus: { mode: "물건", subject: "핸드드립 커피", look: "검은 도자기 잔" } } };
+    expect(subjectOf(p)).toEqual({ anchor: "핸드드립 커피", look: "검은 도자기 잔" });
+  });
+
+  it("★ 시나리오가 없는 옛 프로젝트는 브리핑 그대로다 — 각인이 안 흔들린다", async () => {
+    const { subjectOf } = await import("../lib/cuts.js");
+    const p = { briefing: { topic: "앰플 광고", focus: { mode: "물건", subject: "VT 앰플", look: "투명 유리병" } } };
+    expect(subjectOf(p)).toEqual({ anchor: "VT 앰플", look: "투명 유리병" });
+  });
+
+  it("초점이 사람·정보면 앵커는 주제다 — 인물을 '이 제품'이라 부르지 않는다", async () => {
+    const { subjectOf } = await import("../lib/cuts.js");
+    const p = { scenario: { topic: "동네 카페 이야기", focus: { mode: "사람", subject: "20대 바리스타" } } };
+    expect(subjectOf(p)).toEqual({ anchor: "동네 카페 이야기", look: "" });
+  });
+});
+
+describe("화면 설계 지문의 주제·초점 폴백", () => {
+  it("★ 주제도 시나리오가 먼저다 — 브리핑이 없어도 '(밝히지 않음)'이 아니다", () => {
+    const m = buildShowsMessages(project, cuts);
+    expect(m.messages[0].content).toContain("[영상 주제] 카페");
+  });
+
+  // 반쪽짜리 시나리오 초점(mode 만 있고 subject 가 없는)이 truthy 라는 이유로 앞자리를
+  // 차지하면, 멀쩡한 브리핑 초점이 가려져 블록째 사라진다.
+  it("★ 반쪽짜리 시나리오 초점은 브리핑 초점을 가리지 않는다", () => {
+    const half = {
+      settings: {}, material: {},
+      scenario: { topic: "카페", focus: { mode: "물건" } },
+      briefing: { focus: { mode: "사람", subject: "50대 사장님" } },
+    };
+    expect(buildShowsMessages(half, cuts).messages[0].content).toContain("50대 사장님");
+  });
+});
+
 describe("캐스팅이 화자를 받는다", () => {
   it("★ 시나리오가 정한 화자가 지문에 실린다", () => {
     const m = buildCastMessages(cuts, [], "", [], { speakers: ["20대 여성 바리스타", ""] });

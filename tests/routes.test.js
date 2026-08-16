@@ -12,7 +12,7 @@ import { createProject, getProject, updateProject } from "../lib/projects.js";
 const OWNER = "33333333-3333-3333-3333-333333333333";
 import { getStore } from "../lib/store/index.js";
 import { chargeVideo } from "../lib/charges.js";
-import { isAudioStale, isImageStale, isClipStale, isRenderStale, renderKey } from "../lib/steps.js";
+import { isAudioStale, isImageStale, isClipStale, isRenderStale, renderKey, scenarioCutsKey, areCutsStale } from "../lib/steps.js";
 import { isSubtitleStale } from "../lib/translate.js";
 // 축 이름을 여기에 손으로 적지 않는다 — 목록에서 한 줄을 빼면 이 테스트도 함께 줄어야 한다.
 import { MOTION_AXES } from "../lib/motion.js";
@@ -152,7 +152,8 @@ describe("POST /api/projects/[id]/cuts", () => {
     await updateProject(p.id, OWNER, (proj) => ({
       ...proj,
       status: "cuts",
-      cuts_script_version: 1, // 지금 원고에서 나온 컷 — 낡지 않았다
+      // 지금 시나리오에서 나온 컷 — 낡지 않았다(판정이 각인으로 바뀌었다, 2026-08-16)
+      cuts_scenario_of: scenarioCutsKey(proj.scenario),
       cuts: [{ idx: 0, sentence: "이미 만든 컷", state: "done", image: { url: "http://img/1" } }],
     }));
     const res = await cutsPOST(patchReq({}), ctx(p.id));
@@ -163,20 +164,47 @@ describe("POST /api/projects/[id]/cuts", () => {
     expect(pipelineMock.run).not.toHaveBeenCalled();
   });
 
-  it("낡은 컷은 막지 않는다 — 대본을 다시 쓴 뒤에는 다시 나눠야 한다", async () => {
+  // ★★ 시나리오를 고칠 수 있게 하는 것이 이 기능의 전부다. 여기가 막히면 사장님이
+  //    시나리오를 고쳐 다시 확정해도 컷이 옛 시나리오에 영구히 묶인다(409 영구 차단).
+  it("★ 시나리오를 고치면 막지 않는다 — 고친 대로 다시 나눠야 한다", async () => {
     // status 로 판정하면 이 자리가 막힌다. 새 흐름에서 status 는 목소리·이미지로 앞서 가므로
-    // "컷이 있다"만 보면 원고를 고친 뒤 컷을 영영 다시 만들 수 없다.
+    // "컷이 있다"만 보면 시나리오를 고친 뒤 컷을 영영 다시 만들 수 없다.
     const p = await projectWithScript();
     await updateProject(p.id, OWNER, (proj) => ({
       ...proj,
       status: "voice",
-      script: { ...proj.script, version: 2 },
-      cuts_script_version: 1, // 버전 1 원고에서 나온 컷 — 낡았다
-      cuts: [{ idx: 0, sentence: "옛 원고의 컷", state: "done", image: { url: "http://img/1" } }],
+      cuts_scenario_of: scenarioCutsKey(proj.scenario),   // 지금 시나리오의 각인
+      cuts: [{ idx: 0, sentence: "옛 시나리오의 컷", state: "done", image: { url: "http://img/1" } }],
+    }));
+    // 사장님이 첫 장면의 대사를 고쳤다 — 각인이 어긋난다
+    await updateProject(p.id, OWNER, (proj) => ({
+      ...proj,
+      scenario: {
+        ...proj.scenario,
+        shots: [{ ...proj.scenario.shots[0], line: "오늘은 늦게 엽니다." }, proj.scenario.shots[1]],
+      },
     }));
     const res = await cutsPOST(patchReq({}), ctx(p.id));
     expect(res.status).toBe(200);
     expect(pipelineMock.run).toHaveBeenCalled();
+    // 그리고 새 각인이 남는다 — 다음 회차의 409 가 고친 시나리오를 기준으로 판정한다
+    const after = await getProject(p.id, OWNER);
+    expect(after.cuts_scenario_of).toBe(scenarioCutsKey(after.scenario));
+  });
+
+  // 옛 프로젝트(시나리오 없이 원고에서 나온 컷)의 판정은 그대로다
+  it("옛 프로젝트는 원고 버전으로 판정한다 — 원고를 다시 쓰면 막지 않는다", async () => {
+    const p = await projectWithScript();
+    await updateProject(p.id, OWNER, (proj) => ({
+      ...proj,
+      status: "voice",
+      scenario: null,
+      script: { ...proj.script, version: 2 },
+      cuts_script_version: 1, // 버전 1 원고에서 나온 컷 — 낡았다
+      cuts: [{ idx: 0, sentence: "옛 원고의 컷", state: "done", image: { url: "http://img/1" } }],
+    }));
+    // 라우트의 선행 조건(시나리오)에는 걸리지만, 낡음 판정 자체는 옛 규칙대로다
+    expect(areCutsStale(await getProject(p.id, OWNER))).toBe(true);
   });
 
   it("컷이 비어 있으면(분할 실패 뒤 다시 시도) 다시 띄운다", async () => {

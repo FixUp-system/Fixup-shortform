@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import {
-  STEPS, stepsFor, currentStepKey, isReachable, areCutsStale, stepFromPathname, stepHref,
+  STEPS, stepsFor, currentStepKey, isReachable, areCutsStale, scenarioCutsKey, stepFromPathname, stepHref,
   clipKey, renderKey, isAudioStale, isImageStale, isClipStale, isRenderStale, toneKey, imageContextKey,
   isSubtitlePositionOnlyStale, isSubtitleOnlyStale, subtitleHead, renderKeyBody,
 } from "../lib/steps.js";
@@ -129,6 +129,59 @@ describe("areCutsStale — 낡음의 방향이 뒤집혔다", () => {
     expect(areCutsStale({ script: { version: 1 }, cuts: [] })).toBe(false);
     expect(areCutsStale({ cuts })).toBe(false);
     expect(areCutsStale(null)).toBe(false);
+  });
+});
+
+// ★★ 시나리오 프로젝트에는 script.version 이 아예 없다 — 그것을 안 가르면 판정이 늘 false 라
+//    시나리오를 고쳐도 POST /cuts 가 409 로 영구 차단하고 컷이 옛 시나리오에 묶인다.
+//    **고칠 수 있게 하는 것이 이 기능의 전부**라, 그 자리가 막히면 기능이 통째로 죽는다.
+describe("areCutsStale — 시나리오에서 나온 컷은 시나리오 각인으로 잰다", () => {
+  const cuts = [{ idx: 0 }];
+  const shots = [
+    { beat: "문을 연다", line: "오늘도 문을 엽니다.", speaker: "20대 여성", seconds: 8 },
+    { beat: "원두를 간다", line: "", speaker: "", seconds: 7 },
+  ];
+  const scenario = { topic: "카페", angle: "아침", shots, confirmed: true };
+  const of = scenarioCutsKey(scenario);
+
+  it("시나리오가 그대로면 낡지 않았다 — 멱등 가드가 산 것을 지킨다", () => {
+    expect(areCutsStale({ scenario, cuts, cuts_scenario_of: of })).toBe(false);
+  });
+
+  it("★ 대사를 고치면 낡는다", () => {
+    const edited = { ...scenario, shots: [{ ...shots[0], line: "오늘은 늦게 엽니다." }, shots[1]] };
+    expect(areCutsStale({ scenario: edited, cuts, cuts_scenario_of: of })).toBe(true);
+  });
+
+  it("★ 초를 고치면 낡는다 — 컷 초가 곧 사장님이 산 길이다", () => {
+    const edited = { ...scenario, shots: [{ ...shots[0], seconds: 10 }, shots[1]] };
+    expect(areCutsStale({ scenario: edited, cuts, cuts_scenario_of: of })).toBe(true);
+  });
+
+  it("★ beat·speaker 를 고쳐도 낡는다 — 화면 설계·캐스팅이 그 값을 읽는다", () => {
+    const beat = { ...scenario, shots: [{ ...shots[0], beat: "간판을 켠다" }, shots[1]] };
+    expect(areCutsStale({ scenario: beat, cuts, cuts_scenario_of: of })).toBe(true);
+    const speaker = { ...scenario, shots: [{ ...shots[0], speaker: "내레이션" }, shots[1]] };
+    expect(areCutsStale({ scenario: speaker, cuts, cuts_scenario_of: of })).toBe(true);
+  });
+
+  it("장면을 더하거나 빼면 낡는다", () => {
+    expect(areCutsStale({ scenario: { ...scenario, shots: [shots[0]] }, cuts, cuts_scenario_of: of })).toBe(true);
+  });
+
+  // 컷의 모양을 안 바꾸는 값까지 각인에 넣으면, 사장님이 제목만 다듬어도 산 그림·클립이 날아간다.
+  it("주제·전달 방식만 바뀐 것은 낡음이 아니다 — 컷이 안 달라진다", () => {
+    const edited = { ...scenario, topic: "동네 카페", angle: "저녁의 마무리" };
+    expect(areCutsStale({ scenario: edited, cuts, cuts_scenario_of: of })).toBe(false);
+  });
+
+  it("각인이 없는 시나리오 컷은 낡은 것으로 본다 — 어디서 나왔는지 모른다", () => {
+    expect(areCutsStale({ scenario, cuts })).toBe(true);
+  });
+
+  // 시나리오가 있으면 script.version 은 아예 안 본다 — 옛 필드가 판정을 흔들면 안 된다
+  it("시나리오가 있으면 옛 script.version 은 판정에 끼어들지 않는다", () => {
+    expect(areCutsStale({ scenario, cuts, cuts_scenario_of: of, script: { version: 9 }, cuts_script_version: 1 })).toBe(false);
   });
 });
 
