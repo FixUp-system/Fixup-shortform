@@ -68,6 +68,19 @@ describe("generateScenario", () => {
     expect(got.calls).toBe(2);
   });
 
+  // ★★ 2026-08-16 최종 리뷰가 must-fix 로 올린 자리 — 섞인 실패(모양 O·규칙 X → 모양 X).
+  //    지우면 사장님은 **고칠 수 있었던 시나리오**를 잃고 화면에는 오류만 남는다.
+  //    규칙 위반은 사장님이 화면에서 고칠 수 있고, 그것이 이 단계의 존재 이유다.
+  it("★ 첫 답이 규칙만 어겼고 둘째 답의 모양이 깨지면, 첫 답을 지킨다", async () => {
+    const call = vi.fn().mockResolvedValueOnce(bad).mockResolvedValueOnce({ shots: [] });
+    const got = await generateScenario(project, { call });
+    expect(got.scenario?.shots).toHaveLength(4);
+    // 사유는 살아남은 시나리오와 짝이 맞아야 한다 — "형식이 맞지 않았어요"는 이 시나리오의 문제가 아니다
+    expect(got.problems.length).toBeGreaterThan(0);
+    expect(got.problems.join(" ")).not.toContain("형식");
+    expect(got.calls).toBe(2);
+  });
+
   it("★ 두 번 다 모양이 깨지면 scenario 가 null 이다", async () => {
     const call = vi.fn(async () => ({ shots: [] }));
     const got = await generateScenario(project, { call });
