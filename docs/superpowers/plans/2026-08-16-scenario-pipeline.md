@@ -1043,9 +1043,13 @@ Expected: FAIL — `STEPS[1].key` 가 `"script"` 다
 ```js
 export function currentStepKey(project) {
   if (!project) return "material";
-  // ★ 시나리오 확정이 ①자료를 닫는 신호다(예전에는 briefing.confirmed 였다).
-  //   되묻기가 없어지면서 브리핑에는 확정할 것이 남지 않았다.
-  if (!project.scenario?.confirmed) return "material";
+  // ★★ ①자료를 닫는 것은 **설명이 적혔는가**다. 시나리오 확정으로 닫으면 잠금 고리가 된다 —
+  //   ②시나리오가 열려야 확정할 수 있는데 확정해야 ②가 열리기 때문이다.
+  //   (⑥완성이 status:done 으로 닫히면 같은 고리가 된다고 아래 isReachable 주석이 적어 둔
+  //   바로 그 모양이다. 같은 처방을 쓴다: 그 단계에서만 만들 수 있는 것으로 그 단계를 닫지 않는다.)
+  if (!project.material?.text?.trim()) return "material";
+  // ②시나리오 — 확정해야 뒤가 열린다
+  if (!project.scenario?.confirmed) return "scenario";
   if (project.status === "done") return "done";
   if (project.status === "video") return "video";
   if (project.status === "images") return "video";
@@ -1056,6 +1060,14 @@ export function currentStepKey(project) {
   return "scenario";
 }
 ```
+
+★★ **④이미지가 컷을 기다릴 줄 알아야 한다.** 말하는 프로젝트(Seedance — 기본 모델이라
+**주 경로**다)는 확정 뒤 ③목소리를 건너뛰고 ④이미지로 간다. 그런데 그 시점에 컷 분할은
+아직 도는 중이고, ④이미지는 컷이 0개면 **`"대본을 먼저 만들어 주세요"`** 를 띄운다 —
+없어진 단계를 만들라고 하는 화면이다. ③목소리에는 그 대기 화면이 이미 있다
+(`app/create/[id]/voice/page.js` 의 "분할이 끝나기를 기다린다" 절, `lib/poll.js` 사용).
+④이미지에 같은 대기를 얹고 문구를 고친다 — `status === "cuts"` 이고 컷이 비어 있으면
+"컷을 나누는 중이에요", 분할이 실패했으면(`cuts_error`) 사유와 [다시 시도].
 
 `isReachable` 안의 `project.briefing?.confirmed` 를 `project.scenario?.confirmed` 로 바꾼다.
 
