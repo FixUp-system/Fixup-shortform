@@ -352,9 +352,53 @@ describe("buildImagePrompt — 화면 근거", () => {
     expect(p).not.toContain("회전한다");
   });
 
-  it("shows 가 통째로 움직임이면 문장으로 폴백한다 — 그림은 나와야 한다", () => {
+  // ★★ 2026-08-17 — 폴백은 **낭독 문장을 쓰지 않는다.** 두 이유가 lib/cuts.js 의
+  //   imagePromptBody 주석에 있다(첫째는 처음부터 있던 규칙, 둘째는 언어 불일치).
+  it("shows 가 통째로 움직임이면 낭독 문장이 아니라 주제 앵커로 폴백한다", () => {
     const cut = { idx: 0, sentence: "폴백 문장입니다.", shows: "자전거가 천천히 지나간다" };
-    expect(buildImagePrompt(cut, project)).toContain("폴백 문장입니다.");
+    const p = buildImagePrompt(cut, project);
+    expect(p).not.toContain("폴백 문장입니다");
+    expect(p).toContain("Scene: 생딸기라떼.");
+  });
+
+  it("영어 앵커로 폴백하면 이미지 프롬프트에 한글이 한 글자도 없다", () => {
+    const english = {
+      ...project,
+      briefing: undefined,
+      scenario: { focus: { mode: "물건", subject: "a matte black stainless tumbler" }, topic: "a tumbler ad" },
+    };
+    // 영어 shows 가 통째로 카메라 이동이라 걸러진다 → 폴백
+    const cut = { idx: 0, sentence: "아침마다 커피가 식어서 버리는 게 아까웠어요.", shows: "the camera pans left across the shelf" };
+    const p = buildImagePrompt(cut, english);
+    expect(p).toContain("Scene: a matte black stainless tumbler.");
+    expect(p).not.toMatch(/[가-힣]/);
+  });
+
+  it("주어 잃은 분사구만 남는 shows 도 문장으로 떨어지지 않는다", () => {
+    const cut = { idx: 0, sentence: "폴백 문장입니다.", shows: "자전거가 지나간다" };
+    expect(buildImagePrompt(cut, project)).not.toContain("폴백 문장입니다");
+  });
+
+  it("앵커까지 없으면 Scene 절 자체가 없다 — 빈 `Scene: .` 로 $0.08 을 쓰지 않는다", () => {
+    const bare = { settings: { aspect_ratio: "9:16" } };
+    const cut = { idx: 0, sentence: "폴백 문장입니다.", shows: "자전거가 천천히 지나간다" };
+    const p = buildImagePrompt(cut, bare);
+    expect(p).not.toContain("Scene:");
+    expect(p).not.toContain("폴백 문장입니다");
+  });
+
+  it("폴백 앵커는 시나리오가 브리핑보다 앞이다 — 옛 프로젝트는 브리핑으로 떨어진다", () => {
+    const both = { ...project, scenario: { topic: "new topic" } };
+    const cut = { idx: 0, sentence: "폴백 문장입니다." };
+    expect(buildImagePrompt(cut, both)).toContain("Scene: new topic.");
+    expect(buildImagePrompt(cut, project)).toContain("Scene: 생딸기라떼.");
+    // 초점(focus)도 같은 차례다 — subjectOf 와 어긋나면 Scene 과 subject 절이 딴 대상을 가리킨다
+    const bothFocus = {
+      ...project,
+      briefing: { topic: "생딸기라떼", focus: { mode: "물건", subject: "옛 초점" } },
+      scenario: { focus: { mode: "물건", subject: "새 초점" } },
+    };
+    expect(buildImagePrompt(cut, bothFocus)).toContain("Scene: 새 초점.");
   });
 
 
@@ -365,9 +409,11 @@ describe("buildImagePrompt — 화면 근거", () => {
     expect(p).not.toContain("매일 아침 딸기를 갈아 씁니다");
   });
 
-  it("화면 패스가 실패한 컷은 문장으로 폴백한다 — 그림은 나온다", () => {
+  it("화면 패스가 실패한 컷은 주제 앵커로 폴백한다 — 그림은 나온다", () => {
     const cut = { idx: 0, sentence: "폴백 문장입니다." };
-    expect(buildImagePrompt(cut, project)).toContain("폴백 문장입니다.");
+    const p = buildImagePrompt(cut, project);
+    expect(p).toContain("Scene: 생딸기라떼.");
+    expect(p).not.toContain("폴백 문장입니다");
   });
 
   it("구성 시절 프로젝트는 장면의 보여줌으로 폴백한다", () => {
