@@ -53,6 +53,29 @@ const jsxBlockIn = (src, name) => {
 };
 // marker 를 품은 useEffect 의 본문. 초기값을 **한 번만** 채우는지 보려면 그 자리가
 // 빗장(noteLoadedFor) 안쪽인지 봐야 한다 — 밖이면 매 렌더마다 덮어 타이핑이 끊긴다.
+// 최상위 컴포넌트 함수의 본문(`function 이름(` … `\n}`). 프롬프트 편집 컴포넌트가 그렇게 산다
+// (video 의 ClipPromptEdit · images 의 PreviewPane).
+// ★ 왜 파일 전역 정규식으로는 못 재는가 — `/buildClipPrompt/` 는 **import 문**에 걸린다.
+//   그래서 호출을 promptBodyOf 로 바꿔 꼬리를 빈 문자열로 만들어도 초록이었다(리뷰 실측).
+//   창(`{0,N}`)으로 좁히는 것도 안 된다: 위쪽 긴 주석이 창을 통째로 먹어 무엇을 재는지
+//   아무도 모르는 단정이 된다. 그래서 **함수 본문만** 잘라 낸다.
+const compIn = (src, name) => {
+  const start = src.indexOf(`function ${name}(`);
+  if (start < 0) return "";
+  const end = src.indexOf("\n}", start);
+  if (end < 0) return "";
+  return src.slice(start, end).replace(/\/\/[^\n]*/g, "");
+};
+// JSX 요소 하나의 속성 부분(`<Tag` … `/>`). key 처럼 **그 요소에 달려야만 뜻이 있는** 속성을
+// 재려면 여기까지 좁혀야 한다 — 파일 전역에서 `/key=\{/` 를 찾으면 컷 목록의 `key={c.idx}`
+// 에 걸려, 프롬프트 편집기의 key 를 지워도 초록이다.
+const elementIn = (src, tag) => {
+  const start = src.indexOf(`<${tag}`);
+  if (start < 0) return "";
+  const end = src.indexOf("/>", start);
+  if (end < 0) return "";
+  return src.slice(start, end);
+};
 const effectIn = (src, marker) => {
   const at = src.indexOf(marker);
   if (at < 0) return "";
@@ -68,6 +91,30 @@ describe("④이미지 — 프롬프트 편집", () => {
       .toMatch(/buildImagePrompt/);
     expect(images, "본문 씨앗을 판정 함수에서 안 얻는다").toMatch(/promptBodyOf/);
     expect(images).toMatch(/from "\.\.\/\.\.\/\.\.\/\.\.\/lib\/cuts"/);
+  });
+
+  // ★★ 위 단정은 **import 문에 걸려** 아무것도 안 잰다(리뷰 실측: 호출을 바꿔도 초록).
+  //    그래서 **컴포넌트 본문 안에서 두 값이 어느 함수로 만들어지는지**를 여기서 못 박는다.
+  //      · generated = 본문 판정(promptBodyOf) — 전체 조립으로 바꾸면 씨앗이 전체 프롬프트가
+  //        되어 한 번 저장할 때마다 꼬리가 한 벌씩 늘어난다(컷당 $0.08)
+  //      · full = 전체 조립(buildImagePrompt) — 본문 판정으로 바꾸면 꼬리가 빈 문자열이 되어
+  //        접힌 칸이 코드가 붙이는 문장을 **아무것도 안 보여 준다**
+  it("★ 씨앗은 본문 판정으로, 꼬리는 전체 조립으로 만든다", () => {
+    const comp = compIn(images, "PreviewPane").replace(/\s+/g, " ");
+    expect(comp, "PreviewPane 본문을 못 찾았다").toBeTruthy();
+    expect(comp, "씨앗을 본문 판정(promptBodyOf)으로 안 만든다 — 전체를 앉히면 꼬리가 두 벌이 된다")
+      .toMatch(/const generated = promptBodyOf\("image", \{ \.\.\.cut, image_prompt: "" \}, project\)/);
+    expect(comp, "꼬리를 전체 조립(buildImagePrompt)에서 떼지 않는다 — 꼬리가 빈 값이 된다")
+      .toMatch(/const full = buildImagePrompt\(cut, project, \[\]\)/);
+  });
+
+  // ★ 컷을 바꾸면 텍스트칸도 새로 시작해야 한다. key 가 없으면 앞 컷의 글이 남고, 그 글이
+  //   이 컷의 image_prompt 로 저장된다 — 사장님이 고치지도 않은 프롬프트가 컷에 굳는다.
+  it("★ 컷을 바꾸면 편집칸이 갈아 끼워진다 — key 가 그 구현이다", () => {
+    const el = elementIn(images, "PreviewPane");
+    expect(el, "PreviewPane 을 그리는 자리를 못 찾았다").toBeTruthy();
+    expect(el, "key 가 없다 — 컷을 바꿔도 앞 컷 글이 남아 이 컷에 저장된다")
+      .toMatch(/key=\{activeCut\.idx\}/);
   });
 
   // ★ 화면이 조립을 흉내내면 안 된다. 문형을 화면에 한 벌 더 적으면 그날부터 프롬프트가
@@ -194,6 +241,34 @@ describe("⑤영상 — 프롬프트 편집", () => {
     expect(video).toMatch(/from "\.\.\/\.\.\/\.\.\/\.\.\/lib\/cuts"/);
   });
 
+  // ★★ 돈에 가장 가까운 그물이다. 위 단정은 **import 문에 걸려** 아무것도 안 잰다 —
+  //    호출을 서로 바꿔도 초록이었다(리뷰가 뮤테이션으로 실측했다). 그래서 컴포넌트 본문
+  //    안에서 두 값이 **어느 함수로** 만들어지는지를 못 박는다:
+  //      · generated = 본문 판정(promptBodyOf). 전체 조립으로 바꾸면 씨앗이 전체 프롬프트가
+  //        되어, 한 번 고쳐 저장하는 순간 꼬리가 **두 벌**이 된다(Seedance 30초 회당 ~$9)
+  //      · full = 전체 조립(buildClipPrompt). 본문 판정으로 바꾸면 fixedTail 이 빈 문자열이
+  //        되어 접힌 칸이 **대사·립싱크·글자 금지를 아무것도 안 보여 준다** — 이 파일 첫
+  //        단정이 막겠다고 적어 둔 바로 그 일이다
+  it("★ 씨앗은 본문 판정으로, 꼬리는 전체 조립으로 만든다", () => {
+    const comp = compIn(video, "ClipPromptEdit").replace(/\s+/g, " ");
+    expect(comp, "ClipPromptEdit 본문을 못 찾았다").toBeTruthy();
+    expect(comp, "씨앗을 본문 판정(promptBodyOf)으로 안 만든다 — 전체를 앉히면 꼬리가 두 벌이 된다")
+      .toMatch(/const generated = promptBodyOf\("clip", \{ \.\.\.cut, clip_prompt: "" \}, project\)/);
+    expect(comp, "꼬리를 전체 조립(buildClipPrompt)에서 떼지 않는다 — 꼬리가 빈 값이 된다")
+      .toMatch(/const full = buildClipPrompt\(cut, project\)/);
+  });
+
+  // ★ 컷을 바꾸면 텍스트칸도 새로 시작해야 한다. key 를 지우면 앞 컷의 글이 남고, 그 글이
+  //   이 컷의 clip_prompt 로 저장된다 — 구현자가 그 자리에 주석까지 달아 둔 결함이다.
+  //   파일 전역으로 `/key=\{/` 를 찾으면 컷 목록의 key 에 걸려 아무것도 안 재므로
+  //   **그 요소의 속성만** 잘라 낸다.
+  it("★ 컷을 바꾸면 편집칸이 갈아 끼워진다 — key 가 그 구현이다", () => {
+    const el = elementIn(video, "ClipPromptEdit");
+    expect(el, "ClipPromptEdit 을 그리는 자리를 못 찾았다").toBeTruthy();
+    expect(el, "key 가 없다 — 컷을 바꿔도 앞 컷 글이 남아 이 컷에 저장된다")
+      .toMatch(/key=\{selected\.idx\}/);
+  });
+
   // ★ 화면이 조립을 흉내내면 안 된다 — ④이미지와 같은 이유다. 문형을 화면에 한 벌 더 적으면
   //   그날부터 프롬프트가 두 곳에서 만들어지고, 사장님은 화면의 것을 읽고 서버는 자기 것을 보낸다.
   it("★ 화면이 프롬프트 문형을 스스로 적지 않는다", () => {
@@ -294,6 +369,68 @@ describe("①자료 — 프로젝트 공통 지시", () => {
     expect(briefing.match(/<textarea/g)?.length, "텍스트칸이 둘이 아니다").toBe(2);
   });
 
+  // ★★ 위 단정(`/image_note/`·`/clip_note/`·`<textarea` 수)은 **배선을 안 잰다** — 영상 칸의
+  //    value/onChange 를 imageNote/setImageNote 로 바꿔도 초록이었다(리뷰 실측). 그러면
+  //    **영상 칸에 타이핑하면 이미지 칸이 바뀌고, 영상 지시는 영원히 빈 값으로 저장된다.**
+  //    낱말이 아니라 **연결**을 재야 한다. 그래서 상자 블록을 `<label` 로 갈라, 사장님이 읽는
+  //    라벨로 어느 칸인지 알아낸 뒤 그 칸 안에서만 배선을 본다 — 파일 전역이나 상자 전체로
+  //    재면 **이웃 칸**의 배선에 걸려 두 칸을 같은 상태에 묶어도 안 걸린다.
+  const noteFieldsOf = () => {
+    const box = jsxBlockIn(briefing, "notePicker");
+    const segs = box.split("<label").slice(1);
+    return {
+      image: segs.find((s) => s.includes("이미지에 함께 보낼 지시")) || "",
+      clip: segs.find((s) => s.includes("영상에 함께 보낼 지시")) || "",
+    };
+  };
+
+  it("★ 두 칸이 각자 자기 상태에 걸려 있다 — 섞이면 한쪽이 영영 빈 값으로 저장된다", () => {
+    const { image, clip } = noteFieldsOf();
+    expect(image, "이미지 칸을 못 찾았다").toBeTruthy();
+    expect(clip, "영상 칸을 못 찾았다").toBeTruthy();
+    expect(image, "이미지 칸이 imageNote 를 안 보여 준다").toMatch(/value=\{imageNote\}/);
+    expect(image, "이미지 칸 타이핑이 imageNote 를 안 고친다").toMatch(/setImageNote\(/);
+    expect(image, "이미지 칸에 영상 상태가 섞였다").not.toMatch(/clipNote/);
+    expect(clip, "영상 칸이 clipNote 를 안 보여 준다").toMatch(/value=\{clipNote\}/);
+    expect(clip, "영상 칸 타이핑이 clipNote 를 안 고친다").toMatch(/setClipNote\(/);
+    expect(clip, "영상 칸에 이미지 상태가 섞였다 — 영상 지시가 영원히 빈 값으로 저장된다")
+      .not.toMatch(/imageNote/);
+  });
+
+  // ★ 실제 UX 결함이었다(칸이 둘이 되며 새로 생겼다). onBlur 가 saveNote → setBusy(true) 를
+  //   하는데 두 칸이 disabled={busy} 였다 — 이미지 칸에서 영상 칸으로 **탭하면 영상 칸이 그
+  //   순간 disabled 가 되어 포커스가 날아간다.** 화풍 보정은 칸이 하나여서 없던 상황이다.
+  //   `disabled=` 를 아무 형태로도 못 달게 막는다 — `disabled={busy && ...}` 같은 변형이
+  //   같은 결함을 되돌려 놓는다.
+  it("★ 두 칸 사이를 탭해도 포커스를 잃지 않는다 — 저장이 칸을 잠그지 않는다", () => {
+    const { image, clip } = noteFieldsOf();
+    expect(image, "이미지 칸이 저장 중에 잠긴다 — 탭하면 포커스가 날아간다").not.toMatch(/disabled=/);
+    expect(clip, "영상 칸이 저장 중에 잠긴다 — 탭하면 포커스가 날아간다").not.toMatch(/disabled=/);
+  });
+
+  // ★ 서버(normalizePromptNote)가 **공백을 접어서** 저장한다(`\s+` → 한 칸). 화면이 원문으로
+  //   비교하면 내부 이중 공백이나 개행이 든 지시는 빗장이 안 풀려 **blur 마다 헛 PATCH +
+  //   refetch** 가 계속 돈다. 그래서 비교도 저장도 **게이트와 같은 함수로 접은 값**이어야
+  //   한다 — 접는 규칙을 화면에 한 벌 더 적으면 그날부터 갈린다.
+  it("★ 비교와 저장이 서버와 같은 정규화를 쓴다 — 안 그러면 blur 마다 헛 PATCH 다", () => {
+    expect(briefing, "게이트와 같은 정규화 함수를 안 끌어온다")
+      .toMatch(/normalizePromptNote.*from "\.\.\/\.\.\/\.\.\/\.\.\/lib\/styles"/);
+    const { image, clip } = noteFieldsOf();
+    for (const [seg, state, key, label] of [
+      [image, "imageNote", "image_note", "이미지"],
+      [clip, "clipNote", "clip_note", "영상"],
+    ]) {
+      const flat = seg.replace(/\/\/[^\n]*/g, "").replace(/\s+/g, " ");
+      expect(flat, `${label} 칸이 원문을 접지 않고 비교한다`)
+        .toMatch(new RegExp(`normalizePromptNote\\(${state},`));
+      // 저장도 **접은 값**이어야 한다. 원문을 보내면 서버가 접어 저장해 다음 blur 에서 또 다르다.
+      expect(flat, `${label} 칸이 접은 값이 아니라 원문을 저장한다`)
+        .toMatch(new RegExp(`saveNote\\("${key}", note\\)`));
+      expect(flat, `${label} 칸이 아직 trim() 으로 비교한다 — 내부 공백이 안 접힌다`)
+        .not.toMatch(new RegExp(`${state}\\.trim\\(\\) !==`));
+    }
+  });
+
   it("★ 화풍 보정 입력은 그대로 남는다 — 다른 값이다", () => {
     // 상태 선언만 보면 배선이 끊겨도 초록이다(뮤테이션 실측) — 값과 콜백이 실제로
     // StylePicker 에 걸려 있는지 잰다.
@@ -303,7 +440,10 @@ describe("①자료 — 프로젝트 공통 지시", () => {
     expect(briefing, "화풍 저장 경로가 사라졌다").toMatch(/saveStyle\(/);
     // ★ import 문이 아니라 **그려지는 자리**를 잰다 — `/StylePicker/` 만으로는 import 가
     //   남아 있는 한 초록이라, 화면에서 칩과 보정 칸을 통째로 떼어도 안 걸린다(뮤테이션 실측).
-    expect(briefing, "화풍 고르는 자리가 사라졌다").toMatch(/<StylePicker/);
+    // ★ 경계를 넣는다 — `/<StylePicker/` 만으로는 `<StylePickerXX`(정의되지 않은 컴포넌트라
+    //   렌더에서 죽는다)가 통과한다(리뷰 실측). 이름 뒤에 공백·개행·`/`·`>` 중 하나가
+    //   와야 그 이름의 컴포넌트다.
+    expect(briefing, "화풍 고르는 자리가 사라졌다").toMatch(/<StylePicker(?=[\s/>])/);
   });
 
   // ★ `normalizeStyle` 은 preset 을 함께 요구한다. 공통 지시를 화풍과 같은 몸통에 실으면
