@@ -15,9 +15,19 @@
 > `git archive --format=tar HEAD | tar -x -C <빈폴더>` → `.vercel` 만 복사해 넣고
 > `npx vercel deploy --prod --yes`. 근본 해결은 그 이메일을 GitHub 계정에 인증 등록하는 것이다
 > (기존 커밋까지 한꺼번에 인정된다).
-> ⚠️ **`next.config.mjs` 는 의도적 미커밋**이다(주석에 "커밋하지 않는다"). `git add -A` 금지.
-> ⚠️ **dev 서버를 둘 이상 띄우려면 `SHOTFORM_DIST_DIR` 로 빌드 디렉터리를 갈라라.** 안 가르면
-> 같은 `.next` 를 덮어써 돌아가던 서버가 404 가 된다(2026-08-13 실측).
+> ⚠️⚠️ **`SHOTFORM_DIST_DIR` 는 지금 아무 일도 하지 않는다**(2026-08-18 실측). 커밋된
+> `next.config.mjs` 에 `distDir` 배선이 **0건**이라, `SHOTFORM_DIST_DIR=.next-verify npx next build`
+> 는 조용히 **`.next` 를 덮어써 돌아가던 dev 서버를 죽인다**(`Cannot find module
+> './vendor-chunks/*.js'`). 한 세션에 두 번 밟았고, 두 번 다 **손대지도 않은 페이지의 500** 으로
+> 나타나 원인을 찾는 데 시간이 걸렸다(로그에는 `Jest worker encountered child process
+> exceptions` 만 남는다).
+> · 굽고 싶으면 **dev 서버를 먼저 끈다** → `npx next build` → `.next` 삭제 → 다시 띄운다.
+> · 안 끄고 확인하려면 **테스트 그린 + 라이브 화면 HTTP 200** 으로 갈음한다.
+> · 되살리려면 `next.config.mjs` 에 `distDir: process.env.SHOTFORM_DIST_DIR || ".next"` 를
+>   넣고 **커밋해야** 한다 — 그래야 워크트리마다 갈리지 않는다.
+> ⚠️ **`next.config.mjs` 는 커밋돼 있다**(2026-08-18 확인 — `git archive` 에 들어간다).
+> 옛 문장은 "의도적 미커밋이다(주석에 '커밋하지 않는다')" 였는데 **둘 다 사실이 아니다**:
+> 파일은 추적되고 있고 그런 주석도 없다. 이 두 벌 상태가 위 함정의 원인이었다.
 >
 > ★ **이어서 하는 세션은 wiki 부터 읽어라** — 지금 상태와 남은 일이 한 장에 있다:
 > `C:\Users\fixup\obsidian_jaechan\sources\shotform-deploy-and-qa-2026-08-14.md`
@@ -29,7 +39,10 @@
 > 들어가 두 파일이 깨졌는데 **1720 그린인 채 앱이 안 떴다**(서버 로그를 보고 발견).
 >
 > ```bash
-> SHOTFORM_DIST_DIR=.next-verify npx next build   # dev 서버를 안 죽이고 전 화면 컴파일
+> # dev 서버를 끄고 굽는다 — SHOTFORM_DIST_DIR 은 안 먹는다(위 경고 참고).
+> # 굽고 나면 .next 를 지우고 dev 를 다시 띄운다: 빌드 산출물이 섞인 .next 로 dev 를 돌리면
+> # 그 자리에서 또 청크를 잃는다.
+> npx next build && rm -rf .next
 > ```
 >
 > ⚠️ **스크립트(heredoc)로 코드를 넣을 때 역슬래시가 한 겹 먹힌다.** `\n` 이 줄바꿈으로,
@@ -137,8 +150,9 @@ cp .env.local.example .env.local             # 키를 채운다 — 없으면 �
 npm run dev                                  # localhost:3000
 SHOTFORM_FAKE=fal npm run dev                # fal(이미지·TTS·i2v·합성)만 가짜, LLM(Claude·OpenAI)은 진짜
 SHOTFORM_FAKE=all npm run dev                # LLM 까지 가짜 — 완전 0원, 배선·상태 전이만 확인
-SHOTFORM_DIST_DIR=.next-x npx next dev -p 3005   # 둘째 서버는 빌드 디렉터리를 갈라야 한다
-SHOTFORM_DIST_DIR=.next-verify npx next build    # dev 를 안 죽이고 컴파일만 확인
+npx next build                               # 전 화면 컴파일 — ⚠️ dev 서버를 먼저 끈다
+# ⚠️ SHOTFORM_DIST_DIR 은 지금 안 먹는다(커밋된 next.config.mjs 에 distDir 배선이 없다).
+#    그래서 "둘째 서버"도 "dev 를 안 죽이고 굽기"도 지금은 불가능하다 — 위 경고 참고.
 npx vitest run                               # 전체 — 개수는 여기서 센다(적어 두지 않는다)
 npx vitest run tests/steps.test.js           # 파일 하나만
 npx vitest run -t "낡음"                      # 이름으로 골라서
@@ -226,12 +240,21 @@ readable if not configured"** 이고 보관 기간 과금도 문서에 없다. �
 버려진 갱신은 **AI 호출이 끝난 뒤**라 돈은 나가고 결과가 안 남는다. 큐를 넣은 뒤 n=24까지
 **재시도 0회·유실 0**. AI 병렬성은 그대로 둔다 — 한 번이 17초라 직렬화하면 컷 12개에 3분 24초다.
 
-## 지금 구조 (2026-07-29)
+## 지금 구조 (2026-08-18 갱신)
 
 ```
-①자료 → ②대본 → ③목소리 → ④이미지 → ⑤영상 → ⑥완성
+①자료 → ②시나리오 → ③목소리 → ④이미지 → ⑤영상 → ⑥완성
 ```
 단계 표는 `lib/steps.js`의 `STEPS` 하나뿐이다(사이드바 스테퍼와 라우팅 가드가 같은 표를 본다).
+
+> ★ **②는 이제 대본이 아니라 시나리오다**(2026-08-16~18, 프로덕션 배포됨). `②대본` 화면과
+> `app/api/projects/[id]/script/route.js` 는 **삭제됐다** — 아래 "원고가 원본이다" 절의 설명은
+> 그 시절 것이라 낡았다. 지금은 시나리오(장면·대사·초)가 원본이고 컷은 코드가 옮겨 담는다.
+> · 사람이 멈추는 유일한 자리는 ②시나리오다(`lib/scenario-rules.js` 의 `checkScenario` 가 확정을 막는다)
+> · **①자료는 이제 입력을 받지 않는다**(2026-08-18) — 길이·사이즈·모델·화질·컨셉·공통 지시는
+>   전부 첫 화면(`app/create/page.js`)에서 한 번에 받는다. ①은 적어 준 자료를 보여 주고 ②로 보낸다.
+>   ⚠️ 그래서 **시작한 뒤에는 그 값들을 바꿀 수 없다.** 바꿀 자리를 다시 열면 낡음 경고
+>   (전 컷 재구매)도 함께 돌아와야 한다 — 그 값들이 전 컷의 각인에 들어간다
 
 - **원고가 원본이다.** 컷은 원고를 잘라서 만든다 — LLM은 경계 번호만 고르고 코드가 자른다.
   `컷을 이어붙이면 원고와 글자 그대로 같다`가 이 파이프라인의 유일한 구조적 보장이다
@@ -474,8 +497,14 @@ readable if not configured"** 이고 보관 기간 과금도 문서에 없다. �
 6. **문단 구조는 보장한 적이 없다** — `validateCutRanges`가 문장을 `" "`로 잇고
    `splitSentences`가 개행을 버린다. 07-29에 고친 것은 "절 나눔 안에서의 보존"이다
 7. `target_seconds`에 `TARGET_CHOICES`(15·30·45·60) 밖의 값을 주면 조용히 `null`로 저장된다
-8. **배포** — `main` 은 `origin/main` 과 같다(미푸시 0). 배포는 사용자가 요청할 때만 한다.
-   그 전에 위 크레딧 절의 **`db/schema.sql` 라이브 반영**과 **`credit_grants` 재조정**을 먼저 본다
+8. **배포** — 배포는 사용자가 요청할 때만 한다. 커밋 수는 적지 않는다(적는 순간 낡는다) —
+   `git rev-list --count origin/main..main` 로 센다.
+   그 전에 위 크레딧 절의 **`db/schema.sql` 라이브 반영**과 **`credit_grants` 재조정**을 먼저 본다.
+   ★ **배포 전 점검 둘**(2026-08-18 에 이 순서로 막았다):
+   · `.env.local.example` 의 diff 를 본다 — **새 env 가 늘었으면 프로덕션에 먼저 넣는다**
+     (`npx vercel env ls production`). 이 브랜치는 `CLAUDE_API_KEY` 를 요구했고, 없으면
+     대본·컷분할·화면설계·캐스팅·브리핑·대화가 **전부** 죽는다
+   · `db/schema.sql` 의 diff 를 본다 — 비어 있으면 마이그레이션이 없다는 뜻이다
 
 ## 잊으면 안 되는 것
 
