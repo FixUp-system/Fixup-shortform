@@ -494,17 +494,39 @@ function PreviewPane({ cut, project, url, photoName, aspect, stalled, onRegen, o
   //   본문을 복사해도 "저장하면 나갈 글자"가 그대로 나온다.
   // ⚠️ 레퍼런스 사진 절은 여기에도 빠진다 — 화면이 그 판정을 못 하기 때문이다(위 주석).
   //    아래 안내가 이미 그 사실을 말한다.
+  // ★ 꼬리는 **서버에서 받는다** — 레퍼런스 사진 절(`Attached reference images, in order: …`)은
+  //   resolveCutRefs → readRefBytes 를 거쳐야 알 수 있고 그 판정이 fs·Storage 를 끈다.
+  //   화면이 쥔 fixedTail 에는 그 절이 없다. 못 받으면 **그 사실을 말한다** — 조용히 화면
+  //   꼬리로 돌아가면 사장님은 "정확한 전문"으로 알고 밖에서 돌린다.
   const [copyMsg, setCopyMsg] = useState("");
   async function copyAll() {
+    let exact = null;
+    let missing = 0;
     try {
-      await navigator.clipboard.writeText(prompt + fixedTail);
-      setCopyMsg("복사했어요");
+      const res = await fetch(`/api/projects/${project.id}/cuts/${cut.idx}/prompt`);
+      if (res.ok) {
+        const got = await res.json();
+        exact = got.tail;
+        missing = got.missing || 0;
+      }
+    } catch {
+      // 아래에서 화면 꼬리로 복사하고, 무엇이 빠졌는지 알린다
+    }
+    try {
+      await navigator.clipboard.writeText(prompt + (exact ?? fixedTail));
+      setCopyMsg(
+        exact === null
+          ? "복사했어요 — 다만 레퍼런스 사진 지시는 못 넣었어요"
+          : missing > 0
+            ? `복사했어요 · 사진 ${missing}장은 못 읽어서 그림에도 안 실려요`
+            : "복사했어요"
+      );
     } catch {
       // 클립보드는 브라우저가 막을 수 있다(권한·비보안 컨텍스트). 조용히 실패하면
       // 사장님은 복사된 줄 알고 빈 것을 붙인다.
       setCopyMsg("복사하지 못했어요 — 위 글을 직접 긁어 주세요");
     }
-    setTimeout(() => setCopyMsg(""), 3000);
+    setTimeout(() => setCopyMsg(""), 4000);
   }
 
   const isPhoto = cut.source === "photo";
