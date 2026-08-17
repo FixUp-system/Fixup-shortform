@@ -1,7 +1,7 @@
 import { createProject, listProjects } from "../../../lib/projects";
 import { isAspect, DEFAULT_ASPECT_ID } from "../../../lib/aspects";
 import { TARGET_CHOICES } from "../../../lib/script";
-import { normalizeStyle } from "../../../lib/styles";
+import { normalizeStyle, normalizePromptNote } from "../../../lib/styles";
 import { ownedPhotoKeys } from "../../../lib/refs-io.js";
 import { withUser } from "../../../lib/auth/require-user.js";
 import { DEFAULT_I2V_MODEL, I2V_MODEL_IDS, isResolutionFor } from "../../../lib/clip-limits";
@@ -81,6 +81,22 @@ export const POST = withUser(async (req, ctx, user) => {
       return Response.json({ error: "그 화질은 몰라요" }, { status: 400 });
     }
     settings.resolution = body.settings.resolution;
+  }
+  // ★ 공통 지시(모든 이미지·영상에 함께 보내는 지시)도 **만들 때** 받는다(2026-08-18) —
+  //   ①자료에서 따로 받던 칸을 첫 화면으로 모았다. 위 화질과 같은 이유로 여기 적지 않으면
+  //   사장님이 적은 지시가 **말없이 사라진다**(이 settings 는 명시 화이트리스트다).
+  //
+  // ★ 판정은 PATCH 와 **같은 자**다(normalizePromptNote) — 상한을 넘으면 자르지 않고 400 이고,
+  //   정규화한 값을 **되돌려 담는다**. 저장되는 값과 프롬프트가 읽는 값이 갈리면, 각인이
+  //   그 차이를 보고 거짓 낡음으로 유료 [다시 만들기]를 연다(lib/cuts.js promptNoteOf).
+  // ★ 안 보내면 아무것도 안 넣는다 — 화질과 같은 규칙이다.
+  for (const [key, label] of [["image_note", "이미지 지시"], ["clip_note", "영상 지시"]]) {
+    if (body?.settings?.[key] === undefined) continue;
+    try {
+      settings[key] = normalizePromptNote(body.settings[key], label);
+    } catch (e) {
+      return Response.json({ error: e.message }, { status: 400 });
+    }
   }
   const project = await createProject({
     settings,

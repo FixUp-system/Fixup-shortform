@@ -211,10 +211,16 @@ describe("영상 컨셉은 자료 쪽에서 고른다", () => {
     expect(pickerSrc).toContain("STYLE_PRESETS.map");
   });
 
-  it("두 화면이 같은 컴포넌트를 쓴다 — 목록이 화면마다 달라지지 않게", () => {
-    for (const [name, src] of [["/create", createSrc], ["①자료", briefSrc]]) {
-      expect(src, `${name} 가 StylePicker 를 안 쓴다`).toContain("StylePicker");
-    }
+  // ★★ 2026-08-18 — 자리가 **하나로 모였다**(사용자 지시). 컨셉·사이즈·화질·공통 지시를
+  //    ①자료에서 또 받고 있었고, 그것은 첫 화면에서 이미 받은 것을 두 번 묻는 일이었다.
+  //    그래서 이 묶음의 이름("자료 쪽에서 고른다")은 그대로이고 자리만 하나다.
+  it("첫 화면이 컨셉을 고른다", () => {
+    expect(createSrc, "/create 가 StylePicker 를 안 쓴다").toContain("StylePicker");
+  });
+
+  it("①자료는 컨셉을 다시 묻지 않는다", () => {
+    expect(briefSrc, "①자료가 컨셉을 또 받는다 — 첫 화면에서 이미 받았다")
+      .not.toContain("StylePicker");
   });
 
   // 자리만 ②대본에서 ②시나리오로 바뀌었고 규칙은 같다 — 컨셉은 그림의 근거라 자료 쪽에 있어야 한다.
@@ -223,22 +229,16 @@ describe("영상 컨셉은 자료 쪽에서 고른다", () => {
     expect(scenarioSrc).not.toContain("STYLE_PRESETS");
   });
 
-  // 재던 것은 "보이는 모든 상태에 컨셉 고르기가 있는가"다 — 한 상태에라도 빠지면 그 흐름을
-  // 탄 사장님은 컨셉을 바꿀 자리를 영원히 못 만난다. 되묻기를 걷어낸 뒤(Task 9) ①자료의
-  // 보이는 상태는 하나뿐이라 자리도 하나다.
-  it("①자료의 보이는 모든 상태에 있다", () => {
-    const uses = [...briefSrc.matchAll(/\{stylePicker\}/g)];
-    expect(uses.length, "①자료가 stylePicker 를 안 그린다").toBe(1);
-  });
-
   it("/create 가 만들 때 컨셉을 함께 보낸다", () => {
     expect(createSrc).toMatch(/style:\s*\{\s*preset:/);
   });
 
-  it("그림이 이미 있을 때만 값 경고를 띄운다", () => {
-    // 그림을 만들기 전에는 컨셉을 바꿔도 0원이다. 거기서 값 얘기를 꺼내면 겁만 준다.
-    expect(briefSrc).toMatch(/madeImages\s*=\s*\(project\.cuts \|\| \[\]\)\.some/);
-  });
+  // ★ 옛 계약 둘을 지웠다(2026-08-18): "①자료의 보이는 모든 상태에 stylePicker 가 있다"와
+  //   "그림이 이미 있으면 값 경고를 띄운다". 둘 다 **①자료에서 컨셉을 바꿀 수 있을 때만**
+  //   뜻이 있던 못이다. 지금은 만들기 전에 한 번 고르므로, 이미 만든 그림을 낡게 만들
+  //   길 자체가 그 화면에 없다 — 경고할 것도 없다.
+  //   ⚠️ 대가는 분명하다: **시작한 뒤에는 컨셉을 바꿀 수 없다.** 바꿀 자리를 다시 열려면
+  //      그때 이 경고(madeImages)도 함께 돌아와야 한다 — 없이 열면 산 그림이 조용히 낡는다.
 });
 
 // ★ 여기 있던 묶음 셋을 지웠다(2026-08-16) — 전부 ②대본 화면 하나를 재던 것이고,

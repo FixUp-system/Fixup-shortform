@@ -20,6 +20,9 @@ const VIDEO_PAGE = "app/create/[id]/video/page.js";
 const video = readFileSync(VIDEO_PAGE, "utf8");
 const BRIEFING_PAGE = "app/create/[id]/briefing/page.js";
 const briefing = readFileSync(BRIEFING_PAGE, "utf8");
+// 첫 화면 — 길이·사이즈·모델·화질·컨셉·공통 지시를 **한 자리에서** 받는다(2026-08-18).
+const CREATE_PAGE = "app/create/page.js";
+const create = readFileSync(CREATE_PAGE, "utf8");
 
 // ── 범위를 좁혀 재는 헬퍼 ────────────────────────────────────────────────
 // ★ 파일 전체를 훑는 정규식은 **아무것도 안 잰다** — 주석·다른 함수·다른 버튼에 걸려서
@@ -453,12 +456,15 @@ describe("사장님이 쓴 글의 자리를 알려 준다", () => {
   });
 });
 
-describe("①자료 — 프로젝트 공통 지시", () => {
+// ★★ 2026-08-18 — 자리가 **첫 화면**으로 옮겼다(사용자 지시). ①자료가 첫 화면에서 이미
+//    받은 값들과 함께 이 칸까지 다시 받고 있었다. 옮기면서 저장 방식이 바뀐다:
+//    ①자료는 칸마다 blur 에 PATCH 를 쳤지만, 첫 화면은 **만들 때 한 번** 함께 보낸다.
+//    그래서 "헛 PATCH"·"저장 중 포커스 날림" 같은 옛 못은 여기서 뜻을 잃고, 대신
+//    **두 칸이 섞이지 않는가**와 **만들 때 실려 가는가**가 이 기능의 전부가 된다.
+describe("첫 화면 — 프로젝트 공통 지시", () => {
   it("칸이 둘이다 — 이미지용과 영상용", () => {
-    expect(briefing, "이미지 공통 지시 칸이 없다").toMatch(/image_note/);
-    expect(briefing, "영상 공통 지시 칸이 없다").toMatch(/clip_note/);
-    // 칸이 실제로 둘인지 — 이 화면의 텍스트칸은 이 둘뿐이다(화풍 보정은 StylePicker 안에 있다).
-    expect(briefing.match(/<textarea/g)?.length, "텍스트칸이 둘이 아니다").toBe(2);
+    expect(create, "이미지 공통 지시 칸이 없다").toMatch(/image_note/);
+    expect(create, "영상 공통 지시 칸이 없다").toMatch(/clip_note/);
   });
 
   // ★★ 위 단정(`/image_note/`·`/clip_note/`·`<textarea` 수)은 **배선을 안 잰다** — 영상 칸의
@@ -467,9 +473,11 @@ describe("①자료 — 프로젝트 공통 지시", () => {
   //    낱말이 아니라 **연결**을 재야 한다. 그래서 상자 블록을 `<label` 로 갈라, 사장님이 읽는
   //    라벨로 어느 칸인지 알아낸 뒤 그 칸 안에서만 배선을 본다 — 파일 전역이나 상자 전체로
   //    재면 **이웃 칸**의 배선에 걸려 두 칸을 같은 상태에 묶어도 안 걸린다.
+  // ★ 구간을 `</label>` 에서 **끊는다.** 안 끊으면 마지막 칸의 구간이 파일 끝까지 이어져
+  //   화면 아래쪽(만들기 버튼의 `disabled=`)까지 삼킨다 — "칸이 잠기는가"를 재는 단정이
+  //   엉뚱한 버튼을 보고 빨개졌다(2026-08-18 실측).
   const noteFieldsOf = () => {
-    const box = jsxBlockIn(briefing, "notePicker");
-    const segs = box.split("<label").slice(1);
+    const segs = create.split("<label").slice(1).map((s) => s.split("</label>")[0]);
     return {
       image: segs.find((s) => s.includes("이미지에 함께 보낼 지시")) || "",
       clip: segs.find((s) => s.includes("영상에 함께 보낼 지시")) || "",
@@ -500,83 +508,71 @@ describe("①자료 — 프로젝트 공통 지시", () => {
     expect(clip, "영상 칸이 저장 중에 잠긴다 — 탭하면 포커스가 날아간다").not.toMatch(/disabled=/);
   });
 
-  // ★ 서버(normalizePromptNote)가 **공백을 접어서** 저장한다(`\s+` → 한 칸). 화면이 원문으로
-  //   비교하면 내부 이중 공백이나 개행이 든 지시는 빗장이 안 풀려 **blur 마다 헛 PATCH +
-  //   refetch** 가 계속 돈다. 그래서 비교도 저장도 **게이트와 같은 함수로 접은 값**이어야
-  //   한다 — 접는 규칙을 화면에 한 벌 더 적으면 그날부터 갈린다.
-  it("★ 비교와 저장이 서버와 같은 정규화를 쓴다 — 안 그러면 blur 마다 헛 PATCH 다", () => {
-    expect(briefing, "게이트와 같은 정규화 함수를 안 끌어온다")
-      .toMatch(/normalizePromptNote.*from "\.\.\/\.\.\/\.\.\/\.\.\/lib\/styles"/);
-    const { image, clip } = noteFieldsOf();
-    for (const [seg, state, key, label] of [
-      [image, "imageNote", "image_note", "이미지"],
-      [clip, "clipNote", "clip_note", "영상"],
-    ]) {
-      const flat = seg.replace(/\/\/[^\n]*/g, "").replace(/\s+/g, " ");
-      expect(flat, `${label} 칸이 원문을 접지 않고 비교한다`)
-        .toMatch(new RegExp(`normalizePromptNote\\(${state},`));
-      // 저장도 **접은 값**이어야 한다. 원문을 보내면 서버가 접어 저장해 다음 blur 에서 또 다르다.
-      expect(flat, `${label} 칸이 접은 값이 아니라 원문을 저장한다`)
-        .toMatch(new RegExp(`saveNote\\("${key}", note\\)`));
-      expect(flat, `${label} 칸이 아직 trim() 으로 비교한다 — 내부 공백이 안 접힌다`)
-        .not.toMatch(new RegExp(`${state}\\.trim\\(\\) !==`));
-    }
+  // ★ 만들 때 **함께 보낸다.** 화면에 칸만 있고 요청에 안 실리면 사장님이 적은 지시가
+  //   말없이 사라진다 — 라우트 쪽 그물(tests/routes.test.js)의 짝이다.
+  // ★ 화풍(style)과 **같은 몸통에 넣지 않는다.** normalizeStyle 은 preset 을 함께 요구하므로
+  //   style 안에 실으면 400 이거나 고른 화풍이 조용히 덮인다.
+  it("★ 만들 때 두 지시를 함께 보낸다 — 화풍과 섞지 않는다", () => {
+    const submit = create.match(/async function submit\([\s\S]*?\n  \}/)?.[0] || "";
+    expect(submit, "submit 을 못 찾았다").toBeTruthy();
+    expect(submit, "이미지 지시를 안 실어 보낸다").toMatch(/image_note/);
+    expect(submit, "영상 지시를 안 실어 보낸다").toMatch(/clip_note/);
+    // style 몸통 안에 들어가면 안 된다 — `style: { preset: …, note: … }` 안에 note 키가 둘이 되면
+    // 화풍 보정과 공통 지시가 한 칸을 다툰다.
+    expect(submit, "공통 지시를 화풍 몸통 안에 넣었다")
+      .not.toMatch(/style:\s*\{[^}]*(image_note|clip_note)/);
   });
 
   it("★ 화풍 보정 입력은 그대로 남는다 — 다른 값이다", () => {
     // 상태 선언만 보면 배선이 끊겨도 초록이다(뮤테이션 실측) — 값과 콜백이 실제로
     // StylePicker 에 걸려 있는지 잰다.
-    expect(briefing, "화풍 보정을 지웠다 — 120자짜리 그 칸은 이 작업의 대상이 아니다")
+    expect(create, "화풍 보정을 지웠다 — 120자짜리 그 칸은 이 작업의 대상이 아니다")
       .toMatch(/note=\{styleNote\}/);
-    expect(briefing, "화풍 보정 입력이 상태를 안 고친다").toMatch(/onNote=\{setStyleNote\}/);
-    expect(briefing, "화풍 저장 경로가 사라졌다").toMatch(/saveStyle\(/);
+    expect(create, "화풍 보정 입력이 상태를 안 고친다").toMatch(/onNote=\{setStyleNote\}/);
     // ★ import 문이 아니라 **그려지는 자리**를 잰다 — `/StylePicker/` 만으로는 import 가
     //   남아 있는 한 초록이라, 화면에서 칩과 보정 칸을 통째로 떼어도 안 걸린다(뮤테이션 실측).
     // ★ 경계를 넣는다 — `/<StylePicker/` 만으로는 `<StylePickerXX`(정의되지 않은 컴포넌트라
     //   렌더에서 죽는다)가 통과한다(리뷰 실측). 이름 뒤에 공백·개행·`/`·`>` 중 하나가
     //   와야 그 이름의 컴포넌트다.
-    expect(briefing, "화풍 고르는 자리가 사라졌다").toMatch(/<StylePicker(?=[\s/>])/);
+    expect(create, "화풍 고르는 자리가 사라졌다").toMatch(/<StylePicker(?=[\s/>])/);
   });
 
-  // ★ `normalizeStyle` 은 preset 을 함께 요구한다. 공통 지시를 화풍과 같은 몸통에 실으면
-  //   400 이거나(preset 없음) 사장님이 고른 화풍이 조용히 덮인다. 그래서 **settings 에
-  //   그 값 하나만** 보낸다. 함수 본문만 잘라서 잰다 — 파일 전체를 훑으면 saveStyle 의
-  //   `style` 에 걸려 무엇을 보내든 초록이다.
-  it("★ 공통 지시 저장은 화풍과 섞이지 않는다", () => {
-    const fn = fnIn(briefing, "saveNote");
-    expect(fn, "saveNote 함수가 없다 — 칸이 저장되지 않는다").toBeTruthy();
-    expect(fn, "PATCH 가 아니다").toMatch(/method: "PATCH"/);
-    expect(fn.replace(/\s+/g, " "), "settings 에 그 값 하나만 보내지 않는다")
-      .toMatch(/settings: \{ \[key\]: value \}/);
-    expect(fn, "화풍을 함께 보낸다 — normalizeStyle 이 preset 을 요구한다").not.toMatch(/style/);
-    // 실제로 칸에 걸려 있어야 한다 — 함수만 있고 안 걸려 있으면 아무것도 저장되지 않는다.
-    expect(briefing, "이미지 칸이 저장에 안 걸려 있다").toMatch(/saveNote\("image_note"/);
-    expect(briefing, "영상 칸이 저장에 안 걸려 있다").toMatch(/saveNote\("clip_note"/);
+  // ★ 옛 계약 셋을 지웠다(2026-08-18) — 전부 **①자료에서 blur 마다 PATCH 하던 방식**을 재던
+  //   못이다: saveNote 가 settings 에 값 하나만 보내는가 / 초기값 빗장(noteLoadedFor)이
+  //   타이핑을 덮지 않는가 / 고치면 전 컷을 다시 만들어야 한다고 적는가.
+  //   첫 화면에는 저장할 프로젝트가 아직 없어 PATCH 도 초기값도 없고, 만들기 전이라 낡을
+  //   산출물도 없다("유료" 경고를 여기서 하면 겁만 준다).
+  //   ⚠️ 대가: **시작한 뒤에는 공통 지시를 바꿀 수 없다.** 바꿀 자리를 다시 열면 그때
+  //      낡음 경고(전 컷 재구매)도 함께 돌아와야 한다 — 없이 열면 산 그림이 조용히 낡는다.
+});
+
+// ★★ 두 번 묻지 않는다(2026-08-18, 사용자 지시). ①자료가 첫 화면에서 이미 받은 값을 다시
+//    받고 있었다 — 사이즈·컨셉은 글자 그대로 중복이었고, 화질·공통 지시는 그 화면에만 있어
+//    "처음에 정한 것"과 "나중에 정하는 것"이 갈려 있었다. 지금은 전부 첫 화면 하나다.
+//    이 묶음은 그 화면이 **입력을 다시 들이지 않는지** 지킨다.
+describe("①자료 — 뒷단 값을 다시 묻지 않는다", () => {
+  for (const [what, pattern] of [
+    ["사이즈", /ASPECTS/],
+    ["컨셉", /StylePicker/],
+    ["화질", /resolutionsForProject/],
+    ["이미지 공통 지시", /image_note/],
+    ["영상 공통 지시", /clip_note/],
+  ]) {
+    it(`★ ${what}를 다시 받지 않는다`, () => {
+      expect(briefing, `${what} 입력이 ①자료에 남아 있다 — 첫 화면에서 이미 받았다`)
+        .not.toMatch(pattern);
+    });
+  }
+
+  // 입력이 없어졌으니 저장할 것도 없다. PATCH 가 남아 있으면 그 자리에 칸이 다시 붙는다.
+  it("★ 저장(PATCH)하는 자리가 없다", () => {
+    expect(briefing, "①자료가 아직 프로젝트를 고친다").not.toMatch(/method: "PATCH"/);
   });
 
-  // ★ 빗장(noteLoadedFor)이 하나다. 두 칸을 그 밖에서 채우면 매 렌더마다 저장값으로
-  //   덮여 타이핑이 글자마다 되돌아간다 — 화풍 보정이 이미 그 방식을 쓴다.
-  it("★ 초기값은 한 번만 채운다 — 매 렌더마다 덮으면 타이핑이 끊긴다", () => {
-    const eff = effectIn(briefing, "noteLoadedFor.current = project.id");
-    expect(eff, "초기값을 채우는 effect 를 못 찾았다").toBeTruthy();
-    expect(eff, "빗장이 없다").toMatch(/noteLoadedFor\.current === project\.id/);
-    expect(eff, "이미지 공통 지시를 빗장 안에서 채우지 않는다").toMatch(/setImageNote/);
-    expect(eff, "영상 공통 지시를 빗장 안에서 채우지 않는다").toMatch(/setClipNote/);
-    expect(eff, "화풍 보정 초기값이 빠졌다").toMatch(/setStyleNote/);
-  });
-
-  // ★★ 공통 지시는 설계상 **전 컷의 각인**에 들어간다(lib/steps.js). 한 번 고치면 그림·클립이
-  //   통째로 낡는다 — 컷당 $0.08 에 Seedance 30초 한 편이 ~$9다. 안 적으면 사장님은 한 줄
-  //   보태고 전 컷 재구매를 마주한다. 상자 블록만 잘라서 잰다(주석은 걷는다).
-  it("★ 고치면 전 컷을 다시 만들어야 한다고 적는다", () => {
-    const box = jsxBlockIn(briefing, "notePicker");
-    expect(box, "공통 지시 상자 블록을 못 찾았다").toBeTruthy();
-    expect(box, "값이 든다는 말이 없다 — 사장님이 모르고 고친다").toMatch(/유료/);
-    expect(box, "다시 만들어야 한다는 말이 없다").toMatch(/다시 만들/);
-    // 이 화면의 다른 안내(화풍 보정)와 섞이지 않게, 실제로 이 상자 안에서 재고 있는지
-    // 확인한다 — 두 칸의 라벨이 같은 블록에 있어야 한다.
-    expect(box, "이미지 칸 라벨이 이 블록에 없다").toMatch(/이미지/);
-    expect(box, "영상 칸 라벨이 이 블록에 없다").toMatch(/영상/);
+  // 남아야 하는 것 — 자료를 보여 주고 다음으로 보내는 일. 그것까지 지우면 흐름이 끊긴다.
+  it("★ 자료를 보여 주고 시나리오로 보낸다", () => {
+    expect(briefing, "적어 준 자료를 안 보여 준다").toMatch(/material\?\.text/);
+    expect(briefing, "다음으로 가는 길이 없다").toMatch(/\/scenario/);
   });
 });
 

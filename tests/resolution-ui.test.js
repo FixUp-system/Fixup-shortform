@@ -18,13 +18,16 @@ const create = read("app/create/page.js");
 const material = read("app/create/[id]/briefing/page.js");
 const quick = read("components/QuickCreate.jsx");
 
-// 이사 완료(2026-08-16) — 칩은 **①자료**(create/[id]/briefing)로 갔다. ②시나리오가 아니라
-// ①인 이유: 길이·비율·모델·화풍이 이미 거기 모여 있고, 잠금 기준이 결제라 ③목소리 앞이면
-// 어디든 성립한다. 아래 여섯이 그 이사의 유일한 그물이다.
-describe("①자료 — 화질 선택", () => {
-  const script = material;
+// ★★ 두 번째 이사(2026-08-18, 사용자 지시) — 칩은 **첫 화면**(/create)으로 갔다.
+//    ①자료에 있던 것이 첫 화면에서 이미 받은 값(길이·비율·모델·컨셉)을 **두 번 묻는**
+//    자리였기 때문이다. 결제 앞이라는 원래 조건은 그대로 성립한다(만들기 전이 가장 앞이다).
+//    바뀐 것이 하나 있다: 여기는 아직 프로젝트가 없어 **잠금(project.charged)이 없다.**
+//    그 자리를 대신 지키는 못이 "모델을 바꾸면 그 모델에 없는 화질이 남지 않는다"다 —
+//    잠금이 없는 대신, 고른 값이 모델과 어긋날 수 없어야 한다.
+describe("첫 화면 — 화질 선택", () => {
+  const script = create;
   it("화질 목록을 lib/clip-limits 에서 읽는다 — 화면이 해상도 문자열을 적지 않는다", () => {
-    expect(script).toMatch(/resolutionsForProject\(project\)/);
+    expect(script).toMatch(/resolutionsForModel\(model\)/);
     // 큰따옴표만 잡으면 작은따옴표·백틱·JSX 텍스트로 박아 넣고 빠져나간다.
     // (주석은 strip 이 먼저 걷어내므로 여기 남는 것은 전부 화면이 적은 값이다.)
     expect(script, "해상도 값을 화면에 박았다 — 모델이 여는 목록은 표가 안다")
@@ -39,30 +42,26 @@ describe("①자료 — 화질 선택", () => {
     expect(script).toMatch(/resolutions\.length\s*>\s*0\s*&&\s*\(?\s*<[\s\S]{0,800}?resolutions\.map\(/);
   });
 
-  it("지금 고른 값은 resolutionForProject 로 읽는다 — 저장값을 직접 읽지 않는다", () => {
-    // 저장값을 직접 읽으면 모델과 어긋난 옛 값(Seedance 1080p → Kling)이 그대로 켜진 것처럼
-    // 보인다. resolutionForProject 는 그 자리에서 그 모델의 기본값으로 떨어뜨린다.
-    expect(script).toMatch(/resolutionForProject\(project\)/);
-    expect(script, "settings.resolution 을 화면이 직접 읽는다")
-      .not.toMatch(/settings\?\.resolution/);
+  // ★ 잠금이 없는 자리의 유일한 방어선이다. 모델을 Seedance(1080p 있음) → Kling(없음) 으로
+  //   바꿔도 1080p 가 상태에 남아 있으면, 그 값이 그대로 생성 요청에 실려 **400** 이거나
+  //   (검증을 못 지나면) fal 이 거절하는 값으로 저장된다.
+  it("★ 모델을 바꾸면 그 모델에 없는 화질은 남지 않는다", () => {
+    const fn = script.match(/function pickModel\([\s\S]*?\n  \}/)?.[0] || "";
+    expect(fn, "모델 고르기를 함수로 두지 않아 화질을 함께 못 맞춘다").toBeTruthy();
+    expect(fn, "모델을 바꿀 때 화질 목록을 다시 안 본다").toMatch(/resolutionsForModel\(/);
+    expect(fn, "모델에 없는 화질을 그대로 둔다").toMatch(/setResolution\(/);
   });
 
   it("칩마다 그 화질의 정가를 적는다 — 값이 달라지는 것이 고르는 이유다", () => {
     expect(script).toMatch(/videoPrice\([\s\S]{0,120}?\)/);
     // 셋째 인자로 그 칩의 해상도가 들어가야 한다. 안 넘기면 세 칩이 같은 값을 적는다.
-    expect(script).toMatch(/videoPrice\(\s*[^)]*settings\?\.target_seconds[\s\S]{0,80}?,\s*r\s*\)/);
+    expect(script).toMatch(/videoPrice\(\s*seconds\s*,\s*model\s*,\s*r\s*\)/);
   });
 
-  it("정가를 낸 뒤에는 잠긴다 — 낸 값과 만드는 값이 어긋나지 않게", () => {
-    // 판정은 서버가 장부에서 내려 준 project.charged 하나다(③목소리 화면과 같은 값).
-    // 화면이 장부를 추측하지 않는다.
-    expect(script).toMatch(/project\.charged/);
-    expect(script, "잠겼는데 칩을 누를 수 있다").toMatch(/disabled=\{[^}]*Locked/);
-  });
-
-  it("PATCH 로 settings.resolution 을 저장한다 — 사이즈·컨셉과 같은 경로", () => {
-    expect(script).toMatch(/settings:\s*\{\s*resolution\s*\}/);
-    expect(script, "저장 실패를 삼킨다").toMatch(/화질을 저장하지 못했어요/);
+  it("만들 때 고른 화질을 함께 보낸다 — 안 보내면 말없이 기본값이 된다", () => {
+    const submit = script.match(/async function submit\([\s\S]*?\n  \}/)?.[0] || "";
+    expect(submit, "submit 을 못 찾았다").toBeTruthy();
+    expect(submit, "화질을 안 실어 보낸다").toMatch(/resolution/);
   });
 });
 

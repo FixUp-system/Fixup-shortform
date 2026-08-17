@@ -16,6 +16,7 @@ import { isAudioStale, isImageStale, isClipStale, isRenderStale, renderKey, scen
 import { isSubtitleStale } from "../lib/translate.js";
 // 축 이름을 여기에 손으로 적지 않는다 — 목록에서 한 줄을 빼면 이 테스트도 함께 줄어야 한다.
 import { MOTION_AXES } from "../lib/motion.js";
+import { PROMPT_NOTE_MAX } from "../lib/styles.js";
 
 // 시작 게이트가 붙은 뒤로, 영상 정가(30초 = 50 크레딧)가 없는 사용자는 유료 시작 라우트에서 402 다.
 // 이 파일이 재는 것은 각 라우트의 가드·배선이므로, 유료 시작을 부르는 테스트는 충전해 두고
@@ -1048,6 +1049,43 @@ describe("POST /api/projects — 영상 모델", () => {
 // settings 는 생성 라우트에서 **명시 화이트리스트**다(PATCH 처럼 통짜 머지가 아니다) —
 // 목록에 없는 키는 말없이 사라진다. 화질이 그 자리였다: 만들 때 골라 보내도 안 남고,
 // 사장님은 720p 로 만들어진 것을 1080p 로 골랐다고 믿는다.
+// ★★ 2026-08-18 — 공통 지시(image_note·clip_note)를 **만들 때** 받는다(사용자 지시).
+//    ①자료에서 따로 받던 칸을 첫 화면으로 모았으므로, 생성 라우트가 그 값을 받지 못하면
+//    사장님이 적은 지시가 **말없이 사라진다** — 화질이 겪은 것과 같은 화이트리스트 함정이다.
+describe("POST /api/projects — 공통 지시", () => {
+  it("이미지·영상 지시를 settings 에 담아 만든다", async () => {
+    const res = await projectsPOST(patchReq({
+      material: { text: "가" },
+      settings: { image_note: "shot on 35mm film", clip_note: "hand-held camera" },
+    }));
+    expect(res.status ?? 200).toBe(200);
+    const { settings } = await res.json();
+    // ★ 끝 부호는 **저장할 때 닫지 않는다** — 판독 한 자리(lib/cuts.js promptNoteOf 의
+    //   closeSentence)에서 닫는다. 저장할 때도 닫으면 정규화가 두 벌이 되고, 프롬프트와
+    //   각인이 보는 값이 갈릴 자리가 생긴다(그 파일 주석에 근거가 있다).
+    expect(settings.image_note).toBe("shot on 35mm film");
+    expect(settings.clip_note).toBe("hand-held camera");
+  });
+
+  // 판정은 PATCH 와 **같은 자**(normalizePromptNote)여야 한다 — 두 입구가 다른 자를 쓰면
+  // 한쪽으로 들어온 값만 상한을 넘긴 채 저장되고, 그 값이 그대로 유료 호출로 나간다.
+  it("상한을 넘기면 400 이다 — PATCH 와 같은 자다", async () => {
+    const res = await projectsPOST(patchReq({
+      material: { text: "가" }, settings: { image_note: "a".repeat(PROMPT_NOTE_MAX + 1) },
+    }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/이미지 지시/);
+  });
+
+  // 안 보내면 아무것도 안 넣는다 — 화질과 같은 규칙이다(빈 문자열도 값이다).
+  it("안 보내면 settings 에 넣지 않는다", async () => {
+    const res = await projectsPOST(patchReq({ material: { text: "가" } }));
+    const { settings } = await res.json();
+    expect(settings).not.toHaveProperty("image_note");
+    expect(settings).not.toHaveProperty("clip_note");
+  });
+});
+
 describe("POST /api/projects — 화질", () => {
   it("고른 화질을 settings 에 담아 만든다", async () => {
     const res = await projectsPOST(patchReq({ material: { text: "가" }, settings: { resolution: "1080p" } }));
