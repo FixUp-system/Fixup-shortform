@@ -348,6 +348,66 @@ describe("①자료 — 프로젝트 공통 지시", () => {
   });
 });
 
+// ──────────────────────────────────────────────────────────────────────────
+// ②시나리오 — 칸마다 **누가 읽는가**로 언어가 갈린다(lib/scenario.js 의 SYSTEM).
+//
+// narrator_voice 는 번역 단계 없이 영상 모델에 실린다(lib/cuts.js speechFor 의 `Voice:` 절).
+// 그런데 이 칸은 **사장님이 보고 고치는 칸**이라, 자리표시자가 한국어 예시를 권하면
+// 사장님은 그 예시를 따라 한국어로 고치고 그 한국어가 그대로 fal 에 나간다 — 화면 스스로가
+// "고칠 수 있는 척하는 칸"이라 부르며 경계한 것과 같은 종류의 거짓말이다.
+// 반대로 beat·line·speaker·angle 은 한국어가 맞다(사장님과 다음 단계 LLM 이 읽고, line 은
+// 그대로 자막이 된다). 다음 영문화 회차가 **어느 쪽으로도** 흔들지 못하게 양쪽을 박아 둔다.
+const SCENARIO_PAGE = "app/create/[id]/scenario/page.js";
+const scenarioPage = readFileSync(SCENARIO_PAGE, "utf8");
+
+// `{조건 && (` … `\n      )}` 로 묶인 조건부 JSX 덩어리. 내레이터 칸이 그 안에 있다.
+// ★ 파일 전체를 훑으면 아무것도 안 잰다 — 위 주석과 다른 칸의 자리표시자에 걸린다.
+//   그래서 JSX 주석까지 걷어 **사장님이 실제로 보는 글자만** 남긴다.
+const condBlockIn = (src, head) => {
+  const start = src.indexOf(`{${head} && (`);
+  if (start < 0) return "";
+  const end = src.indexOf("\n      )}", start);
+  if (end < 0) return "";
+  return src.slice(start, end).replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+};
+const HANGUL = /[가-힣]/;
+const placeholdersIn = (block) => [...block.matchAll(/placeholder="([^"]*)"/g)].map((m) => m[1]);
+
+describe("②시나리오 — 칸마다 언어가 다르다", () => {
+  it("★ 내레이터 목소리 자리표시자는 영어다 — 그 글자가 영상 모델에 그대로 실린다", () => {
+    const block = condBlockIn(scenarioPage, "hasNarration(scenario)");
+    expect(block, "내레이터 목소리 블록을 못 찾았다").toBeTruthy();
+    expect(block, "이 블록이 내레이터 칸이 아니다").toContain("narrator_voice");
+    const holders = placeholdersIn(block);
+    expect(holders.length, "자리표시자가 없다 — 사장님이 무엇을 적을지 모른다").toBe(1);
+    expect(HANGUL.test(holders[0]), `자리표시자가 한국어를 권한다("${holders[0]}") — 사장님이 그대로 따라 적으면 그 한국어가 fal 에 나간다`).toBe(false);
+  });
+
+  it("★ 왜 영어인지 안내한다 — 이유가 없으면 사장님은 실수로 보고 한국어로 고친다", () => {
+    const block = condBlockIn(scenarioPage, "hasNarration(scenario)");
+    expect(block, "영어로 적어야 한다는 안내가 없다").toMatch(/영어/);
+    // 안내 문구는 **사장님이 읽는 자리**에 있어야 한다 — 라벨·주석이 아니라 pgsub 문단이다.
+    // 줄 단위로 본다: `<b>영어로</b>` 처럼 강조 태그가 끼어도 걸리게(태그 통과 정규식은
+    // 강조를 넣는 순간 조용히 빨개져 안내를 지운 것과 구분되지 않는다).
+    const guide = block.split("\n").find((l) => l.includes("영어") && l.includes('className="pgsub"'));
+    expect(guide, "영어로 적으라는 안내가 화면 문단(pgsub)에 없다").toBeTruthy();
+  });
+
+  // ★ 반대 방향의 그물이다. beat·line·speaker 는 사장님과 다음 단계 LLM 이 읽고, line 은
+  //   ffmpeg 가 그대로 자막으로 태운다(lib/subtitles.js) — 영어로 바꾸면 사장님 영상에
+  //   영어 자막이 박힌다. speaker 는 "내레이션"이라는 그 낱말이 판정에 쓰인다.
+  it("★ 장면 칸들은 한국어를 지킨다 — 영문화가 여기까지 번지면 자막이 영어가 된다", () => {
+    const rows = scenarioPage.slice(scenarioPage.indexOf('<div className="plan-list">'));
+    expect(rows, "장면 목록을 못 찾았다").toBeTruthy();
+    for (const label of ["이 장면이 하는 일", "대사", "말하는 사람"]) {
+      expect(rows, `장면 칸 라벨("${label}")이 사라졌다`).toContain(label);
+    }
+    for (const holder of placeholdersIn(rows)) {
+      expect(HANGUL.test(holder), `장면 칸 자리표시자가 영어다("${holder}") — 이 칸들은 사장님과 다음 단계 LLM 이 읽는다`).toBe(true);
+    }
+  });
+});
+
 // ★ 화면이 끌어오는 사슬 어디에도 `fs`·`path` 가 없어야 한다. 이 저장소는 화면이 서버 전용
 //   모듈을 끌어와 빌드가 깨진 사고를 세 번 겪었고, 그때 **테스트는 전부 초록**이었다.
 //   프롬프트 때문에 lib/cuts 를 새로 끌어왔으니 그 사슬을 여기서 잰다.

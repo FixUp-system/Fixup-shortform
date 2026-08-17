@@ -186,10 +186,17 @@ export default function ScenarioStepPage() {
       {hasNarration(scenario) && (
         <>
           <div className="eyebrow">내레이터 목소리</div>
+          {/* ★ 자리표시자만 영어다 — 이 칸의 값은 번역 단계 없이 영상 모델에 그대로 실린다
+              (lib/cuts.js speechFor 의 `Voice:` 절, lib/scenario.js SYSTEM 의 언어 규칙).
+              예시 값이 사장님이 무슨 말로 적을지를 정하는 가장 강한 신호라, 한국어 예시를
+              두면 사장님이 한국어로 고치고 그 한국어가 그대로 fal 에 나간다 —
+              "고칠 수 있는 척하는 칸"과 같은 종류의 거짓말이다(위 주석). */}
           <input className="field" value={scenario.narrator_voice || ""}
-            placeholder="예: 차분한 30대 남성, 낮고 단단한 톤"
+            placeholder="e.g. calm man in his 30s, low and steady tone"
             onChange={(e) => edit({ narrator_voice: e.target.value })} />
           <p className="pgsub">화면 밖에서 읽는 목소리예요 — 비워 두면 컷마다 다른 사람이 읽어요</p>
+          {/* 왜 영어냐를 말해 준다 — 이유 없이 영어 예시만 있으면 사장님은 실수로 보고 고친다 */}
+          <p className="pgsub">영상 모델이 이 글자를 그대로 읽어요 — <b>영어로</b> 적어 주세요</p>
           {/* ★ angle 칸의 안내와 짝이다 — 다만 방향이 반대다. angle 은 이미 만든 컷에
               **반영이 안 돼서** 말해 주고, 이 칸은 **곧바로 반영돼서** 말해 준다:
               이 값은 클립 프롬프트에 실리므로(lib/cuts.js speechFor) 고치면 그 장면의
