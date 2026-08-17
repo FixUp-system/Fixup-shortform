@@ -481,6 +481,32 @@ function PreviewPane({ cut, project, url, photoName, aspect, stalled, onRegen, o
   const fixedTail = full.startsWith(seed)
     ? full.slice(seed.length)
     : full.slice(promptBodyOf("image", cut, project).length);
+  // ── 전문 복사 ────────────────────────────────────────────────────────
+  //
+  // 접힌 칸은 본문(텍스트칸)과 꼬리(문단)를 **따로** 보여 준다. 밖으로 가져가려면 두 곳을
+  // 긁어 손으로 이어야 했고, 이으면서 순서가 뒤바뀌거나 꼬리가 빠지면 밖에서 돌려 본 결과가
+  // 우리 결과와 달라도 왜 다른지 알 수 없다.
+  //
+  // ★ 잇는 값은 **화면에 보이는 두 토막 그대로**다(prompt + fixedTail). 여기서 조립 함수를
+  //   다시 부르면 사장님이 방금 고친 본문이 빠진 옛 프롬프트가 복사된다 — 보는 것과
+  //   가져가는 것이 갈리는, 이 화면이 처음부터 경계한 그 병이다.
+  // ★ 꼬리는 본문에 딸리지 않는다(fixedTail 은 seed 기준) — 그래서 아직 저장하지 않은
+  //   본문을 복사해도 "저장하면 나갈 글자"가 그대로 나온다.
+  // ⚠️ 레퍼런스 사진 절은 여기에도 빠진다 — 화면이 그 판정을 못 하기 때문이다(위 주석).
+  //    아래 안내가 이미 그 사실을 말한다.
+  const [copyMsg, setCopyMsg] = useState("");
+  async function copyAll() {
+    try {
+      await navigator.clipboard.writeText(prompt + fixedTail);
+      setCopyMsg("복사했어요");
+    } catch {
+      // 클립보드는 브라우저가 막을 수 있다(권한·비보안 컨텍스트). 조용히 실패하면
+      // 사장님은 복사된 줄 알고 빈 것을 붙인다.
+      setCopyMsg("복사하지 못했어요 — 위 글을 직접 긁어 주세요");
+    }
+    setTimeout(() => setCopyMsg(""), 3000);
+  }
+
   const isPhoto = cut.source === "photo";
   const busyCut = !stalled && cut.state === "generating";
   const atLimit = cut.regen_count >= MAX_REGEN_PER_CUT;
@@ -548,7 +574,12 @@ function PreviewPane({ cut, project, url, photoName, aspect, stalled, onRegen, o
             />
             {/* 글자 수만 보여 준다. 상한 숫자는 화면에 안 적는다 — 값이 두 벌이면 갈린다
                 (상한은 원장이 자르는 자리 하나이고, 넘으면 서버 문구가 위에 뜬다). */}
-            <span className="regen-note mono">{prompt.length}자</span>
+            <div className="preview-actions">
+              {/* 본문+공통지시+꼬리를 한 덩어리로 — 밖에서 그대로 돌려 볼 수 있게 */}
+              <button className="mini" onClick={copyAll}>전문 복사</button>
+              <span className="regen-note mono">{prompt.length}자</span>
+              {copyMsg && <span className="regen-note">{copyMsg}</span>}
+            </div>
             <p className="preview-note">
               영어로 쓰면 더 잘 알아들어요. 아래 문장은 저희가 항상 뒤에 붙여요 — 고칠 수 없어요.
             </p>
