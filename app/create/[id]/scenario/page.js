@@ -195,6 +195,23 @@ export default function ScenarioStepPage() {
           정상 흐름(모델이 채워 온 경우)에는 화면에 안 나온다.
           이 값은 클립 프롬프트에 실린다 — 고치면 그 컷의 영상이 낡는다
           (lib/cuts.js speechFor · lib/steps.js clipKey). 그래서 "반영은 다음에"가 아니다. */}
+      {/* ★ 음악 — **영상 하나에 하나**이고 사장님이 직접 정한다(2026-08-18 요청).
+          전달 방식·내레이터 목소리와 달리 이 칸은 **늘 보인다**: 그 둘은 우리가 모델에 주는
+          지시라 걷었지만, 음악은 사장님이 고르고 싶다고 한 값이다.
+          이 값은 전 컷 클립 프롬프트에 **같은 글자로** 실린다(lib/cuts.js clipContextClause) —
+          그래서 컷마다 다른 곡이 나오던 것이 한 성격으로 모인다.
+          ⚠️ 고치면 그 뒤에 만드는 클립이 낡는다(lib/steps.js clipKey 가 음악을 각인한다) —
+          비워 두면 절이 아예 안 붙어 옛 프로젝트의 클립은 그대로다. */}
+      <div className="eyebrow">배경음악</div>
+      {/* 자리표시자만 영어다 — 내레이터 칸과 같은 이유다. 이 글자가 번역 없이 영상 모델에
+          그대로 실리므로, 한국어 예시를 두면 사장님이 한국어로 고치고 그것이 그대로 나간다. */}
+      <input className="field" value={scenario.music || ""}
+        placeholder="e.g. slow piano, sparse and calm"
+        onChange={(e) => edit({ music: e.target.value })} />
+      <p className="pgsub">영상 전체에 깔릴 음악이에요 — <b>영어로</b> 적어 주세요. 비워 두면 음악을 넣지 않아요</p>
+      {/* 가사가 있는 음악을 막는 것은 시나리오 지시문이 이미 한다(lib/scenario.js) —
+          여기서 또 말하면 칸 하나에 안내가 셋이 된다. */}
+
       {hasNarration(scenario) && voiceOpen && (
         <>
           <div className="eyebrow">내레이터 목소리</div>

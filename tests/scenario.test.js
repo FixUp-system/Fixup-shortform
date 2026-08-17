@@ -75,6 +75,9 @@ const LANG = {
   subject: "영어",
   look: "영어",
   narrator_voice: "영어",
+  // music — 영상 하나에 하나인 배경음악(2026-08-18). 전 컷 클립 프롬프트에 같은 글자로
+  // 실리므로(lib/cuts.js clipContextClause) narrator_voice 와 같은 대우다.
+  music: "영어",
   // 한국어 — 사장님이 읽고 고치고, 다음 단계 LLM 도 한국어로 읽는다.
   // speaker 는 "내레이션"이라는 **그 낱말**이 판정에 쓰인다(isNarrationSpeaker)
   topic: "한국어",
