@@ -1216,6 +1216,53 @@ describe("카메라 낱말은 그림 지시에서 지운다", () => {
       expect(stillOnly("there is slowly rising steam")).toBe("");
     });
 
+    // ★★ D1(2026-08-17 눈 확인) — 정지 서술의 동사 목록이 EN_MOTION 과 **두 벌**이라
+    //   `rise` 가 빠졌다. 그래서 "steam rises from the lid" 가 통째로 버려지고, shows 가 비어
+    //   이미지 프롬프트가 **한국어 낭독 문장**으로 떨어졌다(컷당 $0.08).
+    //   목록을 하나로 합쳤으므로 EN_MOTION 의 동사는 전부 대기 서술에서 면제된다 — 아래는
+    //   그 구조를 재는 못이다(한 낱말만 박으면 다음에 또 다른 낱말이 빠진다).
+    it("빛·김·먼지가 주어인 정지 서술은 움직임 동사가 무엇이든 살린다", () => {
+      for (const ok of [
+        "steam rises from the lid",                    // ★ 실제로 버려지던 값
+        "steam settles over the cup",
+        "steam swirls above the mug",
+        "light fills the room",
+        "the glow flickers on the counter",
+        "dust turns in the beam from the window",
+        "shadows cross the wooden floor",
+        "warm lighting falls on the shelf",             // 조명 → lighting (한국어 목록에만 있었다)
+        "a reflection lands on the tiles",
+        "mist drifts past the window",
+      ]) {
+        expect(stillOnly(ok), ok).toBe(ok);
+      }
+    });
+
+    // 면제는 **대기가 주어일 때만**이다 — 사람·물건이 그 동사를 하면 그것은 움직임이다
+    it("사람·물건이 주어면 같은 동사도 뺀다", () => {
+      for (const s of ["the cup rises toward her mouth", "the barista turns to the shelf"]) {
+        expect(stillOnly(s), s).toBe("");
+      }
+    });
+
+    // ★★ D3(2026-08-17 눈 확인) — 앞 절이 버려진 뒤 남은 분사구가 주어를 잃은 채 나갔다
+    it("앞 절이 버려져 주어를 잃은 분사구는 함께 버린다", () => {
+      expect(stillOnly("a woman passes the counter, holding a paper cup")).toBe("");
+    });
+
+    it("앞 절이 살아 있으면 분사구는 주어를 잃지 않는다", () => {
+      const s = "close-up of the lid, steam curling from the open lid";
+      expect(stillOnly(s)).toBe(s);
+      expect(stillOnly("a wide shot of the cafe, holding a paper cup"))
+        .toBe("a wide shot of the cafe, holding a paper cup");
+    });
+
+    // -ing 로 끝나는 **명사**를 분사구로 오독하면 정당한 조명 서술이 사라진다
+    it("-ing 명사는 분사구가 아니다", () => {
+      expect(stillOnly("a woman passes the counter, lighting rigs overhead"))
+        .toBe("lighting rigs overhead");
+    });
+
     // 존재 서술(there is/are)은 움직임 낱말이 들어 있어도 정지 그림이다 —
     // 이 항목을 지워도 전부 그린이었다(한국어 '보인다'에 대응하는 자리다).
     it("존재 서술은 움직임 낱말이 있어도 살린다", () => {
@@ -1498,6 +1545,37 @@ describe("톤·전환 필터", () => {
         "a delivery truck parked outside",
         "film camera grain",
       ]) expect(usableTone(t), t).toBe(t);
+    });
+
+    // ★★ D2(2026-08-17 눈 확인) — 인정하는 앞자리에 **형용사가 없었다.** 부사형은 버리는데
+    //   형용사형은 통과해, 사람이 톤 칸에 쓰기 더 쉬운 쪽이 그대로 새어 카메라 이동이
+    //   이미지 프롬프트의 색·질감 지시절로 실렸다.
+    it("형용사 앞자리의 카메라 이동도 버린다", () => {
+      for (const t of [
+        "slow zoom in",
+        "warm amber grade, slow zoom in throughout",
+        "muted palette, gentle push in",
+        "soft grade with a slow dolly in",
+        "a quick tilt down into the shadows",
+        "steady track across the court, cool cast",
+      ]) {
+        expect(usableTone(t), t).toBe("");
+        expect(usableTransition(t), t).toBe("");
+      }
+      // 부사형은 원래 걸렸다 — 함께 못 박는다(둘의 판정이 갈리면 안 된다)
+      expect(usableTone("warm amber grade, slowly zooms in throughout")).toBe("");
+    });
+
+    // 형용사 목록을 `\w+` 로 열면 명사 주어가 형용사로 오독돼 정상 톤이 통째로 버려진다
+    it("형용사를 넓혀도 명사 주어의 방향 이동은 살아 있다", () => {
+      for (const t of [
+        "hard light from a low sun, shadows track across the floor",
+        "a slow shutter blur across the frame",   // 방향어가 없다 — 카메라 지시가 아니다
+        "gentle film grain, muted palette",
+        "the slow pour of milk into the glass",
+      ]) {
+        expect(usableTone(t), t).toBe(t);
+      }
     });
 
     // 주어가 없으면(값의 시작·구두점·-ly 부사 뒤) 그것은 카메라 지시다
