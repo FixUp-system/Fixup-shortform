@@ -1173,6 +1173,55 @@ describe("카메라 낱말은 그림 지시에서 지운다", () => {
       const s = "아침 7시 주방, 클로즈업 of hands dropping strawberries";
       expect(stillOnly(s)).toBe(s);
     });
+
+    // ★ D1(2026-08-17 리뷰 실측) — 한글이 **한 글자**만 섞여도 그 절이 한국어 규칙으로 가고,
+    //   한국어 정지형 검사(`~다/요`)에 안 걸려 **무조건 살아남았다**. 사장님이 손으로 고친
+    //   shows·모델이 낸 혼합값이 그 모양으로 온다. 게다가 지우는 정규식이 `pushes` 를
+    //   못 잡아(`push(?:s|ed)?` — es 가 없었다) 카메라 이동이 그림 지시로 실렸다.
+    it("한글이 섞여도 영어 카메라 이동은 새어 들어가지 않는다", () => {
+      expect(stillOnly("클로즈업 of the shoe as the camera pushes in")).toBe("");
+      expect(stillOnly("클로즈업 of hands, the camera pushes in")).toBe("클로즈업 of hands");
+      // 혼합 절도 영어 움직임 검사를 받는다 — 한국어 종결이 아니어서 전부 통과하던 자리다
+      expect(stillOnly("미디엄 샷 of a woman who runs")).toBe("");
+    });
+
+    // 방향어를 요구하는 낱말의 3인칭 단수형(-es)을 못 잡고 있었다
+    it("pushes·crosses 같은 -es 형도 지운다", () => {
+      expect(stillOnly("low-angle, the camera pushes in")).toBe("low-angle");
+      expect(stillOnly("full shot, pushes in on the outsole")).toBe("full shot");
+    });
+
+    // ★ D2 — 낱말만 지웠더니 목적어가 남아 **비문**이 유료 프롬프트로 갔다.
+    //   한국어는 이 자리에서 자가교정된다(`카메라가` 를 지워도 `다` 종결이라 정지형 검사로
+    //   절이 통째로 빠진다). 영어는 EN_MOTION 이 **이미 지워진 동사**를 못 보므로 무력했다.
+    //   가르는 규칙: 낱말을 지운 자리에 **머리를 잃은 기능어**가 남았는가(아래 주석 참고).
+    it("낱말을 지워 비문이 되면 그 절을 통째로 버린다", () => {
+      expect(stillOnly("wide shot of the court. the camera orbits around the players"))
+        .toBe("wide shot of the court");
+      expect(stillOnly("full shot. the camera cranes up over the rooftops")).toBe("full shot");
+      expect(stillOnly("wide shot. tracking the runner along the fence")).toBe("wide shot");
+    });
+
+    // ★ 반대쪽 — 낱말만 지워도 **문장이 성립하는** 잔여물은 살린다. 둘을 가르는 것이
+    //   이 규칙의 전부다(앵글·샷 크기를 잃으면 그림이 무난해진다).
+    it("문장이 성립하는 잔여물은 살린다", () => {
+      expect(stillOnly("low-angle tracking, feet turning on the crossover"))
+        .toBe("low-angle, feet turning on the crossover");
+      expect(stillOnly("handheld close-up of the hands")).toBe("close-up of the hands");
+    });
+
+    // 속도 부사 검사가 정지형 검사보다 **앞선다**(한국어와 같은 순서). 그 순서를 재는
+    // 입력이 하나도 없어서 검사를 지워도 전부 그린이었다 — 관측 가능한 갈림을 박는다.
+    it("속도 부사는 정지 서술이어도 버린다", () => {
+      expect(stillOnly("there is slowly rising steam")).toBe("");
+    });
+
+    // 존재 서술(there is/are)은 움직임 낱말이 들어 있어도 정지 그림이다 —
+    // 이 항목을 지워도 전부 그린이었다(한국어 '보인다'에 대응하는 자리다).
+    it("존재 서술은 움직임 낱말이 있어도 살린다", () => {
+      const s = "there is a road that runs past the shop";
+      expect(stillOnly(s)).toBe(s);
+    });
   });
 
   // 제품 용어와 겹치는 낱말을 지우면 정당한 화면이 망가진다
@@ -1422,6 +1471,43 @@ describe("톤·전환 필터", () => {
 
     it("자기 완결적인 영어 전환은 쓴다", () => {
       for (const t of keepTransitions) expect(usableTransition(t), t).toBe(t);
+    });
+
+    // ★ D3(2026-08-17 리뷰 실측) — 방향어 절에 **카메라/피사체 구분이 없었다.** 피사체가
+    //   방향으로 움직이는 정상 톤이 통째로 버려져 전 컷의 색·질감 레이어가 0 이 됐다.
+    //   같은 형태인 "the dog runs across the yard" 는 통과했으니(run 은 목록 밖) 판정이
+    //   일관되지도 않았다. 이제 **주어가 카메라인지**를 본다 — 방향어 동사 앞에 명사가
+    //   오면 그 주어는 카메라가 아니다.
+    const keepSubjectMotion = [
+      "hard light from a low sun, shadows track across the floor",
+      "cool grade, light pans across the wall",
+      "the model pulls back her hair",
+      "the dog runs across the yard",   // 판정이 일관되는지 — 위 셋과 같은 형태다
+      "warm grade, the curtain lifts up in the draft",
+    ];
+    it("피사체가 방향으로 움직이는 톤은 살린다 — 주어가 카메라가 아니다", () => {
+      for (const t of keepSubjectMotion) expect(usableTone(t), t).toBe(t);
+      for (const t of keepSubjectMotion) expect(usableTransition(t), t).toBe(t);
+    });
+
+    // 좁힌 대책을 없애지 않았다는 못 — pan·truck·crane 에 방향어를 요구한 것 자체는 유효하다
+    it("방향어 없는 일반명사는 그대로 통과한다", () => {
+      for (const t of [
+        "a crane by the harbor",
+        "a pan of eggs on the stove",
+        "a delivery truck parked outside",
+        "film camera grain",
+      ]) expect(usableTone(t), t).toBe(t);
+    });
+
+    // 주어가 없으면(값의 시작·구두점·-ly 부사 뒤) 그것은 카메라 지시다
+    it("주어 없는 방향어 절은 여전히 버린다", () => {
+      for (const t of [
+        "pushes in on the outsole",
+        "slowly tracks across the court",
+        "warm grade, pans across the wall",
+        "already zoomed in on the shoe",
+      ]) expect(usableTone(t), t).toBe("");
     });
   });
 
