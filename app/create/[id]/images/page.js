@@ -11,6 +11,10 @@ import { useProject } from "../../../../components/ProjectContext";
 import { useMe } from "../../../../components/MeContext";
 import BackButton from "../../../../components/BackButton";
 import { isImageStale, isReachable } from "../../../../lib/steps";
+// ★ 프롬프트는 **서버와 같은 함수**로 만든다 — 화면이 자기 규칙으로 다시 만들면 사장님이
+//   보는 것과 실제로 나가는 것이 갈린다. 본문 판정도 같은 자리에서 온다(promptBodyOf).
+//   이 사슬에는 `fs` 가 없다(tests/prompt-editing-ui.test.js 가 그 그물을 친다).
+import { buildImagePrompt, promptBodyOf } from "../../../../lib/cuts";
 // 상한과 값은 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다).
 import { MAX_REGEN_PER_CUT, priceLabel, regenPrice, videoPrice } from "../../../../lib/pricing";
 import { modelIdForProject, resolutionForProject } from "../../../../lib/clip-limits";
@@ -182,6 +186,25 @@ export default function ImagesStepPage() {
     if (!res.ok) setErr(data.error);
     await load(id).catch(() => {});
     await reloadMe().catch(() => {});
+  }
+
+  // 컷별 프롬프트 덮어쓰기 저장. editSentence 와 같은 모양이다 — 같은 PATCH 자리다.
+  //
+  // ★ **빈 문자열을 보내는 것이 "원래대로"의 구현이다** — 서버가 필드를 지운다
+  //   (app/api/projects/[id]/route.js). 별도 필드를 두지 않기로 한 설계다.
+  // ★ 오류를 삼키지 않는다 — 길이 상한을 넘으면 400 이 오고, 그 문구를 안 띄우면 사장님은
+  //   저장된 줄 알고 다음 단계로 간다(그 값은 유료 호출로 나가지 않는다).
+  async function savePrompt(idx, image_prompt) {
+    setErr("");
+    const res = await fetch(`/api/projects/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cut: { idx, image_prompt } }),
+    });
+    if (!res.ok) {
+      setErr((await res.json().catch(() => ({}))).error || "저장하지 못했어요");
+      return;
+    }
+    await load(id).catch(() => {});
   }
 
   async function editSentence(idx, sentence) {
@@ -390,11 +413,13 @@ export default function ImagesStepPage() {
         <PreviewPane
           key={activeCut.idx}
           cut={activeCut}
+          project={project}
           url={imgUrl(activeCut)}
           photoName={project.material.photos.find((p) => p.id === activeCut.photo_id)?.filename}
           aspect={project.settings?.aspect_ratio || "9:16"}
           stalled={stalled}
           onRegen={regen}
+          onSavePrompt={savePrompt}
         />
       )}
     </div>
@@ -415,8 +440,30 @@ function frameStyle(aspect) {
 
 // 우측 큰 미리보기 + 컷별 수정. instruction 입력은 컷마다 초기화돼야 하므로
 // 부모가 key={cut.idx}로 이 컴포넌트를 갈아끼운다(로컬 state가 자연히 리셋됨).
-function PreviewPane({ cut, url, photoName, aspect, stalled, onRegen }) {
+function PreviewPane({ cut, project, url, photoName, aspect, stalled, onRegen, onSavePrompt }) {
   const [instr, setInstr] = useState("");
+  // ── 실제로 보내는 지시 ──────────────────────────────────────────────
+  //
+  // ★ 판정은 서버와 **같은 함수**다(promptBodyOf·buildImagePrompt). 화면이 문형을 한 벌 더
+  //   들면 그날부터 보는 것과 나가는 것이 갈린다.
+  // ★ 텍스트칸에 앉히는 씨앗은 **사장님이 저장한 날 글자**이고, 없으면 코드가 만든 본문이다.
+  //   판정 결과(promptBodyOf)를 그대로 앉히면 안 된다 — 덮어쓰기 경로에서는 그 값에 코드가
+  //   붙인 판형 절(`… vertical 9:16 composition.`)이 이미 들어 있어서, 저장할 때마다 그
+  //   절이 한 벌씩 늘어난다(실측으로 확인한 함정이다).
+  // ★ 꼬리는 전체에서 사장님 글자만큼 떼어 낸 것이다. 코드가 채운 마침표·판형 절이 꼬리
+  //   쪽에 보이는 것이 맞다 — 그것도 코드가 붙이는 것이다.
+  //   `startsWith` 는 lib/cuts.js 의 불변이고 테스트가 못 박는다(tests/prompt-override).
+  const saved = typeof cut.image_prompt === "string" ? cut.image_prompt.trim() : "";
+  // 덮어쓰기를 지운 컷의 본문 — "원래대로"가 텍스트칸에 되돌려 놓는 값이다.
+  const generated = promptBodyOf("image", { ...cut, image_prompt: "" }, project);
+  const [prompt, setPrompt] = useState(saved || generated);
+  // ⚠️ 레퍼런스 사진 문구는 화면에서 만들 수 없다 — 그 판정(lib/cast.js)이 `fs` 를 끈다.
+  //    그래서 꼬리에 그 절이 빠질 수 있고, 아래 안내에 그렇게 적는다(없는 것처럼 보이면
+  //    사장님이 "레퍼런스가 안 나간다"고 읽는다).
+  const full = buildImagePrompt(cut, project, []);
+  const fixedTail = full.startsWith(saved || generated)
+    ? full.slice((saved || generated).length)
+    : full.slice(promptBodyOf("image", cut, project).length);
   const isPhoto = cut.source === "photo";
   const busyCut = !stalled && cut.state === "generating";
   const atLimit = cut.regen_count >= MAX_REGEN_PER_CUT;
@@ -470,6 +517,53 @@ function PreviewPane({ cut, url, photoName, aspect, stalled, onRegen }) {
               ? `더는 다시 만들 수 없어요 (${MAX_REGEN_PER_CUT}/${MAX_REGEN_PER_CUT})`
               : `다시 만듦 ${cut.regen_count}/${MAX_REGEN_PER_CUT}`}
           </span>
+
+          {/* 접어 둔다 — 주경로는 위 "고치고 싶은 점" 칸이다. 이 자리는 직접 지시를 쓰는
+              사장님을 위한 곁길이라, 펼치지 않으면 기본 흐름이 그대로다. */}
+          <details className="prompt-edit">
+            <summary>이 그림에 실제로 보내는 지시 보기</summary>
+            {/* 고치는 것은 **본문**이다. 판형·글자 금지·레퍼런스 결속은 코드가 언제나 뒤에
+                붙인다 — 무엇을 쓰든 지워지지 않는다. */}
+            <textarea
+              className="ref mono"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+            />
+            {/* 글자 수만 보여 준다. 상한 숫자는 화면에 안 적는다 — 값이 두 벌이면 갈린다
+                (상한은 원장이 자르는 자리 하나이고, 넘으면 서버 문구가 위에 뜬다). */}
+            <span className="regen-note mono">{prompt.length}자</span>
+            <p className="preview-note">
+              영어로 쓰면 더 잘 알아들어요. 아래 문장은 저희가 항상 뒤에 붙여요 — 고칠 수 없어요.
+            </p>
+            <p className="preview-note mono">{fixedTail}</p>
+            <p className="preview-note">
+              레퍼런스 사진을 쓰는 컷에는 그 사진에 대한 지시도 함께 붙어요.
+            </p>
+            {/* 고쳐도 지금 그림은 그대로다 — 반영하려면 다시 만들어야 하고 그때 값이 든다. */}
+            <p className="preview-note warn">
+              고쳐서 저장해도 지금 그림은 그대로예요 — 반영하려면 [그냥 다시]로 다시 만들어야
+              하고, 그때 값이 들어요 (유료 · {regenLabel})
+            </p>
+            <div className="preview-actions">
+              <button
+                className="mini"
+                disabled={busyCut || prompt.trim() === saved}
+                onClick={() => onSavePrompt(cut.idx, prompt.trim())}
+              >
+                저장
+              </button>
+              {/* ★ 빈 값을 보내는 것이 "원래대로"의 구현이다 — 서버가 필드를 지운다.
+                  텍스트칸도 코드가 만든 본문으로 되돌려 놓는다(저장 뒤 다시 그려지지만,
+                  이 컴포넌트는 컷이 안 바뀌면 다시 마운트되지 않는다). */}
+              <button
+                className="mini"
+                disabled={busyCut || !saved}
+                onClick={() => { setPrompt(generated); onSavePrompt(cut.idx, ""); }}
+              >
+                원래대로
+              </button>
+            </div>
+          </details>
         </div>
       )}
     </aside>

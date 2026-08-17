@@ -2,7 +2,9 @@
 // 본문/꼬리로 가르는 리팩터는 조용히 실패한다 — 문구가 한 글자 달라져도 테스트는 초록인데
 // 앞으로 만들 그림이 달라진다. 그래서 기대값을 **손으로 적어** 못 박는다.
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { buildClipPrompt, buildImagePrompt } from "../lib/cuts.js";
+import { buildClipPrompt, buildImagePrompt, promptBodyOf } from "../lib/cuts.js";
+// 상한 숫자를 이 파일에 적지 않는다 — 원장이 자르는 자리 하나에서 온다(Ruling 11).
+import { LEDGER_PROMPT_MAX } from "../lib/costs.js";
 import { imageContextKey, clipKey, isImageStale, isClipStale } from "../lib/steps.js";
 import { normalizePromptNote, PROMPT_NOTE_MAX, STYLE_NOTE_MAX } from "../lib/styles.js";
 import { memoryStore, resetMemoryStore } from "../lib/store/memory.js";
@@ -897,5 +899,136 @@ describe("PATCH /api/projects/[id] — 컷별 프롬프트 덮어쓰기", () => 
     await patchCut({ idx: 0, image_prompt: "a red shoe" });
     const row = await memoryStore.selectProject(P, A);
     expect(row.doc.script.text).toBe("첫 문장. 둘째 문장.");
+  });
+});
+
+// ── 본문 판정 한 자리 (promptBodyOf) ──────────────────────────────────────
+//
+// 화면이 텍스트칸에 앉힐 씨앗을 얻는 유일한 길이다. 조립 함수
+// (imagePromptBody·imagePromptTail·clipPromptBody)는 계속 감춘 채 **판정만** 열었다 —
+// promptOverride 와 같은 성질이다(조립은 비공개, 판정은 공유).
+//
+// ★ 여기서 재는 불변 하나: **전체 프롬프트는 언제나 본문으로 시작한다.**
+//   이것이 있어야 화면이 `full.slice(body.length)` 로 꼬리를 떼어 "이 뒤는 코드가 붙여요"로
+//   보여 줄 수 있다. 깨지면 화면이 꼬리를 잘못 잘라 사장님이 보는 것과 나가는 것이 갈린다.
+describe("promptBodyOf — 본문 판정 한 자리", () => {
+  const speaks = { settings: { i2v_model: "seedance-2.0", aspect_ratio: "9:16" } };
+  // 영상 세 갈래 — 무음 / 내레이션 / 화면 안 대사. 갈래마다 이어 붙이는 문자열이 따로라
+  // 한 갈래만 재면 나머지에서 불변이 조용히 깨진다.
+  const silentCut = { idx: 0, motion: "slow push-in", silent: true };
+  const narratedCut = { idx: 0, motion: "slow push-in", sentence: "핑계 대지 마세요", narration: true };
+  const narratedProject = { ...speaks, scenario: { narrator_voice: "calm low male voice" }, cuts: [narratedCut] };
+  const spokenCut = { idx: 0, motion: "slow push-in", sentence: "핑계 대지 마세요" };
+  const spokenProject = {
+    ...speaks,
+    cast: [{ who: "코치", look: "wiry coach in a grey tracksuit", voice: "gravelly veteran voice", cuts: [0] }],
+    cuts: [spokenCut],
+  };
+
+  it("덮어쓰기가 없으면 코드가 만든 본문을 낸다 — 그 본문이 프롬프트의 앞머리다", () => {
+    const body = promptBodyOf("image", cut, project);
+    expect(body).toBe("High-quality photographic still for a short-form video, vertical 9:16 composition. Scene: close-up of the shoe on wet asphalt. The video's subject is: black high-top basketball shoe. Keep this exact product/subject consistent in every scene. Its appearance, identical in every scene: black upper with red sole.");
+  });
+
+  it("덮어쓰기가 있으면 그 값이 본문이다 — 판형은 코드가 다시 붙인다", () => {
+    const over = { ...cut, image_prompt: "a red shoe in the rain" };
+    expect(promptBodyOf("image", over, project))
+      .toBe("a red shoe in the rain. vertical 9:16 composition.");
+  });
+
+  it("영상 본문은 움직임과 속도뿐이다 — 대사·목소리는 꼬리다", () => {
+    expect(promptBodyOf("clip", { idx: 0, motion: "slow push-in", speed: "fast" }, speaks))
+      .toBe("slow push-in. fast, explosive motion.");
+    expect(promptBodyOf("clip", { ...spokenCut, clip_prompt: "the shoe explodes" }, spokenProject))
+      .toBe("the shoe explodes.");
+  });
+
+  it("★ 이미지 프롬프트는 언제나 본문으로 시작한다 — 덮어쓰기 유무 모두", () => {
+    for (const c of [cut, { ...cut, image_prompt: "a red shoe in the rain" }, { ...cut, image_prompt: "끝에 부호 없음" }]) {
+      const body = promptBodyOf("image", c, project);
+      for (const refs of [[], [{ kind: "person", who: "barista" }, { kind: "thing" }]]) {
+        expect(buildImagePrompt(c, project, refs).startsWith(body), `본문으로 시작하지 않는다: ${body}`).toBe(true);
+      }
+    }
+  });
+
+  it("★ 영상 프롬프트도 세 갈래 전부에서 본문으로 시작한다", () => {
+    const cases = [
+      [silentCut, { ...speaks }],
+      [narratedCut, narratedProject],
+      [spokenCut, spokenProject],
+    ];
+    for (const [c, p] of cases) {
+      for (const over of [null, "the shoe explodes in slow motion", "부호 없이 끝나는 덮어쓰기"]) {
+        const cc = over ? { ...c, clip_prompt: over } : c;
+        const body = promptBodyOf("clip", cc, p);
+        expect(buildClipPrompt(cc, p).startsWith(body), `본문으로 시작하지 않는다: ${body}`).toBe(true);
+      }
+    }
+  });
+
+  // ★ 화면이 텍스트칸에 앉히는 것은 **사장님이 저장한 날 글자**다(정규화 전). 화면이 꼬리를
+  //   그 길이로 떼어 내므로, 날 글자도 프롬프트의 앞머리여야 한다 — 아니면 화면이 꼬리를
+  //   한 글자 어긋나게 잘라 보여 준다. 여기서 재지 않으면 그 어긋남이 조용히 산다.
+  it("★ 사장님이 저장한 날 글자도 프롬프트의 앞머리다 — 부호를 코드가 채워도", () => {
+    const raw = "  끝에 부호 없는 덮어쓰기  ";
+    const img = { ...cut, image_prompt: raw };
+    expect(buildImagePrompt(img, project, []).startsWith(raw.trim())).toBe(true);
+    const clip = { idx: 0, motion: "slow push-in", clip_prompt: raw };
+    expect(buildClipPrompt(clip, speaks).startsWith(raw.trim())).toBe(true);
+  });
+
+  it("모르는 갈래는 던진다 — 조용히 이미지 본문을 내면 영상에 판형이 실린다", () => {
+    expect(() => promptBodyOf("audio", cut, project)).toThrow();
+  });
+});
+
+// ── 길이 상한 (Ruling 11) ────────────────────────────────────────────────
+//
+// ★ 상한은 **원장이 프롬프트를 자르는 자리**(LEDGER_PROMPT_MAX)다. 그 위로 쓰면 원장에
+//   안 남아 "무엇을 보냈는가"를 확인할 채널이 막힌다. 숫자를 여기 손으로 적지 않는다 —
+//   두 벌이면 값이 갈리는 날 이 테스트가 거짓 초록이 된다.
+describe("PATCH — 컷별 덮어쓰기 길이 상한", () => {
+  beforeEach(async () => {
+    resetMemoryStore();
+    await memoryStore.insertProject(
+      {
+        id: P, created_ts: 1, status: "draft", settings: { target_seconds: 15 },
+        cuts: [{ idx: 0, sentence: "첫 문장.", shows: "a shoe on wet asphalt" }],
+      },
+      A
+    );
+  });
+
+  for (const key of ["image_prompt", "clip_prompt"]) {
+    it(`${key} 상한까지는 담긴다`, async () => {
+      const at = "a".repeat(LEDGER_PROMPT_MAX);
+      expect((await patchCut({ idx: 0, [key]: at })).status).toBe(200);
+      expect((await savedCuts())[0][key]).toBe(at);
+    });
+
+    it(`★ ${key} 상한을 넘으면 400 — 값이 저장되지 않는다`, async () => {
+      const over = "a".repeat(LEDGER_PROMPT_MAX + 1);
+      const res = await patchCut({ idx: 0, [key]: over });
+      expect(res.status).toBe(400);
+      const { error } = await res.json();
+      // 문구는 normalizePromptNote 의 어조다 — 상한과 지금 글자 수를 함께 말한다.
+      expect(error).toContain(String(LEDGER_PROMPT_MAX));
+      expect(error).toContain(String(over.length));
+      expect((await savedCuts())[0][key]).toBeUndefined();
+    });
+
+    it(`${key} 상한은 공백을 걷은 뒤로 잰다 — 앞뒤 공백 때문에 거절당하지 않는다`, async () => {
+      const at = `  ${"a".repeat(LEDGER_PROMPT_MAX)}  `;
+      expect((await patchCut({ idx: 0, [key]: at })).status).toBe(200);
+    });
+  }
+
+  // 넘는 값이 하나라도 있으면 **아무것도 저장하지 않는다** — 절반만 저장되면 사장님은
+  // 거절 문구를 보면서 다른 칸이 바뀐 것을 모른다.
+  it("★ 한 칸이 넘으면 같은 요청의 다른 값도 저장되지 않는다", async () => {
+    const res = await patchCut({ idx: 0, image_prompt: "a".repeat(LEDGER_PROMPT_MAX + 1), shows: "새 화면" });
+    expect(res.status).toBe(400);
+    expect((await savedCuts())[0].shows).toBe("a shoe on wet asphalt");
   });
 });
