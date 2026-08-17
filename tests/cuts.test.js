@@ -3,6 +3,8 @@ import { splitSentences, splitUnits, explodeLongRanges, buildSplitMessages, buil
 import { clipProfileForProject, minSecondsFor, maxSecondsFor } from "../lib/clip-limits.js";
 import { STYLE_PRESETS } from "../lib/styles.js";
 import { MOTION_AXES } from "../lib/motion.js";
+// 언어 테스트가 "한국어 섬"(샷 크기 낱말)을 손으로 적지 않고 목록에서 끌어온다
+import { SHOT_SIZES } from "../lib/shots.js";
 import { motionFields, motionRules, speedRule } from "../lib/cuts.js";
 import { SPEEDS } from "../lib/speeds.js";
 // 관통 테스트라 파일 경계를 넘는다 — 화면 설계(validate) → 그림 프롬프트(cuts) → 각인(steps).
@@ -180,7 +182,9 @@ describe("buildShowsMessages", () => {
 
   it("shows 작법을 지시한다 — 샷 크기·앵글·조명, 부정형 금지, 삽화 금지", () => {
     const { system } = buildShowsMessages(project, cuts);
-    for (const term of ["극단적 클로즈업", "미디엄 샷", "광각", "로우 앵글", "골든아워"]) {
+    // 샷 크기는 한국어 낱말로 남는다 — lib/shots.js 의 shotSizeOf 가 그 낱말을 읽는다.
+    // 앵글·시간대는 코드가 읽지 않아 영어로 옮겼다(2026-08-17 언어 정책).
+    for (const term of ["극단적 클로즈업", "미디엄 샷", "광각", "low angle", "golden hour"]) {
       expect(system).toContain(term);
     }
     expect(system).toContain("없는 것으로 쓰지 않는다");
@@ -1419,28 +1423,39 @@ describe("SHOWS_SYSTEM — 톤·전환 규칙", () => {
 
   // 지문이 가르치는 ✓ 예시가 코드 문지기에 걸리면 지문이 스스로를 무효로 만든다.
   it("지문의 ✓ 예시가 코드 문지기를 통과한다", () => {
-    const tone = "어두운 배경에 제품 색만 채도를 올린 시네마틱 광고 필름 질감";
-    const transition = "발 클로즈업, 아스팔트 위, 같은 눈높이";
+    const tone = "dark background with only the product color saturated, cinematic ad film grain";
+    const transition = "클로즈업 of the feet on asphalt, at the same eye level";
     expect(system()).toContain(tone);
     expect(system()).toContain(transition);
     expect(usableTone(tone)).toBe(tone);
     expect(usableTransition(transition)).toBe(transition);
   });
 
-  // 지문이 가르치는 ✗ 예시가 문지기에 안 걸리면, 지문은 "안 된다"고 하면서 실제로는
-  // 살아남는 값을 가르치는 셈이 된다 — 거짓을 가르치는 예시다.
-  it("지문의 ✗ 예시는 코드 문지기가 버린다", () => {
-    const badTones = ["체육관, 스포트라이트", "카메라가 다가가며 차가워지는 색"];
-    const badTransitions = [
-      "앞 컷에서 이어진다",
-      "직전 컷과 같은 각도",
-      "이어받아 카메라가 다가간 상태로 시작",
+  // 지문이 가르치는 ✗ 예시는 지문에 실제로 들어 있어야 한다 — 빠지면 아무것도 안 가르친다.
+  it("지문의 ✗ 예시가 지문에 들어 있다", () => {
+    const bad = [
+      "gym, hard spotlights",
+      "the color cools as the camera moves closer",
+      "continues from the previous cut",
+      "same angle as the cut just before",
+      "picks up with the camera already moved in",
     ];
-    for (const t of badTones) expect(system(), t).toContain(t);
-    for (const t of badTransitions) expect(system(), t).toContain(t);
-    // tone 의 ✗ 하나는 environment 침범이라 문지기가 못 잡는다 — 그것은 말로만 막는다
+    for (const t of bad) expect(system(), t).toContain(t);
+  });
+
+  // 문지기 계약은 따로 잰다 — 저장된 옛 한국어 값은 여전히 이 판정을 받는다.
+  //
+  // ⚠️ CAMERA_MOTION·CUT_REFERENCE 가 **한국어 전용 정규식**이라, 영어로 바뀐 새 값은 이
+  //    그물에 안 걸린다(실측: usableTone("the camera pushes in as the color cools") 가 값을
+  //    그대로 돌려준다). 그래서 위 ✗ 예시와 이 단언을 갈라 두었다 — 하나로 묶으면 영어
+  //    예시를 문지기가 버린다는 **거짓**을 못 박게 된다.
+  //    문지기를 영어까지 넓히는 일은 별개 태스크다(각인에 닿는 자리라 함께 손대면 굳은
+  //    그림이 낡아 유료 재구매가 열린다).
+  it("문지기는 한국어 카메라 움직임·앞 컷 참조를 통째로 버린다", () => {
     expect(usableTone("카메라가 다가가며 차가워지는 색")).toBe("");
-    for (const t of badTransitions) expect(usableTransition(t), t).toBe("");
+    for (const t of ["앞 컷에서 이어진다", "직전 컷과 같은 각도", "이어받아 카메라가 다가간 상태로 시작"]) {
+      expect(usableTransition(t), t).toBe("");
+    }
   });
 
   // 카메라 어휘가 든 톤·전환은 usableTone/usableTransition 이 통째로 버린다 —
@@ -1837,6 +1852,83 @@ describe("절의 재료를 고르는 함수", () => {
     expect(orientOf({ settings: { aspect_ratio: "1:1" } })).toBe("square 1:1");
     expect(orientOf({ settings: { aspect_ratio: "16:9" } })).toBe("horizontal 16:9");
     expect(orientOf({ settings: {} })).toBe("horizontal 16:9"); // 지금 동작 그대로
+  });
+});
+
+// ★ 예시가 출력 언어를 정한다. 지시문에 "영어로 써라"라고만 적고 한국어 예시를 두면 둘이
+//   싸우고 모델은 예시를 따른다 — 그래서 재는 것은 지시문이 아니라 **예시 값**이다.
+//
+// 값을 **따옴표 안에서만** 본다. 예시 옆의 괄호 설명("(그건 environment 다)")은 우리가
+// 유지보수하는 한국어 글이고 모델이 베낄 값이 아니다.
+//
+// ⚠️ 예외가 하나뿐이고, 손으로 적지 않는다 — 샷 크기 낱말은 lib/shots.js 의 SHOT_SIZES 에서
+//    끌어온다. shotSizeOf 가 shows 에서 그 낱말을 한국어로 찾아 클로즈업 쏠림을 판정하므로
+//    (shotBalance), 예시까지 영어로 바꾸면 그 판정이 조용히 죽는다. 목록에서 끌어오면
+//    목록이 영어로 옮겨지는 날 이 예외도 저절로 사라진다.
+describe("SHOWS_SYSTEM — 언어", () => {
+  const cuts = [{ idx: 0, sentence: "가." }, { idx: 1, sentence: "나." }];
+  const system = () => buildShowsMessages({ material: {}, briefing: {}, settings: {} }, cuts).system;
+
+  const ISLANDS = SHOT_SIZES.flatMap((s) => s.words);
+  const stripIslands = (v) => ISLANDS.reduce((acc, w) => acc.split(w).join(" "), v);
+  // ✓/✗ 로 시작하는 줄에서 따옴표로 묶인 값만 뽑는다
+  const examples = (mark) => {
+    const out = [];
+    for (const line of system().split("\n")) {
+      if (!new RegExp(`^\\s*${mark}`).test(line)) continue;
+      for (const m of line.matchAll(/"([^"]*)"/g)) out.push({ line: line.trim(), value: m[1] });
+    }
+    return out;
+  };
+
+  it("★ ✓ 예시 값이 영어다 — 예시가 출력 언어를 정한다", () => {
+    const good = examples("✓");
+    expect(good.length, "✓ 예시를 못 찾겠다").toBeGreaterThan(3);
+    const korean = good.filter((e) => /[가-힣]/.test(stripIslands(e.value)));
+    expect(korean.map((e) => e.value), `아직 한국어 ✓ 예시가 ${korean.length}개다`).toEqual([]);
+  });
+
+  it("★ ✗ 예시 값도 영어다 — 못 쓸 형태도 그 언어로 보여야 한다", () => {
+    const bad = examples("✗");
+    expect(bad.length, "✗ 예시를 못 찾겠다").toBeGreaterThan(3);
+    const korean = bad.filter((e) => /[가-힣]/.test(stripIslands(e.value)));
+    expect(korean.map((e) => e.value), `아직 한국어 ✗ 예시가 ${korean.length}개다`).toEqual([]);
+  });
+
+  it("어느 칸을 영어로 쓸지 이름으로 부른다", () => {
+    const s = system();
+    expect(s).toMatch(/shows[^\n]*tone[^\n]*environment[^\n]*transition[^\n]*움직임 축[^\n]*영어/);
+  });
+
+  it("움직임 축 예시도 영어다 — 여기가 한국어면 축만 한국어로 나온다", () => {
+    for (const a of MOTION_AXES) {
+      expect(/[가-힣]/.test(a.example), `${a.id}.example 이 한국어다`).toBe(false);
+      if (a.bad) expect(/[가-힣]/.test(a.bad), `${a.id}.bad 가 한국어다`).toBe(false);
+    }
+  });
+
+  // label·hint 는 반대로 한국어여야 한다 — label 은 사장님이 화면에서 읽는 이름이고
+  // hint 는 우리가 유지보수하는 지시문이다. 셋을 한 언어로 맞추면 하나가 제 몫을 잃는다.
+  it("축의 label·hint 는 한국어로 남는다", () => {
+    for (const a of MOTION_AXES) {
+      expect(/[가-힣]/.test(a.label), `${a.id}.label`).toBe(true);
+      expect(/[가-힣]/.test(a.hint), `${a.id}.hint`).toBe(true);
+    }
+  });
+
+  // 샷 크기만 한국어 섬으로 남는다 — 그 낱말이 지문에서 사라지면 shotBalance 가 조용히 죽는다.
+  it("샷 크기 낱말은 한국어로 남아 있다 — shotSizeOf 가 그것을 읽는다", () => {
+    for (const s of SHOT_SIZES) {
+      expect(system(), `${s.label} 가 지문에 없다`).toContain(s.words[0]);
+    }
+  });
+
+  // gpt-4o 를 밀어붙이려 넣은 강조다. 지금 모델은 지시를 문자 그대로 따라 과하게 작동한다.
+  // 걷은 것은 표시뿐이라 규칙 문장은 위 다른 테스트들이 계속 못 박고 있다.
+  it("★ gpt-4o 시절의 과한 강조를 걷었다", () => {
+    const s = system();
+    expect((s.match(/★/g) || []).length, "★ 가 아직 남았다").toBe(0);
+    expect((s.match(/\*\*반드시|절대/g) || []).length, "강조가 아직 남았다").toBe(0);
   });
 });
 
