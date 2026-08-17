@@ -1,9 +1,26 @@
+import { runInBackground } from "../../../../../lib/background.js";
 import { getProject, updateProject } from "../../../../../lib/projects";
 import { runImagesPipeline, withProgress } from "../../../../../lib/pipeline";
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { requireVideoCharge, NoCredits } from "../../../../../lib/charges.js";
 import { fakeFal } from "../../../../../lib/fake";
 import { modelIdForProject, projectSpeaks, resolutionForProject } from "../../../../../lib/clip-limits.js";
+
+// ★★ 응답을 보낸 뒤에도 이 일이 계속 돌아야 한다 — 그것을 **플랫폼에 말해 줘야 한다**
+//    (2026-08-18 프로덕션 실측). Vercel 에서 응답 후의 작업은 보장되지 않는다: `after()` 로
+//    함수 수명을 그 약속까지 늘리고(lib/background.js 한 자리), `maxDuration` 으로 상한을 명시해야 한다. 둘 다 없어서
+//    **클립 3개를 결제하고 2개만 저장됐고**(오류 기록조차 없다), 합성은 두 번 다 조용히 죽었다.
+//    폴링이 우연히 그 인스턴스를 깨우면 진행되고 아니면 멈췄다 — 부분 성공과 전면 실패를 가른
+//    것이 **운**이었다.
+//
+// ★ **약속(promise) 을 넘긴다 — 콜백이 아니다.** 콜백으로 넘기면 파이프라인이 요청 범위 밖에서
+//   시작하고, 비용 주체는 AsyncLocalStorage 에서 읽으므로(lib/actor.js) 컨텍스트가 없으면
+//   `costActor()` 가 **던진다**. 이 형태는 호출이 요청 안에서 일어나 컨텍스트가 따라간다.
+// ★ 심장박동(startHeartbeat)은 이것을 막지 못한다 — 죽음을 보이게 하는 장치일 뿐이다.
+//   근본 해결은 작업 큐·워커이고 별개 프로젝트다(CLAUDE.md).
+//
+// 컷마다 그림 한 장 + VLM 검수. 실측 3컷 ~13초.
+export const maxDuration = 300;
 
 export const POST = withUser(async (req, { params }, user) => {
   const { id } = await params;
@@ -71,11 +88,13 @@ export const POST = withUser(async (req, { params }, user) => {
   );
 
   // 비동기 시작 — 완료를 기다리지 않고 폴링으로 확인 (컷 파이프라인과 같은 방식)
-  runImagesPipeline(id, user.id).catch(async (e) => {
-    console.error("images pipeline error:", e);
-    await updateProject(id, user.id, (proj) => ({
-      ...proj, images_error: e?.message || "이미지를 만들지 못했어요",
-    })).catch(() => {});
-  });
+  runInBackground(
+    runImagesPipeline(id, user.id).catch(async (e) => {
+      console.error("images pipeline error:", e);
+      await updateProject(id, user.id, (proj) => ({
+        ...proj, images_error: e?.message || "이미지를 만들지 못했어요",
+      })).catch(() => {});
+    })
+  );
   return Response.json({ started: true });
 });
