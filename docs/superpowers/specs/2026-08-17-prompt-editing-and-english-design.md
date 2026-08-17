@@ -81,13 +81,25 @@ POST https://fal.run/fal-ai/nano-banana-2
 
 ### B. ①자료의 프로젝트 공통 지시 — 상자 둘
 
-**이미지 쪽은 이미 있다.** `settings.style.note` 가 `Style note: …` 로 실리고,
-각인(`lib/styles.js` 의 `styleKey`)에도 이미 들어가 있다. **새 필드를 만들지 않는다** —
-①자료에 그 입력을 노출하고 안내 문구만 "밖에서 쓴 프롬프트를 그대로 넣어도 됩니다"로
-넓힌다. (규율: *같은 값을 두 군데 두지 않는다*.)
+**비슷한 것이 이미 있다 — 하지만 그것이 아니다.** `settings.style.note` 가
+`Style note: …` 로 실리고 각인(`styleKey`)에도 들어가 있으며, ①자료에 입력칸까지 있다
+(`StylePicker`). 처음에는 그것을 재사용하려 했는데, **상한이 120자다**
+(`STYLE_NOTE_MAX`). 근거가 코드에 적혀 있다 — *"보정 한 줄의 상한. 프롬프트는 한 문장
+열거라, 여기가 길어지면 우리 지시를 밀어낸다."*
 
-**영상 쪽은 대응물이 없다.** 새로 만든다: `settings.clip_note` → `buildClipPrompt` 의
-맥락 절과 꼬리 **사이**에 싣는다.
+밖에서 써 온 프롬프트는 보통 300~800자다. 재사용하면 **사장님이 붙여넣기부터 거절당한다.**
+
+> **판단(Ruling)** — `style.note` 는 **그대로 둔다**(화풍 보정 한 줄, 120자). 프로젝트 공통
+> 지시는 **새 필드 둘**로 만든다: `settings.image_note` · `settings.clip_note`, 상한
+> `PROMPT_NOTE_MAX = 600`.
+>
+> *같은 값을 두 군데 두지 않는다* 를 어기는 것이 아니다 — **다른 값**이다. 하나는 화풍에
+> 딸린 보정 한 줄이고, 하나는 밖에서 써 온 프롬프트 통짜다. 상한도 자리도 성격도 다르다.
+> 120자 상한을 올려서 재사용하는 쪽은 택하지 않는다: 그 숫자에는 근거가 적혀 있고,
+> 화풍 보정을 800자로 열어 주는 것은 이 작업이 요청받은 일이 아니다.
+
+싣는 자리: `image_note` 는 `Style note` 절 옆(이미지 본문 끝), `clip_note` 는
+`buildClipPrompt` 의 맥락 절과 꼬리 **사이**. 둘 다 꼬리보다 앞이다.
 
 > **판단(Ruling)** — 상자를 **둘로** 나눈다. 하나로 합치면 영상 지시(움직임·립싱크·시간)가
 > 이미지 프롬프트에 붙는다. 그것이 해로운 것은 추측이 아니라 이 저장소가 이미 코드로
@@ -101,9 +113,10 @@ POST https://fal.run/fal-ai/nano-banana-2
 | 각인 | 더할 것 | 조건 |
 |---|---|---|
 | `imageContextKey` | `\|prompt:<cut.image_prompt>` | 있을 때만 |
+| `imageContextKey` | `\|imgnote:<settings.image_note>` | 있을 때만 |
 | `clipKey` | `\|prompt:<cut.clip_prompt>` | 있을 때만 |
 | `clipKey` | `\|clipnote:<settings.clip_note>` | 있을 때만 |
-| `styleKey` | (손대지 않는다 — `note` 가 이미 들어 있다) | — |
+| `styleKey` | (손대지 않는다 — `style.note` 가 이미 들어 있다) | — |
 
 "있을 때만"이 아니면 **지금 저장된 모든 산출물의 각인이 불일치가 되어 통째로 재구매가
 제시된다.** 이 저장소는 같은 함정을 `style_of`·해상도·`tone_of`·자막 위치에서 네 번
