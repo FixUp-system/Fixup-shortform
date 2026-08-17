@@ -245,7 +245,7 @@ describe("컷별 프롬프트 덮어쓰기", () => {
   it("★ 이미지 덮어쓰기 전문 — 본문만 갈리고 꼬리는 그대로다", () => {
     const c = { ...cut, image_prompt: "A cat" };
     expect(buildImagePrompt(c, project, [])).toBe(
-      "A cat vertical 9:16 composition. " +
+      "A cat. vertical 9:16 composition. " +
       "Cinematic lighting, realistic, no text or letters in the image. " +
       "Overall look and color treatment, keep identical across all cuts: high-contrast night film grain."
     );
@@ -270,9 +270,42 @@ describe("컷별 프롬프트 덮어쓰기", () => {
   it("★ 영상 덮어쓰기 전문 — 판형이 붙지 않고 꼬리만 남는다", () => {
     const c = { idx: 0, motion: "slow push-in", clip_prompt: "the shoe explodes" };
     expect(buildClipPrompt(c, { settings: { aspect_ratio: "9:16" } })).toBe(
-      "the shoe explodes The attached image is the first frame — continue naturally from it. " +
+      "the shoe explodes. The attached image is the first frame — continue naturally from it. " +
       "Keep the subject and style unchanged. No text or letters. No talking faces or lip sync."
     );
+  });
+
+  // ★ 이음매 마침표 — 축 이음매(clipPromptBody)와 같은 문제다. 없으면 두 지시가 한 문장으로
+  //   붙어 읽힌다("the shoe explodes The attached image is the first frame …").
+  //   정규화는 promptOverride 한 자리라 이미지·영상이 함께 고쳐진다 — **둘 다** 잰다.
+  it("★ 마침표 없는 덮어쓰기에는 마침표가 붙는다 — 두 지시가 한 문장으로 붙으면 안 된다", () => {
+    expect(buildImagePrompt({ ...cut, image_prompt: "a cat on a red sofa" }, project, []))
+      .toContain("a cat on a red sofa. vertical 9:16 composition.");
+    expect(buildClipPrompt({ idx: 0, clip_prompt: "the shoe explodes" }, { settings: {} }))
+      .toContain("the shoe explodes. The attached image");
+  });
+
+  it("★ 이미 마침표로 끝나면 그대로 둔다 — '..' 가 되면 안 된다", () => {
+    const img = buildImagePrompt({ ...cut, image_prompt: "a cat on a red sofa." }, project, []);
+    expect(img).toContain("a cat on a red sofa. vertical 9:16 composition.");
+    expect(img).not.toContain("..");
+    const clip = buildClipPrompt({ idx: 0, clip_prompt: "the shoe explodes." }, { settings: {} });
+    expect(clip).toContain("the shoe explodes. The attached image");
+    expect(clip).not.toContain("..");
+  });
+
+  it("★ 물음표·느낌표로 끝나도 붙이지 않는다 — 문장은 이미 닫혀 있다", () => {
+    expect(buildImagePrompt({ ...cut, image_prompt: "why not a cat?" }, project, []))
+      .toContain("why not a cat? vertical 9:16 composition.");
+    expect(buildClipPrompt({ idx: 0, clip_prompt: "it explodes!" }, { settings: {} }))
+      .toContain("it explodes! The attached image");
+    // 전각 부호 — 사장님은 한국어로 쓴다. 한글 입력에서 이 부호들이 섞여 나온다.
+    expect(buildClipPrompt({ idx: 0, clip_prompt: "신발이 터진다。" }, { settings: {} }))
+      .toContain("신발이 터진다。 The attached image");
+    expect(buildClipPrompt({ idx: 0, clip_prompt: "신발이 터진다！" }, { settings: {} }))
+      .toContain("신발이 터진다！ The attached image");
+    expect(buildClipPrompt({ idx: 0, clip_prompt: "신발이 터질까？" }, { settings: {} }))
+      .toContain("신발이 터질까？ The attached image");
   });
 
   // ★ 이것이 "원래대로" 버튼의 구현이다 — 별도 필드를 두지 않는다. 사장님이 칸을 비우면
