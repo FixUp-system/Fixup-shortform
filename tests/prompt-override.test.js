@@ -164,4 +164,62 @@ describe("영상 프롬프트 — 본문과 꼬리", () => {
     };
     expect(buildClipPrompt(c, p)).toContain('Says exactly, in Korean: "핑계 대지 마세요"');
   });
+
+  // 절이 전부 찬 컷을 **내레이션 갈래에도** 따로 둔다. 위의 것은 화면 안 대사 갈래라,
+  // 내레이션 return 의 절 순서는 아무도 재지 않았다 — 리뷰 실측: `${context}` 를 문장
+  // 맨 끝으로 옮겨도 전체가 초록이었다. 갈래마다 이어 붙이는 문자열이 따로 있으므로
+  // 그물도 갈래마다 있어야 한다.
+  it("★ 절이 전부 있는 내레이션 컷도 지금과 글자 그대로 같다", () => {
+    const c = {
+      idx: 1,
+      camera: "천천히 뒤로 물러난다",
+      subject: "컵을 들어 입으로 가져간다",
+      ambient: "김이 천천히 피어오른다",
+      speed: "fast",
+      environment: "a narrow morning cafe counter",
+      tone: "soft daylight pastel",
+      sentence: "한 모금이면 충분해요",
+      narration: true,
+    };
+    const p = {
+      settings: { i2v_model: "seedance-2.0" },
+      scenario: {
+        narrator_voice: "calm low male voice",
+        focus: { mode: "물건", subject: "walnut espresso tamper", look: "walnut handle with steel base" },
+      },
+      // 화면 밖 목소리라도 화면에는 사람이 있을 수 있다 — 인물 절이 비지 않게 캐스팅을 둔다.
+      cast: [{ who: "barista", look: "short-haired barista in a linen apron", voice: "warm alto voice", cuts: [1] }],
+      cuts: [c],
+    };
+    expect(buildClipPrompt(c, p)).toBe(
+      "천천히 뒤로 물러난다. 컵을 들어 입으로 가져간다. 김이 천천히 피어오른다. " +
+      "fast, explosive motion. A narrator speaks in voiceover, off-screen — no one in frame speaks or moves their lips. " +
+      "Voice: calm low male voice. Says exactly, in Korean: \"한 모금이면 충분해요\". " +
+      "Setting: a narrow morning cafe counter. " +
+      "Characters in this frame: barista: short-haired barista in a linen apron. " +
+      "The subject is: walnut espresso tamper. Its appearance: walnut handle with steel base. " +
+      "Color treatment, keep identical across all cuts: soft daylight pastel. " +
+      "The attached image is the first frame — continue naturally from it. " +
+      "Keep the subject and style unchanged. No text or letters."
+    );
+  });
+
+  // ★ 본문의 폴백 문구 — 움직임 축 셋과 옛 `motion` 이 **전부 빈** 컷이 타는 자리다
+  //   (옛 프로젝트, 또는 화면 설계가 통째로 실패한 경우).
+  //
+  // ⚠️ 이 문자열은 각인(lib/steps.js 의 clipKey)에 그대로 들어간다. 바뀌면 그런 컷들의
+  //    **살아 있는 클립이 통째로 낡아 유료 재구매가 열린다**(Seedance 30초 한 편 ~$9).
+  //    문구를 고칠 이유는 앞으로 생긴다 — 움직임 축을 영어로 옮기는 작업이 이 한국어
+  //    폴백까지 함께 "영문화"할 자리다. 그때 이 테스트가 빨개져야 값을 치르는 결정임이
+  //    보인다.
+  //
+  // 기대값을 lib/cuts.js 에서 import 하지 않고 **손으로 적는** 이유: 상수를 끌어오면
+  // 동어반복이라 문구가 바뀌어도 늘 초록이다.
+  it("★ 축도 motion 도 없는 컷의 폴백 문구는 각인에 들어간다 — 바뀌면 클립을 다시 산다", () => {
+    expect(buildClipPrompt({ idx: 0 }, { settings: {} })).toBe(
+      "거의 정지 상태, 아주 느린 카메라 이동. " +
+      "The attached image is the first frame — continue naturally from it. " +
+      "Keep the subject and style unchanged. No text or letters. No talking faces or lip sync."
+    );
+  });
 });
