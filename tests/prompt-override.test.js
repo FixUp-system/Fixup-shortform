@@ -401,10 +401,37 @@ describe("덮어쓰기와 각인", () => {
   //   같은 값인데 각인 문자열이 달라져 병합 시점에 산출물이 낡는다 — 그래서 toContain 이
   //   아니라 **전문**으로 못 박는다.
   it("★ 덮어쓰기 각인은 기존 항목 맨 뒤에 붙는다 — 다음 태스크가 그 뒤에 잇는다", () => {
+    // 마침표는 promptOverride 가 채운 것이다 — 각인은 **프롬프트에 실제로 실리는 값**을 담는다.
     expect(imageContextKey({ ...fullCut, image_prompt: "a red shoe" }, full))
-      .toBe(`${IMG_BASE}|prompt:a red shoe`);
+      .toBe(`${IMG_BASE}|prompt:a red shoe.`);
     expect(clipKey({ ...fullCut, clip_prompt: "it explodes" }, full))
-      .toBe(`${CLIP_BASE}|prompt:it explodes`);
+      .toBe(`${CLIP_BASE}|prompt:it explodes.`);
+  });
+
+  // ★ 이 파일의 불변을 한 줄로: **프롬프트가 같으면 각인도 같다.**
+  //   각인이 `trim()` 만 보던 동안 이것이 깨져 있었다 — 사장님이 이미 적은 덮어쓰기 끝에
+  //   마침표만 더하면 나가는 프롬프트는 한 글자도 안 바뀌는데 각인이 갈려 **거짓 낡음**이
+  //   유료 [다시 만들기]를 열었다(그림 컷당 $0.08, Seedance 30초 한 편 ~$9).
+  //   프롬프트 단언과 각인 단언을 **나란히** 두는 이유가 그것이다 — 둘이 같이 움직여야 한다.
+  it("★ 마침표만 더한 덮어쓰기는 프롬프트도 각인도 같다 — 거짓 낡음이 유료 버튼을 열면 안 된다", () => {
+    const a = { ...fullCut, image_prompt: "a red shoe", clip_prompt: "it explodes" };
+    const b = { ...fullCut, image_prompt: "a red shoe.", clip_prompt: "it explodes." };
+    expect(buildImagePrompt(a, full, [])).toBe(buildImagePrompt(b, full, []));
+    expect(imageContextKey(a, full)).toBe(imageContextKey(b, full));
+    expect(buildClipPrompt(a, full)).toBe(buildClipPrompt(b, full));
+    expect(clipKey(a, full)).toBe(clipKey(b, full));
+    // 앞뒤 공백도 마찬가지다 — promptOverride 가 떼므로 프롬프트가 안 갈린다.
+    const c = { ...fullCut, image_prompt: "  a red shoe.  ", clip_prompt: "  it explodes.  " };
+    expect(imageContextKey(c, full)).toBe(imageContextKey(b, full));
+    expect(clipKey(c, full)).toBe(clipKey(b, full));
+  });
+
+  // 반대 방향 — 정규화가 **다른 내용까지** 같게 만들면 고쳐도 안 낡는다.
+  it("★ 내용이 다른 덮어쓰기는 여전히 각인이 갈린다", () => {
+    expect(imageContextKey({ ...fullCut, image_prompt: "a red shoe" }, full))
+      .not.toBe(imageContextKey({ ...fullCut, image_prompt: "a red shoe!" }, full));
+    expect(clipKey({ ...fullCut, clip_prompt: "it explodes." }, full))
+      .not.toBe(clipKey({ ...fullCut, clip_prompt: "it melts." }, full));
   });
 
   it("★ 덮어쓰면 각인이 바뀐다 — 고쳤는데 조용히 지나가지 않는다", () => {
