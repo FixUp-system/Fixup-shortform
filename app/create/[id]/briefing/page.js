@@ -12,7 +12,11 @@ import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 // PROMPT_NOTE_MAX 는 서버 게이트(normalizePromptNote)와 **같은 자리**에서 온다 —
 // 숫자를 화면에 또 적으면 두 벌이 되어, 붙여넣기는 통했는데 저장이 400 인 칸이 생긴다.
-import { activeStyle, PROMPT_NOTE_MAX } from "../../../../lib/styles";
+// normalizePromptNote 도 같은 자리에서 온다 — 서버가 **공백을 접어서**(`\s+` → 한 칸)
+// 저장하므로, 화면이 원문으로 비교하면 내부 이중 공백이나 개행이 든 지시는 빗장이 영영
+// 안 풀려 blur 마다 헛 PATCH + refetch 가 돈다(실측 결함). 접는 규칙을 화면에 한 벌 더
+// 적지 않고 게이트와 **같은 함수**를 부른다 — 두 벌이면 갈린다.
+import { activeStyle, PROMPT_NOTE_MAX, normalizePromptNote } from "../../../../lib/styles";
 import { ASPECTS, DEFAULT_ASPECT_ID } from "../../../../lib/aspects";
 // 화질 — 모델이 실제로 여는 값만 고른다. 목록도 지금 값도 표(lib/clip-limits)가 준다.
 // 이 화면이 그것을 드는 이유는 **화질이 정가를 바꾸기 때문**이다(Seedance 30초: 720p 160 ·
@@ -186,23 +190,33 @@ export default function BriefingStepPage() {
           이미 만든 그림·클립이 있어요 — 여기를 고치면 전 컷을 다시 만들어야 해요 (유료)
         </div>
       )}
+      {/* ★ 이 두 칸은 **busy 로 잠그지 않는다.** 잠그면 사장님이 이미지 칸에서 영상 칸으로
+          탭하는 순간 이미지 칸의 onBlur → saveNote → setBusy(true) 가 돌아, 방금 포커스를
+          받은 영상 칸이 그 자리에서 disabled 가 되며 **포커스가 날아간다**(다시 클릭해야
+          한다). 화풍 보정은 칸이 하나라 겪지 않던 일이고, 칸이 둘이 된 지금 처음 생겼다.
+          잠금을 뺀 대가는 없다 — 저장은 PATCH 한 번이고, 초기값은 빗장(noteLoadedFor)이
+          한 번만 채우므로 저장 중에 타이핑한 글자가 되돌아가지도 않는다. */}
       <label className="tray-note">이미지에 함께 보낼 지시
         <textarea className="sent-input fix-input" maxLength={PROMPT_NOTE_MAX}
           placeholder="예: shot on 35mm film, shallow depth of field"
-          value={imageNote} disabled={busy}
+          value={imageNote}
           onChange={(e) => setImageNote(e.target.value)}
-          // 바뀌었을 때만 보낸다 — 지나갈 때마다 PATCH 하지 않게(화풍 보정과 같은 규칙)
+          // 바뀌었을 때만 보낸다 — 지나갈 때마다 PATCH 하지 않게(화풍 보정과 같은 규칙).
+          // ★ 비교도 저장도 **서버와 같은 함수로 접은 값**이다. 원문으로 비교하면 서버가
+          //   접어 저장한 값과 영원히 달라 blur 마다 헛 PATCH 가 돈다.
           onBlur={() => {
-            if (imageNote.trim() !== (project.settings?.image_note || "")) saveNote("image_note", imageNote);
+            const note = normalizePromptNote(imageNote, "이미지 지시");
+            if (note !== (project.settings?.image_note || "")) saveNote("image_note", note);
           }} />
       </label>
       <label className="tray-note">영상에 함께 보낼 지시
         <textarea className="sent-input fix-input" maxLength={PROMPT_NOTE_MAX}
           placeholder="예: hand-held camera, subtle shake"
-          value={clipNote} disabled={busy}
+          value={clipNote}
           onChange={(e) => setClipNote(e.target.value)}
           onBlur={() => {
-            if (clipNote.trim() !== (project.settings?.clip_note || "")) saveNote("clip_note", clipNote);
+            const note = normalizePromptNote(clipNote, "영상 지시");
+            if (note !== (project.settings?.clip_note || "")) saveNote("clip_note", note);
           }} />
       </label>
     </div>
