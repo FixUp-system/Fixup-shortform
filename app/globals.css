@@ -848,6 +848,14 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
   border-bottom: 1px solid var(--line);
 }
 .sub-row:last-child { border-bottom: 0; }
+/* ★ 이 줄의 칩은 **줄바꿈하지 않는다**(2026-08-18). 조절판은 336px 로 못 박혀 있어 칩이 들어갈
+   칸이 234px 뿐이고, 예전에는 `중국어(간체)` 하나가 넘쳐 **그 칩만 혼자 다음 줄로** 내려갔다 —
+   선택지가 셋인데 둘처럼 읽힌다. 라벨을 줄인 것(lib/subtitle-langs.js)이 근본 수정이고, 이
+   규칙은 **언어가 늘었을 때 같은 모양으로 무너지지 않게** 하는 그물이다.
+   ★ `.chips` 자체는 건드리지 않는다 — 그 클래스는 첫 화면 트레이 등 여러 곳이 쓰고,
+   그쪽은 칩이 많아 줄바꿈이 맞다. */
+.sub-row .chips { flex-wrap: nowrap; min-width: 0; }
+.sub-row .chips .chip { padding: 7px 12px; white-space: nowrap; }
 .sub-label { color: var(--ink-soft); font-size: 12px; }
 /* 컨트롤과 그 값이 한 줄에 — 값은 늘 오른쪽 끝이라 눈이 한 자리에서 읽는다 */
 .sub-control { display: flex; align-items: center; gap: 14px; max-width: var(--ctl-w); }
