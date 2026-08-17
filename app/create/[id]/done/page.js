@@ -456,7 +456,11 @@ export default function DoneStepPage() {
           <div className="brief">
             <div className="brief-row"><b>이어붙이기</b><div className="val">컷 {clipCount}개를 순서대로</div></div>
             <div className="brief-row"><b>소리</b><div className="val">컷마다 읽은 목소리를 그대로</div></div>
-            <div className="brief-row"><b>자막</b><div className="val">문장을 화면에 태워요 — 틱톡·릴스 버튼에 가리지 않는 위치에</div></div>
+            {/* ★ "화면에 태워요" 를 걷었다(2026-08-17 사용자 지적). ffmpeg 쪽 낱말(burn-in)이
+                화면까지 새어 나온 자리다 — 사장님에게 "태운다"는 없애는 것처럼 들린다.
+                뒷단 주석에서는 그 낱말을 그대로 쓴다(lib/subtitles.js 가 하는 일이 그것이다).
+                화면 문구는 바로 위 안내("목소리와 자막을 얹어요")와 같은 말을 쓴다. */}
+            <div className="brief-row"><b>자막</b><div className="val">컷마다 문장을 얹어요 — 틱톡·릴스 버튼에 가리지 않는 위치에</div></div>
             <div className="brief-row"><b>비율</b><div className="val">{project?.settings?.aspect_ratio || "9:16"}</div></div>
           </div>
         </>
