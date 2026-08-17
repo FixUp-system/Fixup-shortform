@@ -103,6 +103,51 @@ describe("buildCastMessages", () => {
     },
   );
 
+  // ── 되돌아오는 쪽도 잰다 ────────────────────────────────────────────────
+  // 위 그물은 "영어여야 할 칸이 한국어가 되는 것"만 본다. 반대쪽이 통째로 빠져 있었다:
+  // 이 지문의 **입력측 예시**(shows 를 흉내내는 한국어 문장 — "주인이 손님에게 옷을
+  // 입히고 …", "손님"·"코트를 든 남성"·"그분", "앰플"·"병"·"제품"·"세럼")를 영어로 옮겨도
+  // 49 그린이었다. 그 예시들은 모델이 **한국어 shows 문장과 대조하는** 자리라 영문화가
+  // 실질 열화다 — 컷을 못 고르거나 잘못 고른다.
+  //
+  // 규칙 블록을 전부 훑어 who·look·voice(모델에 실리는 칸)를 말하는 블록과 나머지를 가른다.
+  // 표시(`✓`/`✗`)나 `e.g.` 같은 **꼬리표로 가르지 않는다** — 되돌리는 사람이 꼬리표까지
+  // 함께 바꾸면 그 칸이 그물에서 조용히 사라진다. 값 자체의 한글 유무로 잰다.
+  function allRuleBlocks(system) {
+    const blocks = [];
+    let cur = null;
+    for (const l of system.split("\n")) {
+      if (l.startsWith("- ")) blocks.push((cur = [l]));
+      else if (cur && l.startsWith("  ")) cur.push(l);
+      else cur = null;
+    }
+    return blocks.map((b) => b.join("\n"));
+  }
+  const MODEL_FIELDS = ["who", "look", "voice"];
+
+  it("입력측 예시는 한국어다 — 모델이 한국어 화면 설명과 대조하는 자리다", () => {
+    const { system } = buildCastMessages(cuts, AVATARS);
+    const korean = [];
+    for (const b of allRuleBlocks(system)) {
+      if (MODEL_FIELDS.some((f) => b.includes(f))) continue; // 그쪽은 위 그물이 본다
+      korean.push(...[...b.matchAll(/"([^"]{2,})"/g)].map((m) => m[1]));
+    }
+    expect(korean.length, "입력측 예시가 하나도 없다").toBeGreaterThan(0);
+    for (const v of korean) {
+      expect(v, `한국어 화면 설명을 흉내내야 하는 예시가 영어다: ${v}`).toMatch(HANGUL);
+    }
+  });
+
+  // look 이 없을 때 무엇이 일어났는지가 이 요구의 유일한 근거다. 지우면 "외형을 적어라"가
+  // 취향처럼 보이고, 영어로 옮기는 손에 씻겨 나간다.
+  it("look 을 요구하는 실측 근거가 그대로다", () => {
+    const { system } = buildCastMessages(cuts, AVATARS);
+    const look = allRuleBlocks(system).find((b) => b.startsWith("- look 은"));
+    expect(look, "look 규칙이 사라졌다").toBeTruthy();
+    expect(look, "look 이 없어 무엇이 일어났는지(실측)가 사라졌다")
+      .toContain("실측에서 이것이 없어 컷마다 다른 사람이 나왔고");
+  });
+
   it("JSON 스키마 줄도 세 칸의 언어를 말해 준다 — 규칙 줄까지 안 읽고 채우는 것을 막는다", () => {
     const { system } = buildCastMessages(cuts, AVATARS);
     const schema = system.split("\n").find((l) => l.includes('"cast"'));

@@ -53,46 +53,132 @@ describe("buildScenarioMessages", () => {
 //   예시가 서로 싸운다. 그래서 예시의 언어를 따로 못 박는다.
 const HANGUL = /[가-힣]/;
 
+// ★★ 이 그물을 **창(`{0,N}`)으로 짜면 아무것도 안 잰다.** 실제로 그랬다(2026-08-17 변이 실험):
+//
+//   `/"line"[\s\S]{0,200}한국어/` 는 `line` 칸이 영어로 뒤집혀도 초록이었다 — 12자 뒤
+//   **이웃 칸**인 `"speaker": "… (한국어, …)"` 에 맞기 때문이다. `{0,400}` 짜리는 더 넓어서
+//   `focus.subject`·`look` 을 한국어로 되돌려도 옆줄 `narrator_voice` 의 "영어로"에 맞았다.
+//   창은 이웃 칸을 덮으니 "**어느 칸이** 무슨 말인가"를 원리적으로 못 가른다.
+//
+//   그래서 아래는 칸 하나를 **잘라 내서** 잰다:
+//   - 스키마는 `"칸": "설명"` 의 설명 하나만 뽑는다(값에 따옴표가 없어 그 칸에서 끊긴다)
+//   - 규칙은 `- ` 로 시작하는 줄 하나 + 딸린 이어짐만 뽑고, 언어 낱말은 **한 문장 안**
+//     (마침표·줄바꿈을 넘지 않고)에서 칸 이름 **바로 뒤**의 것만 읽는다
+//
+// ★ 규칙 줄과 스키마 줄을 **따로** 잰다(cast.test.js 가 먼저 쓴 방식). 한 덩어리로 재면
+//   규칙의 언어 블록을 8줄 통째로 지워도 스키마 줄에 맞아 초록이다 — 그것도 겪었다.
+//   규칙에서 사라지면 "왜 이 칸이 그 말인가"가 지문에서 사라진다.
+
+// 칸별 언어. 값이 왜 그 말인지는 lib/scenario.js 상단 주석과 같다.
+const LANG = {
+  // 영어 — 그림·영상 모델에 그대로 실린다(lib/cuts.js subjectOf · speechFor)
+  subject: "영어",
+  look: "영어",
+  narrator_voice: "영어",
+  // 한국어 — 사장님이 읽고 고치고, 다음 단계 LLM 도 한국어로 읽는다.
+  // speaker 는 "내레이션"이라는 **그 낱말**이 판정에 쓰인다(isNarrationSpeaker)
+  topic: "한국어",
+  angle: "한국어",
+  beat: "한국어",
+  speaker: "한국어",
+  // 대사만은 영상 모델이 읽는데도 한국어다 — 그 글자가 **그대로 자막이 된다**
+  // (lib/subtitles.js 가 ffmpeg 로 태운다). 영어가 되면 사장님 영상에 영어 자막이 박힌다
+  line: "한국어",
+};
+const OPPOSITE = { 영어: "한국어", 한국어: "영어" };
+const ENGLISH_FIELDS = Object.keys(LANG).filter((f) => LANG[f] === "영어");
+
+// 스키마의 한 칸 설명만 떼어 온다 — 이웃 칸으로 넘어가지 않는다.
+function schemaField(system, name) {
+  const at = system.indexOf("JSON 으로만 답한다:");
+  expect(at, "JSON 스키마 블록이 사라졌다").toBeGreaterThan(-1);
+  const m = system.slice(at).match(new RegExp(`"${name}":\\s*"([^"]*)"`));
+  expect(m, `스키마에 "${name}" 칸이 없다`).toBeTruthy();
+  return m[1];
+}
+
+// 규칙 목록을 블록으로 자른다 — 규칙은 `- ` 로 시작하고 들여쓴 줄이 그 뒤에 딸린다.
+// (스키마 줄도 들여쓰여 있지만 그 앞의 안 들여쓴 줄에서 블록이 닫히므로 섞이지 않는다)
+function ruleBlocks(system) {
+  const blocks = [];
+  let cur = null;
+  for (const l of system.split("\n")) {
+    if (l.startsWith("- ")) blocks.push((cur = [l]));
+    else if (cur && l.startsWith("  ")) cur.push(l);
+    else cur = null;
+  }
+  return blocks.map((b) => b.join("\n"));
+}
+
+// 칸 이름 **바로 뒤**(같은 문장 안)의 언어 낱말. 게으른 창인 이유: 욕심쟁이면
+// `subject 는 한국어로, narrator_voice 는 영어로` 에서 subject 가 뒤쪽 "영어"에 맞아
+// 되돌린 칸이 그대로 초록이 된다. 마침표·줄바꿈을 넘지 않는 이유도 같다 — 넘으면
+// 이웃 문장·이웃 칸의 언어 낱말을 읽는다.
+function declarations(system, field) {
+  const re = new RegExp(`${field}[^.\\n]{0,40}?(영어|한국어)`, "g");
+  return ruleBlocks(system).flatMap((b) =>
+    [...b.matchAll(re)].map((m) => ({ block: b, lang: m[1] })));
+}
+
+// 블록 안의 예시 값. `e.g.`/`예:` 같은 **표시로 가르지 않는다** — 되돌리는 사람이 표시까지
+// 함께 바꾸는 것은 자연스러운 편집이고, 그러면 되돌린 칸이 그물에서 사라진다(다른 블록에
+// 남은 `e.g.` 하나가 "영어 예시가 있다"를 계속 만족시켰다). 값 자체의 한글 유무로 잰다.
+function quotedExamples(block) {
+  return [...block.matchAll(/"([^"]{2,})"/g)].map((m) => m[1]);
+}
+
 describe("SYSTEM — 칸마다 언어를 못 박는다", () => {
   const system = () => buildScenarioMessages(project).system;
 
-  // subject·look·narrator_voice 는 그림·영상 프롬프트에 **그대로** 실린다
-  // (lib/cuts.js subjectOf · speechFor). 영어가 그 모델들의 말이다.
-  it("★ 모델이 읽는 칸(focus·narrator_voice)을 영어로 요구한다", () => {
-    expect(system(), "focus 를 영어로 쓰라는 지시가 없다").toMatch(/"focus"[\s\S]{0,400}영어/);
-    expect(system(), "narrator_voice 를 영어로 쓰라는 지시가 없다").toMatch(/"narrator_voice"[\s\S]{0,300}영어/);
+  // 양방향이다: 영어여야 할 칸이 한국어라고 적혀도, 한국어여야 할 칸이 영어라고 적혀도 빨강.
+  it.each(Object.entries(LANG))('★ 스키마의 "%s" 칸이 %s 를 못 박는다', (field, want) => {
+    const desc = schemaField(system(), field);
+    expect(desc, `"${field}" 칸에 ${want} 표시가 없다: ${desc}`).toContain(want);
+    expect(desc, `"${field}" 칸이 ${OPPOSITE[want]} 라고 말한다: ${desc}`)
+      .not.toContain(OPPOSITE[want]);
   });
 
-  // ★ 대사만은 영상 모델이 읽는데도 한국어다 — 그 글자가 **그대로 자막이 된다**
-  //   (ffmpeg 가 태운다, lib/subtitles.js). 이유를 지문에 적어 두지 않으면 "모델이 읽는
-  //   칸은 영어"라는 큰 규칙에 끌려 영어 대사가 나오고, 사장님 영상에 영어 자막이 박힌다.
-  it("★ 대사는 한국어를 못 박는다 — 이 글자가 그대로 자막이 된다", () => {
-    expect(system()).toMatch(/"line"[\s\S]{0,200}한국어/);
-    expect(system(), "왜 한국어여야 하는지(자막)를 안 적었다").toMatch(/자막/);
-  });
-
-  it("★ 사장님·다음 단계 LLM 이 읽는 칸은 한국어를 못 박는다", () => {
-    for (const field of ['"topic"', '"angle"', '"beat"', '"speaker"']) {
-      expect(system(), `${field} 에 한국어 표시가 없다`)
-        .toMatch(new RegExp(`${field}[\\s\\S]{0,200}한국어`));
+  // 스키마에만 적혀 있으면 안 된다 — 규칙에서 사라지면 이유가 사라지고, 규칙만 읽고
+  // 채우는 모델은 언어를 모른 채 답한다.
+  it.each(Object.entries(LANG))("★ 규칙 줄도 %s 의 언어(%s)를 말한다", (field, want) => {
+    const found = declarations(system(), field);
+    expect(found.length, `규칙 목록에 ${field} 의 언어를 말하는 줄이 없다`).toBeGreaterThan(0);
+    for (const { lang, block } of found) {
+      expect(lang, `${field} 를 ${lang} 로 쓰라고 적혀 있다:\n${block}`).toBe(want);
     }
   });
 
-  // ★ 예시의 언어를 표시로 가른다: 영어 예시는 `e.g.`, 한국어 예시는 `예:`.
-  //   둘을 같은 표시로 두면 이 그물이 영어 칸의 예시가 한국어로 되돌아간 것을 못 잡는다.
-  it("★ 예시가 언어를 정한다 — `e.g.` 는 영어, `예:` 는 한국어다", () => {
+  // ★ 대사가 왜 한국어인지를 **그 칸 안쪽**에 적어 둔다. 파일 어디에나 있는 `/자막/` 로
+  //   재면 안 된다 — 옛 그물이 무관한 줄("자막·로고는 우리가 나중에 따로 붙인다")에 맞아,
+  //   line 칸을 통째로 영어로 뒤집어도 초록이었다.
+  it("★ 대사가 왜 한국어인지(자막)를 대사 칸 안쪽에 적는다", () => {
     const s = system();
+    expect(schemaField(s, "line"), "스키마의 line 칸이 이유(자막)를 말하지 않는다")
+      .toMatch(/자막/);
+    const rule = declarations(s, "line").map((d) => d.block).join("\n");
+    expect(rule, "대사 규칙이 이유(자막)를 말하지 않는다").toMatch(/자막/);
+  });
 
-    const english = [...s.matchAll(/e\.g\.\s*((?:"[^"]*"(?:\s*[·,]\s*)?)+)/g)].map((m) => m[1]);
-    expect(english.length, "영어 칸의 예시를 `e.g.` 로 든 자리가 없다").toBeGreaterThan(0);
-    for (const v of english) {
-      expect(v, `영어 칸의 예시에 한글이 남았다: ${v}`).not.toMatch(HANGUL);
+  // ★ 언어를 정하는 가장 강한 신호는 지시문이 아니라 예시 값이다. "영어로 써라" 옆에
+  //   한국어 예시가 남아 있으면 모델은 예시를 따른다. 그래서 지시와 예시를 따로 잰다.
+  //   양쪽을 다 잰다 — 영어 칸 규칙의 예시는 영어, 나머지 규칙의 예시는 한국어다
+  //   (한국어 예시가 영문화되는 쪽이 지금까지 통째로 빠져 있었다).
+  it("★ 예시가 언어를 정한다 — 영어 칸 규칙은 영어 예시, 나머지는 한국어 예시다", () => {
+    const english = [];
+    const korean = [];
+    for (const b of ruleBlocks(system())) {
+      const bucket = ENGLISH_FIELDS.some((f) => b.includes(f)) ? english : korean;
+      bucket.push(...quotedExamples(b));
     }
 
-    const korean = [...s.matchAll(/예:\s*"([^"]*)"/g)].map((m) => m[1]);
-    expect(korean.length, "한국어 칸의 예시가 사라졌다").toBeGreaterThan(0);
+    expect(english.length, "영어 칸 규칙에 예시가 하나도 없다").toBeGreaterThan(0);
+    for (const v of english) {
+      expect(v, `영어 칸 규칙의 예시에 한글이 남았다: ${v}`).not.toMatch(HANGUL);
+    }
+
+    expect(korean.length, "한국어 칸 규칙의 예시가 사라졌다").toBeGreaterThan(0);
     for (const v of korean) {
-      expect(v, `한국어 칸의 예시가 한글이 아니다: ${v}`).toMatch(HANGUL);
+      expect(v, `한국어 칸 규칙의 예시가 한글이 아니다: ${v}`).toMatch(HANGUL);
     }
   });
 
