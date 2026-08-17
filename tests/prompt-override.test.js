@@ -630,13 +630,13 @@ describe("프로젝트 공통 지시", () => {
 
     it("★ 공통 지시 각인은 prompt 뒤에 붙는다", () => {
       expect(imageContextKey(fullCut, noted({ image_note: "shot on 35mm film" })))
-        .toBe(`${IMG_BASE}|imgnote:shot on 35mm film`);
+        .toBe(`${IMG_BASE}|imgnote:shot on 35mm film.`);
       expect(imageContextKey({ ...fullCut, image_prompt: "a red shoe" }, noted({ image_note: "shot on 35mm film" })))
-        .toBe(`${IMG_BASE}|prompt:a red shoe.|imgnote:shot on 35mm film`);
+        .toBe(`${IMG_BASE}|prompt:a red shoe.|imgnote:shot on 35mm film.`);
       expect(clipKey(fullCut, noted({ clip_note: "hand-held documentary feel" })))
-        .toBe(`${CLIP_BASE}|clipnote:hand-held documentary feel`);
+        .toBe(`${CLIP_BASE}|clipnote:hand-held documentary feel.`);
       expect(clipKey({ ...fullCut, clip_prompt: "it explodes" }, noted({ clip_note: "hand-held documentary feel" })))
-        .toBe(`${CLIP_BASE}|prompt:it explodes.|clipnote:hand-held documentary feel`);
+        .toBe(`${CLIP_BASE}|prompt:it explodes.|clipnote:hand-held documentary feel.`);
     });
 
     it("★ 공통 지시가 없으면 각인이 글자 그대로 그대로다 — 있을 때만 붙는다", () => {
@@ -665,6 +665,65 @@ describe("프로젝트 공통 지시", () => {
       expect(clipKey(fullCut, a)).not.toBe(clipKey(fullCut, b));
       expect(imageContextKey(fullCut, a)).not.toBe(imageContextKey(fullCut, full));
       expect(clipKey(fullCut, a)).not.toBe(clipKey(fullCut, full));
+    });
+
+    // ★ 끝 부호도 덮어쓰기와 **같은 규칙**이다(lib/clauses.js closeSentence).
+    //   고치기 전에는 조립이 마침표를 무조건 붙여 "shot on 35mm film.." · "Use warm light!."
+    //   가 그대로 나갔다. 규칙을 **판독 함수 안**에 두면 프롬프트도 각인도 같은 정규화된
+    //   값을 보므로 Ruling 7 이 지켜진다 — 두 단언을 나란히 두는 이유가 그것이다.
+    it("★ 마침표만 더한 공통 지시는 프롬프트도 각인도 같다 — 거짓 낡음이 유료 버튼을 열면 안 된다", () => {
+      const a = noted({ image_note: "shot on 35mm film", clip_note: "hand-held documentary feel" });
+      const b = noted({ image_note: "shot on 35mm film.", clip_note: "hand-held documentary feel." });
+      expect(buildImagePrompt(fullCut, a, [])).toBe(buildImagePrompt(fullCut, b, []));
+      expect(imageContextKey(fullCut, a)).toBe(imageContextKey(fullCut, b));
+      expect(buildClipPrompt(fullCut, a)).toBe(buildClipPrompt(fullCut, b));
+      expect(clipKey(fullCut, a)).toBe(clipKey(fullCut, b));
+      // 그리고 실제로 ".." 가 아니다 — 위 단언은 둘이 같다고만 말한다.
+      expect(buildImagePrompt(fullCut, b, [])).toContain("shot on 35mm film. Cinematic lighting");
+      expect(buildImagePrompt(fullCut, b, [])).not.toContain("..");
+      expect(buildClipPrompt(fullCut, b)).toContain("hand-held documentary feel. The attached image");
+      expect(buildClipPrompt(fullCut, b)).not.toContain("..");
+    });
+
+    it("★ 물음표·느낌표·전각 부호로 끝나면 마침표를 안 붙인다 — 문장은 이미 닫혀 있다", () => {
+      const img = buildImagePrompt(fullCut, noted({ image_note: "Use warm light!" }), []);
+      expect(img).toContain("Use warm light! Cinematic lighting");
+      expect(img).not.toContain("!.");
+      const q = buildImagePrompt(fullCut, noted({ image_note: "why not warm light?" }), []);
+      expect(q).toContain("why not warm light? Cinematic lighting");
+      expect(q).not.toContain("?.");
+      // 전각 — 사장님은 한국어로 쓴다. 한글 입력에서 이 부호들이 섞여 나온다.
+      for (const note of ["따뜻한 빛으로。", "따뜻한 빛으로！", "따뜻한 빛으로？"]) {
+        const clip = buildClipPrompt(fullCut, noted({ clip_note: note }));
+        expect(clip).toContain(`${note} The attached image`);
+        expect(clip).not.toContain(`${note}.`);
+        // 각인도 같은 값을 본다 — 한쪽만 정규화하면 거짓 낡음이 된다.
+        expect(clipKey(fullCut, noted({ clip_note: note }))).toBe(`${CLIP_BASE}|clipnote:${note}`);
+      }
+    });
+
+    // 갈래마다 이어 붙이는 문자열이 따로라 부호도 갈래마다 재야 한다 — 한 갈래만 재면
+    // 나머지에서 ".." 가 조용히 남는다.
+    it("★ 영상 세 갈래 전부에서 부호가 겹치지 않는다", () => {
+      const note = { clip_note: "hand-held documentary feel." };
+      // 무음
+      const silent = { idx: 0, motion: "slow push-in", silent: true };
+      expect(buildClipPrompt(silent, { settings: { ...note } }))
+        .toContain("hand-held documentary feel. The attached image");
+      // 내레이션
+      const nc = { idx: 0, motion: "slow push-in", sentence: "핑계 대지 마세요", narration: true };
+      const np = { settings: { i2v_model: "seedance-2.0", ...note }, scenario: { narrator_voice: "calm low male voice" }, cuts: [nc] };
+      expect(buildClipPrompt(nc, np)).toContain("hand-held documentary feel. The attached image");
+      expect(buildClipPrompt(nc, np)).not.toContain("..");
+      // 화면 안 대사
+      const sc = { idx: 0, motion: "slow push-in", sentence: "핑계 대지 마세요" };
+      const sp = {
+        settings: { i2v_model: "seedance-2.0", ...note },
+        cast: [{ who: "코치", look: "wiry coach in a grey tracksuit", voice: "gravelly veteran voice", cuts: [0] }],
+        cuts: [sc],
+      };
+      expect(buildClipPrompt(sc, sp)).toContain("hand-held documentary feel. The attached image");
+      expect(buildClipPrompt(sc, sp)).not.toContain("..");
     });
 
     // 상자가 둘인 이유 — 영상 지시(움직임·립싱크·시간)가 이미지 프롬프트에 실리면
