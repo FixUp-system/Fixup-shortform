@@ -551,12 +551,18 @@ const condBlockIn = (src, head) => {
   if (end < 0) return "";
   return src.slice(start, end).replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
 };
+// ★ 2026-08-18 — 조건에 `voiceOpen` 이 붙었다. 내레이터 칸을 사장님 화면에서 걷고
+//   **값이 비어 확정이 막힐 때만** 열기 때문이다(tests/scenario-ui.test.js 가 그 계약을
+//   지킨다). 여기서 재는 것은 "칸이 나타났을 때 무슨 글자가 보이는가"라 그대로 유효하다.
+//   조건을 상수로 뺀 이유: 두 테스트가 같은 문자열을 손으로 적으면 한쪽만 고쳐지는 날
+//   그 테스트는 빈 블록을 재며 조용히 통과한다.
+const NARRATOR_COND = "hasNarration(scenario) && voiceOpen";
 const HANGUL = /[가-힣]/;
 const placeholdersIn = (block) => [...block.matchAll(/placeholder="([^"]*)"/g)].map((m) => m[1]);
 
 describe("②시나리오 — 칸마다 언어가 다르다", () => {
   it("★ 내레이터 목소리 자리표시자는 영어다 — 그 글자가 영상 모델에 그대로 실린다", () => {
-    const block = condBlockIn(scenarioPage, "hasNarration(scenario)");
+    const block = condBlockIn(scenarioPage, NARRATOR_COND);
     expect(block, "내레이터 목소리 블록을 못 찾았다").toBeTruthy();
     expect(block, "이 블록이 내레이터 칸이 아니다").toContain("narrator_voice");
     const holders = placeholdersIn(block);
@@ -565,7 +571,7 @@ describe("②시나리오 — 칸마다 언어가 다르다", () => {
   });
 
   it("★ 왜 영어인지 안내한다 — 이유가 없으면 사장님은 실수로 보고 한국어로 고친다", () => {
-    const block = condBlockIn(scenarioPage, "hasNarration(scenario)");
+    const block = condBlockIn(scenarioPage, NARRATOR_COND);
     expect(block, "영어로 적어야 한다는 안내가 없다").toMatch(/영어/);
     // 안내 문구는 **사장님이 읽는 자리**에 있어야 한다 — 라벨·주석이 아니라 pgsub 문단이다.
     // 줄 단위로 본다: `<b>영어로</b>` 처럼 강조 태그가 끼어도 걸리게(태그 통과 정규식은

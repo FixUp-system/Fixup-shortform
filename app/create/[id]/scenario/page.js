@@ -7,8 +7,11 @@
 // ★ 판정을 화면이 손으로 다시 적지 않는다(checkScenario 한 벌). 두 벌이면 화면은
 //   통과라는데 라우트가 400 을 준다.
 // ★ 여기 있는 칸은 라우트가 전부 저장한다(tests/scenario-route.test.js 가 박아 둔다) —
-//   장면의 넷(beat·line·speaker·seconds)에 전체 단위의 angle·narrator_voice 까지.
+//   장면의 넷(beat·line·speaker·seconds), 그리고 나타났을 때의 narrator_voice.
 //   "고칠 수 있는 척하는 칸"을 만들면 사장님은 고쳤다고 믿고 다음 단계에서 돈을 낸다.
+// ★ **화면에 칸이 없는 값도 그대로 왕복한다** — PATCH 가 `{ scenario }` 를 통째로 보내므로,
+//   angle 처럼 화면에서 걷은 값(2026-08-18)도 문서에 살아 남아 다음 단계 LLM 이 읽는다.
+//   즉 "칸을 지우는 것"과 "값을 없애는 것"은 다른 일이다 — 여기서는 앞엣것만 했다.
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
@@ -29,6 +32,10 @@ export default function ScenarioStepPage() {
   const [err, setErr] = useState("");
   const [saved, setSaved] = useState(false);
   const madeFor = useRef(null);
+  // 내레이터 목소리 칸을 열어 둘까. **한 번 열리면 이 화면을 떠날 때까지 닫지 않는다.**
+  //   조건이 "값이 비었는가"라서, 안 붙잡으면 사장님이 첫 글자를 치는 순간 칸이 사라져
+  //   입력을 이어 갈 수 없다(값이 채워지면 조건이 거짓이 되므로).
+  const [voiceOpen, setVoiceOpen] = useState(false);
 
   const scenario = project?.scenario || null;
   const { ok, problems } = scenario ? checkScenario(scenario, project) : { ok: false, problems: [] };
@@ -51,6 +58,12 @@ export default function ScenarioStepPage() {
     if (!project || scenario || madeFor.current === id) return;
     generate();
   }, [project?.id, scenario, id]);
+
+  // 모델이 내레이터 목소리를 안 채워 왔으면 그때만 칸을 연다 — 그 상태로는 확정이 막히고
+  // (lib/scenario-rules.js), 칸이 없으면 사장님이 빠져나올 수단이 없다.
+  useEffect(() => {
+    if (hasNarration(scenario) && !scenario.narrator_voice) setVoiceOpen(true);
+  }, [scenario]);
 
   // ★ 실패했을 때 빠져나가는 문. madeFor 를 푸는 것이 요점이다 — 자동 생성은 프로젝트당
   //   한 번만 돌기 때문에, 그 각인이 남아 있는 한 화면에는 오류 문구만 있고 다시 만들 길이
@@ -168,22 +181,21 @@ export default function ScenarioStepPage() {
       <h2>시나리오를 확인해 주세요</h2>
       {err && <p className="pgsub warn">{err}</p>}
 
-      <div className="eyebrow">이 영상을 어떻게 전달하나</div>
-      <textarea className="field" value={scenario.angle || ""} rows={2}
-        onChange={(e) => edit({ angle: e.target.value })} />
-      {/* ★ 이 칸은 컷을 안 바꾼다 — 그래서 각인(scenarioCutsKey)에도 안 들어간다(산 그림·클립을
-          지키는 쪽이 맞다). 하지만 화면 설계·캐스팅은 **컷을 나눌 때** 한 번만 이 값을 읽으므로,
-          이미 컷이 있으면 여기를 고쳐도 아무 일도 안 일어난다. 말 안 하면 "고칠 수 있는 척하는
-          칸"이 된다 — 사장님은 고쳤다고 믿고 다음 단계에서 돈을 낸다(2026-08-16 Important 5). */}
-      {(project?.cuts || []).length > 0 && (
-        <p className="pgsub">이 칸은 <b>다음에 컷을 나눌 때</b>부터 반영돼요 — 이미 만든 컷은 그대로예요</p>
-      )}
+      {/* ★ 전달 방식(angle)은 **화면에서 걷었다**(2026-08-18 사용자 지시) — 사장님이 판단할
+          것이 아니라 우리가 다음 단계 LLM 에 주는 지시다. 값은 그대로 만들어지고(lib/scenario.js)
+          그대로 저장된다(이 화면이 `{ scenario }` 를 통째로 PATCH 한다) — 화면 설계·캐스팅이
+          컷을 나눌 때 읽는 경로(lib/cuts.js:487)도 손대지 않았다.
+          곁들여 사라진 것: 컷이 이미 있으면 "반영은 다음 컷 분할부터"라고 알리던 안내.
+          그 문장은 칸이 있을 때만 필요한 말이었다(2026-08-16 Important 5) — 없는 칸을
+          설명하면 거짓말이 된다. (그 문구를 여기 그대로 적지 않는다: 이 저장소의 화면 계약은
+          소스 문자열을 훑어 재므로, 주석에 적은 낱말도 "칸이 남아 있다"로 읽힌다.) */}
 
-      {/* ★ 내레이터 목소리 — 화면 밖 목소리를 쓰는 장면이 있을 때만 보인다.
-          컷마다 영상을 따로 만들기 때문에 이 한 줄이 없으면 컷마다 다른 사람이 읽는다.
-          angle 과 달리 이 값은 **클립 프롬프트에 실린다** — 고치면 그 컷의 영상이 낡는다
+      {/* ★ 내레이터 목소리도 걷었다. **다만 비어 있을 때는 남긴다** — 그 상태로는 확정이
+          막히는데(lib/scenario-rules.js), 칸이 아예 없으면 빠져나올 수단이 없다.
+          정상 흐름(모델이 채워 온 경우)에는 화면에 안 나온다.
+          이 값은 클립 프롬프트에 실린다 — 고치면 그 컷의 영상이 낡는다
           (lib/cuts.js speechFor · lib/steps.js clipKey). 그래서 "반영은 다음에"가 아니다. */}
-      {hasNarration(scenario) && (
+      {hasNarration(scenario) && voiceOpen && (
         <>
           <div className="eyebrow">내레이터 목소리</div>
           {/* ★ 자리표시자만 영어다 — 이 칸의 값은 번역 단계 없이 영상 모델에 그대로 실린다
