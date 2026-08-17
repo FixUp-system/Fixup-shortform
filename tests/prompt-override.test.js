@@ -223,3 +223,79 @@ describe("영상 프롬프트 — 본문과 꼬리", () => {
     );
   });
 });
+
+// 여기서 처음으로 **동작이 바뀐다.** 위의 전문 고정들은 그대로 초록이어야 한다 —
+// 덮어쓰기가 없는 프롬프트는 글자 하나도 달라지지 않는다는 것이 이 기능의 첫 계약이다.
+describe("컷별 프롬프트 덮어쓰기", () => {
+  it("★ 덮어써도 꼬리는 남는다 — 글자 금지가 지워지지 않는다", () => {
+    const c = { ...cut, image_prompt: "A huge neon sign that says SALE in big letters" };
+    const out = buildImagePrompt(c, project, []);
+    expect(out).toContain("A huge neon sign that says SALE in big letters");
+    expect(out, "글자 금지가 사라졌다 — 사장님 입력이 우리 계약을 지웠다").toContain("no text or letters in the image");
+  });
+
+  // ★ 판형은 지금 **본문 문형 안에** 있다(`${orient} composition`). 본문을 통째로 갈아
+  //   끼우면 함께 사라지므로 덮어쓰기 경로에서 다시 붙인다 — 판형이 틀리면 합성이 깨진다.
+  it("★ 덮어쓰면 판형이 꼬리에 붙는다 — 본문이 통째로 갈렸으므로", () => {
+    const c = { ...cut, image_prompt: "A cat" };
+    expect(buildImagePrompt(c, project, [])).toContain("vertical 9:16 composition");
+  });
+
+  // 절 순서까지 못 박는다 — toContain 만으로는 판형이 꼬리 어디에 붙든 초록이다.
+  it("★ 이미지 덮어쓰기 전문 — 본문만 갈리고 꼬리는 그대로다", () => {
+    const c = { ...cut, image_prompt: "A cat" };
+    expect(buildImagePrompt(c, project, [])).toBe(
+      "A cat vertical 9:16 composition. " +
+      "Cinematic lighting, realistic, no text or letters in the image. " +
+      "Overall look and color treatment, keep identical across all cuts: high-contrast night film grain."
+    );
+  });
+
+  it("★ 영상 덮어쓰기 — 대사는 사장님이 못 지운다", () => {
+    const c = { idx: 0, sentence: "핑계 대지 마세요", narration: true, clip_prompt: "the shoe explodes" };
+    const p = {
+      ...project,
+      settings: { ...project.settings, i2v_model: "seedance-2.0" },
+      scenario: { ...project.scenario, narrator_voice: "calm low male voice" },
+      cuts: [c],
+    };
+    const out = buildClipPrompt(c, p);
+    expect(out).toContain("the shoe explodes");
+    expect(out).toContain('Says exactly, in Korean: "핑계 대지 마세요"');
+  });
+
+  // ★ 영상 쪽에는 판형을 **붙이지 않는다** — 클립 프롬프트에는 애초에 판형 절이 없고
+  //   (lib/i2v.js 가 aspect_ratio 를 별도 요청 필드로 보낸다), 없던 절을 여기서 만들면
+  //   덮어쓴 컷만 프롬프트 모양이 달라진다.
+  it("★ 영상 덮어쓰기 전문 — 판형이 붙지 않고 꼬리만 남는다", () => {
+    const c = { idx: 0, motion: "slow push-in", clip_prompt: "the shoe explodes" };
+    expect(buildClipPrompt(c, { settings: { aspect_ratio: "9:16" } })).toBe(
+      "the shoe explodes The attached image is the first frame — continue naturally from it. " +
+      "Keep the subject and style unchanged. No text or letters. No talking faces or lip sync."
+    );
+  });
+
+  // ★ 이것이 "원래대로" 버튼의 구현이다 — 별도 필드를 두지 않는다. 사장님이 칸을 비우면
+  //   코드가 만든 본문으로 돌아간다.
+  it("빈 문자열·공백은 덮어쓰기가 아니다 — 코드가 만든 본문으로 돌아간다", () => {
+    expect(buildImagePrompt({ ...cut, image_prompt: "   " }, project, []))
+      .toBe(buildImagePrompt(cut, project, []));
+    expect(buildImagePrompt({ ...cut, image_prompt: "" }, project, []))
+      .toBe(buildImagePrompt(cut, project, []));
+  });
+
+  it("빈 문자열·공백은 영상에서도 덮어쓰기가 아니다", () => {
+    const c = { idx: 0, motion: "slow push-in" };
+    expect(buildClipPrompt({ ...c, clip_prompt: "   " }, { settings: {} }))
+      .toBe(buildClipPrompt(c, { settings: {} }));
+  });
+
+  // 문자열이 아닌 값(옛 문서·잘못된 저장)이 본문을 "undefined" 로 갈아 끼우면 안 된다.
+  it("문자열이 아닌 값은 덮어쓰기가 아니다", () => {
+    expect(buildImagePrompt({ ...cut, image_prompt: { text: "A cat" } }, project, []))
+      .toBe(buildImagePrompt(cut, project, []));
+    const c = { idx: 0, motion: "slow push-in" };
+    expect(buildClipPrompt({ ...c, clip_prompt: 7 }, { settings: {} }))
+      .toBe(buildClipPrompt(c, { settings: {} }));
+  });
+});
