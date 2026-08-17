@@ -357,7 +357,12 @@ export default function ImagesStepPage() {
                   <span className="badge ai">{c.seconds}초</span>
                   {/* ★ 사유를 뭉뚱그리지 않는다. 낡음을 만드는 것은 화면 설명·화풍만이
                       아니다 — 이 컷의 프롬프트 덮어쓰기와 프로젝트 공통 지시(①자료)도
-                      같은 배지를 띄운다(lib/steps.js imageContextKey 가 그 넷을 다 각인한다).
+                      같은 배지를 띄운다.
+                      ★ 판정 자리가 하나가 아니다 — `isImageStale`(lib/steps.js) 안에서
+                      화면 설명은 `image.of`, 화풍은 `image.style_of`, 톤·전환은 `image.tone_of`,
+                      그리고 프롬프트 덮어쓰기·공통 지시·무대·인물·제품은 `image.context_of`
+                      (=`imageContextKey`)가 각각 판정한다. `imageContextKey` 만 보면
+                      화면 설명과 화풍을 못 찾는다 — 그 둘은 거기 안 들어 있다.
                       옛 문구는 프롬프트를 고쳐 낡은 컷에 **틀린 사유**를 보여 줬다 —
                       재생성 자체는 정당하니 돈이 새는 것은 아니지만, 사장님이 무엇 때문에
                       낡았는지 오해하면 엉뚱한 값을 되돌리며 찾는다. */}
