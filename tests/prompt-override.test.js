@@ -3,6 +3,7 @@
 // 앞으로 만들 그림이 달라진다. 그래서 기대값을 **손으로 적어** 못 박는다.
 import { describe, it, expect } from "vitest";
 import { buildClipPrompt, buildImagePrompt } from "../lib/cuts.js";
+import { imageContextKey, clipKey, isImageStale, isClipStale } from "../lib/steps.js";
 
 const project = {
   scenario: { focus: { mode: "물건", subject: "black high-top basketball shoe", look: "black upper with red sole" } },
@@ -330,5 +331,134 @@ describe("컷별 프롬프트 덮어쓰기", () => {
     const c = { idx: 0, motion: "slow push-in" };
     expect(buildClipPrompt({ ...c, clip_prompt: 7 }, { settings: {} }))
       .toBe(buildClipPrompt(c, { settings: {} }));
+  });
+});
+
+// ── 덮어쓰기와 각인 ────────────────────────────────────────────────────────
+//
+// 위까지는 "프롬프트가 어떻게 만들어지는가"였고, 여기부터는 **"고치면 산출물이 낡는가"**다.
+// 덮어쓰기를 프롬프트에만 실으면 사장님이 프롬프트를 고쳐도 화면은 조용하다 — 이미 만든
+// 그림·클립이 옛 프롬프트로 만들어진 것인데 "최신"으로 보인다. 화면과 실물이 갈린다.
+//
+// 반대 방향이 더 비싸다: 안 실리는 것을 각인에 담으면 **거짓 낡음이 유료 버튼을 연다**
+// (그림 컷당 $0.08, Seedance 30초 한 편 ~$9). 그래서 이 그물의 첫 줄은 "덮어쓰기가 없는
+// 컷의 각인은 글자 그대로 그대로다"이다.
+describe("덮어쓰기와 각인", () => {
+  // 절이 **전부 채워진** 컷이다. 절이 빈 픽스처는 순서 오류를 못 잡는다(Task 1 실측) —
+  // 빈 문자열끼리는 붙이는 차례가 뒤바뀌어도 이어 붙인 결과가 같다.
+  // ★ 대사 갈래를 열려면 말하는 모델(seedance-2.0)이어야 하고 cuts 에 그 컷이 있어야 한다.
+  const full = {
+    settings: { i2v_model: "seedance-2.0" },
+    scenario: {
+      narrator_voice: "calm low male voice",
+      focus: { mode: "물건", subject: "walnut espresso tamper", look: "walnut handle with steel base" },
+    },
+    cast: [{ who: "barista", look: "short-haired barista in a linen apron", voice: "warm alto voice", cuts: [1] }],
+  };
+  const fullCut = {
+    idx: 1,
+    shows: "the tamper resting beside a portafilter",
+    environment: "a narrow morning cafe counter",
+    tone: "soft daylight pastel",
+    camera: "천천히 뒤로 물러난다",
+    subject: "컵을 들어 입으로 가져간다",
+    // 움직임 셋째 축은 background 가 아니라 ambient 다.
+    ambient: "김이 천천히 피어오른다",
+    speed: "fast",
+    seconds: 5,
+    sentence: "한 모금이면 충분해요",
+    narration: true,
+    image: { url: "https://img/1.png" },
+  };
+  full.cuts = [fullCut];
+
+  // 기대값을 함수에서 만들지 않고 **손으로 적는다** — 구현으로 기대값을 만들면 동어반복이라
+  // 항목을 빼도 순서를 바꿔도 늘 초록이다.
+  const IMG_BASE =
+    "stage:a narrow morning cafe counter" +
+    "|cast:barista: short-haired barista in a linen apron" +
+    "|subject:walnut espresso tamper:walnut handle with steel base";
+  const CLIP_BASE =
+    "https://img/1.png|5||fast|한 모금이면 충분해요|calm low male voice||narration" +
+    "|stage:a narrow morning cafe counter" +
+    "|cast:barista: short-haired barista in a linen apron" +
+    "|subject:walnut espresso tamper:walnut handle with steel base" +
+    "|tone:soft daylight pastel" +
+    '|motion:[{"id":"camera","text":"천천히 뒤로 물러난다"},{"id":"subject","text":"컵을 들어 입으로 가져간다"},{"id":"ambient","text":"김이 천천히 피어오른다"}]';
+
+  it("★ 덮어쓰기가 없는 컷의 각인은 글자 그대로 그대로다", () => {
+    // 이 단언이 지키는 것: 지금 저장된 산출물이 통째로 낡아 재구매가 제시되지 않는다.
+    // 절이 전부 찬 컷으로 재는 이유는 위 픽스처 주석에 있다.
+    expect(imageContextKey(fullCut, full)).toBe(IMG_BASE);
+    expect(clipKey(fullCut, full)).toBe(CLIP_BASE);
+    const bare = { idx: 0, shows: "a shoe" };
+    expect(imageContextKey(bare, project)).not.toContain("prompt:");
+    expect(clipKey(bare, project)).not.toContain("prompt:");
+  });
+
+  // ★ Task 5 와의 계약: 각인 항목 차례는 **기존 → prompt → imgnote/clipnote** 다.
+  //   prompt 가 맨 뒤에 붙어 있어야 Task 5 가 그 뒤에 이어 붙일 수 있다. 차례가 갈리면
+  //   같은 값인데 각인 문자열이 달라져 병합 시점에 산출물이 낡는다 — 그래서 toContain 이
+  //   아니라 **전문**으로 못 박는다.
+  it("★ 덮어쓰기 각인은 기존 항목 맨 뒤에 붙는다 — 다음 태스크가 그 뒤에 잇는다", () => {
+    expect(imageContextKey({ ...fullCut, image_prompt: "a red shoe" }, full))
+      .toBe(`${IMG_BASE}|prompt:a red shoe`);
+    expect(clipKey({ ...fullCut, clip_prompt: "it explodes" }, full))
+      .toBe(`${CLIP_BASE}|prompt:it explodes`);
+  });
+
+  it("★ 덮어쓰면 각인이 바뀐다 — 고쳤는데 조용히 지나가지 않는다", () => {
+    const bare = { idx: 0, shows: "a shoe" };
+    const edited = { ...bare, image_prompt: "a red shoe" };
+    expect(imageContextKey(edited, project)).not.toBe(imageContextKey(bare, project));
+    const cbare = { idx: 0, image: { url: "u" }, seconds: 5, motion: "slow" };
+    expect(clipKey({ ...cbare, clip_prompt: "it explodes" }, project)).not.toBe(clipKey(cbare, project));
+  });
+
+  // 덮어쓰기를 **고치면** 각인이 또 달라져야 한다 — 한 번 붙고 마는 표식이면
+  // 두 번째 수정부터 조용해진다.
+  it("★ 덮어쓰기를 고치면 각인도 따라 바뀐다", () => {
+    const a = imageContextKey({ ...fullCut, image_prompt: "a red shoe" }, full);
+    const b = imageContextKey({ ...fullCut, image_prompt: "a blue shoe" }, full);
+    expect(a).not.toBe(b);
+    const c = clipKey({ ...fullCut, clip_prompt: "it explodes" }, full);
+    const d = clipKey({ ...fullCut, clip_prompt: "it melts" }, full);
+    expect(c).not.toBe(d);
+  });
+
+  // ★ 프롬프트가 안 갈리는 값은 각인도 안 갈려야 한다. lib/cuts.js 의 promptOverride 가
+  //   공백을 떼고 문자열이 아닌 값을 무시하므로, 그런 값으로 각인만 달라지면 프롬프트가
+  //   똑같은데 낡았다고 말하게 된다 — 그 버튼은 유료다.
+  it("★ 공백뿐인 값·문자열 아닌 값은 각인을 안 건드린다 — 프롬프트가 안 갈리므로", () => {
+    expect(imageContextKey({ ...fullCut, image_prompt: "   " }, full)).toBe(IMG_BASE);
+    expect(imageContextKey({ ...fullCut, image_prompt: "" }, full)).toBe(IMG_BASE);
+    expect(imageContextKey({ ...fullCut, image_prompt: { text: "a cat" } }, full)).toBe(IMG_BASE);
+    expect(clipKey({ ...fullCut, clip_prompt: "   " }, full)).toBe(CLIP_BASE);
+    expect(clipKey({ ...fullCut, clip_prompt: 7 }, full)).toBe(CLIP_BASE);
+  });
+
+  // 각인은 값을 담는 것으로 끝이 아니다 — 낡음 판정이 실제로 그것을 띄워야 화면에
+  // [다시 만들기]가 뜬다.
+  it("★ 덮어쓴 컷의 그림이 낡음으로 뜬다", () => {
+    const shows = "a shoe";
+    const cutWithImage = {
+      idx: 0,
+      shows,
+      image: { url: "u", of: shows, context_of: imageContextKey({ idx: 0, shows }, project) },
+      image_prompt: "a red shoe",
+    };
+    expect(isImageStale(cutWithImage, project)).toBe(true);
+    // 그리고 안 고친 컷은 낡지 않는다 — 거짓 낡음이 유료 버튼을 열면 안 된다.
+    const { image_prompt, ...untouched } = cutWithImage;
+    expect(isImageStale(untouched, project)).toBe(false);
+  });
+
+  it("★ 덮어쓴 컷의 클립이 낡음으로 뜬다", () => {
+    const base = { idx: 0, image: { url: "u" }, seconds: 5, motion: "slow" };
+    const edited = { ...base, clip_prompt: "it explodes" };
+    const withVideo = { ...edited, video: { url: "v", of: clipKey(base, project) } };
+    expect(isClipStale(withVideo, project)).toBe(true);
+    const { clip_prompt, ...untouched } = withVideo;
+    expect(isClipStale(untouched, project)).toBe(false);
   });
 });
