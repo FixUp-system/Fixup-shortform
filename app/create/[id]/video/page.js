@@ -270,9 +270,13 @@ export default function VideoStepPage() {
                   {c.video?.truncated && (
                     <span className="badge warn">{clipMax}초까지만 움직이고 나머지는 멈춰 있어요</span>
                   )}
+                  {/* ★ ④이미지의 배지와 같은 이유로 사유를 뭉뚱그리지 않는다 — clipKey 는
+                      그림·낭독뿐 아니라 속도·움직임·화질·프롬프트 덮어쓰기·공통 지시까지
+                      각인한다(lib/steps.js). 사장님이 왜 낡았는지 오해하면 엉뚱한 값을
+                      되돌리며 찾는다. */}
                   {isClipStale(c, project) && (
                     <span className="badge warn">
-                      그림이나 낭독이 바뀐 뒤라 클립이 옛것이에요 — 다시 만들면 됩니다
+                      클립을 만든 뒤에 값이 바뀌었어요(그림·낭독·움직임·프롬프트·공통 지시) — 다시 만들면 됩니다
                     </span>
                   )}
                   {(c.video || c.video_error) && (
@@ -447,6 +451,13 @@ function ClipPromptEdit({ cut, project, busyCut, onSavePrompt }) {
         영어로 쓰면 더 잘 알아들어요. 아래 문장은 저희가 항상 뒤에 붙여요 — 고칠 수 없어요.
       </p>
       <p className="preview-note mono">{fixedTail}</p>
+      {/* ★ 꼬리에는 사장님이 직접 쓴 글도 섞여 있다 — 프로젝트 공통 지시(settings.clip_note)가
+          본문 뒤·계약 앞이라 이 블록 안에 나온다. 대사에는 고칠 자리를 적어 뒀는데 이 값에는
+          없어서, 자기가 쓴 문장을 못 고치는 것으로 읽혔다. */}
+      <p className="preview-note">
+        <strong>모든 영상에 함께 보내는 지시</strong>도 위 꼬리에 들어 있어요 — 그건 자료
+        단계에서 고칠 수 있어요.
+      </p>
       {/* ★ 대사가 꼬리에 있는 이유를 사장님 말로 적는다. 안 적으면 위 꼬리에서 대사를 보고
           여기서 고치려 들고, 고칠 자리를 못 찾아 헤맨다. */}
       <p className="preview-note">

@@ -361,6 +361,47 @@ describe("⑤영상 — 프롬프트 편집", () => {
 //   ③ 저장이 화풍과 섞이면 안 된다(normalizeStyle 이 preset 을 함께 요구한다)
 //   ④ 초기값을 매 렌더마다 덮으면 타이핑이 끊긴다
 //   ⑤ 한 번 고치면 **전 컷이 낡는다** — 값이 든다고 미리 말해야 한다
+// ★ 2026-08-17 리뷰 D3·D5 — 접힌 칸과 낡음 배지가 **사장님이 쓴 글**을 다룬 곳들이다.
+//   둘 다 문구만 고친 것이지만, 문구가 틀리면 사장님이 엉뚱한 값을 되돌리며 찾는다.
+describe("사장님이 쓴 글의 자리를 알려 준다", () => {
+  // 배지 하나만 잘라 낸다 — 파일 전체를 훑으면 위쪽 주석에 걸려 배지를 지워도 초록이다.
+  const staleBadge = (src, fn) => {
+    const at = src.indexOf(`${fn}(c, project) && (`);
+    if (at < 0) return "";
+    const end = src.indexOf("</span>", at);
+    return end < 0 ? "" : src.slice(at, end);
+  };
+
+  it("④이미지 낡음 배지가 사유를 화면 설명·화풍으로 좁혀 말하지 않는다", () => {
+    const badge = staleBadge(images, "isImageStale");
+    expect(badge, "낡음 배지를 못 찾았다").not.toBe("");
+    // 프롬프트 덮어쓰기·프로젝트 공통 지시도 같은 배지를 띄운다(imageContextKey 가 각인한다)
+    expect(badge, "프롬프트를 고쳐 낡은 컷에 틀린 사유를 보여 준다").toMatch(/프롬프트/);
+    expect(badge, "공통 지시로 낡은 컷에 틀린 사유를 보여 준다").toMatch(/공통 지시/);
+  });
+
+  it("⑤영상 낡음 배지도 같은 사유를 다 말한다", () => {
+    const badge = staleBadge(video, "isClipStale");
+    expect(badge, "낡음 배지를 못 찾았다").not.toBe("");
+    expect(badge, "프롬프트를 고쳐 낡은 컷에 틀린 사유를 보여 준다").toMatch(/프롬프트/);
+    expect(badge, "공통 지시로 낡은 컷에 틀린 사유를 보여 준다").toMatch(/공통 지시/);
+  });
+
+  // 꼬리(`full.slice(seed.length)`)에는 코드의 계약뿐 아니라 **사장님이 ①자료에서 쓴 공통
+  // 지시**도 들어 있다. "고칠 수 없어요"만 적혀 있으면 자기 글을 못 고치는 것으로 읽는다.
+  it("④이미지 — 꼬리 안의 공통 지시는 어디서 고치는지 적는다", () => {
+    const fold = foldIn(images);
+    expect(fold, "공통 지시가 꼬리에 있다는 말이 없다").toMatch(/함께 보내는 지시/);
+    expect(fold, "어디서 고치는지 안 알려 준다").toMatch(/함께 보내는 지시[\s\S]*자료/);
+  });
+
+  it("⑤영상 — 꼬리 안의 공통 지시는 어디서 고치는지 적는다", () => {
+    const fold = foldIn(video);
+    expect(fold, "공통 지시가 꼬리에 있다는 말이 없다").toMatch(/함께 보내는 지시/);
+    expect(fold, "어디서 고치는지 안 알려 준다").toMatch(/함께 보내는 지시[\s\S]*자료/);
+  });
+});
+
 describe("①자료 — 프로젝트 공통 지시", () => {
   it("칸이 둘이다 — 이미지용과 영상용", () => {
     expect(briefing, "이미지 공통 지시 칸이 없다").toMatch(/image_note/);

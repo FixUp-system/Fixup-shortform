@@ -355,9 +355,15 @@ export default function ImagesStepPage() {
                     <span className="badge photo">내 사진 · {photo?.filename || ""}</span>
                   )}
                   <span className="badge ai">{c.seconds}초</span>
+                  {/* ★ 사유를 뭉뚱그리지 않는다. 낡음을 만드는 것은 화면 설명·화풍만이
+                      아니다 — 이 컷의 프롬프트 덮어쓰기와 프로젝트 공통 지시(①자료)도
+                      같은 배지를 띄운다(lib/steps.js imageContextKey 가 그 넷을 다 각인한다).
+                      옛 문구는 프롬프트를 고쳐 낡은 컷에 **틀린 사유**를 보여 줬다 —
+                      재생성 자체는 정당하니 돈이 새는 것은 아니지만, 사장님이 무엇 때문에
+                      낡았는지 오해하면 엉뚱한 값을 되돌리며 찾는다. */}
                   {isImageStale(c, project) && (
                     <span className="badge warn">
-                      화면 설명이나 화풍을 고친 뒤라 그림이 옛 값으로 그려진 거예요 — 다시 만들면 됩니다
+                      그림을 만든 뒤에 값이 바뀌었어요(화면 설명·화풍·프롬프트·공통 지시) — 다시 만들면 됩니다
                     </span>
                   )}
                 </div>
@@ -542,6 +548,14 @@ function PreviewPane({ cut, project, url, photoName, aspect, stalled, onRegen, o
               영어로 쓰면 더 잘 알아들어요. 아래 문장은 저희가 항상 뒤에 붙여요 — 고칠 수 없어요.
             </p>
             <p className="preview-note mono">{fixedTail}</p>
+            {/* ★ 꼬리에는 사장님이 직접 쓴 글도 섞여 있다 — 프로젝트 공통 지시
+                (settings.image_note)가 본문 뒤·계약 앞이라 이 블록 안에 나온다. "고칠 수
+                없어요"만 적어 두면 자기가 쓴 문장을 못 고치는 것으로 읽는다. 고치는 자리를
+                알려 준다. 원문자(①)는 쓰지 않는다 — tests/design-system.test.js 가 막는다. */}
+            <p className="preview-note">
+              <strong>모든 이미지에 함께 보내는 지시</strong>도 위 꼬리에 들어 있어요 — 그건
+              자료 단계에서 고칠 수 있어요.
+            </p>
             <p className="preview-note">
               레퍼런스 사진을 쓰는 컷에는 그 사진에 대한 지시도 함께 붙어요.
             </p>
