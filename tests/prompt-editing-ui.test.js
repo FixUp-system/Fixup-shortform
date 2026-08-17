@@ -44,7 +44,26 @@ describe("④이미지 — 프롬프트 편집", () => {
     //   된다 — 이 태스크가 막으려는 바로 그 결함이라 이름으로 못 박는다.
     expect(images, "전체 프롬프트를 텍스트칸 값으로 쓴다 — 꼬리가 두 벌이 된다").not.toMatch(/value=\{\s*full\s*\}/);
     expect(images, "전체 프롬프트를 텍스트칸 씨앗으로 쓴다").not.toMatch(/useState\(\s*full\b/);
-    expect(images, "텍스트칸 씨앗이 본문 판정에서 오지 않는다").toMatch(/useState\([^)]*generated/);
+    expect(images, "텍스트칸 씨앗을 이름 하나로 두지 않았다").toMatch(/const seed = saved \|\| generated/);
+    expect(images, "텍스트칸이 씨앗에서 출발하지 않는다").toMatch(/useState\(seed\)/);
+  });
+
+  // ★★ 돈에 닿는 자리다. 덮어쓰기가 없는 컷은 `saved === ""` 이므로, 잠금 판정을 `saved` 로
+  //   재면 **텍스트칸이 코드가 만든 본문 그대로인 상태에서 [저장]이 눌린다.** 한 번 누르면
+  //   그 본문이 덮어쓰기로 굳고 각인이 뒤집혀, 아무것도 안 고친 사장님에게
+  //   "화면 설명이나 화풍을 고친 뒤라…"라는 **틀린 사유로 컷당 $0.08 재생성**을 권한다.
+  //   그래서 비교 대상이 **텍스트칸 씨앗과 같은 값**인지 잰다.
+  it("★ 덮어쓰기가 없고 텍스트칸을 안 건드렸으면 [저장]이 안 눌린다", () => {
+    const fold = foldOf();
+    // [저장] 버튼의 잠금 조건 — 접힌 칸의 첫 버튼이다.
+    const disabled = fold.match(/disabled=\{([^}]*)\}[\s\S]*?>\s*저장/)?.[1];
+    expect(disabled, "[저장] 버튼의 잠금 조건을 못 찾았다").toBeTruthy();
+    const cond = disabled.replace(/\s+/g, " ");
+    expect(cond, "[저장]이 씨앗과 비교하지 않는다 — 안 고쳐도 눌려 각인이 뒤집힌다")
+      .toContain("prompt.trim() === seed");
+    // `saved` 로 재면 안 된다. `=== saved || generated` 같은 형태도 막는다 —
+    // `(a === b) || c` 로 읽혀 항상 잠기고, 그러면 이번엔 저장 자체가 죽는다.
+    expect(cond, "잠금 판정이 저장된 값만 본다").not.toMatch(/prompt\.trim\(\) === saved\b/);
   });
 
   // ⚠️ 브리프의 단정(`toMatch(/유료|다시 만들/)`)은 파일 전체를 훑어서 **아무것도 안 잰다** —
@@ -66,14 +85,39 @@ describe("④이미지 — 프롬프트 편집", () => {
     expect(fold, "지금 그림이 안 바뀐다는 말이 없다").toMatch(/다시 만들/);
   });
 
+  // 버튼 이름은 **접힌 칸 안에서** 잰다 — 파일 전체를 훑으면 주석의 "원래대로"에 걸려
+  // 버튼 이름을 바꿔도 초록이다(유료 경고에서 잡은 것과 같은 함정).
   it("원래대로 버튼이 있다 — 빈 값을 보내는 것이 구현이다", () => {
-    expect(images).toMatch(/원래대로/);
-    expect(images, "빈 값을 보내는 자리가 없다 — 되돌릴 길이 없다").toMatch(/savePrompt\([^)]*""\s*\)|onSavePrompt\([^)]*""\s*\)/);
+    const fold = foldOf();
+    expect(fold, "[원래대로] 버튼 이름이 없다").toMatch(/원래대로/);
+    expect(fold, "빈 값을 보내는 자리가 없다 — 되돌릴 길이 없다").toMatch(/onSavePrompt\([^)]*""\s*\)/);
   });
 
+  // ★ `savePrompt` **함수 본문 안쪽만** 잘라서 잰다. 파일 전체를 훑는 단정은 아무것도 안
+  //   쟀다(리뷰 실측): `/image_prompt/` 는 `cut.image_prompt` 판독과 주석에 걸리고
+  //   `/method: "PATCH"/` 는 `editSentence` 에 걸려서, **함수를 통째로 지워도**(그러면
+  //   `onSavePrompt={savePrompt}` 가 미정의 참조라 화면이 렌더에서 죽는다) 초록이었다.
+  //   필드 이름을 `sentence` 로 바꿔도 초록이었다 — 그러면 프롬프트 저장이 **원고를
+  //   덮어쓰고** ②대본에 거짓 경고가 뜬다(그 버튼이 유료다).
+  const bodyOf = (name) => {
+    const start = images.indexOf(`async function ${name}(`);
+    if (start < 0) return "";
+    // 컴포넌트 안의 함수라 들여쓰기 2칸에서 닫힌다.
+    const end = images.indexOf("\n  }", start);
+    if (end < 0) return "";
+    return images.slice(start, end).replace(/\/\/[^\n]*/g, "");
+  };
+
   it("저장은 컷별 프롬프트 필드로 PATCH 한다 — 저장 경로가 하나다", () => {
-    expect(images).toMatch(/image_prompt/);
-    expect(images).toMatch(/method: "PATCH"/);
+    const fn = bodyOf("savePrompt");
+    expect(fn, "savePrompt 함수가 없다 — 화면이 미정의 참조로 죽는다").toBeTruthy();
+    expect(fn, "PATCH 가 아니다").toMatch(/method: "PATCH"/);
+    expect(fn, "프로젝트 저장 경로가 아니다").toMatch(/\/api\/projects\/\$\{id\}/);
+    // ★ 담는 필드가 **image_prompt** 여야 한다. sentence 로 보내면 원고가 덮인다.
+    expect(fn.replace(/\s+/g, " "), "컷의 image_prompt 로 안 보낸다")
+      .toMatch(/cut: \{ idx, image_prompt \}/);
+    // 화면에 실제로 배선돼 있어야 한다 — 함수만 있고 안 걸려 있으면 버튼이 죽는다.
+    expect(images, "저장 함수가 미리보기에 안 걸려 있다").toMatch(/onSavePrompt=\{savePrompt\}/);
   });
 
   // 글자 수는 보여 준다. **상한 숫자는 화면에 안 적는다** — 값이 두 벌이면 갈린다
@@ -108,7 +152,11 @@ describe("④이미지 화면의 import 사슬 — 서버 전용 모듈이 없�
       const src = readFileSync(file, "utf8");
       for (const m of src.matchAll(/from\s+"(\.[^"]+)"/g)) {
         const base = resolve(dirname(file), m[1]);
-        const hit = [base, `${base}.js`, `${base}.jsx`, `${base}/index.js`].find((p) => existsSync(p) && p.endsWith(".js"));
+        // ★ `.jsx` 를 반드시 센다. 여기서 `.js` 로만 걸렀더니 `components/` 아래
+        //   (ProjectContext·MeContext·BackButton — 전부 `.jsx`)가 사슬에 **한 파일도 안
+        //   들어왔다.** 화면 컴포넌트가 서버 전용 모듈을 끌어와도 초록이었다(리뷰 실측).
+        const hit = [base, `${base}.js`, `${base}.jsx`, `${base}/index.js`, `${base}/index.jsx`]
+          .find((p) => existsSync(p) && /\.jsx?$/.test(p));
         if (hit) queue.push(hit);
       }
     }
@@ -117,9 +165,13 @@ describe("④이미지 화면의 import 사슬 — 서버 전용 모듈이 없�
 
   it("★ 사슬에 fs·path 가 없다", () => {
     const chain = chainOf(resolve(PAGE));
-    // 그물이 실제로 무언가를 훑는지 먼저 본다 — 사슬이 한 파일뿐이면 이 테스트는 헛돈다.
-    expect(chain.length, "사슬을 못 따라갔다").toBeGreaterThan(5);
+    // 그물이 실제로 무언가를 훑는지 먼저 본다 — 사슬이 짧으면 이 테스트는 헛돈다.
+    expect(chain.length, "사슬을 못 따라갔다").toBeGreaterThan(15);
     expect(chain.some((f) => f.endsWith("cuts.js")), "lib/cuts.js 가 사슬에 없다").toBe(true);
+    // ★ 화면 컴포넌트까지 닿았는가 — `.jsx` 를 건너뛰면 여기서 걸린다.
+    for (const must of ["ProjectContext.jsx", "MeContext.jsx", "BackButton.jsx"]) {
+      expect(chain.some((f) => f.endsWith(must)), `${must} 가 사슬에 없다 — .jsx 를 건너뛴다`).toBe(true);
+    }
     const bad = chain.filter((f) => SERVER_ONLY.test(readFileSync(f, "utf8")));
     expect(bad, `화면이 서버 전용 모듈을 끌어온다: ${bad.join(", ")}`).toEqual([]);
   });

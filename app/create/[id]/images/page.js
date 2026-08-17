@@ -456,13 +456,19 @@ function PreviewPane({ cut, project, url, photoName, aspect, stalled, onRegen, o
   const saved = typeof cut.image_prompt === "string" ? cut.image_prompt.trim() : "";
   // 덮어쓰기를 지운 컷의 본문 — "원래대로"가 텍스트칸에 되돌려 놓는 값이다.
   const generated = promptBodyOf("image", { ...cut, image_prompt: "" }, project);
-  const [prompt, setPrompt] = useState(saved || generated);
+  // ★ 씨앗을 **이름 하나로** 둔다. 텍스트칸의 초기값·꼬리를 떼는 기준·[저장] 잠금 판정이
+  //   전부 이 값이어야 한다. 그중 하나만 `saved` 로 재면(그렇게 적혀 있었다) 덮어쓰기가 없는
+  //   컷에서 **아무것도 안 고쳤는데 [저장]이 눌린다** — 그 순간 코드가 만든 본문이 덮어쓰기로
+  //   굳어 화면 설명·화풍을 바꿔도 프롬프트가 안 따라오고, 각인이 뒤집혀
+  //   "화면 설명이나 화풍을 고친 뒤라…" 라는 **틀린 사유로 컷당 $0.08 재생성을 권한다.**
+  const seed = saved || generated;
+  const [prompt, setPrompt] = useState(seed);
   // ⚠️ 레퍼런스 사진 문구는 화면에서 만들 수 없다 — 그 판정(lib/cast.js)이 `fs` 를 끈다.
   //    그래서 꼬리에 그 절이 빠질 수 있고, 아래 안내에 그렇게 적는다(없는 것처럼 보이면
   //    사장님이 "레퍼런스가 안 나간다"고 읽는다).
   const full = buildImagePrompt(cut, project, []);
-  const fixedTail = full.startsWith(saved || generated)
-    ? full.slice((saved || generated).length)
+  const fixedTail = full.startsWith(seed)
+    ? full.slice(seed.length)
     : full.slice(promptBodyOf("image", cut, project).length);
   const isPhoto = cut.source === "photo";
   const busyCut = !stalled && cut.state === "generating";
@@ -547,7 +553,7 @@ function PreviewPane({ cut, project, url, photoName, aspect, stalled, onRegen, o
             <div className="preview-actions">
               <button
                 className="mini"
-                disabled={busyCut || prompt.trim() === saved}
+                disabled={busyCut || prompt.trim() === seed}
                 onClick={() => onSavePrompt(cut.idx, prompt.trim())}
               >
                 저장
