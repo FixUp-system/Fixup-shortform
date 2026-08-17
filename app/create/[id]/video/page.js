@@ -53,6 +53,16 @@ export default function VideoStepPage() {
     setPollTimedOut(false);
     stopRef.current = startPolling({
       url: `/api/projects/${id}/clips/status`,
+      // ★★ 상한을 **명시한다**(2026-08-18). 이 화면만 넘기지 않아 lib/poll.js 의 기본값(5분)을
+      //    그대로 받고 있었다 — 그런데 클립은 실측 **컷당 100~800초**다(원장 기록: 16:13:58 ·
+      //    +20s · +100.8s). 5분을 넘기면 폴링이 포기하고, `pollTimedOut` 이 서면 아래 진입 복원
+      //    까지 막혀(`!pollTimedOut`) **새로고침만이 탈출구**가 됐다. 사장님이 겪은 그 일이다.
+      //    ③목소리·④이미지는 이미 Infinity 다 — 영상만 기본값을 받은 것이 실수였고,
+      //    CLAUDE.md 가 그 함정을 미리 적어 두었다("기본값을 그대로 받지 마라").
+      // ★ 상한을 두지 않는 대신 **멈춤 판정**이 그 자리를 지킨다 — 심장박동이 2분 없으면
+      //   화면이 "진행이 없어요"라고 말한다(lib/progress.js generationState). 즉 무한정
+      //   기다리는 것처럼 보이지 않는다.
+      timeoutMs: Infinity,
       onTick: (st) => {
         setStatus(st);
         setProject((p) => ({ ...p, status: st.status, cuts: st.cuts, video_error: st.video_error }));
@@ -72,6 +82,32 @@ export default function VideoStepPage() {
       },
     });
   }
+
+  // ★★ 탭으로 돌아오면 **스스로 다시 붙는다**(2026-08-18 사장님 지적: "새로고침 후 다시
+  //    생성해야 한다"). 새로고침이 하던 일은 두 가지였다 — 상태를 한 번 다시 읽는 것과,
+  //    포기 표시(pollTimedOut)를 지우는 것. 둘 다 여기서 한다.
+  //
+  // 왜 필요한가: 폴링이 어떤 이유로든 멎으면(연속 실패 5회, 브라우저가 백그라운드 탭의
+  // 타이머를 늦추는 것) 화면은 멎은 채로 남는다. 사장님이 다른 창을 보다 돌아오는 그 순간이
+  // 다시 확인할 가장 자연스러운 자리다.
+  //
+  // ★ 폴링이 돌고 있으면 손대지 않는다 — 멀쩡히 도는 루프를 껐다 켜면 회차가 밀린다.
+  // ★ 포기 표시만 지우고 폴링을 직접 시작하지 않는다 — 시작 판정은 아래 복원 useEffect
+  //   하나가 쥔다(두 곳에서 시작하면 루프가 둘 붙는다). 표시가 풀리면 그 effect 가 잇는다.
+  useEffect(() => {
+    const wake = () => {
+      if (document.visibilityState === "hidden") return;
+      if (stopRef.current) return;
+      setPollTimedOut(false);
+      load(id).catch(() => {});
+    };
+    document.addEventListener("visibilitychange", wake);
+    window.addEventListener("focus", wake);
+    return () => {
+      document.removeEventListener("visibilitychange", wake);
+      window.removeEventListener("focus", wake);
+    };
+  }, [id]);
 
   // 진입·새로고침 복원 — 아직 만들지 않은 컷이 남아 있으면 폴링을 잇는다
   useEffect(() => {
