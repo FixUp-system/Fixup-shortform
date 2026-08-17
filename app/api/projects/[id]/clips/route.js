@@ -1,6 +1,7 @@
 import { getProject, updateProject } from "../../../../../lib/projects";
 import { runVideoPipeline, withProgress } from "../../../../../lib/pipeline";
 import { isClipStale } from "../../../../../lib/steps";
+import { isGenerationLive } from "../../../../../lib/progress.js";
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { requireVideoCharge, assertCanAfford, chargeRegen, NoCredits } from "../../../../../lib/charges.js";
 import { regenPrice, MAX_REGEN_PER_CUT } from "../../../../../lib/pricing.js";
@@ -53,6 +54,25 @@ export const POST = withUser(async (req, { params }, user) => {
   if (!remaining.length) {
     return Response.json(
       { error: "이미 만든 영상이 있어요 — 컷별로 다시 만들 수 있어요" },
+      { status: 409 }
+    );
+  }
+
+  // ★ **돌고 있는 실행 위에 또 시작하지 않는다** — 청구보다 **앞**이다.
+  //
+  // 위 remaining 가드는 이 자리를 못 지킨다: 만드는 중인 컷은 언제나 "남은 것"이라 항상 참이다.
+  // 그래서 화면이 5분 폴링 상한을 넘겨 버튼을 열면 두 번째 누름이 그대로 들어와, 낡은 컷을
+  // 다음 등급 값으로 다시 청구하고(회차·3회 상한까지 깎으며) 같은 컷 위에 파이프라인을
+  // 하나 더 띄웠다(fal 원가 컷당 $0.42~$1.51 이중).
+  //
+  // 화면의 잠금만으로는 부족하다 — 그것은 낡은 탭·직접 호출·두 탭 동시 누름을 모르고,
+  // 애초에 5분이 지나면 스스로 열린다. 값을 지키는 자리는 서버여야 한다.
+  //
+  // 가짜 모드도 함께 막는다. 돈은 안 들지만 같은 프로젝트에 파이프라인 둘이 붙어 문서를
+  // 갈아 쓰는 것은 그 자체로 버그이고, 무엇보다 **가짜에서 못 밟는 버그는 진짜에서 밟는다.**
+  if (isGenerationLive(project.progress, "video", Date.now())) {
+    return Response.json(
+      { error: "이미 영상을 만들고 있어요 — 잠시 기다렸다가 새로고침해 주세요" },
       { status: 409 }
     );
   }
