@@ -1,10 +1,12 @@
 // ★ 이 파일이 지키는 것 하나: **덮어쓰기가 없으면 프롬프트가 글자 그대로 지금과 같다.**
 // 본문/꼬리로 가르는 리팩터는 조용히 실패한다 — 문구가 한 글자 달라져도 테스트는 초록인데
 // 앞으로 만들 그림이 달라진다. 그래서 기대값을 **손으로 적어** 못 박는다.
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { buildClipPrompt, buildImagePrompt } from "../lib/cuts.js";
 import { imageContextKey, clipKey, isImageStale, isClipStale } from "../lib/steps.js";
 import { normalizePromptNote, PROMPT_NOTE_MAX, STYLE_NOTE_MAX } from "../lib/styles.js";
+import { memoryStore, resetMemoryStore } from "../lib/store/memory.js";
+import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
 
 const project = {
   scenario: { focus: { mode: "물건", subject: "black high-top basketball shoe", look: "black upper with red sole" } },
@@ -737,5 +739,163 @@ describe("프로젝트 공통 지시", () => {
       expect(clip).toContain("hand-held documentary feel");
       expect(clip).not.toContain("shot on 35mm film");
     });
+  });
+});
+
+// ── 저장 경로 (PATCH /api/projects/[id]) ───────────────────────────────────
+//
+// 위까지는 "덮어쓰기가 있으면 어떻게 되는가"였고, 여기부터는 **"어떻게 저장되는가"**다.
+// 읽는 쪽(프롬프트·각인)은 다 만들어져 있었는데 저장할 길이 없었다 — 컷 화이트리스트가
+// `.trim()` 이 참일 때만 담아서, 값은 들어가고 **비우기가 아예 안 됐다.**
+//
+// ★ 비우기가 곧 "원래대로" 버튼의 구현이다(별도 필드를 두지 않기로 한 설계).
+//   그래서 빈 값은 빈 문자열로 **남으면 안 되고 필드가 지워져야** 한다 — 이 저장소는
+//   "옛 컷과 글자 그대로 같은 모양"을 각인의 전제로 쓴다. 빈 문자열로 남으면 각인에는
+//   안 잡히지만(promptOverride 가 공백을 덮어쓰기로 안 본다) 컷 모양이 옛 컷과 달라진다.
+const { PATCH } = await import("../app/api/projects/[id]/route.js");
+
+const A = "00000000-0000-4000-8000-00000000000a";
+const P = "p-prompt";
+
+const patchReq = (cut) =>
+  new Request(`http://localhost/api/projects/${P}`, {
+    method: "PATCH",
+    headers: {
+      [USER_HEADER]: A, [STATUS_HEADER]: "approved", [ROLE_HEADER]: "user",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ cut }),
+  });
+const patchCut = (cut) => PATCH(patchReq(cut), { params: Promise.resolve({ id: P }) });
+const savedCuts = async () => (await memoryStore.selectProject(P, A)).doc.cuts;
+
+describe("PATCH /api/projects/[id] — 컷별 프롬프트 덮어쓰기", () => {
+  beforeEach(async () => {
+    resetMemoryStore();
+    await memoryStore.insertProject(
+      {
+        id: P, created_ts: 1, status: "draft", settings: { target_seconds: 15 },
+        script: { text: "첫 문장. 둘째 문장." },
+        cuts: [
+          { idx: 0, sentence: "첫 문장.", shows: "a shoe on wet asphalt" },
+          { idx: 1, sentence: "둘째 문장.", shows: "a shoe in the air" },
+        ],
+      },
+      A
+    );
+  });
+
+  it("★ 값을 보내면 컷에 담긴다 — 앞뒤 공백은 걷힌다", async () => {
+    expect((await patchCut({ idx: 0, image_prompt: "  a red shoe  " })).status).toBe(200);
+    expect((await savedCuts())[0].image_prompt).toBe("a red shoe");
+  });
+
+  it("영상 덮어쓰기도 같은 자리다 — 두 칸이 함께 열려야 한다", async () => {
+    expect((await patchCut({ idx: 0, clip_prompt: "  it explodes  " })).status).toBe(200);
+    expect((await savedCuts())[0].clip_prompt).toBe("it explodes");
+  });
+
+  // ★★ 이 태스크의 존재 이유. 빈 문자열로 **남기면** 안 된다 — `in` 으로 잰다.
+  it("★ 빈 값을 보내면 필드가 지워진다 — 그것이 '원래대로' 버튼이다", async () => {
+    await patchCut({ idx: 0, image_prompt: "a red shoe" });
+    // 먼저 실제로 담겼는지 본다 — 안 그러면 담기지도 않는 구현에서 이 단언이 헛돈다.
+    expect((await savedCuts())[0].image_prompt).toBe("a red shoe");
+    await patchCut({ idx: 0, image_prompt: "" });
+    const cut = (await savedCuts())[0];
+    expect("image_prompt" in cut, "필드가 남아 있다 — 지워져야 한다").toBe(false);
+  });
+
+  it("공백뿐인 값도 지운다 — promptOverride 가 덮어쓰기로 안 보는 값이다", async () => {
+    await patchCut({ idx: 0, clip_prompt: "it explodes" });
+    expect((await savedCuts())[0].clip_prompt).toBe("it explodes");
+    await patchCut({ idx: 0, clip_prompt: "   " });
+    const cut = (await savedCuts())[0];
+    expect("clip_prompt" in cut).toBe(false);
+  });
+
+  // 지운 뒤의 컷은 **옛 컷과 글자 그대로 같은 모양**이어야 한다. 각인만 같아서는 부족하다 —
+  // 다른 코드가 컷 모양을 통째로 비교하는 자리가 있다.
+  it("★ 지우고 나면 컷이 손대기 전과 글자 그대로 같다", async () => {
+    const before = (await savedCuts())[0];
+    await patchCut({ idx: 0, image_prompt: "a red shoe", clip_prompt: "it explodes" });
+    expect((await savedCuts())[0]).not.toEqual(before);
+    await patchCut({ idx: 0, image_prompt: "", clip_prompt: "" });
+    expect((await savedCuts())[0]).toEqual(before);
+  });
+
+  // ★ 위 단언들은 **저장소를 지나온 뒤**를 본다 — 두 저장소 다 JSON 으로 옮기므로
+  //   `image_prompt: undefined` 라는 키가 살아 있어도 직렬화에서 조용히 사라진다.
+  //   즉 머지에서 delete 를 빼도 위 단언은 전부 초록이다(뮤테이션 실측).
+  //   그래서 **라우트가 저장소에 건네는 그 객체**를 잡아 잰다 — 지우는 것은 delete 뿐이다.
+  //   값이 undefined 인 키를 남겨 두면 저장소 구현이 바뀌는 날(예: jsonb 직접 머지)
+  //   컷 모양이 옛 컷과 달라지고, 이 저장소는 그 모양을 각인의 전제로 쓴다.
+  it("★ 저장소에 건네는 컷에 빈 키가 남지 않는다 — undefined 를 남기면 안 된다", async () => {
+    await patchCut({ idx: 0, image_prompt: "a red shoe" });
+    let handed;
+    const orig = memoryStore.updateProjectRow.bind(memoryStore);
+    const spy = vi.spyOn(memoryStore, "updateProjectRow").mockImplementation(async (id, o, v, doc) => {
+      handed = doc.cuts.find((c) => c.idx === 0);
+      return orig(id, o, v, doc);
+    });
+    try {
+      await patchCut({ idx: 0, image_prompt: "" });
+    } finally {
+      spy.mockRestore();
+    }
+    expect(Object.keys(handed), "undefined 인 키가 남아 있다").not.toContain("image_prompt");
+  });
+
+  it("다른 컷은 안 건드린다", async () => {
+    await patchCut({ idx: 0, image_prompt: "a red shoe" });
+    expect((await savedCuts())[1].image_prompt).toBeUndefined();
+    expect((await savedCuts())[1].shows).toBe("a shoe in the air");
+  });
+
+  // 비우기는 **보낸 컷만**이다 — 지우기가 컷 전체를 훑으면 남의 덮어쓰기가 함께 사라진다.
+  it("비우기도 보낸 컷만 지운다", async () => {
+    await patchCut({ idx: 0, image_prompt: "a red shoe" });
+    await patchCut({ idx: 1, image_prompt: "a blue shoe" });
+    await patchCut({ idx: 0, image_prompt: "" });
+    const cuts = await savedCuts();
+    expect("image_prompt" in cuts[0]).toBe(false);
+    expect(cuts[1].image_prompt).toBe("a blue shoe");
+  });
+
+  // 문자열이 아닌 값은 **아무 일도 안 일어나는 것**이 맞다 — 지우지도 담지도 않는다.
+  // 담으면 그 값이 그대로 유료 호출로 나가고(이 파일 위쪽 promptOverride 참고),
+  // 지우면 잘못 보낸 한 번이 사장님이 적어 둔 프롬프트를 날린다.
+  it("★ 비문자열은 담지도 지우지도 않는다", async () => {
+    await patchCut({ idx: 0, image_prompt: "a red shoe" });
+    for (const bad of [7, { text: "a cat" }, ["a cat"], null]) {
+      expect((await patchCut({ idx: 0, image_prompt: bad })).status).toBe(200);
+      expect((await savedCuts())[0].image_prompt, `${JSON.stringify(bad)} 가 값을 건드렸다`)
+        .toBe("a red shoe");
+    }
+  });
+
+  // 기존 화이트리스트 항목 — 머지 방식을 바꿨으니 함께 잰다.
+  it("기존 화이트리스트 항목이 그대로 동작한다", async () => {
+    await patchCut({ idx: 0, shows: "  a shoe in the rain  ", motion: "slow push-in", speed: "fast", camera: "천천히 뒤로" });
+    const cut = (await savedCuts())[0];
+    expect(cut.shows).toBe("a shoe in the rain");
+    expect(cut.motion).toBe("slow push-in");
+    expect(cut.speed).toBe("fast");
+    expect(cut.camera).toBe("천천히 뒤로");
+  });
+
+  // ★ 문장을 고치면 원고가 따라온다 — "컷을 이어붙이면 원고와 글자 그대로 같다"가
+  //   이 파이프라인의 유일한 구조적 보장이다. 비우기 머지가 이 자리를 지나간다.
+  it("★ sentence 를 고치면 script.text 가 따라온다", async () => {
+    await patchCut({ idx: 0, sentence: "고친 문장." });
+    const row = await memoryStore.selectProject(P, A);
+    expect(row.doc.script.text).toBe("고친 문장. 둘째 문장.");
+  });
+
+  // 프롬프트만 고치는 저장은 원고를 건드리면 안 된다 — 건드리면 ②대본에 거짓 경고가 뜨고
+  // 그 안내의 버튼은 유료 호출이다.
+  it("프롬프트만 고치면 원고는 그대로다", async () => {
+    await patchCut({ idx: 0, image_prompt: "a red shoe" });
+    const row = await memoryStore.selectProject(P, A);
+    expect(row.doc.script.text).toBe("첫 문장. 둘째 문장.");
   });
 });

@@ -281,6 +281,23 @@ export const PATCH = withUser(async (req, { params }, user) => {
             patch[key] = body.cut[key].trim();
           }
         }
+        // ★ 프롬프트 덮어쓰기는 **비울 수 있어야 한다** — 그것이 "원래대로" 버튼이다
+        //   (별도 필드를 두지 않기로 한 설계다). 위 루프는 trim() 이 참일 때만 담으므로
+        //   빈 값이 통째로 무시된다 — 담기기만 하고 지워지지 않는다. 그래서 따로 본다.
+        //
+        // ★ 비우면 **필드를 지운다**(빈 문자열로 남기지 않는다). 빈 문자열은 각인에 안
+        //   잡히지만(lib/cuts.js promptOverride 가 공백을 덮어쓰기로 안 본다) 컷 모양이
+        //   옛 컷과 달라진다 — 이 저장소는 "옛 컷과 글자 그대로 같은 모양"을 각인의
+        //   전제로 쓴다.
+        //
+        // ★ 문자열이 아닌 값은 **아무 일도 안 한다.** 담으면 그 값이 그대로 유료 호출로
+        //   나가고(위 113행 주석과 같은 이유), 지우면 잘못 보낸 한 번이 사장님이 적어 둔
+        //   프롬프트를 날린다.
+        for (const key of ["image_prompt", "clip_prompt"]) {
+          if (typeof body.cut[key] !== "string") continue;
+          const v = body.cut[key].trim();
+          patch[key] = v || undefined;   // undefined = 아래 머지에서 지운다
+        }
         // 속도는 닫힌 목록이라 위 문자열 검사와 따로 본다 — 아무 낱말이나 들어가면
         // 클립 프롬프트에 모르는 값이 실리고, 대비 판정도 거짓이 된다.
         if (isSpeed(body.cut.speed)) patch.speed = body.cut.speed;
@@ -299,7 +316,15 @@ export const PATCH = withUser(async (req, { params }, user) => {
           };
         }
         if (Object.keys(patch).length) {
-          next.cuts = proj.cuts.map((c) => (c.idx === body.cut.idx ? { ...c, ...patch } : c));
+          // ★ 전개만으로는 못 지운다 — `{...c, image_prompt: undefined}` 는 값이 undefined
+          //   인 **키가 남는다**("image_prompt" in cut 이 참이고, JSON 직렬화에서 사라져
+          //   저장소마다 답이 갈린다). 지우는 것은 delete 뿐이다.
+          next.cuts = proj.cuts.map((c) => {
+            if (c.idx !== body.cut.idx) return c;
+            const merged = { ...c, ...patch };
+            for (const k of Object.keys(patch)) if (patch[k] === undefined) delete merged[k];
+            return merged;
+          });
           // 문장을 고쳤으면 원고도 함께 따라온다.
           //
           // 컷은 원고를 잘라서 만들고 "이어붙이면 원고와 글자 그대로 같다"가 이 파이프라인의
