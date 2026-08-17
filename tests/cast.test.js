@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildCastMessages, mergePropsIntoCuts } from "../lib/cast.js";
+import { validateCast } from "../lib/validate.js";
 import { AVATARS } from "../lib/refs.js";
 
 describe("buildCastMessages", () => {
@@ -60,6 +61,92 @@ describe("buildCastMessages", () => {
     const { system } = buildCastMessages(cuts, AVATARS);
     expect(system).toContain('"voice"');   // JSON 스키마 줄
     expect(system).toContain("voice 는 그 인물의 목소리다"); // 규칙 줄
+  });
+
+  // ── 모델이 읽는 칸은 영어로 ─────────────────────────────────────────────
+  // who·look·voice 셋은 사람이 읽는 값이 아니라 모델에 그대로 실리는 값이다(lib/cuts.js):
+  // look 은 이미지 프롬프트의 "Characters in this frame …", who·voice 는 영상 프롬프트의
+  // "… speaks to the camera" 와 "Voice: …". 나머지(cuts·avatar_id·photo_id)는 번호와 id 라
+  // 언어와 무관하다.
+  const HANGUL = /[가-힣]/;
+
+  // 규칙 한 줄을 딸린 예시까지 떼어 온다 — 규칙은 "- " 로 시작하고 다음 "- " 앞까지다.
+  // 예시만 따로 재는 이유는 아래 테스트 주석에 있다.
+  function ruleBlock(system, head) {
+    const lines = system.split("\n");
+    const start = lines.findIndex((l) => l.startsWith(`- ${head}`));
+    expect(start).toBeGreaterThan(-1); // 규칙 줄 자체가 사라졌으면 그것이 먼저 터져야 한다
+    const rest = lines.slice(start + 1);
+    const end = rest.findIndex((l) => l.startsWith("- "));
+    return [lines[start], ...(end === -1 ? rest : rest.slice(0, end))];
+  }
+
+  // 규칙 줄로 잰다 — JSON 스키마 줄에만 적혀 있으면 세 칸이 왜 영어인지가 규칙에서 사라진다.
+  // (스키마 줄은 아래 별도 테스트가 본다)
+  it("who·look·voice 를 영어로 쓰라고 규칙에서 지시한다 — 모델에 그대로 실리는 칸이다", () => {
+    const { system } = buildCastMessages(cuts, AVATARS);
+    const rule = system.split("\n").find((l) =>
+      l.startsWith("- ") && l.includes("영어") &&
+      l.includes("who") && l.includes("look") && l.includes("voice"));
+    expect(rule).toBeTruthy();
+  });
+
+  // ★ 언어를 정하는 가장 강한 신호는 지시문이 아니라 예시다. "영어로 써라" 옆에 한국어
+  // 예시를 두면 둘이 싸우고 모델은 예시를 따른다 — 그래서 지시와 예시를 따로 잰다.
+  it.each(["who 는", "look 은", "voice 는"])(
+    "%s 규칙의 ✓/✗ 예시가 영어다 — 예시가 출력 언어를 정한다",
+    (head) => {
+      const { system } = buildCastMessages(cuts, AVATARS);
+      const examples = ruleBlock(system, head).filter((l) => /^\s*[✓✗]/.test(l));
+      expect(examples.length).toBeGreaterThan(0);
+      for (const line of examples) expect(line).not.toMatch(HANGUL);
+    },
+  );
+
+  it("JSON 스키마 줄도 세 칸의 언어를 말해 준다 — 규칙 줄까지 안 읽고 채우는 것을 막는다", () => {
+    const { system } = buildCastMessages(cuts, AVATARS);
+    const schema = system.split("\n").find((l) => l.includes('"cast"'));
+    expect(schema).toMatch(/"who":"[^"]*영어/);
+    expect(schema).toMatch(/"look":"[^"]*영어/);
+    expect(schema).toMatch(/"voice":"[^"]*영어/);
+  });
+
+  // 이 프롬프트는 gpt-4o 를 상대로 쓰인 글이다. claude-opus-5 는 지시를 훨씬 문자 그대로
+  // 따르므로, 밀어붙이려 넣은 강조가 남으면 과도하게 작동한다. 규칙은 그대로 두고 표시만 걷는다.
+  it("강조 표시가 남아 있지 않다 — Opus 5 는 지시를 문자 그대로 따른다", () => {
+    const { system } = buildCastMessages(cuts, AVATARS);
+    expect(system).not.toContain("**");
+    expect(system).not.toContain("반드시");
+  });
+
+  // 영어로 옮기면서 실측 근거가 붙은 요구가 씻겨 나가기 쉽다 — 그 둘을 못으로 박아 둔다.
+  it("who 에 나이대·성별·인종을 요구하는 근거가 그대로다", () => {
+    const { system } = buildCastMessages(cuts, AVATARS);
+    expect(system).toContain("나이대·성별·인종");
+    expect(system).toContain("인종은 그림과 목소리의 일관성");
+  });
+
+  it("얼굴 생김새를 적지 않는다는 실측 규칙이 그대로다", () => {
+    expect(buildCastMessages(cuts, AVATARS).system).toContain("얼굴 생김새는 적지 않는다");
+  });
+});
+
+// 언어 정책은 앞으로 LLM 이 생성할 값만 바꾼다 — 이미 저장된 한국어 캐스팅은 그대로 읽혀야
+// 한다. 방어가 값의 언어를 보기 시작하면 옛 프로젝트의 인물이 조용히 사라진다.
+describe("validateCast 는 값의 언어를 보지 않는다 — 저장된 한국어 캐스팅은 그대로 산다", () => {
+  it("한국어 who·look·voice 를 그대로 통과시킨다", () => {
+    const got = validateCast(
+      { cast: [{ who: "50대 한국인 남성 가게 주인", look: "단정한 반백 머리, 남색 앞치마", voice: "중저음, 차분한 톤", cuts: [1] }] },
+      [],
+      2,
+    );
+    expect(got).toEqual([{
+      id: "c1",
+      who: "50대 한국인 남성 가게 주인",
+      look: "단정한 반백 머리, 남색 앞치마",
+      voice: "중저음, 차분한 톤",
+      cuts: [0],
+    }]);
   });
 });
 
