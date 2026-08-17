@@ -1,6 +1,6 @@
 import { getProject, updateProject } from "../../../../lib/projects";
 import { clipLimitsForProject, I2V_MODEL_IDS, isResolutionFor, resolutionForProject } from "../../../../lib/clip-limits";
-import { normalizeStyle } from "../../../../lib/styles";
+import { normalizeStyle, normalizePromptNote } from "../../../../lib/styles";
 import { isAspect } from "../../../../lib/aspects";
 import { isSpeed } from "../../../../lib/speeds";
 import { MOTION_AXES } from "../../../../lib/motion.js";
@@ -182,6 +182,23 @@ export const PATCH = withUser(async (req, { params }, user) => {
         { error: "영상 모델은 만들 때 정해져요 — 바꾸려면 새로 만들어 주세요" },
         { status: 400 }
       );
+    }
+  }
+
+  // 프로젝트 공통 지시 두 칸 — 사장님이 밖에서 써 온 프롬프트를 그대로 넣는 자리다.
+  // settings 는 화이트리스트 없이 얕게 머지된다 — 여기서 안 막으면 아무 값이나 들어가고
+  // 그 값이 그대로 유료 호출로 나간다(이 파일 113행 주석과 같은 이유).
+  //
+  // ★ 정규화한 값을 **되돌려 담는다**(normalizeStyle 이 style 을 담는 것과 같다) — 저장되는
+  //   값과 프롬프트가 읽는 값이 갈리면 안 된다. 상한을 넘으면 자르지 않고 400 이다.
+  // ★ 화풍 보정(settings.style.note)과 **다른 칸이다.** 그쪽은 상한이 120자라 밖에서 써 온
+  //   프롬프트는 붙여넣기부터 거절당한다(lib/styles.js 의 STYLE_NOTE_MAX 주석 참고).
+  for (const [key, label] of [["image_note", "이미지 지시"], ["clip_note", "영상 지시"]]) {
+    if (body.settings?.[key] === undefined) continue;
+    try {
+      body.settings[key] = normalizePromptNote(body.settings[key], label);
+    } catch (e) {
+      return Response.json({ error: e.message }, { status: 400 });
     }
   }
 

@@ -4,6 +4,7 @@
 import { describe, it, expect } from "vitest";
 import { buildClipPrompt, buildImagePrompt } from "../lib/cuts.js";
 import { imageContextKey, clipKey, isImageStale, isClipStale } from "../lib/steps.js";
+import { normalizePromptNote, PROMPT_NOTE_MAX, STYLE_NOTE_MAX } from "../lib/styles.js";
 
 const project = {
   scenario: { focus: { mode: "물건", subject: "black high-top basketball shoe", look: "black upper with red sole" } },
@@ -487,5 +488,195 @@ describe("덮어쓰기와 각인", () => {
     expect(isClipStale(withVideo, project)).toBe(true);
     const { clip_prompt, ...untouched } = withVideo;
     expect(isClipStale(untouched, project)).toBe(false);
+  });
+});
+
+// ── 프로젝트 공통 지시 (settings.image_note · settings.clip_note) ───────────
+//
+// 컷별 덮어쓰기는 **한 컷**을 갈아 끼우고, 이 둘은 **전 컷**에 실린다. 사장님이 밖에서
+// 써 온 프롬프트를 그대로 넣는 자리다.
+//
+// ★ 그래서 자리가 본문 안이 아니다 — 본문은 컷별 덮어쓰기가 통째로 대체하므로, 공통
+//   지시를 본문에 넣으면 덮어쓴 그 컷만 조용히 공통 지시를 잃는다. 화면에 적는 말이
+//   "모든 이미지에 함께 보낼 지시"인데 거짓말이 된다. 본문과 계약 꼬리 **사이**다.
+describe("프로젝트 공통 지시", () => {
+  it("★ 화풍 보정보다 넉넉하다 — 밖에서 써 온 프롬프트가 들어가야 한다", () => {
+    // 이 단언이 지키는 것: style.note 를 재사용하지 않기로 한 이유 그 자체다.
+    // 상한이 120 이면 붙여넣기부터 거절당한다(밖에서 써 온 프롬프트는 300~800자다).
+    expect(PROMPT_NOTE_MAX).toBeGreaterThan(STYLE_NOTE_MAX);
+    expect(normalizePromptNote("a".repeat(400), "영상 지시")).toHaveLength(400);
+  });
+
+  it("개행을 눕히고 앞뒤를 걷는다 — 프롬프트는 한 줄이다", () => {
+    expect(normalizePromptNote("  hand-held\n  documentary feel  ", "영상 지시"))
+      .toBe("hand-held documentary feel");
+  });
+
+  it("너무 길면 던지고, 이름이 문구에 들어간다", () => {
+    expect(() => normalizePromptNote("가".repeat(PROMPT_NOTE_MAX + 1), "영상 지시"))
+      .toThrow(/영상 지시.*자까지/);
+  });
+
+  it("값이 없으면 빈 문자열이다 — 문자열이 아니면 던진다", () => {
+    expect(normalizePromptNote(undefined, "영상 지시")).toBe("");
+    expect(normalizePromptNote(null, "영상 지시")).toBe("");
+    expect(() => normalizePromptNote(7, "이미지 지시")).toThrow(/이미지 지시/);
+  });
+
+  it("★ 클립 프롬프트에 실리고, 꼬리보다 앞이다", () => {
+    const p = { settings: { clip_note: "hand-held documentary feel" } };
+    const out = buildClipPrompt({ idx: 0, motion: "slow push-in", silent: true }, p);
+    expect(out).toContain("hand-held documentary feel");
+    expect(out.indexOf("hand-held")).toBeLessThan(out.indexOf("The attached image is the first frame"));
+  });
+
+  it("★ 이미지 프롬프트에도 실리고, 글자 금지보다 앞이다", () => {
+    const p = { ...project, settings: { ...project.settings, image_note: "shot on 35mm film" } };
+    const out = buildImagePrompt(cut, p, []);
+    expect(out).toContain("shot on 35mm film");
+    expect(out.indexOf("35mm")).toBeLessThan(out.indexOf("no text or letters"));
+  });
+
+  // ★★ 이 파일의 다른 어떤 단언도 이것을 대신하지 못한다. 컷별 덮어쓰기(Task 3)는 본문을
+  //    **통째로** 대체하므로, 공통 지시가 본문 안에 있으면 덮어쓴 컷에서만 사라진다 —
+  //    전 컷에 실린다는 약속이 컷 하나에서 조용히 깨진다.
+  it("★ 덮어쓴 컷에도 프로젝트 공통 지시가 남는다", () => {
+    const p = { ...project, settings: { ...project.settings, image_note: "shot on 35mm film" } };
+    expect(buildImagePrompt({ ...cut, image_prompt: "a cat" }, p, [])).toContain("shot on 35mm film");
+  });
+
+  it("★ 덮어쓴 컷에도 영상 공통 지시가 남는다", () => {
+    const p = { settings: { clip_note: "hand-held documentary feel" } };
+    expect(buildClipPrompt({ idx: 0, clip_prompt: "the shoe explodes" }, p))
+      .toContain("hand-held documentary feel");
+  });
+
+  // 말하는 갈래 둘(내레이션·화면 안 대사)도 각자 이어 붙이는 문자열이 따로다 —
+  // 한 갈래만 재면 나머지가 조용히 빠진다(이 파일이 이미 두 번 겪은 자리다).
+  it("★ 대사 갈래 둘에도 실린다 — 갈래마다 이어 붙이는 문자열이 따로다", () => {
+    const c = { idx: 0, motion: "slow push-in", sentence: "핑계 대지 마세요", narration: true };
+    const narr = {
+      settings: { i2v_model: "seedance-2.0", clip_note: "hand-held documentary feel" },
+      scenario: { narrator_voice: "calm low male voice" },
+      cuts: [c],
+    };
+    const outN = buildClipPrompt(c, narr);
+    expect(outN).toContain("hand-held documentary feel");
+    expect(outN.indexOf("hand-held")).toBeLessThan(outN.indexOf("The attached image is the first frame"));
+
+    const c2 = { idx: 0, motion: "slow push-in", sentence: "핑계 대지 마세요" };
+    const on = {
+      settings: { i2v_model: "seedance-2.0", clip_note: "hand-held documentary feel" },
+      cast: [{ who: "코치", look: "wiry coach in a grey tracksuit", voice: "gravelly veteran voice", cuts: [0] }],
+      cuts: [c2],
+    };
+    const outS = buildClipPrompt(c2, on);
+    expect(outS).toContain("hand-held documentary feel");
+    expect(outS.indexOf("hand-held")).toBeLessThan(outS.indexOf("The attached image is the first frame"));
+  });
+
+  it("★ 없으면 프롬프트도 각인도 글자 그대로 그대로다", () => {
+    const bare = { idx: 0, motion: "slow", image: { url: "u" } };
+    expect(buildClipPrompt(bare, { settings: {} })).toBe(buildClipPrompt(bare, {}));
+    expect(clipKey(bare, { settings: {} })).not.toContain("clipnote:");
+    expect(imageContextKey(cut, project)).not.toContain("imgnote:");
+    // 빈 문자열·공백뿐인 값도 "없음"이다 — 그런 값으로 프롬프트가 갈리면 산 산출물이 낡는다.
+    expect(buildImagePrompt(cut, { ...project, settings: { ...project.settings, image_note: "   " } }, []))
+      .toBe(buildImagePrompt(cut, project, []));
+    expect(buildClipPrompt(bare, { settings: { clip_note: "" } })).toBe(buildClipPrompt(bare, { settings: {} }));
+  });
+
+  // ★ Ruling 2 — 각인 항목은 prompt **뒤**다. Task 4 가 앞자리 차례를 전문으로 못 박았으니
+  //   새 항목은 그 뒤에 이어 붙어야 한다. 차례가 갈리면 같은 값인데 각인 문자열이 달라져
+  //   살아 있는 산출물이 통째로 낡는다(그림 컷당 $0.08, Seedance 30초 한 편 ~$9).
+  describe("공통 지시와 각인", () => {
+    const full = {
+      settings: { i2v_model: "seedance-2.0" },
+      scenario: {
+        narrator_voice: "calm low male voice",
+        focus: { mode: "물건", subject: "walnut espresso tamper", look: "walnut handle with steel base" },
+      },
+      cast: [{ who: "barista", look: "short-haired barista in a linen apron", voice: "warm alto voice", cuts: [1] }],
+    };
+    const fullCut = {
+      idx: 1,
+      shows: "the tamper resting beside a portafilter",
+      environment: "a narrow morning cafe counter",
+      tone: "soft daylight pastel",
+      camera: "천천히 뒤로 물러난다",
+      subject: "컵을 들어 입으로 가져간다",
+      ambient: "김이 천천히 피어오른다",
+      speed: "fast",
+      seconds: 5,
+      sentence: "한 모금이면 충분해요",
+      narration: true,
+      image: { url: "https://img/1.png" },
+    };
+    full.cuts = [fullCut];
+    const noted = (extra) => ({ ...full, settings: { ...full.settings, ...extra } });
+
+    // 손으로 적는다 — 구현으로 기대값을 만들면 동어반복이라 차례를 바꿔도 늘 초록이다.
+    const IMG_BASE =
+      "stage:a narrow morning cafe counter" +
+      "|cast:barista: short-haired barista in a linen apron" +
+      "|subject:walnut espresso tamper:walnut handle with steel base";
+    const CLIP_BASE =
+      "https://img/1.png|5||fast|한 모금이면 충분해요|calm low male voice||narration" +
+      "|stage:a narrow morning cafe counter" +
+      "|cast:barista: short-haired barista in a linen apron" +
+      "|subject:walnut espresso tamper:walnut handle with steel base" +
+      "|tone:soft daylight pastel" +
+      '|motion:[{"id":"camera","text":"천천히 뒤로 물러난다"},{"id":"subject","text":"컵을 들어 입으로 가져간다"},{"id":"ambient","text":"김이 천천히 피어오른다"}]';
+
+    it("★ 공통 지시 각인은 prompt 뒤에 붙는다", () => {
+      expect(imageContextKey(fullCut, noted({ image_note: "shot on 35mm film" })))
+        .toBe(`${IMG_BASE}|imgnote:shot on 35mm film`);
+      expect(imageContextKey({ ...fullCut, image_prompt: "a red shoe" }, noted({ image_note: "shot on 35mm film" })))
+        .toBe(`${IMG_BASE}|prompt:a red shoe.|imgnote:shot on 35mm film`);
+      expect(clipKey(fullCut, noted({ clip_note: "hand-held documentary feel" })))
+        .toBe(`${CLIP_BASE}|clipnote:hand-held documentary feel`);
+      expect(clipKey({ ...fullCut, clip_prompt: "it explodes" }, noted({ clip_note: "hand-held documentary feel" })))
+        .toBe(`${CLIP_BASE}|prompt:it explodes.|clipnote:hand-held documentary feel`);
+    });
+
+    it("★ 공통 지시가 없으면 각인이 글자 그대로 그대로다 — 있을 때만 붙는다", () => {
+      expect(imageContextKey(fullCut, full)).toBe(IMG_BASE);
+      expect(clipKey(fullCut, full)).toBe(CLIP_BASE);
+      // 빈 값·공백뿐인 값·문자열 아닌 값도 붙지 않는다(프롬프트가 안 갈리므로).
+      expect(imageContextKey(fullCut, noted({ image_note: "   " }))).toBe(IMG_BASE);
+      expect(clipKey(fullCut, noted({ clip_note: 7 }))).toBe(CLIP_BASE);
+    });
+
+    // ★ Ruling 7 — 프롬프트와 각인이 **같은 값**을 읽는다. 한쪽에만 정규화를 넣으면
+    //   프롬프트가 같은데 각인만 갈려 거짓 낡음이 유료 버튼을 연다(Task 4 에서 겪었다).
+    it("★ 프롬프트가 같으면 각인도 같다 — 앞뒤 공백은 양쪽 다 걷는다", () => {
+      const a = noted({ image_note: "shot on 35mm film", clip_note: "hand-held documentary feel" });
+      const b = noted({ image_note: "  shot on 35mm film  ", clip_note: "  hand-held documentary feel  " });
+      expect(buildImagePrompt(fullCut, a, [])).toBe(buildImagePrompt(fullCut, b, []));
+      expect(imageContextKey(fullCut, a)).toBe(imageContextKey(fullCut, b));
+      expect(buildClipPrompt(fullCut, a)).toBe(buildClipPrompt(fullCut, b));
+      expect(clipKey(fullCut, a)).toBe(clipKey(fullCut, b));
+    });
+
+    it("★ 공통 지시를 고치면 산출물이 낡는다 — 고쳤는데 조용히 지나가지 않는다", () => {
+      const a = noted({ image_note: "shot on 35mm film", clip_note: "hand-held documentary feel" });
+      const b = noted({ image_note: "shot on 16mm film", clip_note: "locked-off tripod feel" });
+      expect(imageContextKey(fullCut, a)).not.toBe(imageContextKey(fullCut, b));
+      expect(clipKey(fullCut, a)).not.toBe(clipKey(fullCut, b));
+      expect(imageContextKey(fullCut, a)).not.toBe(imageContextKey(fullCut, full));
+      expect(clipKey(fullCut, a)).not.toBe(clipKey(fullCut, full));
+    });
+
+    // 상자가 둘인 이유 — 영상 지시(움직임·립싱크·시간)가 이미지 프롬프트에 실리면
+    // 정지 화면 설계가 망가진다(stillOnly 가 코드로 막고 있는 바로 그것이다).
+    it("★ 두 칸은 서로의 프롬프트에 새지 않는다", () => {
+      const p = noted({ image_note: "shot on 35mm film", clip_note: "hand-held documentary feel" });
+      const img = buildImagePrompt(fullCut, p, []);
+      expect(img).toContain("shot on 35mm film");
+      expect(img).not.toContain("hand-held documentary feel");
+      const clip = buildClipPrompt(fullCut, p);
+      expect(clip).toContain("hand-held documentary feel");
+      expect(clip).not.toContain("shot on 35mm film");
+    });
   });
 });

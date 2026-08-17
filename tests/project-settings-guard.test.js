@@ -227,6 +227,40 @@ describe("PATCH /api/projects/[id] — 결제 뒤 화질 잠금", () => {
   });
 });
 
+// 프로젝트 공통 지시 두 칸(settings.image_note · settings.clip_note) — 사장님이 밖에서 써 온
+// 프롬프트를 그대로 넣는 자리라 값이 길다. settings 는 화이트리스트 없이 얕게 머지되므로
+// 여기서 안 막으면 아무 값이나 들어가고 그 값이 그대로 유료 호출로 나간다(위 화질과 같은 이유).
+describe("PATCH /api/projects/[id] — 프로젝트 공통 지시", () => {
+  beforeEach(async () => { resetMemoryStore(); await seedProject(); });
+  const savedSettings = async () => (await memoryStore.selectProject(P, A)).doc.settings;
+
+  it("정규화한 값이 저장된다 — 개행이 눕고 앞뒤가 걷힌다", async () => {
+    expect((await PATCH(req({ image_note: "  shot on\n35mm film  " }), ctx())).status).toBe(200);
+    expect((await savedSettings()).image_note).toBe("shot on 35mm film");
+  });
+
+  // ★ 이 칸이 존재하는 이유 — 화풍 보정(120자)이면 붙여넣기부터 거절당한다.
+  it("400자짜리 붙여넣기가 통과한다 — 화풍 보정 상한(120자)이었다면 못 들어온다", async () => {
+    const long = "a".repeat(400);
+    expect((await PATCH(req({ clip_note: long }), ctx())).status).toBe(200);
+    expect((await savedSettings()).clip_note).toBe(long);
+  });
+
+  it("상한을 넘으면 400 이고 저장되지 않는다 — 자르지 않는다", async () => {
+    const res = await PATCH(req({ clip_note: "가".repeat(601) }), ctx());
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/영상 지시/);
+    expect((await savedSettings()).clip_note).toBeUndefined();
+  });
+
+  it("글이 아닌 값은 400 이다 — 그 값이 프롬프트로 나가면 안 된다", async () => {
+    const res = await PATCH(req({ image_note: { text: "a cat" } }), ctx());
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/이미지 지시/);
+    expect((await savedSettings()).image_note).toBeUndefined();
+  });
+});
+
 // ★ 광고 문서(kind:"ad")는 이 경로가 다루지 않는다 — /api/ads/* 가 다룬다.
 // 화질 PATCH 도 target_seconds 게이트와 같은 모양으로 404 여야 한다(리뷰 M3: 프로브로만
 // 확인돼 있고 테스트가 없었다). 여기서 안 막으면 결제 잠금이 **기존 종류의 청구 장부**를
