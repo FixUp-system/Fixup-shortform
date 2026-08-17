@@ -36,6 +36,14 @@ const placeholder = (state) =>
     : state === "generating" ? "생성 중…"
     : "아직 그리기 전";
 
+// 실린 사진을 사장님이 알아볼 이름으로 부른다.
+// 준비된 인물 사진은 파일명이 없다 — 그건 우리가 넣은 것이라 이름을 말해도 소용이 없다.
+//
+// 모듈 스코프에 둔다 — 컷 목록과 미리보기 패널이 **서로 다른 컴포넌트**인데 둘 다 이것을
+// 쓴다(placeholder 와 같은 이유다. 본 컴포넌트 안에 두면 PreviewPane 이 통째로 죽는다).
+const refNames = (refs) =>
+  (refs || []).map((r) => (r.mine ? r.name || "올린 사진" : "준비된 인물 사진")).join(", ");
+
 export default function ImagesStepPage() {
   const { id } = useParams();
   const router = useRouter();
@@ -217,6 +225,29 @@ export default function ImagesStepPage() {
   }
 
   const cuts = project.cuts || [];
+
+  // ── 올린 사진이 실제로 어디에 실렸는가 ────────────────────────────────
+  //
+  // ★ 이 판정은 **서버만 할 수 있다** — resolveCutRefs → 사진 읽기가 `fs`·Storage 를 끈다.
+  //   그래서 이 화면은 사장님이 사진 5장을 올렸는데 한 장만 실렸다는 사실을 지금까지 한 마디도
+  //   못 했다("레퍼런스가 반영이 안 된다"고 읽힌다). 컷 전체를 한 번에 받는다 —
+  //   컷마다 물으면 요청이 컷 수만큼 늘고 같은 사진을 컷마다 다시 내려받는다.
+  // 못 받으면 아무것도 그리지 않는다(null 그대로) — 틀린 말보다 침묵이 낫다.
+  const [refUse, setRefUse] = useState(null);
+  useEffect(() => {
+    if (!cuts.length) return;
+    let alive = true;
+    fetch(`/api/projects/${id}/refs`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (alive && d) setRefUse(d); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [id, cuts.length]);
+  // 사진을 안 올린 프로젝트에서는 이 이야기를 꺼내지 않는다 — 빈 칸이 생긴다.
+  const hasPhotos = !!refUse?.photos_total;
+  const usageOf = (idx) => (hasPhotos ? (refUse.cuts || []).find((u) => u.idx === idx) : null) || null;
+  const unused = hasPhotos ? refUse.unused || [] : [];
+
   // 화면 설명이나 화풍을 고친 뒤 옛 값으로 그린 그림이 남아 있으면 클립을 사러 보내지 않는다.
   // ⚠️ filter(isImageStale) 로 넘기면 배열 번호가 project 자리에 들어가 화풍 판정이 죽는다.
   const staleCount = cuts.filter((c) => isImageStale(c, project)).length;
@@ -281,6 +312,20 @@ export default function ImagesStepPage() {
             그림을 누르면 크게 보고 고칠 수 있어요
           </p>
         )}
+        {/* ★ "올렸는데 안 쓰였다"를 말한다 — 2026-08-18 실측에서 사진 5장 중 1장만 실렸고
+            화면은 아무 말도 하지 않았다. 안 쓰인 사진이 없으면(또는 사진을 안 올렸으면)
+            이 자리는 아예 없다.
+            ⚠️ 여기서 무엇을 해 준다고 말하지 않는다 — 이 화면에는 사진을 컷에 꽂아 주는
+               조작이 없다. 못 하는 일을 권하는 것이 이 화면이 고쳐 온 병이다.
+               대신 왜 그런지만 말한다. */}
+        {unused.length > 0 && (
+          <p className="pgsub warn">
+            올린 사진 {refUse.photos_total}장 중 {unused.length}장은 어느 컷에도 안 쓰였어요 —{" "}
+            {unused.map((u) => u.name).filter(Boolean).join(", ")}. 컷마다 가장 잘 맞는 사진
+            한두 장만 골라서 그려요.
+          </p>
+        )}
+
         {/* 네 가지는 사장님에게 서로 다른 사건이다 — 도는 중 / 멈춤 / 실패 / 상태 못 읽음.
             전에는 전부 한 문단이라 무엇을 해야 할지 알 수 없었다. */}
         {err && <p className="pgsub warn">{err}</p>}
@@ -331,6 +376,9 @@ export default function ImagesStepPage() {
         {cuts.map((c) => {
           const photo = project.material.photos.find((p) => p.id === c.photo_id);
           const img = imgUrl(c);
+          // 사진 컷은 그 사진 자체가 화면이라 아래 배지가 할 말이 없다(옆의 "내 사진" 배지가
+          // 이미 무엇인지 말한다). 레퍼런스로 참고하는 컷만 센다.
+          const usage = c.source === "photo" ? null : usageOf(c.idx);
           return (
             <div className="scene" key={c.idx}>
               <div
@@ -355,6 +403,21 @@ export default function ImagesStepPage() {
                     <span className="badge photo">내 사진 · {photo?.filename || ""}</span>
                   )}
                   <span className="badge ai">{c.seconds}초</span>
+                  {/* ★ 이 컷에 실제로 실린 사진 — 장수와 이름을 함께 적는다. 한 장도 안
+                      실렸으면 그렇다고 말한다: 그것이 사장님이 "반영이 안 된다"고 느끼던
+                      바로 그 자리다. 값을 못 받았으면(usage 가 null) 아무것도 안 그린다. */}
+                  {usage && (
+                    <span className="badge">
+                      {usage.refs.length > 0
+                        ? `쓴 사진 ${usage.refs.length}장 · ${refNames(usage.refs)}`
+                        : "올린 사진을 쓰지 않은 컷"}
+                    </span>
+                  )}
+                  {usage?.missing > 0 && (
+                    <span className="badge warn">
+                      사진 {usage.missing}장을 못 읽어서 그림에 안 실렸어요
+                    </span>
+                  )}
                   {/* ★ 사유를 뭉뚱그리지 않는다. 낡음을 만드는 것은 화면 설명·화풍만이
                       아니다 — 이 컷의 프롬프트 덮어쓰기와 프로젝트 공통 지시(①자료)도
                       같은 배지를 띄운다.
@@ -427,6 +490,7 @@ export default function ImagesStepPage() {
           project={project}
           url={imgUrl(activeCut)}
           photoName={project.material.photos.find((p) => p.id === activeCut.photo_id)?.filename}
+          usage={activeCut.source === "photo" ? null : usageOf(activeCut.idx)}
           aspect={project.settings?.aspect_ratio || "9:16"}
           stalled={stalled}
           onRegen={regen}
@@ -451,7 +515,7 @@ function frameStyle(aspect) {
 
 // 우측 큰 미리보기 + 컷별 수정. instruction 입력은 컷마다 초기화돼야 하므로
 // 부모가 key={cut.idx}로 이 컴포넌트를 갈아끼운다(로컬 state가 자연히 리셋됨).
-function PreviewPane({ cut, project, url, photoName, aspect, stalled, onRegen, onSavePrompt }) {
+function PreviewPane({ cut, project, url, photoName, usage, aspect, stalled, onRegen, onSavePrompt }) {
   const [instr, setInstr] = useState("");
   // ── 실제로 보내는 지시 ──────────────────────────────────────────────
   //
@@ -550,6 +614,17 @@ function PreviewPane({ cut, project, url, photoName, aspect, stalled, onRegen, o
         <span className="badge ai">{cut.seconds}초</span>
       </div>
       <p className="preview-sentence">“{cut.sentence}”</p>
+
+      {/* ★ 이 컷에 실제로 실린 사진. 값을 못 받았으면 이 줄 자체가 없다 —
+          "모른다"를 "없다"로 적으면 사장님이 안 실렸다고 오해한다. */}
+      {usage && (
+        <p className="preview-note">
+          {usage.refs.length > 0
+            ? `이 컷에 쓴 사진: ${refNames(usage.refs)}`
+            : "이 컷은 올린 사진 없이 그렸어요."}
+          {usage.missing > 0 ? ` 사진 ${usage.missing}장은 못 읽어서 안 실렸어요.` : ""}
+        </p>
+      )}
 
       {isPhoto ? (
         <p className="preview-note">내가 올린 사진이라 그대로 쓰여요.</p>
