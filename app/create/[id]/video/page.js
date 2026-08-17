@@ -12,6 +12,10 @@ import {
   I2V_MAX_SECONDS, modelIdForProject, projectSpeaks, resolutionForProject,
 } from "../../../../lib/clip-limits";
 import { isClipStale } from "../../../../lib/steps";
+// ★ 프롬프트는 **서버와 같은 함수**로 만든다 — 화면이 자기 규칙으로 다시 만들면 사장님이
+//   보는 것과 실제로 나가는 것이 갈린다. 본문 판정도 같은 자리에서 온다(promptBodyOf).
+//   이 사슬에는 `fs` 가 없다(tests/prompt-editing-ui.test.js 가 그 그물을 친다).
+import { buildClipPrompt, promptBodyOf } from "../../../../lib/cuts";
 // 비율은 lib 한 곳에서 온다 — 화면이 표를 또 만들면 언젠가 갈린다(④이미지가 그랬다)
 import { aspectFor } from "../../../../lib/aspects";
 // 상한과 값은 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다).
@@ -108,6 +112,26 @@ export default function VideoStepPage() {
     } finally {
       setRegening(null);
     }
+  }
+
+  // 컷별 클립 프롬프트 덮어쓰기 저장. ④이미지의 savePrompt 와 같은 모양이고 담는 필드만
+  // 다르다(clip_prompt) — 같은 PATCH 자리다.
+  //
+  // ★ **빈 문자열을 보내는 것이 "원래대로"의 구현이다** — 서버가 필드를 지운다
+  //   (app/api/projects/[id]/route.js). 별도 필드를 두지 않기로 한 설계다.
+  // ★ 오류를 삼키지 않는다 — 길이 상한을 넘으면 400 이 오고, 그 문구를 안 띄우면 사장님은
+  //   저장된 줄 알고 [다시 만들기]를 누른다(그 값은 유료 호출로 나가지 않는다).
+  async function savePrompt(idx, clip_prompt) {
+    setErr("");
+    const res = await fetch(`/api/projects/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cut: { idx, clip_prompt } }),
+    });
+    if (!res.ok) {
+      setErr((await res.json().catch(() => ({}))).error || "저장하지 못했어요");
+      return;
+    }
+    await load(id).catch(() => {});
   }
 
   const cuts = project?.cuts || [];
@@ -299,6 +323,17 @@ export default function VideoStepPage() {
             )}
           </div>
           {selected && <p className="preview-note">컷 {selected.idx + 1} · {selected.sentence}</p>}
+          {/* 컷마다 상태가 새로 시작해야 하므로 key 로 갈아 끼운다 — 안 갈면 컷을 바꿔도
+              텍스트칸에 앞 컷의 글이 남아, 그 글이 이 컷의 프롬프트로 저장된다. */}
+          {selected && (
+            <ClipPromptEdit
+              key={selected.idx}
+              cut={selected}
+              project={project}
+              busyCut={gen.kind === "running" || regening !== null}
+              onSavePrompt={savePrompt}
+            />
+          )}
         </div>
       </div>
 
@@ -350,5 +385,100 @@ export default function VideoStepPage() {
         </div>
       </div>
     </section>
+  );
+}
+
+// 이 컷에 실제로 보내는 지시 — 보이고, 고친다.
+//
+// ④이미지의 같은 자리와 **글자 그대로 같은 모양**이다(app/create/[id]/images/page.js 의
+// PreviewPane). 그쪽 주석에 왜 이렇게 생겼는지가 다 적혀 있고, 여기서 다른 것은 셋이다:
+//   ① 담는 필드가 clip_prompt 다
+//   ② 판형 절이 없다(클립 프롬프트에는 애초에 없다 — lib/cuts.js promptBodyOf 주석)
+//   ③ **대사는 못 고친다** — 아래 안내가 그 사실을 말한다
+//
+// ★ 대사가 꼬리에 있는 이유: 같은 문자열을 ffmpeg 가 자막으로 태운다(lib/subtitles.js).
+//   사장님이 여기서 대사를 고칠 수 있으면 **들리는 말과 화면의 자막이 갈린다.** 그래서
+//   고칠 수 없게 두고, 대신 어디서 고치는지를 화면이 말해 준다(안 말하면 여기서 고치려 든다).
+function ClipPromptEdit({ cut, project, busyCut, onSavePrompt }) {
+  // ★ 텍스트칸에 앉히는 씨앗은 **사장님이 저장한 날 글자**이고, 없으면 코드가 만든 본문이다.
+  //   판정 결과(promptBodyOf(cut))를 그대로 앉히면 안 된다 — 덮어쓰기 경로에서는 그 값이 곧
+  //   사장님 글자라 괜찮아 보이지만, 이미지 쪽에서는 코드가 붙인 절이 함께 들어 있어 저장할
+  //   때마다 한 벌씩 늘어났다. 두 화면이 같은 규칙을 쓰는 것이 그 함정을 안 밟는 길이다.
+  const saved = typeof cut.clip_prompt === "string" ? cut.clip_prompt.trim() : "";
+  // 덮어쓰기를 지운 컷의 본문 — "원래대로"가 텍스트칸에 되돌려 놓는 값이다.
+  const generated = promptBodyOf("clip", { ...cut, clip_prompt: "" }, project);
+  // ★ 씨앗을 **이름 하나로** 둔다. 텍스트칸의 초기값·꼬리를 떼는 기준·[저장] 잠금 판정이
+  //   전부 이 값이어야 한다. 그중 하나만 `saved` 로 재면 덮어쓰기가 없는 컷에서
+  //   **아무것도 안 고쳤는데 [저장]이 눌리고**, 그 순간 각인이 뒤집혀 살아 있는 클립을
+  //   틀린 사유로 다시 사게 된다(Seedance 30초 한 편이 회당 ~$9다).
+  //   ⚠️ `=== saved || generated` 로 적으면 `(a === b) || c` 로 읽혀 버튼이 영원히 잠긴다 —
+  //      이름을 두는 것이 유일하게 안전한 형태다.
+  const seed = saved || generated;
+  const [prompt, setPrompt] = useState(seed);
+  // 꼬리는 전체에서 씨앗만큼 떼어 낸 것이다 — 본문이 프롬프트 맨 앞이라는 불변에 기댄다
+  // (lib/cuts.js promptBodyOf, tests/prompt-override.test.js 가 못 박는다).
+  // 대사·목소리·립싱크 지시가 여기 보이는 것이 맞다 — 그것도 코드가 붙이는 것이다.
+  const full = buildClipPrompt(cut, project);
+  const fixedTail = full.startsWith(seed)
+    ? full.slice(seed.length)
+    : full.slice(promptBodyOf("clip", cut, project).length);
+  // 컷마다 첫 회는 공짜, 둘째부터 값을 치른다. 화질까지 넘긴다 — 1080p 는 25 가 아니라 57 이다
+  // (컷별 [다시 만들기] 버튼과 같은 출처를 본다).
+  const regenLabel = priceLabel(
+    regenPrice("clip", cut.clip_regen_count || 0, modelIdForProject(project), resolutionForProject(project))
+  );
+
+  return (
+    // 접어 둔다 — 주경로는 컷별 [다시 만들기]다. 이 자리는 직접 지시를 쓰는 사장님을 위한
+    // 곁길이라, 펼치지 않으면 기본 흐름이 그대로다.
+    <details className="prompt-edit">
+      <summary>이 컷에 실제로 보내는 지시 보기</summary>
+      {/* 고치는 것은 **본문**(어떻게 움직이는가)이다. 첫 프레임 유지·글자 금지·대사는 코드가
+          언제나 뒤에 붙인다 — 무엇을 쓰든 지워지지 않는다. */}
+      <textarea
+        className="ref mono"
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+      />
+      {/* 글자 수만 보여 준다. 상한 숫자는 화면에 안 적는다 — 값이 두 벌이면 갈린다
+          (상한은 원장이 자르는 자리 하나이고, 넘으면 서버 문구가 위에 뜬다). */}
+      <span className="regen-note mono">{prompt.length}자</span>
+      <p className="preview-note">
+        영어로 쓰면 더 잘 알아들어요. 아래 문장은 저희가 항상 뒤에 붙여요 — 고칠 수 없어요.
+      </p>
+      <p className="preview-note mono">{fixedTail}</p>
+      {/* ★ 대사가 꼬리에 있는 이유를 사장님 말로 적는다. 안 적으면 위 꼬리에서 대사를 보고
+          여기서 고치려 들고, 고칠 자리를 못 찾아 헤맨다. */}
+      <p className="preview-note">
+        {/* ★ 단계 이름에 원문자(②)를 쓰지 않는다 — 사이드바는 "2 시나리오"라고 적고,
+            화면 문자열의 원문자는 tests/design-system.test.js 가 막는다. */}
+        <strong>대사는 여기서 못 고쳐요</strong> — 자막으로도 그 글자가 나가서, 갈리지 않게
+        시나리오 단계에서 고쳐 주세요.
+      </p>
+      {/* 고쳐도 지금 클립은 그대로다 — 반영하려면 다시 만들어야 하고 그때 값이 든다. */}
+      <p className="preview-note warn">
+        고쳐서 저장해도 지금 클립은 그대로예요 — 반영하려면 [다시 만들기]로 다시 만들어야
+        하고, 그때 값이 들어요 (유료 · {regenLabel})
+      </p>
+      <div className="preview-actions">
+        <button
+          className="mini"
+          disabled={busyCut || prompt.trim() === seed}
+          onClick={() => onSavePrompt(cut.idx, prompt.trim())}
+        >
+          저장
+        </button>
+        {/* ★ 빈 값을 보내는 것이 "원래대로"의 구현이다 — 서버가 필드를 지운다.
+            텍스트칸도 코드가 만든 본문으로 되돌려 놓는다(이 컴포넌트는 컷이 안 바뀌면
+            다시 마운트되지 않으므로 손으로 되돌려야 한다). */}
+        <button
+          className="mini"
+          disabled={busyCut || !saved}
+          onClick={() => { setPrompt(generated); onSavePrompt(cut.idx, ""); }}
+        >
+          원래대로
+        </button>
+      </div>
+    </details>
   );
 }

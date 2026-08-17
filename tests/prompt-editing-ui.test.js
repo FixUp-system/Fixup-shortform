@@ -16,6 +16,30 @@ import { dirname, resolve } from "node:path";
 
 const PAGE = "app/create/[id]/images/page.js";
 const images = readFileSync(PAGE, "utf8");
+const VIDEO_PAGE = "app/create/[id]/video/page.js";
+const video = readFileSync(VIDEO_PAGE, "utf8");
+
+// ── 범위를 좁혀 재는 헬퍼 ────────────────────────────────────────────────
+// ★ 파일 전체를 훑는 정규식은 **아무것도 안 잰다** — 주석·다른 함수·다른 버튼에 걸려서
+//   재려는 것을 통째로 지워도 초록이다. Task 7 에서 이 함정을 네 번 밟았다. 그래서 잴 자리를
+//   먼저 잘라 낸다. 갈래가 셋(④이미지·⑤영상·①자료)이라 소스를 인자로 받는다.
+// 못 찾으면 빈 문자열이다 — 여기서 던지면 수집 단계에서 죽어 이 파일의 다른 단정까지
+// 함께 사라지고, 무엇이 깨졌는지 안 보인다.
+const foldIn = (src) => {
+  const start = src.indexOf("<details");
+  const end = src.indexOf("</details>");
+  if (start < 0 || end < start) return "";
+  return src.slice(start, end).replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+};
+// 컴포넌트 안의 함수는 들여쓰기 2칸에서 닫힌다(`\n  }`). `//` 주석은 걷는다 —
+// 주석에 적힌 필드 이름에 걸리면 함수를 통째로 지워도 초록이다.
+const fnIn = (src, name) => {
+  const start = src.indexOf(`async function ${name}(`);
+  if (start < 0) return "";
+  const end = src.indexOf("\n  }", start);
+  if (end < 0) return "";
+  return src.slice(start, end).replace(/\/\/[^\n]*/g, "");
+};
 
 describe("④이미지 — 프롬프트 편집", () => {
   it("실제로 나가는 프롬프트를 보여 준다 — 서버와 같은 함수로 만든다", () => {
@@ -136,39 +160,149 @@ describe("④이미지 — 프롬프트 편집", () => {
   });
 });
 
+// ⑤영상 — ④이미지와 **같은 모양**이고, 다른 점이 하나다: 대사는 여기서 못 고친다.
+//
+// 왜 대사만 다른가: 같은 문자열을 ffmpeg 가 자막으로 태운다(lib/subtitles.js). 사장님이
+// 영상 프롬프트에서 대사를 고칠 수 있으면 **들리는 말과 화면의 자막이 갈린다.** 그래서
+// 대사 절은 꼬리에 있고(못 고친다), 화면이 그 사실을 말해 줘야 여기서 고치려 들지 않는다.
+describe("⑤영상 — 프롬프트 편집", () => {
+  it("실제로 나가는 프롬프트를 보여 준다 — 서버와 같은 함수로 만든다", () => {
+    expect(video, "화면이 buildClipPrompt 를 안 부른다 — 보는 것과 나가는 것이 갈린다")
+      .toMatch(/buildClipPrompt/);
+    expect(video, "본문 씨앗을 판정 함수에서 안 얻는다").toMatch(/promptBodyOf/);
+    expect(video).toMatch(/from "\.\.\/\.\.\/\.\.\/\.\.\/lib\/cuts"/);
+  });
+
+  // ★ 화면이 조립을 흉내내면 안 된다 — ④이미지와 같은 이유다. 문형을 화면에 한 벌 더 적으면
+  //   그날부터 프롬프트가 두 곳에서 만들어지고, 사장님은 화면의 것을 읽고 서버는 자기 것을 보낸다.
+  it("★ 화면이 프롬프트 문형을 스스로 적지 않는다", () => {
+    for (const forbidden of [
+      "The attached image is the first frame", "No text or letters", "natural lip sync",
+    ]) {
+      expect(video, `화면이 프롬프트 문구("${forbidden}")를 직접 들고 있다`).not.toContain(forbidden);
+    }
+  });
+
+  it("★ 텍스트칸은 본문만 쥔다 — 꼬리는 떼어 내 보여 준다", () => {
+    expect(video, "전체 프롬프트에서 꼬리를 떼어 내는 자리가 없다").toMatch(/\.slice\(/);
+    // 텍스트칸이 하나뿐인 것이 "꼬리는 못 고친다"의 구현이다 — ⑤영상에는 수정 지시 칸이
+    // 없으므로(컷별 [다시 만들기] 하나다) 프롬프트 칸 하나가 전부다.
+    expect(video.match(/<textarea/g)?.length, "텍스트칸 수가 하나가 아니다 — 꼬리가 고쳐질 수 있다").toBe(1);
+    // ★ 전체 프롬프트를 텍스트칸에 앉히면 저장할 때마다 꼬리가 한 벌씩 늘어난다.
+    expect(video, "전체 프롬프트를 텍스트칸 값으로 쓴다 — 꼬리가 두 벌이 된다").not.toMatch(/value=\{\s*full\s*\}/);
+    expect(video, "전체 프롬프트를 텍스트칸 씨앗으로 쓴다").not.toMatch(/useState\(\s*full\b/);
+    // ★ 씨앗은 **사장님이 저장한 날 글자**다. 판정 결과(promptBodyOf)를 그대로 앉히면
+    //   덮어쓰기 경로에서 코드가 붙인 절이 이미 들어 있어 저장할 때마다 한 벌씩 늘어난다.
+    expect(video, "텍스트칸 씨앗을 이름 하나로 두지 않았다").toMatch(/const seed = saved \|\| generated/);
+    expect(video, "텍스트칸이 씨앗에서 출발하지 않는다").toMatch(/useState\(seed\)/);
+  });
+
+  // ★★ 돈에 닿는 자리다(④이미지와 글자 그대로 같은 함정). 덮어쓰기가 없는 컷은
+  //   `saved === ""` 이라, 잠금을 `saved` 로 재면 **아무것도 안 고쳤는데 [저장]이 눌린다.**
+  //   한 번 눌리면 코드가 만든 본문이 덮어쓰기로 굳고 각인이 뒤집혀, 클립을 **틀린 사유로**
+  //   다시 사게 된다(Seedance 30초 한 편이 회당 ~$9다).
+  it("★ 덮어쓰기가 없고 텍스트칸을 안 건드렸으면 [저장]이 안 눌린다", () => {
+    const fold = foldIn(video);
+    const disabled = fold.match(/disabled=\{([^}]*)\}[\s\S]*?>\s*저장/)?.[1];
+    expect(disabled, "[저장] 버튼의 잠금 조건을 못 찾았다").toBeTruthy();
+    const cond = disabled.replace(/\s+/g, " ");
+    expect(cond, "[저장]이 씨앗과 비교하지 않는다 — 안 고쳐도 눌려 각인이 뒤집힌다")
+      .toContain("prompt.trim() === seed");
+    // `=== saved || generated` 같은 형태도 막는다 — `(a === b) || c` 로 읽혀 **영원히 잠긴다**.
+    expect(cond, "잠금 판정이 저장된 값만 본다").not.toMatch(/prompt\.trim\(\) === saved\b/);
+  });
+
+  // ★ 이 화면의 다른 점 하나. 파일 전체를 훑으면 위쪽 주석에 걸려 아무것도 안 재므로
+  //   **접힌 칸 안의 사장님이 읽는 글**만 잘라 낸다.
+  it("★ 대사는 여기서 못 고친다고 적는다 — 자막과 갈리기 때문이다", () => {
+    const fold = foldIn(video);
+    expect(fold, "대사 안내가 없다 — 사장님이 여기서 고치려 든다").toMatch(/대사/);
+    expect(fold, "어디서 고치는지 안 알려 준다").toMatch(/대사[\s\S]*시나리오|시나리오[\s\S]*대사/);
+  });
+
+  it("★ 고치면 값이 든다고 미리 말한다", () => {
+    const fold = foldIn(video);
+    expect(fold, "유료 경고가 없다 — 사장님이 모르고 누른다").toMatch(/유료/);
+    expect(fold, "지금 클립이 안 바뀐다는 말이 없다").toMatch(/다시 만들/);
+  });
+
+  it("원래대로 버튼이 있다 — 빈 값을 보내는 것이 구현이다", () => {
+    const fold = foldIn(video);
+    expect(fold, "[원래대로] 버튼 이름이 없다").toMatch(/원래대로/);
+    expect(fold, "빈 값을 보내는 자리가 없다 — 되돌릴 길이 없다").toMatch(/onSavePrompt\([^)]*""\s*\)/);
+  });
+
+  it("저장은 컷별 프롬프트 필드로 PATCH 한다 — 저장 경로가 하나다", () => {
+    const fn = fnIn(video, "savePrompt");
+    expect(fn, "savePrompt 함수가 없다 — 화면이 미정의 참조로 죽는다").toBeTruthy();
+    expect(fn, "PATCH 가 아니다").toMatch(/method: "PATCH"/);
+    expect(fn, "프로젝트 저장 경로가 아니다").toMatch(/\/api\/projects\/\$\{id\}/);
+    // ★ 담는 필드가 **clip_prompt** 여야 한다. sentence 로 보내면 원고가 덮이고,
+    //   image_prompt 로 보내면 영상 편집이 그림을 낡게 만든다(컷당 $0.08).
+    expect(fn.replace(/\s+/g, " "), "컷의 clip_prompt 로 안 보낸다")
+      .toMatch(/cut: \{ idx, clip_prompt \}/);
+    expect(video, "저장 함수가 미리보기에 안 걸려 있다").toMatch(/onSavePrompt=\{savePrompt\}/);
+  });
+
+  it("글자 수를 보여 주고, 상한 숫자는 화면에 적지 않는다", () => {
+    expect(video, "글자 수 표시가 없다").toMatch(/length\}\s*자/);
+    expect(video, "상한 숫자를 화면에 적었다 — 두 벌이면 갈린다").not.toMatch(/2000/);
+  });
+
+  it("접혀 있고, 기존 컷별 [다시 만들기]가 그대로 살아 있다", () => {
+    expect(video).toMatch(/<details/);
+    expect(video, "컷별 다시 만들기가 사라졌다").toMatch(/onClick=\{\(\) => regen\(c\.idx\)\}/);
+  });
+});
+
 // ★ 화면이 끌어오는 사슬 어디에도 `fs`·`path` 가 없어야 한다. 이 저장소는 화면이 서버 전용
 //   모듈을 끌어와 빌드가 깨진 사고를 세 번 겪었고, 그때 **테스트는 전부 초록**이었다.
 //   프롬프트 때문에 lib/cuts 를 새로 끌어왔으니 그 사슬을 여기서 잰다.
-describe("④이미지 화면의 import 사슬 — 서버 전용 모듈이 없다", () => {
-  const SERVER_ONLY = /\bfrom\s+"(fs|node:fs|fs\/promises|node:fs\/promises|path|node:path|child_process|node:child_process)"/;
+const SERVER_ONLY = /\bfrom\s+"(fs|node:fs|fs\/promises|node:fs\/promises|path|node:path|child_process|node:child_process)"/;
 
-  function chainOf(entry) {
-    const seen = new Set();
-    const queue = [entry];
-    while (queue.length) {
-      const file = queue.shift();
-      if (seen.has(file)) continue;
-      seen.add(file);
-      const src = readFileSync(file, "utf8");
-      for (const m of src.matchAll(/from\s+"(\.[^"]+)"/g)) {
-        const base = resolve(dirname(file), m[1]);
-        // ★ `.jsx` 를 반드시 센다. 여기서 `.js` 로만 걸렀더니 `components/` 아래
-        //   (ProjectContext·MeContext·BackButton — 전부 `.jsx`)가 사슬에 **한 파일도 안
-        //   들어왔다.** 화면 컴포넌트가 서버 전용 모듈을 끌어와도 초록이었다(리뷰 실측).
-        const hit = [base, `${base}.js`, `${base}.jsx`, `${base}/index.js`, `${base}/index.jsx`]
-          .find((p) => existsSync(p) && /\.jsx?$/.test(p));
-        if (hit) queue.push(hit);
-      }
+function chainOf(entry) {
+  const seen = new Set();
+  const queue = [entry];
+  while (queue.length) {
+    const file = queue.shift();
+    if (seen.has(file)) continue;
+    seen.add(file);
+    const src = readFileSync(file, "utf8");
+    for (const m of src.matchAll(/from\s+"(\.[^"]+)"/g)) {
+      const base = resolve(dirname(file), m[1]);
+      // ★ `.jsx` 를 반드시 센다. 여기서 `.js` 로만 걸렀더니 `components/` 아래
+      //   (ProjectContext·MeContext·BackButton — 전부 `.jsx`)가 사슬에 **한 파일도 안
+      //   들어왔다.** 화면 컴포넌트가 서버 전용 모듈을 끌어와도 초록이었다(리뷰 실측).
+      const hit = [base, `${base}.js`, `${base}.jsx`, `${base}/index.js`, `${base}/index.jsx`]
+        .find((p) => existsSync(p) && /\.jsx?$/.test(p));
+      if (hit) queue.push(hit);
     }
-    return [...seen];
   }
+  return [...seen];
+}
 
+describe("④이미지 화면의 import 사슬 — 서버 전용 모듈이 없다", () => {
   it("★ 사슬에 fs·path 가 없다", () => {
     const chain = chainOf(resolve(PAGE));
     // 그물이 실제로 무언가를 훑는지 먼저 본다 — 사슬이 짧으면 이 테스트는 헛돈다.
     expect(chain.length, "사슬을 못 따라갔다").toBeGreaterThan(15);
     expect(chain.some((f) => f.endsWith("cuts.js")), "lib/cuts.js 가 사슬에 없다").toBe(true);
     // ★ 화면 컴포넌트까지 닿았는가 — `.jsx` 를 건너뛰면 여기서 걸린다.
+    for (const must of ["ProjectContext.jsx", "MeContext.jsx", "BackButton.jsx"]) {
+      expect(chain.some((f) => f.endsWith(must)), `${must} 가 사슬에 없다 — .jsx 를 건너뛴다`).toBe(true);
+    }
+    const bad = chain.filter((f) => SERVER_ONLY.test(readFileSync(f, "utf8")));
+    expect(bad, `화면이 서버 전용 모듈을 끌어온다: ${bad.join(", ")}`).toEqual([]);
+  });
+});
+
+// ⑤영상도 같은 그물이 필요하다 — 프롬프트를 보여 주려고 lib/cuts 를 새로 끌어왔다.
+// (④이미지와 따로 재는 이유: 사슬이 다르고, 한쪽만 깨져도 앱이 안 뜬다.)
+describe("⑤영상 화면의 import 사슬 — 서버 전용 모듈이 없다", () => {
+  it("★ 사슬에 fs·path 가 없다", () => {
+    const chain = chainOf(resolve(VIDEO_PAGE));
+    expect(chain.length, "사슬을 못 따라갔다").toBeGreaterThan(15);
+    expect(chain.some((f) => f.endsWith("cuts.js")), "lib/cuts.js 가 사슬에 없다").toBe(true);
     for (const must of ["ProjectContext.jsx", "MeContext.jsx", "BackButton.jsx"]) {
       expect(chain.some((f) => f.endsWith(must)), `${must} 가 사슬에 없다 — .jsx 를 건너뛴다`).toBe(true);
     }
