@@ -29,11 +29,10 @@ afterEach(() => {
 });
 
 describe("selectCandidate 검수 기준", () => {
-  it("장면이 있으면 shows로 심사하고 나레이션 문장은 쓰지 않는다", async () => {
+  it("받은 장면 기준으로 심사한다 — 낭독 문장은 이 자리에 못 들어온다", async () => {
     const store = {};
     await runWithActor("t-user", () => selectCandidate({
-      cut,
-      scene: { role: "가격", shows: "카페 테이블 위 딸기라떼 한 잔", says: "6500원", seconds: 5 },
+      sceneBasis: "카페 테이블 위 딸기라떼 한 잔",
       candidates,
       fetchImpl: capturingFetch(store),
       apiKey: "k",
@@ -45,6 +44,33 @@ describe("selectCandidate 검수 기준", () => {
     expect(text).not.toContain("문장 의도 일치");
   });
 
+  // ★ 판정을 여기서 다시 하지 않는다 — 그림 프롬프트와 심사가 갈릴 자리를 없앤 계약이다.
+  //   컷을 넘겨도 그 안의 값으로 기준을 만들지 않는다(넘길 자리 자체가 없다).
+  it("컷을 받지 않는다 — 조회식이 두 벌이 되는 문을 닫았다", async () => {
+    const store = {};
+    await runWithActor("t-user", () => selectCandidate({
+      cut, scene: { shows: "옛 계약으로 넘긴 화면" },   // 옛 인자는 무시된다
+      candidates, fetchImpl: capturingFetch(store), apiKey: "k",
+    }));
+    const text = promptText(store);
+    expect(text).not.toContain("옛 계약으로 넘긴 화면");
+    expect(text).not.toContain(cut.sentence);
+    expect(text).not.toContain("장면 설명");
+  });
+
+  it("장면 기준이 비면 장면 설명 줄과 일치 기준을 함께 뺀다 — 빈 글과 대조시키지 않는다", async () => {
+    const store = {};
+    await runWithActor("t-user", () => selectCandidate({
+      sceneBasis: "", candidates, fetchImpl: capturingFetch(store), apiKey: "k",
+    }));
+    const text = promptText(store);
+    expect(text).not.toContain("장면 설명");
+    expect(text).not.toContain('""');
+    // 장면 없이도 재는 기준은 그대로 남는다 — 검수를 통째로 건너뛰지 않는다
+    expect(text).toContain("신체·손가락 오류");
+    expect(text).toContain("거울");
+  });
+
   it("거울·반사 같은 물리 오류도 본다", async () => {
     // 2026-07-29 실측: 거울을 등지고 선 사람이 거울 속에서는 정면으로 비쳤는데
     // "신체 오류 없음"으로 통과했다. 검수 기준에 반사·그림자가 없었다.
@@ -52,24 +78,25 @@ describe("selectCandidate 검수 기준", () => {
     // 장면 설명에는 거울을 넣지 않는다 — 넣으면 그 낱말이 프롬프트에 있다는 이유로
     // 기준과 무관하게 통과해 버린다(실제로 그렇게 거짓 통과하는 테스트를 한 번 썼다)
     const store = {};
-    await runWithActor("t-user", () => selectCandidate({ cut, scene: { shows: "작업대 위 코트 클로즈업" }, candidates,
+    await runWithActor("t-user", () => selectCandidate({ sceneBasis: "작업대 위 코트 클로즈업", candidates,
       fetchImpl: capturingFetch(store), apiKey: "k" }));
     const text = promptText(store);
     expect(text).toContain("거울");
     expect(text).toContain("반사");
   });
 
-  it("장면이 없으면(구성 전 옛 프로젝트) 나레이션 문장으로 폴백한다", async () => {
+  it("기준이 아예 안 넘어와도 죽지 않는다 — 장면 없는 검수로 돈다", async () => {
     const store = {};
-    await runWithActor("t-user", () => selectCandidate({ cut, candidates, fetchImpl: capturingFetch(store), apiKey: "k" }));
-    expect(promptText(store)).toContain(cut.sentence);
+    await runWithActor("t-user", () => selectCandidate({ candidates, fetchImpl: capturingFetch(store), apiKey: "k" }));
+    const text = promptText(store);
+    expect(text).not.toContain("장면 설명");
+    expect(text).toContain("신체·손가락 오류");
   });
 
   it("응답의 selectedIndex·passed를 그대로 돌려준다", async () => {
     const store = {};
     const verdict = await runWithActor("t-user", () => selectCandidate({
-      cut,
-      scene: { shows: "화면" },
+      sceneBasis: "화면",
       candidates,
       fetchImpl: capturingFetch(store),
       apiKey: "k",
@@ -80,7 +107,7 @@ describe("selectCandidate 검수 기준", () => {
   it("고르라고 하지 않는다 — 후보가 한 장이라 고를 것이 없다", async () => {
     const store = {};
     const got = await runWithActor("t-user", () => selectCandidate({
-      cut: { sentence: "문장." }, scene: { shows: "화면" },
+      sceneBasis: "화면",
       candidates: [{ url: "http://a" }], fetchImpl: capturingFetch(store), apiKey: "k",
     }));
     expect(promptText(store), "스키마에 selectedIndex 가 남아 있다").not.toContain("selectedIndex");
@@ -94,7 +121,7 @@ describe("selectCandidate 검수 기준", () => {
       json: async () => ({ choices: [{ message: { content: JSON.stringify({ passed: false, note: "손가락 오류" }) } }] }),
     });
     const got = await runWithActor("t-user", () => selectCandidate({
-      cut: { sentence: "문장." }, scene: { shows: "화면" },
+      sceneBasis: "화면",
       candidates: [{ url: "http://a" }], fetchImpl, apiKey: "k",
     }));
     expect(got.passed).toBe(false);

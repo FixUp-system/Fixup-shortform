@@ -30,8 +30,11 @@ function deps({ failCut } = {}) {
       { idx: 1, sentence: "사진컷", seconds: 8, source: "photo", photo_id: "p1", regen_count: 0 },
     ],
     genImage: async ({ prompt }) => ({ url: "http://img/" + Math.random() }),
-    select: async ({ cut }) =>
-      cut.idx === failCut ? { selectedIndex: 0, passed: false, note: "불합격" } : { selectedIndex: 0, passed: true, note: "ok" },
+    // ★ 검수에는 컷이 안 넘어간다 — lib/vlm.js 는 `sceneBasis`(그림이 그려진 글) 하나만
+    //   받는다. 조회식을 두 벌로 만들지 못하게 한 계약이다(2026-08-17).
+    //   이 픽스처에서 검수를 타는 컷은 idx 0 하나뿐이라(idx 1 은 사진 컷) failCut 0 = 이 호출.
+    select: async () =>
+      failCut === 0 ? { selectedIndex: 0, passed: false, note: "불합격" } : { selectedIndex: 0, passed: true, note: "ok" },
   };
 }
 
@@ -362,10 +365,10 @@ describe("분할 → 이미지 (이어 부르면 갈라지기 전과 같다)", (
     const capturing = {
       ...deps(),
       splitCuts: async () => [{ idx: 0, sentence: "AI컷", shows: "딸기라떼 클로즈업", seconds: 6, source: "ai", regen_count: 0 }],
-      select: async ({ scene }) => { seen.push(scene); return { selectedIndex: 0, passed: true, note: "ok" }; },
+      select: async ({ sceneBasis }) => { seen.push(sceneBasis); return { selectedIndex: 0, passed: true, note: "ok" }; },
     };
     await runBoth(p.id,capturing);
-    expect(seen[0]?.shows).toBe("딸기라떼 클로즈업");
+    expect(seen[0]).toBe("딸기라떼 클로즈업");
   });
 
   it("구성 시절 컷은 장면의 화면으로 검수한다 — 옛 프로젝트를 버리지 않는다", async () => {
@@ -378,10 +381,64 @@ describe("분할 → 이미지 (이어 부르면 갈라지기 전과 같다)", (
     const capturing = {
       ...deps(),
       splitCuts: async () => [{ idx: 0, scene_idx: 0, sentence: "옛 컷", seconds: 6, source: "ai", regen_count: 0 }],
-      select: async ({ scene }) => { seen.push(scene); return { selectedIndex: 0, passed: true, note: "ok" }; },
+      select: async ({ sceneBasis }) => { seen.push(sceneBasis); return { selectedIndex: 0, passed: true, note: "ok" }; },
     };
     await runBoth(p.id,capturing);
-    expect(seen[0]?.shows).toBe("옛 장면 화면");
+    expect(seen[0]).toBe("옛 장면 화면");
+  });
+
+  // ★★ 2026-08-17 — 그림 기준과 심사 기준이 갈렸던 자리다. 갈리면 VLM 이 물릴 근거가
+  //    생기고, 물리면 자동 보정이 그림을 한 장 더 산다(컷당 +$0.08, 크레딧 청구 없이
+  //    원가만 쌓인다). 컷 네 갈래로 **프롬프트의 `Scene:` 절 = 심사 기준**을 못 박는다.
+  describe("심사 기준은 그림이 그려진 글이다", () => {
+    const sceneClause = (prompt) => {
+      const m = /Scene:\s*([\s\S]+?)\.\s/.exec(prompt);
+      return m ? m[1] : null;
+    };
+    // 그림 프롬프트와 심사 기준을 함께 붙잡는다
+    async function run(cut, mutate) {
+      const p = await makeProject();
+      if (mutate) await projects.updateProject(p.id, OWNER, mutate);
+      const seen = { prompt: null, basis: undefined };
+      await runBoth(p.id, {
+        ...deps(),
+        splitCuts: async () => [{ idx: 0, seconds: 6, source: "ai", regen_count: 0, ...cut }],
+        genImage: async ({ prompt }) => { seen.prompt = prompt; return { url: "http://img/x" }; },
+        select: async ({ sceneBasis }) => { seen.basis = sceneBasis; return { selectedIndex: 0, passed: true, note: "ok" }; },
+      });
+      return seen;
+    }
+
+    it("움직임 절이 걸러진 컷 — 심사는 원본이 아니라 걸러진 글을 본다", async () => {
+      const seen = await run({ sentence: "AI컷", shows: "a cold brew bottle on the counter, the camera slowly pushes in" });
+      expect(sceneClause(seen.prompt)).toBe(seen.basis);
+      // 걸러졌다는 것 자체도 확인한다 — 안 걸러지면 이 테스트가 아무것도 안 잰다
+      expect(seen.basis).toBe("a cold brew bottle on the counter");
+    });
+
+    it("shows 가 없는 컷 — 심사는 낭독 문장이 아니라 프롬프트가 쓴 주제 앵커를 본다", async () => {
+      const seen = await run(
+        { sentence: "아침마다 커피가 식어서 아까웠어요." },
+        (proj) => ({ ...proj, scenario: { topic: "cold brew", focus: { mode: "물건", subject: "a cold brew bottle" } } })
+      );
+      expect(sceneClause(seen.prompt)).toBe(seen.basis);
+      expect(seen.basis).toBe("a cold brew bottle");
+      expect(seen.basis).not.toContain("커피가 식어서");
+    });
+
+    it("본문을 덮어쓴 컷 — 심사는 사장님이 쓴 그 글을 본다", async () => {
+      const seen = await run({ sentence: "AI컷", shows: "무시될 화면", image_prompt: "a neon-lit ramen counter at night" });
+      expect(seen.basis).toBe("a neon-lit ramen counter at night.");
+      expect(seen.prompt).toContain("a neon-lit ramen counter at night.");
+      // 덮어쓰기는 본문을 통째로 대체하므로 Scene: 절 자체가 없다 — 그런데도 기준은 한 벌이다
+      expect(sceneClause(seen.prompt)).toBeNull();
+    });
+
+    it("그릴 근거가 아무것도 없으면 Scene: 절도 없고 심사 기준도 비어 있다", async () => {
+      const seen = await run({ sentence: "AI컷" });
+      expect(sceneClause(seen.prompt)).toBeNull();
+      expect(seen.basis).toBe("");
+    });
   });
 
   it("regenCut은 3회 제한", async () => {
