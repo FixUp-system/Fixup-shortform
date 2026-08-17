@@ -10,7 +10,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
-import { activeStyle } from "../../../../lib/styles";
+// PROMPT_NOTE_MAX 는 서버 게이트(normalizePromptNote)와 **같은 자리**에서 온다 —
+// 숫자를 화면에 또 적으면 두 벌이 되어, 붙여넣기는 통했는데 저장이 400 인 칸이 생긴다.
+import { activeStyle, PROMPT_NOTE_MAX } from "../../../../lib/styles";
 import { ASPECTS, DEFAULT_ASPECT_ID } from "../../../../lib/aspects";
 // 화질 — 모델이 실제로 여는 값만 고른다. 목록도 지금 값도 표(lib/clip-limits)가 준다.
 // 이 화면이 그것을 드는 이유는 **화질이 정가를 바꾸기 때문**이다(Seedance 30초: 720p 160 ·
@@ -30,6 +32,10 @@ export default function BriefingStepPage() {
   const [err, setErr] = useState("");
   // 저장 전 보정 글. project 가 늦게 오므로 도착한 뒤 한 번 맞춰 준다(아래 effect).
   const [styleNote, setStyleNote] = useState("");
+  // 프로젝트 공통 지시 두 칸. **화풍 보정과 다른 값이다** — 그쪽은 화풍에 딸린 한 줄(120자)이고
+  // 이쪽은 밖에서 써 온 프롬프트 통짜다(600자). 상한과 저장 경로도 따로다.
+  const [imageNote, setImageNote] = useState("");
+  const [clipNote, setClipNote] = useState("");
   const noteLoadedFor = useRef(null);
 
   // 저장된 보정을 칸에 한 번만 채운다 — 매번 덮으면 타이핑 중에 글자가 되돌아간다
@@ -37,6 +43,10 @@ export default function BriefingStepPage() {
     if (!project || noteLoadedFor.current === project.id) return;
     noteLoadedFor.current = project.id;
     setStyleNote(project.settings?.style?.note || "");
+    // ★ 공통 지시도 **같은 빗장 안에서** 채운다. 빗장이 하나뿐이라 밖에 두면 매 렌더마다
+    //   저장값으로 덮여 글자마다 타이핑이 되돌아간다.
+    setImageNote(project.settings?.image_note || "");
+    setClipNote(project.settings?.clip_note || "");
   }, [project?.id]);
 
   // 사이즈 저장. 컷이 없을 때만 부를 수 있는 자리에 있다(위 sizePicker 가 감춘다).
@@ -63,6 +73,28 @@ export default function BriefingStepPage() {
     if (!res || !res.ok) {
       // 실패를 삼키지 않는다 — 고른 컨셉과 그림에 실리는 컨셉이 달라지면 아무도 못 알아본다
       setErr((await res?.json().catch(() => ({})))?.error || "영상 컨셉을 저장하지 못했어요 — 다시 골라 주세요");
+      setBusy(false);
+      return;
+    }
+    setErr("");
+    await load(id).catch(() => {});
+    setBusy(false);
+  }
+
+  // 프로젝트 공통 지시 저장. 사이즈·컨셉과 같은 경로(PATCH settings)이되 **화풍과 섞지
+  // 않는다** — normalizeStyle 이 preset 을 함께 요구하므로 style 과 같은 몸통에 실으면
+  // 400 이거나(preset 없음) 사장님이 고른 화풍이 조용히 덮인다. 그래서 그 값 하나만 보낸다.
+  //
+  // 실패를 삼키지 않는 이유는 다른 저장과 같다 — 이 글은 **전 컷의 프롬프트에 실린다**.
+  // 저장이 안 됐는데 저장된 줄 알면, 사장님이 쓴 지시 없이 값을 치르게 된다.
+  async function saveNote(key, value) {
+    setBusy(true);
+    const res = await fetch(`/api/projects/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings: { [key]: value } }),
+    }).catch(() => null);
+    if (!res || !res.ok) {
+      setErr((await res?.json().catch(() => ({})))?.error || "공통 지시를 저장하지 못했어요 — 다시 시도해 주세요");
       setBusy(false);
       return;
     }
@@ -128,6 +160,54 @@ export default function BriefingStepPage() {
     />
   );
 
+  // 이미 만든 클립이 있는가 — 영상 공통 지시를 고치는 값이 실제로 드는 자리다.
+  // 그림과 따로 본다: 그림만 있는 상태에서 영상 지시를 고치는 것은 아직 0원이다.
+  const madeClips = (project.cuts || []).some((c) => c.video?.url);
+  // 프로젝트 공통 지시 두 칸 — 밖에서 프롬프트를 써 오는 사장님을 위한 자리다.
+  // 전 컷의 프롬프트에 그대로 실린다(lib/cuts.js promptNoteClause).
+  //
+  // ★ 위의 화풍 보정(120자)과 **다른 값이다** — 그쪽은 화풍에 딸린 한 줄이고 이쪽은
+  //   써 온 프롬프트 통짜다(상한 PROMPT_NOTE_MAX). 그래서 칸도 저장 경로도 따로다.
+  // ★ 이미지와 영상을 나눈 이유: 영상 지시(움직임·립싱크)가 이미지 프롬프트에 붙으면
+  //   정지 화면 설계가 망가진다(lib/cuts.js 의 stillOnly 가 같은 이유로 존재한다).
+  // ★ 상한은 maxLength 로 미리 막는다 — 서버도 같은 값으로 거절하지만(600자, 자르지 않고
+  //   400), 붙여넣고 나서 저장이 실패하는 것보다 애초에 안 넘어가는 쪽이 낫다.
+  const notePicker = (
+    <div className="mt-lg">
+      <div className="eyebrow">
+        모든 컷에 함께 보낼 지시 <small>선택 — 밖에서 쓴 프롬프트를 그대로 넣어도 돼요</small>
+      </div>
+      {/* ★ 값이 든다고 미리 말한다. 이 글은 **전 컷의 각인**에 들어가므로(lib/steps.js)
+          한 줄만 고쳐도 그림과 클립이 통째로 낡는다 — 안 적으면 사장님이 한 줄 보태고
+          전 컷 재구매를 마주한다. 이미 만든 것이 있을 때만 말한다: 그 전에는 0원이라
+          값 얘기를 꺼내면 겁만 준다(화풍 보정과 같은 규칙이다). */}
+      {(madeImages || madeClips) && (
+        <div className="script-src warn">
+          이미 만든 그림·클립이 있어요 — 여기를 고치면 전 컷을 다시 만들어야 해요 (유료)
+        </div>
+      )}
+      <label className="tray-note">이미지에 함께 보낼 지시
+        <textarea className="sent-input fix-input" maxLength={PROMPT_NOTE_MAX}
+          placeholder="예: shot on 35mm film, shallow depth of field"
+          value={imageNote} disabled={busy}
+          onChange={(e) => setImageNote(e.target.value)}
+          // 바뀌었을 때만 보낸다 — 지나갈 때마다 PATCH 하지 않게(화풍 보정과 같은 규칙)
+          onBlur={() => {
+            if (imageNote.trim() !== (project.settings?.image_note || "")) saveNote("image_note", imageNote);
+          }} />
+      </label>
+      <label className="tray-note">영상에 함께 보낼 지시
+        <textarea className="sent-input fix-input" maxLength={PROMPT_NOTE_MAX}
+          placeholder="예: hand-held camera, subtle shake"
+          value={clipNote} disabled={busy}
+          onChange={(e) => setClipNote(e.target.value)}
+          onBlur={() => {
+            if (clipNote.trim() !== (project.settings?.clip_note || "")) saveNote("clip_note", clipNote);
+          }} />
+      </label>
+    </div>
+  );
+
   // ★ 목록이 비면 아무것도 안 그린다(Kling·LTX). 그 모델에는 resolution 파라미터 자체가
   //   없어서, 고를 수 있는 척하면 고른 순간 fal 이 거절한다.
   // ★ 지금 값을 project.settings.resolution 이 아니라 resolutionForProject 로 읽는 이유:
@@ -176,6 +256,9 @@ export default function BriefingStepPage() {
       {sizePicker}
       {resolutionPicker}
       {stylePicker}
+      {/* 공통 지시는 화풍 **아래**다 — 화풍이 주경로이고, 이 칸은 프롬프트를 직접 써 오는
+          사장님을 위한 곁길이다. 위에 두면 빈 칸 둘이 기본 흐름을 막는다. */}
+      {notePicker}
       <div className="step-actions">
         <div className="fwd">
           <button className="cta" disabled={busy} onClick={() => router.push(`/create/${id}/scenario`)}>

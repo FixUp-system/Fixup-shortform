@@ -18,6 +18,8 @@ const PAGE = "app/create/[id]/images/page.js";
 const images = readFileSync(PAGE, "utf8");
 const VIDEO_PAGE = "app/create/[id]/video/page.js";
 const video = readFileSync(VIDEO_PAGE, "utf8");
+const BRIEFING_PAGE = "app/create/[id]/briefing/page.js";
+const briefing = readFileSync(BRIEFING_PAGE, "utf8");
 
 // ── 범위를 좁혀 재는 헬퍼 ────────────────────────────────────────────────
 // ★ 파일 전체를 훑는 정규식은 **아무것도 안 잰다** — 주석·다른 함수·다른 버튼에 걸려서
@@ -38,6 +40,25 @@ const fnIn = (src, name) => {
   if (start < 0) return "";
   const end = src.indexOf("\n  }", start);
   if (end < 0) return "";
+  return src.slice(start, end).replace(/\/\/[^\n]*/g, "");
+};
+// `const 이름 = (` … `\n  );` 로 묶인 JSX 덩어리. ①자료가 화면 조각을 그렇게 담는다
+// (sizePicker·stylePicker·resolutionPicker). 사장님이 읽는 글만 남기려고 JSX 주석을 걷는다.
+const jsxBlockIn = (src, name) => {
+  const start = src.indexOf(`const ${name} = (`);
+  if (start < 0) return "";
+  const end = src.indexOf("\n  );", start);
+  if (end < 0) return "";
+  return src.slice(start, end).replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+};
+// marker 를 품은 useEffect 의 본문. 초기값을 **한 번만** 채우는지 보려면 그 자리가
+// 빗장(noteLoadedFor) 안쪽인지 봐야 한다 — 밖이면 매 렌더마다 덮어 타이핑이 끊긴다.
+const effectIn = (src, marker) => {
+  const at = src.indexOf(marker);
+  if (at < 0) return "";
+  const start = src.lastIndexOf("useEffect(", at);
+  const end = src.indexOf("]);", at);
+  if (start < 0 || end < 0) return "";
   return src.slice(start, end).replace(/\/\/[^\n]*/g, "");
 };
 
@@ -252,6 +273,78 @@ describe("⑤영상 — 프롬프트 편집", () => {
   it("접혀 있고, 기존 컷별 [다시 만들기]가 그대로 살아 있다", () => {
     expect(video).toMatch(/<details/);
     expect(video, "컷별 다시 만들기가 사라졌다").toMatch(/onClick=\{\(\) => regen\(c\.idx\)\}/);
+  });
+});
+
+// ①자료 — 프로젝트 공통 지시 상자 둘.
+//
+// 컷별 덮어쓰기와 다른 값이다: 이쪽은 **전 컷의 프롬프트에 함께 실리는** 한 벌이다
+// (lib/cuts.js promptNoteClause). 그래서 화면이 재야 할 것도 다르다 —
+//   ① 칸이 **둘**이다(이미지·영상). 하나로 합치면 움직임 지시가 이미지 프롬프트에 붙어
+//      정지 화면 설계가 망가진다(lib/cuts.js stillOnly 가 같은 이유로 존재한다)
+//   ② 이미 있는 **화풍 보정(120자)을 건드리지 않는다** — 다른 값이고 다른 상한이다
+//   ③ 저장이 화풍과 섞이면 안 된다(normalizeStyle 이 preset 을 함께 요구한다)
+//   ④ 초기값을 매 렌더마다 덮으면 타이핑이 끊긴다
+//   ⑤ 한 번 고치면 **전 컷이 낡는다** — 값이 든다고 미리 말해야 한다
+describe("①자료 — 프로젝트 공통 지시", () => {
+  it("칸이 둘이다 — 이미지용과 영상용", () => {
+    expect(briefing, "이미지 공통 지시 칸이 없다").toMatch(/image_note/);
+    expect(briefing, "영상 공통 지시 칸이 없다").toMatch(/clip_note/);
+    // 칸이 실제로 둘인지 — 이 화면의 텍스트칸은 이 둘뿐이다(화풍 보정은 StylePicker 안에 있다).
+    expect(briefing.match(/<textarea/g)?.length, "텍스트칸이 둘이 아니다").toBe(2);
+  });
+
+  it("★ 화풍 보정 입력은 그대로 남는다 — 다른 값이다", () => {
+    // 상태 선언만 보면 배선이 끊겨도 초록이다(뮤테이션 실측) — 값과 콜백이 실제로
+    // StylePicker 에 걸려 있는지 잰다.
+    expect(briefing, "화풍 보정을 지웠다 — 120자짜리 그 칸은 이 작업의 대상이 아니다")
+      .toMatch(/note=\{styleNote\}/);
+    expect(briefing, "화풍 보정 입력이 상태를 안 고친다").toMatch(/onNote=\{setStyleNote\}/);
+    expect(briefing, "화풍 저장 경로가 사라졌다").toMatch(/saveStyle\(/);
+    // ★ import 문이 아니라 **그려지는 자리**를 잰다 — `/StylePicker/` 만으로는 import 가
+    //   남아 있는 한 초록이라, 화면에서 칩과 보정 칸을 통째로 떼어도 안 걸린다(뮤테이션 실측).
+    expect(briefing, "화풍 고르는 자리가 사라졌다").toMatch(/<StylePicker/);
+  });
+
+  // ★ `normalizeStyle` 은 preset 을 함께 요구한다. 공통 지시를 화풍과 같은 몸통에 실으면
+  //   400 이거나(preset 없음) 사장님이 고른 화풍이 조용히 덮인다. 그래서 **settings 에
+  //   그 값 하나만** 보낸다. 함수 본문만 잘라서 잰다 — 파일 전체를 훑으면 saveStyle 의
+  //   `style` 에 걸려 무엇을 보내든 초록이다.
+  it("★ 공통 지시 저장은 화풍과 섞이지 않는다", () => {
+    const fn = fnIn(briefing, "saveNote");
+    expect(fn, "saveNote 함수가 없다 — 칸이 저장되지 않는다").toBeTruthy();
+    expect(fn, "PATCH 가 아니다").toMatch(/method: "PATCH"/);
+    expect(fn.replace(/\s+/g, " "), "settings 에 그 값 하나만 보내지 않는다")
+      .toMatch(/settings: \{ \[key\]: value \}/);
+    expect(fn, "화풍을 함께 보낸다 — normalizeStyle 이 preset 을 요구한다").not.toMatch(/style/);
+    // 실제로 칸에 걸려 있어야 한다 — 함수만 있고 안 걸려 있으면 아무것도 저장되지 않는다.
+    expect(briefing, "이미지 칸이 저장에 안 걸려 있다").toMatch(/saveNote\("image_note"/);
+    expect(briefing, "영상 칸이 저장에 안 걸려 있다").toMatch(/saveNote\("clip_note"/);
+  });
+
+  // ★ 빗장(noteLoadedFor)이 하나다. 두 칸을 그 밖에서 채우면 매 렌더마다 저장값으로
+  //   덮여 타이핑이 글자마다 되돌아간다 — 화풍 보정이 이미 그 방식을 쓴다.
+  it("★ 초기값은 한 번만 채운다 — 매 렌더마다 덮으면 타이핑이 끊긴다", () => {
+    const eff = effectIn(briefing, "noteLoadedFor.current = project.id");
+    expect(eff, "초기값을 채우는 effect 를 못 찾았다").toBeTruthy();
+    expect(eff, "빗장이 없다").toMatch(/noteLoadedFor\.current === project\.id/);
+    expect(eff, "이미지 공통 지시를 빗장 안에서 채우지 않는다").toMatch(/setImageNote/);
+    expect(eff, "영상 공통 지시를 빗장 안에서 채우지 않는다").toMatch(/setClipNote/);
+    expect(eff, "화풍 보정 초기값이 빠졌다").toMatch(/setStyleNote/);
+  });
+
+  // ★★ 공통 지시는 설계상 **전 컷의 각인**에 들어간다(lib/steps.js). 한 번 고치면 그림·클립이
+  //   통째로 낡는다 — 컷당 $0.08 에 Seedance 30초 한 편이 ~$9다. 안 적으면 사장님은 한 줄
+  //   보태고 전 컷 재구매를 마주한다. 상자 블록만 잘라서 잰다(주석은 걷는다).
+  it("★ 고치면 전 컷을 다시 만들어야 한다고 적는다", () => {
+    const box = jsxBlockIn(briefing, "notePicker");
+    expect(box, "공통 지시 상자 블록을 못 찾았다").toBeTruthy();
+    expect(box, "값이 든다는 말이 없다 — 사장님이 모르고 고친다").toMatch(/유료/);
+    expect(box, "다시 만들어야 한다는 말이 없다").toMatch(/다시 만들/);
+    // 이 화면의 다른 안내(화풍 보정)와 섞이지 않게, 실제로 이 상자 안에서 재고 있는지
+    // 확인한다 — 두 칸의 라벨이 같은 블록에 있어야 한다.
+    expect(box, "이미지 칸 라벨이 이 블록에 없다").toMatch(/이미지/);
+    expect(box, "영상 칸 라벨이 이 블록에 없다").toMatch(/영상/);
   });
 });
 
