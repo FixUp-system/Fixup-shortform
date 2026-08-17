@@ -1256,6 +1256,32 @@ describe("카메라 낱말은 그림 지시에서 지운다", () => {
       expect(stillOnly("handheld close-up of the hands")).toBe("close-up of the hands");
     });
 
+    // ★★ D4(2026-08-18 눈 확인) — **카메라를 "향한다"는 것은 움직임이 아니라 방향이다.**
+    //   실측: shows 가 `… with its rear three-quarter facing camera, tail light glow …` 였는데
+    //   프롬프트에는 `… rear three-quarter facing, tail light glow …` 가 실렸다. `camera` 가
+    //   `facing` 의 **목적어**였는데 낱말만 지워 목적어가 사라졌다 — brokenByRemoval 은
+    //   지운 자리 뒤/앞의 **기능어**만 보므로(`facing` 은 기능어가 아니다) 못 잡는다.
+    //   고치는 방향은 "절을 버린다"가 아니다 — 그러면 `the sedan stopped again` 이라는
+    //   멀쩡한 구도 서술까지 함께 잃는다. 정지 화면에서 카메라를 향한다는 것은 **보는 이를
+    //   향한다**는 뜻이라, 그 말로 바꿔 준다.
+    it("★ 카메라를 향한 방향은 움직임이 아니다 — 목적어를 앗아가지 않는다", () => {
+      expect(stillOnly("the sedan stopped with its rear three-quarter facing camera"))
+        .toBe("the sedan stopped with its rear three-quarter facing the viewer");
+      expect(stillOnly("close-up of a woman looking into the camera"))
+        .toBe("close-up of a woman looking at the viewer");
+      expect(stillOnly("full shot, the shoe angled toward the camera"))
+        .toBe("full shot, the shoe angled toward the viewer");
+    });
+
+    // ★ 반대쪽 그물 — 방향으로 읽어 주는 것은 **닫힌 목록**이다. 움직임 동사 뒤의
+    //   전치사구(`drives toward the camera`)까지 살려 주면, 이 함수가 막으려던 것이
+    //   그대로 통과한다(정지 그림에 담을 수 없는 서술이 유료 프롬프트로 간다).
+    it("★ 카메라로 다가오는 움직임은 여전히 버린다", () => {
+      expect(stillOnly("wide shot. the car drives toward the camera")).toBe("wide shot");
+      expect(stillOnly("close-up of the shoe. the camera slowly pushes in"))
+        .toBe("close-up of the shoe");
+    });
+
     // 속도 부사 검사가 정지형 검사보다 **앞선다**(한국어와 같은 순서). 그 순서를 재는
     // 입력이 하나도 없어서 검사를 지워도 전부 그린이었다 — 관측 가능한 갈림을 박는다.
     it("속도 부사는 정지 서술이어도 버린다", () => {
