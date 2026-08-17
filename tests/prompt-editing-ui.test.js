@@ -288,6 +288,36 @@ describe("④이미지 — 프롬프트 편집", () => {
 // 영상 프롬프트에서 대사를 고칠 수 있으면 **들리는 말과 화면의 자막이 갈린다.** 그래서
 // 대사 절은 꼬리에 있고(못 고친다), 화면이 그 사실을 말해 줘야 여기서 고치려 들지 않는다.
 describe("⑤영상 — 프롬프트 편집", () => {
+  // ★★ 2026-08-18 — ④이미지와 같은 [전문 복사]. **다만 서버에 묻지 않는다.**
+  //    영상 프롬프트에는 레퍼런스 절이 없다(buildClipPrompt 는 refs 를 아예 안 받고, i2v 는
+  //    그림 한 장과 프롬프트로 나가며 판형은 별도 요청 필드다) — 그래서 화면이 쥔
+  //    `prompt + fixedTail` 이 이미 실제로 나가는 전문 그대로다.
+  //    라우트를 부르면 **거짓 정확도**가 된다: 사장님이 방금 고친 본문이 서버의 옛 본문으로
+  //    덮이는데, 얻는 것은 아무것도 없다.
+  it("★ 프롬프트 전문을 한 번에 복사할 수 있다", () => {
+    const fold = foldIn(video);
+    expect(fold, "접힌 칸을 못 찾았다").toBeTruthy();
+    expect(fold, "복사 버튼이 없다").toMatch(/복사/);
+    expect(fold, "버튼이 copyAll 을 부르지 않는다 — 이름만 복사다").toMatch(/onClick=\{copyAll\}/);
+    const copy = fnIn(video, "copyAll");
+    expect(copy, "클립보드에 쓰지 않는다").toMatch(/clipboard/);
+    expect(copy, "본문(prompt)을 안 싣는다").toMatch(/prompt/);
+    expect(copy, "꼬리(fixedTail)를 안 싣는다").toMatch(/fixedTail/);
+  });
+
+  it("★ 서버에 묻지 않는다 — 영상 프롬프트에는 레퍼런스 절이 없다", () => {
+    const copy = fnIn(video, "copyAll");
+    expect(copy, "꼬리를 서버에서 받아 온다 — 방금 고친 본문이 옛 본문으로 덮인다")
+      .not.toMatch(/fetch\(/);
+  });
+
+  it("★ 복사했다고 알린다 — 실패도 알린다", () => {
+    const copy = fnIn(video, "copyAll");
+    expect(copy, "복사됐다는 표시가 없다").toMatch(/복사했어요|복사됐어요/);
+    expect(copy, "실패를 삼킨다 — 복사 안 됐는데 됐다고 보인다").toMatch(/복사하지 못했어요/);
+    expect(foldIn(video), "표시를 그리는 자리가 없다").toMatch(/copyMsg/);
+  });
+
   it("실제로 나가는 프롬프트를 보여 준다 — 서버와 같은 함수로 만든다", () => {
     expect(video, "화면이 buildClipPrompt 를 안 부른다 — 보는 것과 나가는 것이 갈린다")
       .toMatch(/buildClipPrompt/);

@@ -426,6 +426,28 @@ function ClipPromptEdit({ cut, project, busyCut, onSavePrompt }) {
   const fixedTail = full.startsWith(seed)
     ? full.slice(seed.length)
     : full.slice(promptBodyOf("clip", cut, project).length);
+  // ── 전문 복사 ────────────────────────────────────────────────────────
+  //
+  // ④이미지와 같은 버튼이지만 **서버에 묻지 않는다.** 영상 프롬프트에는 레퍼런스 절이 없다
+  // (buildClipPrompt 는 refs 를 아예 안 받고, i2v 는 그림 한 장과 프롬프트로 나가며 판형은
+  //  별도 요청 필드다) — 그래서 화면이 쥔 두 토막이 이미 실제로 나가는 전문 그대로다.
+  // 라우트를 부르면 얻는 것 없이 **방금 고친 본문이 서버의 옛 본문으로 덮인다.**
+  //
+  // ★ 꼬리는 본문에 딸리지 않는다(fixedTail 은 seed 기준) — 아직 저장하지 않은 본문을
+  //   복사해도 "저장하면 나갈 글자"가 그대로 나온다.
+  const [copyMsg, setCopyMsg] = useState("");
+  async function copyAll() {
+    try {
+      await navigator.clipboard.writeText(prompt + fixedTail);
+      setCopyMsg("복사했어요");
+    } catch {
+      // 클립보드는 브라우저가 막을 수 있다(권한·비보안 컨텍스트). 조용히 실패하면
+      // 사장님은 복사된 줄 알고 빈 것을 붙인다.
+      setCopyMsg("복사하지 못했어요 — 위 글을 직접 긁어 주세요");
+    }
+    setTimeout(() => setCopyMsg(""), 4000);
+  }
+
   // 컷마다 첫 회는 공짜, 둘째부터 값을 치른다. 화질까지 넘긴다 — 1080p 는 25 가 아니라 57 이다
   // (컷별 [다시 만들기] 버튼과 같은 출처를 본다).
   const regenLabel = priceLabel(
@@ -446,7 +468,12 @@ function ClipPromptEdit({ cut, project, busyCut, onSavePrompt }) {
       />
       {/* 글자 수만 보여 준다. 상한 숫자는 화면에 안 적는다 — 값이 두 벌이면 갈린다
           (상한은 원장이 자르는 자리 하나이고, 넘으면 서버 문구가 위에 뜬다). */}
-      <span className="regen-note mono">{prompt.length}자</span>
+      <div className="preview-actions">
+        {/* 본문+공통지시+꼬리를 한 덩어리로 — 밖에서 그대로 돌려 볼 수 있게 */}
+        <button className="mini" onClick={copyAll}>전문 복사</button>
+        <span className="regen-note mono">{prompt.length}자</span>
+        {copyMsg && <span className="regen-note">{copyMsg}</span>}
+      </div>
       <p className="preview-note">
         영어로 쓰면 더 잘 알아들어요. 아래 문장은 저희가 항상 뒤에 붙여요 — 고칠 수 없어요.
       </p>
