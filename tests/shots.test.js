@@ -15,6 +15,38 @@ describe("shotSizeOf — 닫힌 목록에서 읽는다", () => {
     expect(shotSizeOf("아웃솔 극단적 클로즈업").id).toBe("extreme_close");
   });
 
+  // 2026-08-17 언어 정책으로 shows 가 영어로 나온다. 한국어 낱말만 보던 목록은 그 순간
+  // 눈이 멀어 shotBalance 가 카탈로그 컷 구성을 못 막았다(실측: 4컷 중 3컷 클로즈업인데 ok).
+  it("영어 낱말도 알아본다 — 화면 설계가 영어로 나온다", () => {
+    expect(shotSizeOf("close-up of the shoe, low angle").id).toBe("close");
+    expect(shotSizeOf("medium shot of the player's feet").id).toBe("medium");
+    expect(shotSizeOf("full shot of the court").id).toBe("full");
+    expect(shotSizeOf("wide shot of the street at dusk").id).toBe("wide");
+    expect(shotSizeOf("establishing shot of the alley").id).toBe("wide");
+    expect(shotSizeOf("extreme close-up of the outsole").id).toBe("extreme_close");
+  });
+
+  it("영어 낱말의 흔한 변형도 본다 — 하이픈·붙여쓰기·대문자", () => {
+    expect(shotSizeOf("Close-Up of the shoe").id).toBe("close");
+    expect(shotSizeOf("closeup of the laces").id).toBe("close");
+    expect(shotSizeOf("close up of the ankle").id).toBe("close");
+    expect(shotSizeOf("Extreme Close-Up of the outsole").id).toBe("extreme_close");
+    expect(shotSizeOf("wide-angle of the court").id).toBe("wide");
+  });
+
+  // 목록 순서가 곧 로직이다 — 영어에서도 긴 것이 먼저 걸려야 한다
+  it("extreme close-up 을 close-up 과 가른다", () => {
+    expect(shotSizeOf("extreme closeup of the midsole").id).toBe("extreme_close");
+  });
+
+  // ★ 한국어 낱말은 그대로 본다 — 저장된 옛 프로젝트의 shows 가 한국어다.
+  //   넓힌 것은 더한 것뿐이라 한국어 판정은 한 글자도 달라지지 않는다.
+  it("한국어 낱말도 그대로 본다 — 옛 프로젝트가 살아 있다", () => {
+    expect(shotSizeOf("신발 클로즈업").id).toBe("close");
+    expect(shotSizeOf("아웃솔 극단적 클로즈업").id).toBe("extreme_close");
+    expect(shotSizeOf("설정 샷, 간판").id).toBe("wide");
+  });
+
   it("적혀 있지 않으면 null 이다", () => {
     expect(shotSizeOf("점프슛 정점에서 공중에 뜬 선수의 역광 실루엣, 로우 앵글")).toBeNull();
     expect(shotSizeOf("")).toBeNull();
@@ -55,6 +87,27 @@ describe("shotBalance — 제품에 붙어 있지 않은가", () => {
 
   // 안 고른 컷 하나 때문에 화면 설계를 다시 부르면 사소한 누락에 LLM 호출을 치른다.
   // 누락된 컷은 분포 셈에서 빠지고 그 컷의 화면은 그대로 쓴다 — 샷 크기가 없어도 그림은 나온다.
+  // ★ 이것이 이번에 닫은 구멍이다 — 영어 shows 에서 같은 구성이 { ok: true } 로 통과했다
+  it("영어 shows 에서도 클로즈업 쏠림을 잡는다", () => {
+    const v = shotBalance(cuts(
+      "close-up of the shoe",
+      "close-up of the ankle",
+      "extreme close-up of the outsole",
+      "medium shot of the player",
+    ));
+    expect(v.ok).toBe(false);
+    expect(v.reason).toContain("클로즈업");
+  });
+
+  it("영어 shows 도 넓은 샷이 대부분이면 통과한다", () => {
+    expect(shotBalance(cuts(
+      "full shot of a player running on the court",
+      "medium shot of the player cutting sideways",
+      "wide shot of people walking down the street",
+      "close-up of the shoe",
+    )).ok).toBe(true);
+  });
+
   it("샷 크기 누락은 재시도 사유가 아니다", () => {
     expect(shotBalance(cuts("선수 풀 샷", "공중에 뜬 선수의 역광 실루엣")).ok).toBe(true);
   });

@@ -3,7 +3,8 @@ import { splitSentences, splitUnits, explodeLongRanges, buildSplitMessages, buil
 import { clipProfileForProject, minSecondsFor, maxSecondsFor } from "../lib/clip-limits.js";
 import { STYLE_PRESETS } from "../lib/styles.js";
 import { MOTION_AXES } from "../lib/motion.js";
-// 언어 테스트가 "한국어 섬"(샷 크기 낱말)을 손으로 적지 않고 목록에서 끌어온다
+// 언어 테스트가 샷 크기 낱말을 손으로 적지 않고 목록에서 끌어온다 — 지문과 판정기가 갈리면
+// shotBalance 가 조용히 죽는다(2026-08-17 에 "한국어 섬"을 걷은 자리)
 import { SHOT_SIZES } from "../lib/shots.js";
 import { motionFields, motionRules, speedRule } from "../lib/cuts.js";
 import { SPEEDS } from "../lib/speeds.js";
@@ -182,9 +183,9 @@ describe("buildShowsMessages", () => {
 
   it("shows 작법을 지시한다 — 샷 크기·앵글·조명, 부정형 금지, 삽화 금지", () => {
     const { system } = buildShowsMessages(project, cuts);
-    // 샷 크기는 한국어 낱말로 남는다 — lib/shots.js 의 shotSizeOf 가 그 낱말을 읽는다.
-    // 앵글·시간대는 코드가 읽지 않아 영어로 옮겼다(2026-08-17 언어 정책).
-    for (const term of ["극단적 클로즈업", "미디엄 샷", "광각", "low angle", "golden hour"]) {
+    // 샷 크기 낱말도 영어다 — lib/shots.js 의 SHOT_SIZES 가 영어를 함께 보게 되면서
+    // "한국어 섬"이 없어졌다(2026-08-17 언어 정책). 낱말은 아래 언어 절이 목록과 대조한다.
+    for (const term of ["extreme close-up", "medium shot", "wide shot", "low angle", "golden hour"]) {
       expect(system).toContain(term);
     }
     expect(system).toContain("없는 것으로 쓰지 않는다");
@@ -1121,6 +1122,59 @@ describe("카메라 낱말은 그림 지시에서 지운다", () => {
     expect(stillOnly("트래킹, 선수 풀 샷")).toBe("선수 풀 샷");
   });
 
+  // 2026-08-17 언어 정책으로 shows 가 영어로 나온다. 낱말 목록이 한국어 전용이던 동안
+  // 영어 shows 는 카메라 절까지 **통째로** 그림 지시로 갔다 — 위 '다리가 셋'과 같은 자리다.
+  describe("영어 shows", () => {
+    it("카메라 절을 그림 지시에서 뺀다", () => {
+      expect(stillOnly("close-up of the shoe. the camera slowly pushes in"))
+        .toBe("close-up of the shoe");
+      expect(stillOnly("tracking, full shot of the player")).toBe("full shot of the player");
+      expect(stillOnly("the camera")).toBe("");
+    });
+
+    it("절은 살리고 카메라 낱말만 지운다 — 앵글은 정당한 구도 서술이다", () => {
+      expect(stillOnly("low-angle tracking, feet turning on the crossover"))
+        .toBe("low-angle, feet turning on the crossover");
+    });
+
+    // 지문의 ✓ 예시가 그대로 통과해야 한다 — 여기가 깎이면 시키는 대로 쓴 shows 가 망가진다
+    it("지문이 요구한 형태는 건드리지 않는다", () => {
+      for (const ok of [
+        "a 7am kitchen, close-up of hands dropping whole strawberries into a blender, first light through the window",
+        "an empty pre-dawn shop, full shot, chairs stacked on the tables",
+        "close-up of a single ampoule bottle on a table, morning sunlight",
+        "medium shot of a woman in her late 20s holding the ampoule bottle and looking at it, smiling",
+        "sunlight comes through the window",
+        "dust drifts in the light from the window",
+        "the shoes are placed on a wooden bench",
+      ]) {
+        expect(stillOnly(ok), ok).toBe(ok);
+      }
+    });
+
+    // 움직임은 축이 맡는다 — 축 예시에 있는 말이 shows 에 오면 그림 지시가 아니다
+    it("움직임 서술은 뺀다 — 그것은 움직임 축의 자리다", () => {
+      for (const s of [
+        "the wheel slowly rotates",
+        // 속도 부사만이 잡는 절 — 'stretch' 는 움직임 낱말 목록에 없다(한국어 SPEED_ADVERBS 와
+        // 같은 자리다: "손이 키보드를 빠르게 치고 있다"를 부사가 잡는다)
+        "the shadows slowly stretch across the floor",
+        "people pass by outside the window",
+        "the cup rises toward her mouth",
+        "red puree slowly fills the clear cup",
+      ]) {
+        expect(stillOnly(s), s).toBe("");
+      }
+    });
+
+    // 한국어 절과 영어 절은 규칙이 다르다(형태론이 다르다). 섞인 값은 지금까지처럼 한국어로 본다 —
+    // 저장된 옛 shows("클로즈업 of hands …")가 그 모양이다
+    it("한국어가 섞인 절은 한국어 규칙으로 본다", () => {
+      const s = "아침 7시 주방, 클로즈업 of hands dropping strawberries";
+      expect(stillOnly(s)).toBe(s);
+    });
+  });
+
   // 제품 용어와 겹치는 낱말을 지우면 정당한 화면이 망가진다
   it("정당한 화면은 건드리지 않는다", () => {
     for (const ok of [
@@ -1288,6 +1342,87 @@ describe("톤·전환 필터", () => {
       // 톤에서 버리는 것은 전환에서도 버린다 — 두 문지기가 같은 패턴을 본다
       for (const t of drop) expect(usableTransition(t), t).toBe("");
     });
+
+    // ★ 한국어 판정 무변경 계약 — 위 drop·keep 목록이 곧 각인(toneKey)의 계약이다.
+    //   2026-08-17 에 영어를 더했다. 더한 것뿐이므로 이 목록의 결과가 한 글자도 달라지면
+    //   이미 굳은 image.tone_of 가 뒤집혀 재구매가 열린다. 각인까지 함께 못 박는다.
+    it("한국어 값의 각인이 그대로다", () => {
+      expect(toneKey({ tone: "필름 카메라가 만든 거친 입자감", transition: "방금 구운 빵의 클로즈업" }))
+        .toBe("필름 카메라가 만든 거친 입자감\n방금 구운 빵의 클로즈업");
+      expect(toneKey({ tone: "카메라가 도는 느낌", transition: "앞 컷에서 이어지는 발 클로즈업" })).toBe("");
+      expect(toneKey({ tone: "달리 보이는 진한 대비", transition: "트래킹으로 들어온 발 클로즈업" }))
+        .toBe("달리 보이는 진한 대비\n");
+    });
+  });
+
+  // 2026-08-17 언어 정책 — tone·transition 이 영어로 나온다. 한국어 전용 정규식은 영어 값에
+  // 아예 안 걸려, 카메라 움직임이 톤으로 전 컷에 실리고 앞 컷 참조가 그림 지시로 갔다.
+  //
+  // ★ 지금 넓히는 것이 공짜다: 이 브랜치는 미배포이고 라이브로 한 번도 안 돌렸으므로
+  //   **영어 톤이 저장된 프로젝트가 하나도 없다** — 낡을 산출물이 없다. 한국어 판정은
+  //   위 전수 목록이 무변경을 못 박는다.
+  describe("영어 문지기 전수 목록", () => {
+    // 지문이 요구하는 어휘에서 뽑았다 — 축 예시("slowly pulls back"·"orbits around, pulls
+    // back, then pushes in again")와 tone·transition 의 ✗ 예시가 그 원천이다
+    const dropTones = [
+      "the camera pushes in as the color cools",
+      "the color cools as the camera moves closer",   // 지문의 ✗ 예시 그대로
+      "slowly pulls back, cinematic grain",
+      "orbits around with a warm cast",
+      "tracking texture across the asphalt",
+      "zoom in on the cooling color",
+      "dolly in to a tighter contrast",
+      "tilt down into darkness",
+      "pan up to a brighter tone",
+      "a crane shot rising over the court",
+    ];
+    // 카메라·팬·달리 계열 낱말이 나오지만 움직임 지시가 아닌 정상값 — 대가가 "값 통째"라
+    // 여기가 무너지면 톤 레이어 전체가 0 이 된다
+    const keepTones = [
+      "dark background with only the product color saturated, cinematic ad film grain",
+      "faded film grain with a green cast, low-contrast documentary texture",
+      "handheld documentary texture with rough grading",   // 핸드헬드는 질감이다
+      "grain of a vintage polaroid camera",                // 카메라는 명사다
+      "the grain a film camera leaves behind",
+      "a panoramic warmth across the frame",               // 'pan' 이 낱말 안에 들어 있다
+      "truck-stop neon spilling into the shadows",         // 'truck' 이 카메라가 아니다
+      "a crane silhouetted against the dusk sky",          // 방향어 없는 crane 은 사물이다
+    ];
+    const dropTransitions = [
+      "continues from the previous cut",                   // 지문의 ✗ 예시 그대로
+      "same angle as the cut just before",                 // 지문의 ✗ 예시 그대로
+      "picks up with the camera already moved in",         // 지문의 ✗ 예시 그대로
+      "the previous shot's framing, held",
+      "carrying over from the last shot",
+      "same as above",
+      "starting already zoomed in on the outsole",
+    ];
+    const keepTransitions = [
+      "close-up of the feet on asphalt, at the same eye level",     // 지문의 ✓ 예시 그대로
+      "medium shot with the bottle in hand cropped at the left edge, background blurred",
+      "freshly baked bread in close-up",
+      "the last light of the day on the wall",              // 'last' 가 컷 참조가 아니다
+    ];
+
+    it("영어 카메라 움직임 지시는 톤에서 버린다", () => {
+      for (const t of dropTones) expect(usableTone(t), t).toBe("");
+    });
+
+    it("영어 정상 톤은 온전히 쓴다", () => {
+      for (const t of keepTones) expect(usableTone(t), t).toBe(t);
+    });
+
+    it("영어 카메라 움직임 지시는 전환에서도 버린다", () => {
+      for (const t of dropTones) expect(usableTransition(t), t).toBe("");
+    });
+
+    it("영어 앞 컷 참조는 전환에서 버린다", () => {
+      for (const t of dropTransitions) expect(usableTransition(t), t).toBe("");
+    });
+
+    it("자기 완결적인 영어 전환은 쓴다", () => {
+      for (const t of keepTransitions) expect(usableTransition(t), t).toBe(t);
+    });
   });
 
   // 버려진 값이 지금까지 아무 데도 안 남았다 — 오검출 셋도 손으로 돌려 보고서야 드러났다.
@@ -1424,7 +1559,7 @@ describe("SHOWS_SYSTEM — 톤·전환 규칙", () => {
   // 지문이 가르치는 ✓ 예시가 코드 문지기에 걸리면 지문이 스스로를 무효로 만든다.
   it("지문의 ✓ 예시가 코드 문지기를 통과한다", () => {
     const tone = "dark background with only the product color saturated, cinematic ad film grain";
-    const transition = "클로즈업 of the feet on asphalt, at the same eye level";
+    const transition = "close-up of the feet on asphalt, at the same eye level";
     expect(system()).toContain(tone);
     expect(system()).toContain(transition);
     expect(usableTone(tone)).toBe(tone);
@@ -1861,16 +1996,13 @@ describe("절의 재료를 고르는 함수", () => {
 // 값을 **따옴표 안에서만** 본다. 예시 옆의 괄호 설명("(그건 environment 다)")은 우리가
 // 유지보수하는 한국어 글이고 모델이 베낄 값이 아니다.
 //
-// ⚠️ 예외가 하나뿐이고, 손으로 적지 않는다 — 샷 크기 낱말은 lib/shots.js 의 SHOT_SIZES 에서
-//    끌어온다. shotSizeOf 가 shows 에서 그 낱말을 한국어로 찾아 클로즈업 쏠림을 판정하므로
-//    (shotBalance), 예시까지 영어로 바꾸면 그 판정이 조용히 죽는다. 목록에서 끌어오면
-//    목록이 영어로 옮겨지는 날 이 예외도 저절로 사라진다.
+// ★ **예외가 없다**(2026-08-17). 하나 있던 "한국어 섬"(샷 크기 낱말)은 걷었다 — 목록에서
+//    끌어와 예외 처리하던 자리라, SHOT_SIZES 가 영어 낱말을 함께 보게 된 순간 그 예외가
+//    설계대로 저절로 사라졌다. 이제 ✓·✗ 예시 값에 한국어가 한 글자라도 있으면 빨개진다.
 describe("SHOWS_SYSTEM — 언어", () => {
   const cuts = [{ idx: 0, sentence: "가." }, { idx: 1, sentence: "나." }];
   const system = () => buildShowsMessages({ material: {}, briefing: {}, settings: {} }, cuts).system;
 
-  const ISLANDS = SHOT_SIZES.flatMap((s) => s.words);
-  const stripIslands = (v) => ISLANDS.reduce((acc, w) => acc.split(w).join(" "), v);
   // ✓/✗ 로 시작하는 줄에서 따옴표로 묶인 값만 뽑는다
   const examples = (mark) => {
     const out = [];
@@ -1884,14 +2016,14 @@ describe("SHOWS_SYSTEM — 언어", () => {
   it("★ ✓ 예시 값이 영어다 — 예시가 출력 언어를 정한다", () => {
     const good = examples("✓");
     expect(good.length, "✓ 예시를 못 찾겠다").toBeGreaterThan(3);
-    const korean = good.filter((e) => /[가-힣]/.test(stripIslands(e.value)));
+    const korean = good.filter((e) => /[가-힣]/.test(e.value));
     expect(korean.map((e) => e.value), `아직 한국어 ✓ 예시가 ${korean.length}개다`).toEqual([]);
   });
 
   it("★ ✗ 예시 값도 영어다 — 못 쓸 형태도 그 언어로 보여야 한다", () => {
     const bad = examples("✗");
     expect(bad.length, "✗ 예시를 못 찾겠다").toBeGreaterThan(3);
-    const korean = bad.filter((e) => /[가-힣]/.test(stripIslands(e.value)));
+    const korean = bad.filter((e) => /[가-힣]/.test(e.value));
     expect(korean.map((e) => e.value), `아직 한국어 ✗ 예시가 ${korean.length}개다`).toEqual([]);
   });
 
@@ -1916,10 +2048,12 @@ describe("SHOWS_SYSTEM — 언어", () => {
     }
   });
 
-  // 샷 크기만 한국어 섬으로 남는다 — 그 낱말이 지문에서 사라지면 shotBalance 가 조용히 죽는다.
-  it("샷 크기 낱말은 한국어로 남아 있다 — shotSizeOf 가 그것을 읽는다", () => {
+  // 지문이 요구하는 낱말과 판정기가 아는 낱말이 같아야 한다 — 갈리면 shotBalance 가
+  // 조용히 죽어 카탈로그 같은 컷 구성을 아무도 막지 않는다(그것이 이번에 닫은 구멍이다).
+  it("샷 크기 낱말이 목록과 같다 — shotSizeOf 가 그것을 읽는다", () => {
     for (const s of SHOT_SIZES) {
       expect(system(), `${s.label} 가 지문에 없다`).toContain(s.words[0]);
+      expect(/[가-힣]/.test(s.words[0]), `${s.label}.words[0] 이 아직 한국어다`).toBe(false);
     }
   });
 

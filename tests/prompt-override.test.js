@@ -44,7 +44,10 @@ describe("이미지 프롬프트 — 본문과 꼬리", () => {
       shows: "the tamper resting beside a portafilter",
       environment: "a narrow morning cafe counter",
       tone: "soft daylight pastel",
-      transition: "wide shot pulling back from the counter",
+      // ⚠️ 전환은 **구도**여야 한다 — "pulling back" 같은 카메라 이동을 적으면 문지기가
+      //    통째로 버려서 이 절이 프롬프트에서 사라진다(2026-08-17 에 영어를 보게 되면서
+      //    이 픽스처가 실제로 그렇게 걸렸다). 지문의 ✓ 예시와 같은 형태로 둔다.
+      transition: "the tamper cropped at the left edge, at counter eye level",
       edit_instruction: "make the steel base brighter",
     };
     const refs = [{ kind: "person", who: "barista" }, { kind: "thing" }];
@@ -68,7 +71,7 @@ describe("이미지 프롬프트 — 본문과 꼬리", () => {
       "Use the attached reference only for what the subject looks like — never for its camera angle, its framing, or how much of the frame it fills. " +
       "Keep it at natural real-world size relative to the people and surroundings, and let the scene description alone decide the shot. " +
       "Overall look and color treatment, keep identical across all cuts: soft daylight pastel. " +
-      "Compose the opening framing as: wide shot pulling back from the counter. " +
+      "Compose the opening framing as: the tamper cropped at the left edge, at counter eye level. " +
       "Important correction requested by the user, apply it strictly: make the steel base brighter."
     );
   });
