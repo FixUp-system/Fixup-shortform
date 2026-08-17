@@ -11,7 +11,8 @@ npm run dev
 ```
 
 필요한 키:
-- `OPENAI_API_KEY` — 대화 수집 (gpt-4o)
+- `CLAUDE_API_KEY` — 대본·컷분할·화면설계·캐스팅·브리핑·대화 (Claude Opus 5)
+- `OPENAI_API_KEY` — 이미지 검수·사진 설명만 (gpt-4o vision)
 - `FAL_KEY` — 영상 생성 (fal.ai)
 - `FAL_IMAGE_ENDPOINT` — 컷 이미지 모델 (기본: fal-ai/nano-banana, $0.04/장)
 - 영상 모델은 env 가 아니라 프로젝트가 정한다(⑤영상에서 고른다, `lib/clip-limits.js`의 `I2V_MODELS`)
@@ -24,7 +25,7 @@ npm run dev
 app/page.js                          홈 챗 UI (메시지·퀵리플라이·결과 재생)
 components/QuickCreate.jsx           대화 → 요약 카드 → 자동 관통 시작·진행 폴링
 components/Sidebar.jsx               사이드바
-app/api/chat/route.js                gpt-4o 대화 수집 → ask | generate JSON
+app/api/chat/route.js                Claude 대화 수집 → ask | generate JSON
 app/api/projects/[id]/auto/route.js  대본→목소리→그림→클립→합성 자동 관통
 ```
 

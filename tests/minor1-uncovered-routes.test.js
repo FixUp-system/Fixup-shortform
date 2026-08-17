@@ -54,28 +54,33 @@ describe("POST /api/projects/[id]/voice — withUser", () => {
 
 // ── POST /api/chat — withUser ───────────────────────────────────────────
 describe("POST /api/chat — withUser", () => {
-  const ORIG_KEY = process.env.OPENAI_API_KEY;
+  const ORIG_KEY = process.env.CLAUDE_API_KEY;
   beforeEach(() => {
-    process.env.OPENAI_API_KEY = "test-key";
+    process.env.CLAUDE_API_KEY = "test-key";
   });
   afterEach(() => {
-    if (ORIG_KEY === undefined) delete process.env.OPENAI_API_KEY;
-    else process.env.OPENAI_API_KEY = ORIG_KEY;
+    if (ORIG_KEY === undefined) delete process.env.CLAUDE_API_KEY;
+    else process.env.CLAUDE_API_KEY = ORIG_KEY;
   });
 
-  const openAiOk = async () => ({
+  // Anthropic Messages API 응답 모양 — SDK 는 headers.get 을 부른다
+  const claudeOk = async () => ({
     ok: true,
+    status: 200,
+    headers: new Headers({ "content-type": "application/json" }),
     json: async () => ({
-      choices: [{ message: { content: JSON.stringify({ action: "ask", message: "m", quick_replies: [] }) } }],
+      id: "msg_test", type: "message", role: "assistant", model: "claude-opus-5",
+      content: [{ type: "text", text: JSON.stringify({ action: "ask", message: "m", quick_replies: [] }) }],
+      stop_reason: "end_turn", usage: { input_tokens: 10, output_tokens: 5 },
     }),
   });
 
-  it("헤더가 없으면 500 이고 OpenAI 를 부르지 않는다", async () => {
+  it("헤더가 없으면 500 이고 Claude 를 부르지 않는다", async () => {
     const { POST } = await import("../app/api/chat/route.js");
     let called = false;
     global.fetch = async () => {
       called = true;
-      return openAiOk();
+      return claudeOk();
     };
     const bare = new Request("http://localhost/api/chat", {
       method: "POST",
@@ -89,7 +94,7 @@ describe("POST /api/chat — withUser", () => {
 
   it("신원이 있으면 200 이다", async () => {
     const { POST } = await import("../app/api/chat/route.js");
-    global.fetch = async () => openAiOk();
+    global.fetch = async () => claudeOk();
     const req = new Request("http://localhost/api/chat", {
       method: "POST",
       headers: { "content-type": "application/json", ...headersFor(A) },

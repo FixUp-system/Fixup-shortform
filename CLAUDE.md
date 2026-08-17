@@ -67,7 +67,7 @@
 >
 > ⚠️ **가짜 모드로는 비용 배선을 검증할 수 없다** — `llm/imagegen/i2v/tts` 넷 다 가짜 판정이
 > `addRecord` **앞**이라 `SHOTFORM_FAKE=all` 에서는 **기록 자체가 안 남는다.**
-> 검증하려면 `SHOTFORM_FAKE=fal`(LLM 만 진짜, 클립·이미지는 가짜)로 띄운다.
+> 검증하려면 `SHOTFORM_FAKE=fal`(LLM(Claude·OpenAI) 만 진짜, 클립·이미지는 가짜)로 띄운다.
 >
 > **처음 켤 때는 `docs/auth-setup.md`** — 특히 첫 관리자는 `profiles`·`app_metadata` 양쪽이다.
 > 개발 중 로그인은 `.env.local` 의 **`SHOTFORM_DEV_USER`** 하나로 건너뛴다(프로덕션 빌드에서는
@@ -135,7 +135,7 @@
 npm install                                  # 새 클론이면 이것부터
 cp .env.local.example .env.local             # 키를 채운다 — 없으면 서버가 뜨면서 죽는다
 npm run dev                                  # localhost:3000
-SHOTFORM_FAKE=fal npm run dev                # fal(이미지·TTS·i2v·합성)만 가짜, LLM 은 진짜
+SHOTFORM_FAKE=fal npm run dev                # fal(이미지·TTS·i2v·합성)만 가짜, LLM(Claude·OpenAI)은 진짜
 SHOTFORM_FAKE=all npm run dev                # LLM 까지 가짜 — 완전 0원, 배선·상태 전이만 확인
 SHOTFORM_DIST_DIR=.next-x npx next dev -p 3005   # 둘째 서버는 빌드 디렉터리를 갈라야 한다
 SHOTFORM_DIST_DIR=.next-verify npx next build    # dev 를 안 죽이고 컴파일만 확인
@@ -382,7 +382,7 @@ readable if not configured"** 이고 보관 기간 과금도 문서에 없다. �
 > | 장부 | 단위 | 테이블 | 무엇 |
 > |---|---|---|---|
 > | 청구 | **크레딧** | `credit_grants`(충전) · `credit_charges`(청구·환불) | 사장님이 낸 값 |
-> | 원가 | **USD** | `cost_records` | 우리가 fal·OpenAI 에 낸 값 |
+> | 원가 | **USD** | `cost_records` | 우리가 fal·Anthropic·OpenAI 에 낸 값 |
 >
 > **잔액 = 충전 합계(`sum_grants`) − 청구 합계(`sum_charges`)** — 둘 다 크레딧이라 단위가
 > 안 섞인다. 잔액 컬럼은 없다(갈라질 자리를 안 만든다). 환불은 지우지 않고 **음수 행**이다.

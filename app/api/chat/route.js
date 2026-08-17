@@ -1,9 +1,13 @@
-// POST /api/chat — gpt-4o 로 영상 생성에 필요한 정보를 대화로 수집
+// POST /api/chat — Claude Opus 5 로 영상 생성에 필요한 정보를 대화로 수집
 // 응답: {action:"ask", message, quick_replies[]} 또는
 //       {action:"generate", material_text, target_seconds, aspect_ratio, style, voice_label, summary}
 
+import Anthropic from "@anthropic-ai/sdk";
 import { withUser } from "../../../lib/auth/require-user.js";
 import { addRecord, assertBudget, costActor, estimateLlmCost } from "../../../lib/costs";
+// ★ 모델·상한·판독을 lib/llm.js 하나에서 가져온다 — 두 군데가 되면 한쪽만 바꾸는 날이 오고,
+//   그때 원장 엔드포인트와 실제 요청이 갈린다.
+import { MODEL, MAX_TOKENS, textOf } from "../../../lib/llm";
 import { randomUUID } from "crypto";
 import { TARGET_CHOICES } from "../../../lib/script";
 import { STYLE_PRESETS, DEFAULT_STYLE_ID } from "../../../lib/styles";
@@ -44,20 +48,20 @@ voice_label 선택 기준: 느낌이 밝으면 "밝은 여성"/"밝은 남성", 
 material_text 는 프롬프트가 아니라 **자료**다 — 영어로 쓰지 말고, 연출 지시를 넣지 말고, 사용자가 준 사실만 담는다.`;
 
 export const POST = withUser(async (req) => {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.CLAUDE_API_KEY || process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return Response.json(
-      { error: "OPENAI_API_KEY가 설정되지 않았어요 (.env.local 확인)" },
+      { error: "CLAUDE_API_KEY가 설정되지 않았어요 (.env.local 확인)" },
       { status: 500 }
     );
   }
 
-  // ★ 이 라우트는 lib/llm.js 를 안 거치고 OpenAI 를 직접 부른다 — 그래서 오랫동안
-  // 한도도 기록도 없었다. 승인만 받으면 크레딧 0 으로 gpt-4o 를 무한히 태울 수 있었고,
+  // ★ 이 라우트는 lib/llm.js 의 callJson 을 안 거치고 모델을 직접 부른다 — 그래서 오랫동안
+  // 한도도 기록도 없었다. 승인만 받으면 크레딧 0 으로 무한히 태울 수 있었고,
   // 그 지출은 우리 비용 화면에 **보이지도 않았다.**
   //
   // amount 는 0 이다 — 토큰 수는 호출한 뒤에야 안다(lib/llm.js 와 같은 이유).
-  await assertBudget({ endpoint: "openai/gpt-4o", amount: 0 });
+  await assertBudget({ endpoint: `anthropic/${MODEL}`, amount: 0 });
 
   let body;
   try {
@@ -70,49 +74,64 @@ export const POST = withUser(async (req) => {
     return Response.json({ error: "메시지가 비어 있어요" }, { status: 400 });
   }
 
+  // ★★ 첫 메시지는 반드시 user 여야 한다 — 아니면 Anthropic 이 400 이고, 그 400 은
+  // 아래 catch 에서 502 가 되어 사장님 화면에 "문제가 생겼어요" 로 뜬다.
+  //
+  // 홈 챗은 우리가 박아 둔 인사말이 이미 떠 있는 상태로 시작하고(components/QuickCreate.jsx),
+  // 사장님이 첫 마디를 치면 그 인사말까지 함께 올라온다. OpenAI 는 그것을 받아 줬다.
+  // 그래서 이 잘라내기가 없으면 **홈에서 첫 마디를 던지는 모든 사장님**이 막힌다.
+  //
+  // 빈 텍스트도 같은 이유로 거른다(빈 content 역시 400 사유다).
+  const turns = messages
+    .map((m) => ({ role: m.role === "me" ? "user" : "assistant", content: m.text }))
+    .filter((m) => typeof m.content === "string" && m.content.trim() !== "");
+  while (turns.length && turns[0].role === "assistant") turns.shift();
+  if (turns.length === 0) {
+    return Response.json({ error: "메시지가 비어 있어요" }, { status: 400 });
+  }
+
+  // ★ SDK 의 기본 재시도(2회)·기본 타임아웃(10분)을 명시해 덮는다.
+  //
+  // 기본값을 두면 한 논리 호출이 최대 6번 나갈 수 있다 — SDK 가 429·5xx 를 3번까지
+  // 부르고, 200 을 받았는데 JSON 파싱이 깨지면 아래 루프가 한 번 더 돌아 또 3번이다.
+  // 게다가 타임아웃으로 우리가 끊은 요청도 서버는 이미 생성을 마쳤을 수 있는데, 그
+  // 토큰은 usage 로 안 돌아와 **원장에 한 줄도 안 남는다** — 이 저장소가 못 박은
+  // "원가가 0 이 되는 경로는 예산 가드가 못 보는 값" 이 그대로 재현되는 모양이다.
+  // 옛 raw fetch 에는 내부 재시도가 없었으니 이것은 SDK 를 들이며 새로 생긴 구멍이다.
+  const client = new Anthropic({ apiKey, maxRetries: 1, timeout: 120_000 });
+
   // 1회 재시도 포함 — JSON 파싱 실패 방어
   for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o",
-        temperature: 0.4,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          ...messages.map((m) => ({
-            role: m.role === "me" ? "user" : "assistant",
-            content: m.text,
-          })),
-        ],
-      }),
-    });
-
-    if (!res.ok) {
-      const detail = await res.text().catch(() => "");
-      console.error("OpenAI error:", res.status, detail.slice(0, 500));
+    let data;
+    try {
+      data = await client.messages.create({
+        model: MODEL,
+        max_tokens: MAX_TOKENS,
+        // ★ system 은 messages 가 아니라 별도 필드다. temperature 는 보내지 않는다 —
+        //   Opus 5 는 받으면 400 이다.
+        system: SYSTEM_PROMPT,
+        messages: turns,
+      });
+    } catch (e) {
+      // SDK 가 상태코드를 예외로 바꾼다 — 기존 !res.ok 자리와 같은 역할이다
+      console.error("Claude error:", e?.status, String(e?.message).slice(0, 500));
       return Response.json(
         { error: "대화 모델 호출에 실패했어요. 잠시 후 다시 시도해 주세요." },
         { status: 502 }
       );
     }
 
-    const data = await res.json();
     // 파싱에 실패해 재시도하더라도 부른 값은 치렀다 — 그래서 파싱 앞에서 기록한다
     // (lib/llm.js 와 같은 규칙).
-    const model = data?.model || "gpt-4o";
+    const model = data?.model || MODEL;
     await addRecord({
-      request_id: randomUUID(), ts: Date.now(), endpoint: `openai/${model}`,
+      request_id: randomUUID(), ts: Date.now(), endpoint: `anthropic/${model}`,
       stage: "대화", user: costActor(), project_id: null,
-      prompt: "", duration: `${data?.usage?.prompt_tokens ?? 0}+${data?.usage?.completion_tokens ?? 0}tok`,
+      prompt: "", duration: `${data?.usage?.input_tokens ?? 0}+${data?.usage?.output_tokens ?? 0}tok`,
       aspect_ratio: "-",
       est_cost_usd: estimateLlmCost(model, data?.usage), status: "done", video_url: "-",
     }).catch(() => {});
-    const raw = data?.choices?.[0]?.message?.content ?? "";
+    const raw = textOf(data);
     try {
       const parsed = JSON.parse(raw);
       if (parsed.action === "ask" && typeof parsed.message === "string") {

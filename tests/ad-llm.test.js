@@ -106,9 +106,19 @@ describe("callJson — 정상 파싱", () => {
 describe("① usage 필드 매핑 — input_tokens/output_tokens 를 놓치면 원가가 0이 된다", () => {
   beforeEach(() => resetMemoryStore());
 
-  it("estimateLlmCost 는 prompt_tokens/completion_tokens 이름을 읽는다 — 그대로 넘기면 0원", () => {
-    // Anthropic 원본 이름 그대로 넘기면(매핑 안 하면) 이렇게 0이 된다는 것을 보여주는 대조군
-    expect(estimateLlmCost(CLAUDE_MODEL, { input_tokens: 1_000_000, output_tokens: 1_000_000 })).toBe(0);
+  // ★ 이 자리에는 원래 "Anthropic 이름을 그대로 넘기면 0원이 된다"는 **대조군**이 있었다.
+  //    본 파이프라인이 Claude 로 옮겨 오면서(2026-08-17 병합) estimateLlmCost 가 두 이름을
+  //    함께 읽게 됐다 — 그 결함이 없어졌으므로 대조군도 성립하지 않는다.
+  //    없어진 결함을 그대로 두면 테스트가 **되돌아가는 것을 지키는** 자가 된다.
+  //    재는 것을 뒤집는다: 어느 공급자의 이름으로 와도 **0 이 아니다**.
+  //    0 은 예산 가드가 못 보는 값이라, 이것이 지킬 값어치가 있는 쪽이다.
+  it("usage 이름이 어느 쪽이든 원가가 0 이 아니다 — 0 은 예산 가드가 못 본다", () => {
+    const anthropic = estimateLlmCost(CLAUDE_MODEL, { input_tokens: 1_000_000, output_tokens: 1_000_000 });
+    const openai = estimateLlmCost(CLAUDE_MODEL, { prompt_tokens: 1_000_000, completion_tokens: 1_000_000 });
+    expect(anthropic).toBeGreaterThan(0);
+    expect(openai).toBeGreaterThan(0);
+    // 같은 토큰 수면 이름이 달라도 같은 값이어야 한다 — 한쪽만 읽으면 여기서 갈린다
+    expect(anthropic).toBe(openai);
   });
 
   it("callJson 을 실제로 부르면 project 비용이 0보다 커진다 — 매핑이 이뤄졌다는 증거", async () => {

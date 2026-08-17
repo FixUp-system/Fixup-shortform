@@ -24,7 +24,7 @@ async function spend(usd) {
   // 스토어 메서드는 insertCost 다(addRecord 는 lib/costs.js 의 감싼 이름).
   await memoryStore.insertCost({
     request_id: `r-${Date.now()}-${Math.random()}`, ts: Date.now(),
-    endpoint: "openai/gpt-4o", stage: "대본", user: A, project_id: null,
+    endpoint: "anthropic/claude-opus-5", stage: "대본", user: A, project_id: null,
     est_cost_usd: usd, status: "done",
   });
 }
@@ -32,10 +32,14 @@ async function spend(usd) {
 const okFetch = () =>
   vi.fn(async () => ({
     ok: true,
+    status: 200,
+    headers: new Headers({ "content-type": "application/json" }),
     json: async () => ({
-      model: "gpt-4o",
-      usage: { prompt_tokens: 10, completion_tokens: 10 },
-      choices: [{ message: { content: '{"ok":true}' } }],
+      id: "msg_test", type: "message", role: "assistant",
+      model: "claude-opus-5",
+      usage: { input_tokens: 10, output_tokens: 10 },
+      content: [{ type: "text", text: '{"ok":true}' }],
+      stop_reason: "end_turn",
     }),
   }));
 
@@ -55,7 +59,7 @@ describe("callJson 이 한도를 본다", () => {
   });
 
   // ★ 막는 것이 기록보다 먼저다 — 돈이 나간 뒤에 막으면 막은 것이 아니다.
-  it("한도를 넘으면 OpenAI 를 **안 부른다**", async () => {
+  it("한도를 넘으면 Claude 를 **안 부른다**", async () => {
     await spend(FREE_TRIAL_USD + 0.01);
     const f = okFetch();
     await expect(call(f)).rejects.toThrow(BudgetExceeded);
@@ -75,9 +79,9 @@ describe("callJson 이 한도를 본다", () => {
   });
 
   // ★★ 하필 이 모드가 이 저장소가 "비용 배선을 검증하려면" 이라고 지정한 모드다(CLAUDE.md).
-  // fal 만 가짜이고 **OpenAI 는 진짜로 나간다** — 그러니 게이트도 진짜로 살아 있어야 한다.
+  // fal 만 가짜이고 **LLM 은 진짜로 나간다** — 그러니 게이트도 진짜로 살아 있어야 한다.
   // 예전 `assertBudget` 첫 줄 `if (fakeFal()) return;` 은 이 모드에서 게이트를 통째로 껐다.
-  it("SHOTFORM_FAKE=fal 이면 LLM 게이트는 **살아 있다** — OpenAI 는 진짜로 나간다", async () => {
+  it("SHOTFORM_FAKE=fal 이면 LLM 게이트는 **살아 있다** — LLM 은 진짜로 나간다", async () => {
     await spend(FREE_TRIAL_USD + 0.01);
     vi.stubEnv("SHOTFORM_FAKE", "fal");
     const f = okFetch();
@@ -100,22 +104,22 @@ describe("assertBudget 의 가짜 판정은 엔드포인트로 갈린다", () =>
     await expect(guard("fal-ai/nano-banana-2", 1)).resolves.toBeUndefined();
   });
 
-  it("fal 모드에서 openai 경로는 막는다", async () => {
+  it("fal 모드에서 LLM 경로는 막는다", async () => {
     await spend(FREE_TRIAL_USD + 0.01);
     vi.stubEnv("SHOTFORM_FAKE", "fal");
-    await expect(guard("openai/gpt-4o", 0)).rejects.toThrow(BudgetExceeded);
+    await expect(guard("anthropic/claude-opus-5", 0)).rejects.toThrow(BudgetExceeded);
   });
 
   it("all 모드에서는 둘 다 건너뛴다", async () => {
     await spend(FREE_TRIAL_USD * 10);
     vi.stubEnv("SHOTFORM_FAKE", "all");
     await expect(guard("fal-ai/nano-banana-2", 1)).resolves.toBeUndefined();
-    await expect(guard("openai/gpt-4o", 0)).resolves.toBeUndefined();
+    await expect(guard("anthropic/claude-opus-5", 0)).resolves.toBeUndefined();
   });
 
   // ★ 방향이 중요하다 — 모르는 엔드포인트는 **막는 쪽**으로 떨어져야 한다.
   // "openai/ 인가"로 갈랐을 때는 접두사를 안 붙인 새 LLM 호출부가 fal 축으로 떨어져
-  // `SHOTFORM_FAKE=fal` 에서 게이트가 통째로 꺼졌다(fal 모드는 OpenAI 가 진짜로 나간다).
+  // `SHOTFORM_FAKE=fal` 에서 게이트가 통째로 꺼졌다(fal 모드는 LLM 이 진짜로 나간다).
   it("fal 모드에서 모르는 엔드포인트는 막는다 — fail-closed", async () => {
     await spend(FREE_TRIAL_USD + 0.01);
     vi.stubEnv("SHOTFORM_FAKE", "fal");
@@ -126,7 +130,7 @@ describe("assertBudget 의 가짜 판정은 엔드포인트로 갈린다", () =>
   it("가짜 모드가 아니면 둘 다 막는다", async () => {
     await spend(FREE_TRIAL_USD + 0.01);
     await expect(guard("fal-ai/nano-banana-2", 1)).rejects.toThrow(BudgetExceeded);
-    await expect(guard("openai/gpt-4o", 0)).rejects.toThrow(BudgetExceeded);
+    await expect(guard("anthropic/claude-opus-5", 0)).rejects.toThrow(BudgetExceeded);
   });
 });
 

@@ -1,7 +1,7 @@
 // 단가표는 prefix 매칭이라 "순서"가 곧 로직이다.
 // 더 구체적인 prefix가 위에 있지 않으면 조용히 틀린 값이 기록된다 — 그걸 여기서 고정한다.
 import { describe, it, expect, beforeEach } from "vitest";
-import { estimateCost, isFakeFor } from "../lib/costs";
+import { estimateCost, estimateLlmCost, isFakeFor } from "../lib/costs";
 import { resetMemoryStore } from "../lib/store/memory.js";
 
 // 원장은 모듈 하나짜리 인메모리다 — 비우지 않으면 합계 단언이 "이 파일의 다른 테스트가
@@ -156,5 +156,49 @@ describe("Seedance 를 안전장치가 안다", () => {
       if (before === undefined) delete process.env.SHOTFORM_FAKE;
       else process.env.SHOTFORM_FAKE = before;
     }
+  });
+});
+
+describe("LLM 원가 — 두 공급자의 usage 모양", () => {
+  it("Claude 는 input_tokens·output_tokens 로 잰다", () => {
+    // 1000 입력 · 500 출력 = 1000*5/1e6 + 500*25/1e6 = 0.005 + 0.0125
+    expect(estimateLlmCost("claude-opus-5", { input_tokens: 1000, output_tokens: 500 }))
+      .toBeCloseTo(0.0175, 6);
+  });
+
+  // ★ vlm.js 가 gpt-4o 로 남는다 — 이 모양이 죽으면 이미지 검수 원가가 0 이 된다
+  it("gpt-4o 는 prompt_tokens·completion_tokens 로 잰다 — 그대로다", () => {
+    expect(estimateLlmCost("gpt-4o", { prompt_tokens: 1000, completion_tokens: 500 }))
+      .toBeCloseTo(0.0075, 6);
+  });
+
+  it("모르는 모델은 기본 단가로 떨어진다", () => {
+    expect(estimateLlmCost("모르는모델", { input_tokens: 1000, output_tokens: 0 })).toBeGreaterThan(0);
+  });
+
+  it("usage 가 없으면 0 이다 — 던지지 않는다", () => {
+    expect(estimateLlmCost("claude-opus-5", undefined)).toBe(0);
+    expect(estimateLlmCost("claude-opus-5", {})).toBe(0);
+  });
+
+  it("6자리까지 남긴다 — 센트로 자르면 한 호출이 0 이 되어 총합이 작아진다", () => {
+    // 입력 1토큰 = 0.000005
+    expect(estimateLlmCost("claude-opus-5", { input_tokens: 1, output_tokens: 0 })).toBe(0.000005);
+  });
+});
+
+// ★ 응답이 돌려주는 model 이 별칭이 아니라 날짜판일 수 있다(claude-opus-5-20260812).
+// 완전 일치로 찾으면 그날 Claude 원가가 **기본 단가(gpt-4o 값)로 반값** 기록된다 —
+// 원가를 내려 잡으면 예산 가드가 한도를 넘기고도 통과시킨다. 그래서 접두사로 찾는다
+// (estimateCost 의 PRICE_TABLE 이 이미 쓰는 방식이다).
+describe("LLM 단가는 접두사로 찾는다 — 날짜판 모델명", () => {
+  it("claude-opus-5-20260812 도 claude-opus-5 단가다", () => {
+    expect(estimateLlmCost("claude-opus-5-20260812", { input_tokens: 1000, output_tokens: 500 }))
+      .toBeCloseTo(0.0175, 6);
+  });
+
+  it("gpt-4o-2024-08-06 도 gpt-4o 단가다", () => {
+    expect(estimateLlmCost("gpt-4o-2024-08-06", { prompt_tokens: 1000, completion_tokens: 500 }))
+      .toBeCloseTo(0.0075, 6);
   });
 });

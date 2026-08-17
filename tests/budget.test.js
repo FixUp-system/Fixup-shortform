@@ -270,10 +270,14 @@ describe("LLM 비용도 기록한다", () => {
     const { callJson } = await import("../lib/llm.js" + bust());
     const fetchImpl = async () => ({
       ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "application/json" }),
       json: async () => ({
-        model: "gpt-4o",
-        usage: { prompt_tokens: 2000, completion_tokens: 400 },
-        choices: [{ message: { content: '{"script":"원고"}' } }],
+        id: "msg_test", type: "message", role: "assistant",
+        model: "claude-opus-5",
+        usage: { input_tokens: 2000, output_tokens: 400 },
+        content: [{ type: "text", text: '{"script":"원고"}' }],
+        stop_reason: "end_turn",
       }),
     });
     await runWithActor("t-user", () => callJson({ system: "s", messages: [{ role: "user", content: "u" }], apiKey: "k", fetchImpl, projectId: "p1", stage: "대본" }));
