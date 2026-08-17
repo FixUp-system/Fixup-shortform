@@ -14,9 +14,7 @@ import { useRouter } from "next/navigation";
 import { useProject } from "../../components/ProjectContext";
 import { useMe } from "../../components/MeContext";
 import { TARGET_CHOICES } from "../../lib/script";
-// PROMPT_NOTE_MAX 는 서버 게이트(normalizePromptNote)와 **같은 자리**에서 온다 —
-// 숫자를 화면에 또 적으면 두 벌이 되어, 붙여넣기는 통했는데 만들기가 400 인 칸이 생긴다.
-import { DEFAULT_STYLE_ID, PROMPT_NOTE_MAX } from "../../lib/styles";
+import { DEFAULT_STYLE_ID } from "../../lib/styles";
 import { ASPECTS, DEFAULT_ASPECT_ID, aspectFor } from "../../lib/aspects";
 import { I2V_MODELS, DEFAULT_I2V_MODEL, DEFAULT_RESOLUTION, resolutionsForModel } from "../../lib/clip-limits";
 // 값은 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다)
@@ -49,11 +47,6 @@ export default function CreatePage() {
   const [resolution, setResolution] = useState(DEFAULT_RESOLUTION);
   const [stylePreset, setStylePreset] = useState(DEFAULT_STYLE_ID);
   const [styleNote, setStyleNote] = useState("");
-  // 전 컷의 프롬프트에 그대로 실리는 공통 지시(lib/cuts.js promptNoteClause). 밖에서 프롬프트를
-  // 써 오는 사장님을 위한 자리다. **화풍 보정(120자)과 다른 값이다** — 그쪽은 화풍에 딸린 한
-  // 줄이고 이쪽은 써 온 프롬프트 통짜(PROMPT_NOTE_MAX)다.
-  const [imageNote, setImageNote] = useState("");
-  const [clipNote, setClipNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const fileRef = useRef(null);
@@ -115,12 +108,6 @@ export default function CreatePage() {
           // ★ 화질은 **그 모델이 화질을 열 때만** 싣는다. Kling 에는 resolution 파라미터가
           //   아예 없어, 보내면 서버가 400 으로 막는다(그것이 맞는 동작이다).
           ...(resolutionsForModel(model).length ? { resolution } : {}),
-          // ★ 공통 지시는 **화풍과 다른 몸통이다.** style 안에 실으면 normalizeStyle 이
-          //   preset 을 요구해 400 이거나 고른 화풍이 조용히 덮인다.
-          // ★ 빈 칸은 안 보낸다 — "안 적었다"와 "빈 문자열을 적었다"를 구분해 둔다(각인이
-          //   그 차이를 본다, lib/steps.js).
-          ...(imageNote.trim() ? { image_note: imageNote } : {}),
-          ...(clipNote.trim() ? { clip_note: clipNote } : {}),
         },
       }),
     });
@@ -137,9 +124,15 @@ export default function CreatePage() {
 
       <section className="panel--wide">
         <div className="composer">
+          {/* ★ 이 칸 하나가 **전부를 받는다**(2026-08-18 사용자 지시). 예전에는 아래에 이미지용·
+              영상용 공통 지시 칸이 따로 있었는데, 사장님에게 그 구분은 우리 사정이다 — 바라는
+              느낌은 하고 싶은 말과 함께 나온다. 자리표시자가 그 사실을 말해 주지 않으면
+              사장님은 여전히 "적을 자리가 없다"고 느낀다.
+              (걷어낸 라벨을 여기 그대로 옮겨 적지 않는다: 화면 계약이 소스 문자열을 훑어
+               재므로 주석의 낱말도 "칸이 남아 있다"로 읽힌다 — 오늘 세 번째다.) */}
           <textarea ref={textRef} className="field composer-text" value={text} maxLength={2000}
             onChange={(e) => setText(e.target.value)}
-            placeholder="무엇을 알리고 싶으세요? 제품 설명·홍보 포인트·손님 이야기를 자유롭게 적어 주세요" />
+            placeholder="무엇을 알리고 싶으세요? 제품 설명·홍보 포인트·손님 이야기를 자유롭게 적어 주세요. 원하는 분위기나 촬영 느낌이 있으면 그것도 여기 함께 적어 주세요" />
 
           {/* 붙인 사진이 먼저 보인다 — 무엇을 이미 넣었는지가 조작보다 앞이다 */}
           {photos.length > 0 && (
@@ -240,28 +233,16 @@ export default function CreatePage() {
               </div>
             </div>
 
-            {/* 공통 지시 — 컨셉 **아래**다. 컨셉이 주경로이고 이 두 칸은 프롬프트를 직접 써 오는
-                사장님을 위한 곁길이라, 위에 두면 빈 칸 둘이 기본 흐름을 막는다.
-                ★ 두 칸을 **잠그지 않는다.** 잠그면 이미지 칸에서 영상 칸으로 탭하는 순간
-                  포커스가 날아간다(①자료에서 실제로 겪은 결함이다).
-                ★ 자리표시자는 영어다 — 이 값은 번역 없이 모델에 그대로 실린다. 한국어 예시를
-                  두면 사장님이 그것을 따라 적고 그 한국어가 그대로 fal 에 나간다. */}
-            <div className="tray-row">
-              <span className="tray-label">지시</span>
-              <div className="tray-col">
-                <label className="tray-note">이미지에 함께 보낼 지시
-                  <textarea className="field tray-input" maxLength={PROMPT_NOTE_MAX}
-                    placeholder="예: shot on 35mm film, shallow depth of field"
-                    value={imageNote} onChange={(e) => setImageNote(e.target.value)} />
-                </label>
-                <label className="tray-note">영상에 함께 보낼 지시
-                  <textarea className="field tray-input" maxLength={PROMPT_NOTE_MAX}
-                    placeholder="예: hand-held camera, subtle shake"
-                    value={clipNote} onChange={(e) => setClipNote(e.target.value)} />
-                </label>
-                <div className="tray-note">비워 두어도 돼요 · 모든 컷에 그대로 함께 보내요</div>
-              </div>
-            </div>
+            {/* ★★ 공통 지시 칸 둘을 **걷었다**(2026-08-18 사용자 지시). 같은 날 아침에 ①자료에서
+                여기로 옮겨 왔는데, 옮기고 보니 첫 화면이 자료 칸 + 지시 칸 둘이 되어 "무엇을
+                어디에 적어야 하는가"가 사장님 몫이 됐다. 바라는 화풍·촬영 느낌은 **맨 위 자료
+                칸에 함께** 적으면 되고, 그 글이 시나리오·화면 설계를 거쳐 그림에 닿는다.
+                ★ 자료에서 LLM 으로 그 지시를 **뽑지 않는 이유**: 그 값은 그림 각인에
+                  들어간다(lib/steps.js imageContextKey). 시나리오를 다시 만들 때마다 뽑힌 문장이
+                  조금씩 달라지면 **전 컷 그림이 낡아 재구매가 열린다**(컷당 $0.08, 클립까지
+                  낡으면 $0.674). 사장님이 손으로 적을 때는 안 흔들리던 값이라 없던 위험이다.
+                ⚠️ 서버는 여전히 이 값을 받을 수 있다(POST /api/projects · PATCH) — 화면만 안
+                   보낸다. 파워 유저용 자리를 다시 열 때 배관을 새로 깔지 않아도 된다. */}
           </div>
 
           <div className="composer-bar">
