@@ -748,6 +748,30 @@ textarea.ref-lg { min-height: 260px; font-size: 16px; padding: 16px 18px; }
 textarea.script-draft { line-height: 1.9; min-height: 132px; }
 /* 수정 지시 — 두어 줄 쓸 자리는 미리 열어 둔다(쓰기 전에도 칸으로 보이게) */
 .fix-row .fix-input { min-height: 84px; }
+/* ★ 실제로 보내는 지시는 **한 덩어리로 읽힌다**(2026-08-18 사용자 지시). 앞은 사장님이 고치는
+   본문이고 뒤는 코드가 붙이는 계약이지만, 모델이 받는 것은 이어진 문장 하나다 — 사이에
+   안내나 버튼이 끼면 서로 다른 두 개로 읽힌다. 그래서 상자 하나로 잇고, 조작은 그 아래로 뺀다.
+   ★ 그래도 **고칠 수 있는 곳은 눈으로 갈린다**: 편집칸은 제 배경 그대로, 붙는 글은 흐린 글자다.
+   ★ 꼬리를 편집칸 안에 넣지 않는 이유는 화면 주석에 있다(저장할 때마다 꼬리가 두 벌이 된다). */
+.prompt-one {
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--deep);
+  overflow: hidden;
+  margin-top: 6px;
+}
+/* 상자가 테두리를 쥐므로 안쪽 편집칸은 테두리를 벗는다 — 두 겹이면 두 상자로 보인다 */
+.prompt-one textarea.ref { border: 0; border-radius: 0; display: block; margin: 0; }
+.prompt-one .prompt-fixed {
+  margin: 0;
+  /* 편집칸의 좌우 여백과 **같은 값**이라야 글줄이 이어져 보인다(textarea.ref 의 12px 14px) */
+  padding: 0 14px 12px;
+  color: var(--ink-soft);
+  font-size: 16px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 textarea.ref::placeholder { color: var(--ink-soft); }
 textarea.ref:focus-visible { outline: 2px solid var(--ink); outline-offset: -1px; }
 .char-count { text-align: right; font-size: 12px; color: var(--ink-soft); margin-top: 4px; }

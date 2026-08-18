@@ -497,11 +497,19 @@ function ClipPromptEdit({ cut, project, busyCut, onSavePrompt }) {
       <summary>이 컷에 실제로 보내는 지시 보기</summary>
       {/* 고치는 것은 **본문**(어떻게 움직이는가)이다. 첫 프레임 유지·글자 금지·대사는 코드가
           언제나 뒤에 붙인다 — 무엇을 쓰든 지워지지 않는다. */}
-      <textarea
-        className="ref mono"
-        value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
-      />
+      {/* ★★ **하나의 지시문으로 보인다**(2026-08-18 사용자 지시) — ④이미지와 같은 모양이다.
+          앞은 고칠 수 있고 뒤는 코드가 붙이는 글이지만 사장님에게는 모델이 받는 문장 하나다.
+          ★ 붙이는 것은 보이는 방식이고, 고치는 자리는 그대로 본문 하나다 — 꼬리를 텍스트칸에
+            넣으면 저장할 때마다 꼬리가 두 벌이 되고, 이 화면에서는 그 꼬리에 **대사**가
+            들어 있어 자막과 갈리기까지 한다. */}
+      <div className="prompt-one">
+        <textarea
+          className="ref mono"
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+        />
+        <p className="prompt-fixed mono">{fixedTail}</p>
+      </div>
       {/* 글자 수만 보여 준다. 상한 숫자는 화면에 안 적는다 — 값이 두 벌이면 갈린다
           (상한은 원장이 자르는 자리 하나이고, 넘으면 서버 문구가 위에 뜬다). */}
       <div className="preview-actions">
@@ -510,10 +518,7 @@ function ClipPromptEdit({ cut, project, busyCut, onSavePrompt }) {
         <span className="regen-note mono">{prompt.length}자</span>
         {copyMsg && <span className="regen-note">{copyMsg}</span>}
       </div>
-      <p className="preview-note">
-        영어로 쓰면 더 잘 알아들어요. 아래 문장은 저희가 항상 뒤에 붙여요 — 고칠 수 없어요.
-      </p>
-      <p className="preview-note mono">{fixedTail}</p>
+      <p className="preview-note">영어로 쓰면 더 잘 알아들어요 · 회색 글자는 저희가 붙이는 부분이에요</p>
       {/* ★ 꼬리에는 사장님이 직접 쓴 글도 섞여 있다 — 프로젝트 공통 지시(settings.clip_note)가
           본문 뒤·계약 앞이라 이 블록 안에 나온다. 대사에는 고칠 자리를 적어 뒀는데 이 값에는
           없어서, 자기가 쓴 문장을 못 고치는 것으로 읽혔다. */}

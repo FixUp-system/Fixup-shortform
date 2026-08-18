@@ -664,11 +664,20 @@ function PreviewPane({ cut, project, url, photoName, usage, aspect, stalled, onR
             <summary>이 그림에 실제로 보내는 지시 보기</summary>
             {/* 고치는 것은 **본문**이다. 판형·글자 금지·레퍼런스 결속은 코드가 언제나 뒤에
                 붙인다 — 무엇을 쓰든 지워지지 않는다. */}
-            <textarea
-              className="ref mono"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-            />
+            {/* ★★ **하나의 지시문으로 보인다**(2026-08-18 사용자 지시). 앞은 고칠 수 있고 뒤는
+                코드가 붙이는 글이지만, 사장님에게는 모델이 받는 **문장 하나**다 — 사이에 안내나
+                버튼이 끼면 서로 다른 두 개로 읽힌다. 그래서 편집칸과 꼬리를 한 상자로 잇고,
+                조작(복사·글자수)은 그 아래로 내렸다.
+                ★ 붙이는 것은 **보이는 방식**이다. 고치는 자리는 그대로 본문 하나 — 꼬리를
+                  텍스트칸에 넣으면 저장할 때마다 꼬리가 두 벌이 된다(이 저장소가 못 박은 함정). */}
+            <div className="prompt-one">
+              <textarea
+                className="ref mono"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+              />
+              <p className="prompt-fixed mono">{fixedTail}</p>
+            </div>
             {/* 글자 수만 보여 준다. 상한 숫자는 화면에 안 적는다 — 값이 두 벌이면 갈린다
                 (상한은 원장이 자르는 자리 하나이고, 넘으면 서버 문구가 위에 뜬다). */}
             <div className="preview-actions">
@@ -677,10 +686,7 @@ function PreviewPane({ cut, project, url, photoName, usage, aspect, stalled, onR
               <span className="regen-note mono">{prompt.length}자</span>
               {copyMsg && <span className="regen-note">{copyMsg}</span>}
             </div>
-            <p className="preview-note">
-              영어로 쓰면 더 잘 알아들어요. 아래 문장은 저희가 항상 뒤에 붙여요 — 고칠 수 없어요.
-            </p>
-            <p className="preview-note mono">{fixedTail}</p>
+            <p className="preview-note">영어로 쓰면 더 잘 알아들어요 · 회색 글자는 저희가 붙이는 부분이에요</p>
             {/* ★ 꼬리에는 사장님이 직접 쓴 글도 섞여 있다 — 프로젝트 공통 지시
                 (settings.image_note)가 본문 뒤·계약 앞이라 이 블록 안에 나온다. "고칠 수
                 없어요"만 적어 두면 자기가 쓴 문장을 못 고치는 것으로 읽는다. 고치는 자리를
