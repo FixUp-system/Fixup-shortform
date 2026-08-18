@@ -1157,12 +1157,21 @@ describe("POST regen 라우트 — id·ownerId·idx 가 밀리지 않는다", ()
     expect(pipelineMock.regen).not.toHaveBeenCalled();
   });
 
-  it("클립 재생성 — id·ownerId·idx 순서로 넘긴다", async () => {
+  // 2026-08-18: 컷 재생성과 **같은 모양**이 됐다 — 수정사항 칸이 이 화면에도 생겨,
+  // 지시가 서버까지 실려 본문을 다시 쓴다(lib/prompt-revise.js).
+  it("클립 재생성 — id·ownerId·idx·instruction 순서로 넘긴다", async () => {
     const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
     await grant();
-    const res = await clipRegenPOST(patchReq({}), idxCtx(p.id, 2));
+    const res = await clipRegenPOST(patchReq({ instruction: "더 천천히" }), idxCtx(p.id, 2));
     expect(res.status).toBe(200);
-    expect(pipelineMock.regen).toHaveBeenCalledWith(p.id, OWNER, 2);
+    expect(pipelineMock.regen).toHaveBeenCalledWith(p.id, OWNER, 2, undefined, "더 천천히");
+  });
+
+  it("클립 재생성 — 지시가 없으면 안 싣는다", async () => {
+    const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
+    await grant();
+    await clipRegenPOST(patchReq({}), idxCtx(p.id, 2));
+    expect(pipelineMock.regen).toHaveBeenCalledWith(p.id, OWNER, 2, undefined, undefined);
   });
 });
 

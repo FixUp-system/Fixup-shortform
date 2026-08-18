@@ -70,3 +70,37 @@ describe("수정 지시 — 무엇을 모델에게 주는가", () => {
     expect(() => buildPromptReviseMessages({ current: CURRENT, instruction: long })).toThrow(/글자/);
   });
 });
+
+// ⑤영상도 같은 배관을 쓴다(2026-08-18). 화면에 수정사항 칸이 생겼으니 서버도 그 말로
+// **본문을 다시 써야** 한다 — 안 그러면 칸만 있고 아무 일도 안 하는 "적을 수 있는 척"이다.
+describe("영상 재생성도 지시로 본문을 다시 쓴다", () => {
+  it("★ regenClip 이 지시를 받아 clip_prompt 를 고친다", async () => {
+    const { resetMemoryStore } = await import("../lib/store/memory.js");
+    const { createProject, getProject, updateProject } = await import("../lib/projects.js");
+    const pipeline = await import("../lib/pipeline.js");
+    resetMemoryStore();
+    const OWNER = "00000000-0000-4000-8000-00000000000a";
+    const p = await createProject({
+      ownerId: OWNER,
+      settings: { target_seconds: 30, aspect_ratio: "9:16", i2v_model: "kling-v3" },
+      material: { text: "자료", photos: [] },
+    });
+    await updateProject(p.id, OWNER, (proj) => ({
+      ...proj,
+      status: "video",
+      cuts: [{ idx: 0, sentence: "가", seconds: 5, motion: "천천히 다가간다", image: { url: "https://x/i.png" }, clip_regen_count: 0 }],
+    }));
+
+    const seen = [];
+    await pipeline.regenClip(p.id, OWNER, 0, {
+      clip: async ({ prompt }) => { seen.push(prompt); return { url: "https://x/v.mp4", seconds: 5, truncated: false }; },
+      revisePrompt: async (msgs) => { seen.push(msgs.system); return { prompt: "moves in very slowly" }; },
+    }, "더 천천히 다가가게");
+
+    const cut = (await getProject(p.id, OWNER)).cuts[0];
+    expect(cut.clip_prompt, "고쳐 쓴 본문을 안 담았다").toBe("moves in very slowly");
+    expect(seen.some((x) => /대사|자막/.test(x)), "영상 갈래 규칙(대사 보호)을 안 줬다").toBe(true);
+    expect(seen.some((x) => x.includes("moves in very slowly")), "고친 본문으로 안 만들었다").toBe(true);
+    expect(cut.edit_instruction).toBe("더 천천히 다가가게");
+  });
+});

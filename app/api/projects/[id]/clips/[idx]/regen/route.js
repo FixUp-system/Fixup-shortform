@@ -19,6 +19,8 @@ import { modelIdForProject, resolutionForProject } from "../../../../../../../li
 export const maxDuration = 300;
 
 export const POST = withUser(async (req, { params }, user) => {
+  // 사장님이 적은 수정사항 — 있으면 서버가 그 말로 **본문을 다시 쓴다**(꼬리에 덧붙이지 않는다).
+  const { instruction } = (await req.json().catch(() => ({}))) || {};
   const { id, idx } = await params;
 
   // ★ 광고 문서(kind:"ad")는 이 경로가 다루지 않는다 — /api/ads/* 가 다룬다.
@@ -94,7 +96,7 @@ export const POST = withUser(async (req, { params }, user) => {
   }
 
   try {
-    const cut = await regenClip(id, user.id, Number(idx));
+    const cut = await regenClip(id, user.id, Number(idx), undefined, instruction);
     return Response.json({ cut });
   } catch (e) {
     // 못 준 것은 받지 않는다 — 자동 관통의 환불과 같은 정책.

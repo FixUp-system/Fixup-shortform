@@ -134,11 +134,16 @@ export default function VideoStepPage() {
 
   // 다시 만드는 동안 그 컷을 잠근다.
   // 표시가 없던 때는 눌러도 아무 일이 없어 보여 한 번 더 누르게 됐고, 그만큼 돈이 더 나갔다.
-  async function regen(idx) {
+  async function regen(idx, instruction) {
     if (regening !== null) return;
     setErr(""); setRegening(idx);
     try {
-      const res = await fetch(`/api/projects/${id}/clips/${idx}/regen`, { method: "POST" });
+      // 지시를 적었으면 함께 보낸다 — 서버가 그 말로 **본문을 다시 쓴다**(꼬리에 덧붙이지 않는다).
+      const res = await fetch(`/api/projects/${id}/clips/${idx}/regen`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(instruction ? { instruction } : {}),
+      });
       if (!res.ok) {
         setErr((await res.json().catch(() => ({}))).error || "다시 만들지 못했어요");
         return;
@@ -372,6 +377,8 @@ export default function VideoStepPage() {
               project={project}
               busyCut={gen.kind === "running" || regening !== null}
               onSavePrompt={savePrompt}
+              onRegen={regen}
+              showCredits={showCredits}
             />
           )}
         </div>
@@ -439,7 +446,7 @@ export default function VideoStepPage() {
 // ★ 대사가 꼬리에 있는 이유: 같은 문자열을 ffmpeg 가 자막으로 태운다(lib/subtitles.js).
 //   사장님이 여기서 대사를 고칠 수 있으면 **들리는 말과 화면의 자막이 갈린다.** 그래서
 //   고칠 수 없게 두고, 대신 어디서 고치는지를 화면이 말해 준다(안 말하면 여기서 고치려 든다).
-function ClipPromptEdit({ cut, project, busyCut, onSavePrompt }) {
+function ClipPromptEdit({ cut, project, busyCut, onSavePrompt, onRegen, showCredits }) {
   // ★ 텍스트칸에 앉히는 씨앗은 **사장님이 저장한 날 글자**이고, 없으면 코드가 만든 본문이다.
   //   판정 결과(promptBodyOf(cut))를 그대로 앉히면 안 된다 — 덮어쓰기 경로에서는 그 값이 곧
   //   사장님 글자라 괜찮아 보이지만, 이미지 쪽에서는 코드가 붙인 절이 함께 들어 있어 저장할
@@ -454,6 +461,10 @@ function ClipPromptEdit({ cut, project, busyCut, onSavePrompt }) {
   //   ⚠️ `=== saved || generated` 로 적으면 `(a === b) || c` 로 읽혀 버튼이 영원히 잠긴다 —
   //      이름을 두는 것이 유일하게 안전한 형태다.
   const seed = saved || generated;
+  // 수정사항 — 이 컷에서 고치고 싶은 점. ④이미지와 **같은 모양**이다(2026-08-18 사장님 지시로
+  // 이 화면에도 생겼다). 전에는 [다시 만들기]뿐이라, 무엇이 마음에 안 드는지 말할 길 없이
+  // 같은 프롬프트로 한 번 더 사는 것이 전부였다(컷당 8크레딧).
+  const [instr, setInstr] = useState("");
   const [prompt, setPrompt] = useState(seed);
   // 꼬리는 전체에서 씨앗만큼 떼어 낸 것이다 — 본문이 프롬프트 맨 앞이라는 불변에 기댄다
   // (lib/cuts.js promptBodyOf, tests/prompt-override.test.js 가 못 박는다).
@@ -489,10 +500,13 @@ function ClipPromptEdit({ cut, project, busyCut, onSavePrompt }) {
   const regenLabel = priceLabel(
     regenPrice("clip", cut.clip_regen_count || 0, modelIdForProject(project), resolutionForProject(project))
   );
+  // 상한에 닿았는가 — 값을 내도 못 하는 자리다(④이미지와 같은 판정).
+  const atLimit = (cut.clip_regen_count || 0) >= MAX_REGEN_PER_CUT;
 
   return (
-    // 접어 둔다 — 주경로는 컷별 [다시 만들기]다. 이 자리는 직접 지시를 쓰는 사장님을 위한
-    // 곁길이라, 펼치지 않으면 기본 흐름이 그대로다.
+    <>
+    {/* 접어 둔다 — 주경로는 컷별 [다시 만들기]다. 이 자리는 직접 지시를 쓰는 사장님을 위한
+        곁길이라, 펼치지 않으면 기본 흐름이 그대로다. */}
     <details className="prompt-edit">
       <summary>이 컷에 실제로 보내는 지시 보기</summary>
       {/* 고치는 것은 **본문**(어떻게 움직이는가)이다. 첫 프레임 유지·글자 금지·대사는 코드가
@@ -560,5 +574,29 @@ function ClipPromptEdit({ cut, project, busyCut, onSavePrompt }) {
         </button>
       </div>
     </details>
+      {/* ★ 수정사항 칸은 **접힌 칸 아래**다(2026-08-18 사장님 지시) — 무엇을 고칠지 정하려면
+          지금 무엇을 보내고 있는지를 먼저 봐야 한다.
+          ★ 여기 적은 말은 꼬리에 덧붙지 않는다. 위 지시문을 **다시 써서**(lib/prompt-revise.js)
+            가리킨 것은 고치고 새 요구는 더한다 — 그 결과가 위 칸에 그대로 보인다.
+          ★ 대사는 이 길로도 못 고친다 — 고쳐 쓰기 규칙이 그것을 막는다(자막과 갈린다). */}
+      {cut.edit_instruction && (
+        <p className="preview-note">지난 수정 지시: {cut.edit_instruction}</p>
+      )}
+      <textarea
+        className="ref"
+        placeholder="이 영상에서 고치고 싶은 점을 적어주세요 — 예: 더 천천히 다가가게, 흔들림 줄이기"
+        value={instr}
+        onChange={(e) => setInstr(e.target.value)}
+      />
+      <div className="preview-actions">
+        <button
+          className="cta"
+          disabled={busyCut || atLimit || !instr.trim()}
+          onClick={() => onRegen?.(cut.idx, instr.trim())}
+        >
+          {busyCut ? "만드는 중…" : showCredits ? `이 지시로 다시 만들기 · ${regenLabel}` : "이 지시로 다시 만들기"}
+        </button>
+      </div>
+    </>
   );
 }
