@@ -642,8 +642,16 @@ export default function DoneStepPage() {
                   {/* ★ 영상을 만드는 버튼은 이 하나다. 자막만 굽는지 전체를 다시 합치는지는
                       코드가 고른다(applyToVideo) — 사장님이 고를 일이 아니다.
                       고친 게 없으면 누를 것이 없다 — 재생 중인 그 영상이 이미 결과다. */}
-                  <button className="mini confirm-btn" disabled={applying || busy || !dirty} onClick={applyToVideo}>
-                    {applying || busy ? "영상에 반영하는 중…" : dirty ? "영상에 적용" : "적용됨"}
+                  {/* ★★ 잠금이 `dirty` 하나였다(2026-08-18 사장님 지적: "언어를 바꾸면 적용
+                      버튼이 안 눌려"). 그 값은 **자막 설정**만 비교하는데, 언어는 고르는 즉시
+                      서버에 저장되므로(pickLang) 거기 안 걸린다 — 영상에는 옛 언어가 구워져
+                      있는데 버튼은 잠긴 채 "적용됨"이라고 말했다. 화면이 거짓말을 하는 자리다.
+                      각인은 이미 알고 있었다(언어가 바뀌면 stale 이 참이고 경고까지 떴다) —
+                      **아는데 문이 안 열린 것**이다.
+                      ★ 잠금과 문구가 같은 값을 본다. 갈리면 잠긴 버튼이 "영상에 적용"이라 하거나
+                        눌리는 버튼이 "적용됨"이라 한다(지금이 뒤쪽이었다). */}
+                  <button className="mini confirm-btn" disabled={applying || busy || (!dirty && !stale)} onClick={applyToVideo}>
+                    {applying || busy ? "영상에 반영하는 중…" : (dirty || stale) ? "영상에 적용" : "적용됨"}
                   </button>
                 </div>
               </div>
