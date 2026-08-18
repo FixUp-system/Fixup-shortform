@@ -555,7 +555,6 @@ function ClipPromptEdit({ cut, project, busyCut, onSavePrompt, onRegen, showCred
         <span className="regen-note mono">{prompt.length}자</span>
         {copyMsg && <span className="regen-note">{copyMsg}</span>}
       </div>
-      <p className="preview-note">영어로 쓰면 더 잘 알아들어요 · 회색 글자는 저희가 붙이는 부분이에요</p>
       {/* ★ 꼬리에는 사장님이 직접 쓴 글도 섞여 있다 — 프로젝트 공통 지시(settings.clip_note)가
           본문 뒤·계약 앞이라 이 블록 안에 나온다. 대사에는 고칠 자리를 적어 뒀는데 이 값에는
           없어서, 자기가 쓴 문장을 못 고치는 것으로 읽혔다. */}

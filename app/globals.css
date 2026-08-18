@@ -766,7 +766,10 @@ textarea.script-draft { line-height: 1.9; min-height: 132px; }
   margin: 0;
   /* 편집칸의 좌우 여백과 **같은 값**이라야 글줄이 이어져 보인다(textarea.ref 의 12px 14px) */
   padding: 0 14px 12px;
-  color: var(--ink-soft);
+  /* ★ 2026-08-18 사장님 지시로 **색을 통일했다.** 앞은 고칠 수 있고 뒤는 못 고치지만,
+     색을 갈라 두니 한 지시문이 두 글처럼 읽혔다 — 이 상자를 하나로 이은 이유와 어긋난다.
+     고칠 수 있는 자리는 색이 아니라 **커서와 편집칸 자체**가 알려 준다. */
+  color: var(--ink);
   font-size: 16px;
   line-height: 1.55;
   white-space: pre-wrap;
