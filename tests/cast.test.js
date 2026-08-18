@@ -264,10 +264,48 @@ describe("resolveCutRefs — 컷이 실제로 쓸 레퍼런스", () => {
     ]);
   });
 
-  it("업로드 사진이 먼저다 — 2장 상한에 걸릴 때 잘려나가면 안 된다", () => {
+  it("업로드 사진이 먼저다 — 상한에 걸릴 때 잘려나가면 안 된다", () => {
     const got = resolveCutRefs({ ref_ids: ["c2", "c1", "p1"] }, project);
-    expect(got).toHaveLength(2);
     expect(got[0].from).toBe("photo");
+  });
+
+  // ★★ 2026-08-18 — 상한을 2장에서 넓혔다(사장님 실측: **"섞이지 않아"**).
+  //
+  //    옛 상한의 근거는 "얼굴 둘을 함께 넣으면 섞여서 둘 다 아닌 얼굴이 나온다"였는데,
+  //    그 자리 주석이 스스로 **"아직 실측하지 않았다"**고 적어 두고 있었다. 실물을 본
+  //    사장님이 섞이지 않는다고 했으므로 근거가 뒤집혔다.
+  //
+  //    그래서 사장님이 사진을 여러 장 올리면 **여러 장이 실제로 나간다**(전에는 5장을 올려도
+  //    컷마다 한두 장이 끝이었다). 값은 안 는다 — 그림 값은 만드는 장수로 매겨지지 참조
+  //    장수로 매겨지지 않는다.
+  const many = {
+    cast: [
+      { id: "c1", who: "주인", ref: { from: "photo", id: "p9" } },
+      { id: "c2", who: "아이", ref: { from: "avatar", id: "av-child" } },
+    ],
+    material: { photos: [{ id: "p1" }, { id: "p2" }, { id: "p3" }, { id: "p4" }, { id: "p5" }] },
+  };
+
+  it("★ 사물 사진 여러 장이 함께 나간다", () => {
+    const got = resolveCutRefs({ ref_ids: ["p1", "p2", "p3"] }, many);
+    expect(got).toHaveLength(3);
+    expect(got.every((r) => r.kind === "thing")).toBe(true);
+  });
+
+  it("★ 그래도 상한은 있다 — 요청이 무한정 커지면 안 된다", () => {
+    // 사진은 바이트를 인라인(data URI)으로 실어 보낸다(lib/imagegen.js) — 장수가 곧 요청 크기다.
+    const got = resolveCutRefs({ ref_ids: ["p1", "p2", "p3", "p4", "p5"] }, many);
+    expect(got.length).toBeLessThanOrEqual(4);
+    expect(got.length).toBeGreaterThan(2); // 옛 상한(2)보다는 넓다
+  });
+
+  // ★ 인물 자리는 **여전히 지킨다.** 앞에서부터 자르면 사물이 자리를 다 차지해 인물이 통째로
+  //   밀리고, 그러면 컷마다 다른 얼굴이 나온다 — 옛 코드가 1+1 로 나눠 쓴 이유가 그것이다.
+  //   넓어진 지금도 그 보장은 그대로여야 한다.
+  it("★ 사물이 많아도 인물 한 명은 반드시 들어간다", () => {
+    const got = resolveCutRefs({ ref_ids: ["p1", "p2", "p3", "p4", "c2"] }, many);
+    expect(got.some((r) => r.kind === "person"), "인물이 통째로 밀렸다").toBe(true);
+    expect(got[0].kind, "사장님이 올린 사진이 뒤로 밀렸다").toBe("thing");
   });
 
   it("레퍼런스가 없는 인물은 건너뛴다", () => {
@@ -339,11 +377,14 @@ describe("resolveCutRefs — 인물 하나 + 사물 하나", () => {
     material: { photos: [{ id: "p1" }, { id: "p2" }] },
   };
 
+  // ★★ 2026-08-18 에 계약이 바뀌었다. 옛 못은 "총 2장 · 사물 1 + 인물 1"이었는데, 그 상한의
+  //    근거(얼굴이 섞인다)가 사장님 실측으로 뒤집혔다 — 지금은 사진 둘이 **둘 다** 나간다.
+  //    **바뀌지 않은 것이 이 테스트의 핵심이다**: 사물이 아무리 많아도 인물 자리는 남는다.
+  //    앞에서부터 자르면 인물이 통째로 밀려 컷마다 다른 얼굴이 나온다.
   it("사진 둘이 있어도 인물 자리를 남긴다 — 안 그러면 인물 일관성이 통째로 죽는다", () => {
     const got = resolveCutRefs({ ref_ids: ["p1", "p2", "c1"] }, project);
-    expect(got).toHaveLength(2);
-    expect(got.filter((r) => r.kind === "person")).toHaveLength(1);
-    expect(got.filter((r) => r.kind === "thing")).toHaveLength(1);
+    expect(got.filter((r) => r.kind === "person"), "인물이 밀렸다").toHaveLength(1);
+    expect(got.filter((r) => r.kind === "thing"), "사장님이 올린 사진이 잘렸다").toHaveLength(2);
     expect(got[0].id).toBe("p1"); // 사진이 먼저다
   });
 
