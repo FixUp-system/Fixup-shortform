@@ -17,6 +17,7 @@ import { TARGET_CHOICES } from "../../lib/script";
 import { DEFAULT_STYLE_ID } from "../../lib/styles";
 import { ASPECTS, DEFAULT_ASPECT_ID, aspectFor } from "../../lib/aspects";
 import { I2V_MODELS, DEFAULT_I2V_MODEL, DEFAULT_RESOLUTION, resolutionsForModel } from "../../lib/clip-limits";
+import { SUBTITLE_LANGS, DEFAULT_SPEECH_LANG } from "../../lib/subtitle-langs";
 // 값은 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다)
 import { videoPrice } from "../../lib/pricing";
 import StylePicker from "../../components/StylePicker";
@@ -45,6 +46,8 @@ export default function CreatePage() {
   //   하고, 만들기 전이 가장 앞이다. 여기에는 잠금(project.charged)이 없다 — 아직 청구가
   //   없으니 잠글 것도 없고, 그 대신 **모델과 어긋난 값이 남지 않게** pickModel 이 맞춰 준다.
   const [resolution, setResolution] = useState(DEFAULT_RESOLUTION);
+  // 영상이 말할 언어 — 대사 원문이 이 말로 쓰이고, 그 글자가 그대로 자막이 된다
+  const [speechLang, setSpeechLang] = useState(DEFAULT_SPEECH_LANG);
   const [stylePreset, setStylePreset] = useState(DEFAULT_STYLE_ID);
   const [styleNote, setStyleNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -103,7 +106,7 @@ export default function CreatePage() {
       body: JSON.stringify({
         material: { text, photos },
         settings: {
-          target_seconds: seconds, aspect_ratio: aspect, i2v_model: model,
+          target_seconds: seconds, aspect_ratio: aspect, i2v_model: model, speech_lang: speechLang,
           style: { preset: stylePreset, note: styleNote },
           // ★ 화질은 **그 모델이 화질을 열 때만** 싣는다. Kling 에는 resolution 파라미터가
           //   아예 없어, 보내면 서버가 400 으로 막는다(그것이 맞는 동작이다).
@@ -193,6 +196,24 @@ export default function CreatePage() {
                 </div>
               </div>
             )}
+
+            {/* ★ 말하는 언어 — 여기서 한 번 정한다(2026-08-18 사장님 지시).
+                뒤에서 못 정하는 이유: 이 값이 **대사 원문의 언어**라 시나리오를 쓸 때
+                이미 필요하고, 나중에 바꾸면 대사·소리·자막이 전부 낡는다. */}
+            <div className="tray-row">
+              <span className="tray-label">언어</span>
+              <div className="tray-col">
+                <div className="chips">
+                  {SUBTITLE_LANGS.map((l) => (
+                    <button key={l.id} className={`chip${speechLang === l.id ? " on" : ""}`}
+                      onClick={() => setSpeechLang(l.id)}>
+                      {l.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="tray-note">영상이 이 말로 말하고, 같은 말이 자막으로 깔려요 · 만든 뒤에는 바꿀 수 없어요</div>
+              </div>
+            </div>
 
             <div className="tray-row">
               <span className="tray-label">길이</span>

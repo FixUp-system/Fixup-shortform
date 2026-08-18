@@ -2,7 +2,7 @@ import { getProject, updateProject } from "../../../../../lib/projects";
 import { callJson } from "../../../../../lib/llm";
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { BudgetExceeded } from "../../../../../lib/costs.js";
-import { isSubtitleLang } from "../../../../../lib/subtitle-langs.js";
+import { isSubtitleLang, speechLangOf } from "../../../../../lib/subtitle-langs.js";
 import { buildTranslateMessages, validateTranslation, isSubtitleStale } from "../../../../../lib/translate.js";
 
 // 자막 언어를 저장하고, 낡은 컷만 번역한다.
@@ -28,7 +28,9 @@ export const POST = withUser(async (req, { params }, user) => {
   // 무음 컷은 애초에 옮길 문장이 없으니 번역 대상에서 뺀다.
   const staleCuts = cuts
     .map((c, i) => ({ cut: c, i }))
-    .filter(({ cut }) => !cut?.silent && isSubtitleStale(cut, lang));
+    // ★ 원문 언어는 **말한 언어**다(2026-08-18). 예전에는 "ko" 가 글자 그대로 박혀 있어,
+    //   일본어로 말하는 영상에서 일본어 자막을 굳이 번역하고 한국어 자막은 원문 취급했다.
+    .filter(({ cut }) => !cut?.silent && isSubtitleStale(cut, lang, speechLangOf(project)));
 
   let lines = null;
   if (staleCuts.length > 0) {

@@ -24,7 +24,7 @@ import {
 } from "../../../../lib/subtitles";
 import { aspectFor } from "../../../../lib/aspects";
 import { isRenderStale, isClipStale, isImageStale, isSubtitleOnlyStale } from "../../../../lib/steps";
-import { SUBTITLE_LANGS, DEFAULT_SUBTITLE_LANG } from "../../../../lib/subtitle-langs";
+import { SUBTITLE_LANGS, speechLangOf } from "../../../../lib/subtitle-langs";
 import { isSubtitleStale } from "../../../../lib/translate";
 // 두드리는 루프는 화면마다 복붙하지 않는다 — 복붙본이 조금씩 갈려 ④이미지가
 // images_error 를 영영 못 보던 버그가 났다(2026-08-14). 한 벌에서 온다.
@@ -275,7 +275,11 @@ export default function DoneStepPage() {
   //   켜진 칩은 서버가 저장한 뒤에야 옮겨가므로, 기다리는 동안 사장님이 고른 언어는
   //   화면 어디에도 없다. 이 값만이 "일본어로 옮기는 중"이라고 이름을 부를 근거다.
   const [langBusy, setLangBusy] = useState(null);
-  const lang = project?.settings?.subtitle_lang || DEFAULT_SUBTITLE_LANG;
+  // ★ 기본 자막은 **말한 언어**다(2026-08-18). 일본어로 말하는 영상에 한국어 자막이 기본이면
+  //   사장님은 아무것도 안 골랐는데 번역본을 보게 되고, 그 번역에 값이 든다.
+  //   말한 언어를 안 고른 옛 프로젝트는 한국어라 예전과 같다.
+  const sourceLang = speechLangOf(project);
+  const lang = project?.settings?.subtitle_lang || sourceLang;
 
   // 언어를 고르거나(첫 인자) 낡은 컷을 [다시 번역]할 때(같은 언어를 다시 부른다) 쓴다 —
   // 라우트가 낡은 컷만 골라 다시 옮기므로 재호출이 곧 "다시 번역"이다.
@@ -650,7 +654,7 @@ export default function DoneStepPage() {
                 <div className="plan-list sub-translations">
                   <div className="eyebrow">번역 검토 <small>눌러서 고쳐요 — 고치면 지금 원문 기준으로 다시 낡지 않아요</small></div>
                   {cuts.filter((c) => !c.silent).map((c) => {
-                    const stale = isSubtitleStale(c, lang);
+                    const stale = isSubtitleStale(c, lang, sourceLang);
                     const translated = c.subtitles?.[lang]?.text || "";
                     return (
                       <div className="plan-row" key={c.idx}>

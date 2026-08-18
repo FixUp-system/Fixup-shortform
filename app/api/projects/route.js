@@ -1,4 +1,5 @@
 import { createProject, listProjects } from "../../../lib/projects";
+import { isSubtitleLang, DEFAULT_SPEECH_LANG } from "../../../lib/subtitle-langs.js";
 import { isAspect, DEFAULT_ASPECT_ID } from "../../../lib/aspects";
 import { TARGET_CHOICES } from "../../../lib/script";
 import { normalizeStyle, normalizePromptNote } from "../../../lib/styles";
@@ -63,6 +64,11 @@ export const POST = withUser(async (req, ctx, user) => {
     //   모르는 값은 위에서 400 으로 막았다 — 조용히 접으면 방향이 비싼 쪽이라
     //   오타 하나가 청구를 3배로 만든다.
     i2v_model: body.settings?.i2v_model ?? DEFAULT_I2V_MODEL,
+    // ★ 말하는 언어. 이 값 하나가 **대사 원문·소리·자막**을 함께 정한다.
+    //   화이트리스트라 여기 안 적으면 사장님이 고른 언어가 **말없이 사라진다**(화질이 겪은
+    //   함정 그대로다). 모르는 값은 조용히 한국어다 — 여기서 400 을 던지지 않는 이유는
+    //   방향이 싼 쪽이고(한국어), 목록이 나중에 바뀌어도 옛 문서가 계속 열려야 해서다.
+    speech_lang: isSubtitleLang(body.settings?.speech_lang) ? body.settings.speech_lang : DEFAULT_SPEECH_LANG,
     ...(style ? { style } : {}),
   };
   // ★ 화질. 이 settings 는 **명시 화이트리스트**라(PATCH 처럼 통짜 머지가 아니다) 여기
