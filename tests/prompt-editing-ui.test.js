@@ -676,7 +676,17 @@ describe("②시나리오 — 칸마다 언어가 다르다", () => {
     for (const label of ["이 장면이 하는 일", "대사", "말하는 사람"]) {
       expect(rows, `장면 칸 라벨("${label}")이 사라졌다`).toContain(label);
     }
-    for (const holder of placeholdersIn(rows)) {
+    // ★ 2026-08-18 — 글자 칸이 폼(input/textarea)에서 **인라인 편집**으로 바뀌면서
+    //   자리표시자가 `placeholder` 에서 `data-empty` 로 옮겼다(contentEditable 에는
+    //   placeholder 속성이 없다). 둘 다 본다 — 옮긴 자리만 보면 폼이 되살아났을 때 놓치고,
+    //   옛 자리만 보면 지금 그물이 **헛돈다**(자리표시자가 0개라 for 문이 안 돈다).
+    const holders = [
+      ...placeholdersIn(rows),
+      ...[...rows.matchAll(/data-empty="([^"]+)"/g)].map((m) => m[1]),
+    ];
+    expect(holders.length, "장면 칸에 자리표시자가 하나도 없다 — 무엇을 적는 칸인지 모른다")
+      .toBeGreaterThan(0);
+    for (const holder of holders) {
       expect(HANGUL.test(holder), `장면 칸 자리표시자가 영어다("${holder}") — 이 칸들은 사장님과 다음 단계 LLM 이 읽는다`).toBe(true);
     }
   });

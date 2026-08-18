@@ -163,7 +163,7 @@ export default function ScenarioStepPage() {
 
   if (!scenario) {
     return (
-      <section className="panel panel--narrow">
+      <section className="panel panel--wide">
         <h2>{err ? "시나리오를 만들지 못했어요" : "시나리오를 짜는 중이에요"}</h2>
         {err && <p className="pgsub warn">{err}</p>}
         {/* ★ 실패한 자리에 문을 둔다 — 없으면 새로고침이 유일한 복구다 */}
@@ -177,7 +177,7 @@ export default function ScenarioStepPage() {
   }
 
   return (
-    <section className="panel panel--narrow">
+    <section className="panel panel--wide">
       <h2>시나리오를 확인해 주세요</h2>
       {err && <p className="pgsub warn">{err}</p>}
 
@@ -234,6 +234,16 @@ export default function ScenarioStepPage() {
       </p>
       {problems.map((p, i) => <p key={i} className="pgsub warn">{p}</p>)}
 
+      {/* ★ 목록을 조작하는 버튼은 **목록 머리 오른쪽**이다(2026-08-18 셋째 판) —
+          광고의 [수정하기]가 서는 자리와 같다. 예전에는 [장면 추가]가 목록 **아래 왼쪽**
+          이라, 같은 일을 하는 손이 화면마다 다른 곳으로 갔다.
+          `.plan-head` 는 오른쪽 정렬만 빌려 쓰고 구분선·여백은 걷는다(광고와 같은 규칙). */}
+      <div className="step-actions plan-head">
+        <div className="fwd">
+          <button className="mini" onClick={addShot} disabled={busy}>장면 추가</button>
+        </div>
+      </div>
+
       <div className="plan-list">
         {scenario.shots.map((s, i) => (
           <div className="plan-row" key={i}>
@@ -253,28 +263,41 @@ export default function ScenarioStepPage() {
                   onChange={(e) => editShot(i, { seconds: Math.round(Number(e.target.value) || 0) })} />
                 초
               </label>
-              <label className="plan-field">
+              {/* ★★ 글자 칸도 광고와 같은 **인라인 편집**이다(2026-08-18 둘째 판, 사장님 지시:
+                  "텍스트 인풋도 통일 되었으면"). 앞선 판은 배치만 맞췄는데, 칸이 테두리와
+                  배경을 가진 폼(input.field·textarea)이라 광고의 .editable 옆에 놓으면
+                  여전히 다른 화면으로 보였다.
+                  ★ 값을 children 으로 그대로 되돌려준다 — DOM 글자와 같으면 React 가 손대지
+                    않아 커서가 튀지 않는다(④이미지의 지시문 칸과 같은 방식이다). */}
+              <div className="plan-field">
                 <b>비트</b>
-                <input className="field" value={s.beat || ""}
-                  placeholder="이 장면이 하는 일"
-                  onChange={(e) => editShot(i, { beat: e.target.value })} />
-              </label>
+                <span className="editable" contentEditable suppressContentEditableWarning
+                  data-empty="이 장면이 하는 일"
+                  onInput={(e) => editShot(i, { beat: e.currentTarget.textContent })}>
+                  {s.beat || ""}
+                </span>
+              </div>
               {emptyBeat(s) && (
                 <p className="pgsub warn">이 칸이 비어 있으면 이 장면은 저장되지 않아요</p>
               )}
-              <label className="plan-field">
+              <div className="plan-field">
                 <b>대사</b>
-                <textarea className="field" rows={2} value={s.line || ""}
-                  onChange={(e) => editShot(i, { line: e.target.value })} />
-              </label>
+                <span className="editable" contentEditable suppressContentEditableWarning
+                  data-empty="이 장면에서 하는 말"
+                  onInput={(e) => editShot(i, { line: e.currentTarget.textContent })}>
+                  {s.line || ""}
+                </span>
+              </div>
               {/* 광고에는 없는 칸이라 맞출 라벨이 없다 — 이 저장소의 평소 말("말하는 사람")을
                   쓴다. 광고와 겹치는 칸(비트·대사)만 광고의 낱말을 그대로 따른다. */}
-              <label className="plan-field">
+              <div className="plan-field">
                 <b>말하는 사람</b>
-                <input className="field" value={s.speaker || ""}
-                  placeholder="화면 밖 목소리면 내레이션"
-                  onChange={(e) => editShot(i, { speaker: e.target.value })} />
-              </label>
+                <span className="editable" contentEditable suppressContentEditableWarning
+                  data-empty="화면 밖 목소리면 내레이션"
+                  onInput={(e) => editShot(i, { speaker: e.currentTarget.textContent })}>
+                  {s.speaker || ""}
+                </span>
+              </div>
               <div className="sc-actions">
                 <button className="mini" onClick={() => moveShot(i, -1)} disabled={busy}>↑</button>
                 <button className="mini" onClick={() => moveShot(i, 1)} disabled={busy}>↓</button>
@@ -284,8 +307,6 @@ export default function ScenarioStepPage() {
           </div>
         ))}
       </div>
-
-      <button className="mini mt-lg" onClick={addShot} disabled={busy}>장면 추가</button>
 
       <div className="step-actions">
         <BackButton stepKey="scenario" />

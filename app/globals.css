@@ -1348,6 +1348,21 @@ input.field::placeholder { color: var(--ink-soft); }
 .plan-field b { padding-top: 2px; }
 /* 이 화면의 라벨은 광고보다 길다("말하는 사람") — 44px 이면 줄이 접힌다 */
 .sc-body .plan-field b { flex-basis: 72px; }
+/* ★ 인라인 편집 칸(광고와 같은 .editable)에 두 가지만 더한다.
+   ① 여러 줄을 받는다 — 대사는 줄바꿈이 있을 수 있고, 긴 낱말이 칸을 밀면 안 된다.
+   ② 비면 무엇을 적는 칸인지 말한다 — 폼의 placeholder 자리를 대신한다. contentEditable
+      에는 placeholder 속성이 없어서 :empty 와 data-empty 로 만든다. */
+.sc-body .editable {
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 1.6em;
+  cursor: text;
+}
+.sc-body .editable:empty::before {
+  content: attr(data-empty);
+  color: var(--ink-soft);
+  pointer-events: none;
+}
 .sc-actions { display: flex; gap: 6px; margin-top: 8px; }
 
 /* 완성 화면 — 미리보기를 가운데로 */
