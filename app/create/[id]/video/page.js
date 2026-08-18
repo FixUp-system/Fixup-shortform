@@ -552,11 +552,21 @@ function ClipPromptEdit({ cut, project, busyCut, onSavePrompt, onRegen, showCred
             넣으면 저장할 때마다 꼬리가 두 벌이 되고, 이 화면에서는 그 꼬리에 **대사**가
             들어 있어 자막과 갈리기까지 한다. */}
       <div className="prompt-one">
-        <textarea
-          className="ref mono"
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-        />
+        {/* ★★ 본문이 **textarea 가 아니다**(2026-08-18 사장님 지적). 폼 컨트롤 안에서
+            시작한 선택은 밖으로 못 넘어간다 — 한 상자로 이어 보이게 해 놓고 정작
+            **한 덩어리로 집어갈 수는 없었다**. contentEditable 로 바꾸면 본문과 꼬리가
+            같은 종류의 노드라 드래그가 이어지고, 스크롤도 상자 하나가 쥔다(막대 둘이
+            보이던 것도 같은 뿌리다). 컷 문장 편집이 이미 쓰는 방식이다.
+            ★ 값을 children 으로 그대로 되돌려준다 — DOM 글자와 같으면 React 가 손대지
+              않아 커서가 튀지 않는다. 그래서 onInput 에서 상태를 갱신해도 안전하다. */}
+        <div
+          className="ref mono prompt-body"
+          contentEditable
+          suppressContentEditableWarning
+          onInput={(e) => setPrompt(e.currentTarget.textContent)}
+        >
+          {prompt}
+        </div>
         <p className="prompt-fixed mono">{fixedTail}</p>
       </div>
       {/* 글자 수만 보여 준다. 상한 숫자는 화면에 안 적는다 — 값이 두 벌이면 갈린다

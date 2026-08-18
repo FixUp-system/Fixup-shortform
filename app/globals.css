@@ -779,11 +779,40 @@ textarea.script-draft { line-height: 1.9; min-height: 132px; }
   border: 1px solid var(--line);
   border-radius: var(--r-card);
   background: var(--deep);
-  overflow: hidden;
   margin-top: 6px;
+  /* ★ 스크롤을 **이 상자 하나**가 쥔다(2026-08-18). 예전에는 안쪽 textarea 가 제 스크롤을
+     따로 가져서, 한 덩어리로 보이는 상자에 막대가 둘 생기고 그중 하나는 OS 기본 밝은
+     막대였다 — 어두운 화면에 혼자 튀었다. 본문이 contentEditable 이 되면서 안쪽이 스스로
+     구를 일이 없어졌고, 상한을 여기서 준다(없으면 긴 지시문이 화면을 통째로 밀어낸다). */
+  max-height: 420px;
+  overflow-y: auto;
 }
 /* 상자가 테두리를 쥐므로 안쪽 편집칸은 테두리를 벗는다 — 두 겹이면 두 상자로 보인다 */
-.prompt-one textarea.ref { border: 0; border-radius: 0; display: block; margin: 0; }
+.prompt-one .prompt-body {
+  border: 0;
+  border-radius: 0;
+  display: block;
+  margin: 0;
+  min-height: 0;
+  /* textarea 가 아니라서 줄바꿈·긴 낱말을 직접 다뤄야 한다 */
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.prompt-one .prompt-body:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+
+/* 스크롤 막대도 이 화면의 것이다 — 기본 막대는 밝아서 어두운 상자 위에서 혼자 뜬다.
+   두 벌로 적는 이유: Firefox 는 scrollbar-color 만, WebKit 계열은 ::-webkit-scrollbar 만 본다. */
+.prompt-one { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.prompt-one::-webkit-scrollbar { width: 10px; }
+.prompt-one::-webkit-scrollbar-track { background: transparent; }
+.prompt-one::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: var(--r-pill);
+  /* 막대를 상자 벽에서 떼어 놓는다 — 붙어 있으면 테두리와 한 덩어리로 보인다 */
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+.prompt-one::-webkit-scrollbar-thumb:hover { background: var(--ink-soft); background-clip: content-box; }
 .prompt-one .prompt-fixed {
   margin: 0;
   /* 편집칸의 좌우 여백과 **같은 값**이라야 글줄이 이어져 보인다(textarea.ref 의 12px 14px) */

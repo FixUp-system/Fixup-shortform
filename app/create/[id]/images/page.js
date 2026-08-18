@@ -388,7 +388,9 @@ export default function ImagesStepPage() {
             )}
           </p>
         )}
+        {/* 자리표시자와 덮개가 **같은 판정**을 봐야 한다 — 갈리면 둘 다 뜨거나 둘 다 안 뜬다 */}
         {cuts.map((c) => {
+          const busy = (x) => regening === x.idx || x.state === "generating";
           const photo = project.material.photos.find((p) => p.id === c.photo_id);
           const img = imgUrl(c);
           // 사진 컷은 그 사진 자체가 화면이라 아래 배지가 할 말이 없다(옆의 "내 사진" 배지가
@@ -401,22 +403,34 @@ export default function ImagesStepPage() {
                 onClick={() => setSelectedIdx(c.idx)}
               >
                 <span className="num">{c.idx + 1}</span>
+                {/* ★ 도는 동안에는 자리표시자를 그리지 않는다(2026-08-18 사장님 지적).
+                    덮개는 **반투명**이라 아래가 비쳐 보이는데, 그림이 아직 없는 컷에서
+                    비치는 것은 옛 그림이 아니라 **또 다른 문구**("생성 중…")다 —
+                    작은 칸에 같은 사실이 두 겹으로 겹쳐 읽혔다. 남길 것은 도는 표시가
+                    붙은 덮개 쪽이다. */}
                 {img ? <img src={img} alt="" /> :
+                  busy(c) ? null :
                   <span className="ph">{placeholder(c.state)}</span>}
                 {/* ★ 덮개는 그림 갈래 **밖**이다 — 안에 두면 그림이 있는 컷(재생성은 언제나
                     그 경우다)에서 안 뜬다. 옛 그림이 비쳐 보이게 두어 무엇을 다시 만드는지 안다. */}
-                {(regening === c.idx || c.state === "generating") && (
+                {busy(c) && (
                   <span className="frame-busy">
                     <span className="spinner" aria-hidden="true" /> {busyLabel(regening === c.idx)}
                   </span>
                 )}
               </div>
               <div className="txt">
-                “<span contentEditable suppressContentEditableWarning className="editable"
-                  onBlur={(e) => {
-                    const sentence = e.currentTarget.textContent.trim();
-                    if (sentence && sentence !== c.sentence) editSentence(c.idx, sentence);
-                  }}>{c.sentence}</span>”
+                {/* ★ 무음 컷에는 읽을 말이 아예 없다 — 빈 따옴표만 남기면 "말이 사라졌다"로
+                    읽힌다. 배지(초·쓴 사진)는 이 갈래 **밖**이라 그대로 남는다. */}
+                {c.sentence ? (
+                  <>
+                    “<span contentEditable suppressContentEditableWarning className="editable"
+                      onBlur={(e) => {
+                        const sentence = e.currentTarget.textContent.trim();
+                        if (sentence && sentence !== c.sentence) editSentence(c.idx, sentence);
+                      }}>{c.sentence}</span>”
+                  </>
+                ) : null}
                 <div className="badges">
                   {/* ★ "AI 생성"·"레퍼런스 적용"·품질 판정은 걷어냈다(2026-08-13) — 전부 내부
                       상태라 사장님이 보고 할 일이 없다. 내 사진으로 만든 컷만 남긴다:
@@ -715,11 +729,21 @@ function PreviewPane({ cut, project, url, photoName, usage, aspect, stalled, onR
                 ★ 붙이는 것은 **보이는 방식**이다. 고치는 자리는 그대로 본문 하나 — 꼬리를
                   텍스트칸에 넣으면 저장할 때마다 꼬리가 두 벌이 된다(이 저장소가 못 박은 함정). */}
             <div className="prompt-one">
-              <textarea
-                className="ref mono"
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-              />
+              {/* ★★ 본문이 **textarea 가 아니다**(2026-08-18 사장님 지적). 폼 컨트롤 안에서
+                  시작한 선택은 밖으로 못 넘어간다 — 한 상자로 이어 보이게 해 놓고 정작
+                  **한 덩어리로 집어갈 수는 없었다**. contentEditable 로 바꾸면 본문과 꼬리가
+                  같은 종류의 노드라 드래그가 이어지고, 스크롤도 상자 하나가 쥔다(막대 둘이
+                  보이던 것도 같은 뿌리다). 컷 문장 편집이 이미 쓰는 방식이다.
+                  ★ 값을 children 으로 그대로 되돌려준다 — DOM 글자와 같으면 React 가 손대지
+                    않아 커서가 튀지 않는다. 그래서 onInput 에서 상태를 갱신해도 안전하다. */}
+              <div
+                className="ref mono prompt-body"
+                contentEditable
+                suppressContentEditableWarning
+                onInput={(e) => setPrompt(e.currentTarget.textContent)}
+              >
+                {prompt}
+              </div>
               <p className="prompt-fixed mono">{fixedTail}</p>
             </div>
             {/* 글자 수만 보여 준다. 상한 숫자는 화면에 안 적는다 — 값이 두 벌이면 갈린다

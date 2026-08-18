@@ -283,7 +283,7 @@ describe("resolveCutRefs — 컷이 실제로 쓸 레퍼런스", () => {
       { id: "c1", who: "주인", ref: { from: "photo", id: "p9" } },
       { id: "c2", who: "아이", ref: { from: "avatar", id: "av-child" } },
     ],
-    material: { photos: [{ id: "p1" }, { id: "p2" }, { id: "p3" }, { id: "p4" }, { id: "p5" }] },
+    material: { photos: [{ id: "p1" }, { id: "p2" }, { id: "p3" }, { id: "p4" }, { id: "p5" }, { id: "p6" }, { id: "p7" }] },
   };
 
   it("★ 사물 사진 여러 장이 함께 나간다", () => {
@@ -294,9 +294,19 @@ describe("resolveCutRefs — 컷이 실제로 쓸 레퍼런스", () => {
 
   it("★ 그래도 상한은 있다 — 요청이 무한정 커지면 안 된다", () => {
     // 사진은 바이트를 인라인(data URI)으로 실어 보낸다(lib/imagegen.js) — 장수가 곧 요청 크기다.
-    const got = resolveCutRefs({ ref_ids: ["p1", "p2", "p3", "p4", "p5"] }, many);
-    expect(got.length).toBeLessThanOrEqual(4);
-    expect(got.length).toBeGreaterThan(2); // 옛 상한(2)보다는 넓다
+    const got = resolveCutRefs({ ref_ids: ["p1", "p2", "p3", "p4", "p5", "p6", "p7"] }, many);
+    expect(got.length).toBeLessThanOrEqual(6);
+    expect(got.length).toBeGreaterThan(4); // 옛 상한(2 → 4)보다 넓다
+  });
+
+  // ★ 2026-08-18 저녁 실측이 만든 자리 — 사진 4장짜리 컷에 인물이 붙어 다섯이 되자
+  //   상한 4 가 **넷째 사진을 잘라 냈다**(사장님이 "키링4가 누락됐다"로 발견).
+  //   "올린 사진이 잘려나가면 안 된다"가 이 함수의 첫 규칙인데 값이 낮아 스스로를 어겼다.
+  it("★★ 사진 4장 + 인물 1명은 하나도 안 잘린다", () => {
+    const got = resolveCutRefs({ ref_ids: ["p1", "p2", "p3", "p4", "c2"] }, many);
+    expect(got).toHaveLength(5);
+    expect(got.filter((r) => r.kind === "thing")).toHaveLength(4);
+    expect(got.some((r) => r.kind === "person")).toBe(true);
   });
 
   // ★ 인물 자리는 **여전히 지킨다.** 앞에서부터 자르면 사물이 자리를 다 차지해 인물이 통째로

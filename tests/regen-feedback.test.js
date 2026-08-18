@@ -65,8 +65,12 @@ describe("다시 만들기 — 누른 것이 화면에 보인다", () => {
         .toBe(true);
       // 문구 자체는 busyLabel 이 쥔다(lib/progress.js). 재는 것은 **regening 이 그 말에
       // 닿는가**다 — 닿아 있으면 누른 흔적이 화면에 남는다.
+      // ★ 거리로 재지 않는다(2026-08-18). 사이에 주석·판정 헬퍼가 끼면 멀쩡한 배선이
+      //   깨진 것처럼 보인다. 재는 것은 **regening 이 그 말의 근거인가** 하나다 —
+      //   덮개 문구는 `busyLabel(regening === …)` 로 정해지고, 그 밖의 표시(카드 글줄 등)는
+      //   regening 을 곁에 두고 말한다.
       expect(src, "도는 중이라는 말이 없다")
-        .toMatch(/regening[\s\S]{0,400}(다시 만드는 중|만드는 중|busyLabel\()/);
+        .toMatch(/busyLabel\(\s*regening|regening[\s\S]{0,400}(다시 만드는 중|만드는 중)/);
     });
   }
 

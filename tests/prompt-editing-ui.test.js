@@ -184,8 +184,15 @@ describe("④이미지 — 프롬프트 편집", () => {
   //   꼬리는 전체에서 본문 길이만큼 떼어 낸 것이다(lib/cuts.js 가 그 불변을 테스트로 쥔다).
   it("★ 텍스트칸은 본문만 쥔다 — 꼬리는 떼어 내 보여 준다", () => {
     expect(images, "전체 프롬프트에서 꼬리를 떼어 내는 자리가 없다").toMatch(/\.slice\(/);
-    // 꼬리는 고칠 수 없어야 한다 — 텍스트칸이 하나뿐인 것이 그 뜻이다(수정 지시 칸 + 프롬프트 칸).
-    expect(images.match(/<textarea/g)?.length, "텍스트칸 수가 둘이 아니다 — 꼬리가 고쳐질 수 있다").toBe(2);
+    // 꼬리는 고칠 수 없어야 한다.
+    // ★ 예전에는 **텍스트칸 개수**로 쟀는데(수정 지시 칸 + 프롬프트 칸 = 2), 2026-08-18 에
+    //   프롬프트 본문이 textarea 를 벗었다 — 폼 컨트롤 안에서 시작한 드래그가 꼬리까지
+    //   못 가서였다(tests/prompt-one-selection.test.js). 개수는 그 순간 의미를 잃었다.
+    //   재야 할 것은 처음부터 하나였다: **꼬리 자리에 고칠 수 있는 표식이 없는가.**
+    const box = images.slice(images.indexOf('className="prompt-one"'));
+    const tail = box.slice(box.indexOf("prompt-fixed"), box.indexOf("prompt-fixed") + 200);
+    expect(tail, "꼬리를 고칠 수 있다 — 저장할 때마다 꼬리가 두 벌이 된다")
+      .not.toMatch(/contentEditable|<textarea/);
     // ★ 전체 프롬프트를 텍스트칸에 앉히면(씨앗으로든 값으로든) 저장하는 순간 꼬리가 두 벌이
     //   된다 — 이 태스크가 막으려는 바로 그 결함이라 이름으로 못 박는다.
     expect(images, "전체 프롬프트를 텍스트칸 값으로 쓴다 — 꼬리가 두 벌이 된다").not.toMatch(/value=\{\s*full\s*\}/);
