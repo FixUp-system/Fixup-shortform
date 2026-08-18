@@ -166,7 +166,10 @@ describe("영상 프롬프트 — 본문과 꼬리", () => {
       "Voice: warm alto voice. Says exactly, in Korean: \"한 모금이면 충분해요\". " +
       "Setting: a narrow morning cafe counter. " +
       "Characters in this frame: barista: short-haired barista in a linen apron. " +
-      "The subject is: walnut espresso tamper. Its appearance: walnut handle with steel base. " +
+      // ★ 여기 있던 `The subject is: … Its appearance: …` 는 2026-08-18 에 빠졌다.
+      //   i2v 는 참조 사진을 못 받아 **글로 쓴 묘사가 첫 프레임을 이긴다** — 실측에서
+      //   라벤더 토끼가 프롬프트가 말한 크림색 토끼로 다시 그려졌고, 바로 뒤 꼬리의
+      //   `Keep the subject and style unchanged.` 와도 모순이었다.
       "Color treatment, keep identical across all cuts: soft daylight pastel. " +
       "The attached image is the first frame — continue naturally from it. " +
       "Keep the subject and style unchanged. No text or letters."
@@ -219,7 +222,7 @@ describe("영상 프롬프트 — 본문과 꼬리", () => {
       "Voice: calm low male voice. Says exactly, in Korean: \"한 모금이면 충분해요\". " +
       "Setting: a narrow morning cafe counter. " +
       "Characters in this frame: barista: short-haired barista in a linen apron. " +
-      "The subject is: walnut espresso tamper. Its appearance: walnut handle with steel base. " +
+      // ★ 제품 절은 여기서도 빠졌다 — 위 화면 안 대사 갈래와 같은 이유다.
       "Color treatment, keep identical across all cuts: soft daylight pastel. " +
       "The attached image is the first frame — continue naturally from it. " +
       "Keep the subject and style unchanged. No text or letters."
@@ -403,7 +406,8 @@ describe("덮어쓰기와 각인", () => {
     "https://img/1.png|5||fast|한 모금이면 충분해요|calm low male voice||narration" +
     "|stage:a narrow morning cafe counter" +
     "|cast:barista: short-haired barista in a linen apron" +
-    "|subject:walnut espresso tamper:walnut handle with steel base" +
+    // ★ 제품 절은 여기 없다(2026-08-18) — 클립 프롬프트에서 걷어냈으므로 각인에서도 걷었다
+    //   (lib/cuts.js clipContextClause · lib/steps.js clipKey 의 주석에 근거가 있다).
     "|tone:soft daylight pastel" +
     '|motion:[{"id":"camera","text":"천천히 뒤로 물러난다"},{"id":"subject","text":"컵을 들어 입으로 가져간다"},{"id":"ambient","text":"김이 천천히 피어오른다"}]';
 
@@ -644,7 +648,7 @@ describe("프로젝트 공통 지시", () => {
       "https://img/1.png|5||fast|한 모금이면 충분해요|calm low male voice||narration" +
       "|stage:a narrow morning cafe counter" +
       "|cast:barista: short-haired barista in a linen apron" +
-      "|subject:walnut espresso tamper:walnut handle with steel base" +
+      // ★ 제품 절은 여기 없다(2026-08-18) — 위 CLIP_BASE 주석과 같은 이유다.
       "|tone:soft daylight pastel" +
       '|motion:[{"id":"camera","text":"천천히 뒤로 물러난다"},{"id":"subject","text":"컵을 들어 입으로 가져간다"},{"id":"ambient","text":"김이 천천히 피어오른다"}]';
 

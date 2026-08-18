@@ -662,13 +662,16 @@ describe("buildClipPrompt — 클립도 무대와 인물을 받는다", () => {
     expect(buildClipPrompt(cut, project).startsWith("빠른 속도로 도로를 질주한다. fast, explosive motion.")).toBe(true);
   });
 
-  it("무대·인물·제품·톤이 실린다 — 화면비는 안 실린다(lib/i2v.js 가 API 필드로 이미 보낸다)", () => {
+  // ★ 제품(앵커·외형)은 2026-08-18 에 이 프롬프트에서 빠졌다 — i2v 는 참조 사진을 못 받아
+  //   글로 쓴 묘사가 첫 프레임을 이긴다(자세한 근거는 lib/cuts.js clipContextClause 주석과
+  //   tests/clip-subject-look.test.js). 그래서 여기서는 **안 실린다는 것까지** 함께 잰다.
+  it("무대·인물·톤이 실린다 — 제품과 화면비는 안 실린다(lib/i2v.js 가 API 필드로 이미 보낸다)", () => {
     const p = buildClipPrompt(cut, project);
     expect(p).toContain("해질녘 해안 도로");
     expect(p).toContain("20대 남성: 검정 재킷");
-    expect(p).toContain("빨간 스포츠카");
-    expect(p).toContain("매끈한 2도어 쿠페");
     expect(p).toContain("차가운 색감");
+    expect(p).not.toContain("빨간 스포츠카");
+    expect(p).not.toContain("매끈한 2도어 쿠페");
     expect(p).not.toContain("9:16");
     expect(p).not.toContain("Frame:");
   });

@@ -774,10 +774,18 @@ describe("clipKey — 프롬프트에 실리는 것은 각인에도 있다", () 
     expect(clipKey(cut, p1)).not.toBe(clipKey(cut, p2));
   });
 
-  it("제품 앵커가 바뀌면 낡는다", () => {
+  // ★ 뒤집힌 계약(2026-08-18) — 제품은 **클립 프롬프트에 안 실린다**. 그래서 각인도
+  //   안 담는다. 이 저장소의 불변은 "프롬프트에 실리는 것만 각인에 담는다" 하나이므로,
+  //   프롬프트에서 뺀 값이 각인에 남아 있으면 프롬프트는 같은데 낡았다고 말하는 자리가
+  //   생기고 그 버튼은 유료다(컷당 8크레딧). 근거는 lib/cuts.js clipContextClause 주석.
+  //   ★ 같은 값을 이미지 각인(imageContextKey)은 **그대로 담는다** — 이미지 프롬프트는
+  //     제품 묘사를 계속 싣기 때문이다. 바로 아래 한 줄이 그 대칭을 못 박는다.
+  it("제품 앵커가 바뀌어도 클립은 안 낡는다 — 클립 프롬프트가 제품을 안 싣는다", () => {
     const p1 = { ...base, briefing: { topic: "커피" } };
     const p2 = { ...base, briefing: { topic: "차" } };
-    expect(clipKey(cut, p1)).not.toBe(clipKey(cut, p2));
+    expect(clipKey(cut, p1)).toBe(clipKey(cut, p2));
+    // 그림은 여전히 낡는다 — 이미지 프롬프트에는 제품이 실린다
+    expect(imageContextKey(cut, p1)).not.toBe(imageContextKey(cut, p2));
   });
 
   // ★ 관계없는 값은 안 건드린다 — 다른 컷의 인물이 바뀌었다고 이 컷이 낡으면 안 된다
@@ -802,9 +810,10 @@ describe("clipKey — 프롬프트에 실리는 것은 각인에도 있다", () 
       expect(clipKey(rich, null)).toBe("u|5|달린다");
     });
 
-    it("project 를 주면 넷 다 붙는다 — 침묵은 project 가 없을 때뿐이다", () => {
+    // ★ 넷이 아니라 **셋**이다(2026-08-18) — 제품 절이 프롬프트·각인 양쪽에서 함께 빠졌다.
+    it("project 를 주면 셋 다 붙는다 — 침묵은 project 가 없을 때뿐이다", () => {
       const p = { ...base, cast: [{ who: "A", look: "긴 머리", cuts: [0] }], briefing: { topic: "커피" } };
-      expect(clipKey(rich, p)).toBe("u|5|달린다|stage:해변|cast:A: 긴 머리|subject:커피|tone:따뜻");
+      expect(clipKey(rich, p)).toBe("u|5|달린다|stage:해변|cast:A: 긴 머리|tone:따뜻");
     });
   });
 });
