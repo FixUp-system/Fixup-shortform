@@ -60,7 +60,10 @@ describe("이미지 프롬프트 — 본문과 꼬리", () => {
       "Keep this exact product/subject consistent in every scene. " +
       "Its appearance, identical in every scene: walnut handle with steel base. " +
       "Style note: warm amber grade. " +
-      "Cinematic lighting, realistic, no text or letters in the image. " +
+      // ★ 2026-08-18 저녁 — 글자 금지의 **범위**가 첨부 유무로 갈린다. 이 말은 AI 가 지어내는
+      //   엉터리 글자를 막으려던 것인데, 첨부에 인쇄된 글자가 있으면 그것까지 지우라는 말로
+      //   읽혔다(`KONKUK UNIV.` → `KU`). 첨부가 없는 컷의 문장은 예전 그대로다(위 테스트).
+      "Cinematic lighting, realistic, no new text or letters beyond what appears in the attached reference photos — reproduce any printed lettering, logos and markings on the referenced items exactly as photographed, and do not add invented text anywhere else in the image. " +
       // ★ 2026-08-18 에 이 세 줄이 바뀌었다(tests/ref-numbering.test.js 가 이유를 적어 둔다):
       //   ① 목록에 **물건도** 들어간다 — 예전에는 인물만 세어 [1]이 이름 없이 남았다
       //   ② 두 힌트가 **번호로** 가리킨다 — 단수 "the attached reference" 는 첨부가 둘일 때
@@ -73,6 +76,13 @@ describe("이미지 프롬프트 — 본문과 꼬리", () => {
       "Match the product/subject appearance to attached image [2] exactly (shape, colors, packaging). " +
       "Use the attached reference only for what the subject looks like — never for its camera angle, its framing, or how much of the frame it fills. " +
       "Keep it at natural real-world size relative to the people and surroundings, and let the scene description alone decide the shot. " +
+      // ★ **사진이 이긴다** — 위쪽의 `Its appearance…` 는 시나리오가 지어낸 말이라 첨부와
+      //   다툰다. 그 줄은 첨부가 없는 컷에서 일관성의 유일한 근거라 지울 수 없어(그리고
+      //   본문은 refs 를 모른다 — 화면이 같은 함수로 본문을 다시 계산한다), 지우는 대신
+      //   차례를 정했다. 뒤이어 무엇이 금지인지도 못 박는다(`exactly` 만으로는 안 선다).
+      "Where any written description above disagrees with the attached photos, the photos take precedence. " +
+      "Treat the referenced items as fixed, existing products: reproduce each one as photographed, keeping its exact shape, proportions, colors, surface finish, printed graphics and its hardware (rings, clasps, straps, tags). " +
+      "Do not redesign, restyle, simplify, recolor, or invent details for them. " +
       "Overall look and color treatment, keep identical across all cuts: soft daylight pastel. " +
       "Compose the opening framing as: the tamper cropped at the left edge, at counter eye level. " +
       "Important correction requested by the user, apply it strictly: make the steel base brighter."
