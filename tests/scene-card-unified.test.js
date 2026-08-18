@@ -116,6 +116,18 @@ describe("장면 카드 — 두 흐름이 같은 모양", () => {
   //    화면에 놓이는 방식**이었다 — 광고는 인라인 `<span class="badge">` 라 글줄 위에 앉고,
   //    ②시나리오는 안에 숫자 칸을 넣느라 `display: inline-flex` 로 바꿔 놓았다. 그 한 줄이
   //    상자의 높이와 기준선을 바꿔, 같은 12px 를 줘도 눈에는 다른 간격으로 보였다.
+  // ★★ 배지가 **자기 폭만** 차지한다(2026-08-18 브라우저 실측으로 잡았다: 너비 800px).
+  //    장면 안쪽이 세로 flex 상자라, `inline-flex` 로 적어도 flex 로 블록화되고 기본
+  //    stretch 로 통짜로 늘어난다 — 배경 띠가 줄을 가로지르고 글자만 왼쪽에 남아
+  //    "번호와 초가 멀다"로 보였다. 소스만 읽어서는 못 잡는 자리다.
+  it("★★ 초 배지가 줄 전체로 늘어나지 않는다", () => {
+    const r = css.slice(css.indexOf(".plan-row .plan-body > .badge:first-child"),
+                        css.indexOf(".plan-row .plan-body > .badge:first-child") + 260);
+    expect(r, "배지 규칙을 못 찾았다").toBeTruthy();
+    expect(r, "flex 부모에서 통짜로 늘어난다").toMatch(/align-self:\s*flex-start/);
+    expect(r, "블록 부모에서 통짜로 늘어난다").toMatch(/width:\s*fit-content/);
+  });
+
   it("★★ 초 배지가 광고의 배지와 같은 방식으로 놓인다", () => {
     expect(css, "초 배지 모양이 없다").toMatch(/\.sc-secs/);
     const r = rule(".sc-secs");

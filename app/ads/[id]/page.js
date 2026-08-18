@@ -412,7 +412,8 @@ export default function AdDetailPage() {
               <video className="preview-video" controls src={video.url} />
             </div>
           </div>
-          <div className="step-actions">
+          {/* --result — 결과를 받는 줄이다(⑥완성과 같은 이름·같은 치수) */}
+          <div className="step-actions step-actions--result">
             <div className="fwd">
               {/* ★★ 여기 있던 유료 재생성 버튼을 걷었다(2026-08-18 사장님 지시). 완성 화면은
                   결과를 **확인하는 자리**인데, 그 버튼은 누르는 순간 정가가 통째로 다시 나가는

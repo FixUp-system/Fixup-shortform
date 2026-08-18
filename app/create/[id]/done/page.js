@@ -732,7 +732,8 @@ export default function DoneStepPage() {
         </>
       )}
 
-      <div className="step-actions">
+      {/* --result — 결과를 받는 줄이다. 큰 버튼 치수가 이 이름 아래에만 산다(globals.css) */}
+      <div className="step-actions step-actions--result">
         <BackButton stepKey="done" />
         {/* 완성본이 있으면 사장님이 하고 싶은 일은 내려받기다 — 그것을 주 버튼으로 둔다.
             다시 합치기는 컷을 고쳤을 때만 쓰는 보조 동작이다. */}

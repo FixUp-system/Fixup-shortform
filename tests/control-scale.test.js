@@ -87,3 +87,23 @@ describe("간격 — 카드 층위의 사다리", () => {
       .toMatch(/\.chips \{[^}]*gap:\s*7px/);
   });
 });
+
+// ★★ 한 화면을 위한 치수는 **그 화면의 이름 아래**에 둔다(2026-08-18).
+//    `.step-actions .fwd .mini` 라는 전역 선택자가 "실행줄 오른쪽의 모든 작은 버튼"을
+//    132px 로 늘리고 있었다. 완성 화면의 [내려받기] 짝을 맞추려고 쓴 값인데, ②시나리오의
+//    [장면 추가] 기호 버튼까지 늘려 놓았다 — 사장님이 "추가 버튼 크기가 안 줄어든다"고
+//    했고, 선택자가 셋이라 나중에 쓴 규칙이 이기지도 못했다.
+describe("치수는 화면 이름 아래에 산다", () => {
+  it("★★ 실행줄 오른쪽의 모든 작은 버튼을 키우는 전역 규칙이 없다", () => {
+    expect(css, "전역 선택자가 되살아났다 — 다른 화면의 아이콘 버튼까지 커진다")
+      .not.toMatch(/\.step-actions \.fwd \.mini\s*\{/);
+    expect(css, "결과 줄 전용 이름이 없다").toMatch(/\.step-actions--result \.fwd \.mini/);
+  });
+
+  it("★ 그 이름을 쓰는 화면이 실제로 있다 — 이름만 만들고 안 쓰면 치수가 사라진다", () => {
+    const done = readFileSync("app/create/[id]/done/page.js", "utf8");
+    const ad = readFileSync("app/ads/[id]/page.js", "utf8");
+    expect(done, "⑥완성이 결과 줄 이름을 안 쓴다").toContain("step-actions--result");
+    expect(ad, "광고 완성이 결과 줄 이름을 안 쓴다").toContain("step-actions--result");
+  });
+});
