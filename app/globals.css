@@ -1444,7 +1444,16 @@ input.field {
 }
 input.field:focus { outline: 1px solid var(--line); }
 input.field::placeholder { color: var(--ink-soft); }
-.sc-body { display: flex; flex-direction: column; gap: 8px; }
+/* ★★ 장면 안쪽은 **광고와 같은 블록**이다(2026-08-18, 사장님이 네 번째로 짚은 자리:
+   "광고 영상이랑 간격이 일치하지 않아"). 여기만 세로 flex + gap:8px 였고, 그 위에
+   `.plan-field` 의 margin-top 4px 가 더해져 배지와 첫 줄 사이가 **12px** 였다 —
+   광고는 같은 자리가 **6px**(margin 만)다.
+   ★ 값을 눈으로 맞추지 않고 브라우저에서 셋을 재서 골랐다: 지금 12 · gap:0 이면 4 ·
+     **block 이면 6**(= 광고와 같은 값). 간격을 손으로 새로 적는 대신 **같은 구조**를 쓴다 —
+     그래야 다음에 한쪽이 바뀌어도 두 화면이 같이 움직인다.
+   ⚠️ flex 를 걷으면 배지 늘어남도 함께 사라지지만, `align-self`·`width: fit-content` 는
+      그대로 둔다 — 그 방어는 ②만이 아니라 **두 화면 모두**를 위한 것이다. */
+.sc-body { display: block; }
 .sc-cell { display: block; }
 /* ★ 장면 안쪽을 광고 화면과 같은 모양으로 맞췄다(2026-08-18) — 라벨은 값 **앞**에 서고
    (`.plan-field b`), 초는 장면 머리의 배지다. 아래는 그 배지가 **눌러 고칠 수 있는** 것이라
@@ -1458,7 +1467,20 @@ input.field::placeholder { color: var(--ink-soft); }
   /* 배지가 인라인이므로 안쪽 칸도 글줄 위에 앉는다 — 기준선을 배지 글자와 맞춘다 */
   display: inline;
   vertical-align: baseline;
-  width: 2.4em;
+  /* ★★ 숫자 칸이 **글자 수만큼만** 넓다(2026-08-18, 사장님이 다섯 번 짚은 자리).
+     2.4em(≈29px)에 오른쪽 정렬이라, 배지 상자는 번호에서 4px 인데 **숫자 글자는 39px**
+     떨어져 있었다 — 광고(글자 그대로라 10px)와 눈에 띄게 달랐고, 나는 계속 상자만 재고
+     있었다. 두 자리(최대 15초)가 들어갈 만큼만 준다.
+     `field-sizing: content` 는 크롬이 글자 수에 맞춰 더 정확히 줄여 준다 — 안 먹는 브라우저는
+     아래 width 로 선다. */
+  /* ★ 값을 브라우저에서 재서 골랐다: 2.4em → 숫자가 39px · 2ch → 26px ·
+     **width:auto + field-sizing:content → 17px**(광고의 10px 에 가장 가깝다).
+     ⚠️ `width` 를 못 박으면 field-sizing 이 아무 일도 안 한다 — auto 라야 글자 수를 따른다.
+        field-sizing 을 모르는 브라우저에서는 숫자 칸이 기본 폭(20자쯤)이 되므로,
+        아래 max-width 가 그때의 상한이다. */
+  field-sizing: content;
+  width: auto;
+  max-width: 3ch;
   border: 0;
   background: transparent;
   color: inherit;

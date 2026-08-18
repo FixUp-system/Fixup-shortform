@@ -120,6 +120,17 @@ describe("장면 카드 — 두 흐름이 같은 모양", () => {
   //    장면 안쪽이 세로 flex 상자라, `inline-flex` 로 적어도 flex 로 블록화되고 기본
   //    stretch 로 통짜로 늘어난다 — 배경 띠가 줄을 가로지르고 글자만 왼쪽에 남아
   //    "번호와 초가 멀다"로 보였다. 소스만 읽어서는 못 잡는 자리다.
+  // ★★ 장면 안쪽의 **구조**가 같아야 세로 간격이 같다(2026-08-18, 네 번째 판).
+  //    ②만 세로 flex + gap 이라 배지와 첫 줄 사이가 12px 였고 광고는 6px 였다.
+  //    간격을 손으로 새로 적는 대신 같은 구조(블록)를 쓴다 — 그래야 다음에 한쪽이 바뀌어도
+  //    두 화면이 같이 움직인다.
+  it("★★ 장면 안쪽이 광고와 같은 구조다", () => {
+    const r = rule(".sc-body");
+    expect(r, ".sc-body 규칙을 못 찾았다").toBeTruthy();
+    expect(r, "②만 flex 상자다 — 세로 간격이 광고와 갈린다").not.toMatch(/display:\s*flex/);
+    expect(r, "간격을 그 자리에서 새로 만든다").not.toMatch(/gap:/);
+  });
+
   it("★★ 초 배지가 줄 전체로 늘어나지 않는다", () => {
     const r = css.slice(css.indexOf(".plan-row .plan-body > .badge:first-child"),
                         css.indexOf(".plan-row .plan-body > .badge:first-child") + 260);
