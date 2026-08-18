@@ -449,3 +449,35 @@ describe("/ads/new — 숨긴 모델은 안 보인다", () => {
       .toMatch(/AD_MODELS\.filter\(\([^)]*\)\s*=>\s*![^)]*\.hidden\)/);
   });
 });
+
+// ★★ 2026-08-18 실측 결함 — 사진을 올렸는데 광고가 사진 없이 나갔다.
+//
+// 프로젝트 생성 08:45:31.880 · 사진 업로드 완료 08:45:32.452. **업로드가 0.57초 졌다.**
+// onFiles 는 진행 상태를 세우지 않았고 [시나리오 만들기]는 busy·text 만 보고 있었으므로,
+// 사진을 고른 직후 누르면 photos 가 빈 채로 submit 이 나간다. 사진 0장이면
+// pickEndpointKind 가 t2v 를 고르고(lib/ad/scenario.js), t2v 는 image_urls 를 아예 안
+// 싣는다(lib/ad/generate.js) — **아무 경고 없이 $3.63 짜리 사진 없는 광고**가 나온다.
+//
+// ⚠️ 주석은 판정에서 걷어내고 본다. 이 문단이 "photos" 를 여러 번 적고 있어서, 소스를
+//    그대로 재면 주석이 계약을 대신 통과시킨다(오늘 네 번 밟은 함정이다).
+const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+describe("/ads/new — 사진이 다 올라가기 전에는 못 만든다", () => {
+  it("★ 업로드 진행 상태를 실제로 세운다", () => {
+    expect(code, "업로드 중임을 아는 상태가 없다 — 화면은 사진이 붙었는지 모른 채 submit 을 연다")
+      .toMatch(/useState\(false\)/);
+    expect(code, "uploading 상태가 없다").toMatch(/\[\s*uploading\s*,\s*setUploading\s*\]/);
+  });
+
+  it("★ 업로드가 끝나기 전에는 [시나리오 만들기]가 잠긴다", () => {
+    const cta = code.slice(code.indexOf('className="cta"'), code.indexOf('className="cta"') + 200);
+    expect(cta, "버튼이 uploading 을 안 본다 — 사진이 붙기 전에 눌린다")
+      .toMatch(/disabled=\{[^}]*uploading/);
+  });
+
+  it("★ 실패해도 잠금이 풀린다 — finally 로 끈다", () => {
+    const fn = code.slice(code.indexOf("async function onFiles"), code.indexOf("function onModelChange"));
+    expect(fn, "onFiles 가 uploading 을 안 켠다").toMatch(/setUploading\(true\)/);
+    expect(fn, "업로드가 실패하면 버튼이 영영 잠긴다 — finally 가 없다").toMatch(/finally\s*\{/);
+  });
+});

@@ -53,6 +53,11 @@ export default function AdNewPage() {
   const [seconds, setSeconds] = useState(adSecondsFor(DEFAULT_AD_MODEL)[0]);
   const [resolution, setResolution] = useState(DEFAULT_AD_RESOLUTION);
   const [busy, setBusy] = useState(false);
+  // 사진이 아직 올라가는 중인가. ★ busy 로 겸할 수 없다 — busy 는 "만드는 중"이라
+  // 버튼 글자까지 바꾼다. 무엇보다 이 값이 없으면 화면은 사진이 붙었는지 모른 채
+  // [시나리오 만들기]를 열어 둔다(2026-08-18 실측: 업로드가 0.57초 져서 사진 0장으로
+  // 나갔고, 사진이 0장이면 t2v 가 골라져 사진이 아예 안 실린 광고에 $3.63 을 치렀다).
+  const [uploading, setUploading] = useState(false);
   const [err, setErr] = useState("");
   const fileRef = useRef(null);
   const textRef = useRef(null);
@@ -72,15 +77,22 @@ export default function AdNewPage() {
     const files = Array.from(e.target.files);
     const room = MAX_PHOTOS - photos.length;
     if (files.length > room) setErr(`사진은 ${MAX_PHOTOS}장까지 올릴 수 있어요`);
-    for (const file of files.slice(0, Math.max(room, 0))) {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/uploads", { method: "POST", body: fd });
-      const data = await res.json();
-      if (res.ok) setPhotos((p) => [...p, data]);
-      else setErr(data.error || "업로드 실패");
+    // ★ 켜는 자리가 첫 await 앞이어야 한다. 뒤에 두면 그 사이에 눌린 버튼이 이미 이겼다.
+    setUploading(true);
+    try {
+      for (const file of files.slice(0, Math.max(room, 0))) {
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch("/api/uploads", { method: "POST", body: fd });
+        const data = await res.json();
+        if (res.ok) setPhotos((p) => [...p, data]);
+        else setErr(data.error || "업로드 실패");
+      }
+    } finally {
+      // 실패해도 반드시 푼다 — 안 그러면 업로드 한 번 실패한 사장님은 버튼이 영영 잠긴다.
+      setUploading(false);
+      e.target.value = "";
     }
-    e.target.value = "";
   }
 
   // 모델을 바꾸면 그 모델이 받는 길이·해상도가 바뀐다(lib/ad/models.js — 길이는
@@ -190,7 +202,8 @@ export default function AdNewPage() {
               <span className="tray-label">언어</span>
               <div className="tray-col">
                 <div className="chips">
-                  {AD_LANGS.map((l) => (
+                  {/* 숨긴 언어(hidden)는 안 그린다 — 표에는 남아 있다(lib/ad/options.js 주석) */}
+                  {AD_LANGS.filter((l) => !l.hidden).map((l) => (
                     <button key={l.id} className={`chip${lang === l.id ? " on" : ""}`}
                       onClick={() => setLang(l.id)}>
                       {l.label}
@@ -274,8 +287,8 @@ export default function AdNewPage() {
             <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={onFiles} />
 
             <span className="spacer" />
-            <button className="cta" onClick={submit} disabled={busy || !text.trim()}>
-              {busy ? "만드는 중…" : "시나리오 만들기 →"} <span className="cr">무료</span>
+            <button className="cta" onClick={submit} disabled={busy || uploading || !text.trim()}>
+              {busy ? "만드는 중…" : uploading ? "사진 올리는 중…" : "시나리오 만들기 →"} <span className="cr">무료</span>
             </button>
           </div>
         </div>
