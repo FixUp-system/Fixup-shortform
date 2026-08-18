@@ -95,6 +95,23 @@ function happyDeps(calls) {
 describe("runAutoPipeline", () => {
   beforeEach(() => resetMemoryStore());
 
+  // ★ 사진 판정값(2026-08-18) — 시나리오가 사진을 읽었으면 빠른 생성도 그 값을 남긴다.
+  //   안 남기면 바로 뒤 컷 분할이 같은 사진을 또 읽어 사진당 값이 두 번 든다.
+  it("★ 시나리오가 읽은 사진값(vision)을 문서에 남긴다", async () => {
+    const p = await makeProject();
+    const calls = [];
+    const vision = { person: false, what: "가방에 달린 보라색 토끼 인형", who: null, lettering: "" };
+    const deps = happyDeps(calls);
+    deps.generateScenario = async () => ({
+      scenario: SCENARIO, problems: [],
+      photos: [{ id: "p1", filename: "bunny.jpg", url: "/api/uploads/b.jpg", vision }],
+    });
+    await runAutoPipeline(p.id, OWNER, deps);
+    const done = await projects.getProject(p.id, OWNER);
+    expect(done.material.photos[0].vision).toEqual(vision);
+    expect(done.material.text, "자료 글은 그대로다").toBe("국산 딸기 딸기라떼 이번 주 출시");
+  });
+
   it("단계를 순서대로 관통하고 auto.state=done 을 남긴다", async () => {
     const p = await makeProject();
     const calls = [];

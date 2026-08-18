@@ -33,12 +33,18 @@ export const POST = withUser(async (req, { params }, user) => {
     console.error("시나리오 생성 실패:", e);
     return Response.json({ error: "시나리오를 만들지 못했어요. 다시 시도해 주세요." }, { status: 502 });
   }
-  const { scenario, problems } = generated;
+  const { scenario, problems, photos } = generated;
   if (!scenario) {
     return Response.json({ error: "시나리오를 만들지 못했어요. 다시 시도해 주세요." }, { status: 502 });
   }
 
-  await updateProject(id, user.id, (proj) => ({ ...proj, scenario: { ...scenario, confirmed: false } }));
+  // ★ 읽은 사진값을 남긴다(2026-08-18) — 안 남기면 다시 만들 때마다 같은 사진을 또 읽어
+  //   사진당 값이 또 든다. photos 는 읽은 것이 하나라도 있을 때만 온다(lib/scenario.js).
+  await updateProject(id, user.id, (proj) => ({
+    ...proj,
+    scenario: { ...scenario, confirmed: false },
+    ...(photos ? { material: { ...proj.material, photos } } : {}),
+  }));
   return Response.json({ scenario, problems });
 });
 

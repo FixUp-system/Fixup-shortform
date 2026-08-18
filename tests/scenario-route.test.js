@@ -62,6 +62,26 @@ describe("POST /scenario", () => {
     expect((await getProject(id, OWNER)).scenario).toBeFalsy();
   });
 
+  // ★ 사진 판정값(2026-08-18) — generateScenario 가 사진을 읽었으면 그 값을 문서에 남긴다.
+  //   안 남기면 다시 쓸 때마다 같은 사진을 또 읽어 사진당 값이 또 든다(gpt-4o 비전 호출).
+  it("★ 읽은 사진값(vision)을 문서에 남긴다", async () => {
+    const vision = { person: false, what: "가방에 달린 보라색 토끼 인형", who: null, lettering: "" };
+    gen.run.mockResolvedValue({
+      scenario: good, problems: [], calls: 1,
+      photos: [{ id: "p1", filename: "bunny.jpg", url: "/api/uploads/b.jpg", vision }],
+    });
+    await POST(req(), { params: Promise.resolve({ id }) });
+    expect((await getProject(id, OWNER)).material.photos[0].vision).toEqual(vision);
+  });
+
+  it("읽은 사진이 없으면 material 을 건드리지 않는다", async () => {
+    gen.run.mockResolvedValue({ scenario: good, problems: [], calls: 1 });
+    await POST(req(), { params: Promise.resolve({ id }) });
+    const saved = await getProject(id, OWNER);
+    expect(saved.material.photos).toEqual([]);
+    expect(saved.material.text).toBe("동네 카페 소개");
+  });
+
   it("★ LLM 이 던지면 502 다 — 프레임워크 500 이 아니라 사장님 말로 답한다", async () => {
     gen.run.mockRejectedValue(new Error("fetch failed"));
     const res = await POST(req(), { params: Promise.resolve({ id }) });
