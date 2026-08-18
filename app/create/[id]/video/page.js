@@ -332,24 +332,6 @@ export default function VideoStepPage() {
                       <span className="badge ai">
                         다시 만듦 {c.clip_regen_count || 0}/{MAX_REGEN_PER_CUT}
                       </span>
-                      <button
-                        className="mini"
-                        // ★ busy 가 아니라 **실제로 도는 중**일 때만 잠근다. 멈췄거나
-                        //   실패했을 때도 busy 는 참인 채로 남을 수 있는데, 그때 이 버튼이
-                        //   사장님의 유일한 탈출구다 — 잠가 두면 할 수 있는 일이 없다.
-                        disabled={gen.kind === "running" || regening !== null || (c.clip_regen_count || 0) >= MAX_REGEN_PER_CUT}
-                        onClick={() => regen(c.idx)}
-                      >
-                        {/* 컷마다 첫 회는 공짜다. 클립은 다시 만드는 값이 가장 비싸므로
-                            누르기 전에 보여 준다. */}
-                        {regening === c.idx
-                          ? "만드는 중…"
-                          // ★ 화질까지 넘긴다 — 1080p 는 25 가 아니라 57 이다.
-                          //   라우트(clips/[idx]/regen)가 걷는 값과 같은 출처를 본다.
-                          : !showCredits
-                            ? "다시 만들기"
-                            : `다시 만들기 · ${priceLabel(regenPrice("clip", c.clip_regen_count || 0, modelIdForProject(project), resolutionForProject(project)))}`}
-                      </button>
                     </>
                   )}
                 </div>
@@ -358,7 +340,9 @@ export default function VideoStepPage() {
           ))}
         </div>
 
-        <div className="preview-pane">
+        <aside className="panel preview-pane">
+          {/* ① 결과 — 무엇이 만들어졌는가 */}
+          <div className="workbench-step">
           <div className="preview-frame" style={frameStyle}>
             {/* 다시 만드는 중에는 옛 클립을 감춘다 — 그대로 두면 바뀐 줄 알고 또 누르게 된다 */}
             {regening === selected?.idx ? (
@@ -378,6 +362,7 @@ export default function VideoStepPage() {
             )}
           </div>
           {selected && <p className="preview-note">컷 {selected.idx + 1} · {selected.sentence}</p>}
+          </div>
           {/* 컷마다 상태가 새로 시작해야 하므로 key 로 갈아 끼운다 — 안 갈면 컷을 바꿔도
               텍스트칸에 앞 컷의 글이 남아, 그 글이 이 컷의 프롬프트로 저장된다. */}
           {selected && (
@@ -389,9 +374,10 @@ export default function VideoStepPage() {
               onSavePrompt={savePrompt}
               onRegen={regen}
               showCredits={showCredits}
+              regening={regening}
             />
           )}
-        </div>
+        </aside>
       </div>
 
 
@@ -456,7 +442,7 @@ export default function VideoStepPage() {
 // ★ 대사가 꼬리에 있는 이유: 같은 문자열을 ffmpeg 가 자막으로 태운다(lib/subtitles.js).
 //   사장님이 여기서 대사를 고칠 수 있으면 **들리는 말과 화면의 자막이 갈린다.** 그래서
 //   고칠 수 없게 두고, 대신 어디서 고치는지를 화면이 말해 준다(안 말하면 여기서 고치려 든다).
-function ClipPromptEdit({ cut, project, busyCut, onSavePrompt, onRegen, showCredits }) {
+function ClipPromptEdit({ cut, project, busyCut, onSavePrompt, onRegen, showCredits, regening }) {
   // ★ 텍스트칸에 앉히는 씨앗은 **사장님이 저장한 날 글자**이고, 없으면 코드가 만든 본문이다.
   //   판정 결과(promptBodyOf(cut))를 그대로 앉히면 안 된다 — 덮어쓰기 경로에서는 그 값이 곧
   //   사장님 글자라 괜찮아 보이지만, 이미지 쪽에서는 코드가 붙인 절이 함께 들어 있어 저장할
@@ -515,7 +501,9 @@ function ClipPromptEdit({ cut, project, busyCut, onSavePrompt, onRegen, showCred
 
   return (
     <>
-      {/* ★ 수정사항 칸은 **접힌 칸 아래**다(2026-08-18 사장님 지시) — 무엇을 고칠지 정하려면
+      {/* ② 고치기 — 사장님이 하는 일 */}
+      <div className="workbench-step">
+      {/* ★ 수정사항을 먼저, 지시문은 그 아래 곁길로(2026-08-18 사장님 지시) — 무엇을 고칠지 정하려면
           지금 무엇을 보내고 있는지를 먼저 봐야 한다.
           ★ 여기 적은 말은 꼬리에 덧붙지 않는다. 위 지시문을 **다시 써서**(lib/prompt-revise.js)
             가리킨 것은 고치고 새 요구는 더한다 — 그 결과가 위 칸에 그대로 보인다.
@@ -537,11 +525,25 @@ function ClipPromptEdit({ cut, project, busyCut, onSavePrompt, onRegen, showCred
         >
           {busyCut ? "만드는 중…" : "이 지시로 다시 만들기"}
         </button>
+        {/* ★ 지시 없이 그냥 다시 만드는 문 — ④이미지와 같은 짝이다.
+            그리고 이것이 **멈춤·실패에서 빠져나오는 유일한 문**이다: 그때는 고칠 말이 없어도
+            한 번 더 만들어 보는 것이 사장님이 할 수 있는 전부다. 그래서 `regening` 만 보고
+            잠근다 — busyCut 으로 잠그면 멈춤 동안에도 닫혀 탈출구가 사라진다. */}
+        <button
+          className="mini"
+          disabled={regening !== null || atLimit}
+          onClick={() => onRegen?.(cut.idx)}
+        >
+          {regening === cut.idx ? "만드는 중…" : "재생성"}
+        </button>
       </div>
+      </div>
+
+      {/* ③ 들여다보기 — 궁금할 때만 펼치는 곁길 */}
     {/* 접어 둔다 — 주경로는 컷별 [다시 만들기]다. 이 자리는 직접 지시를 쓰는 사장님을 위한
         곁길이라, 펼치지 않으면 기본 흐름이 그대로다. */}
-    <details className="prompt-edit">
-      <summary>이 컷에 실제로 보내는 지시 보기</summary>
+    <details className="prompt-edit workbench-step">
+      <summary>실제로 보내는 지시</summary>
       {/* 고치는 것은 **본문**(어떻게 움직이는가)이다. 첫 프레임 유지·글자 금지·대사는 코드가
           언제나 뒤에 붙인다 — 무엇을 쓰든 지워지지 않는다. */}
       {/* ★★ **하나의 지시문으로 보인다**(2026-08-18 사용자 지시) — ④이미지와 같은 모양이다.

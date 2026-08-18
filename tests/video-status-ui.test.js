@@ -65,8 +65,11 @@ describe("⑤영상 — 생성 상태 표시", () => {
 
   // 멈췄거나 실패했을 때 busy 가 참인 채로 남을 수 있다. 그때 컷별 [다시 만들기] 가
   // 유일한 탈출구인데 잠겨 있으면 사장님이 할 수 있는 일이 없다.
+  // ★ 버튼이 좌측 카드에서 우측 작업대의 ②고치기 단으로 옮겨졌다(2026-08-18 화면 통일).
+  //   재는 것은 자리가 아니라 **멈춤·실패에서 열려 있는가**다: 잠금식이 gen(상태)에도
+  //   busy 에도 닿지 않고 "지금 내가 누른 것"(regening)만 봐야 한다.
   it("컷별 다시 만들기가 멈춤·실패 때 눌린다", () => {
-    const regenIdx = video.indexOf("onClick={() => regen(c.idx)}");
+    const regenIdx = video.indexOf("onClick={() => onRegen?.(cut.idx)}");
     expect(regenIdx, "컷별 다시 만들기 버튼이 없다").toBeGreaterThan(-1);
     const buttonStart = video.lastIndexOf("<button", regenIdx);
     const button = video.slice(buttonStart, regenIdx);
@@ -75,7 +78,8 @@ describe("⑤영상 — 생성 상태 표시", () => {
     expect(disabled[1], "busy 로 잠가 두면 멈춤·실패에서 빠져나갈 수 없다").not.toMatch(
       /\bbusy\b/
     );
-    expect(disabled[1]).toContain('gen.kind === "running"');
+    expect(disabled[1], "생성 상태로 잠갔다 — 멈춤·실패가 곧 잠금이 된다").not.toMatch(/gen\./);
+    expect(disabled[1], "누른 것을 안 본다 — 연타로 이중 청구가 난다").toMatch(/regening/);
   });
 
   // ★ 프로젝트 단위 video_error 는 스스로 지워지지 않는다. 컷별 [다시 만들기] 라우트는

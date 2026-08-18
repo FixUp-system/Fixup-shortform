@@ -632,6 +632,8 @@ function PreviewPane({ cut, project, url, photoName, usage, aspect, stalled, onR
 
   return (
     <aside className="panel preview-pane">
+      {/* ① 결과 — 무엇이 만들어졌는가 */}
+      <div className="workbench-step">
       <div className="preview-frame" style={frameStyle(aspect)}>
         {url ? <img src={url} alt="" /> : <span className="ph">{placeholder(cut.state)}</span>}
         {/* 판정은 busyCut 하나다(로컬 표시를 먼저 보고, 서버 state 를 그다음에 본다) —
@@ -659,10 +661,13 @@ function PreviewPane({ cut, project, url, photoName, usage, aspect, stalled, onR
         </p>
       )}
 
+      </div>
+
+      {/* ② 고치기 — 사장님이 하는 일. 사진 컷은 고칠 것이 없어 안내 한 줄로 끝난다. */}
       {isPhoto ? (
-        <p className="preview-note">내가 올린 사진이라 그대로 쓰여요.</p>
+        <p className="preview-note workbench-step">내가 올린 사진이라 그대로 쓰여요.</p>
       ) : (
-        <div className="preview-edit">
+        <div className="preview-edit workbench-step">
           {/* ★ 안내를 지웠다(2026-08-13) — 아래 입력칸이 예시까지 들고 같은 말을 한다.
               "문장이 그림의 재료"라는 뒷단 설명은 사장님이 알아야 할 일이 아니다. */}
           {/* ★ 수정사항 칸은 **접힌 칸 아래**다(2026-08-18 사장님 지시). 무엇을 고칠지 정하려면
@@ -698,8 +703,9 @@ function PreviewPane({ cut, project, url, photoName, usage, aspect, stalled, onR
 
           {/* 접어 둔다 — 주경로는 위 "고치고 싶은 점" 칸이다. 이 자리는 직접 지시를 쓰는
               사장님을 위한 곁길이라, 펼치지 않으면 기본 흐름이 그대로다. */}
-          <details className="prompt-edit">
-            <summary>이 그림에 실제로 보내는 지시 보기</summary>
+          {/* ③ 들여다보기 — 궁금할 때만 펼치는 곁길 */}
+          <details className="prompt-edit workbench-step">
+            <summary>실제로 보내는 지시</summary>
             {/* 고치는 것은 **본문**이다. 판형·글자 금지·레퍼런스 결속은 코드가 언제나 뒤에
                 붙인다 — 무엇을 쓰든 지워지지 않는다. */}
             {/* ★★ **하나의 지시문으로 보인다**(2026-08-18 사용자 지시). 앞은 고칠 수 있고 뒤는
