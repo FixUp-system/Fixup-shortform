@@ -113,10 +113,12 @@ describe("로그인 화면 시각", () => {
     expect(css).toMatch(/\.sent-input--lg \{[^}]*line-height:\s*1\.2/);
     // 주버튼: 16 × 1.2 = 19.2 + .cta 패딩 24 = 43.2 < 48
     expect(css).toMatch(/\.cta--block \{[^}]*line-height:\s*1\.2/);
-    // 그 24 는 .cta 의 공유값이다 — 여기서 복제하지 않고 감시만 한다.
-    // 전역 버튼 패딩이 커지면 43.2 가 48 을 넘어 min-height 가 조용히 무력해지므로,
-    // 이 줄이 빨개져 로그인 계산을 다시 보게 만든다.
-    expect(css).toMatch(/\.cta \{[^}]*padding:\s*12px 20px/);
+    // ★ 2026-08-18 — 버튼이 **위아래 여백이 아니라 사다리 높이**로 선다(--ctl-md).
+    //   그래서 감시할 값도 패딩이 아니라 높이다: 로그인 버튼은 min-height:48 로 사다리보다
+    //   크게 서는데, 사다리가 48 을 넘으면 그 min-height 가 조용히 무력해진다.
+    //   이 줄이 그때 빨개져 로그인 계산을 다시 보게 만든다.
+    expect(css).toMatch(/\.cta \{[^}]*height:\s*var\(--ctl-md\)/);
+    expect(css).toMatch(/--ctl-md:\s*40px/);
   });
 
   it("기존 .sent-input 기본형을 키우지 않았다 — 브리핑·StylePicker 가 쓴다", () => {
