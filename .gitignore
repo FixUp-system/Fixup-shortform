@@ -11,3 +11,6 @@ dev.log
 
 # SDD 작업 공간 — 원장·브리프·리뷰 꾸러미. 기록은 git 이력이 남긴다
 .superpowers/
+
+# 세션 중 dev 서버 로그 — 저장소에 들어가면 안 된다
+dev-*.log
