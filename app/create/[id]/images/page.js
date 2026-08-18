@@ -402,7 +402,14 @@ export default function ImagesStepPage() {
               >
                 <span className="num">{c.idx + 1}</span>
                 {img ? <img src={img} alt="" /> :
-                  <span className="ph">{regening === c.idx ? "다시 만드는 중…" : placeholder(c.state)}</span>}
+                  <span className="ph">{placeholder(c.state)}</span>}
+                {/* ★ 덮개는 그림 갈래 **밖**이다 — 안에 두면 그림이 있는 컷(재생성은 언제나
+                    그 경우다)에서 안 뜬다. 옛 그림이 비쳐 보이게 두어 무엇을 다시 만드는지 안다. */}
+                {(regening === c.idx || c.state === "generating") && (
+                  <span className="frame-busy">
+                    <span className="spinner" aria-hidden="true" /> 다시 만드는 중이에요
+                  </span>
+                )}
               </div>
               <div className="txt">
                 “<span contentEditable suppressContentEditableWarning className="editable"
@@ -627,6 +634,13 @@ function PreviewPane({ cut, project, url, photoName, usage, aspect, stalled, onR
     <aside className="panel preview-pane">
       <div className="preview-frame" style={frameStyle(aspect)}>
         {url ? <img src={url} alt="" /> : <span className="ph">{placeholder(cut.state)}</span>}
+        {/* 판정은 busyCut 하나다(로컬 표시를 먼저 보고, 서버 state 를 그다음에 본다) —
+            버튼이 잠기는 조건과 화면이 말하는 조건이 갈리면 사장님이 둘 중 무엇을 믿을지 모른다. */}
+        {busyCut && (
+          <span className="frame-busy">
+            <span className="spinner" aria-hidden="true" /> 다시 만드는 중이에요
+          </span>
+        )}
       </div>
       <div className="badges mt-md">
         {isPhoto && <span className="badge photo">내 사진 · {photoName || ""}</span>}

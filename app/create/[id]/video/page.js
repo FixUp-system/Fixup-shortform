@@ -286,6 +286,13 @@ export default function VideoStepPage() {
               >
                 {c.image?.url ? <img src={c.image.url} alt="" /> : <span className="ph">컷 {c.idx + 1}</span>}
                 <span className="num">{c.idx + 1}</span>
+                {/* ★ 덮개는 그림 갈래 **밖**이다 — 이 화면의 카드는 언제나 컷 그림을 들고 있어,
+                    갈래 안에 두면 영영 안 뜬다. 아래 글줄로만 말하던 것을 그림 위로 올린다. */}
+                {(regening === c.idx || (gen.kind === "running" && !c.video && !c.video_error)) && (
+                  <span className="frame-busy">
+                    <span className="spinner" aria-hidden="true" /> 다시 만드는 중이에요
+                  </span>
+                )}
               </div>
               <div>
                 <div className="preview-sentence">{c.sentence}</div>
@@ -363,8 +370,11 @@ export default function VideoStepPage() {
             ) : (
               <span className="ph">컷을 고르면 여기서 크게 봅니다</span>
             )}
-            {regening === selected?.idx && (
-              <span className="ph">다시 만드는 중이에요…</span>
+            {(regening === selected?.idx ||
+              (gen.kind === "running" && selected && !selected.video && !selected.video_error)) && (
+              <span className="frame-busy">
+                <span className="spinner" aria-hidden="true" /> 다시 만드는 중이에요
+              </span>
             )}
           </div>
           {selected && <p className="preview-note">컷 {selected.idx + 1} · {selected.sentence}</p>}

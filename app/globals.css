@@ -555,6 +555,28 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
 
 /* 도는 중임을 글자 말고도 알린다 — 글자만 있으면 멈춘 화면과 구별되지 않는다.
    위 .spin 과 달리 글줄 안에 섞여 흐르므로 크기를 em 으로 잡는다. */
+/* 만드는 중 덮개 — 그림 자리 **위에** 얹는다(2026-08-18 사장님 지시).
+   ★ 자리표시자(.ph)로는 부족했다: 그것은 그림이 **없을 때만** 보이는 자리인데,
+     재생성은 언제나 그림이 이미 있는 컷에서 일어난다 — 옛 그림이 그대로 보이고
+     아무 표시도 안 떴다. 덮개는 그림이 있든 없든 뜬다.
+   ★ 흐름에서 빼낸다(absolute) — 끼워 넣으면 카드 높이가 변해 목록이 들썩인다.
+   ★ 살짝 비쳐 보이게 둔다: 무엇을 다시 만드는 중인지 옛 그림으로 알 수 있다. */
+.frame-busy {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: color-mix(in srgb, var(--deep) 72%, transparent);
+  color: var(--ink);
+  font-size: 12px;
+  text-align: center;
+  padding: 8px;
+  border-radius: inherit;
+  z-index: 1;
+}
+
 .spinner {
   display: inline-block; width: .8em; height: .8em; margin-right: .4em;
   border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
