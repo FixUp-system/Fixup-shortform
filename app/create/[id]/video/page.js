@@ -505,6 +505,29 @@ function ClipPromptEdit({ cut, project, busyCut, onSavePrompt, onRegen, showCred
 
   return (
     <>
+      {/* ★ 수정사항 칸은 **접힌 칸 아래**다(2026-08-18 사장님 지시) — 무엇을 고칠지 정하려면
+          지금 무엇을 보내고 있는지를 먼저 봐야 한다.
+          ★ 여기 적은 말은 꼬리에 덧붙지 않는다. 위 지시문을 **다시 써서**(lib/prompt-revise.js)
+            가리킨 것은 고치고 새 요구는 더한다 — 그 결과가 위 칸에 그대로 보인다.
+          ★ 대사는 이 길로도 못 고친다 — 고쳐 쓰기 규칙이 그것을 막는다(자막과 갈린다). */}
+      {cut.edit_instruction && (
+        <p className="preview-note">지난 수정 지시: {cut.edit_instruction}</p>
+      )}
+      <textarea
+        className="ref"
+        placeholder="이 영상에서 고치고 싶은 점을 적어주세요 — 예: 더 천천히 다가가게, 흔들림 줄이기"
+        value={instr}
+        onChange={(e) => setInstr(e.target.value)}
+      />
+      <div className="preview-actions">
+        <button
+          className="cta"
+          disabled={busyCut || atLimit || !instr.trim()}
+          onClick={() => onRegen?.(cut.idx, instr.trim())}
+        >
+          {busyCut ? "만드는 중…" : "이 지시로 다시 만들기"}
+        </button>
+      </div>
     {/* 접어 둔다 — 주경로는 컷별 [다시 만들기]다. 이 자리는 직접 지시를 쓰는 사장님을 위한
         곁길이라, 펼치지 않으면 기본 흐름이 그대로다. */}
     <details className="prompt-edit">
@@ -574,29 +597,6 @@ function ClipPromptEdit({ cut, project, busyCut, onSavePrompt, onRegen, showCred
         </button>
       </div>
     </details>
-      {/* ★ 수정사항 칸은 **접힌 칸 아래**다(2026-08-18 사장님 지시) — 무엇을 고칠지 정하려면
-          지금 무엇을 보내고 있는지를 먼저 봐야 한다.
-          ★ 여기 적은 말은 꼬리에 덧붙지 않는다. 위 지시문을 **다시 써서**(lib/prompt-revise.js)
-            가리킨 것은 고치고 새 요구는 더한다 — 그 결과가 위 칸에 그대로 보인다.
-          ★ 대사는 이 길로도 못 고친다 — 고쳐 쓰기 규칙이 그것을 막는다(자막과 갈린다). */}
-      {cut.edit_instruction && (
-        <p className="preview-note">지난 수정 지시: {cut.edit_instruction}</p>
-      )}
-      <textarea
-        className="ref"
-        placeholder="이 영상에서 고치고 싶은 점을 적어주세요 — 예: 더 천천히 다가가게, 흔들림 줄이기"
-        value={instr}
-        onChange={(e) => setInstr(e.target.value)}
-      />
-      <div className="preview-actions">
-        <button
-          className="cta"
-          disabled={busyCut || atLimit || !instr.trim()}
-          onClick={() => onRegen?.(cut.idx, instr.trim())}
-        >
-          {busyCut ? "만드는 중…" : showCredits ? `이 지시로 다시 만들기 · ${regenLabel}` : "이 지시로 다시 만들기"}
-        </button>
-      </div>
     </>
   );
 }

@@ -1083,12 +1083,28 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
 .preview-note { font-size: 12px; color: var(--ink-soft); margin: 0 0 8px; }
 .preview-edit textarea.ref { min-height: 68px; margin-bottom: 0; }
 /* 실제로 보내는 지시 — 접어 둔다(주경로는 위 "고치고 싶은 점" 칸이다).
-   여닫는 표시는 .lib-fold 와 같은 관용구다(기본 삼각형을 끄고 ▸/▾ 로 쓴다). */
-.prompt-edit { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 12px; }
-.prompt-edit > summary { cursor: pointer; font-size: 12px; color: var(--ink-soft); list-style: none; }
+   ★ 2026-08-18 사장님 지시로 **상자를 걷었다.** 윗줄(border-top)이 이 자리를 하나의 영역처럼
+     보이게 해서, 여는 손잡이가 "상자 안의 토글"로 읽혔다 — 지금은 **그냥 토글 버튼** 하나다.
+     여닫는 표시는 .lib-fold 와 같은 관용구다(기본 삼각형을 끄고 ▸/▾ 로 쓴다). */
+.prompt-edit { margin-top: 12px; }
+.prompt-edit > summary {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* 눌리는 것으로 보이게 — 글자만 있으면 링크인지 버튼인지 갈리지 않는다.
+     칩과 같은 모양을 쓰되(테두리·둥근 모서리) 더 작다: 주경로가 아니라 곁길이다. */
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  padding: 5px 12px;
+  font-size: 12px;
+  color: var(--ink-soft);
+  list-style: none;
+}
+.prompt-edit > summary:hover { border-color: var(--ink-soft); }
 .prompt-edit > summary::-webkit-details-marker { display: none; }
-.prompt-edit > summary::before { content: "▸ "; color: var(--ink-soft); }
-.prompt-edit[open] > summary::before { content: "▾ "; }
+.prompt-edit > summary::before { content: "▸"; color: var(--ink-soft); }
+.prompt-edit[open] > summary::before { content: "▾"; }
 .prompt-edit > summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .prompt-edit textarea.ref { min-height: 140px; margin: 10px 0 4px; }
 /* 코드가 붙이는 꼬리 — 못 고치는 글이라 흐리게 두고, 길어도 칸을 안 밀도록 가둔다 */

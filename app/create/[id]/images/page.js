@@ -651,6 +651,37 @@ function PreviewPane({ cut, project, url, photoName, usage, aspect, stalled, onR
         <div className="preview-edit">
           {/* ★ 안내를 지웠다(2026-08-13) — 아래 입력칸이 예시까지 들고 같은 말을 한다.
               "문장이 그림의 재료"라는 뒷단 설명은 사장님이 알아야 할 일이 아니다. */}
+          {/* ★ 수정사항 칸은 **접힌 칸 아래**다(2026-08-18 사장님 지시). 무엇을 고칠지 정하려면
+              지금 무엇을 보내고 있는지를 **먼저** 봐야 한다 — 위에 있으면 프롬프트를 펼치기도
+              전에 빈 칸부터 마주친다.
+              ★ 여기 적은 말은 꼬리에 덧붙지 않는다. 위 지시문을 **다시 써서**(lib/prompt-revise.js)
+                가리킨 것은 고치고 새 요구는 더한다 — 그 결과가 위 칸에 그대로 보인다. */}
+          {cut.edit_instruction && <p className="preview-note">지난 수정 지시: {cut.edit_instruction}</p>}
+          <textarea
+            className="ref"
+            placeholder="이 이미지에서 고치고 싶은 점을 적어주세요 — 예: 딸기라떼가 보이게, 컵을 더 작게, 손 빼기"
+            value={instr}
+            onChange={(e) => setInstr(e.target.value)}
+          />
+          {/* 만드는 중에는 글자로도 알린다 — 잠기기만 하면 눌렸는지 알 수 없어 또 누르게 된다 */}
+          <div className="preview-actions">
+            <button
+              className="cta"
+              disabled={atLimit || busyCut || !instr.trim()}
+              onClick={() => onRegen(cut.idx, instr.trim())}
+            >
+              {busyCut ? "만드는 중…" : "이 지시로 다시 만들기"}
+            </button>
+            <button className="mini" disabled={atLimit || busyCut} onClick={() => onRegen(cut.idx)}>
+              {busyCut ? "만드는 중…" : "재생성"}
+            </button>
+          </div>
+          <span className="regen-note mono">
+            {atLimit
+              ? `더는 다시 만들 수 없어요 (${MAX_REGEN_PER_CUT}/${MAX_REGEN_PER_CUT})`
+              : `다시 만듦 ${cut.regen_count}/${MAX_REGEN_PER_CUT}`}
+          </span>
+
           {/* 접어 둔다 — 주경로는 위 "고치고 싶은 점" 칸이다. 이 자리는 직접 지시를 쓰는
               사장님을 위한 곁길이라, 펼치지 않으면 기본 흐름이 그대로다. */}
           <details className="prompt-edit">
@@ -721,36 +752,6 @@ function PreviewPane({ cut, project, url, photoName, usage, aspect, stalled, onR
               </button>
             </div>
           </details>
-          {/* ★ 수정사항 칸은 **접힌 칸 아래**다(2026-08-18 사장님 지시). 무엇을 고칠지 정하려면
-              지금 무엇을 보내고 있는지를 **먼저** 봐야 한다 — 위에 있으면 프롬프트를 펼치기도
-              전에 빈 칸부터 마주친다.
-              ★ 여기 적은 말은 꼬리에 덧붙지 않는다. 위 지시문을 **다시 써서**(lib/prompt-revise.js)
-                가리킨 것은 고치고 새 요구는 더한다 — 그 결과가 위 칸에 그대로 보인다. */}
-          {cut.edit_instruction && <p className="preview-note">지난 수정 지시: {cut.edit_instruction}</p>}
-          <textarea
-            className="ref"
-            placeholder="이 이미지에서 고치고 싶은 점을 적어주세요 — 예: 딸기라떼가 보이게, 컵을 더 작게, 손 빼기"
-            value={instr}
-            onChange={(e) => setInstr(e.target.value)}
-          />
-          {/* 만드는 중에는 글자로도 알린다 — 잠기기만 하면 눌렸는지 알 수 없어 또 누르게 된다 */}
-          <div className="preview-actions">
-            <button
-              className="cta"
-              disabled={atLimit || busyCut || !instr.trim()}
-              onClick={() => onRegen(cut.idx, instr.trim())}
-            >
-              {busyCut ? "만드는 중…" : showCredits ? `이 지시로 다시 만들기 · ${regenLabel}` : "이 지시로 다시 만들기"}
-            </button>
-            <button className="mini" disabled={atLimit || busyCut} onClick={() => onRegen(cut.idx)}>
-              {busyCut ? "만드는 중…" : `재생성 · ${regenLabel}`}
-            </button>
-          </div>
-          <span className="regen-note mono">
-            {atLimit
-              ? `더는 다시 만들 수 없어요 (${MAX_REGEN_PER_CUT}/${MAX_REGEN_PER_CUT})`
-              : `다시 만듦 ${cut.regen_count}/${MAX_REGEN_PER_CUT}`}
-          </span>
 
         </div>
       )}
