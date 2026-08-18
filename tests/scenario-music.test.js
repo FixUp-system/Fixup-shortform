@@ -75,23 +75,16 @@ describe("시나리오가 음악을 정한다", () => {
     expect(got.problems.join(" "), "음악이 없다고 확정을 막는다").not.toMatch(/음악/);
   });
 
-  // ★ 사장님이 **직접 정하는** 값이다(2026-08-18 요청: "시나리오 구성에서 전체적인 BGM을
-  //   설정하고"). 그래서 전달 방식(angle)·내레이터와 달리 화면에 칸이 **늘 있다** — 그 둘은
-  //   우리가 모델에 주는 지시라 걷었지만, 음악은 사장님이 고르고 싶다고 한 것이다.
-  it("★ ②시나리오에서 음악을 고칠 수 있다", () => {
+  // ★★ 2026-08-18 (둘째 판) — **모델이 정한다. 사장님은 안 적는다**(사용자 지시:
+  //    "사용자한테 입력 받는 게 아닌 모델이 선정하는 걸로").
+  //    아침에 칸을 뒀다가 같은 날 걷은 것은, 이 값이 사장님이 판단할 것이 아니라 우리가
+  //    영상 모델에 주는 지시이기 때문이다 — 전달 방식(angle)·내레이터 목소리와 같은 부류다.
+  //    값은 그대로 만들어지고 그대로 저장되고 전 컷에 실린다. 화면에서만 사라진다.
+  it("★ ②시나리오가 음악을 되묻지 않는다 — 모델이 정한다", () => {
     const page = readFileSync("app/create/[id]/scenario/page.js", "utf8");
-    expect(page, "음악 칸이 없다").toMatch(/음악/);
-    // 낱말이 아니라 **배선**을 잰다 — 값이 시나리오에서 오고, 타이핑이 그 값을 고쳐야 한다.
-    expect(page, "값을 시나리오에서 안 읽는다").toMatch(/scenario\.music/);
-    expect(page, "타이핑이 음악을 안 고친다").toMatch(/edit\(\{\s*music:/);
-  });
-
-  it("★ 음악 칸은 영어로 적으라고 알려 준다 — 그 글자가 그대로 모델에 실린다", () => {
-    const page = readFileSync("app/create/[id]/scenario/page.js", "utf8");
-    // 자리표시자가 사장님이 무슨 말로 적을지를 정하는 가장 강한 신호다(내레이터 칸과 같은 판단).
-    const seg = page.split("<label").concat(page.split("음악")).join("");
-    expect(seg.length, "칸을 못 찾았다").toBeGreaterThan(0);
-    expect(page, "영어로 적으라는 안내가 없다").toMatch(/음악[\s\S]{0,600}영어/);
+    expect(page, "음악 칸이 남아 있다").not.toMatch(/edit\(\{\s*music:/);
+    expect(page, "음악 값을 화면이 읽는다 — 고칠 수 없는데 보여 주면 거짓말이다")
+      .not.toMatch(/scenario\.music/);
   });
 
   it("★ 시나리오를 다시 만들 때 옛 음악을 참고로 넘기지 않는다 — 사장님이 고친 값이 씨앗이 되면 안 된다", () => {
