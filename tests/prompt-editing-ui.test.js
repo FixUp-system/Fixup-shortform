@@ -673,7 +673,9 @@ describe("②시나리오 — 칸마다 언어가 다르다", () => {
   it("★ 장면 칸들은 한국어를 지킨다 — 영문화가 여기까지 번지면 자막이 영어가 된다", () => {
     const rows = scenarioPage.slice(scenarioPage.indexOf('<div className="plan-list">'));
     expect(rows, "장면 목록을 못 찾았다").toBeTruthy();
-    for (const label of ["이 장면이 하는 일", "대사", "말하는 사람"]) {
+    // ★ 라벨은 2026-08-18 에 광고 화면에 맞춰 짧아졌다(비트·대사·음성). "이 장면이 하는 일"은
+    //   라벨에서 자리표시자로 옮겼다 — 둘 다 이 화면 안에 있으므로 이 검사는 그대로 선다.
+    for (const label of ["이 장면이 하는 일", "대사", "음성"]) {
       expect(rows, `장면 칸 라벨("${label}")이 사라졌다`).toContain(label);
     }
     // ★ 2026-08-18 — 글자 칸이 폼(input/textarea)에서 **인라인 편집**으로 바뀌면서

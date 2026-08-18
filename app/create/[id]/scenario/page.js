@@ -288,10 +288,11 @@ export default function ScenarioStepPage() {
                   {s.line || ""}
                 </span>
               </div>
-              {/* 광고에는 없는 칸이라 맞출 라벨이 없다 — 이 저장소의 평소 말("말하는 사람")을
-                  쓴다. 광고와 겹치는 칸(비트·대사)만 광고의 낱말을 그대로 따른다. */}
+              {/* ★ 라벨을 "음성"으로(2026-08-18 사장님 지시). 광고에는 이 칸이 없지만 라벨의
+                  **길이와 결**은 광고를 따른다 — 거기 라벨은 전부 두세 글자다(비트·카메라·
+                  조명·음향·동작·대사). "말하는 사람"만 여섯 글자라 라벨 칸을 혼자 넓혔다. */}
               <div className="plan-field">
-                <b>말하는 사람</b>
+                <b>음성</b>
                 <span className="editable" contentEditable suppressContentEditableWarning
                   data-empty="화면 밖 목소리면 내레이션"
                   onInput={(e) => editShot(i, { speaker: e.currentTarget.textContent })}>
