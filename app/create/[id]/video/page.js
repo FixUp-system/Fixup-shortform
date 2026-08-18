@@ -290,7 +290,7 @@ export default function VideoStepPage() {
                     갈래 안에 두면 영영 안 뜬다. 아래 글줄로만 말하던 것을 그림 위로 올린다. */}
                 {(regening === c.idx || (gen.kind === "running" && !c.video && !c.video_error)) && (
                   <span className="frame-busy">
-                    <span className="spinner" aria-hidden="true" /> {busyLabel(regening === c.idx)}
+                    {busyLabel(regening === c.idx)} <span className="spinner" aria-hidden="true" />
                   </span>
                 )}
               </div>
@@ -357,7 +357,7 @@ export default function VideoStepPage() {
             {(regening === selected?.idx ||
               (gen.kind === "running" && selected && !selected.video && !selected.video_error)) && (
               <span className="frame-busy">
-                <span className="spinner" aria-hidden="true" /> {busyLabel(regening === selected?.idx)}
+                {busyLabel(regening === selected?.idx)} <span className="spinner" aria-hidden="true" />
               </span>
             )}
           </div>

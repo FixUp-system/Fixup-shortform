@@ -415,7 +415,7 @@ export default function ImagesStepPage() {
                     그 경우다)에서 안 뜬다. 옛 그림이 비쳐 보이게 두어 무엇을 다시 만드는지 안다. */}
                 {busy(c) && (
                   <span className="frame-busy">
-                    <span className="spinner" aria-hidden="true" /> {busyLabel(regening === c.idx)}
+                    {busyLabel(regening === c.idx)} <span className="spinner" aria-hidden="true" />
                   </span>
                 )}
               </div>
@@ -654,7 +654,7 @@ function PreviewPane({ cut, project, url, photoName, usage, aspect, stalled, onR
             버튼이 잠기는 조건과 화면이 말하는 조건이 갈리면 사장님이 둘 중 무엇을 믿을지 모른다. */}
         {busyCut && (
           <span className="frame-busy">
-            <span className="spinner" aria-hidden="true" /> {busyLabel(regening === cut.idx)}
+            {busyLabel(regening === cut.idx)} <span className="spinner" aria-hidden="true" />
           </span>
         )}
       </div>

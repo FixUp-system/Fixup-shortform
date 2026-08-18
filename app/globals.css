@@ -611,6 +611,11 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
   z-index: 1;
 }
 
+/* ★ 덮개 안에서는 표시가 **문장 끝**에 붙는다(2026-08-18 사장님 지적). 앞에 두었더니
+   좁은 카드에서 글이 접히며 "만드는 / ◌ 중이에요" 로 읽혔다. 자리가 바뀌었으니 사이를
+   두는 방향도 반대다. */
+.frame-busy .spinner { margin-right: 0; margin-left: .4em; }
+
 .spinner {
   display: inline-block; width: .8em; height: .8em; margin-right: .4em;
   border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
