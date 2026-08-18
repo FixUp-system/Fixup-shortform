@@ -1370,8 +1370,15 @@ input.field::placeholder { color: var(--ink-soft); }
 /* ★ 장면 안쪽을 광고 화면과 같은 모양으로 맞췄다(2026-08-18) — 라벨은 값 **앞**에 서고
    (`.plan-field b`), 초는 장면 머리의 배지다. 아래는 그 배지가 **눌러 고칠 수 있는** 것이라
    생기는 차이만 적는다: 광고는 읽기 전용 배지라 이 규칙이 필요 없다. */
-.sc-secs { display: inline-flex; align-items: center; gap: 2px; cursor: text; }
+/* ★ 광고의 배지와 **같은 방식으로** 놓인다(2026-08-18 사장님 지적: "번호와 초 간격이
+   광고와 다르다"). 구조는 이미 같았는데 이 한 줄이 달랐다 — 숫자 칸을 넣느라
+   `display: inline-flex` 로 바꿔 두었더니 상자의 높이와 기준선이 달라져, 같은 12px 를
+   줘도 눈에는 다른 간격으로 보였다. 인라인으로 되돌리고, 안쪽 숫자 칸도 인라인으로 둔다. */
+.sc-secs { cursor: text; }
 .sc-secs input {
+  /* 배지가 인라인이므로 안쪽 칸도 글줄 위에 앉는다 — 기준선을 배지 글자와 맞춘다 */
+  display: inline;
+  vertical-align: baseline;
   width: 2.4em;
   border: 0;
   background: transparent;

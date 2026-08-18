@@ -19,6 +19,11 @@ import { readFileSync } from "node:fs";
 const ad = readFileSync("app/ads/[id]/page.js", "utf8");
 const sc = readFileSync("app/create/[id]/scenario/page.js", "utf8");
 const css = readFileSync("app/globals.css", "utf8");
+const rule = (sel) => {
+  const at = css.indexOf(`
+${sel} {`);
+  return at === -1 ? "" : css.slice(at, css.indexOf("}", at));
+};
 
 describe("장면 카드 — 두 흐름이 같은 모양", () => {
   it("★ 같은 그릇을 쓴다", () => {
@@ -106,7 +111,15 @@ describe("장면 카드 — 두 흐름이 같은 모양", () => {
     expect(sc, "②시나리오가 그 이름을 안 쓴다 — 간격이 앞 요소에 딸린다").toContain("plan-note");
   });
 
-  it("★ 초 배지가 광고의 배지와 같은 크기·색을 쓴다", () => {
+  // ★★ 다섯 번째 판(2026-08-18): "번호와 초 간격이 광고와 일치하지 않아."
+  //    구조는 이미 같았다(.plan-row > .num + .plan-body > .badge). 다른 것은 **배지가
+  //    화면에 놓이는 방식**이었다 — 광고는 인라인 `<span class="badge">` 라 글줄 위에 앉고,
+  //    ②시나리오는 안에 숫자 칸을 넣느라 `display: inline-flex` 로 바꿔 놓았다. 그 한 줄이
+  //    상자의 높이와 기준선을 바꿔, 같은 12px 를 줘도 눈에는 다른 간격으로 보였다.
+  it("★★ 초 배지가 광고의 배지와 같은 방식으로 놓인다", () => {
     expect(css, "초 배지 모양이 없다").toMatch(/\.sc-secs/);
+    const r = rule(".sc-secs");
+    expect(r, "배지를 flex 상자로 바꿨다 — 광고의 인라인 배지와 기준선이 달라진다")
+      .not.toMatch(/display:\s*(inline-)?flex/);
   });
 });
