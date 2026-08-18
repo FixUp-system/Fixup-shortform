@@ -1389,7 +1389,7 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
 /* ★ 번호와 내용 사이를 좁혔다(2026-08-18 사장님 지적: "번호와 5초 사이가 너무 멀다").
    12px 였는데, 초 배지가 제 좌우 여백(8px)을 또 갖고 있어 **눈에는 20px** 였다.
    두 화면이 같은 규칙을 쓰므로 광고 시나리오도 함께 좁아진다 — 통일이 유지된다. */
-.plan-row { display: flex; gap: var(--sp-2); padding: var(--sp-3) 0; border-bottom: 1px solid var(--line); }
+.plan-row { display: flex; gap: var(--sp-1); padding: var(--sp-3) 0; border-bottom: 1px solid var(--line); }
 /* 초 배지를 번호와 **같은 높이**로 세운다. 배지가 글줄에 앉으면(line-height 1.7 ≈ 27px)
    원의 가운데보다 몇 px 아래로 내려가는데, 그 어긋남이 "멀다"로 읽히는 절반이다.
    ★★ 나머지 절반은 **배지가 줄 전체로 늘어나 있던 것**이었다(2026-08-18 브라우저 실측:
@@ -1404,6 +1404,15 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
   height: 24px;
   align-self: flex-start;
   width: fit-content;
+  /* ★ 번호 바로 옆이라 **제 좌우 여백을 줄인다**(2026-08-18, 사장님이 세 번 짚은 자리).
+     줄 간격 8px + 배지 여백 8px = 글자까지 16px 였다. 4 + 6 으로 10px 이 된다 —
+     알약 모양은 남기되 번호와 한 덩어리로 읽힌다. */
+  padding: 2px 6px;
+  /* 광고 화면의 장면 안쪽은 블록이라 배지가 **글줄 위에** 앉는다 — 그러면 글줄 높이
+     (16px × 1.7 ≈ 27px)와 배지 높이(24px)의 차이만큼 번호 원의 가운데보다 내려간다.
+     ★ 값을 눈으로 고르지 않고 브라우저에서 넷을 재서 골랐다(2026-08-18):
+       baseline 2.5px · middle 1.9px · text-top 1.8px · **top 0px**. */
+  vertical-align: top;
 }
 .plan-row:last-child { border-bottom: 0; }
 .plan-row .num {
