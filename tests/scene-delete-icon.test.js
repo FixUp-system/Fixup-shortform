@@ -47,6 +47,18 @@ describe("장면 삭제 — 오른쪽 끝 아이콘", () => {
     expect(head, "무엇을 하는 버튼인지 말하지 않는다").toMatch(/aria-label="[^"]*장면 추가/);
   });
 
+  it("★★ 두 기호 버튼의 크기가 같다 — 짝인데 8px 어긋나 있었다", () => {
+    // 추가 버튼은 목록 머리줄에 있어 `.step-actions .mini` 의 40px 를 물려받았고,
+    // 카드 안의 삭제는 32px 였다. 실행줄 규칙의 뜻은 "한 줄에 선 **글자 버튼들**의 키를
+    // 맞춘다"이지, 짝이 있는 기호 버튼까지 끌어가라는 것이 아니다.
+    const del = css.slice(css.indexOf(".sc-del"), css.indexOf(".sc-del") + 200);
+    const add = css.slice(css.indexOf(".step-actions .sc-add"), css.indexOf(".step-actions .sc-add") + 160);
+    expect(add, "추가 버튼이 실행줄 키를 그대로 물려받는다").toMatch(/height:\s*var\(--ctl-sm\)/);
+    for (const r of [del, add]) {
+      expect(r, "정사각이 아니다 — 짝과 모양이 갈린다").toMatch(/width:\s*var\(--ctl-sm\)/);
+    }
+  });
+
   it("★ 장면 줄의 다른 것들은 그대로다", () => {
     expect(rows, "끌기가 사라졌다").toMatch(/draggable/);
     expect(rows, "삭제 동작이 사라졌다").toMatch(/removeShot/);

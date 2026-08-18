@@ -371,9 +371,12 @@ export default function ScenarioStepPage() {
           {saved ? "저장했어요" : "임시저장"}
         </button>
         <div className="fwd">
-          <span className="hint">
-            확정하면 장면을 컷으로 나누고 컷마다 화면을 설계해요 · 여기서 고치는 것이 마지막 무료 관문이에요
-          </span>
+          {/* ★ 버튼 왼쪽 안내를 걷었다(2026-08-18 사장님 지시). 두 가지를 한 줄에 담고
+              있었는데(다음에 무슨 일이 일어나는가 · 여기가 값 내기 전 마지막 자리다),
+              버튼 이름이 이미 "확정하고 다음으로"라 앞엣것은 되풀이였고, 뒤엣것은 여기서
+              할 일을 바꾸지 않는 정보였다 — 사장님은 어차피 이 화면을 고치고 나서 누른다.
+              ⚠️ 값 내기 전 마지막 관문이라는 **사실**은 그대로다. 그것을 지키는 것은 이
+                 문구가 아니라 라우트다(app/api/projects/[id]/scenario/route.js). */}
           <button className="cta" disabled={busy || !ok} onClick={confirmScenario}>
             확정하고 다음으로 →
           </button>
