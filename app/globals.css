@@ -1386,7 +1386,13 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
 
 /* 구성 목록 — 대본 화면에서 컷·화면·움직임을 함께 본다 */
 .plan-list { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; }
-.plan-row { display: flex; gap: var(--sp-3); padding: var(--sp-3) 0; border-bottom: 1px solid var(--line); }
+/* ★ 번호와 내용 사이를 좁혔다(2026-08-18 사장님 지적: "번호와 5초 사이가 너무 멀다").
+   12px 였는데, 초 배지가 제 좌우 여백(8px)을 또 갖고 있어 **눈에는 20px** 였다.
+   두 화면이 같은 규칙을 쓰므로 광고 시나리오도 함께 좁아진다 — 통일이 유지된다. */
+.plan-row { display: flex; gap: var(--sp-2); padding: var(--sp-3) 0; border-bottom: 1px solid var(--line); }
+/* 초 배지를 번호와 **같은 높이**로 세운다. 배지가 글줄에 앉으면(line-height 1.7 ≈ 27px)
+   원의 가운데보다 몇 px 아래로 내려가는데, 그 어긋남이 "멀다"로 읽히는 나머지 절반이다. */
+.plan-row .plan-body > .badge:first-child { display: inline-flex; align-items: center; height: 24px; }
 .plan-row:last-child { border-bottom: 0; }
 .plan-row .num {
   flex: 0 0 24px; height: 24px; border-radius: 50%;
@@ -1464,6 +1470,20 @@ input.field::placeholder { color: var(--ink-soft); }
   pointer-events: none;
 }
 .sc-actions { display: flex; gap: var(--sp-2); margin-top: var(--sp-2); }
+/* ★ 삭제는 **오른쪽 끝**이다(2026-08-18 사장님 지시). 가끔 쓰는 일이라 눈길이 먼저 닿을
+   자리가 아니고, 글자 대신 아이콘이라 줄을 덜 먹는다. 정사각으로 세워 다른 작은 버튼들과
+   높이를 맞춘다(--ctl-sm 사다리 위에 그대로 선다). */
+.sc-del { margin-left: auto; width: var(--ctl-sm); padding: 0; color: var(--ink-soft); }
+.sc-del:hover { color: var(--ink); }
+
+/* ★ 번호가 곧 손잡이다(2026-08-18 사장님 지시: "업다운이 아닌 드래그 배치로").
+   따로 그린 손잡이를 옆에 두면 좁은 줄에 부품이 하나 더 늘고, 번호는 이미 "이 장면"을
+   가리키는 자리라 잡을 것이 거기 있는 것이 자연스럽다. */
+.sc-grip { cursor: grab; user-select: none; }
+.sc-grip:active { cursor: grabbing; }
+.sc-grip:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+/* 끄는 동안 무엇을 들고 있는지 보인다 — 안 보이면 어느 카드가 움직이는지 모른 채 놓게 된다 */
+.plan-row.dragging { opacity: 0.45; }
 
 /* 완성 화면 — 미리보기를 가운데로 */
 /* 사용자 관리의 도구 줄 — 찾기 · 줄 수 · 지금 보고 있는 수 */

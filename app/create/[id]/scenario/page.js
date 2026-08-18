@@ -13,6 +13,7 @@
 //   angle 처럼 화면에서 걷은 값(2026-08-18)도 문서에 살아 남아 다음 단계 LLM 이 읽는다.
 //   즉 "칸을 지우는 것"과 "값을 없애는 것"은 다른 일이다 — 여기서는 앞엣것만 했다.
 import { useEffect, useRef, useState } from "react";
+import Icon from "../../../../components/Icon";
 import { useParams, useRouter } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 import BackButton from "../../../../components/BackButton";
@@ -79,18 +80,26 @@ export default function ScenarioStepPage() {
   const addShot = () =>
     edit({ shots: [...scenario.shots, { beat: "", line: "", speaker: "", seconds: 0 }] });
   const removeShot = (i) => edit({ shots: scenario.shots.filter((_, j) => j !== i) });
-  const moveShot = (i, dir) => {
-    const to = i + dir;
-    if (to < 0 || to >= scenario.shots.length) return;
+  // ★ 끌어 놓기는 "3번을 1번 자리로"다 — **뽑아서 끼운다**(맞바꾸기가 아니다).
+  //   맞바꾸면 사이에 있던 장면들이 제자리에 남아, 놓은 자리와 눈에 보이던 자리가 어긋난다.
+  const moveTo = (from, to) => {
+    if (from === to || to < 0 || to >= scenario.shots.length) return;
     const next = [...scenario.shots];
-    [next[i], next[to]] = [next[to], next[i]];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
     edit({ shots: next });
   };
+  // 화살표 키로 한 칸 — 끌기는 마우스 전용이라, 버튼이 하던 일을 키가 이어받는다.
+  const moveShot = (i, dir) => moveTo(i, i + dir);
 
   // ★ 라우트의 validateScenario 는 **하는 일이 빈 장면을 버린다**(lib/scenario.js) —
   //   화면 설계가 무엇을 그릴지 모르는 장면이라서다. checkScenario 는 그것을 재지 않으므로,
   //   말해 주지 않으면 사장님이 더한 장면이 저장에서 말없이 사라진다.
   const emptyBeat = (s) => !String(s?.beat || "").trim();
+  // 지금 끌고 있는 장면 — 놓을 때 어디서 왔는지 알아야 한다.
+  // ★ dataTransfer 에만 담지 않는다: 끄는 동안 어느 카드를 들고 있는지 화면에 비추려면
+  //   렌더가 그 값을 봐야 하는데, dataTransfer 는 놓는 순간에만 읽을 수 있다.
+  const [dragIdx, setDragIdx] = useState(null);
 
   // ★ 임시저장 — 확정하지 않고 저장만 한다(라우트의 PATCH 가 원래 그 자리다).
   //
@@ -246,8 +255,30 @@ export default function ScenarioStepPage() {
 
       <div className="plan-list">
         {scenario.shots.map((s, i) => (
-          <div className="plan-row" key={i}>
-            <span className="num">{i + 1}</span>
+          <div
+            className={`plan-row${dragIdx === i ? " dragging" : ""}`}
+            key={i}
+            draggable={!busy}
+            onDragStart={() => setDragIdx(i)}
+            onDragEnd={() => setDragIdx(null)}
+            // 놓기를 받으려면 기본 동작을 막아야 한다 — 빼면 커서만 바뀌고 아무 데도 못 놓는다
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => { e.preventDefault(); if (dragIdx !== null) moveTo(dragIdx, i); setDragIdx(null); }}
+          >
+            {/* 번호가 곧 손잡이다 — 끌 수 있다는 것을 따로 그리지 않아도 알 수 있는 자리이고,
+                초점을 두고 화살표 키를 누르면 키보드로도 옮긴다(끌기는 마우스 전용이다). */}
+            <span
+              className="num sc-grip"
+              tabIndex={0}
+              role="button"
+              aria-label={`${i + 1}번 장면 — 끌어서 옮기거나 화살표 키로 옮겨요`}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowUp") { e.preventDefault(); moveShot(i, -1); }
+                if (e.key === "ArrowDown") { e.preventDefault(); moveShot(i, 1); }
+              }}
+            >
+              {i + 1}
+            </span>
             {/* ★ 장면 안쪽을 **광고 화면과 같은 모양**으로 맞췄다(2026-08-18 사장님 지시).
                 광고는 `plan-field` 한 줄에 `<b>라벨</b> 값`, 초는 머리에 배지다. 여기는
                 라벨을 값 위에 얹은 폼이라 같은 것을 두 모양으로 보여 주고 있었다.
@@ -299,10 +330,23 @@ export default function ScenarioStepPage() {
                   {s.speaker || ""}
                 </span>
               </div>
+              {/* ↑↓ 는 걷었다 — 한 칸씩만 옮겨서, 6번을 맨 위로 보내려면 다섯 번 눌러야 했고
+                  누를 때마다 목록이 움직여 눈이 다시 자리를 찾아야 했다. 순서는 끌어서 옮긴다.
+                  ★ 삭제는 남는다(순서가 아니라 없애는 일이라 실수로 끌려 사라지면 안 된다).
+                    다만 **오른쪽 끝의 작은 아이콘**이다 — 가끔 쓰는 일이라 눈길이 먼저 닿을
+                    자리가 아니고, 그렇다고 없앨 수도 없다.
+                  ★ 아이콘만 두면 이름 없는 버튼이 된다 — 이 저장소는 아이콘 옆에 늘 글자를
+                    두는데(components/Icon.jsx), 라벨을 뺀 자리는 aria-label 이 대신한다. */}
               <div className="sc-actions">
-                <button className="mini" onClick={() => moveShot(i, -1)} disabled={busy}>↑</button>
-                <button className="mini" onClick={() => moveShot(i, 1)} disabled={busy}>↓</button>
-                <button className="mini" onClick={() => removeShot(i)} disabled={busy}>삭제</button>
+                <button
+                  className="mini sc-del"
+                  onClick={() => removeShot(i)}
+                  disabled={busy}
+                  aria-label={`${i + 1}번 장면 삭제`}
+                  title="이 장면을 삭제해요"
+                >
+                  <Icon name="trash" size={16} />
+                </button>
               </div>
             </div>
           </div>
