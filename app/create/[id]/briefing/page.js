@@ -32,7 +32,7 @@ export default function BriefingStepPage() {
 
   return (
     <section className="panel panel--narrow">
-      <h2>자료는 준비됐어요</h2>
+      <h2>입력을 확인해 주세요</h2>
       {/* 적은 글을 통째로 보여 준다 — 이제 이 글 하나가 시나리오의 유일한 원천이다 */}
       <p className="script-src">{project.material?.text}</p>
       {photos.length > 0 && (

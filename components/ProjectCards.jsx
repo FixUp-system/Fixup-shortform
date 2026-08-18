@@ -9,7 +9,7 @@ import { useDialog } from "./DialogProvider";
 // 단계 이름의 한국어 라벨. lib/steps.js 의 STEPS 와 같은 뜻이지만 여기서는
 // 카드에 짧게 찍을 한 단어만 필요해서 별도 표를 둔다.
 export const STATUS_LABEL = {
-  draft: "자료",
+  draft: "입력",
   briefing: "확인",
   script: "대본",
   cuts: "그림",
@@ -22,7 +22,7 @@ export const STATUS_LABEL = {
 // "draft"·"done"을 쓰지만(lib/ad/pipeline.js) 뜻이 기존 6단계와 다르다("draft"는
 // 시나리오 전, "done"은 굽기 완료뿐) — 표를 섞으면 카드가 엉뚱한 단어를 보여준다.
 const AD_STATUS_LABEL = {
-  draft: "자료",
+  draft: "입력",
   scenario: "시나리오",
   rendering: "만드는 중",
   done: "완성",

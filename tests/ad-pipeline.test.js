@@ -217,6 +217,8 @@ describe("광고 파이프라인 — storeVideoDefault", () => {
       // storeVideo 를 안 준다 — 진짜 storeVideoDefault 경로를 부른다
       runAdRenderPipeline(p.id, U, {
         generateAdVideo: async () => ({ url: "https://fal.example/v.mp4", seconds: 15 }),
+        // 자막 굽기는 진짜 ffmpeg 를 부른다 — 여기서 재는 것은 **저장 이름**이라 가로챈다
+        burn: async ({ projectId }) => ({ url: `/api/renders/${projectId}.mp4` }),
       })
     );
 
@@ -224,9 +226,14 @@ describe("광고 파이프라인 — storeVideoDefault", () => {
     // ★ 가장 중요한 단정 — 파일명에서 뽑은 uuid 가 프로젝트 id 와 같아야
     // /api/renders/[name] 라우트(UUID_MP4 정규식으로 이름에서 id 를 되찾는다)가 소유자를 찾는다.
     // 무작위 이름이면 getProject(무작위id, ownerId) 가 null 이라 그 라우트는 404 를 낸다.
-    expect(back.videos[0].url).toBe(`/api/renders/${p.id}.mp4`);
+    // ★ 2026-08-18 — fal 이 준 영상은 이제 **자막 없는 원본**으로 저장되고(-raw), 그 위에
+    //   우리가 자막을 태워 `<id>.mp4` 를 만든다(⑥완성과 같은 규칙).
+    //   이 테스트가 지키는 불변은 그대로다: **파일명에 프로젝트 id 가 들어간다.**
+    //   무작위 이름이면 /api/renders/[name] 라우트가 소유자를 못 찾아 404 다.
+    expect(back.videos[0].rawUrl).toBe(`/api/renders/${p.id}-raw.mp4`);
+    expect(back.videos[0].url).toContain(p.id);
 
-    const stored = await getStore().getObject("renders", `${p.id}.mp4`);
+    const stored = await getStore().getObject("renders", `${p.id}-raw.mp4`);
     expect(Buffer.from(stored)).toEqual(Buffer.from(bytes));
   });
 
