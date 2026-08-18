@@ -61,13 +61,16 @@ describe("이미지 프롬프트 — 본문과 꼬리", () => {
       "Its appearance, identical in every scene: walnut handle with steel base. " +
       "Style note: warm amber grade. " +
       "Cinematic lighting, realistic, no text or letters in the image. " +
-      "Attached reference images, in order: [1] barista. " +
+      // ★ 2026-08-18 에 이 세 줄이 바뀌었다(tests/ref-numbering.test.js 가 이유를 적어 둔다):
+      //   ① 목록에 **물건도** 들어간다 — 예전에는 인물만 세어 [1]이 이름 없이 남았다
+      //   ② 두 힌트가 **번호로** 가리킨다 — 단수 "the attached reference" 는 첨부가 둘일 때
+      //      아무것도 안 가리켰고, 실제로 그 컷만 다른 제품이 그려졌다
+      //   ③ 구도 금지 꼬리가 **한 번**이다 — 인물·물건이 각자 달고 있어 두 번 실렸다
+      "Attached reference images, in order: [1] barista, [2] walnut espresso tamper. " +
       "Draw each of these people as the person in their own numbered image — do not swap them between roles. " +
-      "Keep the same person (face, hair, build) as the attached reference — do not invent a different person. " +
-      "Use the attached reference only for what the subject looks like — never for its camera angle, its framing, or how much of the frame it fills. " +
-      "Keep it at natural real-world size relative to the people and surroundings, and let the scene description alone decide the shot. " +
+      "Keep the same person (face, hair, build) as attached image [1] — do not invent a different person. " +
       "Only the described people appear in this frame — no other people, including in the background. " +
-      "Match the product/subject appearance to the attached reference image exactly (shape, colors, packaging). " +
+      "Match the product/subject appearance to attached image [2] exactly (shape, colors, packaging). " +
       "Use the attached reference only for what the subject looks like — never for its camera angle, its framing, or how much of the frame it fills. " +
       "Keep it at natural real-world size relative to the people and surroundings, and let the scene description alone decide the shot. " +
       "Overall look and color treatment, keep identical across all cuts: soft daylight pastel. " +
