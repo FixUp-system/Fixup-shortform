@@ -1135,7 +1135,13 @@ describe("runRenderPipeline — 하나로 합친다", () => {
     });
     expect(got.subtitle).toBeUndefined();
     expect(got.subtitlePosition).toBe("top");
-    expect(got.lang).toBeUndefined();   // 언어를 안 고른 프로젝트는 옛 경로 그대로다
+    // ★ 2026-08-18 — 언어를 안 고른 프로젝트는 이제 **"ko" 를 명시적으로** 싣는다.
+    //   결과는 글자 그대로 같다(자막 글자·폰트·각인이 전부 같은 길로 간다) — 달라진 것은
+    //   굽는 쪽이 "모른다"가 아니라 "한국어다"를 받는다는 것이다.
+    //   그 차이가 필요한 이유: 일본어로 말하는 프로젝트가 자막 언어를 한 번도 안 골랐을 때,
+    //   undefined 면 굽는 쪽이 한국어 폰트로 일본어를 그려 두부(□□□)가 됐다.
+    expect(got.lang).toBe("ko");
+    expect(got.sourceLang).toBe("ko");
   });
 
   // 전체 재합성에서 언어가 빠지면 완성본만 조용히 한국어가 된다(각인은 그 언어로 찍힌다)
