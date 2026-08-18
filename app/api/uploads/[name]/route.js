@@ -8,15 +8,18 @@ import { withUser } from "../../../../lib/auth/require-user.js";
 const MIME = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" };
 const BUCKET = "uploads";
 
-export const GET = withUser(async (_req, { params }, user) => {
+// user 는 이제 안 쓴다 — withUser 는 그대로 둔다(로그인 자체는 여전히 문이다).
+export const GET = withUser(async (_req, { params }) => {
   const { name } = await params;
   // 경로 조작 방지 — 버킷 키에 슬래시나 상위 경로가 들어가면 안 된다
   if (!/^[a-z0-9-]+\.(jpg|png|webp)$/.test(name)) {
     return new Response("잘못된 파일명", { status: 400 });
   }
-  // 주인 기록이 없는 파일은 열지 않는다 — 옛 업로드는 백필(Task 13)이 채운다.
+  // ★ 소유자 대조를 걷어냈다(보관함 전체 공유) — 남이 만든 영상의 재료 사진도 보여야
+  //   상세 화면이 온전하다. 대신 **주인 기록이 없는 파일은 여전히 안 연다**: 그 검사가
+  //   남아 있어야 아무 이름이나 찍어 보는 길(존재 확인)이 막힌다. 로그인은 지난다.
   const owner = await getStore().findUploadOwner(name);
-  if (owner !== user.id) {
+  if (!owner) {
     return new Response("파일을 찾을 수 없어요", { status: 404 });
   }
   let buf;

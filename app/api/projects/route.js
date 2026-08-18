@@ -1,4 +1,4 @@
-import { createProject, listProjects } from "../../../lib/projects";
+import { createProject, listProjects, listAllProjects } from "../../../lib/projects";
 import { isSubtitleLang, DEFAULT_SPEECH_LANG } from "../../../lib/subtitle-langs.js";
 import { isAspect, DEFAULT_ASPECT_ID } from "../../../lib/aspects";
 import { TARGET_CHOICES } from "../../../lib/script";
@@ -7,9 +7,16 @@ import { ownedPhotoKeys } from "../../../lib/refs-io.js";
 import { withUser } from "../../../lib/auth/require-user.js";
 import { DEFAULT_I2V_MODEL, I2V_MODEL_IDS, isResolutionFor } from "../../../lib/clip-limits";
 
-// 내 프로젝트 목록 — doc 통짜를 안 실어 보낸다(listProjects 가 이미 요약해서 준다).
-export const GET = withUser(async (_req, _ctx, user) => {
-  return Response.json({ projects: await listProjects(user.id) });
+// 보관함 목록 — doc 통짜를 안 실어 보낸다(목록 함수가 이미 요약해서 준다).
+//
+// ★ scope=all 이면 **남이 만든 것까지** 준다(내부 팀이라 서로 결과물을 본다).
+//   기본은 내 것이다 — 실수로 전체가 기본이 되면 보관함을 연 사람마다 남의 목록이
+//   쏟아진다. 여는 쪽이 명시적이어야 한다.
+// ★ 읽기만 여는 것이라 이 문은 mine 만 실어 준다 — 만든 사람이 누구인지는 안 준다.
+export const GET = withUser(async (req, _ctx, user) => {
+  const scope = new URL(req.url).searchParams.get("scope");
+  const projects = scope === "all" ? await listAllProjects(user.id) : await listProjects(user.id);
+  return Response.json({ projects });
 });
 
 export const POST = withUser(async (req, ctx, user) => {

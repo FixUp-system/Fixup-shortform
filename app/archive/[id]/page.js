@@ -198,8 +198,13 @@ export default function ArchiveDetailPage() {
             {video && (
               <a className="mini" href={`${video}?dl=1`} download>내려받기</a>
             )}
-            {/* ★ 값이 나가는 버튼은 이 화면에 없다 — 만드는 일은 제작 화면에서 한다 */}
-            <Link href={workHref} className="cta">이어서 작업하기 →</Link>
+            {/* ★ 값이 나가는 버튼은 이 화면에 없다 — 만드는 일은 제작 화면에서 한다.
+                ★ 남이 만든 영상이면(mine === false) 이 길도 안 그린다: 제작 화면은
+                  소유자만 열 수 있어(getProject 가 소유자를 요구한다) 눌러도 404 다.
+                  옛 응답에 mine 이 없을 수 있으므로 **false 일 때만** 감춘다. */}
+            {doc.mine !== false && (
+              <Link href={workHref} className="cta">이어서 작업하기 →</Link>
+            )}
           </div>
         </div>
       </section>

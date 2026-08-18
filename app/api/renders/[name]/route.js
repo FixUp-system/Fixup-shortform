@@ -1,5 +1,5 @@
 import { withUser } from "../../../../lib/auth/require-user.js";
-import { getProject } from "../../../../lib/projects.js";
+import { getProjectForViewing } from "../../../../lib/projects.js";
 import { getStore } from "../../../../lib/store/index.js";
 
 // 파일명이 곧 프로젝트 id 다(lib/compose.js 가 `${projectId}.mp4` 로 올린다).
@@ -19,7 +19,10 @@ export const GET = withUser(async (req, { params }, user) => {
   const m = RENDER_MP4.exec(name);
   if (!m) return new Response("잘못된 파일명", { status: 400 });
 
-  const project = await getProject(m[1], user.id);
+  // ★ 소유자가 아니어도 재생된다(보관함 전체 공유) — 내부 팀이라 서로의 결과물을 본다.
+  //   그래도 **로그인은 지난다**(withUser): 주소를 아는 아무나에게 열지는 않는다.
+  //   프로젝트가 없으면 그대로 404 다 — 파일명만 찍어 보는 길은 여전히 막혀 있다.
+  const project = (await getProjectForViewing(m[1], user.id))?.doc || null;
   if (!project) return new Response("없음", { status: 404 });
 
   // ── 캐시 ────────────────────────────────────────────────────────────────

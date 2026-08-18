@@ -133,9 +133,12 @@ export default function ProjectCards({ projects, limit, onDeleted, selecting, se
                 {selecting && (
                   <span className="card-pick" aria-hidden="true">{selected?.has(p.id) ? "✓" : ""}</span>
                 )}
-                {/* 고르는 동안에는 낱개 지우기를 감춘다 — 두 가지 지우는 길이 한 화면에
+                {/* ★ 남이 만든 카드에는 쓰기 버튼을 아예 안 그린다(mine === false).
+                    보관함 [전체]는 읽기만 여는 자리다 — 눌러도 404 인 버튼을 그리면
+                    "왜 안 되지"만 남는다. 목록에 mine 이 없는 옛 호출부(홈)는 지금 그대로다.
+                    고르는 동안에는 낱개 지우기를 감춘다 — 두 가지 지우는 길이 한 화면에
                     있으면 어느 것이 지금 도는 길인지 흐려진다 */}
-                {onDeleted && !selecting && (
+                {onDeleted && !selecting && p.mine !== false && (
                   <button
                     className="card-del"
                     aria-label="이 영상 지우기"

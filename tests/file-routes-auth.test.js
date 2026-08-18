@@ -11,12 +11,15 @@ const as = (id) => new Request("http://localhost/x", {
   headers: { [USER_HEADER]: id, [STATUS_HEADER]: "approved", [ROLE_HEADER]: "user" },
 });
 
-// 렌더 라우트는 파일명이 곧 프로젝트 id 라 소유자 판정을 getProject 가 한다 —
+// 렌더 라우트는 파일명이 곧 프로젝트 id 라 프로젝트 판정을 lib/projects.js 가 한다 —
 // upload_owners 같은 별도 원장이 없다. 완성본은 이제 renders 비공개 버킷에 있다
 // (lib/compose.js 가 거기에 올린다). ★ 객체를 실제로 심는 이유는 예전에 파일을 심던
-// 이유와 같다 — 없으면 getObject 실패가 먼저 404 를 내서, 소유자 검사를 지워도
-// 통과하는 "지키는 척하는 테스트"가 된다. 주인이 부르면 200(+내용), 남이 부르면
-// 객체가 있는데도 404 여야 진짜 검사다.
+// 이유와 같다 — 없으면 getObject 실패가 먼저 404 를 내서, 라우트가 프로젝트를 아예
+// 안 읽어도 통과하는 "지키는 척하는 테스트"가 된다.
+//
+// ★ 2026-08-18 — **읽기는 소유자를 안 따진다**(보관함 전체 공유, 내부 팀). 남은 자물쇠는
+// 둘이다: 로그인(withUser)과 "그 프로젝트가 실제로 있는가". 쓰는 문은 그대로 잠겨 있고,
+// 그 보장은 tests/archive-shared.test.js 가 정적으로도 지킨다.
 async function putRenderObject(projectId, content = "video-bytes") {
   await memoryStore.putObject("renders", `${projectId}.mp4`, Buffer.from(content), "video/mp4");
 }
@@ -31,11 +34,15 @@ describe("업로드 소유자", () => {
     expect(res.status).toBe(200);
   });
 
-  it("남은 404 다", async () => {
+  // ★ 2026-08-18 뒤집힘 — 남이 올린 사진도 열린다(보관함 전체 공유, 내부 팀).
+  //   상세 화면이 남의 영상을 보여주려면 그 재료 사진도 보여야 한다.
+  //   대신 아래 "주인 기록이 없는 파일"은 그대로 막혀 있다 — 그 검사가 이름을 찍어 보는
+  //   길(존재 확인)을 막는 유일한 자물쇠다.
+  it("남이 올린 사진도 열린다 — 읽기만 연다", async () => {
     await memoryStore.putObject("uploads", "aaa.jpg", Buffer.from("x"), "image/jpeg");
     await memoryStore.insertUploadOwner("aaa.jpg", A);
     const res = await getUpload(as(B), { params: Promise.resolve({ name: "aaa.jpg" }) });
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(200);
   });
 
   it("주인 기록이 없는 옛 파일도 404 다 — 열어두지 않는다", async () => {
@@ -56,13 +63,22 @@ describe("완성본 내려받기", () => {
     expect(Buffer.from(await res.arrayBuffer()).toString()).toBe("진짜-영상-바이트");
   });
 
-  it("파일명이 곧 프로젝트 id 다 — 객체가 있어도 남의 것은 404", async () => {
+  // ★ 2026-08-18 뒤집힘 — 남이 만든 영상도 재생된다(보관함 전체 공유). 다만 **로그인은
+  //   지난다**: 주소를 아는 아무나에게 여는 것이 아니다.
+  it("남이 만든 영상도 200 이다 — 읽기만 연다", async () => {
     const p = await createProject({ settings: {}, material: { text: "가", photos: [] }, ownerId: A });
-    // 객체가 버킷에 실제로 있다 — 그런데도 막혀야 진짜 소유자 검사다(리뷰 C1).
-    // 객체를 안 두면 getObject 실패가 먼저 404 를 내서, 소유자 검사를 지워도
-    // 테스트가 통과하는 "지키는 척하는 테스트"가 된다.
     await putRenderObject(p.id, "진짜-영상-바이트");
     const res = await getRender(as(B), { params: Promise.resolve({ name: `${p.id}.mp4` }) });
+    expect(res.status).toBe(200);
+  });
+
+  // 소유자 검사가 빠진 자리에도 자물쇠 하나는 남아야 한다: **프로젝트가 있어야 한다.**
+  // 객체를 실제로 심어 두는 이유는 예전과 같다 — 안 심으면 getObject 실패가 먼저 404 를
+  // 내서, 라우트가 프로젝트를 아예 안 읽어도 통과하는 "지키는 척하는 테스트"가 된다.
+  it("프로젝트가 없으면 객체가 있어도 404 다", async () => {
+    const ghost = "33333333-3333-4333-8333-333333333333";
+    await putRenderObject(ghost, "고아-바이트");
+    const res = await getRender(as(A), { params: Promise.resolve({ name: `${ghost}.mp4` }) });
     expect(res.status).toBe(404);
   });
 
@@ -91,10 +107,10 @@ describe("원본(-raw) 내려받기", () => {
     expect(Buffer.from(await res.arrayBuffer()).toString()).toBe("원본-바이트");
   });
 
-  it("남의 원본은 객체가 있어도 404 다 — 완성본과 같은 소유자 검사를 받는다", async () => {
+  it("남의 원본도 완성본과 같은 문을 지난다 — 읽기는 열려 있다", async () => {
     const p = await seed(A);
     const res = await getRender(as(B), { params: Promise.resolve({ name: `${p.id}-raw.mp4` }) });
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(200);
   });
 
   it("-raw 를 흉내 낸 이름은 여전히 400 이다", async () => {
@@ -164,13 +180,13 @@ describe("완성본 캐시", () => {
     expect(Buffer.from(await res.arrayBuffer()).toString()).toBe("새로-만든-영상");
   });
 
-  it("남의 것은 ETag 가 맞아도 404 다 — 캐시가 소유자 검사를 앞지르지 않는다", async () => {
+  it("남이 봐도 캐시는 똑같이 먹는다 — ETag 가 맞으면 304", async () => {
     const p = await seedRendered(A, 1755000000000);
     const res = await getRender(
       withEtag(B, '"1755000000000"'),
       { params: Promise.resolve({ name: `${p.id}.mp4` }) }
     );
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(304);
   });
 });
 
@@ -200,15 +216,17 @@ describe("완성본 — 서명 URL 로 넘긴다", () => {
     }
   });
 
-  it("★ 소유자 검사는 서명보다 먼저다 — 남의 것은 서명 자체를 안 만든다", async () => {
-    const p = await mk();
-    await putRenderObject(p.id);
+  it("★ 프로젝트 판정이 서명보다 먼저다 — 없는 프로젝트는 서명 자체를 안 만든다", async () => {
+    // 소유자 검사가 열린 뒤에도 순서는 그대로여야 한다: 문을 통과한 것만 서명한다.
+    // 서명은 공짜가 아니라 Storage 왕복이고, 만들어진 URL 은 토큰이 실린 채로 남는다.
+    const ghost = "44444444-4444-4444-8444-444444444444";
+    await putRenderObject(ghost);
     let asked = 0;
     memoryStore.signedObjectUrl = async () => { asked += 1; return "https://storage.example/signed"; };
     try {
-      const res = await getRender(as(B), { params: Promise.resolve({ name: `${p.id}.mp4` }) });
+      const res = await getRender(as(B), { params: Promise.resolve({ name: `${ghost}.mp4` }) });
       expect(res.status).toBe(404);
-      expect(asked, "남의 것인데 서명을 만들었다").toBe(0);
+      expect(asked, "없는 프로젝트인데 서명을 만들었다").toBe(0);
     } finally {
       delete memoryStore.signedObjectUrl;
     }

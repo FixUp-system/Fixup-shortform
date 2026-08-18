@@ -699,6 +699,14 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
   white-space: nowrap;
 }
 .mini:hover { border-color: var(--ink-soft); }
+/* 보관함 [내 영상]·[전체] — 지금 보고 있는 쪽을 눌린 상태로 그린다.
+   클래스가 아니라 aria-pressed 를 셀렉터로 쓴다: 보이는 상태와 스크린리더가 읽는 상태가
+   갈릴 수 없다(한쪽만 고치는 날이 안 온다). */
+.mini[aria-pressed="true"] {
+  border-color: var(--ink);
+  color: var(--ink);
+  font-weight: 600;
+}
 /* 결과 확정 — 미리보기 패널의 주 버튼 */
 .mini.confirm-btn {
   background: var(--btn);

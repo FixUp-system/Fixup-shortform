@@ -1,4 +1,4 @@
-import { getProject, updateProject } from "../../../../lib/projects.js";
+import { getProject, getProjectForViewing, updateProject } from "../../../../lib/projects.js";
 import { isAspect } from "../../../../lib/aspects.js";
 import { normalizeAdOptions } from "../../../../lib/ad/options.js";
 import {
@@ -17,11 +17,23 @@ export async function loadAd(id, ownerId) {
   return project && project.kind === "ad" ? project : null;
 }
 
+// 읽기 전용 갈래 — **소유자를 안 따진다**(보관함 전체 공유).
+//
+// loadAd 를 안 고친다: 그 함수는 render·scenario 등 **값이 나가는 라우트 넷**이 함께
+// 쓴다(app/api/ads/[id]/render/route.js 외). 거기서 소유자가 빠지면 남의 프로젝트로
+// 돈이 나간다. 그래서 읽는 자리만 별도 이름으로 가른다.
+async function loadAdForViewing(id, viewerId) {
+  const viewed = await getProjectForViewing(id, viewerId);
+  if (!viewed || viewed.doc.kind !== "ad") return null;
+  return { project: viewed.doc, mine: viewed.mine };
+}
+
 export const GET = withUser(async (_req, { params }, user) => {
   const { id } = await params;
-  const project = await loadAd(id, user.id);
-  if (!project) return Response.json({ error: "찾을 수 없어요" }, { status: 404 });
-  return Response.json(project);
+  const viewed = await loadAdForViewing(id, user.id);
+  if (!viewed) return Response.json({ error: "찾을 수 없어요" }, { status: 404 });
+  // mine — 화면이 쓰기 버튼을 그릴지 정하는 근거다(만든 사람이 누구인지는 안 준다).
+  return Response.json({ ...viewed.project, mine: viewed.mine });
 });
 
 export const PATCH = withUser(async (req, { params }, user) => {

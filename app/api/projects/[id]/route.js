@@ -1,4 +1,4 @@
-import { getProject, updateProject } from "../../../../lib/projects";
+import { getProject, getProjectForViewing, updateProject } from "../../../../lib/projects";
 import { clipLimitsForProject, I2V_MODEL_IDS, isResolutionFor, resolutionForProject } from "../../../../lib/clip-limits";
 import { normalizeStyle, normalizePromptNote } from "../../../../lib/styles";
 import { isAspect } from "../../../../lib/aspects";
@@ -30,9 +30,14 @@ class ResolutionLocked extends Error {
   }
 }
 
+// ★ 읽기는 **소유자를 안 따진다**(보관함 전체 공유). 내부 팀이라 남이 만든 결과물을
+//   서로 볼 수 있어야 한다 — 그래서 보기 전용 문(getProjectForViewing)으로 읽는다.
+//   이 파일의 PATCH·DELETE 와 아래 20곳 넘는 제작 라우트는 그대로 getProject 를 지난다:
+//   돈이 나가거나 지우는 문은 여전히 소유자만 연다.
 export const GET = withUser(async (req, { params }, user) => {
   const { id } = await params;
-  const project = await getProject(id, user.id);
+  const viewed = await getProjectForViewing(id, user.id);
+  const project = viewed?.doc || null;
   // ★ 광고 문서(kind:"ad")는 이 경로가 다루지 않는다 — /api/ads/* 가 다룬다.
   // 없는 것과 같이 404 다: 남의 것이 아니라 "이 문 뒤에 없는 것"이라서다.
   if (!project || project.kind === "ad") return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
@@ -47,6 +52,8 @@ export const GET = withUser(async (req, { params }, user) => {
     ...project,
     clip_limits: clipLimitsForProject(project),
     charged: await alreadyChargedVideo(id),
+    // 내가 만든 것인가 — 화면이 쓰기 버튼([이어서 작업하기])을 그릴지 정하는 근거다.
+    mine: viewed.mine,
   });
 });
 

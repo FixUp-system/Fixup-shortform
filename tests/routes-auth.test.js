@@ -57,9 +57,18 @@ describe("프로젝트 라우트 인증", () => {
     expect(res.status).toBe(200);
   });
 
-  it("남은 404 다 — 존재 여부를 흘리지 않는다", async () => {
+  // ★ 2026-08-18 뒤집힘 — 읽기는 남에게도 열린다(보관함 전체 공유, 내부 팀).
+  //   그래도 **읽기뿐이다**: 아래 "변이 라우트" 묶음이 그대로 404 여야 한다.
+  //   내 것이 아니라는 사실은 mine:false 로 실려 나가고, 화면은 그것으로 쓰기 버튼을 지운다.
+  it("남도 읽는다 — 다만 mine:false 로 온다", async () => {
     const p = await make(A);
     const res = await getProjectRoute(reqAs(B), ctx(p.id));
+    expect(res.status).toBe(200);
+    expect((await res.json()).mine).toBe(false);
+  });
+
+  it("없는 프로젝트는 그대로 404 다", async () => {
+    const res = await getProjectRoute(reqAs(B), ctx("00000000-0000-4000-8000-0000000000ff"));
     expect(res.status).toBe(404);
   });
 

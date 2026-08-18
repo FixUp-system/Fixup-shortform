@@ -9,6 +9,12 @@ import { useDialog } from "../../components/DialogProvider";
 export default function Archive() {
   const [projects, setProjects] = useState(null); // null = 불러오는 중
   const [err, setErr] = useState("");
+  // 보는 범위 — "mine"(내 영상) 또는 "all"(전체).
+  //
+  // ★ 기본은 **내 영상**이다. 내부 팀이라 서로의 결과물을 볼 수 있게 열었지만, 보관함을
+  //   열자마자 남의 영상이 쏟아지면 내 것을 찾는 자리가 아니게 된다. 여는 쪽이 한 번
+  //   누르는 동작이어야 한다.
+  const [scope, setScope] = useState("mine");
 
   // 정리는 몰아서 하는 일이다 — 하나씩 지우면 스무 편을 치우는 데 스무 번을 묻는다.
   // 평소에는 카드가 프로젝트로 들어가는 문이고, [수정] 을 누른 동안에만 고르는 자리가 된다.
@@ -17,12 +23,21 @@ export default function Archive() {
   const [selected, setSelected] = useState(() => new Set());
   const [busy, setBusy] = useState(false);
 
+  // 범위를 바꾸면 다시 불러온다. 늦게 온 앞 요청이 뒤 요청을 덮지 않게 alive 로 막는다 —
+  // 두 번 빠르게 누르면 [내 영상]을 보는데 [전체] 결과가 얹히는 일이 생긴다.
   useEffect(() => {
-    loadProjects().then(({ projects, err }) => {
+    let alive = true;
+    setProjects(null);
+    setErr("");
+    loadProjects(fetch, scope).then(({ projects, err }) => {
+      if (!alive) return;
       setProjects(projects);
       setErr(err);
     });
-  }, []);
+    return () => {
+      alive = false;
+    };
+  }, [scope]);
 
   function toggle(id) {
     setSelected((s) => {
@@ -72,6 +87,15 @@ export default function Archive() {
   }
 
   const count = projects?.length || 0;
+  const isAll = scope === "all";
+
+  // 범위를 바꿀 때는 고르던 것을 버린다 — 남긴 채 넘어가면 [전체]에서 고른 남의 카드가
+  // 선택에 남아 지우기가 404 로 떨어진다.
+  function changeScope(next) {
+    if (next === scope) return;
+    stopSelecting();
+    setScope(next);
+  }
 
   return (
     <>
@@ -98,7 +122,24 @@ export default function Archive() {
           </div>
         ) : (
           <div className="chips">
-            {count > 0 && (
+            {/* 보는 범위 — 내부 팀이라 남이 만든 것도 볼 수 있다(읽기 전용) */}
+            <button
+              className="mini"
+              aria-pressed={!isAll}
+              onClick={() => changeScope("mine")}
+            >
+              내 영상
+            </button>
+            <button
+              className="mini"
+              aria-pressed={isAll}
+              onClick={() => changeScope("all")}
+            >
+              전체
+            </button>
+            {/* 몰아서 지우기는 **내 영상** 자리에서만 연다 — 전체 목록에는 남의 카드가
+                섞여 있어 "모두 선택"이 지울 수 없는 것까지 고른다 */}
+            {count > 0 && !isAll && (
               <button className="mini" onClick={() => setSelecting(true)}>
                 수정
               </button>
@@ -112,13 +153,17 @@ export default function Archive() {
       <p className="pgsub">
         {selecting
           ? "지울 영상을 눌러서 고르세요."
-          : "지금까지 만든 영상이 여기 모입니다. 눌러서 이어서 작업할 수 있어요."}
+          : isAll
+            ? "팀이 만든 영상을 모두 볼 수 있어요. 남이 만든 것은 보기만 됩니다."
+            : "지금까지 만든 영상이 여기 모입니다. 눌러서 이어서 작업할 수 있어요."}
       </p>
 
       {projects === null && <p className="pgsub">불러오는 중…</p>}
       {err && <p className="pgsub warn">{err}</p>}
       {projects?.length === 0 && !err && (
-        <p className="pgsub">아직 만든 영상이 없어요. 새로 만들어 보세요.</p>
+        <p className="pgsub">
+          {isAll ? "아직 만들어진 영상이 없어요." : "아직 만든 영상이 없어요. 새로 만들어 보세요."}
+        </p>
       )}
       {projects && projects.length > 0 && (
         <ProjectCards
