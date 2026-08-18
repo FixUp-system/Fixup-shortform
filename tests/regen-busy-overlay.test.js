@@ -51,7 +51,10 @@ describe("만드는 중 — 그림 자리 위에 덮개가 뜬다", () => {
       const at = src.indexOf("frame-busy");
       const box = src.slice(at, at + 400);
       expect(box, "로딩 표시가 없다").toMatch(/spinner/);
-      expect(box, "무엇을 하는 중인지 말하지 않는다").toMatch(/만드는 중/);
+      // ★ 문구는 lib/progress.js 의 busyLabel 이 정한다(2026-08-18) — 처음 굽는 컷에
+      //   "다시"가 뜨던 것을 고치면서 네 자리가 갈리지 않게 한 곳으로 모았다.
+      //   여기서 재는 것은 "덮개가 말을 하는가"이고, 그 말이 무엇인지는 busy-label.test.js 다.
+      expect(box, "무엇을 하는 중인지 말하지 않는다").toMatch(/만드는 중|busyLabel\(/);
     });
   }
 });

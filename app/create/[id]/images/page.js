@@ -22,7 +22,7 @@ import { modelIdForProject, resolutionForProject } from "../../../../lib/clip-li
 // 같은 판정을 화면마다 손으로 적었을 때 조용히 갈렸고, 그 어긋남이 이 화면이
 // images_error 를 영영 못 보던 버그였다(2026-08-14).
 import { startPolling } from "../../../../lib/poll";
-import { generationState, isCutDone } from "../../../../lib/progress";
+import { generationState, isCutDone, busyLabel } from "../../../../lib/progress";
 import { firstError } from "../../../../lib/step-errors";
 
 // 그림이 아직 없는 자리에 뭐라고 쓸지.
@@ -407,7 +407,7 @@ export default function ImagesStepPage() {
                     그 경우다)에서 안 뜬다. 옛 그림이 비쳐 보이게 두어 무엇을 다시 만드는지 안다. */}
                 {(regening === c.idx || c.state === "generating") && (
                   <span className="frame-busy">
-                    <span className="spinner" aria-hidden="true" /> 다시 만드는 중이에요
+                    <span className="spinner" aria-hidden="true" /> {busyLabel(regening === c.idx)}
                   </span>
                 )}
               </div>
@@ -640,7 +640,7 @@ function PreviewPane({ cut, project, url, photoName, usage, aspect, stalled, onR
             버튼이 잠기는 조건과 화면이 말하는 조건이 갈리면 사장님이 둘 중 무엇을 믿을지 모른다. */}
         {busyCut && (
           <span className="frame-busy">
-            <span className="spinner" aria-hidden="true" /> 다시 만드는 중이에요
+            <span className="spinner" aria-hidden="true" /> {busyLabel(regening === cut.idx)}
           </span>
         )}
       </div>

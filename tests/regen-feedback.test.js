@@ -63,7 +63,10 @@ describe("다시 만들기 — 누른 것이 화면에 보인다", () => {
         /const busyCut =[^;]*regening/.test(src) && /disabled=\{[^}]*busyCut/.test(src);
       expect(direct || viaBusy, "도는 동안에도 버튼이 눌린다 — 두 번 누르면 값이 두 번 나간다")
         .toBe(true);
-      expect(src, "도는 중이라는 말이 없다").toMatch(/regening[\s\S]{0,400}(다시 만드는 중|만드는 중)/);
+      // 문구 자체는 busyLabel 이 쥔다(lib/progress.js). 재는 것은 **regening 이 그 말에
+      // 닿는가**다 — 닿아 있으면 누른 흔적이 화면에 남는다.
+      expect(src, "도는 중이라는 말이 없다")
+        .toMatch(/regening[\s\S]{0,400}(다시 만드는 중|만드는 중|busyLabel\()/);
     });
   }
 

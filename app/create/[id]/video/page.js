@@ -23,7 +23,7 @@ import { MAX_REGEN_PER_CUT, priceLabel, regenPrice } from "../../../../lib/prici
 // 폴링 루프·진행 판정·오류 필드 표는 전부 lib 한 벌이다. 화면마다 복붙해 두었더니
 // 조금씩 다르게 틀렸다(④이미지가 images_error 를 영영 못 보던 버그가 그것이다).
 import { startPolling } from "../../../../lib/poll";
-import { generationState, isCutDone } from "../../../../lib/progress";
+import { generationState, isCutDone, busyLabel } from "../../../../lib/progress";
 import { firstError } from "../../../../lib/step-errors";
 
 export default function VideoStepPage() {
@@ -290,7 +290,7 @@ export default function VideoStepPage() {
                     갈래 안에 두면 영영 안 뜬다. 아래 글줄로만 말하던 것을 그림 위로 올린다. */}
                 {(regening === c.idx || (gen.kind === "running" && !c.video && !c.video_error)) && (
                   <span className="frame-busy">
-                    <span className="spinner" aria-hidden="true" /> 다시 만드는 중이에요
+                    <span className="spinner" aria-hidden="true" /> {busyLabel(regening === c.idx)}
                   </span>
                 )}
               </div>
@@ -357,7 +357,7 @@ export default function VideoStepPage() {
             {(regening === selected?.idx ||
               (gen.kind === "running" && selected && !selected.video && !selected.video_error)) && (
               <span className="frame-busy">
-                <span className="spinner" aria-hidden="true" /> 다시 만드는 중이에요
+                <span className="spinner" aria-hidden="true" /> {busyLabel(regening === selected?.idx)}
               </span>
             )}
           </div>
