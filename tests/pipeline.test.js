@@ -450,15 +450,59 @@ describe("분할 → 이미지 (이어 부르면 갈라지기 전과 같다)", (
     await expect(pipeline.regenCut(p.id, OWNER, 0, deps())).rejects.toThrow(/3회/);
   });
 
-  it("regenCut instruction이 컷에 저장되고 이후 프롬프트에 실린다", async () => {
+  // ★★ 2026-08-18 사장님 지시로 뜻이 바뀌었다. 옛 계약은 "지시를 컷에 저장하고 **꼬리에
+  //    덧붙인다**"였다 — 그러면 원래 서술이 그대로 남은 채 새 요구가 뒤에 붙어 모델이 서로
+  //    다투는 두 지시를 받는다. 지금은 지시로 **본문을 다시 써서** 덮어쓰기에 저장한다:
+  //    가리킨 것은 고치고, 새 요구는 더하고, 나머지는 그대로.
+  it("★ regenCut instruction 이 본문을 다시 쓴다 — 덧붙이지 않는다", async () => {
     const p = await makeProject();
-    await runBoth(p.id,deps());
+    await runBoth(p.id, deps());
     const prompts = [];
-    const capturing = { ...deps(), genImage: async ({ prompt }) => { prompts.push(prompt); return { url: "http://img/x" }; } };
+    const seen = [];
+    const capturing = {
+      ...deps(),
+      genImage: async ({ prompt }) => { prompts.push(prompt); return { url: "http://img/x" }; },
+      // 고쳐 쓰는 일은 LLM 이 한다 — 여기서는 무엇을 받았는지만 본다
+      revisePrompt: async (msgs) => { seen.push(msgs); return { prompt: "A latte with visible strawberries" }; },
+    };
     await pipeline.regenCut(p.id, OWNER, 0, capturing, "딸기라떼가 보이게");
+
     const cut = (await projects.getProject(p.id, OWNER)).cuts.find((c) => c.idx === 0);
+    // 고쳐 쓰는 쪽에 **지금 본문과 사장님 요구**가 함께 갔다
+    expect(seen).toHaveLength(1);
+    expect(JSON.stringify(seen[0])).toContain("딸기라떼가 보이게");
+    // 결과가 덮어쓰기로 저장된다 — 사장님이 접힌 칸에서 눈으로 확인할 수 있는 자리다
+    expect(cut.image_prompt).toBe("A latte with visible strawberries");
+    // 그리고 그 프롬프트로 실제로 만들었다
+    expect(prompts.some((pr) => pr.includes("A latte with visible strawberries"))).toBe(true);
+    // 지시 원문도 남긴다 — 무엇을 시켰는지 화면이 보여 준다
     expect(cut.edit_instruction).toBe("딸기라떼가 보이게");
-    expect(prompts.some((pr) => pr.includes("딸기라떼가 보이게"))).toBe(true);
+  });
+
+  it("★ 지시가 없으면 본문을 건드리지 않는다 — 값 드는 호출도 안 만든다", async () => {
+    const p = await makeProject();
+    await runBoth(p.id, deps());
+    let called = 0;
+    const capturing = { ...deps(), revisePrompt: async () => { called += 1; return { prompt: "X" }; } };
+    await pipeline.regenCut(p.id, OWNER, 0, capturing);
+    const cut = (await projects.getProject(p.id, OWNER)).cuts.find((c) => c.idx === 0);
+    expect(called, "지시가 없는데 고쳐 쓰기를 불렀다").toBe(0);
+    expect(cut.image_prompt ?? "", "지시가 없는데 본문이 굳었다").toBe("");
+  });
+
+  // ★ 두 번째 지시는 **첫 번째 결과 위에** 얹힌다 — 그래야 "기존 내용에 추가"가 된다.
+  it("★ 다시 고치면 앞서 고친 본문 위에 얹는다", async () => {
+    const p = await makeProject();
+    await runBoth(p.id, deps());
+    const seen = [];
+    const mk = (out) => ({
+      ...deps(),
+      revisePrompt: async (msgs) => { seen.push(msgs.user); return { prompt: out }; },
+    });
+    await pipeline.regenCut(p.id, OWNER, 0, mk("first revision"), "배경을 노을로");
+    await pipeline.regenCut(p.id, OWNER, 0, mk("second revision"), "차를 더 가까이");
+    // 두 번째 호출이 받은 "지금 지시문"에 첫 번째 결과가 들어 있어야 한다
+    expect(seen[1], "앞서 고친 본문을 안 물려받았다 — 매번 원점에서 다시 고친다").toContain("first revision");
   });
 
   it("그림에 무엇을 보고 그렸는지를 각인한다", async () => {
