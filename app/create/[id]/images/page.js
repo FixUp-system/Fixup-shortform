@@ -62,6 +62,11 @@ export default function ImagesStepPage() {
   // 드러내려는 바로 그 실패가 조용히 묻힌다. 무엇을 접었는지 알아야 그것만 감춘다.
   const [dismissedMsg, setDismissedMsg] = useState(null);
   const [selectedIdx, setSelectedIdx] = useState(null); // 우측 큰 미리보기로 볼 컷
+  // ★ 다시 만드는 중인 컷 — **로컬로 들고 있는다**(⑤영상과 같은 모양, 2026-08-18).
+  //   컷의 state 를 낙관적으로 generating 으로 바꾸는 것만으로는 부족했다: 곧바로 이어지는
+  //   load(id) 가 서버 값으로 덮으면 표시가 사라져, 누른 흔적이 화면에서 없어진다.
+  //   사장님 지적이 정확히 그것이었다 — "버튼이 눌린 건지 확인이 안 돼."
+  const [regening, setRegening] = useState(null);
   const [status, setStatus] = useState(null); // 마지막 상태 응답 — 심장박동이 여기 온다
   const stopRef = useRef(null);
 
@@ -185,15 +190,25 @@ export default function ImagesStepPage() {
   }
 
   async function regen(idx, instruction) {
+    // 두 번 눌리면 값이 두 번 나간다 — 도는 동안은 받지 않는다.
+    if (regening !== null) return;
+    setErr("");
+    setRegening(idx);
     setProject((p) => ({ ...p, cuts: p.cuts.map((c) => c.idx === idx ? { ...c, state: "generating" } : c) }));
-    const res = await fetch(`/api/projects/${id}/cuts/${idx}/regen`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(instruction ? { instruction } : {}),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) setErr(data.error);
-    await load(id).catch(() => {});
-    await reloadMe().catch(() => {});
+    try {
+      const res = await fetch(`/api/projects/${id}/cuts/${idx}/regen`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(instruction ? { instruction } : {}),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) setErr(data.error || "다시 만들지 못했어요");
+      await load(id).catch(() => {});
+      await reloadMe().catch(() => {});
+    } finally {
+      // ★ **반드시 내린다.** 실패한 채로 두면 그 컷이 영영 잠겨, 다시 시도할 길이
+      //   새로고침뿐이다(⑤영상이 같은 이유로 finally 를 쓴다).
+      setRegening(null);
+    }
   }
 
   // 컷별 프롬프트 덮어쓰기 저장. editSentence 와 같은 모양이다 — 같은 PATCH 자리다.
@@ -387,7 +402,7 @@ export default function ImagesStepPage() {
               >
                 <span className="num">{c.idx + 1}</span>
                 {img ? <img src={img} alt="" /> :
-                  <span className="ph">{placeholder(c.state)}</span>}
+                  <span className="ph">{regening === c.idx ? "다시 만드는 중…" : placeholder(c.state)}</span>}
               </div>
               <div className="txt">
                 “<span contentEditable suppressContentEditableWarning className="editable"
@@ -494,6 +509,7 @@ export default function ImagesStepPage() {
           aspect={project.settings?.aspect_ratio || "9:16"}
           stalled={stalled}
           onRegen={regen}
+          regening={regening}
           onSavePrompt={savePrompt}
         />
       )}
@@ -515,7 +531,7 @@ function frameStyle(aspect) {
 
 // 우측 큰 미리보기 + 컷별 수정. instruction 입력은 컷마다 초기화돼야 하므로
 // 부모가 key={cut.idx}로 이 컴포넌트를 갈아끼운다(로컬 state가 자연히 리셋됨).
-function PreviewPane({ cut, project, url, photoName, usage, aspect, stalled, onRegen, onSavePrompt }) {
+function PreviewPane({ cut, project, url, photoName, usage, aspect, stalled, onRegen, onSavePrompt, regening }) {
   const [instr, setInstr] = useState("");
   // ── 실제로 보내는 지시 ──────────────────────────────────────────────
   //
@@ -594,7 +610,10 @@ function PreviewPane({ cut, project, url, photoName, usage, aspect, stalled, onR
   }
 
   const isPhoto = cut.source === "photo";
-  const busyCut = !stalled && cut.state === "generating";
+  // ★ 로컬 표시(regening)를 **먼저** 본다. 서버 state 는 다시 읽는 순간 덮이므로 그것만
+  //   보면 방금 누른 버튼이 도로 풀린다. `stalled` 예외는 서버 판정에만 건다 —
+  //   멈춤이라고 해서 방금 누른 이 요청까지 열어 주면 값이 두 번 나간다.
+  const busyCut = regening === cut.idx || (!stalled && cut.state === "generating");
   const atLimit = cut.regen_count >= MAX_REGEN_PER_CUT;
   // 컷마다 첫 회는 공짜, 둘째부터 값을 치른다 — 누르기 전에 보여 준다.
   // ★ 모델을 안 넘긴다 — 이미지 재생성 값은 영상 모델과 무관하다(REGEN_PRICE.image 는 표가

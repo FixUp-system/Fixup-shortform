@@ -9,6 +9,15 @@ import { BudgetExceeded } from "../../../../../../../lib/costs.js";
 import { fakeFal } from "../../../../../../../lib/fake";
 import { modelIdForProject, resolutionForProject } from "../../../../../../../lib/clip-limits.js";
 
+// ★★ 이 라우트는 **기다렸다가 답한다**(await regen…) — 생성 라우트 여섯과 다른 점이다.
+//    그래서 `maxDuration` 이 곧 성공과 실패를 가른다: 배포 기본값에 잘리면 사장님에게는
+//    그냥 실패이고, 값은 이미 나간 뒤다(2026-08-18 사장님 지적으로 찾았다).
+//    화면이 이 응답을 받고 곧바로 다시 읽는 구조라 백그라운드로 돌리지 않는다 —
+//    돌리면 "다시 만드는 중" 표시를 내릴 자리가 사라진다.
+//
+// 클립 하나. 실측 컷당 100~800초(seedance 480p) — **여기가 가장 아슬아슬하다.**
+export const maxDuration = 300;
+
 export const POST = withUser(async (req, { params }, user) => {
   const { id, idx } = await params;
 
