@@ -374,7 +374,7 @@ export default function ImagesStepPage() {
                 열리는 쪽은 글을 쓰기 전에는 회색이고, 컷을 안 고르면 오른쪽에 사진 컷이
                 올라와 버튼이 아예 없을 수도 있다 — 그래서 고르는 단계까지 말한다.
                 (대괄호로 부르는 이름은 테스트가 실제 버튼과 대조한다) */}
-            {" "}멈춘 컷을 눌러 오른쪽에서 [그냥 다시]로 이어가실 수 있어요.
+            {" "}멈춘 컷을 눌러 오른쪽에서 [재생성]으로 이어가실 수 있어요.
           </p>
         )}
 
@@ -698,7 +698,7 @@ function PreviewPane({ cut, project, url, photoName, usage, aspect, stalled, onR
             </p>
             {/* 고쳐도 지금 그림은 그대로다 — 반영하려면 다시 만들어야 하고 그때 값이 든다. */}
             <p className="preview-note warn">
-              고쳐서 저장해도 지금 그림은 그대로예요 — 반영하려면 [그냥 다시]로 다시 만들어야
+              고쳐서 저장해도 지금 그림은 그대로예요 — 반영하려면 [재생성]으로 다시 만들어야
               하고, 그때 값이 들어요 (유료 · {regenLabel})
             </p>
             <div className="preview-actions">
@@ -743,7 +743,7 @@ function PreviewPane({ cut, project, url, photoName, usage, aspect, stalled, onR
               {busyCut ? "만드는 중…" : showCredits ? `이 지시로 다시 만들기 · ${regenLabel}` : "이 지시로 다시 만들기"}
             </button>
             <button className="mini" disabled={atLimit || busyCut} onClick={() => onRegen(cut.idx)}>
-              {busyCut ? "만드는 중…" : `그냥 다시 · ${regenLabel}`}
+              {busyCut ? "만드는 중…" : `재생성 · ${regenLabel}`}
             </button>
           </div>
           <span className="regen-note mono">
