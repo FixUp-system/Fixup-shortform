@@ -229,10 +229,10 @@ export default function ScenarioStepPage() {
       )}
 
       {/* 합계는 늘 보인다 — 고치는 동안 목표에서 얼마나 벗어났는지가 이 화면의 유일한 눈금이다 */}
-      <p className={ok ? "pgsub" : "pgsub warn"}>
+      <p className={`plan-note ${ok ? "pgsub" : "pgsub warn"}`}>
         장면 {scenario.shots.length}개 · 초 합계 {total}초{target ? ` / 목표 ${target}초` : ""}
       </p>
-      {problems.map((p, i) => <p key={i} className="pgsub warn">{p}</p>)}
+      {problems.map((p, i) => <p key={i} className="pgsub warn plan-note">{p}</p>)}
 
       {/* ★ 목록을 조작하는 버튼은 **목록 머리 오른쪽**이다(2026-08-18 셋째 판) —
           광고의 [수정하기]가 서는 자리와 같다. 예전에는 [장면 추가]가 목록 **아래 왼쪽**

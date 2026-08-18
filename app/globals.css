@@ -323,6 +323,12 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
    구분선과 넉넉한 위 여백은 걷어낸다. 저 둘은 "화면 아래쪽 실행줄"의 모양이라
    목록 머리에 그대로 쓰면 시나리오 본문과 장면 목록 사이가 두 번 끊겨 보인다. */
 .step-actions.plan-head { margin-top: var(--sp-3); padding-top: 0; border-top: 0; }
+/* ★ 목록 **바로 위** 줄(2026-08-18 사장님 지적: "광고와 간격이 다르다" — 재어 보니 6px).
+   원인은 붙어 있는 여백끼리 겹칠 때 **큰 쪽이 이긴다**는 것이었다: 광고는 그 자리가
+   `.script-src`(아래 여백 0)라 목록 머리의 12px 가 그대로 간격이 되는데, ②시나리오는
+   `.pgsub`(아래 여백 18px)라 18px 가 이겼다. 앞에 무엇이 오느냐에 간격이 달리면 화면마다
+   리듬이 갈린다 — 그 자리에 이름을 주고 아래 여백을 0 으로 둔다. 간격은 목록 머리가 정한다. */
+.plan-note { margin-bottom: 0; }
 
 .side-new {
   display: block;
