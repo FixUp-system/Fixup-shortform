@@ -271,14 +271,17 @@ export default function DoneStepPage() {
   // 낙관적으로 먼저 켜 두면, 라우트가 번역을 못 쓰는 답을 받아 저장을 접었을 때(502)
   // 화면은 이미 "일본어"를 켠 채라 사장님이 안 바뀐 것을 바뀐 것으로 믿는다.
   const [langErr, setLangErr] = useState("");
-  const [langBusy, setLangBusy] = useState(false);
+  // ★ boolean 이 아니라 **무엇을 옮기는 중인지**(언어 id)를 든다 — 재생성의 regening 과 같다.
+  //   켜진 칩은 서버가 저장한 뒤에야 옮겨가므로, 기다리는 동안 사장님이 고른 언어는
+  //   화면 어디에도 없다. 이 값만이 "일본어로 옮기는 중"이라고 이름을 부를 근거다.
+  const [langBusy, setLangBusy] = useState(null);
   const lang = project?.settings?.subtitle_lang || DEFAULT_SUBTITLE_LANG;
 
   // 언어를 고르거나(첫 인자) 낡은 컷을 [다시 번역]할 때(같은 언어를 다시 부른다) 쓴다 —
   // 라우트가 낡은 컷만 골라 다시 옮기므로 재호출이 곧 "다시 번역"이다.
   async function pickLang(langId) {
     if (langBusy) return;
-    setLangBusy(true);
+    setLangBusy(langId);
     setLangErr("");
     try {
       const res = await fetch(`/api/projects/${id}/subtitle-lang`, {
@@ -293,7 +296,7 @@ export default function DoneStepPage() {
     } catch (e) {
       setLangErr(e.message || "언어를 저장하지 못했어요 — 자막 언어는 그대로예요");
     } finally {
-      setLangBusy(false);
+      setLangBusy(null);
     }
   }
 
@@ -523,6 +526,18 @@ export default function DoneStepPage() {
                     ))}
                   </div>
                 </div>
+                {/* ★ 옮기는 데 한참 걸린다 — 그 동안 바뀌는 것이 "칩이 회색이 된다" 하나뿐이면
+                    사장님 눈에는 눌리지 않은 것과 같다. 셋을 함께 말한다: **무엇을**(고른 언어
+                    이름) · **하는 중**(도는 표시) · **왜 걸리는지**(컷마다 옮긴다).
+                    자리는 오류 문구와 같은 자리다 — 언어 줄 바로 아래라 시선이 이미 거기 있다.
+                    ⚠️ 칩 안에 넣지 않는다: 이 줄의 칩은 줄바꿈이 막혀 있어(.sub-row .chips)
+                       글자가 늘면 칩이 칸 밖으로 밀린다. */}
+                {langBusy && (
+                  <p className="pgsub">
+                    <span className="spinner" />
+                    {SUBTITLE_LANGS.find((l) => l.id === langBusy)?.label}로 옮기는 중이에요 — 컷마다 옮겨서 잠깐 걸려요
+                  </p>
+                )}
                 {langErr && <p className="pgsub warn">{langErr}</p>}
                 <div className="sub-row">
                   <span className="sub-label">위치</span>
