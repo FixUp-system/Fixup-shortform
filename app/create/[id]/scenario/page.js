@@ -238,33 +238,43 @@ export default function ScenarioStepPage() {
         {scenario.shots.map((s, i) => (
           <div className="plan-row" key={i}>
             <span className="num">{i + 1}</span>
+            {/* ★ 장면 안쪽을 **광고 화면과 같은 모양**으로 맞췄다(2026-08-18 사장님 지시).
+                광고는 `plan-field` 한 줄에 `<b>라벨</b> 값`, 초는 머리에 배지다. 여기는
+                라벨을 값 위에 얹은 폼이라 같은 것을 두 모양으로 보여 주고 있었다.
+                ★ 옮긴 것은 **형식뿐이다.** 초 편집·장면 추가·삭제·순서 이동은 그대로다 —
+                  광고에는 그 길이 아예 없지만(장면 수를 못 바꾼다), 여기서는 초의 합을
+                  목표에 맞추는 것이 **확정의 조건**이라 손댈 수단이 사라지면 안 된다.
+                ★ 광고의 "읽기 기본 + [수정하기]" 토글은 안 옮긴다. 그건 형식이 아니라
+                  **흐름**이다 — 광고는 받아 보는 화면이고 ②는 고치는 화면이다. */}
             <div className="plan-body sc-body">
-              <label className="sc-cell">
-                <span className="sc-label">이 장면이 하는 일</span>
+              {/* 초 — 광고와 같은 자리(장면 머리)에 배지로. 다만 여기서는 눌러 고친다. */}
+              <label className="badge sc-secs">
+                <input type="number" value={s.seconds ?? 0} aria-label={`${i + 1}번 장면 길이(초)`}
+                  onChange={(e) => editShot(i, { seconds: Math.round(Number(e.target.value) || 0) })} />
+                초
+              </label>
+              <label className="plan-field">
+                <b>비트</b>
                 <input className="field" value={s.beat || ""}
+                  placeholder="이 장면이 하는 일"
                   onChange={(e) => editShot(i, { beat: e.target.value })} />
               </label>
               {emptyBeat(s) && (
                 <p className="pgsub warn">이 칸이 비어 있으면 이 장면은 저장되지 않아요</p>
               )}
-              <label className="sc-cell">
-                <span className="sc-label">대사</span>
+              <label className="plan-field">
+                <b>대사</b>
                 <textarea className="field" rows={2} value={s.line || ""}
                   onChange={(e) => editShot(i, { line: e.target.value })} />
               </label>
-              <div className="sc-two">
-                <label className="sc-cell">
-                  <span className="sc-label">말하는 사람</span>
-                  <input className="field" value={s.speaker || ""}
-                    placeholder="화면 밖 목소리면 내레이션"
-                    onChange={(e) => editShot(i, { speaker: e.target.value })} />
-                </label>
-                <label className="sc-cell sc-secs">
-                  <span className="sc-label">초</span>
-                  <input className="field" type="number" value={s.seconds ?? 0}
-                    onChange={(e) => editShot(i, { seconds: Math.round(Number(e.target.value) || 0) })} />
-                </label>
-              </div>
+              {/* 광고에는 없는 칸이라 맞출 라벨이 없다 — 이 저장소의 평소 말("말하는 사람")을
+                  쓴다. 광고와 겹치는 칸(비트·대사)만 광고의 낱말을 그대로 따른다. */}
+              <label className="plan-field">
+                <b>말하는 사람</b>
+                <input className="field" value={s.speaker || ""}
+                  placeholder="화면 밖 목소리면 내레이션"
+                  onChange={(e) => editShot(i, { speaker: e.target.value })} />
+              </label>
               <div className="sc-actions">
                 <button className="mini" onClick={() => moveShot(i, -1)} disabled={busy}>↑</button>
                 <button className="mini" onClick={() => moveShot(i, 1)} disabled={busy}>↓</button>
