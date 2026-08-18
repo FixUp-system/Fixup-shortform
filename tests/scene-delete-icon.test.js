@@ -40,6 +40,13 @@ describe("장면 삭제 — 오른쪽 끝 아이콘", () => {
     expect(r, "오른쪽 끝으로 안 민다").toMatch(/margin-left:\s*auto|justify-content:\s*flex-end/);
   });
 
+  // 사장님 지시(같은 회차): "장면 추가 버튼도 그냥 기호로 표현해줘."
+  it("★★ 장면 추가도 기호다 — 삭제와 짝이 되는 자리다", () => {
+    const head = sc.slice(sc.indexOf("step-actions plan-head"), sc.indexOf('<div className="plan-list">'));
+    expect(head, "장면 추가가 아직 글자다").toMatch(/Icon[^>]*name="plus"/);
+    expect(head, "무엇을 하는 버튼인지 말하지 않는다").toMatch(/aria-label="[^"]*장면 추가/);
+  });
+
   it("★ 장면 줄의 다른 것들은 그대로다", () => {
     expect(rows, "끌기가 사라졌다").toMatch(/draggable/);
     expect(rows, "삭제 동작이 사라졌다").toMatch(/removeShot/);

@@ -249,7 +249,18 @@ export default function ScenarioStepPage() {
           `.plan-head` 는 오른쪽 정렬만 빌려 쓰고 구분선·여백은 걷는다(광고와 같은 규칙). */}
       <div className="step-actions plan-head">
         <div className="fwd">
-          <button className="mini" onClick={addShot} disabled={busy}>장면 추가</button>
+          {/* ★ 기호 하나로(2026-08-18 사장님 지시). 삭제와 짝이 되는 자리라 모양도 짝이어야
+              한다 — 한쪽만 글자면 두 버튼이 다른 종류로 보인다.
+              라벨을 뺀 자리는 aria-label·title 이 대신한다(components/Icon.jsx 머리말). */}
+          <button
+            className="mini sc-add"
+            onClick={addShot}
+            disabled={busy}
+            aria-label="장면 추가"
+            title="장면을 하나 더해요"
+          >
+            <Icon name="plus" size={16} />
+          </button>
         </div>
       </div>
 

@@ -1475,6 +1475,8 @@ input.field::placeholder { color: var(--ink-soft); }
    높이를 맞춘다(--ctl-sm 사다리 위에 그대로 선다). */
 .sc-del { margin-left: auto; width: var(--ctl-sm); padding: 0; color: var(--ink-soft); }
 .sc-del:hover { color: var(--ink); }
+/* 장면 추가 — 삭제와 짝이라 같은 정사각이다(한쪽만 글자면 두 버튼이 다른 종류로 보인다) */
+.sc-add { width: var(--ctl-sm); padding: 0; }
 
 /* ★ 번호가 곧 손잡이다(2026-08-18 사장님 지시: "업다운이 아닌 드래그 배치로").
    따로 그린 손잡이를 옆에 두면 좁은 줄에 부품이 하나 더 늘고, 번호는 이미 "이 장면"을
