@@ -115,7 +115,13 @@ export default function CreatePage() {
       }),
     });
     const data = await res.json();
-    if (res.ok) router.push(`/create/${data.id}/briefing`);
+    // ★ **바로 ②시나리오로** 간다(2026-08-18 사장님 지시). ①자료 화면은 오늘 아침 입력을
+    //   전부 잃어(전부 이 화면으로 모았다) 남은 일이 "적은 글을 보여 주고 버튼 하나를 누르는
+    //   것" 뿐이었다 — 누를 것이 하나뿐인 화면은 게이트가 아니라 한 번 더 누르게 하는 자리다.
+    //   ★ 화면을 지우지는 않는다: 스테퍼의 ①이 그곳을 가리키고, 적은 자료를 다시 볼 자리가
+    //     필요하다. 가드도 막지 않는다 — 자료 글이 있으면 currentStepKey 가 곧바로
+    //     "scenario" 를 돌려주고, 이 화면이 그 글을 반드시 받는다.
+    if (res.ok) router.push(`/create/${data.id}/scenario`);
     // 실패해도 써 둔 자료는 화면에 남는다(로컬 state) — 다시 누르면 된다
     else { setErr(data.error || "생성 실패"); setBusy(false); }
   }
