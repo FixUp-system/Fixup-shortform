@@ -14,6 +14,8 @@ import { chargeVideo } from "../lib/charges.js";
 import { DELETE } from "../app/api/projects/[id]/route.js";
 // 라우트는 신원 헤더(withUser)로 소유자를 정한다 — 헤더가 없으면 500 이다.
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
+// 이름 규칙은 **한 곳**에서 온다 — 여기에 손으로 목록을 적으면 방식이 늘 때 또 샌다.
+import { FILM_MODES, filmVideoBase } from "../lib/film/mode.js";
 
 const A = "00000000-0000-4000-8000-00000000000a";
 const B = "00000000-0000-4000-8000-00000000000b";
@@ -67,6 +69,27 @@ describe("프로젝트 지우기", () => {
 
     await expect(store.getObject("renders", `${p.id}.mp4`)).rejects.toThrow();
     await expect(store.getObject("renders", `${p.id}-raw.mp4`)).rejects.toThrow();
+  });
+
+  // ★★ 한 번에 굽는 영상(film)은 **한 프로젝트에서 두 편**을 굽는다(order·refs) — 이름이
+  //   `<id>-<방식>.mp4`·`<id>-<방식>-raw.mp4` 라 광고 이름 둘만 지우면 넷이 그대로 남는다.
+  //   문서를 지우면 /api/renders 가 404 를 내므로 그 파일들은 **다시 열 수도 찾을 수도 없다** —
+  //   편당 ~40MB 가 무료 플랜 1GB 에 영구히 눌러앉는다.
+  it("film 의 방식별 완성본도 함께 지운다 — 문서를 지우면 다시 찾을 길이 없다", async () => {
+    const store = getStore();
+    const p = await createProject({ ownerId: A, kind: "film", settings: {}, material: { text: "자료", photos: [] } });
+    const names = FILM_MODES.flatMap((m) => [
+      `${filmVideoBase(p.id, m.id)}.mp4`,
+      `${filmVideoBase(p.id, m.id)}-raw.mp4`,
+    ]);
+    expect(names.length).toBe(4);
+    for (const n of names) await store.putObject("renders", n, Buffer.from("완성본"), "video/mp4");
+
+    await DELETE(req(), ctx(p.id));
+
+    for (const n of names) {
+      await expect(store.getObject("renders", n), `${n} 이 남았다`).rejects.toThrow();
+    }
   });
 
   it("없는 프로젝트를 지우려 하면 404", async () => {

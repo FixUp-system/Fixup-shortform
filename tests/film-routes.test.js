@@ -296,3 +296,126 @@ describe("굽기 라우트 — 청구", () => {
     expect(await balanceFor(U)).toBe(1000);
   });
 });
+
+// ── 두 방향 잠금 · 시나리오 판 ─────────────────────────────────────────────
+//
+// ★★ 화면(lib/film/gates.js)이 두 버튼을 서로 잠그지만, 화면 잠금은 **한 벌뿐이라 샌다**
+//   (탭 둘·새로고침 실패·직접 호출). 서버가 같은 것을 판정해야 값이 안 샌다.
+describe("굽기와 그림이 서로를 막는다", () => {
+  beforeEach(() => {
+    resetMemoryStore();
+    filmMock.images.mockClear();
+    filmMock.start.mockClear();
+    filmMock.start.mockImplementation(async () => ({ done: false, requestId: "req-1" }));
+  });
+
+  it("★★ 굽는 중에는 그림을 못 그린다 — 그리면 status 가 images 로 바뀌어 그 회차를 영영 못 수거한다", async () => {
+    const p = await readyFilm();
+    await runWithActor(U, () =>
+      updateProject(p.id, U, (d) => putFilm(d, "order", { status: "rendering", job: { requestId: "r-1" } }))
+    );
+    const res = await imagesPOST(post({ mode: "order" }), ctx(p.id));
+    expect(res.status).toBe(409);
+    expect(filmMock.images).not.toHaveBeenCalled();
+    // 문서도 그대로다 — status 가 흔들리면 수거(collectFilmRender)가 그 job 을 못 알아본다
+    const doc = await runWithActor(U, () => getProject(p.id, U));
+    expect(doc.films.order.status).toBe("rendering");
+    expect(doc.films.order.job.requestId).toBe("r-1");
+  });
+
+  it("★ 옆 방식이 굽는 중인 것은 안 막는다 — 두 방식은 각각의 문이다", async () => {
+    const p = await readyFilm();
+    await runWithActor(U, () =>
+      updateProject(p.id, U, (d) => putFilm(d, "refs", { status: "rendering", job: { requestId: "r-1" } }))
+    );
+    const res = await imagesPOST(post({ mode: "order" }), ctx(p.id));
+    expect(res.status).toBe(200);
+  });
+
+  it("★★ 그리는 중에는 못 굽는다 — 옛 그림으로 값이 나간다. 청구 앞에서 걸려야 한다", async () => {
+    await grant(1000);
+    const p = await readyFilm();
+    await runWithActor(U, () =>
+      updateProject(p.id, U, (d) => putFilm(d, "order", { status: "drawing", drawingAt: Date.now() }))
+    );
+    const res = await renderPOST(post({ mode: "order" }), ctx(p.id));
+    expect(res.status).toBe(409);
+    expect(filmMock.start).not.toHaveBeenCalled();
+    expect(await balanceFor(U)).toBe(1000);
+  });
+
+  it("★ 그리기 잠금도 영원하지 않다 — 만료된 '그리는 중'이 굽기를 영영 막으면 막다른 길이다", async () => {
+    await grant(1000);
+    const p = await readyFilm();
+    await runWithActor(U, () =>
+      updateProject(p.id, U, (d) =>
+        putFilm(d, "order", { status: "drawing", drawingAt: Date.now() - FILM_IMAGE_LOCK_MS - 1 }))
+    );
+    const res = await renderPOST(post({ mode: "order" }), ctx(p.id));
+    expect(res.status).toBe(202);
+  });
+});
+
+describe("시나리오 판(scenario.tries)이 조건을 지킨다", () => {
+  beforeEach(() => {
+    resetMemoryStore();
+    scenarioMock.make.mockClear();
+    filmMock.start.mockClear();
+    filmMock.start.mockImplementation(async () => ({ done: false, requestId: "req-1" }));
+  });
+
+  it("★★ 한 편이라도 구웠으면 시나리오를 다시 못 쓴다 — 방식마다 다른 판으로 구우면 비교가 무의미하다", async () => {
+    const p = await readyFilm();
+    await runWithActor(U, () =>
+      updateProject(p.id, U, (d) =>
+        putFilm(d, "order", { status: "done", video: { url: "/api/renders/x-order.mp4" } }))
+    );
+    const res = await scenarioPOST(post({}), ctx(p.id));
+    expect(res.status).toBe(400);
+    expect(scenarioMock.make).not.toHaveBeenCalled();
+  });
+
+  it("★ 그림만 있으면 아직 고칠 수 있다 — 값을 치르기 전이라 막다른 길을 만들지 않는다", async () => {
+    const p = await readyFilm();
+    const res = await scenarioPOST(post({}), ctx(p.id));
+    expect(res.status).toBe(200);
+    expect(scenarioMock.make).toHaveBeenCalled();
+  });
+
+  it("★★ 시나리오를 고친 뒤에는 옛 그림으로 못 굽는다 — 청구 앞에서 걸린다", async () => {
+    await grant(1000);
+    const p = await readyFilm();
+    // 그림은 1판으로 그렸는데 시나리오가 2판이 됐다
+    await runWithActor(U, () =>
+      updateProject(p.id, U, (d) => ({
+        ...putFilm(d, "order", { status: "images", scenarioTries: 1 }),
+        scenario: { ...d.scenario, tries: 2 },
+      }))
+    );
+    const res = await renderPOST(post({ mode: "order" }), ctx(p.id));
+    expect(res.status).toBe(400);
+    expect(filmMock.start).not.toHaveBeenCalled();
+    expect(await balanceFor(U)).toBe(1000);
+  });
+
+  it("★ 같은 판이면 그대로 굽는다", async () => {
+    await grant(1000);
+    const p = await readyFilm();
+    await runWithActor(U, () =>
+      updateProject(p.id, U, (d) => ({
+        ...putFilm(d, "order", { status: "images", scenarioTries: 2 }),
+        scenario: { ...d.scenario, tries: 2 },
+      }))
+    );
+    expect((await renderPOST(post({ mode: "order" }), ctx(p.id))).status).toBe(202);
+  });
+
+  it("★ 판을 안 적어 둔 옛 문서는 그대로 통과한다 — 이 태스크 전에 그린 그림을 못 굽게 만들지 않는다", async () => {
+    await grant(1000);
+    const p = await readyFilm();
+    await runWithActor(U, () =>
+      updateProject(p.id, U, (d) => ({ ...d, scenario: { ...d.scenario, tries: 3 } }))
+    );
+    expect((await renderPOST(post({ mode: "order" }), ctx(p.id))).status).toBe(202);
+  });
+});

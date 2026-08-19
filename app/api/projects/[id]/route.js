@@ -14,6 +14,9 @@ import { isSubtitleLang } from "../../../../lib/subtitle-langs.js";
 // 컷별 덮어쓰기 상한. 숫자를 여기서 새로 만들지 않는다 — **원장이 프롬프트를 자르는 자리**를
 // 그대로 쓴다(lib/costs.js 의 LEDGER_PROMPT_MAX 주석에 왜 2000 인지가 있다).
 import { LEDGER_PROMPT_MAX } from "../../../../lib/costs.js";
+// 완성본 파일 이름 규칙 — **한 곳에서** 온다. film 은 방식이 이름에 들어가 한 프로젝트에
+// 파일이 넷이다(lib/film/mode.js). 순수 모듈이라 굽기 장치(ffmpeg·fal)가 딸려 오지 않는다.
+import { FILM_MODES, filmVideoBase } from "../../../../lib/film/mode.js";
 
 // 결제 뒤 화질 잠금이 **락 안에서** 걸렸다는 표식.
 //
@@ -413,7 +416,18 @@ export const DELETE = withUser(async (_req, { params }, user) => {
   const gone = await getStore().deleteProject(id, user.id);
   if (!gone) return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
 
-  for (const key of [`${id}.mp4`, `${id}-raw.mp4`]) {
+  // ★★ film 은 **한 프로젝트에서 두 편**을 굽는다(order·refs) — 이름이 `<id>-<방식>.mp4` 라
+  //   광고 이름 둘만 지우면 넷이 그대로 남고, 문서가 없어진 뒤에는 /api/renders 가 404 를
+  //   내므로 **다시 열 수도 목록으로 찾을 수도 없다**(편당 ~40MB 가 영구히 눌러앉는다).
+  // ★ 종류(kind)로 가르지 않는다 — 문서는 방금 지워서 이제 없다. 지우기는 멱등이고
+  //   없는 키는 조용히 지나가므로, 광고 문서에서 film 이름 넷을 부르는 것은 아무 일도
+  //   아니다. 대신 이름은 **표에서 파생**한다(lib/film/mode.js) — 손으로 적으면 방식이
+  //   늘 때 또 샌다.
+  const filmKeys = FILM_MODES.flatMap((m) => {
+    const base = filmVideoBase(id, m.id);
+    return [`${base}.mp4`, `${base}-raw.mp4`];
+  });
+  for (const key of [`${id}.mp4`, `${id}-raw.mp4`, ...filmKeys]) {
     await getStore().deleteObject("renders", key).catch((e) => {
       console.error("완성본 삭제 실패:", key, e?.message);
     });

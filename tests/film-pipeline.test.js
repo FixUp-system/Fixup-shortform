@@ -100,6 +100,21 @@ describe("그림 만들기", () => {
     expect(seen[0].refs.map((r) => r.key)).toEqual(["rabbit.jpg"]);
   });
 
+  // ★★ 그림이 **어느 판의 시나리오**로 그려졌는지 함께 적는다. 이 한 숫자가 없으면
+  //   시나리오를 다시 쓴 뒤에도 옛 그림으로 굽기가 열려 $2 가 나가고, 두 방식을 서로
+  //   다른 판으로 구워도 문서에 그 사실이 안 남는다(그러면 비교가 무의미해진다).
+  it("★★ 그림에 시나리오 판이 함께 적힌다", async () => {
+    const p = await makeFilm();
+    const row = await getStore().selectProject(p.id, U);
+    await getStore().updateProjectRow(p.id, U, row.version, {
+      ...row.doc, scenario: { ...SCENARIO, tries: 2 },
+    });
+    await runWithActor(U, () =>
+      runFilmImages(p.id, U, "order", { generateImage: async () => ({ url: "https://fal.example/t.png" }) })
+    );
+    expect((await getProject(p.id, U)).films.order.scenarioTries).toBe(2);
+  });
+
   it("만든 그림이 방식 칸에 남는다", async () => {
     const p = await makeFilm();
     await runWithActor(U, () =>

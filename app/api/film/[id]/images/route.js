@@ -32,6 +32,17 @@ export const POST = withUser(async (req, { params }, user) => {
   if (isDrawLocked(film)) {
     return Response.json({ error: "이미 그리는 중이에요" }, { status: 409 });
   }
+  // ★★ **굽는 중에는 그리지 않는다.** 화면(lib/film/gates.js)이 이미 두 버튼을 서로
+  //   잠그지만 화면 잠금은 한 벌뿐이라 샌다(탭 둘·새로고침 실패·직접 호출). 그리고
+  //   새면 돈이 두 번 나간다: 그리기가 끝나면 putFilm 이 status 를 "images" 로 바꾸는데,
+  //   collectFilmRender 는 `status !== "rendering"` 이면 그 job 을 **영영 수거하지 않는다** —
+  //   fal 값은 나갔고 회차는 살아 있어 환불도 안 되며, 다음 [굽기]가 새 회차를 열어
+  //   35 크레딧을 다시 걷는다. 그래서 지켜져야 하는 것을 서버가 판정한다.
+  // ★ 판정은 새로 만들지 않는다 — 굽는 중은 곧 status 가 "rendering" 이라는 뜻이고,
+  //   그것은 굽기 라우트가 자기 재진입을 막을 때 보는 것과 같은 값이다.
+  if (film.status === "rendering") {
+    return Response.json({ error: "지금 영상을 만드는 중이에요" }, { status: 409 });
+  }
   const tries = Number(film.imageTries) || 0;
   if (tries >= MAX_FILM_IMAGE_TRIES) {
     return Response.json({ error: "그림을 너무 많이 다시 그렸어요" }, { status: 400 });
