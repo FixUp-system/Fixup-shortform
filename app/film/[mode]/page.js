@@ -54,12 +54,16 @@ export default function FilmPage() {
   const fileRef = useRef(null);
   const stopRef = useRef(null);
 
-  // 주소의 id 로 프로젝트를 읽는다. film 문서도 kind 가 "ad" 가 아니라 이 문을 지난다
-  // (app/api/projects/[id]/route.js). 방식별 산출물은 이 문서 안의 films 에 두 벌로 있다.
+  // 주소의 id 로 프로젝트를 읽는다 — **film 전용 문**이다(app/api/film/[id]/route.js).
+  // 방식별 산출물은 이 문서 안의 films 에 두 벌로 있다.
+  //
+  // ★★ 예전에는 GET /api/projects/[id] 를 두드렸다. 그 문이 kind === "ad" 만 막고 있어서
+  //   film 문서가 "지나갔던" 것뿐이다 — 단계별 경로가 종류를 옳게 막자 이 화면이 통째로
+  //   죽었다(2026-08-19). 종류마다 자기 문으로 읽는다: 광고는 /api/ads/[id] 가 그렇게 한다.
   useEffect(() => {
     if (!id) { setProject(null); return; }
     let alive = true;
-    fetch(`/api/projects/${id}`)
+    fetch(`/api/film/${id}`)
       .then(async (res) => {
         const data = await res.json().catch(() => ({}));
         if (!alive) return;
@@ -93,7 +97,7 @@ export default function FilmPage() {
   async function reload() {
     if (!id) return;
     try {
-      const res = await fetch(`/api/projects/${id}`);
+      const res = await fetch(`/api/film/${id}`);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setErr(data.error || "지금 상태를 확인하지 못했어요 — 새로고침해 주세요");

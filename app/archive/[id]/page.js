@@ -7,9 +7,9 @@
 // 확인하는 것인데, 제작 화면은 **유료 버튼을 들고 있다** — 확인하러 들어갔다가 값이
 // 나가는 문 앞에 서게 된다. 그래서 보는 자리와 고치는 자리를 가른다.
 //
-// ★ 한 화면이 두 종류를 다 받는다(광고 kind:"ad" · 기존 단계별). 읽는 문이 갈려 있어서
-//   (/api/ads/[id] 와 /api/projects/[id] 가 서로를 404 로 거절한다) **광고를 먼저 묻고
-//   아니면 기존 문으로** 간다. 주소만으로는 종류를 알 수 없기 때문이다.
+// ★ 한 화면이 세 종류를 다 받는다(광고 kind:"ad" · 한 번에 굽기 kind:"film" · 기종 단계별).
+//   읽는 문이 종류마다 갈려 있어서(서로를 404 로 거절한다) **차례로 두드린다.**
+//   주소만으로는 종류를 알 수 없기 때문이다.
 // ★ 값이 나가는 버튼은 여기 없다. 이어서 작업하려면 [이어서 작업하기]로 제작 화면에 간다.
 import { Suspense, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
@@ -41,9 +41,13 @@ function ArchiveDetailPageBody() {
   useEffect(() => {
     let alive = true;
     (async () => {
-      // 광고를 먼저 묻는다 — 기존 문서가 훨씬 많지만, 광고 쪽 응답이 kind 를 달고 와서
-      // 한 번에 판정된다. 404 면 기존 문으로 간다(양방향 격리라 서로를 404 로 거절한다).
-      for (const url of [`/api/ads/${id}`, `/api/projects/${id}`]) {
+      // 종류 전용 문을 먼저 묻고, 아니면 기존(단계별) 문으로 간다. 전용 문의 응답은
+      // kind 를 달고 와서 한 번에 판정된다(양방향 격리라 서로를 404 로 거절한다).
+      //
+      // ★ film 문을 빠뜨리면 film 카드는 **눌러도 아무것도 안 열린다** — /api/ads 도
+      //   /api/projects 도 그 문서를 404 로 거절하기 때문이다(2026-08-19에 실제로 그랬다).
+      //   종류가 늘 때 여기 한 줄을 더하는 것을 tests/step-doc-gate.test.js 가 잰다.
+      for (const url of [`/api/ads/${id}`, `/api/film/${id}`, `/api/projects/${id}`]) {
         try {
           const res = await fetch(url);
           if (!res.ok) continue;
@@ -70,23 +74,38 @@ function ArchiveDetailPageBody() {
   if (!doc) return <p className="pgsub">불러오는 중…</p>;
 
   const isAd = doc.kind === "ad";
+  // ★ film 도 여기까지 온다(2026-08-19). 갈라 두지 않으면 "종류가 없는 옛 문서"로 떨어져
+  //   [이어서 작업하기]가 단계별 화면(/create/…)을 가리킨다 — 그 화면의 문은 film 문서를
+  //   404 로 거절하므로 눌러도 막다른 길이다.
+  const isFilm = doc.kind === "film";
   const s = doc.settings || {};
   // 완성본 — 광고는 videos[0], 단계별은 render 다. 둘 다 없으면 아직 안 만든 것이다.
-  const video = isAd ? doc.videos?.[0]?.url : doc.render?.url;
+  // ★ film 은 **방식마다 한 벌**이라(films.order·films.refs) 먼저 구워진 것을 보여 준다.
+  //   두 편을 나란히 보는 자리는 제작 화면이다 — 여기는 "무슨 영상이었지"를 확인하는 자리다.
+  const video = isAd
+    ? doc.videos?.[0]?.url
+    : isFilm
+      ? Object.values(doc.films || {}).map((fm) => fm?.video).find(Boolean) || null
+      : doc.render?.url;
   // 이어서 작업하는 자리 — 종류마다 제작 화면이 다르다.
-  const workHref = isAd ? `/ads/${id}` : `/create/${id}/briefing`;
+  const workHref = isAd ? `/ads/${id}` : isFilm ? `/film/order?id=${id}` : `/create/${id}/briefing`;
   // 모델은 **전체 이름**으로 적는다 — 여기는 모델 묶음 밖이라 "2.0" 만 적으면 무엇의
   // 2.0 인지 알 수 없다. 이름은 표에서 온다(화면이 짓지 않는다).
-  const modelId = isAd ? s.model : modelIdForProject(doc);
-  const modelLabel = isAd
-    ? adModel(s.model)?.name || adModel(s.model)?.label
-    : I2V_MODELS.find((m) => m.id === modelId)?.label || modelId;
-  const resolution = isAd ? s.resolution : resolutionForProject(doc);
-  const seconds = isAd ? s.seconds : s.target_seconds;
+  //
+  // ★ film 은 이 표들(광고표·단계별 I2V 표) 중 어디에도 없다. 억지로 태우면 화면이 **그 문서에
+  //   없는 모델·화질을 지어낸다** — 없는 값은 줄째 안 그리는 것이 이 화면의 규칙이다(Row).
+  const modelId = isAd ? s.model : isFilm ? null : modelIdForProject(doc);
+  const modelLabel = isFilm
+    ? null
+    : isAd
+      ? adModel(s.model)?.name || adModel(s.model)?.label
+      : I2V_MODELS.find((m) => m.id === modelId)?.label || modelId;
+  const resolution = isAd ? s.resolution : isFilm ? null : resolutionForProject(doc);
+  const seconds = isAd ? s.seconds : isFilm ? s.seconds ?? null : s.target_seconds;
 
   return (
     <>
-      <h1 className="pgtitle">{isAd ? "광고 영상" : "영상 만들기 (단계별)"}</h1>
+      <h1 className="pgtitle">{isAd ? "광고 영상" : isFilm ? "한 번에 굽는 영상" : "영상 만들기 (단계별)"}</h1>
       <p className="pgsub">이 영상이 어떻게 만들어졌는지 볼 수 있어요.</p>
 
       <section className="panel panel--library">

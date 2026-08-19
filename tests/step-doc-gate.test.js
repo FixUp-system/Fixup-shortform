@@ -43,6 +43,9 @@ import { GET as cutsStatusGET } from "../app/api/projects/[id]/cuts/status/route
 import { GET as voiceStatusGET } from "../app/api/projects/[id]/voice/status/route.js";
 import { GET as clipsStatusGET } from "../app/api/projects/[id]/clips/status/route.js";
 import { GET as renderStatusGET } from "../app/api/projects/[id]/render/status/route.js";
+// 종류 전용 읽기 문 — 단계별 문을 막는 것과 **한 쌍**이라 같은 파일에서 함께 잰다.
+import { GET as adGET } from "../app/api/ads/[id]/route.js";
+import { GET as filmGET } from "../app/api/film/[id]/route.js";
 
 const U = "00000000-0000-4000-8000-00000000000a";
 const run = (fn) => runWithActor(U, fn);
@@ -145,10 +148,18 @@ describe("단계별 라우트는 종류 있는 문서를 모른다", () => {
       expect(res.status).toBe(404);
     });
 
-    it(`GET /api/projects/[id] — ${kind} 문서는 404`, async () => {
+    // ★★ 이 한 줄만 두면 **사고가 계약이 된다.** 2026-08-19 에 실제로 그랬다:
+    //   film 을 여기서 막았는데 film 에는 자기 읽기 문이 없어서, 제작 화면과 보관함 상세가
+    //   통째로 죽은 채 이 테스트는 그린이었다. 그래서 **막는 것과 대신 여는 문을 한 쌍으로**
+    //   잰다 — 짝이 없는 차단은 통과할 수 없다.
+    it(`GET /api/projects/[id] — ${kind} 문서는 404 이고, 그 종류의 문이 대신 연다`, async () => {
       const p = await make(kind);
-      const res = await projectGET(reqAs(), ctx(p.id));
-      expect(res.status).toBe(404);
+      expect((await projectGET(reqAs(), ctx(p.id))).status).toBe(404);
+
+      const ownDoor = { film: filmGET, ad: adGET }[kind];
+      const opened = await ownDoor(reqAs(), ctx(p.id));
+      expect(opened.status ?? 200, `${kind} 를 막았는데 그 종류의 읽기 문이 안 연다`).toBe(200);
+      expect((await opened.json()).id).toBe(p.id);
     });
 
     // PATCH 는 본문 모양마다 다른 자리를 지난다(사전 판정 둘 · 락 안 판정 하나).
@@ -253,6 +264,16 @@ describe("★ 단계별 라우트는 전부 공용 판정을 쓴다", () => {
 
   const METHOD = /export\s+(?:const|async\s+function)\s+(GET|POST|PATCH|PUT|DELETE)\b/g;
 
+  // 핸들러가 그 도우미를 **정말로** 부르는가. 부분 문자열로 재면 이름이 `load` 일 때
+  // `reload(`·`upload(` 가 그대로 통과해, 판정을 한 번도 안 지난 핸들러가 그린이 된다.
+  // 그래서 **앞 글자가 식별자가 아닐 때만**(=이름의 시작일 때만) 부른 것으로 센다.
+  const callsHelper = (body, name) => {
+    for (let at = body.indexOf(`${name}(`); at !== -1; at = body.indexOf(`${name}(`, at + 1)) {
+      if (!/[A-Za-z0-9_$]/.test(body[at - 1] || "")) return true;
+    }
+    return false;
+  };
+
   // 문서 하나를 다루지 않는 핸들러 — 여기에 종류 판정을 걸 대상이 없다.
   //
   // ★ DELETE 는 **일부러** 뺀다. 보관함의 지우기 버튼(components/ProjectCards.jsx)이
@@ -286,7 +307,7 @@ describe("★ 단계별 라우트는 전부 공용 판정을 쓴다", () => {
         if (EXEMPT.has(name)) continue;
         const body = src.slice(marks[i].index, marks[i + 1]?.index ?? src.length);
         const guarded =
-          body.includes("isStepDoc") || preambleGuards.some((g) => body.includes(`${g}(`));
+          body.includes("isStepDoc") || preambleGuards.some((g) => callsHelper(body, g));
         if (!guarded) offenders.push(name);
       }
     }
@@ -298,5 +319,81 @@ describe("★ 단계별 라우트는 전부 공용 판정을 쓴다", () => {
   it("손으로 적은 종류 비교가 남아 있지 않다", () => {
     const offenders = routeFiles.filter((f) => /kind\s*[=!]==\s*["'](ad|film)["']/.test(strip(readFileSync(f, "utf8"))));
     expect(offenders, "단계별 라우트가 종류를 손으로 비교한다 — isStepDoc 을 쓸 것").toEqual([]);
+  });
+});
+
+// ★★ 화면이 두드리는 주소가 **실제로 있는 라우트인가.**
+//
+// 이 태스크의 Critical 이 여기서 새어 나갔다. film 제작 화면은 GET /api/projects/[id] 로
+// 문서를 읽고 있었는데(그 문이 kind === "ad" 만 막아서 지나갔던 것뿐이다), 그 문을 옳게
+// 막자 화면이 열리자마자 죽었다 — 대체 문(app/api/film/[id]/route.js)이 없었기 때문이다.
+// 그런데 화면 계약 테스트는 **소스 문자열**만 재므로 "그 주소가 404 가 됐다"를 못 잰다.
+//
+// 그래서 주소를 파일 트리와 맞춰 본다. 라우트 파일이 진실의 원천이고, 화면이 부르는 주소가
+// 그 트리에 없으면 실패한다. 종류가 늘어 화면이 새 문을 두드릴 때 그 문을 안 만들면 걸린다.
+describe("★ 화면이 부르는 주소는 실제로 있는 라우트다", () => {
+  const strip = (src) =>
+    src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+  // app/api 아래의 라우트를 **주소 모양**으로 모은다. [id]·[name] 같은 동적 칸은 아무
+  // 값이나 받는다 — 화면 쪽 `${...}` 와 짝이 맞는 자리다.
+  const routes = [];
+  (function walk(dir, segs) {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.isDirectory()) walk(path.join(dir, e.name), [...segs, e.name]);
+      else if (e.name === "route.js") routes.push(segs);
+    }
+  })("app/api", []);
+
+  const isDynamic = (seg) => seg.startsWith("[") && seg.endsWith("]");
+  const exists = (want) =>
+    routes.some(
+      (segs) =>
+        segs.length === want.length &&
+        segs.every((seg, i) => isDynamic(seg) || want[i] === "*" || want[i] === seg)
+    );
+
+  // 화면이 부르는 주소 — 주석을 걷어낸 뒤 따옴표·백틱 안의 /api/… 만 본다.
+  const urlsOf = (file) => {
+    const src = strip(readFileSync(file, "utf8"));
+    return [...new Set([...src.matchAll(/[`'"](\/api\/[^`'"]*)[`'"]/g)].map((m) => m[1]))];
+  };
+  const wanted = (url) =>
+    url
+      .split("?")[0]
+      .replace(/\$\{[^}]*\}/g, "*")
+      .split("/")
+      .filter(Boolean)
+      .slice(1); // 맨 앞 "api" 를 뺀다
+
+  const SCREENS = [
+    "app/film/[mode]/page.js", // ★ 이번 사고가 난 자리
+    "app/archive/[id]/page.js", // 보관함 상세 — 종류마다 문을 차례로 두드린다
+  ];
+
+  it("라우트 트리를 실제로 훑었다 — 목록이 비면 이 테스트는 아무것도 안 지킨다", () => {
+    expect(routes.length).toBeGreaterThan(20);
+  });
+
+  it.each(SCREENS)("%s 가 두드리는 문이 전부 있다", (file) => {
+    const urls = urlsOf(file);
+    expect(urls.length, `${file} 에서 주소를 하나도 못 찾았다 — 추출이 깨졌다`).toBeGreaterThan(0);
+    const missing = urls.filter((u) => !exists(wanted(u)));
+    expect(missing, `${file} 이 없는 라우트를 부른다 — 화면이 열리자마자 죽는다`).toEqual([]);
+  });
+
+  // 위 검사는 "파일이 있는가"까지다. film 화면의 읽기 문만은 **한 걸음 더** 못 박는다 —
+  // 이 문이 다시 /api/projects 로 돌아가면 단계별 게이트가 그것을 404 로 거절한다.
+  it("film 화면은 film 전용 문으로 문서를 읽는다 — 단계별 문으로 돌아가면 안 된다", () => {
+    const src = strip(readFileSync("app/film/[mode]/page.js", "utf8"));
+    expect(src, "film 화면이 단계별 문을 두드린다").not.toMatch(/\/api\/projects\//);
+    expect(src).toMatch(/`\/api\/film\/\$\{id\}`/);
+  });
+
+  it("보관함 상세는 세 종류의 문을 다 두드린다 — 하나라도 빠지면 그 카드가 안 열린다", () => {
+    const src = strip(readFileSync("app/archive/[id]/page.js", "utf8"));
+    for (const door of ["/api/ads/${id}", "/api/film/${id}", "/api/projects/${id}"]) {
+      expect(src, `보관함 상세가 ${door} 를 안 두드린다`).toContain(door);
+    }
   });
 });
