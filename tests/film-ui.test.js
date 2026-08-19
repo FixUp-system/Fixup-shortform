@@ -6,6 +6,9 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { FILM_MODES } from "../lib/film/mode.js";
+// 문 판정은 순수 함수라 **값으로** 잰다 — 화면 소스 훑기로는 "막다른 길이 안 생기는가"를
+// 재지 못한다(그 질문의 답은 글자가 아니라 동작이다).
+import { filmGates } from "../lib/film/gates.js";
 
 const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 const side = strip(readFileSync("components/Sidebar.jsx", "utf8"));
@@ -61,22 +64,51 @@ describe("한 화면이 두 방식을 받는다", () => {
 
 describe("돈이 두 번 나가지 않게", () => {
   it("★ 굽는 중(status==='rendering')이면 버튼이 잠긴다", () => {
-    expect(page).toMatch(/status\s*===\s*"rendering"/);
-    // 잠금이 실제로 disabled 에 닿는가 — 상태만 읽고 안 쓰면 아무 것도 막지 못한다
+    // 판정은 lib/film/gates.js 한 벌이다 — 화면 소스가 아니라 값으로 잰다.
+    expect(filmGates({ status: "rendering" }).locked).toBe(true);
+    expect(filmGates({ status: "rendering" }).drawLocked).toBe(true);
+    // 잠금이 실제로 disabled 에 닿는가 — 계산만 하고 안 쓰면 아무 것도 막지 못한다
     expect(page).toMatch(/disabled=\{[^}]*(locked|rendering)/);
   });
 
-  it("★ 그리는 중(status==='drawing')도 같은 잠금을 탄다 — 장당 ≈$0.08 이다", () => {
+  it("★ 그리는 중이면 그림 버튼이 잠긴다 — 장당 ≈$0.08 이다", () => {
     // busy 는 이 탭에서 누른 것만 안다. 그리는 도중 새로고침하면 busy 가 비므로,
-    // 문서의 status 를 안 보면 [그림 만들기]가 다시 열린다(서버는 409 로 막는다 —
-    // 그러나 "누르고 오류를 보는 것"과 "못 누르는 것"은 다르다).
-    expect(page).toMatch(/status\s*===\s*"drawing"/);
-    expect(page).toMatch(/locked\s*=[^;]*drawing/);
+    // 문서의 상태를 안 보면 [그림 만들기]가 다시 열린다.
+    expect(filmGates({ status: "drawing", canDraw: false, triesLeft: 5 }).drawLocked).toBe(true);
+    // 화면이 그 판정을 실제로 쓰는가 — 계산만 하고 안 쓰면 아무 것도 막지 못한다
+    expect(page).toMatch(/filmGates\(/);
+    expect(page).toMatch(/disabled=\{drawLocked/);
   });
 
-  it("★ 그리는 중이라는 것을 말로 알린다 — 굽기와 같은 결", () => {
-    // 폴링이 없어 화면이 스스로 안 바뀐다. 말 안 하면 굳은 화면을 보고 계속 누른다.
-    expect(page).toMatch(/drawing && \(/);
+  it("★★ 만료된 잠금은 막다른 길이 아니다 — 무기한 잠기면 다시 그릴 길이 아예 없다", () => {
+    // 인스턴스가 죽으면 "drawing" 이 문서에 눌러앉는다(아무도 되돌려 쓰지 않는다).
+    // 서버는 10분 뒤 다시 열어 주고(canDraw:true) 화면도 함께 열려야 한다 —
+    // status 만 보고 잠그면 새로고침으로도 안 풀리는 막다른 길이 된다.
+    const expired = { status: "drawing", canDraw: true, triesLeft: 5 };
+    expect(filmGates(expired).drawLocked).toBe(false);
+    expect(filmGates(expired).drawingNow).toBe(false);
+    // 폴링도 그때는 멈춰야 한다(눌러앉은 상태로 영원히 서버를 두드리지 않는다)
+    expect(filmGates(expired).rendering).toBe(false);
+  });
+
+  it("★ 횟수 소진과 '그리는 중'은 다른 일이다 — 섞으면 굽는 길이 막힌다", () => {
+    // 6회를 다 쓴 프로젝트도 **이미 만든 그림으로는 구울 수 있어야** 한다.
+    const gone = filmGates({ status: "images", canDraw: false, triesLeft: 0 });
+    expect(gone.drawLocked).toBe(true);
+    expect(gone.locked).toBe(false);
+    expect(gone.triesGone).toBe(true);
+  });
+
+  it("★ canDraw 가 없는 옛 응답에서도 죽지 않는다 — status 로 떨어진다", () => {
+    // 문서만 읽은 첫 화면(GET /api/projects/[id])에는 canDraw·triesLeft 가 없다.
+    expect(filmGates({ status: "drawing" }).drawLocked).toBe(true);
+    expect(filmGates({ status: "images" }).drawLocked).toBe(false);
+    expect(filmGates(null).locked).toBe(false);
+    expect(filmGates(undefined).drawLocked).toBe(false);
+  });
+
+  it("★ 그리는 중이라는 것을 말로 알린다", () => {
+    expect(page).toMatch(/drawingNow && \(/);
     expect(page).toMatch(/그리는 중이에요/);
   });
 
@@ -117,9 +149,29 @@ describe("실패가 화면까지 닿는다", () => {
   });
 });
 
-describe("폴링은 이번 범위 밖", () => {
-  it("★ setInterval 을 직접 돌리지 않는다 — 상태 라우트가 아직 없다", () => {
+describe("화면이 스스로 갱신된다", () => {
+  it("★ 폴링 루프를 새로 만들지 않는다 — lib/poll.js 한 벌을 쓴다", () => {
+    // 화면마다 복붙한 루프가 조금씩 다르게 틀려 있었다(lib/poll.js 주석의 그 사고다).
+    expect(page).toMatch(/startPolling/);
     expect(page).not.toMatch(/setInterval/);
+    expect(page).toContain("/status");
+  });
+
+  it("★ 끝나면 멈춘다 — 안 멈추면 서버를 계속 두드린다", () => {
+    // 멈춤 판정은 화면의 잠금과 **같은 함수**여야 한다(두 벌이면 한쪽이 먼저 낡는다).
+    const tick = page.slice(page.indexOf("onTick"), page.indexOf("onStop"));
+    expect(tick).toMatch(/filmGates/);
+    expect(tick).toMatch(/rendering \|\| [a-zA-Z.]*drawingNow/);
+    // done · error 는 둘 다 아니므로 멈춘다
+    for (const st of ["done", "error", "images", "draft"]) {
+      const g = filmGates({ status: st });
+      expect(g.rendering || g.drawingNow, `${st} 에서 안 멈춘다`).toBe(false);
+    }
+    expect(filmGates({ status: "rendering" }).rendering).toBe(true);
+  });
+
+  it("★ 화면을 떠나면 뗀다", () => {
+    expect(page).toMatch(/stopRef\.current\?\.\(\)/);
   });
 });
 

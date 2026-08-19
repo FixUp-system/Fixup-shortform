@@ -21,6 +21,10 @@ import Link from "next/link";
 // (mode.js·doc.js 는 import 가 없는 순수 모듈이라 "use client" 화면이 그대로 부를 수 있다.)
 import { FILM_MODES, isFilmMode, filmMode } from "../../../lib/film/mode";
 import { filmOf } from "../../../lib/film/doc";
+// 문 판정은 순수 함수 한 벌이다 — 화면 안에 두면 "막다른 길이 안 생기는가"를 값으로 잴 수 없다.
+import { filmGates } from "../../../lib/film/gates";
+// 폴링 루프도 한 벌이다(화면마다 복붙했더니 조금씩 다르게 틀렸다 — lib/poll.js 주석).
+import { startPolling } from "../../../lib/poll";
 import { ASPECTS, DEFAULT_ASPECT_ID, aspectFor } from "../../../lib/aspects";
 // 사진 상한 — 서버(app/api/film/route.js)와 **같은 파일**에서 읽는다. 손으로 두 벌 적으면
 // 화면은 통과시키는데 서버가 400 을 내고, 사장님은 다 올린 뒤에야 거절당한다.
@@ -44,7 +48,11 @@ export default function FilmPage() {
   // **그림의 참조**라 없으면 제품이 딴 물건으로 그려진다.
   const [uploading, setUploading] = useState(false);
   const [err, setErr] = useState("");
+  // 상태 라우트가 준 마지막 응답의 **이 방식** 한 칸. 문서(GET /api/projects)에는 없는
+  // canDraw·triesLeft 가 여기에만 실려 온다 — 그 둘이 막다른 길을 걷어내는 열쇠다.
+  const [live, setLive] = useState(null);
   const fileRef = useRef(null);
+  const stopRef = useRef(null);
 
   // 주소의 id 로 프로젝트를 읽는다. film 문서도 kind 가 "ad" 가 아니라 이 문을 지난다
   // (app/api/projects/[id]/route.js). 방식별 산출물은 이 문서 안의 films 에 두 벌로 있다.
@@ -66,6 +74,13 @@ export default function FilmPage() {
   //   모른 채 [굽기]를 다시 연다 — 그러면 **화면 잠금이 사라지고 서버가 유일한 방어선**이
   //   된다(서버는 409·400 으로 막지만, 방어선이 하나만 남는 것을 설계로 삼지 않는다).
   //   못 읽었으면 화면이 그렇게 말하고, 사장님은 새로고침으로 지금 상태를 확인한다.
+  // 방식을 건너가면(같은 프로젝트, 다른 mode) 이 컴포넌트는 그대로 남는다 — 비우지 않으면
+  // 옆 방식의 상태가 잠깐 이 화면의 것으로 보인다(그러면 잠금도 옆 것을 따른다).
+  useEffect(() => { setLive(null); }, [mode, id]);
+
+  // 떠날 때는 반드시 뗀다 — 안 떼면 화면을 나가도 서버를 계속 두드린다.
+  useEffect(() => () => { stopRef.current?.(); stopRef.current = null; }, []);
+
   async function reload() {
     if (!id) return;
     try {
@@ -76,9 +91,40 @@ export default function FilmPage() {
         return;
       }
       setProject(data);
+      // ★ 방금 읽은 문서가 최신이다 — 지난 폴링이 남긴 값을 비운다. 안 비우면 live 가
+      //   언제나 이겨서, 그림을 새로 만들어도 화면에는 옛 회차의 그림이 남는다.
+      setLive(null);
     } catch {
       setErr("지금 상태를 확인하지 못했어요 — 새로고침해 주세요");
     }
+  }
+
+  // ★ 상태 라우트를 두드린다. 굽기는 큐를 타서 몇 분이 걸리고(출력 1초당 ≈33.5초),
+  //   그동안 화면이 안 바뀌면 사장님은 굳은 줄 알고 다시 누른다 — 그것이 이중 청구다.
+  //   이 라우트는 두드릴 때마다 **수거까지** 한다(서버리스에는 응답 뒤에 도는 자리가 없다).
+  function beginPolling() {
+    stopRef.current?.();
+    stopRef.current = startPolling({
+      url: `/api/film/${id}/status`,
+      // ★ 기본값(5분)을 그대로 받지 않는다 — 15초짜리도 큐에서 십몇 분이 걸린다.
+      //   상한에 걸려 폴링이 포기하면 다 만들어진 영상을 새로고침해야만 보게 된다.
+      //   대신 아래 onTick 이 **끝나면 스스로 멈춘다**(무한정 두드리지 않는다).
+      timeoutMs: Infinity,
+      onTick: (st) => {
+        const f = st?.films?.[mode] || null;
+        setLive(f);
+        // 다 끝났으면(done · error · 그냥 멈춤) 멈춘다. ★ 판정은 화면과 **같은 함수**다 —
+        //   만료된 "drawing" 은 drawingNow 가 false 라, 눌러앉은 상태로 영원히 두드리지 않는다.
+        const g = filmGates(f);
+        return !(g.rendering || g.drawingNow);
+      },
+      onStop: ({ timedOut }) => {
+        // ★ 반드시 비운다. startPolling 이 돌려주는 것은 "떼기"라 스스로 끝난 폴링에서는
+        //   안 불리고, 안 비우면 손잡이가 영원히 truthy 라 아래 복원이 다시 안 붙는다.
+        stopRef.current = null;
+        if (timedOut) setErr("상태 확인이 오래 걸리고 있어요 — 새로고침해 주세요");
+      },
+    });
   }
 
   async function onFiles(e) {
@@ -162,7 +208,20 @@ export default function FilmPage() {
     if (!res.ok) setErr(data.error || "굽지 못했어요");
     await reload();
     setBusy("");
+    // 접수는 202 다(굽기는 큐를 탄다) — 여기서 바로 두드리기 시작한다. 위 reload 가
+    // rendering 을 못 읽었더라도 폴링이 곧 실제 상태를 가져온다.
+    beginPolling();
   }
+
+  // 진입·새로고침 복원 — 굽는 중이거나 그리는 중이면 폴링을 잇는다.
+  // ★ 여기서만 시작한다(두 곳에서 시작하면 루프가 둘 붙는다). 훅 규칙 때문에 아래 gates
+  //   계산보다 위에 있어야 해서, 같은 함수를 여기서 한 번 더 부른다(판정은 여전히 한 벌이다).
+  const gatesNow = isFilmMode(mode) ? filmGates(live || filmOf(project, mode)) : null;
+  useEffect(() => {
+    if (!id || !gatesNow) return;
+    if ((gatesNow.rendering || gatesNow.drawingNow) && !stopRef.current) beginPolling();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, gatesNow?.rendering, gatesNow?.drawingNow]);
 
   // ★ 훅을 다 부른 뒤에 갈린다 — 조건부 return 을 훅 위에 두면 방식이 바뀔 때 훅 수가 달라진다.
   if (!isFilmMode(mode)) {
@@ -183,21 +242,16 @@ export default function FilmPage() {
 
   const here = filmMode(mode);
   const other = FILM_MODES.find((m) => m.id !== mode);
-  const film = filmOf(project, mode);
+  // ★ 상태 라우트가 준 값이 있으면 그것이 최신이다(문서보다 앞선다 — 수거까지 마친 값이다).
+  //   없으면 문서에서 읽는다. 그때는 canDraw·triesLeft 가 없고, gates 가 status 로 떨어진다.
+  const film = live || filmOf(project, mode);
   const scenario = project?.scenario;
-  // 굽는 중 — 폴링이 없으니 이 값은 새로고침해야 바뀐다. 그동안 유료 버튼은 잠긴다.
-  const rendering = film.status === "rendering";
-  // 그리는 중 — **rendering 과 대칭이어야 한다.** busy 는 이 탭에서 누른 것만 알아서,
-  // 그리는 도중에 새로고침하면 busy 가 비어 [그림 만들기]가 다시 열렸다. 서버가 409 로
-  // 막으니 값은 안 새지만, "누르고 400 을 보는 것과 못 누르는 것은 다르다"는 이 화면의
-  // 규칙이 하필 장당 ≈$0.08 짜리 자리에서만 깨진다.
-  // ★ 문서의 status 만 본다 — 잠금 만료(10분, lib/film/doc.js 의 FILM_IMAGE_LOCK_MS)는
-  //   서버가 판정한다. 화면이 시각 계산을 따로 하면 두 판정이 갈리고, 갈리는 순간
-  //   화면은 열려 있는데 서버가 막거나 그 반대가 된다.
-  const drawing = film.status === "drawing";
-  // 잠금 하나로 모은다. 버튼마다 조건을 따로 적으면 언젠가 한 곳이 빠지고, 그 자리가
-  // 이중 청구의 문이 된다(이 저장소가 실제로 겪은 모양이다).
-  const locked = !!busy || uploading || rendering || drawing;
+  // ★★ 문 판정은 lib/film/gates.js 한 벌이다. 버튼마다 조건을 따로 적으면 언젠가 한 곳이
+  //   빠지고 그 자리가 이중 청구의 문이 된다 — 그런데 **모두 같은 조건으로 잠그는 것도**
+  //   틀린다(횟수를 다 쓴 것과 굽지 못하는 것은 다른 일이다). 그래서 문을 둘로 돌려받는다:
+  //   locked(사진·사이즈·굽기) · drawLocked(그림).
+  // ★ 만료된 "drawing" 은 서버가 canDraw 로 걷어낸다 — 화면이 시각 계산을 따로 하지 않는다.
+  const { rendering, drawingNow, triesGone, locked, drawLocked } = filmGates(film, !!busy || uploading);
 
   return (
     <>
@@ -302,11 +356,16 @@ export default function FilmPage() {
           <section className="panel panel--wide">
             <h2>그림</h2>
             <p className="pgsub">{here.hint}</p>
-            {drawing && (
-              // 굽기와 **같은 결**로 알린다. 폴링이 없어 화면이 스스로 안 바뀌는데 그 말을
-              // 안 하면, 사장님은 굳은 화면을 보며 계속 누른다(그 자리가 장당 ≈$0.08 이다).
-              <p className="pgsub">그림을 그리는 중이에요 — 잠시 뒤 새로고침해서 확인해 주세요.</p>
+            {drawingNow && (
+              // 폴링이 붙었으니 화면이 스스로 갱신된다 — 새로고침을 시키지 않는다.
+              <p className="pgsub">그림을 그리는 중이에요 — 다 되면 여기에 나타나요.</p>
             )}
+            {/* 남은 횟수를 **미리** 말한다. 안 말하면 6회를 넘긴 뒤에 400 으로 처음 안다.
+                상한 값은 서버가 셈해 내려준 triesLeft 를 그대로 쓴다(두 벌로 안 적는다). */}
+            {Number.isFinite(film.triesLeft) && !triesGone && (
+              <p className="pgsub">다시 그릴 수 있는 횟수가 {film.triesLeft}번 남았어요.</p>
+            )}
+            {triesGone && <p className="pgsub warn">그림을 다시 그릴 수 있는 횟수를 다 썼어요.</p>}
             {film.images?.length > 0 && (
               <div className="uploads">
                 {film.images.map((im) => (
@@ -319,8 +378,8 @@ export default function FilmPage() {
             <div className="step-actions">
               {/* ★ 값이 나가는 자리다(장당 ≈$0.08). 시나리오가 없으면 아예 못 누른다 —
                   서버도 막지만, 누르고 나서 400 을 보는 것과 못 누르는 것은 다르다. */}
-              <button className="mini" disabled={locked || !scenario?.text} onClick={makeImages}>
-                {busy === "images" || drawing ? "그리는 중…" : film.images?.length ? "그림 다시 만들기" : "그림 만들기"}
+              <button className="mini" disabled={drawLocked || !scenario?.text} onClick={makeImages}>
+                {busy === "images" || drawingNow ? "그리는 중…" : film.images?.length ? "그림 다시 만들기" : "그림 만들기"}
               </button>
             </div>
           </section>
@@ -328,9 +387,8 @@ export default function FilmPage() {
           <section className="panel panel--wide">
             <h2>굽기</h2>
             {rendering && (
-              // 폴링이 아직 없다 — 화면이 스스로 안 바뀐다는 것을 말로 알린다.
-              // 말 안 하면 사장님은 굳은 화면을 보며 [만들기]를 다시 누른다(그것이 이중 청구다).
-              <p className="pgsub">영상을 만드는 중이에요 — 잠시 뒤 새로고침해서 확인해 주세요.</p>
+              // 폴링이 붙었으니 화면이 스스로 갱신된다(상태 라우트가 두드릴 때마다 수거도 한다).
+              <p className="pgsub">영상을 만드는 중이에요 — 다 되면 여기에 나타나요.</p>
             )}
             {film.video?.url && (
               <div className="preview-pane done-preview">
@@ -342,7 +400,7 @@ export default function FilmPage() {
             <div className="step-actions">
               <div className="fwd">
                 <span className="hint">
-                  {rendering || drawing ? "만드는 중에는 다시 누를 수 없어요" : "이대로 만들면 크레딧이 나가요 — 되돌릴 수 없어요"}
+                  {rendering || drawingNow ? "만드는 중에는 다시 누를 수 없어요" : "이대로 만들면 크레딧이 나가요 — 되돌릴 수 없어요"}
                 </span>
                 {/* ★★ 굽는 중이거나 그림을 만드는 중이면 잠긴다(locked). 두 번 누르면 회차가
                     두 번 열려 값이 두 번 걷힌다(app/api/film/[id]/render/route.js 의
