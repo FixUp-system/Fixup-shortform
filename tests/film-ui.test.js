@@ -119,6 +119,14 @@ describe("돈이 두 번 나가지 않게", () => {
     expect(gone.triesGone).toBe(true);
   });
 
+  it("★ 폴백도 두 막다른 길 사이에 선다 — triesLeft 가 아니라 status 를 본다", () => {
+    // drawing 없는 응답에 canDraw·triesLeft 만 실리는 날이 와도:
+    //  · 마지막 회차가 **도는 중**이면 잠긴다(옛 그림으로 값이 나가지 않는다)
+    expect(filmGates({ status: "drawing", canDraw: false, triesLeft: 0 }).locked).toBe(true);
+    //  · 다 쓰고 **멈춘** 것은 안 잠긴다(이미 만든 그림으로 구울 수 있어야 한다)
+    expect(filmGates({ status: "images", canDraw: false, triesLeft: 0 }).locked).toBe(false);
+  });
+
   it("★ canDraw 가 없는 옛 응답에서도 죽지 않는다 — status 로 떨어진다", () => {
     // 문서만 읽은 첫 화면(GET /api/projects/[id])에는 canDraw·triesLeft 가 없다.
     expect(filmGates({ status: "drawing" }).drawLocked).toBe(true);
@@ -207,6 +215,19 @@ describe("화면이 스스로 갱신된다", () => {
     expect(eff).toMatch(/stopRef\.current = null/);
     expect(eff).toMatch(/setLive\(null\)/);
     expect(eff).toMatch(/\[mode, id\]/);
+  });
+
+  it("★★ 다시 붙이는 쪽도 방식을 본다 — 뗐는데 안 붙으면 화면이 멎는다", () => {
+    // 소스 앵커 테스트는 "떼기가 코드에 있는가"는 재도 **"뗀 뒤에 다시 붙는가"라는 순서**는
+    // 못 잰다(렌더 하네스가 없다). 그 구멍을 deps 목록으로 좁힌다: 두 방식이 동시에 같은
+    // 상태면(둘 다 굽는 중) 플래그가 true → true 라 deps 가 안 바뀌고, mode 가 없으면
+    // 복원 effect 가 아예 안 돌아 새 방식 폴링이 시작되지 않는다.
+    const at = page.indexOf("beginPolling();", page.indexOf("gatesNow"));
+    const deps = page.slice(at, page.indexOf("]);", at) + 2);
+    const list = deps.match(/\[[^\]]*\]/g)?.pop();
+    expect(list, "복원 effect 의 deps 를 못 찾았다").toBeTruthy();
+    expect(list).toMatch(/\bmode\b/);
+    expect(list).toMatch(/\bid\b/);
   });
 
   it("★ 접수되지 않았으면 두드리지 않는다 — 수거까지 하는 GET 을 헛되이 부른다", () => {

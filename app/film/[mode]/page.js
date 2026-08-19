@@ -232,7 +232,13 @@ export default function FilmPage() {
     if (!id || !gatesNow) return;
     if ((gatesNow.rendering || gatesNow.drawingNow) && !stopRef.current) beginPolling();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, gatesNow?.rendering, gatesNow?.drawingNow]);
+    // ★★ mode 가 deps 에 **있어야 한다.** 위 [mode, id] effect 가 폴링을 떼고 나면 다시
+    //   붙이는 것은 여기뿐인데, 두 방식이 **동시에 같은 상태**면(둘 다 굽는 중) 플래그가
+    //   true → true 로 그대로라 deps 가 안 바뀌고 이 effect 가 아예 안 돈다 — 손잡이는
+    //   방금 비었으므로 새 방식 폴링이 시작되지 않는다. 돈은 안 새지만(굽는 중이라 버튼은
+    //   잠긴 채다) 새로고침 전까지 화면이 안 갱신된다. 한쪽만 굽는 흔한 경로에서는
+    //   플래그가 뒤집혀 정상 재부착되므로 눈에 잘 안 띈다.
+  }, [id, mode, gatesNow?.rendering, gatesNow?.drawingNow]);
 
   // ★ 훅을 다 부른 뒤에 갈린다 — 조건부 return 을 훅 위에 두면 방식이 바뀔 때 훅 수가 달라진다.
   if (!isFilmMode(mode)) {
