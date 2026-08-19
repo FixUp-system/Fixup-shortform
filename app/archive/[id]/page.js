@@ -11,8 +11,8 @@
 //   (/api/ads/[id] 와 /api/projects/[id] 가 서로를 404 로 거절한다) **광고를 먼저 묻고
 //   아니면 기존 문으로** 간다. 주소만으로는 종류를 알 수 없기 때문이다.
 // ★ 값이 나가는 버튼은 여기 없다. 이어서 작업하려면 [이어서 작업하기]로 제작 화면에 간다.
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { adModel } from "../../../lib/ad/models";
 import { I2V_MODELS, modelIdForProject, resolutionForProject } from "../../../lib/clip-limits";
@@ -30,7 +30,10 @@ function Row({ label, children }) {
   );
 }
 
-export default function ArchiveDetailPage() {
+function ArchiveDetailPageBody() {
+  // ★ 어디서 왔는지 주소가 말해 준다(2026-08-19). [보관함으로]가 **두 곳**이라 값을
+  //   한 자리에서 판다 — 두 번 적으면 언젠가 한쪽만 고쳐져 갈린다.
+  const backTo = useSearchParams().get("scope") === "all" ? "/archive?scope=all" : "/archive";
   const { id } = useParams();
   const [doc, setDoc] = useState(null);
   const [err, setErr] = useState("");
@@ -60,7 +63,7 @@ export default function ArchiveDetailPage() {
     return (
       <>
         <h1 className="pgtitle">{err}</h1>
-        <Link href="/archive" className="cta">보관함으로</Link>
+        <Link href={backTo} className="cta">보관함으로</Link>
       </>
     );
   }
@@ -200,7 +203,7 @@ export default function ArchiveDetailPage() {
         </div>
 
         <div className="step-actions">
-          <Link href="/archive" className="mini">보관함으로</Link>
+          <Link href={backTo} className="mini">보관함으로</Link>
           <div className="fwd">
             {video && (
               <a className="mini" href={`${video}?dl=1`} download>내려받기</a>
@@ -216,5 +219,14 @@ export default function ArchiveDetailPage() {
         </div>
       </section>
     </>
+  );
+}
+
+// ★ useSearchParams 는 Suspense 경계 안에서만 쓸 수 있다(Next App Router).
+export default function ArchiveDetailPage() {
+  return (
+    <Suspense fallback={null}>
+      <ArchiveDetailPageBody />
+    </Suspense>
   );
 }

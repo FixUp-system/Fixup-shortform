@@ -72,7 +72,7 @@ function Thumb({ video, image, alt }) {
 //
 // ★ 두 세계가 한 목록에 섞인다(단계별 영상 · 광고). listProjects 요약의 kind 로 가른다 —
 // 없으면(옛 문서) null 이고, 그때는 기존 동작 그대로다.
-export default function ProjectCards({ projects, limit, onDeleted, selecting, selected, onToggleSelect }) {
+export default function ProjectCards({ projects, limit, onDeleted, selecting, selected, onToggleSelect, scope }) {
   const shown = limit ? projects.slice(0, limit) : projects;
   const { confirm, alert } = useDialog();
   const [busyId, setBusyId] = useState(null);
@@ -112,7 +112,10 @@ export default function ProjectCards({ projects, limit, onDeleted, selecting, se
         // ★ 보관함에서는 **보는 화면**으로 간다(2026-08-14). 예전에는 제작 화면으로
         //   직행했는데, 확인하러 들어간 자리에 유료 버튼이 있었다. 이어서 작업하는
         //   길은 그 화면 안의 [이어서 작업하기]다 — 종류에 맞는 제작 화면으로 보낸다.
-        const href = `/archive/${p.id}`;
+        // ★ 보던 탭을 주소에 실어 보낸다(2026-08-19) — 상세의 [보관함으로]가 그 값을
+        //   되돌려 받아야 [전체]에서 들어간 사람이 [내 영상]으로 떨어지지 않는다.
+        //   "mine" 은 안 싣는다: 기본값이라 붙이면 주소만 길어진다.
+        const href = scope === "all" ? `/archive/${p.id}?scope=all` : `/archive/${p.id}`;
         const label = isAd ? (AD_STATUS_LABEL[p.status] || p.status) : (STATUS_LABEL[p.status] || p.status);
         return (
           <li key={p.id}>

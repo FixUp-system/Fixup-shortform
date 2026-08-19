@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { loadProjects } from "../../lib/projects-client";
 import ProjectCards from "../../components/ProjectCards";
 import { useDialog } from "../../components/DialogProvider";
 
-export default function Archive() {
+function ArchiveBody() {
   const [projects, setProjects] = useState(null); // null = 불러오는 중
   const [err, setErr] = useState("");
   // 보는 범위 — "mine"(내 영상) 또는 "all"(전체).
@@ -14,7 +15,10 @@ export default function Archive() {
   // ★ 기본은 **내 영상**이다. 내부 팀이라 서로의 결과물을 볼 수 있게 열었지만, 보관함을
   //   열자마자 남의 영상이 쏟아지면 내 것을 찾는 자리가 아니게 된다. 여는 쪽이 한 번
   //   누르는 동작이어야 한다.
-  const [scope, setScope] = useState("mine");
+  // ★ 첫 탭은 **주소**가 정한다(2026-08-19). 상세에서 [보관함으로]로 돌아올 때 보던 탭이
+  //   실려 오므로, 화면 안 상태로만 기억하면 돌아올 때마다 [내 영상]으로 떨어진다.
+  const params = useSearchParams();
+  const [scope, setScope] = useState(() => (params.get("scope") === "all" ? "all" : "mine"));
 
   // 정리는 몰아서 하는 일이다 — 하나씩 지우면 스무 편을 치우는 데 스무 번을 묻는다.
   // 평소에는 카드가 프로젝트로 들어가는 문이고, [수정] 을 누른 동안에만 고르는 자리가 된다.
@@ -167,6 +171,7 @@ export default function Archive() {
       )}
       {projects && projects.length > 0 && (
         <ProjectCards
+          scope={scope}
           projects={projects}
           selecting={selecting}
           selected={selected}
@@ -175,5 +180,15 @@ export default function Archive() {
         />
       )}
     </>
+  );
+}
+
+// ★ useSearchParams 는 Suspense 경계 안에서만 쓸 수 있다(Next App Router).
+//   감싸지 않으면 배포 빌드가 이 페이지를 정적으로 굽지 못하고 죽는다.
+export default function Archive() {
+  return (
+    <Suspense fallback={null}>
+      <ArchiveBody />
+    </Suspense>
   );
 }
