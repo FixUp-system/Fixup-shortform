@@ -399,6 +399,141 @@ git commit -m "feat(ad): 참조를 주소로도 받는다 — 만든 이미지�
 
 ---
 
+### Task 3.5: 이미지가 읽을 **영어 한 줄** — 시나리오에 `shows` 를 더한다
+
+★ 왜 계획에 없던 태스크가 생겼나(2026-08-19 실측): 광고 시나리오의 `shots` 는 값이 **전부
+한국어**다(`camera: "테이블 높이 로우 앵글, 느린 푸시인…"`). 광고에서는 그 필드가 **사람이
+읽는 용**이고 모델에 가는 것은 영어 `text` 하나뿐이라 문제가 없었다. 그런데 이 기능은 그
+한국어를 **이미지 프롬프트로** 쓴다 — 이미지 모델의 한국어 이해에 기대는 셈이고, 그것은
+"측정 없이 품질을 주장하지 않는다"는 이 저장소 규율과 어긋난다.
+
+단계별 경로가 이미 같은 이름으로 같은 일을 한다(`cut.shows` — 화면에 무엇이 보이는가를
+영어로). 광고 시나리오에도 같은 칸을 더한다.
+
+**Files:**
+- Modify: `lib/ad/scenario.js` (SYSTEM 의 JSON 스키마 · `EDITABLE_SHOT_FIELDS`)
+- Modify: `lib/film/mode.js` (`imagePlanFor` 의 축 재료를 `shows` 로)
+- Test: `tests/film-shows.test.js`
+
+**Interfaces:**
+- Produces: `scenario.shots[].shows` — 그 장면에 **보이는 것**을 영어 한 줄로
+- Consumes: Task 1 의 `imagePlanFor`
+
+★ **각인 영향 없음**: 광고 굽기 프롬프트는 `scenario.text` 만 쓰고 `shots` 를 안 읽는다
+(`lib/ad/generate.js` 의 `withSpokenLines` 는 `line` 만 본다). 필드가 하나 늘어도 광고가
+이미 산 영상은 낡지 않는다.
+
+- [ ] **Step 1: 실패하는 테스트를 쓴다**
+
+```js
+// tests/film-shows.test.js
+import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { imagePlanFor } from "../lib/film/mode.js";
+
+const src = readFileSync("lib/ad/scenario.js", "utf8");
+
+const SCENARIO = {
+  shots: [
+    { beat: "키링으로 시선을 끈다", shows: "a lavender bunny keyring swaying on a tan leather handbag", camera: "느린 푸시인", lighting: "부드러운 낮빛", action: "키링이 흔들린다", seconds: 5 },
+    { beat: "손에 들어 보여준다", shows: "a hand holding the small bunny charm close to the lens", camera: "클로즈업", lighting: "창가 빛", action: "손이 들어올린다", seconds: 5 },
+  ],
+};
+
+describe("시나리오가 이미지용 영어 한 줄을 낸다", () => {
+  it("★ 스키마가 shows 를 요구한다 — 영어로", () => {
+    expect(src).toMatch(/"shows"/);
+  });
+
+  it("★ 사장님이 고칠 수 있는 칸에도 들어간다", () => {
+    expect(src).toMatch(/EDITABLE_SHOT_FIELDS[^\]]*"shows"/);
+  });
+});
+
+describe("이미지 프롬프트가 영어에서 나온다", () => {
+  it("★ 장면 순서 — 그 장면의 shows 가 실린다", () => {
+    const plan = imagePlanFor("order", SCENARIO);
+    expect(plan[0].prompt).toContain("lavender bunny keyring");
+    // 한국어 필드가 프롬프트를 채우지 않는다 — 이미지 모델이 읽는 글이다
+    expect(plan[0].prompt).not.toContain("느린 푸시인");
+  });
+
+  it("★ 참고 그림 — 축들이 shows 에서 나온다", () => {
+    const plan = imagePlanFor("refs", SCENARIO);
+    const joined = plan.map((p) => p.prompt).join(" ");
+    expect(joined).toContain("lavender bunny keyring");
+    expect(joined).not.toContain("손이 들어올린다");
+  });
+
+  it("★ shows 가 없는 옛 문서에서도 죽지 않는다", () => {
+    const old = { shots: [{ beat: "무엇을 한다", seconds: 5 }] };
+    expect(() => imagePlanFor("order", old)).not.toThrow();
+    expect(() => imagePlanFor("refs", old)).not.toThrow();
+  });
+});
+```
+
+- [ ] **Step 2: 실패를 확인한다**
+
+Run: `npx vitest run tests/film-shows.test.js`
+Expected: FAIL — 스키마에 `shows` 없음, 프롬프트가 한국어를 담음
+
+- [ ] **Step 3: 구현**
+
+`lib/ad/scenario.js` 의 JSON 스키마에 한 줄을 더한다(`"beat"` 바로 아래):
+
+```js
+    "shows": "이 장면에 **보이는 것** — 영어 한 줄. 이미지 모델이 읽는 글이라 한국어를 쓰지 않는다",
+```
+
+그리고 `EDITABLE_SHOT_FIELDS` 에 `"shows"` 를 더한다:
+
+```js
+const EDITABLE_SHOT_FIELDS = ["beat", "shows", "camera", "lighting", "action", "sound", "line"];
+```
+
+`lib/film/mode.js` 의 축 재료를 바꾼다 — **한국어 필드를 이미지 프롬프트에서 걷는다**:
+
+```js
+  if (mode === "order") {
+    // ★ shows(영어)만 쓴다. beat·camera·lighting 은 사장님이 읽는 한국어라 이미지 모델에
+    //   보내면 이해에 기대는 꼴이 된다(2026-08-19). 옛 문서(shows 없음)는 beat 로 떨어진다 —
+    //   빈 프롬프트로 값을 치르는 것보다 낫다.
+    return shots.map((s, i) => ({
+      key: `shot-${i + 1}`,
+      prompt: `${s.shows || s.beat || ""}. ${NO_TEXT}`.trim(),
+    }));
+  }
+```
+
+`refs` 의 세 축도 `shows` 에서 나오게 하되 **축마다 다른 조각**을 쓴다(세 장이 같은 그림이
+되면 안 된다):
+
+```js
+  const shows = shots.map((s) => s.shows || s.beat || "").filter(Boolean);
+  return [
+    { key: "subject", prompt: `A clean product shot of the main object in: ${shows[0] || ""}. ${NO_TEXT}` },
+    { key: "person", prompt: `A portrait of the person in: ${shows[shows.length - 1] || ""}. ${NO_TEXT}` },
+    { key: "place", prompt: `The place, empty of people, in: ${shows.join(" ")}. ${NO_TEXT}` },
+  ];
+```
+
+- [ ] **Step 4: 통과를 확인한다**
+
+Run: `npx vitest run tests/film-shows.test.js` → PASS
+Run: `npx vitest run tests/film-mode.test.js` → **앞 태스크의 테스트가 깨질 것이다.** 축 재료가
+바뀌었으므로 그 테스트의 픽스처에 `shows` 를 더해 뜻을 유지한다(테스트를 지우지 않는다).
+Run: `npx vitest run` → 회귀 0
+
+- [ ] **Step 5: 커밋**
+
+```bash
+git add lib/ad/scenario.js lib/film/mode.js tests/film-shows.test.js tests/film-mode.test.js
+git commit -m "feat(film): 이미지가 읽을 영어 한 줄 — 한국어 필드를 프롬프트에서 걷는다"
+```
+
+---
+
 ### Task 4: 파이프라인 — 이미지 만들기와 굽기
 
 **Files:**
