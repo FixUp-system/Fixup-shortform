@@ -183,3 +183,56 @@ describe("참고 그림 — focus 가 세 축을 정한다", () => {
     expect(place.prompt).not.toContain("a woman walking out of a sunlit doorway");
   });
 });
+
+// ★★ 앵커가 생기면서 "첫 이미지 = 첫 장면"이 **거짓**이 됐다(2026-08-19).
+//
+// 장면 순서 방식의 문구는 "첨부 이미지가 이 영상의 장면들이다, 순서대로 — 첫 이미지를
+// 첫 장면에" 였다. 그런데 이제 **첫 이미지는 앵커**(생김새 참조)다. 그대로 두면 모델이
+// 앵커를 1번 장면으로 그리고, 실제 1번 장면이 2번으로 밀린다 — 장면이 통째로 어긋난다.
+//
+// ★ 앵커가 **있을 때만** 그렇게 말해야 한다. focus 가 info 이거나 옛 문서면 앵커가
+//   없으므로 예전 문구가 맞다. 그래서 판정을 문구에 넘긴다(hasAnchor).
+describe("붙인 그림을 뭐라고 부르는가 — 앵커가 있으면 세는 법이 다르다", () => {
+  it("★ 앵커가 있으면 첫 이미지가 장면이 아니라고 말한다", () => {
+    const c = attachClauseFor("order", { hasAnchor: true });
+    expect(c).toMatch(/first (attached )?image/i);
+    expect(c).toMatch(/not a scene|appearance reference/i);
+  });
+
+  it("★ 앵커가 있으면 장면은 **두 번째 이미지부터**라고 말한다", () => {
+    expect(attachClauseFor("order", { hasAnchor: true })).toMatch(/second image/i);
+  });
+
+  it("★ 앵커가 없으면 예전 문구 그대로다 — info·옛 문서는 안 바뀐다", () => {
+    expect(attachClauseFor("order")).toBe(attachClauseFor("order", { hasAnchor: false }));
+    expect(attachClauseFor("order")).toMatch(/first image for the first scene/i);
+  });
+
+  it("참고 그림 방식은 앵커 인자와 무관하다 — 그 방식에는 앵커가 없다", () => {
+    expect(attachClauseFor("refs", { hasAnchor: true })).toBe(attachClauseFor("refs"));
+  });
+
+  it("★ 두 문구는 여전히 다르다", () => {
+    expect(attachClauseFor("order", { hasAnchor: true })).not.toBe(attachClauseFor("refs"));
+  });
+});
+
+// buildFilmPrompt 가 **문서의 그림 목록**을 보고 판정해야 한다 — scenario.focus 로
+// 추론하면 그림을 그린 뒤 시나리오가 바뀌었을 때 어긋난다(잠금이 막지만, 판정의 근거는
+// "무엇을 실제로 보냈는가"여야 한다).
+describe("buildFilmPrompt 가 앵커 유무를 그림 목록에서 읽는다", () => {
+  const withAnchor = [{ key: "anchor" }, { key: "shot-1" }];
+  const noAnchor = [{ key: "shot-1" }];
+
+  it("★ 첫 그림이 anchor 면 그렇게 말한다", () => {
+    expect(buildFilmPrompt(SCENARIO, "order", withAnchor)).toMatch(/second image/i);
+  });
+
+  it("★ 앵커가 없으면 예전 문구다", () => {
+    expect(buildFilmPrompt(SCENARIO, "order", noAnchor)).toMatch(/first image for the first scene/i);
+  });
+
+  it("그림 목록을 안 주면 예전 문구다 — 옛 호출부가 안 죽는다", () => {
+    expect(buildFilmPrompt(SCENARIO, "order")).toMatch(/first image for the first scene/i);
+  });
+});
