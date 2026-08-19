@@ -372,3 +372,41 @@ describe("voice — 나레이션 목소리", () => {
     expect(s).toMatch(/목소리/);
   });
 });
+
+// ★★ 인물 레퍼런스(2026-08-19). 실측에서 인물이 전부 외국인이었고, "한국인"이라는 **말**만
+// 넣는 것으로는 컷마다 다른 얼굴이 나오는 것을 못 막는다 — 얼굴을 고정하려면 **사진**이
+// 있어야 한다. 단계별(lib/cast.js)은 아바타 풀에서 골라 컷마다 꽂는데 film 에는 그 단계가
+// 없었다.
+//
+// ★ LLM 패스를 늘리지 않는다 — 시나리오 한 번 호출 안에서 컷마다 고르게 한다.
+describe("avatar_id — 컷마다 인물 사진을 고른다", () => {
+  const ok = (shots) => ({ text: "지시문", focus: "person", voice: "v", shots });
+
+  it("★ 스키마의 shots 칸에 avatar_id 가 있다", () => {
+    expect(Object.keys(SCENARIO_SCHEMA.properties.shots.items.properties)).toContain("avatar_id");
+  });
+
+  it("★ required 다 — 빠뜨리면 사람 있는 컷과 없는 컷을 구분할 수 없다", () => {
+    expect(SCENARIO_SCHEMA.properties.shots.items.required).toContain("avatar_id");
+  });
+
+  it("모델이 낸 avatar_id 가 컷에 그대로 남는다", () => {
+    const out = validateScenario(ok([{ beat: "b", avatar_id: "av-woman-20s" }]), 0);
+    expect(out.shots[0].avatar_id).toBe("av-woman-20s");
+  });
+
+  it("★ SYSTEM 이 아바타 목록을 id 와 함께 보여준다 — 목록을 모르면 못 고른다", () => {
+    const s = buildScenarioMessages({ settings, material: { text: "소재", photos: [] } }).system;
+    for (const id of ["av-man-30s", "av-man-50s", "av-woman-20s"]) expect(s).toContain(id);
+  });
+
+  it("★ SYSTEM 이 같은 사람에게 같은 id 를 쓰라고 말한다 — 그것이 얼굴을 고정하는 규칙이다", () => {
+    const s = buildScenarioMessages({ settings, material: { text: "소재", photos: [] } }).system;
+    expect(s).toMatch(/같은 사람.*같은/s);
+  });
+
+  it("★ SYSTEM 이 안 맞으면 비우라고 말한다 — 억지로 끼워 맞추면 엉뚱한 얼굴이 실린다", () => {
+    const s = buildScenarioMessages({ settings, material: { text: "소재", photos: [] } }).system;
+    expect(s).toMatch(/빈 문자열|비운다/);
+  });
+});

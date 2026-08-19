@@ -408,3 +408,77 @@ describe("그림 맥락(언어·사진)이 계획까지 흐른다", () => {
     expect(seen.every((a) => !/reference photo/i.test(a.prompt))).toBe(true);
   });
 });
+
+// ★★ 고른 사진이 **실제로 참조로 실려야** 한다. 시나리오가 avatar_id 를 골라도
+// 파이프라인이 안 넘기면 아무 일도 안 일어난다.
+describe("컷이 고른 인물 사진이 참조로 실린다", () => {
+  beforeEach(() => resetMemoryStore());
+
+  const SHOTS = [
+    { beat: "제품만", shows: "a product on velvet", avatar_id: "", seconds: 5 },
+    { beat: "여성 등장", shows: "a woman holding the product", avatar_id: "av-woman-20s", seconds: 5 },
+    { beat: "같은 여성", shows: "the same woman smiling", avatar_id: "av-woman-20s", seconds: 5 },
+  ];
+
+  const run = async (photoKeys = []) => {
+    const p = await makeFilm({ photoKeys });
+    const row = await getStore().selectProject(p.id, U);
+    await getStore().updateProjectRow(p.id, U, row.version, {
+      ...row.doc, scenario: { ...SCENARIO, focus: "product", shots: SHOTS },
+    });
+    const seen = [];
+    await runWithActor(U, () =>
+      runFilmImages(p.id, U, "order", {
+        generateImage: async (args) => { seen.push(args); return { url: "https://fal.example/w.png" }; },
+      })
+    );
+    return seen;
+  };
+
+  // ★ 인덱스로 찾지 않는다 — 사진이 없는 프로젝트는 앵커가 앞에 하나 더 붙어 밀린다.
+  //   프롬프트로 찾으면 앵커가 있든 없든 같은 컷을 가리킨다.
+  const byShows = (seen, needle) => seen.find((a) => a.prompt.includes(needle));
+
+  it("★ 사람이 없는 컷에는 인물 사진을 안 넘긴다 — 제품 클로즈업에 얼굴이 끼어들면 방해다", async () => {
+    const seen = await run();
+    expect(byShows(seen, "a product on velvet").refs.some((r) => r.key === "woman-20s.jpg")).toBe(false);
+  });
+
+  it("★ 사람이 있는 컷에는 그 사진이 실린다", async () => {
+    const seen = await run();
+    expect(byShows(seen, "a woman holding").refs.some((r) => r.key === "woman-20s.jpg")).toBe(true);
+  });
+
+  it("★ 같은 id 를 쓴 두 컷은 같은 사진을 받는다 — 그것이 얼굴을 고정하는 방법이다", async () => {
+    const seen = await run();
+    const a = byShows(seen, "a woman holding").refs.find((r) => r.key === "woman-20s.jpg");
+    const b = byShows(seen, "the same woman smiling").refs.find((r) => r.key === "woman-20s.jpg");
+    expect(a).toBeTruthy();
+    expect(b.bytes.equals(a.bytes)).toBe(true);
+  });
+
+  it("★ 사장님 사진과 함께 실린다 — 제품은 사진이, 얼굴은 아바타가 쥔다", async () => {
+    const seen = await run(["keyring.jpg"]);
+    const keys = byShows(seen, "a woman holding").refs.map((r) => r.key);
+    expect(keys).toContain("keyring.jpg");
+    expect(keys).toContain("woman-20s.jpg");
+  });
+
+  it("모르는 id 는 조용히 빠진다 — 파일이 없다고 그림을 못 만들 이유가 없다", async () => {
+    const p = await makeFilm();
+    const row = await getStore().selectProject(p.id, U);
+    await getStore().updateProjectRow(p.id, U, row.version, {
+      ...row.doc,
+      scenario: { ...SCENARIO, focus: "product", shots: [{ beat: "b", shows: "x", avatar_id: "av-nope", seconds: 5 }] },
+    });
+    const seen = [];
+    await runWithActor(U, () =>
+      runFilmImages(p.id, U, "order", {
+        generateImage: async (args) => { seen.push(args); return { url: "https://fal.example/v.png" }; },
+      })
+    );
+    // 사진이 없는 프로젝트라 앵커가 하나 붙는다 — 장면은 하나뿐이고 얼굴은 안 실린다
+    expect(seen).toHaveLength(2);
+    for (const a of seen) expect(a.refs.some((r) => r.key === "woman-20s.jpg")).toBe(false);
+  });
+});
