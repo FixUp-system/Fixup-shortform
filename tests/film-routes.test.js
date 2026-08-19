@@ -447,3 +447,30 @@ describe("시나리오 판(scenario.tries)이 조건을 지킨다", () => {
     expect((await renderPOST(post({ mode: "order" }), ctx(p.id))).status).toBe(202);
   });
 });
+
+// ★★ film 이 사진을 읽는다(2026-08-19). 라우트 주석은 "이 경로는 사진을 그림 만들기에서
+// 참조 바이트로 직접 넘기므로 글자를 받아쓰는 우회가 필요 없다"였는데 실측이 뒤집었다 —
+// 시나리오가 사진을 못 봐서 제품의 글자도 색도 크기도 모른 채 쓰였고, 굽기(r2v)에는
+// 사장님 사진이 아예 안 간다(films[].images 만 참조로 간다).
+describe("film 시나리오가 사진을 읽는다", () => {
+  beforeEach(() => { resetMemoryStore(); scenarioMock.make.mockClear(); });
+
+  it("★ 시나리오를 만들기 전에 사진을 읽는다 — 광고와 같은 함수를 쓴다", () => {
+    const src = strip(readFileSync("app/api/film/[id]/scenario/route.js", "utf8"));
+    expect(src).toMatch(/readPhotoVision/);
+  });
+
+  it("★ 광고 파이프라인도 같은 함수를 쓴다 — 베끼면 두 벌이 된다", () => {
+    const src = strip(readFileSync("lib/ad/pipeline.js", "utf8"));
+    expect(src).toMatch(/readPhotoVision/);
+    // 인라인으로 다시 적지 않았는지 — describePhoto 를 직접 부르는 자리가 없어야 한다
+    expect(src).not.toMatch(/describePhoto\)\(\{/);
+  });
+
+  it("★ 읽은 사진값을 문서에 남긴다 — 안 남기면 다시 쓸 때마다 사진을 또 읽는다(사진당 값이 든다)", () => {
+    const src = strip(readFileSync("app/api/film/[id]/scenario/route.js", "utf8"));
+    // seen 이 새 객체일 때만 material 을 갈아 끼운다(광고 파이프라인과 같은 판정)
+    expect(src).toMatch(/seen !== project/);
+    expect(src).toMatch(/material:/);
+  });
+});

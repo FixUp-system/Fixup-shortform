@@ -111,6 +111,10 @@ describe("광고도 사진을 한 번 읽는다", () => {
     const at = src.indexOf("export async function runScenarioStep");
     const fn = src.slice(at, src.indexOf("\n}", at));
     expect(fn, "사진을 안 읽는다 — 읽어 둔 글자가 영영 안 생긴다").toMatch(/describePhoto|readPhotoVision/);
-    expect(fn, "이미 본 사진을 또 읽는다 — 사진마다 한 번이어야 한다").toMatch(/\.vision/);
+    // ★ "이미 본 사진을 또 읽지 않는다"는 이제 readPhotoVision 안에 있고
+    //   tests/ad-photo-vision.test.js 가 **값으로** 잰다(소스 훑기보다 정확하다).
+    //   여기서는 그 함수를 쓰는지만 본다 — 인라인으로 되돌아가면 film 이 또 못 읽는다.
+    expect(fn, "공유 함수를 안 쓴다 — 인라인으로 두면 film 이 그 경로를 안 지나 사진을 못 읽는다")
+      .toMatch(/readPhotoVision/);
   });
 });

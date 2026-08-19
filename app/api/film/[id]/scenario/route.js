@@ -1,7 +1,7 @@
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { loadFilm } from "../../../../../lib/film/load.js";
 import { updateProject, getProject } from "../../../../../lib/projects.js";
-import { generateScenario, pickEditedShots } from "../../../../../lib/ad/scenario.js";
+import { generateScenario, pickEditedShots, readPhotoVision } from "../../../../../lib/ad/scenario.js";
 import { MAX_SCENARIO_TRIES } from "../../../../../lib/pricing.js";
 import { scenarioLock } from "../../../../../lib/film/doc.js";
 
@@ -47,9 +47,18 @@ export const POST = withUser(async (req, { params }, user) => {
   const body = await req.json().catch(() => null);
   const edits = pickEditedShots(project.scenario?.shots, body?.shots);
 
+  // ★★ 사진을 먼저 읽는다(2026-08-19). 이 자리에 원래 "사진 읽기는 여기서 하지 않는다 —
+  //   이 경로는 사진을 그림 만들기에서 참조 바이트로 직접 넘기므로 우회가 필요 없다"고
+  //   적혀 있었는데, 실측이 그 판단을 뒤집었다:
+  //     · 시나리오가 사진을 못 봐서 제품의 글자("Giants")도 색도 크기도 모른 채 쓰였다
+  //     · **굽기(r2v)에는 사장님 사진이 아예 안 간다** — films[].images(우리가 만든 그림)만
+  //       참조로 간다. 즉 사진은 그림 단계에만 닿고 시나리오·영상에는 안 닿는다
+  //   판정은 광고와 **같은 함수**다(readPhotoVision) — 두 벌이면 두 흐름이 갈린다.
+  const seen = await readPhotoVision(project);
+
   let scenario;
   try {
-    scenario = await generateScenario({ project, edits });
+    scenario = await generateScenario({ project: seen, edits });
   } catch (e) {
     return Response.json({ error: e?.message || "시나리오를 만들지 못했어요" }, { status: 500 });
   }
@@ -58,6 +67,10 @@ export const POST = withUser(async (req, { params }, user) => {
     ...p,
     scenario: { ...scenario, tries: (Number(p.scenario?.tries) || 0) + 1 },
     status: "scenario",
+    // 읽은 사진값을 남긴다 — 안 남기면 다시 쓸 때마다 사진을 또 읽는다(사진당 값이 든다).
+    // ★ readPhotoVision 은 읽은 것이 없으면 받은 project 를 그대로 돌려주므로,
+    //   `seen !== project` 가 "새로 읽었다"의 판정이다(광고 파이프라인과 같다).
+    ...(seen !== project ? { material: { ...p.material, photos: seen.material.photos } } : {}),
   }));
   return Response.json(await getProject(id, user.id));
 });
