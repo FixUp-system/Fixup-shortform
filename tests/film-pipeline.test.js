@@ -240,3 +240,85 @@ describe("실패는 문서에 남는다", () => {
     expect(back.films.order.error).toBeNull();
   });
 });
+
+// ★★ 장면 순서 방식의 앵커(2026-08-19). 실측에서 사장님이 눈으로 잡으신 결함이다 —
+// 컷마다 인물도 컵도 딴 것이 나왔다. 원인은 imagePlanFor 의 order 갈래가 컷마다
+// **독립적으로** 그림을 만들기 때문이다(앞 그림을 안 본다).
+//
+// ★ 앞 그림을 이어서 넘기지 않는다. 2→3→4 로 오차가 누적된다(직전만 보면 조금씩 밀린다).
+//   focus 하나만 그린 **앵커 한 장**을 먼저 만들어 장면 그림 전부의 참조로 넘긴다.
+// ★ 첫 장면 그림을 앵커로 삼지 않는 이유: 첫 장면에 중심이 안 보일 수 있다(실측에서
+//   1번 컷은 잔만 있고 인물이 없었다 — 그걸로는 인물을 고정할 수 없다).
+describe("장면 순서 — 앵커 한 장이 일관성을 쥔다", () => {
+  beforeEach(() => resetMemoryStore());
+
+  const runOrder = async (focus) => {
+    const p = await makeFilm();
+    const row = await getStore().selectProject(p.id, U);
+    await getStore().updateProjectRow(p.id, U, row.version, {
+      ...row.doc, scenario: { ...SCENARIO, focus },
+    });
+    const seen = [];
+    let n = 0;
+    await runWithActor(U, () =>
+      runFilmImages(p.id, U, "order", {
+        generateImage: async (args) => { seen.push(args); return { url: `https://fal.example/anchor-${n++}.png` }; },
+      })
+    );
+    return { id: p.id, seen };
+  };
+
+  it("★ 앵커를 **먼저** 만든다 — 뒤에 만들면 장면 그림이 참조할 것이 없다", async () => {
+    const { seen } = await runOrder("person");
+    expect(seen[0].prompt).toMatch(/portrait|person/i);
+  });
+
+  it("★ 장면 그림 전부가 같은 앵커를 참조한다 — 직전 그림이 아니다(오차가 누적된다)", async () => {
+    const { seen } = await runOrder("person");
+    const scenes = seen.slice(1);
+    expect(scenes.length).toBe(SCENARIO.shots.length);
+    for (const args of scenes) {
+      expect(args.refs.some((r) => r.url === "https://fal.example/anchor-0.png")).toBe(true);
+    }
+  });
+
+  it("★ 앵커는 문서에 남지만 장면 그림과 구분된다 — 굽기에 무엇이 참조로 갔는지 알아야 한다", async () => {
+    const { id } = await runOrder("product");
+    const row = await getStore().selectProject(id, U);
+    const keys = row.doc.films.order.images.map((im) => im.key);
+    expect(keys[0]).toBe("anchor");
+    expect(keys.slice(1)).toEqual(SCENARIO.shots.map((_, i) => `shot-${i + 1}`));
+  });
+
+  it("★ focus 가 info 면 앵커를 안 만든다 — 고정할 대상이 없는데 $0.08 을 치를 이유가 없다", async () => {
+    const { seen } = await runOrder("info");
+    expect(seen).toHaveLength(SCENARIO.shots.length);
+    for (const args of seen) expect(args.refs.every((r) => !r.url)).toBe(true);
+  });
+
+  it("focus 없는 옛 문서도 앵커를 안 만든다 — 예전 그대로 흐른다", async () => {
+    const p = await makeFilm();
+    const seen = [];
+    await runWithActor(U, () =>
+      runFilmImages(p.id, U, "order", {
+        generateImage: async (args) => { seen.push(args); return { url: "https://fal.example/x.png" }; },
+      })
+    );
+    expect(seen).toHaveLength(SCENARIO.shots.length);
+  });
+
+  it("★ 참고 그림 방식은 앵커를 안 만든다 — 그 방식은 세 축 자체가 앵커다", async () => {
+    const p = await makeFilm();
+    const row = await getStore().selectProject(p.id, U);
+    await getStore().updateProjectRow(p.id, U, row.version, {
+      ...row.doc, scenario: { ...SCENARIO, focus: "person" },
+    });
+    const seen = [];
+    await runWithActor(U, () =>
+      runFilmImages(p.id, U, "refs", {
+        generateImage: async (args) => { seen.push(args); return { url: "https://fal.example/y.png" }; },
+      })
+    );
+    expect(seen).toHaveLength(3);
+  });
+});
