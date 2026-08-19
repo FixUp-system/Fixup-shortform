@@ -26,10 +26,15 @@ import { filmGates } from "../../../lib/film/gates";
 // 폴링 루프도 한 벌이다(화면마다 복붙했더니 조금씩 다르게 틀렸다 — lib/poll.js 주석).
 import { startPolling } from "../../../lib/poll";
 import { ASPECTS, DEFAULT_ASPECT_ID, aspectFor } from "../../../lib/aspects";
+import { AD_FORMATS, AD_MOODS, AD_LANGS, AD_STYLE_LINES, DEFAULT_AD_OPTIONS } from "../../../lib/ad/options";
+import { STYLE_PRESETS } from "../../../lib/styles";
 // 사진 상한 — 서버(app/api/film/route.js)와 **같은 파일**에서 읽는다. 손으로 두 벌 적으면
 // 화면은 통과시키는데 서버가 400 을 내고, 사장님은 다 올린 뒤에야 거절당한다.
 import { MAX_PHOTOS } from "../../../lib/photos";
 import { MAX_MATERIAL_TEXT } from "../../../lib/material";
+
+// 화풍은 영상용 문구가 있는 것만 고를 수 있다 — 광고 화면(app/ads/new/page.js)과 같은 규칙이다.
+const AD_STYLES = STYLE_PRESETS.filter((s) => Object.keys(AD_STYLE_LINES).includes(s.id));
 
 export default function FilmPage() {
   const { mode } = useParams();
@@ -41,6 +46,13 @@ export default function FilmPage() {
   const [text, setText] = useState("");
   const [photos, setPhotos] = useState([]); // {id, filename, url}
   const [aspect, setAspect] = useState(DEFAULT_ASPECT_ID);
+  // ★★ 조건 넷을 화면이 고른다(2026-08-19). 그전에는 안 보내서 전부 기본값으로 떨어졌고,
+  //   야구단 굿즈 광고에 mood=premium 이 박혀 모델이 정장 코트를 입고 나왔다.
+  //   기본값은 lib/ad/options.js 의 것을 그대로 쓴다 — 두 벌이면 갈린다.
+  const [format, setFormat] = useState(DEFAULT_AD_OPTIONS.format);
+  const [mood, setMood] = useState(DEFAULT_AD_OPTIONS.mood);
+  const [style, setStyle] = useState(DEFAULT_AD_OPTIONS.style);
+  const [lang, setLang] = useState(DEFAULT_AD_OPTIONS.narration_lang);
   // busy 는 "지금 무슨 일을 시켰는가" 다(빈 문자열이면 아무 일도 안 시킨 것). 버튼 글자를
   // 바꾸는 데도 쓰므로 boolean 하나로 겸하지 않는다.
   const [busy, setBusy] = useState("");
@@ -172,7 +184,8 @@ export default function FilmPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         material: { text, photos },
-        settings: { aspect_ratio: aspect },
+        // ★ 길이·화질·모델은 여전히 안 보낸다 — 서버가 박는다(두 방식의 조건을 같게 둔다).
+        settings: { aspect_ratio: aspect, format, mood, style, narration_lang: lang },
       }),
     });
     const data = await res.json().catch(() => ({}));
@@ -319,9 +332,70 @@ export default function FilmPage() {
               </div>
             )}
 
-            {/* 사이즈만 고른다 — 길이·화질·모델은 서버가 박는다(두 방식의 조건을 같게 둔다).
-                그 값들을 여기서 열면 두 편이 다른 조건으로 구워져 비교가 무너진다. */}
+            {/* ★ 무엇을 만드는가(컨셉·분위기·화풍·언어·사이즈)는 사장님이 고른다.
+                어떻게 굽는가(길이·화질·모델)는 서버가 박는다 — 두 방식의 조건이 같아야
+                비교가 성립하기 때문이다. 그 값들을 여기서 열면 두 편이 다른 조건으로
+                구워져 이 기능이 통째로 무의미해진다. */}
             <div className="composer-tray">
+              <div className="tray-row">
+                <span className="tray-label">컨셉</span>
+                <div className="tray-col">
+                  <div className="chips">
+                    {AD_FORMATS.map((f) => (
+                      <button key={f.id} className={`chip${format === f.id ? " on" : ""}`}
+                        disabled={locked} onClick={() => setFormat(f.id)}>
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="tray-note">{AD_FORMATS.find((f) => f.id === format)?.beat}</div>
+                </div>
+              </div>
+
+              <div className="tray-row">
+                <span className="tray-label">분위기</span>
+                <div className="tray-col">
+                  <div className="chips">
+                    {AD_MOODS.map((m) => (
+                      <button key={m.id} className={`chip${mood === m.id ? " on" : ""}`}
+                        disabled={locked} onClick={() => setMood(m.id)}>
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="tray-row">
+                <span className="tray-label">화풍</span>
+                <div className="tray-col">
+                  <div className="chips">
+                    {AD_STYLES.map((s) => (
+                      <button key={s.id} className={`chip${style === s.id ? " on" : ""}`}
+                        disabled={locked} onClick={() => setStyle(s.id)}>
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="tray-note">{AD_STYLES.find((s) => s.id === style)?.desc}</div>
+                </div>
+              </div>
+
+              <div className="tray-row">
+                <span className="tray-label">언어</span>
+                <div className="tray-col">
+                  <div className="chips">
+                    {/* 숨긴 언어(hidden)는 안 그린다 — 표에는 남아 있다 */}
+                    {AD_LANGS.filter((l) => !l.hidden).map((l) => (
+                      <button key={l.id} className={`chip${lang === l.id ? " on" : ""}`}
+                        disabled={locked} onClick={() => setLang(l.id)}>
+                        {l.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
               <div className="tray-row">
                 <span className="tray-label">사이즈</span>
                 <div className="tray-col">

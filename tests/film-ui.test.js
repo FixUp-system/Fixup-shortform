@@ -262,3 +262,35 @@ describe("시나리오 다시 쓰기 — 서버와 같은 판정을 쓴다", () 
     expect(page).toMatch(/disabled=\{[^}]*scenarioLocked[^}]*\}/);
   });
 });
+
+// ★★ film 화면이 조건을 안 보내서 전부 기본값으로 떨어지고 있었다(2026-08-19).
+//
+// 실측: 야구단 굿즈 광고인데 mood 가 `premium`("고급스러운")으로 박혀 모델이 베이지
+// 코트에 정장 바지를 입고 나왔다 — 사장님이 고른 값이 아니라 화면이 안 보내서 생긴
+// 기본값이다. lib/ad/options.js:79 에 그 위험이 적혀 있다: "조용히 기본값으로
+// 떨어뜨리면 사장님이 고른 것과 만들어지는 것이 달라지고, 그 차이를 아무도 못 알아본다."
+//
+// ★ 길이·화질·모델은 **여전히 서버가 박는다** — 두 방식의 조건이 같아야 비교가 성립한다.
+//   여는 것은 "무엇을 만드는가"(컨셉·분위기·화풍·언어)이지 "어떻게 굽는가"가 아니다.
+describe("film 화면이 조건을 고른다", () => {
+  for (const [label, symbol] of [["컨셉", "AD_FORMATS"], ["분위기", "AD_MOODS"], ["화풍", "AD_STYLES"], ["언어", "AD_LANGS"]]) {
+    it(`★ ${label} 목록을 표에서 돌려 그린다 — 손으로 적으면 표가 늘 때 빠진다`, () => {
+      // ★ import 줄에도 같은 이름이 나오므로 **map 호출**을 직접 찾는다.
+      //   AD_LANGS 만 hidden 을 거른 뒤 map 한다.
+      const call = symbol === "AD_LANGS"
+        ? "{AD_LANGS.filter((l) => !l.hidden).map("
+        : "{" + symbol + ".map(";
+      expect(page).toContain(call);
+    });
+  }
+
+  it("★ 고른 값을 서버에 보낸다 — 안 보내면 기본값으로 조용히 떨어진다", () => {
+    const body = page.slice(page.indexOf("settings: {"), page.indexOf("settings: {") + 300);
+    for (const k of ["format", "mood", "style", "narration_lang"]) expect(body).toContain(k);
+  });
+
+  it("★ 길이·화질·모델은 여전히 화면에 없다 — 두 방식의 조건이 같아야 비교가 성립한다", () => {
+    expect(page).not.toMatch(/AD_MODELS/);
+    expect(page).not.toMatch(/adSecondsFor|adResolutionsFor/);
+  });
+});
