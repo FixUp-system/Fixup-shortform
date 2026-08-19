@@ -7,7 +7,7 @@
 // 그 네 단계를 실제로 순서대로 겪게 만든 가짜 fetch 로 잰다 — 한 번의 fetch 로
 // 끝나는 옛 성질을 그대로 흉내 내면 이 파일이 지키려는 것을 못 잡는다.
 import { describe, it, expect, afterEach } from "vitest";
-import { generateAdVideo } from "../lib/ad/generate.js";
+import { generateAdVideo, withSpokenLines } from "../lib/ad/generate.js";
 import { runWithActor } from "../lib/actor.js";
 import { resetMemoryStore } from "../lib/store/memory.js";
 import { getStore } from "../lib/store/index.js";
@@ -343,5 +343,34 @@ describe("광고 영상 생성 — 예산 축(★ Task 25, 프로젝트 축만 �
     )
       .then(() => { throw new Error("막았어야 한다"); })
       .catch((e) => { expect(e.scope).toBe("trial"); });
+  });
+});
+
+// ★★ 목소리가 **실제로 나가야** 한다(2026-08-19). 스키마에 칸을 열고 저장까지 해도
+// 프롬프트에 안 실리면 아무 일도 안 일어난다 — shows 가 정확히 그랬다(78ac723).
+describe("withSpokenLines — 목소리를 지시문에 싣는다", () => {
+  it("★ voice 가 있으면 Voice 절이 붙는다", () => {
+    const out = withSpokenLines("장면 설명.", [{ line: "안녕하세요" }], "a warm woman in her twenties");
+    expect(out).toContain("a warm woman in her twenties");
+    expect(out).toMatch(/Voice:/);
+  });
+
+  it("★ 대사가 이미 지시문에 들어 있어도 Voice 절은 붙는다 — 두 판정이 서로 다른 것이다", () => {
+    // 실측(2026-08-19): Claude 가 대사를 늘 text 안에 넣어서 대사 보강 절은 거의 안 켜진다.
+    // 목소리를 그 절에 얹으면 함께 안 나간다.
+    const base = 'the narrator says "안녕하세요".';
+    const out = withSpokenLines(base, [{ line: "안녕하세요" }], "a calm man");
+    expect(out).toContain("a calm man");
+  });
+
+  it("voice 가 없으면 예전 그대로다 — 옛 문서·광고 회귀 0", () => {
+    const base = 'the narrator says "안녕하세요".';
+    expect(withSpokenLines(base, [{ line: "안녕하세요" }])).toBe(base);
+    expect(withSpokenLines(base, [{ line: "안녕하세요" }], "")).toBe(base);
+  });
+
+  it("★ 목소리는 소리다 — 화면 글자로 띄우라는 뜻이 아님을 함께 말한다", () => {
+    const out = withSpokenLines("장면.", [], "a calm man");
+    expect(out).toMatch(/spoken|audio|voice/i);
   });
 });

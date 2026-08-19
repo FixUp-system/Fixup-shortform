@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { FILM_MODES, isFilmMode, filmMode, imagePlanFor, attachClauseFor } from "../lib/film/mode.js";
+import { buildFilmPrompt } from "../lib/film/pipeline.js";
 
 const SCENARIO = {
   text: "Vertical 9:16 ...",
@@ -103,5 +104,82 @@ describe("그림을 뭐라고 부르는가", () => {
 
   it("★ 둘이 서로 다른 말을 한다 — 같으면 실험이 성립하지 않는다", () => {
     expect(attachClauseFor("order")).not.toBe(attachClauseFor("refs"));
+  });
+});
+
+// ★ film 도 목소리를 실어야 한다 — buildFilmPrompt 가 withSpokenLines 를 부르면서
+//   voice 를 안 넘기면 광고에서만 나가고 이 경로는 예전 그대로다(같은 함수를 쓰는데
+//   인자 하나가 빠져서 절반만 도는 모양은 이 저장소가 여러 번 겪었다).
+describe("buildFilmPrompt 가 목소리를 싣는다", () => {
+  it("★ scenario.voice 가 지시문에 실린다", () => {
+    const sc = { ...SCENARIO, voice: "a calm man in his thirties, close-mic" };
+    for (const mode of ["order", "refs"]) {
+      expect(buildFilmPrompt(sc, mode)).toContain("a calm man in his thirties");
+    }
+  });
+
+  it("voice 가 없으면 예전 그대로다", () => {
+    expect(buildFilmPrompt(SCENARIO, "order")).not.toMatch(/Voice:/);
+  });
+});
+
+// ★★ 참고 그림 축이 focus 를 따른다(2026-08-19). 지금까지는 무엇이 중심이든 늘
+// 제품·사람·자리 세 장이었다 — 인물이 주인공인 영상에도 제품 컷을 그리고, 공간이
+// 주인공인 영상에도 인물 초상을 그렸다. 장당 $0.08 이 그렇게 나갔다.
+//
+// ★ 장수는 셋 그대로다. 늘리면 돈이 는다 — 무엇을 그릴지만 바꾼다.
+describe("참고 그림 — focus 가 세 축을 정한다", () => {
+  const withFocus = (f) => ({ ...SCENARIO, focus: f });
+
+  it("★ 어느 focus 든 세 장이다 — 장수는 돈이다", () => {
+    for (const f of ["product", "person", "place", "info"]) {
+      expect(imagePlanFor("refs", withFocus(f))).toHaveLength(3);
+    }
+  });
+
+  it("★ focus 마다 축이 다르다 — 같으면 이 갈래가 아무 일도 안 하는 것이다", () => {
+    const keys = (f) => imagePlanFor("refs", withFocus(f)).map((p) => p.key).join(",");
+    expect(keys("product")).not.toBe(keys("person"));
+    expect(keys("person")).not.toBe(keys("place"));
+  });
+
+  it("★ 중심이 인물이면 인물을 두 장 그린다", () => {
+    const plan = imagePlanFor("refs", withFocus("person"));
+    expect(plan.filter((p) => p.key.startsWith("person"))).toHaveLength(2);
+  });
+
+  it("★ 중심이 제품이면 제품을 두 장 그린다", () => {
+    const plan = imagePlanFor("refs", withFocus("product"));
+    expect(plan.filter((p) => p.key.startsWith("subject"))).toHaveLength(2);
+  });
+
+  it("★ 중심이 공간이면 공간을 두 장 그린다", () => {
+    const plan = imagePlanFor("refs", withFocus("place"));
+    expect(plan.filter((p) => p.key.startsWith("place"))).toHaveLength(2);
+  });
+
+  it("info 와 옛 문서(focus 없음)는 지금까지의 세 축 그대로다 — 고정할 대상이 없다", () => {
+    for (const sc of [withFocus("info"), SCENARIO]) {
+      expect(imagePlanFor("refs", sc).map((p) => p.key)).toEqual(["subject", "person", "place"]);
+    }
+  });
+
+  // ── 오늘 실측에서 눈으로 본 결함 둘 ──────────────────────────────────────
+  //
+  // 딸기라떼 실측(2026-08-19)에서 그대로 나온 프롬프트:
+  //   [person] "A portrait of the person in: She smiles and sets the glass down, the pink
+  //             drink centered and glowing on the marble counter with soft sun flare behind."
+  //   [place]  "The place, empty of people, in: <네 장면 전부 — 사람 묘사 포함>"
+  // 초상화를 그리라면서 잔·카운터·역광을 다 넣고, 사람 없는 곳이라면서 사람 묘사를 재료로
+  // 다 받았다. B 방식에만 있는 결함이라 두 방식 비교까지 오염시킨다.
+  it("★ 사람 축은 장면 전체를 재료로 받지 않는다 — 초상에 배경·소품이 딸려 들어간다", () => {
+    const person = imagePlanFor("refs", withFocus("person")).find((p) => p.key === "person");
+    expect(person.prompt).not.toContain("a woman walking out of a sunlit doorway with the bag");
+  });
+
+  it("★ 자리 축은 '사람 없는 곳'이라면서 사람 묘사를 재료로 넣지 않는다", () => {
+    const place = imagePlanFor("refs", withFocus("place")).find((p) => p.key.startsWith("place"));
+    expect(place.prompt).toMatch(/empty of people|no people/i);
+    expect(place.prompt).not.toContain("a woman walking out of a sunlit doorway");
   });
 });

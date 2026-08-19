@@ -339,3 +339,36 @@ describe("SYSTEM 이 중심을 먼저 정하라고 말한다", () => {
     expect(sys()).toMatch(/"focus"/);
   });
 });
+
+// ★★ 목소리(2026-08-19). 지금까지 시나리오는 환경음·효과음은 장면마다 정하면서
+// **목소리의 성질**(성별·나이·톤·속도)은 한 마디도 정하지 않았다. 그래서 seedance 가
+// 기본값으로 읽고, 사장님이 "AI 가 읽어주는 느낌"이라고 하신 밋밋한 나레이션이 된다.
+//
+// ★ 단계별(lib/cast.js)은 인물마다 voice 를 정한다 — "목소리: 음색과 톤, 영어로".
+//   통짜로 굽는 쪽에는 그 자리가 없었다.
+// ★ 화자는 **하나**라 최상위에 둔다(shots 안이 아니다). 장면마다 다른 목소리를 지정하면
+//   한 영상 안에서 사람이 바뀐다.
+describe("voice — 나레이션 목소리", () => {
+  const ok = (extra) => ({ text: "지시문", shots: [{ beat: "등장" }], focus: "product", ...extra });
+
+  it("★ 모델이 낸 voice 가 통과한다", () => {
+    const v = "a warm, unhurried woman in her late twenties, soft and close-mic";
+    expect(validateScenario(ok({ voice: v }), 0).voice).toBe(v);
+  });
+
+  it("빠지면 빈 문자열이다 — 없으면 지시문에 아무 말도 안 붙는다(옛 문서와 같다)", () => {
+    expect(validateScenario(ok({}), 0).voice).toBe("");
+    expect(validateScenario(ok({ voice: 7 }), 0).voice).toBe("");
+  });
+
+  it("스키마가 voice 를 낼 길을 연다", () => {
+    expect(Object.keys(SCENARIO_SCHEMA.properties)).toContain("voice");
+    expect(SCENARIO_SCHEMA.required).toContain("voice");
+  });
+
+  it("★ SYSTEM 이 목소리를 정하라고 말한다", () => {
+    const s = buildScenarioMessages({ settings, material: { text: "소재", photos: [] } }).system;
+    expect(s).toMatch(/"voice"/);
+    expect(s).toMatch(/목소리/);
+  });
+});
