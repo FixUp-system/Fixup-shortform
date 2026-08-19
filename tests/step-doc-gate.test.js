@@ -20,6 +20,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { resetMemoryStore } from "../lib/store/memory.js";
 import { createProject, isStepDoc } from "../lib/projects.js";
+import { archiveVideoUrl } from "../lib/archive/video.js";
 import { runWithActor } from "../lib/actor.js";
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
 
@@ -382,8 +383,17 @@ describe("★ 화면이 부르는 주소는 실제로 있는 라우트다", () =
     expect(missing, `${file} 이 없는 라우트를 부른다 — 화면이 열리자마자 죽는다`).toEqual([]);
   });
 
-  // 위 검사는 "파일이 있는가"까지다. film 화면의 읽기 문만은 **한 걸음 더** 못 박는다 —
-  // 이 문이 다시 /api/projects 로 돌아가면 단계별 게이트가 그것을 404 로 거절한다.
+  // ⚠️ 위 검사의 한계를 분명히 해 둔다 — **이 그물은 이번 사고를 못 잡았을 것이다.**
+  //   옛 주소 /api/projects/${id} 도 *존재하는 라우트*라 파일 존재만으로는 통과한다.
+  //   이 그물이 잡는 것은 "화면이 아예 없는 문을 부른다"까지이고, "있긴 한데 이 종류를
+  //   404 로 거절하는 문을 부른다"는 못 본다. 그 자리를 실제로 붙드는 것은 **아래 두
+  //   하드코딩 단정**이며, 그것은 다음 종류에는 일반화되지 않는다 — 종류가 늘면 아래에
+  //   한 줄을 더해야 한다. 일반화하려면 "화면이 부르는 문이 그 종류의 문서를 200 으로
+  //   답하는가"를 실제로 돌려 봐야 하는데, 그러려면 화면이 어느 종류를 다루는지를
+  //   테스트가 알아야 한다(지금은 소스 문자열로만 화면을 잰다).
+  //
+  // film 화면의 읽기 문은 그래서 **한 걸음 더** 못 박는다 — 이 문이 다시 /api/projects 로
+  // 돌아가면 단계별 게이트가 그것을 404 로 거절한다.
   it("film 화면은 film 전용 문으로 문서를 읽는다 — 단계별 문으로 돌아가면 안 된다", () => {
     const src = strip(readFileSync("app/film/[mode]/page.js", "utf8"));
     expect(src, "film 화면이 단계별 문을 두드린다").not.toMatch(/\/api\/projects\//);
@@ -395,5 +405,48 @@ describe("★ 화면이 부르는 주소는 실제로 있는 라우트다", () =
     for (const door of ["/api/ads/${id}", "/api/film/${id}", "/api/projects/${id}"]) {
       expect(src, `보관함 상세가 ${door} 를 안 두드린다`).toContain(door);
     }
+  });
+});
+
+// 종류를 늘리면 **화면이 그 종류의 값을 어디서 꺼내는지**도 함께 늘어난다.
+// 그 자리에서 실제로 틀렸다: film 갈래만 films[mode].video 를 통째로 냈는데 그것은
+// { url, seconds, rawUrl, subtitled, ts } 객체다. 광고·단계별은 문자열(videos[0].url·
+// render.url)이라, <video src>·내려받기 href 가 "[object Object]" 를 받아 둘 다 죽었다.
+//
+// 소스 문자열 검사로는 이것을 못 잡는다("URL 인가"는 글자가 아니라 값의 성질이다).
+// 그래서 판정을 순수 함수로 빼 두고 **세 종류를 다 넣어** 본다.
+describe("보관함 상세의 완성본 주소 — 언제나 URL 문자열이다", () => {
+  const URLISH = /^(https?:|\/)/;
+
+  it.each([
+    ["광고", { kind: "ad", videos: [{ url: "/api/renders/a.mp4" }] }],
+    ["한 번에 굽기", { kind: "film", films: { order: { video: { url: "/api/renders/f.mp4", seconds: 15 } } } }],
+    ["단계별(종류 없음)", { render: { url: "/api/renders/s.mp4" } }],
+  ])("%s — 객체가 아니라 주소를 낸다", (_n, doc) => {
+    const v = archiveVideoUrl(doc);
+    expect(typeof v, `${_n} 갈래가 문자열이 아닌 것을 냈다 — <video src> 가 죽는다`).toBe("string");
+    expect(v).toMatch(URLISH);
+  });
+
+  // film 은 방식이 둘이라 한쪽만 구워진 경우가 정상 흐름이다 — 빈 칸을 먼저 집으면 안 된다.
+  it("film — 아직 안 구운 방식은 건너뛰고 구워진 것을 집는다", () => {
+    const doc = { kind: "film", films: { order: { video: null }, refs: { video: { url: "/api/renders/r.mp4" } } } };
+    expect(archiveVideoUrl(doc)).toBe("/api/renders/r.mp4");
+  });
+
+  it.each([
+    ["광고", { kind: "ad" }],
+    ["한 번에 굽기", { kind: "film", films: { order: {}, refs: {} } }],
+    ["단계별(종류 없음)", {}],
+  ])("%s — 아직 없으면 null 이다(화면이 '아직 완성본이 없어요'를 그리는 근거)", (_n, doc) => {
+    expect(archiveVideoUrl(doc)).toBeNull();
+  });
+
+  it("화면이 그 판정을 쓴다 — 삼항식을 화면에 되돌리면 값으로 잴 수 없어진다", () => {
+    const strip = (src) =>
+      src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+    const src = strip(readFileSync("app/archive/[id]/page.js", "utf8"));
+    expect(src).toContain("archiveVideoUrl(doc)");
+    expect(src, "화면이 films 를 직접 헤집는다 — 그 자리가 객체를 냈던 자리다").not.toMatch(/doc\.films/);
   });
 });

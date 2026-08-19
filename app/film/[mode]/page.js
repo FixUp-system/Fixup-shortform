@@ -48,7 +48,7 @@ export default function FilmPage() {
   // **그림의 참조**라 없으면 제품이 딴 물건으로 그려진다.
   const [uploading, setUploading] = useState(false);
   const [err, setErr] = useState("");
-  // 상태 라우트가 준 마지막 응답의 **이 방식** 한 칸. 문서(GET /api/projects)에는 없는
+  // 상태 라우트가 준 마지막 응답의 **이 방식** 한 칸. 문서(GET /api/film/[id])에는 없는
   // canDraw·triesLeft 가 여기에만 실려 온다 — 그 둘이 막다른 길을 걷어내는 열쇠다.
   const [live, setLive] = useState(null);
   const fileRef = useRef(null);

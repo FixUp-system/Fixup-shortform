@@ -17,6 +17,7 @@ import Link from "next/link";
 import { adModel } from "../../../lib/ad/models";
 import { I2V_MODELS, modelIdForProject, resolutionForProject } from "../../../lib/clip-limits";
 import { axesOf, motionAxisFor } from "../../../lib/motion";
+import { archiveVideoUrl } from "../../../lib/archive/video";
 
 // 한 줄짜리 정보. 값이 없으면 줄째 안 그린다 — 빈 칸을 늘어놓으면 무엇이 없는지가 아니라
 // 화면이 덜 만들어진 것처럼 보인다.
@@ -79,14 +80,10 @@ function ArchiveDetailPageBody() {
   //   404 로 거절하므로 눌러도 막다른 길이다.
   const isFilm = doc.kind === "film";
   const s = doc.settings || {};
-  // 완성본 — 광고는 videos[0], 단계별은 render 다. 둘 다 없으면 아직 안 만든 것이다.
-  // ★ film 은 **방식마다 한 벌**이라(films.order·films.refs) 먼저 구워진 것을 보여 준다.
-  //   두 편을 나란히 보는 자리는 제작 화면이다 — 여기는 "무슨 영상이었지"를 확인하는 자리다.
-  const video = isAd
-    ? doc.videos?.[0]?.url
-    : isFilm
-      ? Object.values(doc.films || {}).map((fm) => fm?.video).find(Boolean) || null
-      : doc.render?.url;
+  // 완성본 주소 — 종류마다 사는 자리가 다르다. 판정은 순수 함수 한 벌이다(lib/archive/video.js).
+  // ★ 화면 안 삼항식으로 두었더니 film 갈래만 **객체**를 내서 재생·내려받기가 둘 다 죽었다.
+  //   그 함수의 주석에 왜 값으로 재야 하는지가 있다.
+  const video = archiveVideoUrl(doc);
   // 이어서 작업하는 자리 — 종류마다 제작 화면이 다르다.
   const workHref = isAd ? `/ads/${id}` : isFilm ? `/film/order?id=${id}` : `/create/${id}/briefing`;
   // 모델은 **전체 이름**으로 적는다 — 여기는 모델 묶음 밖이라 "2.0" 만 적으면 무엇의
