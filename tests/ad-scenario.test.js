@@ -410,3 +410,76 @@ describe("avatar_id — 컷마다 인물 사진을 고른다", () => {
     expect(s).toMatch(/빈 문자열|비운다/);
   });
 });
+
+// ★★ 단계별에 쌓인 것을 옮긴다(2026-08-19 사장님 지시 — "단계별에서 겪은 시행착오를
+// 여기서 다시 반복하는 건 너무 비효율적이다"). lib/scenario.js·lib/cuts.js 를 훑어
+// 광고·film 에 없는 축을 찾았다.
+describe("단계별에서 옮겨 온 축들", () => {
+  const sys = () => buildScenarioMessages({ settings, material: { text: "소재", photos: [] } }).system;
+  const ok = (extra) => ({ text: "t", focus: "product", voice: "v", shots: [{ beat: "b" }], ...extra });
+
+  // B. 음악 — 영상 하나에 하나. lib/cuts.js:1552 가 전 컷에 같은 글자로 싣는다.
+  describe("music", () => {
+    it("★ 스키마에 있다", () => {
+      expect(Object.keys(SCENARIO_SCHEMA.properties)).toContain("music");
+      expect(SCENARIO_SCHEMA.required).toContain("music");
+    });
+    it("모델이 낸 값이 통과한다", () => {
+      expect(validateScenario(ok({ music: "slow piano, sparse and calm" }), 0).music).toBe("slow piano, sparse and calm");
+    });
+    it("빠지면 빈 문자열이다 — 정적이 연출인 경우도 있다", () => {
+      expect(validateScenario(ok({}), 0).music).toBe("");
+    });
+    it("★ SYSTEM 이 영상 하나에 하나라고 말한다 — 장면마다 다르면 경계에서 곡이 바뀐다", () => {
+      expect(sys()).toMatch(/음악/);
+      expect(sys()).toMatch(/하나/);
+    });
+    it("★ SYSTEM 이 가사 있는 음악을 막는다 — 낭독과 겹쳐 둘 다 안 들린다", () => {
+      expect(sys()).toMatch(/가사/);
+    });
+  });
+
+  // C. 톤(색 처리) — lib/cuts.js:1536 이 전 컷에 같은 글자로 싣는다.
+  describe("tone", () => {
+    it("★ 스키마에 있다", () => {
+      expect(Object.keys(SCENARIO_SCHEMA.properties)).toContain("tone");
+    });
+    it("모델이 낸 값이 통과한다", () => {
+      expect(validateScenario(ok({ tone: "warm film grain, muted shadows" }), 0).tone).toBe("warm film grain, muted shadows");
+    });
+    it("빠지면 빈 문자열이다", () => {
+      expect(validateScenario(ok({}), 0).tone).toBe("");
+    });
+  });
+
+  // E. look — 제품 외형 전용 칸. 단계별은 focus.look 에 색·부위·소재와 **크기·비례**를 적는다.
+  describe("look", () => {
+    it("★ 스키마에 있다", () => {
+      expect(Object.keys(SCENARIO_SCHEMA.properties)).toContain("look");
+    });
+    it("모델이 낸 값이 통과한다", () => {
+      expect(validateScenario(ok({ look: "pink plush bunny, palm-sized" }), 0).look).toBe("pink plush bunny, palm-sized");
+    });
+    it("★ SYSTEM 이 크기·비례까지 적으라고 말한다 — 모르면 컷마다 다른 크기로 나온다", () => {
+      expect(sys()).toMatch(/크기/);
+    });
+  });
+
+  // D. speaker — 누가 말하는가. 단계별은 컷마다 적는다("내레이션" 또는 인물).
+  describe("speaker", () => {
+    it("★ shots 칸에 있다", () => {
+      expect(Object.keys(SCENARIO_SCHEMA.properties.shots.items.properties)).toContain("speaker");
+    });
+    it("모델이 낸 값이 컷에 남는다", () => {
+      expect(validateScenario(ok({ shots: [{ beat: "b", speaker: "내레이션" }] }), 0).shots[0].speaker).toBe("내레이션");
+    });
+    it("★ SYSTEM 이 화면 밖 목소리를 '내레이션'으로 적으라고 말한다 — 그 글자가 판정에 쓰인다", () => {
+      expect(sys()).toMatch(/내레이션/);
+    });
+  });
+
+  // F. 대사 규칙 — "짧게, 영상을 말로 다 채우지 마라"
+  it("★ SYSTEM 이 말로 다 채우지 말라고 한다 — 쉬는 자리가 있어야 숨이 트인다", () => {
+    expect(sys()).toMatch(/쉬는 자리|다 채우지/);
+  });
+});

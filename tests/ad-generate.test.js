@@ -374,3 +374,37 @@ describe("withSpokenLines — 목소리를 지시문에 싣는다", () => {
     expect(out).toMatch(/spoken|audio|voice/i);
   });
 });
+
+// ★★ 값이 **실제로 나가야** 한다. 스키마에 칸을 열고 저장까지 해도 프롬프트에 안 실리면
+// 아무 일도 안 일어난다 — shows 가 정확히 그랬다(78ac723).
+//
+// 단계별은 lib/cuts.js 가 컷마다 붙인다:
+//   Color treatment, keep identical across all cuts: ${tone}.
+//   Background music, identical across all cuts: ${music}.
+// 통짜로 굽는 이 경로는 지시문이 하나뿐이라 **한 번씩** 붙인다.
+describe("음악·색처리·외형이 지시문에 실린다", () => {
+  const sc = (extra) => ({ text: "장면 설명.", shots: [], ...extra });
+  const out = (extra) => withSpokenLines(sc(extra).text, [], undefined, sc(extra));
+
+  it("★ music 이 실린다", () => {
+    expect(out({ music: "slow piano, sparse and calm" })).toContain("slow piano, sparse and calm");
+  });
+
+  it("★ 가사 없는 음악이라는 것을 함께 말한다 — 낭독과 겹치면 둘 다 안 들린다", () => {
+    expect(out({ music: "slow piano" })).toMatch(/no lyrics|instrumental/i);
+  });
+
+  it("★ tone 이 실리고 '끝까지 같게'를 말한다", () => {
+    const t = out({ tone: "warm film grain" });
+    expect(t).toContain("warm film grain");
+    expect(t).toMatch(/throughout|identical|same/i);
+  });
+
+  it("★ look 이 실린다", () => {
+    expect(out({ look: "pink plush bunny, palm-sized" })).toContain("pink plush bunny, palm-sized");
+  });
+
+  it("셋 다 없으면 예전 그대로다 — 옛 문서·각인 회귀 0", () => {
+    expect(out({})).toBe("장면 설명.");
+  });
+});
