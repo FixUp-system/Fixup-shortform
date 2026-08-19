@@ -2,6 +2,7 @@
 // 코드가 먼저 좁히고, 남는 결정 지점은 "사진 1장" 하나다.
 import { describe, it, expect } from "vitest";
 import { pickEndpointKind, buildScenarioMessages, validateScenario, generateScenario, pickEditedShots } from "../lib/ad/scenario.js";
+import { SCENARIO_SCHEMA } from "../lib/ad/llm.js";
 
 const settings = {
   seconds: 15, aspect_ratio: "9:16", narration_lang: "ko",
@@ -276,5 +277,65 @@ describe("컷 편집을 프롬프트에 싣는다", () => {
     expect(pickEditedShots(saved, null)).toEqual([]);
     expect(pickEditedShots(saved, "가")).toEqual([]);
     expect(pickEditedShots(null, [{ beat: "가" }])).toEqual([]);
+  });
+});
+
+// ★★ 이 영상의 **중심**(2026-08-19). 지금까지 시나리오는 카메라·조명·음향은 장면마다
+// 상세히 정하면서 "무엇이 이 영상의 주인공인가"는 한 줄도 정하지 않았다. 그래서 제품과
+// 인물이 섞여 나오고, 그림을 만들 때 무엇을 지켜야 하는지 아무도 모른 채로 흘러갔다
+// (실측 2026-08-19: 딸기라떼 영상에서 컷마다 인물도 컵도 딴 것이 나왔다).
+//
+// ★ 컨셉(AD_FORMATS)과 다른 질문이다 — 컨셉은 "어떤 형식으로 보여줄까", focus 는
+//   "무엇을 지켜야 하나"다. 제품 히어로 형식이어도 중심은 인물일 수 있다.
+describe("focus — 이 영상의 중심", () => {
+  const ok = (extra) => ({ text: "지시문", shots: [{ beat: "등장" }], ...extra });
+
+  it("★ 모델이 낸 focus 가 통과한다 — validateScenario 는 최상위 칸을 열거해서 통과시킨다", () => {
+    expect(validateScenario(ok({ focus: "person" }), 0).focus).toBe("person");
+  });
+
+  it("넷을 전부 통과시킨다", () => {
+    for (const f of ["product", "person", "info", "place"]) {
+      expect(validateScenario(ok({ focus: f }), 0).focus).toBe(f);
+    }
+  });
+
+  // ★ 모르는 값에 **던지지 않는다.** 옵션(normalizeAdOptions)은 사장님이 고른 값이라
+  //   던지는 것이 맞지만, 이건 모델이 낸 값이다 — 던지면 시나리오 한 편이 통째로 날아가고
+  //   그 호출값은 이미 치렀다. 안전한 쪽(product)으로 떨어뜨린다.
+  it("모르는 값·빠진 값은 product 로 떨어진다 — 시나리오를 통째로 잃지 않는다", () => {
+    expect(validateScenario(ok({ focus: "무엇" }), 0).focus).toBe("product");
+    expect(validateScenario(ok({}), 0).focus).toBe("product");
+    expect(validateScenario(ok({ focus: 7 }), 0).focus).toBe("product");
+  });
+});
+
+// 스키마가 막으면 SYSTEM 이 아무리 요구해도 모델이 못 낸다 — shows 가 그랬다(78ac723).
+describe("SCENARIO_SCHEMA 가 focus 를 낼 길을 연다", () => {
+  it("★ 최상위에 focus 가 있고 required 다", () => {
+    expect(Object.keys(SCENARIO_SCHEMA.properties)).toContain("focus");
+    expect(SCENARIO_SCHEMA.required).toContain("focus");
+  });
+});
+
+// SYSTEM 이 중심을 **먼저** 정하게 한다 — 장면을 다 짜고 나서 "그래서 중심이 뭐였지"를
+// 뒤에 붙이면 그 값이 장면 구성에 아무 영향을 못 준다(순서가 곧 설계다).
+describe("SYSTEM 이 중심을 먼저 정하라고 말한다", () => {
+  const sys = () => buildScenarioMessages({ settings, material: { text: "소재", photos: [] } }).system;
+
+  it("★ 넷을 이름으로 열거한다 — 코드가 그 값으로 갈라지므로 모델이 아무 말이나 내면 안 된다", () => {
+    const s = sys();
+    for (const f of ["product", "person", "info", "place"]) expect(s).toContain(f);
+  });
+
+  it("★ 중심을 먼저 정하고 장면을 짜라고 말한다 — 장면 설명보다 앞에 나온다", () => {
+    const s = sys();
+    expect(s).toMatch(/중심/);
+    // 카메라 지시(장면 설계의 시작)보다 focus 얘기가 먼저 와야 한다
+    expect(s.indexOf("중심")).toBeLessThan(s.indexOf("카메라"));
+  });
+
+  it("★ JSON 예시에 focus 칸이 있다 — 스키마만 열고 예시에 없으면 모델이 자주 빠뜨린다", () => {
+    expect(sys()).toMatch(/"focus"/);
   });
 });
