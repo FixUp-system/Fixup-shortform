@@ -67,7 +67,7 @@ import { getStore } from "../lib/store/index.js";
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
 import { createProject, updateProject, getProject } from "../lib/projects.js";
 import { runWithActor } from "../lib/actor.js";
-import { putFilm } from "../lib/film/doc.js";
+import { putFilm, MAX_FILM_IMAGE_TRIES, FILM_IMAGE_LOCK_MS } from "../lib/film/doc.js";
 import { balanceFor } from "../lib/charges.js";
 import { adVideoPrice } from "../lib/pricing.js";
 
@@ -161,6 +161,46 @@ describe("그림 라우트", () => {
     expect(res.status).toBe(200);
     expect(filmMock.images).toHaveBeenCalledWith(p.id, U, "refs");
   });
+
+  it("★ 그리는 중이면 두 번째 요청을 막는다 — 청구가 없는 자리라 잠금이 유일한 그물이다", async () => {
+    const p = await readyFilm();
+    await runWithActor(U, () =>
+      updateProject(p.id, U, (d) => putFilm(d, "order", { status: "drawing", drawingAt: Date.now() }))
+    );
+    const res = await imagesPOST(post({ mode: "order" }), ctx(p.id));
+    expect(res.status).toBe(409);
+    expect(filmMock.images).not.toHaveBeenCalled();
+  });
+
+  it("★ 잠금은 영원하지 않다 — 인스턴스가 죽어 '그리는 중'이 남아도 다시 그릴 수 있다", async () => {
+    const p = await readyFilm();
+    await runWithActor(U, () =>
+      updateProject(p.id, U, (d) =>
+        putFilm(d, "order", { status: "drawing", drawingAt: Date.now() - FILM_IMAGE_LOCK_MS - 1 }))
+    );
+    const res = await imagesPOST(post({ mode: "order" }), ctx(p.id));
+    expect(res.status).toBe(200);
+    expect(filmMock.images).toHaveBeenCalled();
+  });
+
+  it("★ 다시 그리기에 상한이 있다 — 무료지만 무제한은 아니다", async () => {
+    const p = await readyFilm();
+    await runWithActor(U, () =>
+      updateProject(p.id, U, (d) => putFilm(d, "order", { imageTries: MAX_FILM_IMAGE_TRIES }))
+    );
+    const res = await imagesPOST(post({ mode: "order" }), ctx(p.id));
+    expect(res.status).toBe(400);
+    expect(filmMock.images).not.toHaveBeenCalled();
+  });
+
+  it("★ 한 번 그리면 회차가 하나 는다 — 상한이 실제로 세어진다", async () => {
+    const p = await readyFilm();
+    await imagesPOST(post({ mode: "order" }), ctx(p.id));
+    const doc = await runWithActor(U, () => getProject(p.id, U));
+    expect(doc.films.order.imageTries).toBe(1);
+    // 방식이 다르면 회차도 따로 센다 — 두 벌을 남기는 문서 모양 그대로다
+    expect(doc.films.refs.imageTries).toBeUndefined();
+  });
 });
 
 describe("굽기 라우트 — 청구", () => {
@@ -190,12 +230,31 @@ describe("굽기 라우트 — 청구", () => {
   it("★ 접수가 실패하면 되돌려준다 — 못 준 것은 받지 않는다", async () => {
     await grant(1000);
     const p = await readyFilm();
-    filmMock.start.mockImplementationOnce(async () => { throw new Error("fal 이 안 받아요"); });
+    // 진짜 파이프라인처럼 **문서에 실패를 적고** 던진다(lib/film/pipeline.js 의 failFilm).
+    filmMock.start.mockImplementationOnce(async (pid, owner, mode) => {
+      await updateProject(pid, owner, (d) => putFilm(d, mode, { status: "error", error: "fal 이 안 받아요" }));
+      throw new Error("fal 이 안 받아요");
+    });
     const res = await renderPOST(post({ mode: "order" }), ctx(p.id));
     expect(res.status).toBe(400);
     expect(await balanceFor(U)).toBe(1000);
     const doc = await runWithActor(U, () => getProject(p.id, U));
+    // ★ 라우트가 파이프라인이 적은 실패 상태를 **덮지 않는다** — 화면이 이 status 를 읽는다.
+    expect(doc.films.order.status).toBe("error");
     expect(doc.films.order.error).toMatch(/fal/);
+  });
+
+  it("★ 청구가 안 걷히면(회차 충돌) 접수하지 않는다 — 공짜로 한 편이 나가는 길", async () => {
+    await grant(1000);
+    const p = await readyFilm();
+    // insertCharge 가 false = `idem_key` 유니크 충돌(다른 요청이 같은 회차를 먼저 썼다).
+    // chargeAd 가 0 을 돌려주는 유일한 길이라, 그 상황을 그 자리에서 만든다.
+    const spy = vi.spyOn(getStore(), "insertCharge").mockResolvedValueOnce(false);
+    const res = await renderPOST(post({ mode: "order" }), ctx(p.id));
+    expect(res.status).toBe(409);
+    expect(filmMock.start).not.toHaveBeenCalled();
+    expect(await balanceFor(U)).toBe(1000);
+    spy.mockRestore();
   });
 
   it("★ 잔액이 모자라면 402 이고 fal 로 나가지 않는다", async () => {

@@ -1,9 +1,8 @@
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { isFilmMode } from "../../../../../lib/film/mode.js";
 import { loadFilm } from "../../../../../lib/film/load.js";
-import { filmOf, putFilm } from "../../../../../lib/film/doc.js";
+import { filmOf } from "../../../../../lib/film/doc.js";
 import { startFilmRender } from "../../../../../lib/film/pipeline.js";
-import { updateProject } from "../../../../../lib/projects.js";
 import { assertCanAfford, chargeAd, refundAd, NoCredits } from "../../../../../lib/charges.js";
 import { adVideoPrice } from "../../../../../lib/pricing.js";
 
@@ -60,12 +59,20 @@ export const POST = withUser(async (req, { params }, user) => {
   //   받는 것이라 이 경로가 값이 새는 구멍이 된다.
   //   여기까지 온 요청은 전부 실제로 fal 에 한 편을 접수한다(위 rendering·images 문을 지났다).
   //   그러니 회차를 열어 **한 편에 한 줄**을 남긴다 — 그것이 장부가 사실과 맞는 유일한 모양이다.
-  await chargeAd({
+  const charged = await chargeAd({
     userId: user.id, projectId: id,
     seconds: project.settings?.seconds, model: project.settings?.model,
     resolution: project.settings?.resolution,
     openNewAttempt: true,
   });
+  // ★★ 0 은 **안 걷혔다**는 뜻이다. openNewAttempt 가 true 라 chargeAd 가 0 을 주는 길은
+  //   `idem_key` 유니크 충돌 하나뿐 — 같은 회차 번호를 계산한 다른 요청이 먼저 썼다는 말이다.
+  //   그대로 접수하면 35 크레딧(원가 ≈$2)짜리 한 편이 **공짜로** 나간다.
+  //   이 경로에서는 경합이 예외가 아니다: 두 방식을 나란히 재는 것이 목적이라 화면에
+  //   [둘 다 굽기]가 생기면 병렬 두 요청이 정상 흐름이 된다. 그래서 여기서 멈춘다.
+  if (!charged) {
+    return Response.json({ error: "방금 접수된 것 같아요 — 잠시 뒤 다시 눌러 주세요" }, { status: 409 });
+  }
 
   try {
     const out = await startFilmRender(id, user.id, mode);
@@ -74,9 +81,9 @@ export const POST = withUser(async (req, { params }, user) => {
     // 못 준 것은 받지 않는다 — 방금 연 회차를 음수 행으로 되돌린다(refundAd 는 살아 있는
     // 마지막 회차만 되돌리는데, 그것이 바로 위에서 우리가 연 회차다).
     await refundAd({ projectId: id }).catch(() => {});
-    await updateProject(id, user.id, (p) =>
-      putFilm(p, mode, { status: "draft", error: e?.message || "굽지 못했어요" })
-    ).catch(() => {});
+    // ★ 문서에 실패를 적지 않는다 — 파이프라인의 failFilm 이 방금 status:"error" 와 문구를
+    //   남겼다. 여기서 또 쓰면 마지막 쓰기가 이겨 그 상태를 덮어버리고(예전엔 "draft" 로
+    //   되돌렸다), 화면은 films[mode].status 를 읽으므로 실패 표시가 어긋난다.
     return Response.json({ error: e?.message || "굽지 못했어요" }, { status: 400 });
   }
 });
