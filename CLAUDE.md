@@ -8,6 +8,13 @@
 >
 > ⚠️ **새로 클론했으면 `npm install` 이 먼저다.** 안 하면 `npx vitest run` 이 테스트가 아니라
 > `Cannot find module 'vitest/config'` 로 죽는다 — 테스트 실패로 오해하기 쉽다.
+> ⚠️⚠️ **원격이 둘이다 — `origin` 은 배포와 무관하다**(2026-08-19 사고).
+> `origin` = FixUp-system/Fixup-shortform · `fixup` = jaechanyoon0519-Fixup/Fixup-shortform.
+> **Vercel 이 보는 것은 `fixup` 뿐이다.** 관례대로 `git push origin main` 을 하면 푸시는
+> 성공하고 아무 일도 안 일어난다 — "배포했다"고 보고까지 한 뒤에야 사장님이 "반영이 안
+> 되어 있다"로 알려 주었다. **푸시 전에 `git remote -v` 를 본다.**
+> ★ 다만 원격을 맞춰도 **푸시만으로는 배포가 안 된다**(바로 아래 항목). 푸시는 보관이고
+>   배포는 따로 한다 — 이 둘을 같은 일로 부르지 마라.
 > ⚠️ **배포는 라이브다**(2026-08-14) — Vercel `fixup-shortform-service`(팀 FixUp).
 > 다만 **푸시로 자동 배포되지 않는다**: 커밋 작성자 이메일(`system@fix-up.kr`)이 GitHub 계정과
 > 매칭 안 돼 Git 트리거 빌드가 **0ms 에서 멈춘다**. 저장소를 연결한 뒤로는 CLI 배포에도 같은
