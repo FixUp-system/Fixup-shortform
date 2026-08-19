@@ -28,6 +28,15 @@ const AD_STATUS_LABEL = {
   done: "완성",
 };
 
+// 한 번에 굽는 영상(kind:"film")의 상태 라벨 — 또 별도 표다. 이 경로의 문서는 최상단
+// status 로 "draft"·"scenario" 만 쓰고(굽기 상태는 방식마다 films[mode].status 에 두 벌로
+// 있다), 카드는 방식을 모른다 — 그러니 여기서 "완성"을 말할 수 없다. 광고 표를 돌려쓰면
+// 카드가 있지도 않은 단계를 말한다.
+const FILM_STATUS_LABEL = {
+  draft: "입력",
+  scenario: "시나리오",
+};
+
 // 카드 썸네일 — 완성본이 있으면 영상을, 없으면 첫 컷 그림을 보여준다.
 //
 // 영상은 마우스를 올렸을 때만 재생한다. 카드가 열 개여도 한 번에 하나만 움직이므로
@@ -107,6 +116,10 @@ export default function ProjectCards({ projects, limit, onDeleted, selecting, se
     <ul className="project-grid">
       {shown.map((p) => {
         const isAd = p.kind === "ad";
+        // ★ 세 세계가 한 목록에 섞인다(단계별 영상 · 광고 · 한 번에 굽는 영상).
+        //   film 을 갈라 두지 않으면 단계별 표(STATUS_LABEL)로 떨어져 "scenario" 가
+        //   그대로 찍힌다 — 그 표에는 그 단계가 없다.
+        const isFilm = p.kind === "film";
         // 광고는 자기 화면으로 간다. 고르는 중에는 어느 쪽이든 이동을 막는다 —
         // 막지 않으면 두 번째 카드를 고르려는 순간 그 프로젝트로 들어가 버린다.
         // ★ 보관함에서는 **보는 화면**으로 간다(2026-08-14). 예전에는 제작 화면으로
@@ -116,7 +129,11 @@ export default function ProjectCards({ projects, limit, onDeleted, selecting, se
         //   되돌려 받아야 [전체]에서 들어간 사람이 [내 영상]으로 떨어지지 않는다.
         //   "mine" 은 안 싣는다: 기본값이라 붙이면 주소만 길어진다.
         const href = scope === "all" ? `/archive/${p.id}?scope=all` : `/archive/${p.id}`;
-        const label = isAd ? (AD_STATUS_LABEL[p.status] || p.status) : (STATUS_LABEL[p.status] || p.status);
+        const label = isAd
+          ? (AD_STATUS_LABEL[p.status] || p.status)
+          : isFilm
+            ? (FILM_STATUS_LABEL[p.status] || p.status)
+            : (STATUS_LABEL[p.status] || p.status);
         return (
           <li key={p.id}>
             <Link
@@ -132,6 +149,8 @@ export default function ProjectCards({ projects, limit, onDeleted, selecting, se
                 <span className="title">{p.title || "제목 없음"}</span>
                 {/* 종류 표시 — 광고 문서에만 붙는다. 옛 문서는 이 배지가 아예 없다 */}
                 {isAd && <span className="badge ai">광고</span>}
+                {/* 종류 표시 — 한 번에 굽는 영상. 옛 문서는 이 배지가 아예 없다 */}
+                {isFilm && <span className="badge ai">한 번에</span>}
                 <span className="badge ai">{label}</span>
                 {selecting && (
                   <span className="card-pick" aria-hidden="true">{selected?.has(p.id) ? "✓" : ""}</span>

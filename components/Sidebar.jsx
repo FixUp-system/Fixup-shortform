@@ -11,6 +11,8 @@ import { useAdProject } from "./AdProjectContext";
 import { useMe } from "./MeContext";
 import { STEPS, stepsFor, currentStepKey, isReachable, stepHref } from "../lib/steps";
 import { AD_STEPS, adStepIndex, isAdStepReachable } from "../lib/ad/steps";
+// 한 번에 굽는 영상 — 방식 표. 라벨은 여기서만 읽는다(두 벌이면 갈린다).
+import { FILM_MODES } from "../lib/film/mode";
 
 // 진행 중인 프로젝트의 현재 단계 주소 — 없으면 새 프로젝트 화면.
 // 사이드바 '영상 만들기' 링크가 이걸 써서, 작업 중에 눌러도 프로젝트를 잃지 않는다.
@@ -150,6 +152,19 @@ export default function Sidebar() {
       {inAds && adProject?.id && (
         <Link href="/ads/new" className="side-new">+ 새 광고 만들기</Link>
       )}
+      {/* ★ 두 방식을 나란히 둔다 — 사장님이 비교하실 것이므로 **라벨 자체가 실험 조건**을
+          말해야 한다. 표(FILM_MODES)에서 읽는다: 화면에 라벨을 복사하면 표와 갈린다.
+          ★ 하위 단계 목록을 안 붙인다 — 이 경로는 한 화면 안에서 시나리오·그림·굽기가
+            이어지고, 방식(주소)이 곧 자리다. */}
+      {FILM_MODES.map((m) => (
+        <Link
+          key={m.id}
+          href={`/film/${m.id}`}
+          className={`side-item${pathname === `/film/${m.id}` ? " on" : ""}`}
+        >
+          <span className="ic"><Icon name="sparkle" /></span>{m.label}
+        </Link>
+      ))}
       <Link
         href="/archive"
         className={`side-item${pathname === "/archive" ? " on" : ""}`}
