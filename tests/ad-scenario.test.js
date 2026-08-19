@@ -511,3 +511,28 @@ describe("그림 실측이 잡은 shows 규칙", () => {
     expect(s).toMatch(/avatar_id/);
   });
 });
+
+// ★★ shows 는 **정지 화면**이다(2026-08-19 실측). shot-4 의 shows 에 "gently swaying"
+// (흔들린다)이 들어가 이미지가 **모션 블러로 흔들린 채** 생성됐다. 그 이미지는 굽기에
+// 참조로 가고 프롬프트는 "Keep each scene faithful to its image" 라고 말하므로,
+// 흔들림이 영상까지 따라간다.
+//
+// ★ 단계별은 아예 칸을 나눠 막는다(lib/cuts.js:417 "shows 에는 카메라 움직임을 적지
+//   않는다 — shows 로 만드는 것은 클립의 첫 프레임이 될 정지 화면이다"). 그것으로도 새서
+//   scripts/measure/shows-motion-leak.mjs 로 누출을 측정한다. 여기는 action 칸이 따로
+//   있는데도 shows 정의에 "정지"라는 말이 없어 움직임이 섞였다.
+describe("shows 는 정지 화면이다", () => {
+  const sys = () => buildScenarioMessages({ settings, material: { text: "소재", photos: [] } }).system;
+
+  it("★ shows 가 정지 화면이라고 못 박는다", () => {
+    expect(sys()).toMatch(/정지/);
+  });
+
+  it("★ 움직임은 action 칸이 받는다고 말한다 — 갈 곳을 알려 줘야 안 섞인다", () => {
+    expect(sys()).toMatch(/shows[\s\S]{0,400}action/);
+  });
+
+  it("★ 그 결과(흔들린 그림)를 이유로 든다 — 이유 없는 금지는 안 지켜진다", () => {
+    expect(sys()).toMatch(/흔들|블러/);
+  });
+});
