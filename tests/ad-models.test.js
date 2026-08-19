@@ -157,20 +157,17 @@ describe("2.5 를 서버가 받는다", () => {
   });
 });
 
-// ★ 2.5 를 화면에서 고를 수 있다(2026-08-19 사장님 요청). 2026-08-13 에 원가가 크다는
-//   이유로 hidden 으로 숨겨 두었던 것을 연다 — 표·정가·엔드포인트·원가는 그때 이미
-//   다 만들어 두었고 화면 필터 한 줄만 막고 있었다.
-//
-// ⚠️ 엔드포인트는 여전히 **미검증**이다(문서에서 본 문자열이고 실제로 불러본 적이 없다).
-//   첫 호출에서 404/422 가 나면 lib/ad/pipeline.js 의 refundAd 가 회차를 되돌린다.
-describe("2.5 를 고를 수 있다", () => {
-  it("★ 화면이 거르는 hidden 이 없다 — 이 한 줄이 유일한 문이었다", () => {
+// ★ 2.5 는 **화면에서만** 숨긴다. 08-19 에 잠깐 열었다가 같은 날 다시 닫았다(사장님 요청).
+//   표에서 **지우는 것**과 숨기는 것은 다른 일이다 — 지우면 이미 2.5 로 만든 문서가
+//   가격 계산에서 던져 화면째 죽는다.
+describe("2.5 는 화면에서만 숨긴다", () => {
+  it("표에는 남아 있고 hidden 표시가 붙는다", () => {
     const m = AD_MODELS.find((x) => x.id === "seedance-2.5");
-    expect(m).toBeTruthy();
-    expect(m.hidden).toBeFalsy();
+    expect(m, "2.5 가 표에서 사라졌다 — 옛 문서가 죽는다").toBeTruthy();
+    expect(m.hidden, "hidden 표시가 없다").toBe(true);
   });
 
-  it("★ 숨은 모델이 하나도 없다 — 표의 모델이 곧 고를 수 있는 모델이다", () => {
-    expect(AD_MODELS.filter((m) => m.hidden)).toEqual([]);
+  it("고를 수 있는 모델이 하나는 남는다", () => {
+    expect(AD_MODELS.filter((m) => !m.hidden).length).toBeGreaterThan(0);
   });
 });
