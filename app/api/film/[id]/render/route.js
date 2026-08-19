@@ -3,7 +3,7 @@ import { isFilmMode } from "../../../../../lib/film/mode.js";
 import { loadFilm } from "../../../../../lib/film/load.js";
 import { filmOf } from "../../../../../lib/film/doc.js";
 import { startFilmRender } from "../../../../../lib/film/pipeline.js";
-import { assertCanAfford, chargeAd, refundAd, NoCredits } from "../../../../../lib/charges.js";
+import { assertCanAfford, chargeAd, refundAd, activeAdAttempt, NoCredits } from "../../../../../lib/charges.js";
 import { adVideoPrice } from "../../../../../lib/pricing.js";
 
 // 굽기 접수 — **유료 입구다.**
@@ -74,13 +74,19 @@ export const POST = withUser(async (req, { params }, user) => {
     return Response.json({ error: "방금 접수된 것 같아요 — 잠시 뒤 다시 눌러 주세요" }, { status: 409 });
   }
 
+  // ★★ 방금 연 회차 번호를 읽어 파이프라인에 넘긴다 — 접수증(films[mode].job)에 적힌다.
+  //   왜: refundAd 는 살아 있는 **마지막** 회차를 되돌린다. 접수 직후에는 방금 연 회차가
+  //   늘 마지막이라 맞지만, **수거는 나중**이고 그때는 두 방식의 회차가 동시에 살아 있을 수
+  //   있다 — order 를 수거하다 실패했는데 refs 의 값이 돌아가면 사장님은 멀쩡한 영상값을
+  //   돌려받고 실패한 영상값은 그대로 낸다. 그래서 회차를 접수증에 적어 둔다.
+  const attempt = await activeAdAttempt(id).catch(() => null);
+
   try {
-    const out = await startFilmRender(id, user.id, mode);
+    const out = await startFilmRender(id, user.id, mode, { attempt });
     return Response.json(out, { status: 202 });
   } catch (e) {
-    // 못 준 것은 받지 않는다 — 방금 연 회차를 음수 행으로 되돌린다(refundAd 는 살아 있는
-    // 마지막 회차만 되돌리는데, 그것이 바로 위에서 우리가 연 회차다).
-    await refundAd({ projectId: id }).catch(() => {});
+    // 못 준 것은 받지 않는다 — 방금 연 **그 회차**를 음수 행으로 되돌린다.
+    await refundAd({ projectId: id, attempt }).catch(() => {});
     // ★ 문서에 실패를 적지 않는다 — 파이프라인의 failFilm 이 방금 status:"error" 와 문구를
     //   남겼다. 여기서 또 쓰면 마지막 쓰기가 이겨 그 상태를 덮어버리고(예전엔 "draft" 로
     //   되돌렸다), 화면은 films[mode].status 를 읽으므로 실패 표시가 어긋난다.

@@ -3,7 +3,7 @@ import { isFilmMode } from "../../../../../lib/film/mode.js";
 import { loadFilm } from "../../../../../lib/film/load.js";
 import { runFilmImages } from "../../../../../lib/film/pipeline.js";
 import { updateProject } from "../../../../../lib/projects.js";
-import { filmOf, putFilm, MAX_FILM_IMAGE_TRIES, FILM_IMAGE_LOCK_MS } from "../../../../../lib/film/doc.js";
+import { filmOf, putFilm, MAX_FILM_IMAGE_TRIES, isDrawLocked } from "../../../../../lib/film/doc.js";
 
 // 그림 만들기 — 방식이 정한 계획대로 몇 장을 만든다(장면 순서는 장면 수만큼, 참고 그림은 셋).
 //
@@ -26,7 +26,10 @@ export const POST = withUser(async (req, { params }, user) => {
   //   청구가 0 이라 잔액이 줄지 않기 때문이다. 그래서 문을 둘 단다: **재진입 잠금**과 **상한**.
   // ★ 잠금에 시각을 함께 본다 — 서버리스 인스턴스가 도중에 죽으면 "그리는 중"이 문서에
   //   그대로 남는데, 시각을 안 보면 그 프로젝트는 영영 다시 못 그린다.
-  if (film.status === "drawing" && Date.now() - Number(film.drawingAt || 0) < FILM_IMAGE_LOCK_MS) {
+  // ★ 잠금 판정은 lib/film/doc.js 의 isDrawLocked 하나다 — 상태 라우트가 화면에 내려주는
+  //   canDraw 도 같은 함수를 쓴다. 여기서 손으로 다시 계산하면 화면이 열어 준 버튼을
+  //   서버가 409 로 막는(또는 그 반대) 어긋남이 생긴다.
+  if (isDrawLocked(film)) {
     return Response.json({ error: "이미 그리는 중이에요" }, { status: 409 });
   }
   const tries = Number(film.imageTries) || 0;

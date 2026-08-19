@@ -1,6 +1,7 @@
 import { withUser } from "../../../../lib/auth/require-user.js";
 import { getProjectForViewing } from "../../../../lib/projects.js";
 import { getStore } from "../../../../lib/store/index.js";
+import { FILM_MODES } from "../../../../lib/film/mode.js";
 
 // 파일명이 곧 프로젝트 id 다(lib/compose.js 가 `${projectId}.mp4` 로 올린다).
 // 그래서 별도 매핑 없이 소유자를 검사할 수 있다(uploads 와 달리 upload_owners 가 필요 없다).
@@ -12,7 +13,16 @@ import { getStore } from "../../../../lib/store/index.js";
 // 서명 수명 — 재생 중에 만료되면 영상이 중간에 끊긴다. 넉넉하되 짧게 둔다.
 const SIGNED_URL_SECONDS = 60 * 30;
 
-const RENDER_MP4 = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(-raw)?\.mp4$/;
+// ★ `-<방식>` 갈래도 받는다(2026-08-19) — 한 번에 굽는 영상은 **한 프로젝트에서 두 편**을
+// 굽는다(order·refs). 이름이 `<id>.mp4` 하나면 나중 것이 앞 것을 덮어 비교 대상이 사라지므로
+// 방식을 이름에 넣는다(lib/film/pipeline.js 의 filmVideoBase). 소유자 검사는 그대로
+// **m[1](프로젝트 id)** 하나로 한다 — 광고 이름(`<id>.mp4`·`<id>-raw.mp4`)은 그대로 통과한다.
+// ★ 방식 목록은 lib/film/mode.js 의 표에서 읽는다. 여기에 손으로 "order|refs" 를 적으면
+//   표와 갈리고, 그러면 새 방식의 영상이 저장은 되는데 열리지 않는다.
+const MODES = FILM_MODES.map((m) => m.id).join("|");
+const RENDER_MP4 = new RegExp(
+  `^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(-(?:${MODES}))?(-raw)?\\.mp4$`
+);
 
 export const GET = withUser(async (req, { params }, user) => {
   const { name } = await params;
