@@ -31,7 +31,7 @@ import { getStore } from "../lib/store/index.js";
 import { createProject, updateProject, getProject } from "../lib/projects.js";
 import { runWithActor } from "../lib/actor.js";
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
-import { putFilm, FILM_IMAGE_LOCK_MS } from "../lib/film/doc.js";
+import { putFilm, FILM_IMAGE_LOCK_MS, MAX_FILM_IMAGE_TRIES } from "../lib/film/doc.js";
 import { collectFilmRender, startFilmRender } from "../lib/film/pipeline.js";
 import { chargeAd, balanceFor } from "../lib/charges.js";
 import { adVideoPrice } from "../lib/pricing.js";
@@ -357,6 +357,24 @@ describe("상태 라우트", () => {
     const data = await (await statusGET(req(), ctx(p.id))).json();
     expect(data.films.order.canDraw).toBe(false);
     expect(data.films.refs.canDraw).toBe(true);
+  });
+
+  it("★★ 마지막 회차가 도는 중에는 drawing 이 true 다 — canDraw 만으로는 못 가른다", async () => {
+    // 회차는 그리기를 **시작할 때** 오른다(app/api/film/[id]/images/route.js). 그래서 마지막
+    // 6회차가 도는 동안 canDraw:false 와 triesLeft:0 이 동시에 참이다 — 화면이 그것을
+    // "다 써서 못 그림"으로 읽으면 그리는 중인데 [굽기]가 열려 **옛 그림으로 한 편 값이 나간다**.
+    const p = await make({ status: "drawing", drawingAt: Date.now(), imageTries: MAX_FILM_IMAGE_TRIES });
+    const data = await (await statusGET(req(), ctx(p.id))).json();
+    expect(data.films.order.triesLeft).toBe(0);
+    expect(data.films.order.canDraw).toBe(false);
+    expect(data.films.order.drawing).toBe(true);
+  });
+
+  it("★ 만료된 잠금은 drawing 도 false 다 — 눌러앉은 상태로 화면을 잠그지 않는다", async () => {
+    const p = await make({ status: "drawing", drawingAt: Date.now() - FILM_IMAGE_LOCK_MS - 1 });
+    const data = await (await statusGET(req(), ctx(p.id))).json();
+    expect(data.films.order.status).toBe("drawing");
+    expect(data.films.order.drawing).toBe(false);
   });
 
   it("★★ 잠금이 만료되면 canDraw 가 다시 true 다 — 인스턴스가 죽어도 화면이 잠긴 채로 남지 않는다", async () => {

@@ -91,6 +91,26 @@ describe("돈이 두 번 나가지 않게", () => {
     expect(filmGates(expired).rendering).toBe(false);
   });
 
+  it("★★ 마지막 회차가 도는 중에는 굽기가 안 열린다 — 옛 그림으로 한 편 값이 나간다", () => {
+    // 회차는 그리기를 **시작할 때** 오르므로, 6번째가 도는 동안 canDraw:false 와
+    // triesLeft:0 이 동시에 참이다. 그 둘만 보면 "다 써서 못 그림"으로 읽혀 잠금이 풀린다.
+    // 서버가 실어 보내는 drawing 이 그것을 가른다(app/api/film/[id]/status/route.js).
+    const last = { status: "drawing", drawing: true, canDraw: false, triesLeft: 0 };
+    const g = filmGates(last);
+    expect(g.drawingNow).toBe(true);
+    expect(g.locked).toBe(true);       // [이대로 굽기]가 잠긴다
+    expect(g.drawLocked).toBe(true);
+    // 폴링도 그 자리에서 멈추면 안 된다 — 멈추면 6번째 그림은 새로고침해야만 보인다
+    expect(g.rendering || g.drawingNow).toBe(true);
+  });
+
+  it("★ 다 쓰고 **멈춘** 것과는 다르다 — 그때는 굽는 길이 열려야 한다", () => {
+    const done = filmGates({ status: "images", drawing: false, canDraw: false, triesLeft: 0 });
+    expect(done.drawingNow).toBe(false);
+    expect(done.locked).toBe(false);
+    expect(done.drawLocked).toBe(true);
+  });
+
   it("★ 횟수 소진과 '그리는 중'은 다른 일이다 — 섞으면 굽는 길이 막힌다", () => {
     // 6회를 다 쓴 프로젝트도 **이미 만든 그림으로는 구울 수 있어야** 한다.
     const gone = filmGates({ status: "images", canDraw: false, triesLeft: 0 });
@@ -172,6 +192,26 @@ describe("화면이 스스로 갱신된다", () => {
 
   it("★ 화면을 떠나면 뗀다", () => {
     expect(page).toMatch(/stopRef\.current\?\.\(\)/);
+  });
+
+  it("★★ 방식·프로젝트가 바뀌면 옛 폴링을 뗀다 — 안 떼면 옆 방식 값이 이 화면에 실린다", () => {
+    // onTick 은 **호출 시점의 mode 를 클로저에 가둔다.** 값만 비우면 다음 회차가 옛 방식
+    // 값으로 다시 채우고(refs 칸에 order 의 영상이 뜬다 — A/B 판정이 오염된다), 복원
+    // effect 는 손잡이가 차 있어 새 방식용 폴링을 시작하지도 못한다.
+    // ⚠️ 이 한 줄만은 값이 아니라 소스로 잰다 — 판정이 아니라 **리액트 생명주기**라
+    //    순수 함수로 뺄 수 없고, 이 저장소에는 렌더 하네스가 없다.
+    const at = page.indexOf("[mode, id]");
+    expect(at, "[mode, id] effect 가 없다").toBeGreaterThan(-1);
+    const eff = page.slice(page.lastIndexOf("useEffect", at), at + 12);
+    expect(eff).toMatch(/stopRef\.current\?\.\(\)/);
+    expect(eff).toMatch(/stopRef\.current = null/);
+    expect(eff).toMatch(/setLive\(null\)/);
+    expect(eff).toMatch(/\[mode, id\]/);
+  });
+
+  it("★ 접수되지 않았으면 두드리지 않는다 — 수거까지 하는 GET 을 헛되이 부른다", () => {
+    const fn = page.slice(page.indexOf("async function startRender"), page.indexOf("if (!isFilmMode"));
+    expect(fn).toMatch(/if \(res\.ok\) beginPolling\(\)/);
   });
 });
 

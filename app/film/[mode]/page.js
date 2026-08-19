@@ -74,9 +74,18 @@ export default function FilmPage() {
   //   모른 채 [굽기]를 다시 연다 — 그러면 **화면 잠금이 사라지고 서버가 유일한 방어선**이
   //   된다(서버는 409·400 으로 막지만, 방어선이 하나만 남는 것을 설계로 삼지 않는다).
   //   못 읽었으면 화면이 그렇게 말하고, 사장님은 새로고침으로 지금 상태를 확인한다.
-  // 방식을 건너가면(같은 프로젝트, 다른 mode) 이 컴포넌트는 그대로 남는다 — 비우지 않으면
-  // 옆 방식의 상태가 잠깐 이 화면의 것으로 보인다(그러면 잠금도 옆 것을 따른다).
-  useEffect(() => { setLive(null); }, [mode, id]);
+  // ★★ 방식을 건너가면(같은 프로젝트, 다른 mode) 이 컴포넌트는 **마운트된 채로 남는다.**
+  //   그래서 값을 비우는 것만으로는 부족하다 — 돌던 폴링의 onTick 은 **옛 mode 를 클로저에
+  //   가두고** 있어서, 비워 놓아도 다음 회차가 옆 방식의 status·images·video 로 다시 채운다.
+  //   실제로 order 가 굽는 중에 건너가면 refs 칸에 order 의 영상이 떴다 — 두 편을 나란히
+  //   재는 것이 이 기능의 전부인데 그 판정이 오염된다. 게다가 복원 effect 는 손잡이가
+  //   차 있어서(!stopRef.current) 새 방식용 폴링을 **시작하지도 못한다.**
+  //   그래서 **떼고** 비운다. 그러면 복원 effect 가 새 mode 로 다시 붙는다(id 도 같다).
+  useEffect(() => {
+    stopRef.current?.();
+    stopRef.current = null;
+    setLive(null);
+  }, [mode, id]);
 
   // 떠날 때는 반드시 뗀다 — 안 떼면 화면을 나가도 서버를 계속 두드린다.
   useEffect(() => () => { stopRef.current?.(); stopRef.current = null; }, []);
@@ -210,7 +219,9 @@ export default function FilmPage() {
     setBusy("");
     // 접수는 202 다(굽기는 큐를 탄다) — 여기서 바로 두드리기 시작한다. 위 reload 가
     // rendering 을 못 읽었더라도 폴링이 곧 실제 상태를 가져온다.
-    beginPolling();
+    // ★ 접수된 때만 부른다. 402(잔액)·400·409 에도 부르면, 굽는 것이 없는데도 수거까지
+    //   하는 GET 을 한 번 헛되이 두드린다(첫 회차에서 곧 멈추기는 한다).
+    if (res.ok) beginPolling();
   }
 
   // 진입·새로고침 복원 — 굽는 중이거나 그리는 중이면 폴링을 잇는다.
@@ -365,7 +376,11 @@ export default function FilmPage() {
             {Number.isFinite(film.triesLeft) && !triesGone && (
               <p className="pgsub">다시 그릴 수 있는 횟수가 {film.triesLeft}번 남았어요.</p>
             )}
-            {triesGone && <p className="pgsub warn">그림을 다시 그릴 수 있는 횟수를 다 썼어요.</p>}
+            {/* ★ 그리는 중에는 안 띄운다. 마지막 회차가 도는 동안에는 "다 썼어요"와 "그리는
+                중"이 동시에 참인데, 도는 중에 "다 썼어요"만 보이면 사장님은 끝난 줄 안다. */}
+            {triesGone && !drawingNow && (
+              <p className="pgsub warn">그림을 다시 그릴 수 있는 횟수를 다 썼어요.</p>
+            )}
             {film.images?.length > 0 && (
               <div className="uploads">
                 {film.images.map((im) => (

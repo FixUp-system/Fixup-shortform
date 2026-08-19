@@ -1,7 +1,7 @@
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { loadFilm } from "../../../../../lib/film/load.js";
 import { FILM_MODES } from "../../../../../lib/film/mode.js";
-import { filmOf, canDrawFilm, drawTriesLeft } from "../../../../../lib/film/doc.js";
+import { filmOf, canDrawFilm, drawTriesLeft, isDrawLocked } from "../../../../../lib/film/doc.js";
 import { collectFilmRender } from "../../../../../lib/film/pipeline.js";
 
 // 화면이 두드리는 상태 라우트 — **두 방식을 한 번에** 준다.
@@ -45,6 +45,13 @@ export const GET = withUser(async (_req, { params }, user) => {
       //   그림 라우트가 실제로 보는 판정(lib/film/doc.js)을 그대로 실어 보낸다.
       canDraw: canDrawFilm(film, at),
       triesLeft: drawTriesLeft(film),
+      // ★★ "지금 실제로 그리는 중인가" — canDraw 하나로는 못 가른다.
+      //   회차(imageTries)는 그리기를 **시작할 때** 오르므로(app/api/film/[id]/images/route.js),
+      //   마지막 6회차가 도는 동안에는 canDraw:false 이면서 triesLeft:0 이 동시에 참이다.
+      //   화면이 그것을 "다 써서 못 그림"으로 읽으면 **그리는 중인데 [굽기]가 열린다** —
+      //   그러면 방금 만들어지는 그림이 아니라 옛 그림으로 한 편 값이 나간다.
+      //   판정은 새로 만들지 않는다: 그림 라우트가 409 를 낼 때 보는 그 함수 그대로다.
+      drawing: isDrawLocked(film, at),
     };
   }
   return Response.json({ status: project.status || null, films });
