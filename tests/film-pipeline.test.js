@@ -152,7 +152,76 @@ describe("굽기 접수", () => {
     const back = await getProject(p.id, U);
     expect(back.films.refs.status).toBe("done");
     expect(back.films.refs.video.url).toBe("F");
-    // ★ 다른 방식 칸은 안 건드린다 — 비교가 이 기능의 목적이다
-    expect(back.films.order).toBeUndefined();
+  });
+
+  it("★ 두 방식을 다 구워도 서로의 칸이 살아 있다 — 비교가 이 기능의 목적이다", async () => {
+    const p = await makeFilm();
+    const img = { generateImage: async () => ({ url: "https://fal.example/g.png" }) };
+    const fake = { submitAdVideo: async () => ({ fake: true, url: "F", seconds: 15 }) };
+    await runWithActor(U, () => runFilmImages(p.id, U, "order", img));
+    await runWithActor(U, () => startFilmRender(p.id, U, "order", fake));
+    await runWithActor(U, () => runFilmImages(p.id, U, "refs", img));
+    await runWithActor(U, () => startFilmRender(p.id, U, "refs", fake));
+
+    const back = await getProject(p.id, U);
+    expect(back.films.order.images.length).toBe(SCENARIO.shots.length);
+    expect(back.films.order.status).toBe("done");
+    expect(back.films.refs.images.length).toBe(3);
+    expect(back.films.refs.status).toBe("done");
+  });
+});
+
+describe("실패는 문서에 남는다", () => {
+  beforeEach(() => resetMemoryStore());
+
+  // ★ 그림 만들기는 fire-and-forget 이 되기 쉽다 — 던지고 끝내면 화면은 영원히 "만드는 중"이다
+  it("★ 그림 만들기가 실패하면 문서에 남고, 다시 던진다", async () => {
+    const p = await makeFilm();
+    await expect(
+      runWithActor(U, () =>
+        runFilmImages(p.id, U, "order", { generateImage: async () => { throw new Error("fal 이 막았어요"); } }))
+    ).rejects.toThrow("fal 이 막았어요");
+    const back = await getProject(p.id, U);
+    expect(back.films.order.status).toBe("error");
+    expect(back.films.order.error).toBe("fal 이 막았어요");
+  });
+
+  it("★ 굽기 접수가 실패하면 문서에 남고, 다시 던진다", async () => {
+    const p = await makeFilm();
+    await runWithActor(U, () =>
+      runFilmImages(p.id, U, "refs", { generateImage: async () => ({ url: "https://fal.example/h.png" }) })
+    );
+    await expect(
+      runWithActor(U, () =>
+        startFilmRender(p.id, U, "refs", { submitAdVideo: async () => { throw new Error("영상 접수 실패 (429)"); } }))
+    ).rejects.toThrow("영상 접수 실패 (429)");
+    const back = await getProject(p.id, U);
+    expect(back.films.refs.status).toBe("error");
+    expect(back.films.refs.error).toBe("영상 접수 실패 (429)");
+  });
+
+  // ★ 입구에서 막는 것은 "일이 실패한 것"이 아니라 "시작할 수 없는 것"이다 —
+  //   문서에 error 를 남기면 아직 시작도 안 한 방식이 실패한 것처럼 보인다
+  it("★ 시작할 수 없는 것은 문서에 안 적는다", async () => {
+    const p = await makeFilm();
+    await expect(runWithActor(U, () => startFilmRender(p.id, U, "order", {}))).rejects.toThrow();
+    expect((await getProject(p.id, U)).films?.order).toBeUndefined();
+  });
+
+  it("다시 성공하면 앞 회차 실패가 지워진다 — done 인데 error 가 붙은 모순을 안 남긴다", async () => {
+    const p = await makeFilm();
+    await expect(
+      runWithActor(U, () =>
+        runFilmImages(p.id, U, "order", { generateImage: async () => { throw new Error("한 번 실패"); } }))
+    ).rejects.toThrow();
+    await runWithActor(U, () =>
+      runFilmImages(p.id, U, "order", { generateImage: async () => ({ url: "https://fal.example/i.png" }) })
+    );
+    await runWithActor(U, () =>
+      startFilmRender(p.id, U, "order", { submitAdVideo: async () => ({ fake: true, url: "F", seconds: 15 }) })
+    );
+    const back = await getProject(p.id, U);
+    expect(back.films.order.status).toBe("done");
+    expect(back.films.order.error).toBeNull();
   });
 });
