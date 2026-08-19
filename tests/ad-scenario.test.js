@@ -483,3 +483,31 @@ describe("단계별에서 옮겨 온 축들", () => {
     expect(sys()).toMatch(/쉬는 자리|다 채우지/);
   });
 });
+
+// ★★ 그림 실측이 두 번 잡은 것(2026-08-19, 에스더버니 키링 두 회차).
+//
+//  ① 매크로 컷이 **두 번 연속** 실패했다. 1회차는 금속 고리가 화면을 가렸고("stitching,
+//     the bunny charm's face, the metal clasp catching warm light" — 초점 대상 셋),
+//     2회차는 아예 **3분할 콜라주**로 나왔다("details ...: pink satin ribbon, soft fur
+//     fibers glowing at the edges, ..." — 디테일 나열). 나열이 원인이다.
+//  ② avatar_id 를 적은 컷에 얼굴이 안 나와 인물 사진이 쓰이지 않았다. shows 가
+//     "clipping the keyring onto the handle" 로 손동작에 집중해 모델이 손만 그렸다.
+//     사진값($0.08)을 넘기고 안 쓰는 셈이다.
+describe("그림 실측이 잡은 shows 규칙", () => {
+  const sys = () => buildScenarioMessages({ settings, material: { text: "소재", photos: [] } }).system;
+
+  it("★ 한 장면에 초점 대상은 하나라고 말한다", () => {
+    expect(sys()).toMatch(/초점.*하나|하나.*초점/s);
+  });
+
+  it("★ 디테일 나열을 막고 그 결과(분할·콜라주)를 이유로 든다 — 이유가 있어야 지켜진다", () => {
+    expect(sys()).toMatch(/나열/);
+    expect(sys()).toMatch(/분할|콜라주/);
+  });
+
+  it("★ 인물 사진을 적은 컷은 얼굴이 보이게 쓰라고 말한다 — 안 그러면 그 사진이 안 쓰인다", () => {
+    const s = sys();
+    expect(s).toMatch(/얼굴/);
+    expect(s).toMatch(/avatar_id/);
+  });
+});
