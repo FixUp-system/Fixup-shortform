@@ -15,6 +15,12 @@ describe("방식 표", () => {
     expect(FILM_MODES.map((m) => m.id)).toEqual(["order", "refs"]);
   });
 
+  it("★ 방식 표는 못 바꾼다 — 호출부가 늘리면 '둘뿐'이 런타임에 깨진다", () => {
+    expect(Object.isFrozen(FILM_MODES)).toBe(true);
+    expect(() => FILM_MODES.push({ id: "hack" })).toThrow();
+    expect(FILM_MODES).toHaveLength(2);
+  });
+
   it("★ 모르는 방식은 던진다 — 조용히 떨어지면 고른 것과 다른 것이 구워진다", () => {
     expect(() => filmMode("nope")).toThrow();
     expect(isFilmMode("order")).toBe(true);
@@ -32,9 +38,31 @@ describe("어떤 이미지를 만드는가", () => {
     expect(plan[0].prompt).toContain("keyring sways");
   });
 
+  it("★ 장면 순서 — 그 장면이 하는 일(beat)이 프롬프트에 들어간다", () => {
+    // beat 가 없으면 모델이 무엇을 그릴지 모른 채 조명만 보고 그린다
+    const plan = imagePlanFor("order", SCENARIO);
+    expect(plan[0].prompt).toContain("가방에 달린 키링으로 시선을 끈다");
+    expect(plan[1].prompt).toContain("손에 들어 크기를 보여준다");
+    // 그 장면의 것만 실린다 — 옆 장면 것이 섞이지 않는다
+    expect(plan[0].prompt).not.toContain("손에 들어 크기를 보여준다");
+  });
+
   it("★ 참고 그림 — 장면 수와 무관하게 축 셋이다", () => {
     const plan = imagePlanFor("refs", SCENARIO);
     expect(plan.map((p) => p.key)).toEqual(["subject", "person", "place"]);
+  });
+
+  it("★ 참고 그림 — 세 축이 서로 다른 재료에서 나온다", () => {
+    const plan = imagePlanFor("refs", SCENARIO);
+    const prompts = plan.map((p) => p.prompt);
+    // 셋이 같은 문자열을 받으면 세 장이 같은 그림이 되고 '생김새 참조 세 벌'이 무너진다
+    expect(new Set(prompts).size).toBe(3);
+    const [subject, person, place] = prompts;
+    expect(subject).toContain("keyring sways"); // 물건 = action
+    expect(person).toContain("가방에 달린 키링으로 시선을 끈다"); // 사람 = beat
+    expect(place).toContain("golden hour"); // 자리 = lighting
+    expect(place).not.toContain("keyring sways");
+    expect(subject).not.toContain("golden hour");
   });
 
   it("★ 어느 방식이든 화면에 글자를 요구하지 않는다 — 자막은 우리가 태운다", () => {
@@ -47,6 +75,8 @@ describe("어떤 이미지를 만드는가", () => {
 
   it("★ 장면이 없으면 빈 계획이다 — 빈 프롬프트로 값을 치르지 않는다", () => {
     expect(imagePlanFor("order", { shots: [] })).toEqual([]);
+    // 조기 반환이 두 방식을 함께 덮는다 — refs 도 축 셋을 빈 프롬프트로 만들지 않는다
+    expect(imagePlanFor("refs", { shots: [] })).toEqual([]);
   });
 });
 
