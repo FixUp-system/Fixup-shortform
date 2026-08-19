@@ -886,6 +886,15 @@ textarea.script-draft { line-height: 1.9; min-height: 132px; }
      구를 일이 없어졌고, 상한을 여기서 준다(없으면 긴 지시문이 화면을 통째로 밀어낸다). */
   max-height: 420px;
   overflow-y: auto;
+  /* ★★ 글자 눈금과 좌우 여백을 **이 상자 하나**가 쥐고, 안쪽 둘은 물려받기만 한다
+     (2026-08-19). 전에는 본문은 `textarea.ref`, 꼬리는 `.prompt-fixed` 로 눈금을
+     **따로** 가졌다 — 본문이 textarea 에서 div[contentEditable] 로 바뀌자
+     태그에 묶인 선택자가 통째로 떨어져 나가 본문만 12px 로 주저았고
+     (실측: 본문 12px/18px · 꼬리 16px/24.8px), 한 지시문이 두 영역으로 갈라 보였다.
+     값을 여기 한 번만 적으면 태그를 또 바꿔도 갈라질 자리가 없다. */
+  font-size: 16px;
+  line-height: 1.55;
+  padding: 12px 14px;
 }
 /* 상자가 테두리를 쥐므로 안쪽 편집칸은 테두리를 벗는다 — 두 겹이면 두 상자로 보인다 */
 .prompt-one .prompt-body {
@@ -894,6 +903,12 @@ textarea.script-draft { line-height: 1.9; min-height: 132px; }
   display: block;
   margin: 0;
   min-height: 0;
+  /* 여백도 눈금도 상자가 준다 — 안쪽은 0 이고 글꼴은 물려받는다.
+     `font: inherit` 는 폼 컨트롤(textarea)이 스스로 글꼴을 안 물려받기 때문에
+     두는 것이다 — 이 자리가 다시 textarea 가 돼도 같은 글자로 보인다. */
+  padding: 0;
+  font: inherit;
+  color: inherit;
   /* textarea 가 아니라서 줄바꿈·긴 낱말을 직접 다뤄야 한다 */
   white-space: pre-wrap;
   word-break: break-word;
@@ -915,14 +930,13 @@ textarea.script-draft { line-height: 1.9; min-height: 132px; }
 .prompt-one::-webkit-scrollbar-thumb:hover { background: var(--ink-soft); background-clip: content-box; }
 .prompt-one .prompt-fixed {
   margin: 0;
-  /* 편집칸의 좌우 여백과 **같은 값**이라야 글줄이 이어져 보인다(textarea.ref 의 12px 14px) */
-  padding: 0 14px 12px;
+  /* 좌우 여백이 본문과 **같은 값**이라야 글줄이 이어져 보인다 — 이젠 둘 다
+     0 이고 상자(.prompt-one)가 한 번만 준다. 같은 숫자를 두 번 적지 않는다. */
+  padding: 0;
   /* ★ 2026-08-18 사장님 지시로 **색을 통일했다.** 앞은 고칠 수 있고 뒤는 못 고치지만,
      색을 갈라 두니 한 지시문이 두 글처럼 읽혔다 — 이 상자를 하나로 이은 이유와 어긋난다.
      고칠 수 있는 자리는 색이 아니라 **커서와 편집칸 자체**가 알려 준다. */
   color: var(--ink);
-  font-size: 16px;
-  line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -1233,7 +1247,30 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
 .preview-pane { width: 480px; flex: none; position: sticky; top: 24px; align-self: flex-start; }
 /* 프레임을 9:16(출력 비율)로 고정 — 원본 이미지 비율이 달라도 모든 컷의 미리보기 컴포넌트 크기가 같다.
    폭을 뷰포트 높이로 제한해, 화면이 짧아도 9:16을 정확히 유지하며 프레임 전체가 함께 줄어든다(세로 잘림 없음). */
-.preview-frame { width: 100%; max-width: calc((100vh - 210px) * 9 / 16); aspect-ratio: 9 / 16; margin: 0 auto; border-radius: var(--r-card); overflow: hidden; background: var(--surface2); border: 1px solid var(--line); position: relative; }
+/* ★ 빼는 값이 210 → 280 이다(2026-08-19 실측). 이미지 위가 이미 139px 이고 아래에
+   배지(23) · 컷 설명(26) · 여백(24) 이 붙어 합이 212 였다 — 여유가 사실상 0 이라
+   화면이 조금만 낮아도 **컷 설명이 접힌 자리 아래로 밀렸다.**
+   ★ 큰 화면에는 영향이 없다: 거기서는 칸 폭(480px)이 이미 더 좁은 제약이다. */
+.preview-frame { width: 100%; max-width: calc((100vh - 280px) * 9 / 16); aspect-ratio: 9 / 16; margin: 0 auto; border-radius: var(--r-card); overflow: hidden; background: var(--surface2); border: 1px solid var(--line); position: relative; }
+/* 완성본이 아직 없을 때 — **자리를 지운 채로 두지 않는다.**
+   실측(2026-08-19): 글자만 남아 오른쪽 칸이 360×40 으로 쪼그라들었고, 왼쪽 정보 칸
+   (441px)과 나란히 서지 못해 글자가 허공에 뜬 것처럼 보였다.
+   ★ 9:16 을 그대로 쓰지 않는다 — 빈 상자를 768px 로 세우면 없는 것을 더 크게 말하는 꼴이다.
+     자리를 알아볼 만큼만 세우고, 안내는 가운데에 둔다. */
+.empty-frame {
+  min-height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--surface2);
+}
+.empty-frame p { margin: 0; font-size: 14px; color: var(--ink); }
+.empty-frame span { display: block; margin-top: 6px; font-size: 12px; color: var(--ink-soft); }
+
 .preview-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .preview-frame .ph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--ink-soft); font-size: 12px; }
 /* ── 컷 작업대 ────────────────────────────────────────────────────────────
@@ -1294,6 +1331,14 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
 .preview-actions .mini {
   flex: 1 1 0;
   margin-top: 0;
+  /* ★ 키를 여기서 맞춘다(2026-08-19). 이 줄은 글자·여백만 맞추고 **키는 안 맞췄다** —
+     .mini 는 --ctl-sm(32px), .cta 는 --ctl-md(40px) 라 나란히 서면 8px 이 어긋난다.
+     위 362 줄 주석이 적어 둔 그 사고이고, 그때 해법은 .step-actions 에만 걸렸다.
+     ★ height 를 못 박지 않고 auto + min-height 로 둔다 — 이 줄은 white-space: normal
+       이라 좁은 화면에서 라벨이 두 줄이 되는데, 고정 키면 그때 글자가 잘린다.
+       align-items: stretch 가 이미 있어 둘은 늘 서로 같은 키가 된다. */
+  height: auto;
+  min-height: var(--ctl-md);
   justify-content: center;
   text-align: center;
   padding: 10px 12px;

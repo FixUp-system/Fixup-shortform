@@ -187,7 +187,14 @@ export default function ArchiveDetailPage() {
                 <video className="preview-video" controls src={video} />
               </div>
             ) : (
-              <p className="pgsub">아직 완성본이 없어요.</p>
+              // 자리를 비워 두지 않는다 — 글자만 남으면 이 칸이 글자 높이로 쪼그라들어
+              // 왼쪽 정보 칸과 나란히 서지 못한다(2026-08-19 실측 360×40).
+              <div className="empty-frame">
+                <p>
+                  아직 완성본이 없어요
+                  <span>마지막 단계까지 만들면 여기에서 볼 수 있어요</span>
+                </p>
+              </div>
             )}
           </div>
         </div>
