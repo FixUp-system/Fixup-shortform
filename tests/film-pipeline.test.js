@@ -322,3 +322,50 @@ describe("장면 순서 — 앵커 한 장이 일관성을 쥔다", () => {
     expect(seen).toHaveLength(3);
   });
 });
+
+// ★★ 사진이 있으면 앵커를 안 만든다(2026-08-19 사장님 결정).
+//
+// 사장님이 올린 사진이 **제품의 진실**이다. 앵커는 그 사진을 참조로 AI 가 그린 그림이라
+// 한 다리 건넌 것인데, 장면 그림에 둘 다 참조로 넘기면 조금만 달라도 두 참조 사이에서
+// 흔들린다. 사진이 있으면 사진이 더 나은 앵커다 — 값($0.08)도 아낀다.
+//
+// ⚠️ 남는 한계: focus 가 person·place 인데 올린 사진이 **제품 사진**이면 인물·공간을
+//   고정할 것이 없어진다. 올린 사진에 무엇이 찍혔는지는 이 코드가 모른다(사장님 결정으로
+//   지금은 여기서 멈춘다 — 알려면 사진을 읽는 단계가 하나 더 필요하다).
+describe("사진이 있으면 앵커를 안 만든다", () => {
+  beforeEach(() => resetMemoryStore());
+
+  const run = async ({ photoKeys }) => {
+    const p = await makeFilm({ photoKeys });
+    const row = await getStore().selectProject(p.id, U);
+    await getStore().updateProjectRow(p.id, U, row.version, {
+      ...row.doc, scenario: { ...SCENARIO, focus: "product" },
+    });
+    const seen = [];
+    await runWithActor(U, () =>
+      runFilmImages(p.id, U, "order", {
+        generateImage: async (args) => { seen.push(args); return { url: "https://fal.example/z.png" }; },
+      })
+    );
+    const after = await getStore().selectProject(p.id, U);
+    return { seen, keys: after.doc.films.order.images.map((im) => im.key) };
+  };
+
+  it("★ 사진이 있으면 장면 수만큼만 만든다 — 앵커 한 장을 안 산다", async () => {
+    const { seen, keys } = await run({ photoKeys: ["keyring.jpg"] });
+    expect(seen).toHaveLength(SCENARIO.shots.length);
+    expect(keys).not.toContain("anchor");
+  });
+
+  it("★ 사진이 없으면 앵커를 만든다 — 그때는 고정할 것이 그림밖에 없다", async () => {
+    const { keys } = await run({ photoKeys: [] });
+    expect(keys[0]).toBe("anchor");
+  });
+
+  it("★ 사진이 있으면 장면 그림이 그 사진을 참조한다 — 앵커 자리를 사진이 대신한다", async () => {
+    const { seen } = await run({ photoKeys: ["keyring.jpg"] });
+    for (const args of seen) {
+      expect(args.refs.map((r) => r.key)).toEqual(["keyring.jpg"]);
+    }
+  });
+});
