@@ -176,6 +176,48 @@ describe("buildCues", () => {
     expect(cues[1].end).toBe(7);
   });
 
+  // ★★ 받아쓰기가 준 **실측 시작 시각**(2026-08-19). spoken_seconds 는 "얼마나 말하나"만
+  //   말하고 "언제 말하나"는 여전히 누적(t += held)이 정한다. 단계별 광고는 낭독을 우리가
+  //   만들고 클립을 그 길이에 맞추므로 시작이 곧 컷 경계라 그 값이 필요 없었다.
+  //   통짜로 굽는 영상(film·광고 r2v)은 모델이 자기 마음대로 말해서 시작이 어긋난다 —
+  //   실측(2026-08-19, fal-ai/whisper): 계획 초로는 3·4번 자막이 1.8초·2.7초 늦게 떴다.
+  it("spoken_start 가 있으면 누적이 아니라 그 시각에 자막이 뜬다", () => {
+    // 실측 그대로 — 계획은 4·4·4·3 인데 소리는 1.06·4.24·6.18·9.32 에서 났다
+    const cuts = [
+      { idx: 0, sentence: "요즘 내 가방의 주인공?", seconds: 4, spoken_start: 1.06, spoken_seconds: 1.42 },
+      { idx: 1, sentence: "에스더버니 라벤더 버니 키링.", seconds: 4, spoken_start: 4.24, spoken_seconds: 1.94 },
+      { idx: 2, sentence: "걸을 때마다 통통, 시선은 저절로.", seconds: 4, spoken_start: 6.18, spoken_seconds: 3.14 },
+      { idx: 3, sentence: "내 가방에도, 러브 레벨 만점.", seconds: 3, spoken_start: 9.32, spoken_seconds: 5.26 },
+    ];
+    const cues = buildCues(cuts);
+    expect(cues).toHaveLength(4);
+    expect(cues[0].start).toBe(1.06);
+    expect(cues[1].start).toBe(4.24);
+    expect(cues[2].start).toBe(6.18);   // 누적이면 8 이다
+    expect(cues[3].start).toBe(9.32);   // 누적이면 12 다
+  });
+
+  // ★ 길이는 여전히 spoken_seconds 가 쥔다 — 시작만 갈아끼우는 것이지 두 값이 하나가 아니다.
+  it("spoken_start 가 있어도 자막이 머무는 길이는 spoken_seconds 다", () => {
+    const cues = buildCues([
+      { idx: 0, sentence: "한 문장.", seconds: 10, spoken_start: 2.5, spoken_seconds: 1.5 },
+    ]);
+    expect(cues[0].start).toBe(2.5);
+    expect(cues[0].end).toBe(4);        // 2.5 + 1.5 — 컷 끝(10)이 아니다
+  });
+
+  // ★ 한 컷이 자막 여러 조각으로 쪼개져도(긴 문장) 첫 조각이 실측 시각에서 시작해야 한다.
+  it("자막이 여러 조각으로 쪼개져도 첫 조각이 spoken_start 에서 시작한다", () => {
+    const long = "아주 긴 문장을 하나 적어 두면 화면 폭에 맞춰 여러 조각으로 쪼개진다 그래서 조각이 둘 이상 나온다";
+    const cues = buildCues(
+      [{ idx: 0, sentence: long, seconds: 10, spoken_start: 3, spoken_seconds: 6 }],
+      { width: 720, height: 1280 }
+    );
+    expect(cues.length).toBeGreaterThan(1);
+    expect(cues[0].start).toBe(3);
+    expect(cues[cues.length - 1].end).toBe(9);   // 3 + 6 — 말 끝에 못 박힌다
+  });
+
   // spoken_seconds 가 없는 옛 문서는 지금처럼 화면 시간을 쓴다 — 회귀 0
   it("옛 컷(spoken_seconds 없음)은 지금과 같게 흐른다", () => {
     const cuts = [{ idx: 0, sentence: "옛 컷입니다.", seconds: 4, video: { seconds: 4 } }];
