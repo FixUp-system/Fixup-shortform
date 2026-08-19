@@ -369,3 +369,42 @@ describe("사진이 있으면 앵커를 안 만든다", () => {
     }
   });
 });
+
+// ★★ 값이 **실제로 흐르는지**가 이 태스크의 전부다. imagePlanFor 에 옵션 자리를 열어도
+// runFilmImages 가 안 넘기면 코드만 있고 아무 일도 안 일어난다 — shows 가 정확히
+// 그랬다(스키마에 칸이 없어 SYSTEM 요구가 무의미했다).
+describe("그림 맥락(언어·사진)이 계획까지 흐른다", () => {
+  beforeEach(() => resetMemoryStore());
+
+  const run = async ({ photoKeys = [], narration_lang = "ko" } = {}) => {
+    const p = await makeFilm({ photoKeys });
+    const row = await getStore().selectProject(p.id, U);
+    await getStore().updateProjectRow(p.id, U, row.version, {
+      ...row.doc,
+      settings: { ...row.doc.settings, narration_lang },
+      scenario: { ...SCENARIO, focus: "product" },
+    });
+    const seen = [];
+    await runWithActor(U, () =>
+      runFilmImages(p.id, U, "order", {
+        generateImage: async (args) => { seen.push(args); return { url: "https://fal.example/q.png" }; },
+      })
+    );
+    return seen;
+  };
+
+  it("★ 나레이션 언어가 그림 프롬프트에 닿는다 — 한국어면 인물이 한국인이다", async () => {
+    const seen = await run({ narration_lang: "ko" });
+    expect(seen.some((a) => /Korean/.test(a.prompt))).toBe(true);
+  });
+
+  it("★ 사진이 있으면 '참조가 이긴다'가 프롬프트에 닿는다", async () => {
+    const seen = await run({ photoKeys: ["keyring.jpg"] });
+    expect(seen.every((a) => /reference photo/i.test(a.prompt))).toBe(true);
+  });
+
+  it("사진이 없으면 그 말을 안 붙인다", async () => {
+    const seen = await run({ photoKeys: [] });
+    expect(seen.every((a) => !/reference photo/i.test(a.prompt))).toBe(true);
+  });
+});

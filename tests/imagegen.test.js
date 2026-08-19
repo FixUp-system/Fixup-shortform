@@ -74,3 +74,37 @@ describe("generateImage — 레퍼런스", () => {
     delete process.env.SHOTFORM_FAKE;
   });
 });
+
+// ★★ 참조는 **바이트 또는 주소**다(2026-08-19). 이 함수는 바이트만 받고 있었는데,
+// film 의 앵커는 우리가 만든 그림이라 fal 공개 **주소**로 넘어온다 — 그러면
+// toDataUri(undefined, undefined) 가 되어 **깨진 data URI** 가 그대로 나간다.
+//
+// lib/ad/generate.js 의 refUri 는 이미 둘 다 받는다(`r.url ? r.url : toDataUri(...)`).
+// 같은 규약을 여기에도 둔다 — 한쪽만 받으면 같은 참조가 경로에 따라 깨진다.
+describe("참조는 바이트 또는 주소다", () => {
+  it("★ url 을 준 참조는 그 주소를 그대로 보낸다 — 바이트로 읽으려다 깨지지 않는다", async () => {
+    const seen = {};
+    await runWithActor("t-user", () =>
+      generateImage({
+        prompt: "p", aspect_ratio: "9:16", projectId: "p1",
+        refs: [{ url: "https://fal.example/anchor.png" }],
+        fetchImpl: ok(seen),
+      })
+    );
+    expect(seen.body.image_urls).toEqual(["https://fal.example/anchor.png"]);
+  });
+
+  it("★ 바이트와 주소가 섞여도 각각 옳게 나간다 — 사장님 사진(바이트) + 앵커(주소)", async () => {
+    const seen = {};
+    await runWithActor("t-user", () =>
+      generateImage({
+        prompt: "p", aspect_ratio: "9:16", projectId: "p1",
+        refs: [{ bytes: Buffer.from("x"), key: "a.jpg" }, { url: "https://fal.example/anchor.png" }],
+        fetchImpl: ok(seen),
+      })
+    );
+    expect(seen.body.image_urls).toHaveLength(2);
+    expect(seen.body.image_urls[0]).toMatch(/^data:image\//);
+    expect(seen.body.image_urls[1]).toBe("https://fal.example/anchor.png");
+  });
+});

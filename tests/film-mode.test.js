@@ -76,10 +76,15 @@ describe("어떤 이미지를 만드는가", () => {
     for (const p of prompts) expect(p).not.toContain("가방에 달린 키링으로 시선을 끈다");
   });
 
-  it("★ 어느 방식이든 화면에 글자를 요구하지 않는다 — 자막은 우리가 태운다", () => {
+  // ★ 판정을 "no text" 문자열에서 **의미**로 옮겼다(2026-08-19). 옛 문구
+  //   "No text or letters anywhere in the image." 는 화면에 얹는 자막뿐 아니라
+  //   **제품에 인쇄된 글자까지** 지웠다(실측). 막아야 하는 것은 모델이 **새로 얹는**
+  //   글자이므로, 문자열을 고정하면 그 구분을 못 하게 된다.
+  it("★ 어느 방식이든 모델이 글자를 새로 얹는 것을 막는다 — 자막은 우리가 태운다", () => {
     for (const mode of ["order", "refs"]) {
       for (const p of imagePlanFor(mode, SCENARIO)) {
-        expect(p.prompt.toLowerCase()).toContain("no text");
+        expect(p.prompt).toMatch(/do not add any text|no added text/i);
+        expect(p.prompt).toMatch(/caption|title/i);
       }
     }
   });
@@ -234,5 +239,64 @@ describe("buildFilmPrompt 가 앵커 유무를 그림 목록에서 읽는다", (
 
   it("그림 목록을 안 주면 예전 문구다 — 옛 호출부가 안 죽는다", () => {
     expect(buildFilmPrompt(SCENARIO, "order")).toMatch(/first image for the first scene/i);
+  });
+});
+
+// ★★ 실측 2026-08-19(에스더버니 키링, 사진 1장 첨부) — 그림 넉 장에서 셋이 드러났다.
+//
+//  ② 제품에 인쇄된 글자가 지워졌다. NO_TEXT 가 "이미지 안 **어디에도** 글자 없음"이라
+//     화면에 얹는 자막뿐 아니라 **제품 자체의 인쇄**까지 지우라고 말하고 있었다.
+//  ③ 인물이 전부 외국인이었다. shows 는 "a stylish young woman" 이라고만 하고 국적을
+//     안 적는다. 시나리오의 voice 에는 "Korean woman" 이 있는데 그림 쪽으로 안 간다.
+//  ④ 첫 컷이 올린 사진과 달랐다. shows 의 연출 지시(어두운 벨벳·빔라이트)가 강해서
+//     모델이 **제품 생김새까지** 재해석했다. 참조가 있으면 참조가 이겨야 한다.
+describe("그림 프롬프트 — 참조가 이기고, 제품 글자는 남고, 사람은 한국인이다", () => {
+  const sc = (extra) => ({ ...SCENARIO, focus: "product", ...extra });
+
+  // ② 새로 얹는 글자만 금지한다
+  it("★ 제품에 인쇄된 글자는 지키라고 말한다", () => {
+    const p = imagePlanFor("order", sc())[0].prompt;
+    expect(p).toMatch(/printed on|on the product|part of the product/i);
+  });
+
+  it("★ 그래도 화면에 글자를 얹는 것은 여전히 막는다 — 자막은 우리가 따로 태운다", () => {
+    const p = imagePlanFor("order", sc())[0].prompt;
+    expect(p).toMatch(/do not add|no added|caption|title/i);
+  });
+
+  it("'어디에도 글자 없음'이라고는 말하지 않는다 — 그 문구가 제품 인쇄를 지웠다", () => {
+    for (const mode of ["order", "refs"]) {
+      for (const item of imagePlanFor(mode, sc())) {
+        expect(item.prompt).not.toContain("No text or letters anywhere in the image.");
+      }
+    }
+  });
+
+  // ③ 사람이 나오면 한국인이다
+  it("★ 나레이션 언어가 한국어면 인물을 한국인으로 적는다", () => {
+    const p = imagePlanFor("order", sc(), { narrationLang: "ko" }).map((x) => x.prompt).join("\n");
+    expect(p).toMatch(/Korean/);
+  });
+
+  it("나레이션 언어를 안 주면 국적을 안 적는다 — 옛 호출부가 안 바뀐다", () => {
+    const p = imagePlanFor("order", sc()).map((x) => x.prompt).join("\n");
+    expect(p).not.toMatch(/Korean/);
+  });
+
+  it("★ 참고 그림의 인물 축도 같은 국적을 받는다", () => {
+    const plan = imagePlanFor("refs", sc({ focus: "person" }), { narrationLang: "ko" });
+    expect(plan.find((p) => p.key === "person").prompt).toMatch(/Korean/);
+  });
+
+  // ④ 참조가 있으면 참조가 이긴다
+  it("★ 참조 사진이 있으면 생김새는 참조를 따르고 연출만 글이 정한다고 말한다", () => {
+    const p = imagePlanFor("order", sc(), { hasPhoto: true })[0].prompt;
+    expect(p).toMatch(/reference/i);
+    expect(p).toMatch(/exactly|identical|do not redesign|do not reinterpret/i);
+  });
+
+  it("참조가 없으면 그 말을 안 붙인다 — 있지도 않은 것을 따르라고 하지 않는다", () => {
+    const p = imagePlanFor("order", sc())[0].prompt;
+    expect(p).not.toMatch(/attached reference photo/i);
   });
 });
