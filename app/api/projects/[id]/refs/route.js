@@ -1,4 +1,4 @@
-import { getProject } from "../../../../../lib/projects";
+import { getProject, isStepDoc } from "../../../../../lib/projects";
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { loadRefUsage } from "../../../../../lib/cut-refs.js";
 
@@ -17,8 +17,8 @@ import { loadRefUsage } from "../../../../../lib/cut-refs.js";
 export const GET = withUser(async (req, { params }, user) => {
   const { id } = await params;
   const project = await getProject(id, user.id);
-  // 광고 문서는 이 경로가 다루지 않는다 — 없는 것과 같이 404 다(prompt 라우트와 같은 규칙).
-  if (!project || project.kind === "ad") {
+  // 종류가 있는 문서(광고·film)는 이 경로가 다루지 않는다 — 없는 것과 같이 404 다(prompt 라우트와 같은 규칙).
+  if (!isStepDoc(project)) {
     return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
   }
   // 바이트는 싣지 않는다 — 화면이 쓸 일이 없고 응답만 무거워진다(사진 원본이다).

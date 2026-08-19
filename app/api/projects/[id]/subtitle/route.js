@@ -1,4 +1,4 @@
-import { getProject, updateProject } from "../../../../../lib/projects";
+import { getProject, updateProject, isStepDoc } from "../../../../../lib/projects";
 import { runSubtitlePipeline } from "../../../../../lib/pipeline";
 import { withUser } from "../../../../../lib/auth/require-user.js";
 
@@ -18,7 +18,10 @@ export const maxDuration = 300;
 export const POST = withUser(async (req, { params }, user) => {
   const { id } = await params;
   const project = await getProject(id, user.id);
-  if (!project) return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
+  // ★ 이 문에는 종류 판정이 아예 없었다(2026-08-19). 그래서 광고·film 문서도 그대로 지나
+  // 이 경로의 일을 시킬 수 있었다 — 여기는 단계별 파이프라인의 자막 자리이고, 그 문서들의
+  // 자막은 /api/ads/*·/api/film/* 이 따로 굽는다. 종류가 없는 옛 문서만 받는다.
+  if (!isStepDoc(project)) return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
 
   // 원본이 없는 옛 프로젝트 — 자막만 다시 구울 재료가 없다. 전체 합성을 한 번 하면 생긴다.
   // ⚠️ 이름이 camelCase 다(render.rawUrl). `raw_url` 은 이 저장소에 없는 필드다.

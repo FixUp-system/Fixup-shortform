@@ -1,5 +1,5 @@
 import { regenClip } from "../../../../../../../lib/pipeline";
-import { getProject } from "../../../../../../../lib/projects";
+import { getProject, isStepDoc } from "../../../../../../../lib/projects";
 import { withUser } from "../../../../../../../lib/auth/require-user.js";
 import {
   assertCanAfford, chargeRegen, refundRegen, requireVideoCharge, NoCredits,
@@ -23,7 +23,7 @@ export const POST = withUser(async (req, { params }, user) => {
   const { instruction } = (await req.json().catch(() => ({}))) || {};
   const { id, idx } = await params;
 
-  // ★ 광고 문서(kind:"ad")는 이 경로가 다루지 않는다 — /api/ads/* 가 다룬다.
+  // ★ 이 경로는 **종류가 없는 옛 문서**만 다룬다 — 광고는 /api/ads/*, film 은 /api/film/* 이 다룬다.
   // 없는 것과 같이 404 다: 남의 것이 아니라 "이 문 뒤에 없는 것"이라서다.
   //
   // 아래 "컷당 첫 재생성" 블록 안에도 이 판정이 있었지만 그 블록은 `!fakeFal()` 일 때만
@@ -32,7 +32,7 @@ export const POST = withUser(async (req, { params }, user) => {
   // 여부와 무관하게 먼저 확인한다. 재생성은 폴링이 아니라 버튼을 누를 때만 도는 자리라
   // getProject 호출이 하나 늘어도 비용 문제가 안 된다.
   const guardProject = await getProject(id, user.id);
-  if (guardProject?.kind === "ad") {
+  if (guardProject && !isStepDoc(guardProject)) {
     return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
   }
 

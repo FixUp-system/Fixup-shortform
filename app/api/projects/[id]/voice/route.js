@@ -1,5 +1,5 @@
 import { runInBackground } from "../../../../../lib/background.js";
-import { getProject, updateProject } from "../../../../../lib/projects";
+import { getProject, updateProject, isStepDoc } from "../../../../../lib/projects";
 import { runVoicePipeline, withProgress } from "../../../../../lib/pipeline";
 import { VOICES } from "../../../../../lib/voices";
 import { fakeFal } from "../../../../../lib/fake";
@@ -26,9 +26,9 @@ export const maxDuration = 300;
 export const POST = withUser(async (req, { params }, user) => {
   const { id } = await params;
   const project = await getProject(id, user.id);
-  // ★ 광고 문서(kind:"ad")는 이 경로가 다루지 않는다 — /api/ads/* 가 다룬다.
+  // ★ 이 경로는 **종류가 없는 옛 문서**만 다룬다 — 광고는 /api/ads/*, film 은 /api/film/* 이 다룬다.
   // 없는 것과 같이 404 다: 남의 것이 아니라 "이 문 뒤에 없는 것"이라서다.
-  if (!project || project.kind === "ad") return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
+  if (!isStepDoc(project)) return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
 
   // 읽을 컷이 있어야 한다 — 목소리는 컷별로 만든다.
   // 컷은 시나리오 확정이 나눈다(POST /cuts).

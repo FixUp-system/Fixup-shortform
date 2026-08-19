@@ -1,5 +1,5 @@
 import { runInBackground } from "../../../../../lib/background.js";
-import { getProject, updateProject } from "../../../../../lib/projects";
+import { getProject, updateProject, isStepDoc } from "../../../../../lib/projects";
 import { isAspect, DEFAULT_ASPECT_ID } from "../../../../../lib/aspects";
 import { runSplitPipeline } from "../../../../../lib/pipeline";
 import { areCutsStale, scenarioCutsKey } from "../../../../../lib/steps";
@@ -24,9 +24,9 @@ export const maxDuration = 300;
 export const POST = withUser(async (req, { params }, user) => {
   const { id } = await params;
   const project = await getProject(id, user.id);
-  // ★ 광고 문서(kind:"ad")는 이 경로가 다루지 않는다 — /api/ads/* 가 다룬다.
+  // ★ 이 경로는 **종류가 없는 옛 문서**만 다룬다 — 광고는 /api/ads/*, film 은 /api/film/* 이 다룬다.
   // 없는 것과 같이 404 다: 남의 것이 아니라 "이 문 뒤에 없는 것"이라서다.
-  if (!project || project.kind === "ad") return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
+  if (!isStepDoc(project)) return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
   // 컷은 시나리오에서 나온다 — 확정된 시나리오가 없으면 나눌 것이 없다(2026-08-16).
   // 예전에는 원고(script.text)를 봤다. 옛 프로젝트는 시나리오가 없어 여기서 걸린다 —
   // 그 프로젝트들은 ②로 돌아가 시나리오를 만들면 된다.

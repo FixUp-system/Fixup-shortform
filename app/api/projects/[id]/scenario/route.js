@@ -2,16 +2,16 @@
 //
 // ★ 확정만 규칙을 강제한다. 고치는 도중에는 어긋나 있는 것이 정상이라 PATCH 는 저장하고
 //   problems 만 함께 돌려준다 — 막으면 사장님이 한 번에 다 맞춰야 저장이 된다.
-import { getProject, updateProject } from "../../../../../lib/projects";
+import { getProject, updateProject, isStepDoc } from "../../../../../lib/projects";
 import { generateScenario, validateScenario } from "../../../../../lib/scenario.js";
 import { checkScenario } from "../../../../../lib/scenario-rules.js";
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { BudgetExceeded } from "../../../../../lib/costs.js";
 
-// 광고 문서(kind:"ad")는 이 경로가 다루지 않는다 — 없는 것과 같이 404 다.
+// 종류가 있는 문서(광고·film)는 이 경로가 다루지 않는다 — 없는 것과 같이 404 다.
 async function load(id, userId) {
   const project = await getProject(id, userId);
-  return !project || project.kind === "ad" ? null : project;
+  return isStepDoc(project) ? project : null;
 }
 
 export const POST = withUser(async (req, { params }, user) => {

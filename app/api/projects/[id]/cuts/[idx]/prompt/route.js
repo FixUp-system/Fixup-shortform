@@ -1,4 +1,4 @@
-import { getProject } from "../../../../../../../lib/projects";
+import { getProject, isStepDoc } from "../../../../../../../lib/projects";
 import { withUser } from "../../../../../../../lib/auth/require-user.js";
 import { buildImagePrompt, promptBodyOf } from "../../../../../../../lib/cuts";
 import { loadCutRefs } from "../../../../../../../lib/cut-refs.js";
@@ -23,8 +23,8 @@ import { loadCutRefs } from "../../../../../../../lib/cut-refs.js";
 export const GET = withUser(async (req, { params }, user) => {
   const { id, idx } = await params;
   const project = await getProject(id, user.id);
-  // 광고 문서는 이 경로가 다루지 않는다 — 없는 것과 같이 404 다(clips 라우트와 같은 규칙).
-  if (!project || project.kind === "ad") {
+  // 종류가 있는 문서(광고·film)는 이 경로가 다루지 않는다 — 없는 것과 같이 404 다(clips 라우트와 같은 규칙).
+  if (!isStepDoc(project)) {
     return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
   }
   const cut = (project.cuts || []).find((c) => c.idx === Number(idx));
