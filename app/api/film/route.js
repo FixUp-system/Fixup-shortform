@@ -3,9 +3,9 @@ import { isAspect, DEFAULT_ASPECT_ID } from "../../../lib/aspects.js";
 import { normalizeAdOptions } from "../../../lib/ad/options.js";
 import { ownedPhotoKeys } from "../../../lib/refs-io.js";
 import { withUser } from "../../../lib/auth/require-user.js";
-
-// 사진 상한 — 광고와 같은 값이다. base64 는 1.33배로 부는데 fal 요청 본문에 통째로 실린다.
-const MAX_PHOTOS = 4;
+// 사진 상한 — 화면(app/film/[mode]/page.js)과 **같은 파일**에서 읽는다. 두 벌이면 화면은
+// 통과시키는데 서버가 400 을 내고, 사장님은 다 올린 뒤에야 거절당한다.
+import { MAX_PHOTOS } from "../../../lib/photos.js";
 
 export const POST = withUser(async (req, _ctx, user) => {
   const body = await req.json().catch(() => null);

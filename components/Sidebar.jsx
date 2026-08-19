@@ -14,6 +14,11 @@ import { AD_STEPS, adStepIndex, isAdStepReachable } from "../lib/ad/steps";
 // 한 번에 굽는 영상 — 방식 표. 라벨은 여기서만 읽는다(두 벌이면 갈린다).
 import { FILM_MODES } from "../lib/film/mode";
 
+// 방식별 아이콘. ★ 표(FILM_MODES)에 안 넣는다 — 그 표는 **실험의 축**이고 동결돼 있는데,
+// 아이콘은 화면 사정이다(사이드바에서 나란히 선 항목들이 서로 달라야 한다는 것뿐이다).
+// 모르는 방식이 와도 화면이 죽지 않게 폴백을 둔다.
+const FILM_ICON = { order: "film", refs: "layers" };
+
 // 진행 중인 프로젝트의 현재 단계 주소 — 없으면 새 프로젝트 화면.
 // 사이드바 '영상 만들기' 링크가 이걸 써서, 작업 중에 눌러도 프로젝트를 잃지 않는다.
 function makeHref(project) {
@@ -162,7 +167,7 @@ export default function Sidebar() {
           href={`/film/${m.id}`}
           className={`side-item${pathname === `/film/${m.id}` ? " on" : ""}`}
         >
-          <span className="ic"><Icon name="sparkle" /></span>{m.label}
+          <span className="ic"><Icon name={FILM_ICON[m.id] || "film"} /></span>{m.label}
         </Link>
       ))}
       <Link
