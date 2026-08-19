@@ -382,6 +382,34 @@ describe("시나리오 판(scenario.tries)이 조건을 지킨다", () => {
     expect(scenarioMock.make).toHaveBeenCalled();
   });
 
+  // ★★ 굽는 **창** 동안에도 막아야 한다(2026-08-19). 지금 판정은 `f?.video?.url` 하나라
+  //   접수는 됐는데 아직 수거 전인 구간(status="rendering", video 없음)이 통째로 열려 있다.
+  //   이 경로는 굽는 데 8분이 걸리므로 그 창이 좁지 않다 — 그 사이 시나리오를 고치면
+  //   굽고 있는 편은 옛 판, 다음 편은 새 판이 되어 두 편이 서로 다른 시나리오로 남는다.
+  //   그러면 비교가 무의미해지는데 값(35 크레딧)은 이미 나갔다.
+  it("★★ 굽는 중에도 시나리오를 다시 못 쓴다 — 접수된 편은 이미 값을 치렀다", async () => {
+    const p = await readyFilm();
+    await runWithActor(U, () =>
+      updateProject(p.id, U, (d) => putFilm(d, "order", { status: "rendering", job: { requestId: "req-1" } }))
+    );
+    const res = await scenarioPOST(post({}), ctx(p.id));
+    expect(res.status).toBe(400);
+    expect(scenarioMock.make).not.toHaveBeenCalled();
+  });
+
+  // ★★ 그림 상한을 다 쓴 방식이 있으면 그 프로젝트는 **값을 치를 길이 없어진다**:
+  //   시나리오를 고치면 그 방식은 옛 판 그림뿐인데 다시 그릴 수 없고(6회 소진),
+  //   옛 판 그림으로는 굽기가 400 이다. 어느 문으로도 못 나가는 프로젝트가 된다.
+  it("★★ 그림 상한을 다 쓴 방식이 있으면 시나리오를 다시 못 쓴다 — 막다른 길을 만들지 않는다", async () => {
+    const p = await readyFilm();
+    await runWithActor(U, () =>
+      updateProject(p.id, U, (d) => putFilm(d, "order", { imageTries: MAX_FILM_IMAGE_TRIES }))
+    );
+    const res = await scenarioPOST(post({}), ctx(p.id));
+    expect(res.status).toBe(400);
+    expect(scenarioMock.make).not.toHaveBeenCalled();
+  });
+
   it("★★ 시나리오를 고친 뒤에는 옛 그림으로 못 굽는다 — 청구 앞에서 걸린다", async () => {
     await grant(1000);
     const p = await readyFilm();

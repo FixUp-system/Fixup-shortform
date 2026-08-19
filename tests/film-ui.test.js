@@ -241,3 +241,24 @@ describe("보관함 카드", () => {
     expect(cards).toMatch(/kind === "film"|kind==="film"/);
   });
 });
+
+// ★★ 시나리오 [다시 쓰기] 버튼은 지금까지 **누르면 항상 400 인 버튼**으로 열려 있었다.
+//
+// 화면의 locked 는 filmGates 가 준 값이라 **지금 보고 있는 방식**만 본다. 그런데 시나리오는
+// 두 방식이 공유하는 하나라 판정도 프로젝트 전체를 봐야 한다 — 옆 방식이 굽는 중이거나
+// 그림 상한을 다 썼으면 이 방식 화면에서도 못 고친다. 서버는 그것을 막는데(scenarioLock)
+// 화면은 몰라서 버튼을 열어 뒀다.
+//
+// ★ 값 판정은 lib/film/doc.js 의 scenarioLock 자체 테스트가 한다(tests/film-doc.test.js).
+//   여기서는 화면이 **그 함수를 쓰는가**만 잰다 — 손으로 다시 계산하면 판정이 두 벌이 된다.
+describe("시나리오 다시 쓰기 — 서버와 같은 판정을 쓴다", () => {
+  it("★ 화면이 scenarioLock 을 import 한다 — 판정을 손으로 다시 적지 않는다", () => {
+    expect(page).toMatch(/import\s*\{[^}]*scenarioLock[^}]*\}\s*from/);
+  });
+
+  it("★ 시나리오 버튼이 그 값으로 잠긴다", () => {
+    // 버튼의 disabled 가 locked 하나만 보고 있으면 안 된다
+    expect(page).toMatch(/scenarioLock\(/);
+    expect(page).toMatch(/disabled=\{[^}]*scenarioLocked[^}]*\}/);
+  });
+});

@@ -20,7 +20,7 @@ import Link from "next/link";
 // 방식의 표·판정은 여기 하나다. 라벨·귀띔을 화면에 복사하면 표와 갈린다.
 // (mode.js·doc.js 는 import 가 없는 순수 모듈이라 "use client" 화면이 그대로 부를 수 있다.)
 import { FILM_MODES, isFilmMode, filmMode } from "../../../lib/film/mode";
-import { filmOf } from "../../../lib/film/doc";
+import { filmOf, scenarioLock } from "../../../lib/film/doc";
 // 문 판정은 순수 함수 한 벌이다 — 화면 안에 두면 "막다른 길이 안 생기는가"를 값으로 잴 수 없다.
 import { filmGates } from "../../../lib/film/gates";
 // 폴링 루프도 한 벌이다(화면마다 복붙했더니 조금씩 다르게 틀렸다 — lib/poll.js 주석).
@@ -273,6 +273,12 @@ export default function FilmPage() {
   //   locked(사진·사이즈·굽기) · drawLocked(그림).
   // ★ 만료된 "drawing" 은 서버가 canDraw 로 걷어낸다 — 화면이 시각 계산을 따로 하지 않는다.
   const { rendering, drawingNow, triesGone, locked, drawLocked } = filmGates(film, !!busy || uploading);
+  // ★★ 시나리오는 **두 방식이 공유하는 하나**라 잠금도 프로젝트 전체를 본다 — 위 locked 는
+  //   지금 보고 있는 방식만 본다. 옆 방식이 굽는 중이거나 그림 상한을 다 썼으면 여기서도
+  //   못 고치는데, 화면이 그것을 몰라 지금까지 **누르면 항상 400 인 버튼**이 열려 있었다.
+  // ★ 판정은 서버(app/api/film/[id]/scenario/route.js)와 **같은 함수** 하나다.
+  const scLock = scenarioLock(project);
+  const scenarioLocked = locked || !!scLock;
 
   return (
     <>
@@ -367,8 +373,9 @@ export default function FilmPage() {
             ) : (
               <p className="pgsub">시나리오를 만들어 주세요 — 무료예요.</p>
             )}
+            {scLock && <p className="pgsub">{scLock.message}</p>}
             <div className="step-actions">
-              <button className="mini" disabled={locked} onClick={makeScenario}>
+              <button className="mini" disabled={scenarioLocked} onClick={makeScenario}>
                 {busy === "scenario" ? "쓰는 중…" : scenario?.text ? "다시 쓰기 · 무료" : "시나리오 만들기 · 무료"}
               </button>
             </div>

@@ -3,6 +3,7 @@ import { loadFilm } from "../../../../../lib/film/load.js";
 import { updateProject, getProject } from "../../../../../lib/projects.js";
 import { generateScenario, pickEditedShots } from "../../../../../lib/ad/scenario.js";
 import { MAX_SCENARIO_TRIES } from "../../../../../lib/pricing.js";
+import { scenarioLock } from "../../../../../lib/film/doc.js";
 
 // 시나리오 — 동기다(LLM 만 쓰고 몇 초면 끝난다).
 //
@@ -35,13 +36,11 @@ export const POST = withUser(async (req, { params }, user) => {
   //   굽는 길은 굽기 라우트가 films[방식].scenarioTries 로 따로 막는다.
   // ★ 값싸게 간다 — 곧 시나리오 구조 자체가 바뀐다(장면 분할 폐지). 조건이 흔들린 것을
   //   알 수 있게만 하고, 되돌리는 장치는 만들지 않는다(새 프로젝트를 만들면 된다).
-  const baked = Object.values(project.films || {}).find((f) => f?.video?.url);
-  if (baked) {
-    return Response.json(
-      { error: "이미 만든 영상이 있어요 — 시나리오를 바꾸려면 새로 시작해 주세요" },
-      { status: 400 }
-    );
-  }
+  // ★ 판정은 lib/film/doc.js 의 scenarioLock 하나다 — 화면(app/film/[mode]/page.js)의
+  //   [다시 쓰기] 버튼도 같은 함수를 본다. 여기서 손으로 다시 계산하면 화면이 열어 준
+  //   버튼을 서버가 400 으로 막는 어긋남이 생긴다(실제로 그랬다).
+  const lock = scenarioLock(project);
+  if (lock) return Response.json({ error: lock.message }, { status: 400 });
 
   // 사장님이 고친 컷 — 화면이 보낸 목록을 그대로 믿지 않고 저장된 시나리오와 대조해
   // **서버가** 고른다(lib/ad/scenario.js 의 pickEditedShots).
