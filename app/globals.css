@@ -880,12 +880,15 @@ textarea.script-draft { line-height: 1.9; min-height: 132px; }
   border-radius: var(--r-card);
   background: var(--deep);
   margin-top: 6px;
-  /* ★ 스크롤을 **이 상자 하나**가 쥔다(2026-08-18). 예전에는 안쪽 textarea 가 제 스크롤을
-     따로 가져서, 한 덩어리로 보이는 상자에 막대가 둘 생기고 그중 하나는 OS 기본 밝은
-     막대였다 — 어두운 화면에 혼자 튀었다. 본문이 contentEditable 이 되면서 안쪽이 스스로
-     구를 일이 없어졌고, 상한을 여기서 준다(없으면 긴 지시문이 화면을 통째로 밀어낸다). */
-  max-height: 420px;
-  overflow-y: auto;
+  /* ★★ 상한을 걷었다(2026-08-19 사장님 지적: "987자가 전부 드래그가 안 되고 중간에 한번
+     짤려"). 실측으로 상자는 420px 만 보여 주는데 내용이 718px 이었다 — **본문(570px)조차
+     다 안 보였다.** 스크롤 상자 안에서 드래그하면 보이는 만큼 긁다가 경계에서 끊긴 것처럼
+     느껴진다.
+     ★ 옛 주석은 "없으면 긴 지시문이 화면을 통째로 밀어낸다"고 걱정했는데, 이 칸은
+       <details> 안이라 **사장님이 일부러 펼친 자리**다. 펼친 뜻이 "전부 보겠다"인데 거기서
+       다시 가두면 그 뜻과 어긋난다 — 걱정은 접힌 칸이 이미 맡고 있다.
+     ★ 안쪽 둘도 스스로 구르지 않는다(본문은 contentEditable, 꼬리는 <p>). 그래서 이제 이
+       상자에는 막대가 하나도 없다 — 아래 스크롤 막대 규칙을 함께 걷은 이유다. */
   /* ★★ 글자 눈금과 좌우 여백을 **이 상자 하나**가 쥐고, 안쪽 둘은 물려받기만 한다
      (2026-08-19). 전에는 본문은 `textarea.ref`, 꼬리는 `.prompt-fixed` 로 눈금을
      **따로** 가졌다 — 본문이 textarea 에서 div[contentEditable] 로 바뀌자
@@ -915,19 +918,6 @@ textarea.script-draft { line-height: 1.9; min-height: 132px; }
 }
 .prompt-one .prompt-body:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
 
-/* 스크롤 막대도 이 화면의 것이다 — 기본 막대는 밝아서 어두운 상자 위에서 혼자 뜬다.
-   두 벌로 적는 이유: Firefox 는 scrollbar-color 만, WebKit 계열은 ::-webkit-scrollbar 만 본다. */
-.prompt-one { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
-.prompt-one::-webkit-scrollbar { width: 10px; }
-.prompt-one::-webkit-scrollbar-track { background: transparent; }
-.prompt-one::-webkit-scrollbar-thumb {
-  background: var(--line);
-  border-radius: var(--r-pill);
-  /* 막대를 상자 벽에서 떼어 놓는다 — 붙어 있으면 테두리와 한 덩어리로 보인다 */
-  border: 3px solid transparent;
-  background-clip: content-box;
-}
-.prompt-one::-webkit-scrollbar-thumb:hover { background: var(--ink-soft); background-clip: content-box; }
 .prompt-one .prompt-fixed {
   margin: 0;
   /* 좌우 여백이 본문과 **같은 값**이라야 글줄이 이어져 보인다 — 이젠 둘 다

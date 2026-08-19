@@ -43,13 +43,18 @@ describe("실제로 보내는 지시 — 한 덩어리로 집어간다", () => {
     });
   }
 
-  it("★ 스크롤은 상자 하나가 쥐고, 그 막대도 이 화면의 색이다", () => {
+  // ★ 계약이 뒤집혔다(2026-08-19). 예전 규칙은 "상자 **하나**가 스크롤을 쥔다"였고, 그
+  //   목적은 **막대가 둘로 보이지 않게** 하는 것이었다(안쪽 textarea 가 제 스크롤을 따로
+  //   가져 OS 기본 밝은 막대가 어두운 상자에 뜨던 일).
+  //   이제 상자는 상한을 걷어 **아무것도 자르지 않는다** — 사장님이 "987자가 전부 드래그가
+  //   안 되고 중간에 한번 짤려"라고 지적했고, 실측으로 420px 상자에 718px 내용이 들어
+  //   있었다. 자를 것이 없으면 막대도 없으므로 "막대가 둘"은 **구조적으로 불가능**해졌다.
+  //   그래서 목적은 그대로 두고 재는 것을 바꾼다: 셋 중 **어느 것도 스스로 구르지 않는다**.
+  it("★ 이 상자는 아무것도 자르지 않는다 — 잘리면 드래그가 그 경계에서 끊긴다", () => {
     const at = css.indexOf(".prompt-one {");
-    const block = css.slice(at, at + 700);
-    expect(block, "상자가 스크롤을 안 쥔다 — 안쪽이 따로 구르면 막대가 둘로 보인다")
-      .toMatch(/overflow-y:\s*auto|overflow:\s*auto/);
-    expect(block, "높이 상한이 없어 상자가 화면을 밀어낸다").toMatch(/max-height/);
-    expect(css, "스크롤 막대가 이 화면 색이 아니다 — OS 기본 밝은 막대가 어두운 상자에 뜬다")
-      .toMatch(/\.prompt-one::-webkit-scrollbar|scrollbar-color/);
+    const block = css.slice(at, css.indexOf(".prompt-one .prompt-fixed"));
+    expect(block, "상한이 남아 있으면 긴 지시문이 다시 잘린다").not.toMatch(/max-height:/);
+    expect(block, "안쪽이나 상자가 스스로 구르면 그 경계에서 선택이 끊긴다")
+      .not.toMatch(/overflow(-y)?:\s*(auto|scroll)/);
   });
 });
