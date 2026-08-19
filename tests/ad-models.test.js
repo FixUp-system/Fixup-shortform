@@ -135,19 +135,14 @@ describe("광고 모델 표", () => {
   });
 });
 
-// ★ 2.5 를 화면에서 숨긴다(2026-08-13 사용자 요청 — 원가가 크다).
+// ★ 2.5 는 표에도 있고 화면에서도 고를 수 있다.
 //
-// **지우지 않는다.** 지우면 이미 2.5 로 만든 문서가 가격 계산에서 던져 화면째 죽는다
-// (오늘 seedance-2.0-fast 에서 실제로 그랬다). 고르는 길만 닫고, 값·엔드포인트·검증은
-// 그대로 살려 둔다 — 옛 문서는 계속 열리고 계속 만들 수 있어야 한다.
-describe("2.5 는 화면에서만 숨긴다", () => {
-  it("표에는 남아 있고 hidden 표시가 붙는다", () => {
-    const m = AD_MODELS.find((x) => x.id === "seedance-2.5");
-    expect(m, "2.5 가 표에서 사라졌다 — 옛 문서가 죽는다").toBeTruthy();
-    expect(m.hidden, "hidden 표시가 없다").toBe(true);
-  });
-
-  it("★ 서버는 여전히 받는다 — 이미 2.5 인 프로젝트가 저장·수정·굽기에서 막히면 안 된다", () => {
+// 2026-08-13 에 "원가가 크다"로 화면에서만 숨겼다가 **2026-08-19 에 다시 열었다**.
+// 숨김을 걷어내도 아래 두 계약은 그대로 남는다 — 표에서 **지우는 것**과 숨기는 것은
+// 다른 일이고, 지우면 이미 2.5 로 만든 문서가 가격 계산에서 던져 화면째 죽는다
+// (seedance-2.0-fast 에서 실제로 그랬다).
+describe("2.5 를 서버가 받는다", () => {
+  it("★ 서버가 받는다 — 저장·수정·굽기 어디서도 막히지 않는다", () => {
     expect(isAdModel("seedance-2.5")).toBe(true);
     expect(adSecondsFor("seedance-2.5").length).toBeGreaterThan(0);
     expect(adResolutionsFor("seedance-2.5").length).toBeGreaterThan(0);
@@ -159,5 +154,23 @@ describe("2.5 는 화면에서만 숨긴다", () => {
 
   it("고를 수 있는 모델이 하나는 남는다", () => {
     expect(AD_MODELS.filter((m) => !m.hidden).length).toBeGreaterThan(0);
+  });
+});
+
+// ★ 2.5 를 화면에서 고를 수 있다(2026-08-19 사장님 요청). 2026-08-13 에 원가가 크다는
+//   이유로 hidden 으로 숨겨 두었던 것을 연다 — 표·정가·엔드포인트·원가는 그때 이미
+//   다 만들어 두었고 화면 필터 한 줄만 막고 있었다.
+//
+// ⚠️ 엔드포인트는 여전히 **미검증**이다(문서에서 본 문자열이고 실제로 불러본 적이 없다).
+//   첫 호출에서 404/422 가 나면 lib/ad/pipeline.js 의 refundAd 가 회차를 되돌린다.
+describe("2.5 를 고를 수 있다", () => {
+  it("★ 화면이 거르는 hidden 이 없다 — 이 한 줄이 유일한 문이었다", () => {
+    const m = AD_MODELS.find((x) => x.id === "seedance-2.5");
+    expect(m).toBeTruthy();
+    expect(m.hidden).toBeFalsy();
+  });
+
+  it("★ 숨은 모델이 하나도 없다 — 표의 모델이 곧 고를 수 있는 모델이다", () => {
+    expect(AD_MODELS.filter((m) => m.hidden)).toEqual([]);
   });
 });
