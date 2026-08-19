@@ -311,3 +311,71 @@ describe("buildFilmPrompt 가 음악·색처리·외형도 싣는다", () => {
     expect(p).toContain("pink bunny, palm-sized");
   });
 });
+
+// ★ 옷차림은 **사람이 나오는 그림에만** 붙는다 — 제품 클로즈업에 옷 얘기가 들어가면
+//   모델이 없는 사람을 그려 넣는다(같은 이유로 인물 사진도 그 컷에만 넘긴다).
+describe("wardrobe 가 사람 있는 그림에만 붙는다", () => {
+  const sc = {
+    ...SCENARIO,
+    focus: "product",
+    wardrobe: "casual denim jacket and a baseball cap",
+    shots: [
+      { beat: "제품만", shows: "a product on velvet", avatar_id: "", seconds: 5 },
+      { beat: "여성", shows: "a woman holding it", avatar_id: "av-woman-20s", seconds: 5 },
+    ],
+  };
+
+  it("★ 사람이 있는 컷에는 붙는다", () => {
+    const plan = imagePlanFor("order", sc);
+    expect(plan[1].prompt).toContain("casual denim jacket");
+  });
+
+  it("★ 사람이 없는 컷에는 안 붙는다", () => {
+    const plan = imagePlanFor("order", sc);
+    expect(plan[0].prompt).not.toContain("casual denim jacket");
+  });
+
+  it("wardrobe 가 없으면 아무 컷에도 안 붙는다 — 옛 문서 회귀 0", () => {
+    const plan = imagePlanFor("order", { ...sc, wardrobe: "" });
+    for (const p of plan) expect(p.prompt).not.toMatch(/wearing/i);
+  });
+});
+
+// 굽기 지시문에도 실린다 — 영상에서 옷이 바뀌면 그림을 맞춰도 소용없다.
+describe("buildFilmPrompt 가 옷차림을 싣는다", () => {
+  it("★ 실린다", () => {
+    const p = buildFilmPrompt({ ...SCENARIO, wardrobe: "casual denim jacket" }, "order");
+    expect(p).toContain("casual denim jacket");
+  });
+});
+
+describe("무대와 이음이 프롬프트에 실린다", () => {
+  const sc = {
+    ...SCENARIO,
+    environment: "a sunlit minimal cafe, late afternoon",
+    shots: [
+      { beat: "1", shows: "the product on a table", avatar_id: "", transition: "", seconds: 5 },
+      { beat: "2", shows: "a hand lifting it", avatar_id: "", transition: "pulls back from the macro", seconds: 5 },
+    ],
+  };
+
+  it("★ 무대는 **모든** 그림에 붙는다 — 그것이 무대가 하나라는 뜻이다", () => {
+    for (const p of imagePlanFor("order", sc)) expect(p.prompt).toContain("sunlit minimal cafe");
+  });
+
+  it("★ 이음은 그 컷에만 붙는다", () => {
+    const plan = imagePlanFor("order", sc);
+    expect(plan[1].prompt).toContain("pulls back from the macro");
+    expect(plan[0].prompt).not.toContain("pulls back");
+  });
+
+  it("값이 없으면 안 붙는다 — 옛 문서 회귀 0", () => {
+    for (const p of imagePlanFor("order", SCENARIO)) {
+      expect(p.prompt).not.toMatch(/takes place in|continues from/i);
+    }
+  });
+
+  it("★ 굽기 지시문에도 무대가 실린다", () => {
+    expect(buildFilmPrompt(sc, "order")).toContain("sunlit minimal cafe");
+  });
+});

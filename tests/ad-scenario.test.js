@@ -536,3 +536,84 @@ describe("shows 는 정지 화면이다", () => {
     expect(sys()).toMatch(/흔들|블러/);
   });
 });
+
+// ★★ 인물 옷차림(2026-08-19 사장님 지적: "키링과 모델의 옷 스타일이 매치가 안 되는 느낌").
+//
+// 실측: 제품은 야구단 굿즈(Giants 유니폼을 입은 분홍 토끼 — 스포티·캐주얼)인데 모델이
+// 베이지 코트에 정장 바지를 입고 나왔다. shows 에 옷차림이 **한 마디도 없어서** 모델이
+// mood(premium — "고급스러운")만 보고 알아서 입혔다.
+//
+// ★ 영상 하나에 **하나**다 — 컷마다 다르게 적으면 인물이 옷을 갈아입는다.
+//   music·tone 과 같은 성질이라 최상위에 둔다.
+describe("wardrobe — 인물 옷차림", () => {
+  const sys = () => buildScenarioMessages({ settings, material: { text: "소재", photos: [] } }).system;
+  const ok = (extra) => ({ text: "t", focus: "product", voice: "v", shots: [{ beat: "b" }], ...extra });
+
+  it("★ 스키마에 있다", () => {
+    expect(Object.keys(SCENARIO_SCHEMA.properties)).toContain("wardrobe");
+    expect(SCENARIO_SCHEMA.required).toContain("wardrobe");
+  });
+
+  it("모델이 낸 값이 통과한다", () => {
+    expect(validateScenario(ok({ wardrobe: "casual baseball cap and denim jacket" }), 0).wardrobe)
+      .toBe("casual baseball cap and denim jacket");
+  });
+
+  it("사람이 안 나오는 영상은 빈 문자열이다", () => {
+    expect(validateScenario(ok({}), 0).wardrobe).toBe("");
+  });
+
+  it("★ SYSTEM 이 **제품과 어울리게** 정하라고 말한다 — 그것이 톤이 깨지던 자리다", () => {
+    const s = sys();
+    expect(s).toMatch(/옷차림/);
+    expect(s).toMatch(/어울리/);
+  });
+
+  it("★ SYSTEM 이 영상 하나에 하나라고 말한다 — 컷마다 다르면 옷을 갈아입는다", () => {
+    expect(sys()).toMatch(/옷차림[\s\S]{0,300}하나/);
+  });
+});
+
+// ★★ 무대와 이음(2026-08-19 사장님 지적: "장소 전환이 이질적이다, 스튜디오에서 거리로
+// 이동할 수 있긴 한데 부자연스럽다"). 실측 시나리오가 컷마다 다른 장소를 지정했다 —
+// 어두운 스튜디오 → 매크로 → 한국 거리 → 카페. 15초 안에 세 곳을 점프한다.
+//
+// ★ 단계별에는 둘 다 있다(lib/cuts.js:366): environment("이 영상의 무대 — 장소·시간대·
+//   조명 한 줄", **하나만** 정한다) · transition("이 컷이 시작하는 구도 — 첫 컷에는
+//   넣지 않는다"). 사장님이 원한 것은 이동 금지가 아니라 **이어지는 느낌**이라 둘 다 옮긴다.
+describe("environment · transition", () => {
+  const sys = () => buildScenarioMessages({ settings, material: { text: "소재", photos: [] } }).system;
+  const ok = (extra) => ({ text: "t", focus: "product", voice: "v", shots: [{ beat: "b" }], ...extra });
+
+  it("★ environment 가 스키마에 있다", () => {
+    expect(Object.keys(SCENARIO_SCHEMA.properties)).toContain("environment");
+    expect(SCENARIO_SCHEMA.required).toContain("environment");
+  });
+
+  it("모델이 낸 무대가 통과한다", () => {
+    expect(validateScenario(ok({ environment: "a sunlit cafe, late afternoon" }), 0).environment)
+      .toBe("a sunlit cafe, late afternoon");
+  });
+
+  it("★ SYSTEM 이 무대를 하나만 정하라고 말한다", () => {
+    expect(sys()).toMatch(/무대/);
+    expect(sys()).toMatch(/무대[\s\S]{0,300}하나/);
+  });
+
+  it("★ transition 이 컷 칸에 있다", () => {
+    expect(Object.keys(SCENARIO_SCHEMA.properties.shots.items.properties)).toContain("transition");
+  });
+
+  it("모델이 낸 이음이 컷에 남는다", () => {
+    const out = validateScenario(ok({ shots: [{ beat: "b", transition: "pulls back from the close-up" }] }), 0);
+    expect(out.shots[0].transition).toBe("pulls back from the close-up");
+  });
+
+  it("★ SYSTEM 이 첫 컷에는 이음을 넣지 말라고 말한다 — 이어올 앞 컷이 없다", () => {
+    expect(sys()).toMatch(/첫 (장면|컷)[\s\S]{0,120}(넣지|없다|비운다)/);
+  });
+
+  it("★ SYSTEM 이 장소를 옮길 때 이어지게 하라고 말한다 — 이동 금지가 아니다", () => {
+    expect(sys()).toMatch(/이어지|이어서|이어진/);
+  });
+});
