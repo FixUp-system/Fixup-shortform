@@ -312,7 +312,7 @@ export default function ScenarioStepPage() {
                   ★ 값을 children 으로 그대로 되돌려준다 — DOM 글자와 같으면 React 가 손대지
                     않아 커서가 튀지 않는다(④이미지의 지시문 칸과 같은 방식이다). */}
               <div className="plan-field">
-                <b>비트</b>
+                <b>역할</b>
                 <span className="editable" contentEditable suppressContentEditableWarning
                   data-empty="이 장면이 하는 일"
                   onInput={(e) => editShot(i, { beat: e.currentTarget.textContent })}>
@@ -331,7 +331,7 @@ export default function ScenarioStepPage() {
                 </span>
               </div>
               {/* ★ 라벨을 "음성"으로(2026-08-18 사장님 지시). 광고에는 이 칸이 없지만 라벨의
-                  **길이와 결**은 광고를 따른다 — 거기 라벨은 전부 두세 글자다(비트·카메라·
+                  **길이와 결**은 광고를 따른다 — 거기 라벨은 전부 두 글자다(역할·카메라·
                   조명·음향·동작·대사). "말하는 사람"만 여섯 글자라 라벨 칸을 혼자 넓혔다. */}
               <div className="plan-field">
                 <b>음성</b>

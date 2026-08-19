@@ -319,7 +319,7 @@ export default function AdDetailPage() {
                   {/* 초 — 장면 머리에 작게. Number.isFinite 로 감싼다: 이 필드가 없는(연출
                       필드 개편 전에 만든) 옛 시나리오에서는 undefined가 그대로 안 뜨게 한다. */}
                   {Number.isFinite(shot.seconds) && <span className="badge">{shot.seconds}초</span>}
-                  <div className="plan-field"><b>비트</b><Field editing={editing} name="beat" v={shot.beat} /></div>
+                  <div className="plan-field"><b>역할</b><Field editing={editing} name="beat" v={shot.beat} /></div>
                   <div className="plan-field"><b>카메라</b><Field editing={editing} name="camera" v={shot.camera} /></div>
                   {/* 조명·음향 — CF 연출·촬영 감독 SYSTEM(be1cc9c)이 새로 낸다. 컨트롤러 판단:
                       전부 보여주되 한 줄씩 작게(나중에 줄이는 게 늘리는 것보다 쉽다). 옛

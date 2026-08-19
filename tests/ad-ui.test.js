@@ -324,10 +324,18 @@ describe("/ads/[id] 화면 — 연출 필드·모델 표시 (Task 22)", () => {
     expect(detailSrc, "shot.sound 가드가 없다").toMatch(/\(editing \|\| shot\.sound\)\s*&&/);
   });
 
+  // ★ 라벨 글자가 아니라 **필드**를 잰다(2026-08-19). 이 테스트의 뜻은 "칸이 사라지지
+  //   않았는가"인데 라벨 문자열로 재고 있었다 — 그래서 "비트"를 사장님이 읽을 수 있는
+  //   "역할"로 바꾸자 뜻은 그대로인데 테스트가 깨졌다. 라벨은 앞으로도 다듬어질 말이고,
+  //   칸이 살아 있다는 보장은 name 으로 재야 흔들리지 않는다.
   it("기존 beat·camera·action·line 필드는 그대로 남아 있다", () => {
-    for (const label of ["비트", "카메라", "동작", "대사"]) {
-      expect(detailSrc, `"${label}" 필드가 사라졌다`).toContain(label);
+    for (const name of ["beat", "camera", "action", "line"]) {
+      expect(detailSrc, `${name} 칸이 사라졌다`).toMatch(new RegExp(`name=["']${name}["']`));
     }
+  });
+
+  it("★ 내부 용어를 화면 라벨로 쓰지 않는다", () => {
+    expect(detailSrc, "beat 의 음차가 화면에 그대로 있다").not.toContain("비트");
   });
 
   it("이 프로젝트의 모델을 lib/ad/models 의 adModel 로 읽어 보여준다", () => {

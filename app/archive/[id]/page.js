@@ -137,7 +137,7 @@ export default function ArchiveDetailPage() {
                         {Number.isFinite(c.seconds) && <span className="badge">{c.seconds}초</span>}
                         {isAd ? (
                           <>
-                            <div className="plan-field"><b>비트</b><span>{c.beat || "-"}</span></div>
+                            <div className="plan-field"><b>역할</b><span>{c.beat || "-"}</span></div>
                             <div className="plan-field"><b>카메라</b><span>{c.camera || "-"}</span></div>
                             {c.line && <div className="plan-field"><b>대사</b><span>{c.line}</span></div>}
                           </>
