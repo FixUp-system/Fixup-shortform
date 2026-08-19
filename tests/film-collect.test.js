@@ -32,7 +32,7 @@ import { createProject, updateProject, getProject } from "../lib/projects.js";
 import { runWithActor } from "../lib/actor.js";
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
 import { putFilm, FILM_IMAGE_LOCK_MS } from "../lib/film/doc.js";
-import { collectFilmRender } from "../lib/film/pipeline.js";
+import { collectFilmRender, startFilmRender } from "../lib/film/pipeline.js";
 import { chargeAd, balanceFor } from "../lib/charges.js";
 import { adVideoPrice } from "../lib/pricing.js";
 import { GET as statusGET } from "../app/api/film/[id]/status/route.js";
@@ -60,13 +60,17 @@ async function bothRendering() {
       settings: { seconds: 15, resolution: "480p", model: "seedance-2.0", aspect_ratio: "9:16", narration_lang: "ko" },
     })
   );
-  const attempts = { order: 1, refs: 2 };   // 부른 순서대로 회차가 는다
+  // 회차 번호는 **chargeAd 가 준 값**을 그대로 쓴다 — 라우트가 하는 것과 같다.
+  // (장부에 다시 물어보면 그 사이에 옆 방식이 연 회차가 나온다 — 그것이 이 파일이 재는 사고다.)
+  const attempts = {};
   for (const mode of ["order", "refs"]) {
-    await chargeAd({
+    const charged = await chargeAd({
       userId: U, projectId: p.id, seconds: 15, model: "seedance-2.0", resolution: "480p",
       openNewAttempt: true,
     });
+    attempts[mode] = charged.attempt;
   }
+  expect(attempts).toEqual({ order: 1, refs: 2 });
   await runWithActor(U, () =>
     updateProject(p.id, U, (d) => {
       let out = { ...d, scenario: SCENARIO };
@@ -207,6 +211,65 @@ describe("수거 — 실제 동작", () => {
   });
 });
 
+// ★★ 경합 — 이 기능이 노리는 [둘 다 굽기] 흐름 그대로다: A 가 청구하고, **그 뒤에** B 가
+//   청구하고, 그러고 나서 A 가 접수증을 쓴다. 이때 A 가 장부에 "살아 있는 마지막 회차"를
+//   물어보면 B 의 회차(2)가 나온다 — 그러면 A 의 수거 실패가 B 의 값을 환불한다.
+//   그래서 회차는 **청구가 준 번호**여야 한다.
+describe("회차는 청구가 준 번호다 — 물어보면 경합에 진다", () => {
+  beforeEach(() => resetMemoryStore());
+
+  it("★★ A 청구 → B 청구 → A 접수 순서에도 A 의 접수증에는 자기 회차(1)가 남는다", async () => {
+    await getStore().insertGrant({ user_id: U, amount_credits: 1000, reason: "t" });
+    const p = await runWithActor(U, () =>
+      createProject({
+        ownerId: U, kind: "film",
+        material: { text: "토끼", photos: [] },
+        settings: { seconds: 15, resolution: "480p", model: "seedance-2.0", aspect_ratio: "9:16" },
+      })
+    );
+    await runWithActor(U, () =>
+      updateProject(p.id, U, (d) => {
+        let out = { ...d, scenario: SCENARIO };
+        for (const mode of ["order", "refs"]) {
+          out = putFilm(out, mode, { images: [{ key: "shot-1", url: "https://fal.example/a.png" }] });
+        }
+        return out;
+      })
+    );
+    const charge = () =>
+      chargeAd({ userId: U, projectId: p.id, seconds: 15, model: "seedance-2.0", resolution: "480p", openNewAttempt: true });
+
+    const a = await charge();          // order 가 먼저 산다
+    const b = await charge();          // 그 사이에 refs 가 산다
+    expect([a.attempt, b.attempt]).toEqual([1, 2]);
+
+    const fake = { submitAdVideo: async () => ({ requestId: "r", seconds: 15, statusUrl: "s", responseUrl: "u" }) };
+    // A 가 **나중에** 접수해도 자기 번호를 쥐고 있다
+    await runWithActor(U, () => startFilmRender(p.id, U, "order", { ...fake, attempt: a.attempt }));
+    await runWithActor(U, () => startFilmRender(p.id, U, "refs", { ...fake, attempt: b.attempt }));
+
+    const back = await runWithActor(U, () => getProject(p.id, U));
+    expect(back.films.order.job.attempt).toBe(1);
+    expect(back.films.refs.job.attempt).toBe(2);
+
+    // 그리고 order 수거가 실패하면 되돌아가는 것은 **1번 회차**다
+    await runWithActor(U, () =>
+      collectFilmRender(p.id, U, "order", { collectAdVideo: async () => { throw new Error("500"); } })
+    );
+    expect(await getStore().findCharge(`refund_ad:${p.id}:1`)).toBeTruthy();
+    expect(await getStore().findCharge(`refund_ad:${p.id}:2`)).toBeFalsy();
+  });
+
+  it("★ 안 걷혔으면 회차도 없다 — 남의 살아 있는 회차를 자기 것으로 착각하면 안 된다", async () => {
+    await getStore().insertGrant({ user_id: U, amount_credits: 1000, reason: "t" });
+    const P = "00000000-0000-4000-8000-0000000000c1";
+    const first = await chargeAd({ userId: U, projectId: P, seconds: 15 });
+    expect(first.attempt).toBe(1);
+    const again = await chargeAd({ userId: U, projectId: P, seconds: 15 });   // 살아 있는 청구가 있다
+    expect(again).toEqual({ credits: 0, attempt: null });
+  });
+});
+
 // ★★ 이름을 못 되찾으면 저장은 되는데 **열 수가 없다** — app/api/renders/[name] 라우트가
 //   이름에서 프로젝트 id 를 되찾아 소유자를 검사하기 때문이다. 겉보기엔 URL 이 문서에 있어
 //   멀쩡해 보이므로, 이 그물이 없으면 라이브에서 재생만 안 되는 조용한 실패가 된다.
@@ -228,6 +291,29 @@ describe("방식이 들어간 이름도 열린다", () => {
       expect(res.status).toBe(200);
     });
   }
+
+  it("★ film 영상도 304 를 탄다 — ETag 는 films[방식].video.ts 에서 온다", async () => {
+    const p = await bothRendering();
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, arrayBuffer: async () => BYTES.buffer })));
+    await runWithActor(U, () =>
+      collectFilmRender(p.id, U, "order", {
+        collectAdVideo: async () => DONE,
+        burn: async (args) => ({ url: `/api/renders/${args.projectId}.mp4` }),
+      })
+    );
+    vi.unstubAllGlobals();
+    const name = `${p.id}-order.mp4`;
+    // 자막본 바이트는 가짜 burn 이 안 만들었다 — 라우트가 흘려줄 파일만 채워 준다
+    await getStore().putObject("renders", name, Buffer.from("자막본"), "video/mp4");
+    const first = await getRender(req(), { params: Promise.resolve({ name }) });
+    const etag = first.headers.get("ETag");
+    expect(etag).toBeTruthy();
+    const again = await getRender(
+      new Request("http://localhost/x", { headers: { ...H, "if-none-match": etag } }),
+      { params: Promise.resolve({ name }) }
+    );
+    expect(again.status).toBe(304);
+  });
 
   it("★ 광고 이름은 그대로 통과한다 — 넓히되 기존 것을 깨지 않는다", async () => {
     const p = await seed("-raw.mp4");

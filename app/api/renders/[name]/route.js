@@ -49,7 +49,12 @@ export const GET = withUser(async (req, { params }, user) => {
   //   반영되면서도, 안 바뀌었으면 304 로 끝나 본문이 안 나간다.
   //
   // ★ 이 판정을 getObject **앞**에 둔다. 뒤에 두면 이미 내려받은 뒤라 절감이 없다.
-  const etag = project.render?.ts ? `"${project.render.ts}"` : null;
+  // ★ film 문서에는 render 가 없다 — 방식별 영상은 films[방식].video 에 있다. 그래서
+  //   이름에서 되찾은 방식으로 그 자리의 ts 를 읽는다(안 읽으면 이 경로의 영상만 304 를
+  //   못 타 볼 때마다 전량이 다시 나간다). 광고 이름은 m[2] 가 없어 예전 자리를 그대로 본다.
+  const mode = m[2] ? m[2].slice(1) : null;
+  const ts = mode ? project.films?.[mode]?.video?.ts : project.render?.ts;
+  const etag = ts ? `"${ts}"` : null;
   if (etag && req.headers.get("if-none-match") === etag) {
     return new Response(null, { status: 304, headers: { ETag: etag, "Cache-Control": "private, no-cache" } });
   }

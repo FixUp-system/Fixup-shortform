@@ -25,7 +25,7 @@ describe("광고 청구", () => {
   it("정가를 받고 잔액이 그만큼 준다 — 모델을 안 주면 기본 모델(standard)·720p 값이다", async () => {
     await grant(200);
     const paid = await chargeAd({ userId: U, projectId: P, seconds: 15 });
-    expect(paid).toBe(DEFAULT_PRICE_15);
+    expect(paid.credits).toBe(DEFAULT_PRICE_15);
     expect(await balanceFor(U)).toBe(200 - DEFAULT_PRICE_15);
   });
 
@@ -33,7 +33,7 @@ describe("광고 청구", () => {
     await grant(300);
     await chargeAd({ userId: U, projectId: P, seconds: 15 });
     const again = await chargeAd({ userId: U, projectId: P, seconds: 15 });
-    expect(again).toBe(0);
+    expect(again.credits).toBe(0);
     expect(await balanceFor(U)).toBe(300 - DEFAULT_PRICE_15);
   });
 
@@ -52,7 +52,7 @@ describe("광고 청구", () => {
     await chargeAd({ userId: U, projectId: P, seconds: 15 });
     await refundAd({ projectId: P });
     const paid = await chargeAd({ userId: U, projectId: P, seconds: 15 });
-    expect(paid).toBe(DEFAULT_PRICE_15);
+    expect(paid.credits).toBe(DEFAULT_PRICE_15);
   });
 
   it("두 번 불러도 환불은 한 번만 돈다", async () => {
@@ -68,7 +68,7 @@ describe("광고 청구", () => {
     await chargeVideo({ userId: U, projectId: P, seconds: 15 });   // 기존 경로
     const paid = await chargeAd({ userId: U, projectId: P, seconds: 15 }); // 광고 경로
     // 같은 프로젝트 id 라도 서로를 "이미 샀다"로 보지 않는다
-    expect(paid).toBe(DEFAULT_PRICE_15);
+    expect(paid.credits).toBe(DEFAULT_PRICE_15);
     expect(adKey(P, 1)).toBe(`ad:${P}:1`);
   });
 
@@ -84,9 +84,9 @@ describe("광고 청구", () => {
   it("★ openNewAttempt 면 살아 있는 청구가 있어도 새 회차로 또 받는다", async () => {
     await grant(400);
     const first = await chargeAd({ userId: U, projectId: P, seconds: 15 });
-    expect(first).toBe(DEFAULT_PRICE_15);
+    expect(first.credits).toBe(DEFAULT_PRICE_15);
     const again = await chargeAd({ userId: U, projectId: P, seconds: 15, openNewAttempt: true });
-    expect(again).toBe(DEFAULT_PRICE_15);
+    expect(again.credits).toBe(DEFAULT_PRICE_15);
     expect(await balanceFor(U)).toBe(400 - DEFAULT_PRICE_15 * 2);
     // 새 회차 키가 열렸다 — 첫 청구를 덮어쓴 것이 아니다
     expect(adKey(P, 2)).toBe(`ad:${P}:2`);
@@ -97,7 +97,7 @@ describe("광고 청구", () => {
     await grant(300);
     await chargeAd({ userId: U, projectId: P, seconds: 15 });
     const again = await chargeAd({ userId: U, projectId: P, seconds: 15 });
-    expect(again).toBe(0);
+    expect(again.credits).toBe(0);
     expect(await balanceFor(U)).toBe(300 - DEFAULT_PRICE_15);
   });
 
@@ -106,7 +106,7 @@ describe("광고 청구", () => {
     it("★ 모델·길이 조합대로 정가가 다르게 청구된다 — 2.5/30초/720p가 가장 비싸다", async () => {
       await grant(1000);
       const paid = await chargeAd({ userId: U, projectId: P, seconds: 30, model: "seedance-2.5", resolution: "720p" });
-      expect(paid).toBe(AD_VIDEO_PRICE["seedance-2.5"][30]["720p"]);
+      expect(paid.credits).toBe(AD_VIDEO_PRICE["seedance-2.5"][30]["720p"]);
       expect(await balanceFor(U)).toBe(1000 - AD_VIDEO_PRICE["seedance-2.5"][30]["720p"]);
     });
 
@@ -116,7 +116,7 @@ describe("광고 청구", () => {
     it("★ model·resolution 을 안 넘기면(옛 문서) 기본 모델(standard)·720p 값으로 청구된다", async () => {
       await grant(200);
       const paid = await chargeAd({ userId: U, projectId: P, seconds: 15 });
-      expect(paid).toBe(DEFAULT_PRICE_15);
+      expect(paid.credits).toBe(DEFAULT_PRICE_15);
     });
 
     // ④ 모르는 모델이 조용히 싼 값(기본)으로 새면 그 차액이 그대로 우리 돈이다.
@@ -135,20 +135,20 @@ describe("광고 청구", () => {
       const paid720 = await chargeAd({
         userId: U, projectId: P, seconds: 15, model: "seedance-2.0", resolution: "720p",
       });
-      expect(paid720).toBe(AD_VIDEO_PRICE["seedance-2.0"][15]["720p"]);
+      expect(paid720.credits).toBe(AD_VIDEO_PRICE["seedance-2.0"][15]["720p"]);
 
       const P2 = "00000000-0000-4000-8000-0000000000f2";
       const paid1080 = await chargeAd({
         userId: U, projectId: P2, seconds: 15, model: "seedance-2.0", resolution: "1080p",
       });
-      expect(paid1080).toBe(AD_VIDEO_PRICE["seedance-2.0"][15]["1080p"]);
-      expect(paid1080).toBeGreaterThan(paid720);
+      expect(paid1080.credits).toBe(AD_VIDEO_PRICE["seedance-2.0"][15]["1080p"]);
+      expect(paid1080.credits).toBeGreaterThan(paid720.credits);
     });
 
     it("★ resolution 을 안 넘기면(옛 호출부) 720p 값으로 청구된다", async () => {
       await grant(1000);
       const paid = await chargeAd({ userId: U, projectId: P, seconds: 15, model: "seedance-2.0" });
-      expect(paid).toBe(AD_VIDEO_PRICE["seedance-2.0"][15]["720p"]);
+      expect(paid.credits).toBe(AD_VIDEO_PRICE["seedance-2.0"][15]["720p"]);
     });
 
     // ★ 값이 있는데 그 모델·길이가 안 받는 해상도(2.5 에 1080p)면 조용히 새지 않고 던진다.

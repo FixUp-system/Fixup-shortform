@@ -3,7 +3,7 @@ import { isFilmMode } from "../../../../../lib/film/mode.js";
 import { loadFilm } from "../../../../../lib/film/load.js";
 import { filmOf } from "../../../../../lib/film/doc.js";
 import { startFilmRender } from "../../../../../lib/film/pipeline.js";
-import { assertCanAfford, chargeAd, refundAd, activeAdAttempt, NoCredits } from "../../../../../lib/charges.js";
+import { assertCanAfford, chargeAd, refundAd, NoCredits } from "../../../../../lib/charges.js";
 import { adVideoPrice } from "../../../../../lib/pricing.js";
 
 // 굽기 접수 — **유료 입구다.**
@@ -59,6 +59,10 @@ export const POST = withUser(async (req, { params }, user) => {
   //   받는 것이라 이 경로가 값이 새는 구멍이 된다.
   //   여기까지 온 요청은 전부 실제로 fal 에 한 편을 접수한다(위 rendering·images 문을 지났다).
   //   그러니 회차를 열어 **한 편에 한 줄**을 남긴다 — 그것이 장부가 사실과 맞는 유일한 모양이다.
+  // ★★ 반환값에서 **회차 번호를 함께** 받는다(lib/charges.js). 쓰고 나서 장부에 다시
+  //   물어보면 안 된다 — A 가 ad:1 을 쓰고 B 가 ad:2 를 쓴 뒤에 A 가 물어보면 2 가 나오고,
+  //   그러면 order 수거 실패가 refs 의 값을 환불한다. 이 경로는 두 방식을 나란히 굽는 것이
+  //   정상 흐름이라 그 순서가 예외가 아니라 기본이다.
   const charged = await chargeAd({
     userId: user.id, projectId: id,
     seconds: project.settings?.seconds, model: project.settings?.model,
@@ -70,16 +74,14 @@ export const POST = withUser(async (req, { params }, user) => {
   //   그대로 접수하면 35 크레딧(원가 ≈$2)짜리 한 편이 **공짜로** 나간다.
   //   이 경로에서는 경합이 예외가 아니다: 두 방식을 나란히 재는 것이 목적이라 화면에
   //   [둘 다 굽기]가 생기면 병렬 두 요청이 정상 흐름이 된다. 그래서 여기서 멈춘다.
-  if (!charged) {
+  if (!charged.credits) {
     return Response.json({ error: "방금 접수된 것 같아요 — 잠시 뒤 다시 눌러 주세요" }, { status: 409 });
   }
 
-  // ★★ 방금 연 회차 번호를 읽어 파이프라인에 넘긴다 — 접수증(films[mode].job)에 적힌다.
-  //   왜: refundAd 는 살아 있는 **마지막** 회차를 되돌린다. 접수 직후에는 방금 연 회차가
-  //   늘 마지막이라 맞지만, **수거는 나중**이고 그때는 두 방식의 회차가 동시에 살아 있을 수
-  //   있다 — order 를 수거하다 실패했는데 refs 의 값이 돌아가면 사장님은 멀쩡한 영상값을
-  //   돌려받고 실패한 영상값은 그대로 낸다. 그래서 회차를 접수증에 적어 둔다.
-  const attempt = await activeAdAttempt(id).catch(() => null);
+  // 이 회차 번호가 접수증(films[mode].job.attempt)에 적힌다 — 수거가 실패할 때 되돌릴
+  // 회차다. refundAd 는 번호를 안 주면 "살아 있는 **마지막** 회차"를 되돌리는데, 수거
+  // 시점에는 두 방식이 동시에 살아 있을 수 있어 옆 방식의 값이 돌아간다.
+  const attempt = charged.attempt;
 
   try {
     const out = await startFilmRender(id, user.id, mode, { attempt });

@@ -227,6 +227,16 @@ describe("굽기 라우트 — 청구", () => {
     expect(await balanceFor(U)).toBe(1000 - PRICE * 2);
   });
 
+  it("★★ 접수증에 **자기 회차 번호**가 실린다 — 옆 방식이 그 사이에 회차를 열어도 안 밀린다", async () => {
+    await grant(1000);
+    const p = await readyFilm();
+    await renderPOST(post({ mode: "order" }), ctx(p.id));
+    await renderPOST(post({ mode: "refs" }), ctx(p.id));
+    // 라우트는 chargeAd 가 준 번호를 그대로 넘긴다(장부에 다시 물어보면 둘 다 2 가 된다)
+    expect(filmMock.start).toHaveBeenNthCalledWith(1, p.id, U, "order", { attempt: 1 });
+    expect(filmMock.start).toHaveBeenNthCalledWith(2, p.id, U, "refs", { attempt: 2 });
+  });
+
   it("★ 접수가 실패하면 되돌려준다 — 못 준 것은 받지 않는다", async () => {
     await grant(1000);
     const p = await readyFilm();
