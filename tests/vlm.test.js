@@ -144,7 +144,7 @@ describe("describePhoto — 올린 사진에 무엇이 담겼나", () => {
       photoBytes: null, projectId: "p1", apiKey: "k",
       fetchImpl: reply({ person: true, what: "작업복 남성", who: "50대 남성" }),
     }));
-    expect(got).toEqual({ person: true, what: "작업복 남성", who: "50대 남성", lettering: "" });
+    expect(got).toEqual({ person: true, what: "작업복 남성", who: "50대 남성", lettering: "", scale: "" });
   });
 
   it("사물·공간 사진이면 person=false, who=null", async () => {
@@ -152,7 +152,7 @@ describe("describePhoto — 올린 사진에 무엇이 담겼나", () => {
       photoBytes: null, projectId: "p1", apiKey: "k",
       fetchImpl: reply({ person: false, what: "가게 내부", who: "몰라" }),
     }));
-    expect(got).toEqual({ person: false, what: "가게 내부", who: null, lettering: "" });
+    expect(got).toEqual({ person: false, what: "가게 내부", who: null, lettering: "", scale: "" });
   });
 
   it("응답이 깨져도 던지지 않는다 — 사물로 취급해 흐름을 막지 않는다", async () => {
@@ -160,7 +160,7 @@ describe("describePhoto — 올린 사진에 무엇이 담겼나", () => {
       photoBytes: null, projectId: "p1", apiKey: "k",
       fetchImpl: async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: "{{{" } }] }) }),
     }));
-    expect(got).toEqual({ person: false, what: "", who: null, lettering: "" });
+    expect(got).toEqual({ person: false, what: "", who: null, lettering: "", scale: "" });
   });
 
   it("호출이 실패해도 던지지 않는다", async () => {
@@ -168,7 +168,7 @@ describe("describePhoto — 올린 사진에 무엇이 담겼나", () => {
       photoBytes: null, projectId: "p1", apiKey: "k",
       fetchImpl: async () => ({ ok: false, status: 500, text: async () => "" }),
     }));
-    expect(got).toEqual({ person: false, what: "", who: null, lettering: "" });
+    expect(got).toEqual({ person: false, what: "", who: null, lettering: "", scale: "" });
   });
 
   it("actor 컨텍스트 없이 부르면 던진다 — fail-open 이 이것까지 삼키면 안 된다", async () => {
@@ -205,7 +205,7 @@ describe("describePhoto — 올린 사진에 무엇이 담겼나", () => {
       fetchImpl: reply({ person: true, what: "작업복 남성", who: "50대 남성" }, () => { called = true; }),
     }));
     expect(called).toBe(true);
-    expect(got).toEqual({ person: true, what: "작업복 남성", who: "50대 남성", lettering: "" });
+    expect(got).toEqual({ person: true, what: "작업복 남성", who: "50대 남성", lettering: "", scale: "" });
     delete process.env.SHOTFORM_FAKE_IMAGES;
   });
 
