@@ -29,6 +29,7 @@ import { ASPECTS, DEFAULT_ASPECT_ID, aspectFor } from "../../../lib/aspects";
 // 사진 상한 — 서버(app/api/film/route.js)와 **같은 파일**에서 읽는다. 손으로 두 벌 적으면
 // 화면은 통과시키는데 서버가 400 을 내고, 사장님은 다 올린 뒤에야 거절당한다.
 import { MAX_PHOTOS } from "../../../lib/photos";
+import { MAX_MATERIAL_TEXT } from "../../../lib/material";
 
 export default function FilmPage() {
   const { mode } = useParams();
@@ -296,7 +297,7 @@ export default function FilmPage() {
             <textarea
               className="field composer-text"
               value={text}
-              maxLength={2000}
+              maxLength={MAX_MATERIAL_TEXT}
               onChange={(e) => setText(e.target.value)}
               placeholder="무엇을 만들고 싶으세요? 제품·강조하고 싶은 점·타깃을 자유롭게 적어 주세요"
             />

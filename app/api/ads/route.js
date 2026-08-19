@@ -7,6 +7,7 @@ import {
 } from "../../../lib/ad/models.js";
 import { ownedPhotoKeys } from "../../../lib/refs-io.js";
 import { withUser } from "../../../lib/auth/require-user.js";
+import { MAX_MATERIAL_TEXT } from "../../../lib/material.js";
 
 // 사진 상한. base64 는 1.33배로 부는데 fal 요청 본문에 통째로 실린다 —
 // 10MB 짜리 아홉 장이면 100MB 를 넘는다. 실측하고 올린다.
@@ -69,7 +70,7 @@ export const POST = withUser(async (req, _ctx, user) => {
     // ★ 모델을 명시 저장한다. 나중에 모델이 늘 때 "값이 없으면 어느 모델인가"가
     //   옛 문서의 뜻을 바꾼다 — 처음부터 적어 두면 그 질문이 안 생긴다.
     settings: { ...options, seconds, aspect_ratio: aspect, model, resolution },
-    material: { text: body.material.text.slice(0, 4000), photos },
+    material: { text: body.material.text.slice(0, MAX_MATERIAL_TEXT), photos },
     ownerId: user.id,
   });
   return Response.json(project);

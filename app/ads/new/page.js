@@ -27,6 +27,7 @@ import { priceLabel, adVideoPrice } from "../../../lib/pricing";
 // 단계가 사이드바에 남지 않게 비운다(components/AdProjectContext).
 import { useAdProject } from "../../../components/AdProjectContext";
 import { useMe } from "../../../components/MeContext";
+import { MAX_MATERIAL_TEXT } from "../../../lib/material";
 
 // 화풍 라벨은 styles.js 에 있지만, 고를 수 있는 것은 AD_STYLE_LINES 에 영상용 문구가 있는
 // id 뿐이어야 한다 — 둘이 어긋나면 화면에는 있는데 서버(normalizeAdOptions)가 400 을 낸다.
@@ -134,7 +135,7 @@ export default function AdNewPage() {
 
       <section className="panel--wide">
         <div className="composer">
-          <textarea ref={textRef} className="field composer-text" value={text} maxLength={2000}
+          <textarea ref={textRef} className="field composer-text" value={text} maxLength={MAX_MATERIAL_TEXT}
             onChange={(e) => setText(e.target.value)}
             placeholder="무엇을 광고하고 싶으세요? 제품·강조하고 싶은 점·타깃을 자유롭게 적어 주세요" />
 

@@ -7,6 +7,7 @@ import {
 } from "../../../../lib/ad/models.js";
 import { ownedPhotoKeys } from "../../../../lib/refs-io.js";
 import { withUser } from "../../../../lib/auth/require-user.js";
+import { MAX_MATERIAL_TEXT } from "../../../../lib/material.js";
 
 const MAX_PHOTOS = 4;
 
@@ -87,7 +88,7 @@ export const PATCH = withUser(async (req, { params }, user) => {
       return Response.json({ error: "본인이 올린 사진만 쓸 수 있어요" }, { status: 400 });
     }
   }
-  const text = typeof body?.material?.text === "string" ? body.material.text.slice(0, 4000) : project.material.text;
+  const text = typeof body?.material?.text === "string" ? body.material.text.slice(0, MAX_MATERIAL_TEXT) : project.material.text;
 
   // ★ 고치면 시나리오를 버리고 draft 로 되돌린다.
   //   낡은 시나리오로 굽는 길을 아예 막는다 — 그래서 낡음 판정을 새로 만들 필요가 없다.

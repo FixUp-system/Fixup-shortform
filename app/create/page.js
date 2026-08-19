@@ -21,6 +21,7 @@ import { SUBTITLE_LANGS, DEFAULT_SPEECH_LANG } from "../../lib/subtitle-langs";
 // 값은 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다)
 import { videoPrice } from "../../lib/pricing";
 import StylePicker from "../../components/StylePicker";
+import { MAX_MATERIAL_TEXT } from "../../lib/material";
 
 export default function CreatePage() {
   const router = useRouter();
@@ -139,7 +140,7 @@ export default function CreatePage() {
               사장님은 여전히 "적을 자리가 없다"고 느낀다.
               (걷어낸 라벨을 여기 그대로 옮겨 적지 않는다: 화면 계약이 소스 문자열을 훑어
                재므로 주석의 낱말도 "칸이 남아 있다"로 읽힌다 — 오늘 세 번째다.) */}
-          <textarea ref={textRef} className="field composer-text" value={text} maxLength={2000}
+          <textarea ref={textRef} className="field composer-text" value={text} maxLength={MAX_MATERIAL_TEXT}
             onChange={(e) => setText(e.target.value)}
             placeholder="무엇을 알리고 싶으세요? 제품 설명·홍보 포인트·손님 이야기를 자유롭게 적어 주세요. 원하는 분위기나 촬영 느낌이 있으면 그것도 여기 함께 적어 주세요" />
 

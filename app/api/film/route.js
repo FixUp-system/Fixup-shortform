@@ -6,6 +6,7 @@ import { withUser } from "../../../lib/auth/require-user.js";
 // 사진 상한 — 화면(app/film/[mode]/page.js)과 **같은 파일**에서 읽는다. 두 벌이면 화면은
 // 통과시키는데 서버가 400 을 내고, 사장님은 다 올린 뒤에야 거절당한다.
 import { MAX_PHOTOS } from "../../../lib/photos.js";
+import { MAX_MATERIAL_TEXT } from "../../../lib/material.js";
 
 export const POST = withUser(async (req, _ctx, user) => {
   const body = await req.json().catch(() => null);
@@ -37,7 +38,7 @@ export const POST = withUser(async (req, _ctx, user) => {
   const project = await createProject({
     ownerId: user.id,
     kind: "film",
-    material: { text: body.material.text.slice(0, 4000), photos },
+    material: { text: body.material.text.slice(0, MAX_MATERIAL_TEXT), photos },
     settings: {
       ...options,
       aspect_ratio: aspect,

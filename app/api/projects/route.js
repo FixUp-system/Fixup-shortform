@@ -6,6 +6,7 @@ import { normalizeStyle, normalizePromptNote } from "../../../lib/styles";
 import { ownedPhotoKeys } from "../../../lib/refs-io.js";
 import { withUser } from "../../../lib/auth/require-user.js";
 import { DEFAULT_I2V_MODEL, I2V_MODEL_IDS, isResolutionFor } from "../../../lib/clip-limits";
+import { MAX_MATERIAL_TEXT } from "../../../lib/material.js";
 
 // 보관함 목록 — doc 통짜를 안 실어 보낸다(목록 함수가 이미 요약해서 준다).
 //
@@ -114,7 +115,7 @@ export const POST = withUser(async (req, ctx, user) => {
   const project = await createProject({
     settings,
     material: {
-      text: body.material.text.slice(0, 4000),
+      text: body.material.text.slice(0, MAX_MATERIAL_TEXT),
       photos: Array.isArray(body.material.photos) ? body.material.photos : [],
     },
     ownerId: user.id,
