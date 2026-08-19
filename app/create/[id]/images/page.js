@@ -737,7 +737,7 @@ function PreviewPane({ cut, project, url, photoName, usage, aspect, stalled, onR
                   ★ 값을 children 으로 그대로 되돌려준다 — DOM 글자와 같으면 React 가 손대지
                     않아 커서가 튀지 않는다. 그래서 onInput 에서 상태를 갱신해도 안전하다. */}
               <div
-                className="ref mono prompt-body"
+                className="mono prompt-body"
                 contentEditable
                 suppressContentEditableWarning
                 onInput={(e) => setPrompt(e.currentTarget.textContent)}
