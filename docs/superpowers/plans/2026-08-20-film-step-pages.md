@@ -499,16 +499,20 @@ function Inner({ children }) {
   return (
     <>
       <h1 className="pgtitle">한 번에 굽는 영상</h1>
-      <nav className="stepper">
+      {/* ⚠️ 클래스는 **globals.css 에 실제로 있는 것**을 쓴다. 이 계획이 처음에 적었던
+          `stepper`·`stepper-item` 은 코드에도 CSS 에도 0건이라 무스타일이 된다.
+          실물은 components/Sidebar.jsx 의 side-steps / side-step(on·passed·locked)이다
+          (globals.css:282~333). 새 단계 화면들도 이 클래스를 쓴다. */}
+      <nav className="side-steps">
         {FILM_STEPS.map((s) => {
           const open = isFilmStepReachable(s.key, project, mode);
           const on = step?.key === s.key;
           return open ? (
-            <Link key={s.key} href={filmStepHref(s, id, mode)} className={`stepper-item${on ? " on" : ""}`}>
+            <Link key={s.key} href={filmStepHref(s, id, mode)} className={`side-step${on ? " on" : ""}`}>
               {s.no} {s.label}
             </Link>
           ) : (
-            <span key={s.key} className="stepper-item off">{s.no} {s.label}</span>
+            <span key={s.key} className="side-step locked" aria-disabled="true">{s.no} {s.label}</span>
           );
         })}
       </nav>
