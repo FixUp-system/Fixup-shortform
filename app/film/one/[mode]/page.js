@@ -23,19 +23,19 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 // 방식의 표·판정은 여기 하나다. 라벨·귀띔을 화면에 복사하면 표와 갈린다.
 // (mode.js·doc.js 는 import 가 없는 순수 모듈이라 "use client" 화면이 그대로 부를 수 있다.)
-import { FILM_MODES, isFilmMode, filmMode } from "../../../lib/film/mode";
-import { filmOf, scenarioLock } from "../../../lib/film/doc";
+import { FILM_MODES, isFilmMode, filmMode } from "../../../../lib/film/mode";
+import { filmOf, scenarioLock } from "../../../../lib/film/doc";
 // 문 판정은 순수 함수 한 벌이다 — 화면 안에 두면 "막다른 길이 안 생기는가"를 값으로 잴 수 없다.
-import { filmGates } from "../../../lib/film/gates";
+import { filmGates } from "../../../../lib/film/gates";
 // 폴링 루프도 한 벌이다(화면마다 복붙했더니 조금씩 다르게 틀렸다 — lib/poll.js 주석).
-import { startPolling } from "../../../lib/poll";
-import { ASPECTS, DEFAULT_ASPECT_ID, aspectFor } from "../../../lib/aspects";
-import { AD_FORMATS, AD_MOODS, AD_LANGS, AD_STYLE_LINES, DEFAULT_AD_OPTIONS } from "../../../lib/ad/options";
-import { STYLE_PRESETS } from "../../../lib/styles";
+import { startPolling } from "../../../../lib/poll";
+import { ASPECTS, DEFAULT_ASPECT_ID, aspectFor } from "../../../../lib/aspects";
+import { AD_FORMATS, AD_MOODS, AD_LANGS, AD_STYLE_LINES, DEFAULT_AD_OPTIONS } from "../../../../lib/ad/options";
+import { STYLE_PRESETS } from "../../../../lib/styles";
 // 사진 상한 — 서버(app/api/film/route.js)와 **같은 파일**에서 읽는다. 손으로 두 벌 적으면
 // 화면은 통과시키는데 서버가 400 을 내고, 사장님은 다 올린 뒤에야 거절당한다.
-import { MAX_PHOTOS } from "../../../lib/photos";
-import { MAX_MATERIAL_TEXT } from "../../../lib/material";
+import { MAX_PHOTOS } from "../../../../lib/photos";
+import { MAX_MATERIAL_TEXT } from "../../../../lib/material";
 
 // 화풍은 영상용 문구가 있는 것만 고를 수 있다 — 광고 화면(app/ads/new/page.js)과 같은 규칙이다.
 const AD_STYLES = STYLE_PRESETS.filter((s) => Object.keys(AD_STYLE_LINES).includes(s.id));
