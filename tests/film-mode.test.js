@@ -59,19 +59,25 @@ describe("어떤 이미지를 만드는가", () => {
     expect(plan.map((p) => p.key)).toEqual(["subject", "person", "place"]);
   });
 
-  it("★ 참고 그림 — 세 축이 서로 다른 재료에서 나온다", () => {
+  it("★ 참고 그림 — 세 축이 서로 다른 그림이 된다", () => {
     const plan = imagePlanFor("refs", SCENARIO);
     const prompts = plan.map((p) => p.prompt);
     // 셋이 같은 문자열을 받으면 세 장이 같은 그림이 되고 '생김새 참조 세 벌'이 무너진다
     expect(new Set(prompts).size).toBe(3);
     const [subject, person, place] = prompts;
-    // 재료는 셋 다 shows 지만 **쥐어 주는 조각이 다르다** — 물건은 첫 장면, 사람은 마지막
-    // 장면, 자리는 전부. 그래야 세 장이 같은 그림이 되지 않는다
+
+    // ★ 물건과 자리는 shows 에서 재료를 받는다 — 무엇을 그릴지가 장면에 적혀 있다.
     expect(subject).toContain("a bunny keyring hanging on a tan handbag");
-    expect(person).toContain("a woman walking out of a sunlit doorway");
     expect(place).toContain("a bunny keyring hanging on a tan handbag");
-    expect(place).toContain("a woman walking out of a sunlit doorway");
+
+    // ★★ 사람 축은 **장면 재료를 안 받는다**(2026-08-19). 장면을 통째로 주면
+    //   "초상을 그려라"면서 잔·카운터·역광까지 들어간다(실측). 대신 배경을 지우는
+    //   말(plain neutral background)로 사람만 남긴다.
+    expect(person).toMatch(/portrait/i);
+    expect(person).toMatch(/plain neutral background|no props/i);
+    expect(person).not.toContain("a woman walking out of a sunlit doorway");
     expect(subject).not.toContain("a woman walking out of a sunlit doorway");
+
     // 한국어 필드는 어느 축에도 실리지 않는다 — 이미지 모델이 읽는 글이다
     for (const p of prompts) expect(p).not.toContain("가방에 달린 키링으로 시선을 끈다");
   });
@@ -377,5 +383,58 @@ describe("무대와 이음이 프롬프트에 실린다", () => {
 
   it("★ 굽기 지시문에도 무대가 실린다", () => {
     expect(buildFilmPrompt(sc, "order")).toContain("sunlit minimal cafe");
+  });
+});
+
+// ★★ refs 갈래의 구멍 셋(2026-08-19 사장님 지적: "참고 그림으로 만들면 마지막에 인물
+// 옷이 갑자기 바뀐다"). order 를 기준으로 축을 붙이면서 refs 를 끝까지 안 훑었다.
+//
+//  ① focus=product 면 축이 제품·제품·자리라 **사람 그림이 한 장도 없다**. avatarId 를
+//     넘기는 자리도 person 계열뿐이라 아바타 사진이 fal 에 안 갔다 — 영상에서 사람이
+//     나올 때마다 모델이 새로 그려 얼굴도 옷도 컷마다 바뀐다.
+//  ② STAGE(무대)가 person 계열에만 붙어 제품·자리 축은 무대를 몰랐다.
+//  ③ WEAR(옷차림)도 마찬가지.
+describe("참고 그림 — 사람이 나오면 인물 축을 확보한다", () => {
+  const base = {
+    ...SCENARIO,
+    focus: "product",
+    environment: "a sunlit minimal cafe",
+    wardrobe: "casual denim jacket",
+  };
+  const withPerson = { ...base, shots: base.shots.map((s, i) => ({ ...s, avatar_id: i === 1 ? "av-woman-20s" : "" })) };
+  const noPerson = { ...base, shots: base.shots.map((s) => ({ ...s, avatar_id: "" })) };
+
+  it("★ 사람이 나오면 넉 장이 되고 인물 축이 생긴다", () => {
+    const plan = imagePlanFor("refs", withPerson);
+    expect(plan).toHaveLength(4);
+    expect(plan.map((p) => p.key)).toContain("person");
+  });
+
+  it("★ 그 인물 축이 아바타 사진을 받는다 — 이것이 없어서 옷이 바뀌었다", () => {
+    const person = imagePlanFor("refs", withPerson).find((p) => p.key === "person");
+    expect(person.avatarId).toBe("av-woman-20s");
+  });
+
+  it("★ 인물 축에 옷차림이 붙는다", () => {
+    const person = imagePlanFor("refs", withPerson).find((p) => p.key === "person");
+    expect(person.prompt).toContain("casual denim jacket");
+  });
+
+  it("★ 사람이 안 나오면 예전처럼 세 장이다 — 쓸데없는 $0.08 을 안 쓴다", () => {
+    expect(imagePlanFor("refs", noPerson)).toHaveLength(3);
+  });
+
+  it("★ 무대는 **모든** 축에 붙는다 — 그것이 무대가 하나라는 뜻이다", () => {
+    for (const p of imagePlanFor("refs", withPerson)) {
+      expect(p.prompt, p.key).toContain("sunlit minimal cafe");
+    }
+  });
+
+  it("★ focus 가 person·place 여도 모든 축에 무대가 붙는다", () => {
+    for (const f of ["person", "place", "info"]) {
+      for (const p of imagePlanFor("refs", { ...withPerson, focus: f })) {
+        expect(p.prompt, `${f}/${p.key}`).toContain("sunlit minimal cafe");
+      }
+    }
   });
 });
