@@ -1994,3 +1994,18 @@ h1.login-head { margin-inline: auto; }
   cursor: pointer;
 }
 .um-item:hover { background: var(--surface2); }
+
+/* 사용자 관리 — 한 계정에 관한 일을 모아 두는 모달(2026-08-20).
+   ★ .dlg 를 그대로 쓰되 폭만 넓힌다 — 안에 내역 목록이 들어가 440px 로는 줄이 접힌다. */
+.dlg--wide { max-width: 560px; }
+.admin-panel { gap: 14px; }
+.admin-panel-sub { font-size: 14px; color: var(--ink-soft); margin-top: 4px; }
+/* 내역이 길어도 모달이 화면 밖으로 자라지 않게 — 여기서만 스크롤한다. */
+.admin-panel-ledger { max-height: 40vh; overflow-y: auto; }
+/* 줄 안의 등급 드롭다운 — 표 칸에 들어가므로 입력칸 기본 높이보다 작게. */
+.tier-pick { height: var(--ctl); padding: 0 8px; font-size: 12px; width: auto; }
+/* 크레딧 넣기 — 계정 모달 안에서 끝난다(모달 위에 모달을 띄우지 않는다). */
+.admin-grant { display: flex; gap: 8px; align-items: center; }
+.admin-grant .dlg-input { flex: 1; }
+.admin-grant-amt { flex: 0 0 96px; }
+.admin-grant-note { margin: 0; font-size: 12px; }

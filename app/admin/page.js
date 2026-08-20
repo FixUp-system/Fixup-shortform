@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 // 기본값은 가격표에서 온다 — 운영자가 매번 고르는 값이라도 출처는 한 곳이다.
 import { DEFAULT_GRANT } from "../../lib/pricing";
 // 내역의 말·부호는 사장님 화면과 **같은 표**를 쓴다 — 둘이 다른 말을 하면 안 된다
@@ -42,8 +42,39 @@ export default function AdminPage() {
   const [openId, setOpenId] = useState(null);
   const [ledger, setLedger] = useState(null);   // null = 불러오는 중
 
-  async function toggleLedger(id) {
-    if (openId === id) { setOpenId(null); return; }
+  // ★★ 고른 계정 — 모달이 이 값으로 열린다(2026-08-20). **id 가 아니라 줄 전체**를 든다:
+  //   모달이 이메일·상태·잔액을 함께 보여 줘야 하는데, id 만 들면 그때마다 목록을 다시
+  //   뒤져야 하고 목록이 갱신되는 사이에 못 찾는 순간이 생긴다.
+  // ★ 그래서 화면에 그릴 때는 **목록의 최신 줄**로 다시 맞춘다(아래 panelUser) — 크레딧을
+  //   넣으면 목록이 갱신되는데, 든 값이 낡으면 모달만 옛 잔액을 보여 준다.
+  const [panelId, setPanelId] = useState(null);
+  const panelUser = panelId ? (users || []).find((u) => u.id === panelId) || null : null;
+  // ★ showModal() 로 연다 — `open` 속성만 두면 **모달이 아니라 인라인**으로 뜬다(배경도
+  //   Esc 도 포커스 가둠도 없다). DialogProvider 와 같은 방식이다.
+  const panelRef = useRef(null);
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el) return;
+    if (panelUser && !el.open) el.showModal();
+    if (!panelUser && el.open) el.close();
+  }, [panelUser]);
+
+  // 계정을 연다 — 여는 순간 내역도 함께 읽는다(모달 안에서 또 한 번 누르게 하지 않는다).
+  function openPanel(u) {
+    setPanelId(u.id);
+    setErr("");
+    // ★ 앞 계정에 적던 값이 남으면 **엉뚱한 사람에게** 그 값이 들어간다. 열 때마다 기본값이다.
+    setGrantAmount(String(DEFAULT_GRANT));
+    setGrantReason("체험");
+    loadLedger(u.id);
+  }
+  function closePanel() {
+    setPanelId(null);
+    setOpenId(null);
+    setLedger(null);
+  }
+
+  async function loadLedger(id) {
     setOpenId(id);
     setLedger(null);
     const r = await fetch(`/api/admin/users/${id}/ledger`);
@@ -99,26 +130,25 @@ export default function AdminPage() {
     setBusy("");
   }
 
-  // 크레딧과 사유를 받아 넣는다. 값을 두 번 묻는 이유는 **장부에 사유가 함께 남아야**
-  // 하기 때문이다 — 나중에 "이 500 은 왜 들어갔나"에 답할 수 있는 유일한 자리다.
+  // 크레딧과 사유를 받아 넣는다.
+  //
+  // ★★ 2026-08-20 — **모달 안에서** 받는다. 그전에는 prompt 를 두 번 불렀는데(값·사유),
+  //   계정 모달이 이미 떠 있는 상태라 dialog 가 둘 겹쳤다. 한 계정에 관한 일을 한자리에
+  //   모으려고 모달을 만들어 놓고, 정작 가장 자주 하는 일이 그 자리를 벗어나 있었다.
+  // ★ **사유를 받는 규칙은 그대로다.** 장부에 사유가 함께 남아야 나중에 "이 500 은 왜
+  //   들어갔나"에 답할 수 있다 — 묻는 자리만 옮긴 것이지 규칙을 뺀 것이 아니다.
   async function grant(id) {
-    const raw = await prompt({
-      title: "크레딧 넣기",
-      body: "회수하려면 음수를 넣어 주세요. 소수점은 쓰지 않습니다.",
-      defaultValue: String(DEFAULT_GRANT),
-      numeric: true,
-      confirmLabel: "다음",
-    });
-    if (raw === null) return;
-    const credits = Number(raw);
-    if (!Number.isInteger(credits) || credits === 0) return;
-    const reason = await prompt({
-      title: "사유",
-      body: "장부에 그대로 남습니다.",
-      defaultValue: "체험",
-      confirmLabel: "넣기",
-    });
-    if (!reason || !reason.trim()) return;
+    const credits = Number(grantAmount);
+    // 0 과 소수는 안 받는다 — 크레딧은 정수 단위다(lib/pricing.js). 회수는 음수로 한다.
+    if (!Number.isInteger(credits) || credits === 0) {
+      setErr("크레딧은 0 이 아닌 정수로 넣어 주세요 (회수는 음수).");
+      return;
+    }
+    const reason = grantReason.trim();
+    if (!reason) {
+      setErr("사유를 적어 주세요 — 장부에 그대로 남습니다.");
+      return;
+    }
     setBusy(id);
     setErr("");
     try {
@@ -128,7 +158,13 @@ export default function AdminPage() {
         body: JSON.stringify({ credits, reason }),
       });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "충전 실패");
-      await load();
+      setErr("");
+      // ★ 넣고 나면 입력칸을 기본값으로 되돌린다 — 안 되돌리면 같은 값이 남아 있어
+      //   두 번째로 누를 때 실수로 또 넣기 쉽다.
+      setGrantAmount(String(DEFAULT_GRANT));
+      setGrantReason("체험");
+      // 내역도 함께 다시 읽는다 — 방금 넣은 줄이 그 자리에서 보여야 "들어갔다"를 안다.
+      await Promise.all([load(), loadLedger(id)]);
       // 남에게 넣었으면 상단바를 흔들 이유가 없다 — 내 것일 때만 다시 읽는다.
       if (id === myself?.id) await reloadMe();
     } catch (e) {
@@ -218,20 +254,23 @@ export default function AdminPage() {
                     </span>
                   </td>
                   <td>{u.role}</td>
-                  {/* 등급 — 칩을 눌러 바꾼다. 지금 등급 판정은 lib/tiers.js 의 tierOf 하나다
-                      (컬럼이 없던 시절 계정은 값이 없고, 그때도 기본 등급으로 읽힌다). */}
+                  {/* 등급 — 드롭다운으로 고른다(2026-08-20 사장님 지시). 칩을 나열하면
+                      등급이 늘 때 줄이 넘치고, 지금 무엇인지도 한눈에 안 들어온다.
+                      ★ 보기는 표(TIERS)에서 나온다 — 화면에 이름을 복사하면 표와 갈린다.
+                      ★ 지금 등급 판정은 lib/tiers.js 의 tierOf 하나다(컬럼이 없던 시절
+                        계정은 값이 없고, 그때도 기본 등급으로 읽힌다). */}
                   <td>
-                    {TIERS.map((t) => (
-                      <button
-                        key={t.id}
-                        className={`chip${tierOf(u) === t.id ? " on" : ""}`}
-                        disabled={busy === u.id || tierOf(u) === t.id}
-                        title={t.hint}
-                        onClick={() => setTier(u.id, t.id)}
-                      >
-                        {t.label}
-                      </button>
-                    ))}
+                    <select
+                      className="dlg-input tier-pick"
+                      value={tierOf(u)}
+                      disabled={busy === u.id}
+                      onChange={(e) => setTier(u.id, e.target.value)}
+                      aria-label={`${u.email} 등급`}
+                    >
+                      {TIERS.map((t) => (
+                        <option key={t.id} value={t.id}>{t.label}</option>
+                      ))}
+                    </select>
                   </td>
                   {/* 언제 들어온 사람인지 — 승인 대기가 쌓였을 때 먼저 볼 줄을 고르는 근거다.
                       날짜 규칙은 마이페이지·크레딧 내역과 같다(ymd: 사장님 시계). */}
@@ -239,60 +278,122 @@ export default function AdminPage() {
                   <td>
                     <span className="st-badge">{u.balance ?? 0}</span>
                   </td>
+                  {/* ★★ 줄에는 **여는 버튼 하나**만 둔다(2026-08-20 사장님 지시). 그전에는
+                      줄마다 버튼이 다섯이라 가로가 좁고, 어느 줄의 버튼인지 눈으로 좇아야
+                      했다. 한 계정에 관한 일은 그 계정을 연 뒤 한자리에서 한다. */}
                   <td>
-                    <button className="mini" onClick={() => toggleLedger(u.id)}>
-                      {openId === u.id ? "내역 닫기" : "내역"}
-                    </button>{" "}
-                    <button className="mini" disabled={busy === u.id} onClick={() => grant(u.id)}>
-                      크레딧 넣기
-                    </button>{" "}
-                    <button className="mini" disabled={busy === u.id} onClick={() => resetPassword(u.id)}>
-                      비밀번호 재설정
-                    </button>{" "}
-                    {u.status !== "approved" && (
-                      <button className="mini" disabled={busy === u.id} onClick={() => setStatus(u.id, "approved")}>
-                        승인
-                      </button>
-                    )}{" "}
-                    {u.status !== "blocked" && (
-                      <button className="mini" disabled={busy === u.id} onClick={() => setStatus(u.id, "blocked")}>
-                        차단
-                      </button>
-                    )}
+                    <button className="mini" disabled={busy === u.id} onClick={() => openPanel(u)}>
+                      관리
+                    </button>
                   </td>
                 </tr>,
-              ].concat(openId === u.id ? [(
-                <tr key={`${u.id}-ledger`}>
-                  <td colSpan={7}>
-                    {ledger === null ? (
-                      <p className="pgsub">불러오는 중…</p>
-                    ) : ledger.length === 0 ? (
-                      <p className="pgsub">아직 쓰거나 충전한 내역이 없어요.</p>
-                    ) : (
-                      <ul className="ledger">
-                        {ledger.map((r, i) => (
-                          <li className="ledger-row" key={`${r.ts}-${i}`}>
-                            <span className="ledger-date mono">{ymd(r.ts)}</span>
-                            <span className="ledger-what">
-                              {ledgerLabel(r.kind)}
-                              {r.project_id && (
-                                <span className="ledger-of"> · {r.project_title || "지운 영상"}</span>
-                              )}
-                            </span>
-                            <span className={`ledger-amt mono ${r.delta > 0 ? "led-plus" : ""}`}>
-                              {r.delta > 0 ? `+${r.delta}` : r.delta}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </td>
-                </tr>
-              )] : [])
+              ]
               ))}
             </tbody>
           </table>
         </div>
+      )}
+      {/* ★★ 한 계정에 관한 일은 여기 한자리에 모인다(2026-08-20 사장님 지시).
+          ★ 새 모달 장치를 만들지 않는다 — components/DialogProvider.jsx 가 쓰는 <dialog>
+            + .dlg 계열을 그대로 쓴다. 두 벌이면 배경·닫기·포커스 규칙이 갈린다.
+          ★ 닫는 길을 둘 준다: [닫기] 버튼과 Esc(dialog 가 기본으로 준다). 모달에 갇히면
+            사장님이 할 수 있는 일이 0 이 된다. */}
+      {panelUser && (
+        <dialog
+          ref={panelRef}
+          className="dlg dlg--wide"
+          onClose={closePanel}
+          aria-label={`${panelUser.email} 관리`}
+          /* ESC 는 브라우저가 준다 — DialogProvider 와 같은 규약이다 */
+          onCancel={(e) => { e.preventDefault(); closePanel(); }}
+          /* 배경을 눌러 닫는다. <dialog> 자체가 배경까지 차지하므로 눌린 자리가
+             상자 밖이면 배경을 누른 것이다(저쪽과 같은 판정). */
+          onClick={(e) => { if (e.target === panelRef.current) closePanel(); }}
+        >
+          <div className="dlg-box admin-panel">
+            <h2 className="dlg-title">{panelUser.email}</h2>
+            <p className="dlg-body">
+              {STATUS_LABEL[panelUser.status] || panelUser.status} · {panelUser.role} ·
+              {" "}잔액 {panelUser.balance ?? 0} 크레딧
+            </p>
+
+            {/* ★★ 크레딧 넣기 — **여기서 끝난다**(2026-08-20). 그전에는 prompt 를 두 번
+                불러 모달 위에 모달이 겹쳤다. 사유를 받는 규칙은 그대로다 — 장부에 사유가
+                함께 남아야 나중에 "이 500 은 왜 들어갔나"에 답할 수 있다. */}
+            <form
+              className="admin-grant"
+              onSubmit={(e) => { e.preventDefault(); grant(panelUser.id); }}
+            >
+              <input
+                className="dlg-input admin-grant-amt"
+                type="number"
+                step="1"
+                value={grantAmount}
+                onChange={(e) => setGrantAmount(e.target.value)}
+                disabled={busy === panelUser.id}
+                aria-label="넣을 크레딧"
+              />
+              <input
+                className="dlg-input"
+                type="text"
+                value={grantReason}
+                onChange={(e) => setGrantReason(e.target.value)}
+                disabled={busy === panelUser.id}
+                placeholder="사유 — 장부에 그대로 남아요"
+                aria-label="사유"
+              />
+              <button type="submit" className="mini confirm-btn" disabled={busy === panelUser.id}>
+                크레딧 넣기
+              </button>
+            </form>
+            <p className="pgsub admin-grant-note">회수하려면 음수를 넣어 주세요. 소수점은 쓰지 않습니다.</p>
+
+            <div className="step-actions">
+              <button className="mini" disabled={busy === panelUser.id} onClick={() => resetPassword(panelUser.id)}>
+                비밀번호 재설정
+              </button>
+              {panelUser.status !== "approved" && (
+                <button className="mini" disabled={busy === panelUser.id} onClick={() => setStatus(panelUser.id, "approved")}>
+                  승인
+                </button>
+              )}
+              {panelUser.status !== "blocked" && (
+                <button className="mini" disabled={busy === panelUser.id} onClick={() => setStatus(panelUser.id, "blocked")}>
+                  차단
+                </button>
+              )}
+            </div>
+
+            {/* 내역 — 여는 순간 함께 읽는다. 합계로는 "누가 왜"를 확인할 수 없다. */}
+            <h3 className="dlg-title admin-panel-sub">내역</h3>
+            {ledger === null ? (
+              <p className="pgsub">불러오는 중…</p>
+            ) : ledger.length === 0 ? (
+              <p className="pgsub">아직 쓰거나 충전한 내역이 없어요.</p>
+            ) : (
+              <ul className="ledger admin-panel-ledger">
+                {ledger.map((r, i) => (
+                  <li className="ledger-row" key={`${r.ts}-${i}`}>
+                    <span className="ledger-date mono">{ymd(r.ts)}</span>
+                    <span className="ledger-what">
+                      {ledgerLabel(r.kind)}
+                      {r.project_id && (
+                        <span className="ledger-of"> · {r.project_title || "지운 영상"}</span>
+                      )}
+                    </span>
+                    <span className={`ledger-amt mono ${r.delta > 0 ? "led-plus" : ""}`}>
+                      {r.delta > 0 ? `+${r.delta}` : r.delta}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className="dlg-actions">
+              <button className="mini confirm-btn dlg-go" onClick={closePanel}>닫기</button>
+            </div>
+          </div>
+        </dialog>
       )}
       {/* ★ 수는 표 감싸개(.cost-table-wrap) **밖**이다. 그 안은 가로 스크롤 상자라
           (overflow-x: auto) 오른쪽 끝에 붙인 글자가 잘려 보인다(2026-08-13 실측). */}
