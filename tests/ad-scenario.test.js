@@ -626,7 +626,8 @@ describe("environment 도 제품과 어울려야 한다", () => {
     const s = buildScenarioMessages({ settings, material: { text: "소재", photos: [] } }).system;
     const at = s.indexOf("무대를 정한다");
     expect(at).toBeGreaterThan(-1);
-    expect(s.slice(at, at + 400)).toMatch(/어울리|어울려/);
+    // ★ 범위 600자 — 이 절에 "사장님이 적으셨으면 그곳이다" 규칙이 더해져 길어졌다.
+    expect(s.slice(at, at + 600)).toMatch(/어울리|어울려/);
   });
 });
 
@@ -708,5 +709,37 @@ describe("변하는 연출을 막지 않는다", () => {
 
   it("생김새를 지어내지 말라는 규칙은 그대로다 — 둘은 다른 얘기다", () => {
     expect(sys(withPhoto)).toMatch(/다시 적지 마라|지어내지/);
+  });
+});
+
+// ★★ 소재에 적힌 것이 광고 관습보다 우선한다(2026-08-19 사장님 지적: "집 주방인데
+// 스튜디오 느낌이 왜 섞이나 — 사용자가 '생활감 있는 집'이라고 적을 리 없다").
+//
+// 실측: 소재가 "20대 여성이 퇴근하고 집에서 조리해 먹는"인데 environment 가
+// "a bright tidy home kitchen … clean pale counter **like a studio backdrop**" 이 됐다.
+// "제품이 주인공"이라는 말이 세 겹(SYSTEM 의 "광고 CF 감독" · format=hero ·
+// focus=product)으로 쌓여 제품 촬영 관습을 끌어온 것이다.
+//
+// ★ angle 에는 "사장님이 적어 주신 이야기가 있으면 그것이 이야기다"를 넣었는데
+//   environment·wardrobe 에는 같은 문장이 없었다.
+describe("소재에 적힌 것이 광고 관습을 이긴다", () => {
+  const sys = () => buildScenarioMessages({ settings, material: { text: "소재", photos: [] } }).system;
+
+  it("★ 무대 — 사장님이 장소를 적었으면 그곳이라고 말한다", () => {
+    const s = sys();
+    const at = s.indexOf("무대를 정한다");
+    expect(s.slice(at, at + 600)).toMatch(/적으셨|적어 주신|적은 곳|그곳/);
+  });
+
+  it("★ 무대 — 광고 관습으로 스튜디오화하지 말라고 말한다", () => {
+    const s = sys();
+    const at = s.indexOf("무대를 정한다");
+    expect(s.slice(at, at + 600)).toMatch(/스튜디오/);
+  });
+
+  it("★ 옷차림도 같다 — 사장님이 적었으면 그것이다", () => {
+    const s = sys();
+    const at = s.indexOf("옷차림도 정한다");
+    expect(s.slice(at, at + 500)).toMatch(/적으셨|적어 주신|적은/);
   });
 });
