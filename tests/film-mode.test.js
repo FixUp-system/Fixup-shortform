@@ -438,3 +438,39 @@ describe("참고 그림 — 사람이 나오면 인물 축을 확보한다", () 
     }
   });
 });
+
+// ★★ 그림에 안 실리던 둘(2026-08-19). 시나리오가 정해서 굽기 지시문에는 갔는데
+// 그림 프롬프트에는 안 갔다 — 그림 색이 이미 제각각인데 영상에서 통일하라고 하는 셈이다.
+describe("색 처리와 제품 외형이 그림에도 실린다", () => {
+  const sc = (extra) => ({
+    ...SCENARIO,
+    focus: "product",
+    tone: "warm muted film tones, gentle grain",
+    look: "pink plush bunny keyring, palm-sized",
+    ...extra,
+  });
+
+  it("★ tone 이 **모든** 그림에 붙는다 — 그림끼리 색이 다르면 영상에서 못 맞춘다", () => {
+    for (const mode of ["order", "refs"]) {
+      for (const p of imagePlanFor(mode, sc())) {
+        expect(p.prompt, `${mode}/${p.key}`).toContain("warm muted film tones");
+      }
+    }
+  });
+
+  it("★ 사진이 없으면 제품 외형(look)이 붙는다 — 그때는 글이 유일한 재료다", () => {
+    const p = imagePlanFor("order", sc(), { hasPhoto: false })[0];
+    expect(p.prompt).toContain("pink plush bunny keyring, palm-sized");
+  });
+
+  it("★ 사진이 있으면 안 붙는다 — 사진이 더 나은 재료이고, 글이 사진과 다투면 진다", () => {
+    const p = imagePlanFor("order", sc(), { hasPhoto: true })[0];
+    expect(p.prompt).not.toContain("pink plush bunny keyring, palm-sized");
+  });
+
+  it("값이 없으면 안 붙는다 — 옛 문서 회귀 0", () => {
+    for (const p of imagePlanFor("order", SCENARIO)) {
+      expect(p.prompt).not.toMatch(/color treatment/i);
+    }
+  });
+});

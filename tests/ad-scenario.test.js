@@ -617,3 +617,15 @@ describe("environment · transition", () => {
     expect(sys()).toMatch(/이어지|이어서|이어진/);
   });
 });
+
+// ★ 무대도 제품과 어울려야 한다 — wardrobe 에는 그 말을 넣었는데 environment 에는
+//   "하나로 묶어라"만 있었다. 야구단 굿즈에 미니멀 화이트 카페가 나와도 규칙 위반이
+//   아니었다(2026-08-19).
+describe("environment 도 제품과 어울려야 한다", () => {
+  it("★ SYSTEM 이 무대를 제품과 어울리게 정하라고 말한다", () => {
+    const s = buildScenarioMessages({ settings, material: { text: "소재", photos: [] } }).system;
+    const at = s.indexOf("무대를 정한다");
+    expect(at).toBeGreaterThan(-1);
+    expect(s.slice(at, at + 400)).toMatch(/어울리|어울려/);
+  });
+});
