@@ -233,10 +233,11 @@ describe("/ads/new 화면 — 모델·길이 선택 (Task 22)", () => {
   it("모델 칩이 lib/ad/models 의 AD_MODELS 에서 온다 — 라벨을 화면에 복사하지 않는다", () => {
     expect(src).toMatch(/from ["'][./]*lib\/ad\/models["']/);
     expect(src).toContain("AD_MODELS");
-    // ★ 숨김이 생기며 AD_MODELS.filter(...).map( 이 됐다(2026-08-13). "표에서 그린다"는
-    // 계약은 그대로다 — 기준점만 넓힌다.
-    const mapIdx = src.search(/AD_MODELS(\.filter\(.*?\))?\.map\(/);
-    expect(mapIdx, "AD_MODELS 에서 그리지 않는다").toBeGreaterThan(-1);
+    // ★ 기준점이 두 번 옮겨졌다. 2026-08-13 에 숨김이 생기며 AD_MODELS.filter(...).map( 이
+    // 됐고, 2026-08-20 에 등급이 생기며 modelsForTier(...).map( 이 됐다(그 함수가 AD_MODELS
+    // 의 원소를 돌려준다 — 숨김도 거기서 함께 걸러진다). **"표에서 그린다"는 계약은 그대로다.**
+    const mapIdx = src.search(/(AD_MODELS(\.filter\(.*?\))?|modelsForTier\([^)]*\))\.map\(/);
+    expect(mapIdx, "표에서 그리지 않는다").toBeGreaterThan(-1);
     // 모델 표의 hint 문구(모델별로 다른 값)를 그대로 베끼면 모델이 하나 늘 때 화면만 낡는다
     expect(src).not.toContain("소리까지 한 번에");
     expect(src).not.toContain("네이티브 오디오");
@@ -258,7 +259,8 @@ describe("/ads/new 화면 — 모델·길이 선택 (Task 22)", () => {
     expect(body, "되돌릴 값이 adSecondsFor(id)[0] 가 아니다 — 그 모델이 실제로 받는 값이 아닐 수 있다")
       .toMatch(/adSecondsFor\(id\)\[0\]/);
     // 모델 칩의 onClick 이 이 함수를 실제로 부르는지 — 안 부르면 죽은 코드다
-    const modelChipIdx = src.search(/AD_MODELS(\.filter\(.*?\))?\.map\(/);
+    // ★ 기준점은 위 "모델 칩이 …에서 온다" 와 같은 자다(2026-08-20 에 modelsForTier 로 옮겼다).
+    const modelChipIdx = src.search(/(AD_MODELS(\.filter\(.*?\))?|modelsForTier\([^)]*\))\.map\(/);
     const modelChipBlock = src.slice(modelChipIdx, modelChipIdx + 300);
     expect(modelChipBlock, "모델 칩 onClick 이 onModelChange 를 안 부른다").toMatch(/onClick=\{[^}]*onModelChange/);
   });
@@ -450,11 +452,18 @@ describe("/ads/[id] — done 은 못 고친다", () => {
   });
 });
 
-// ★ 숨긴 모델은 칩으로 안 그린다 — 표에 남아 있어도(옛 문서 보호) 새로 고를 수는 없다.
-describe("/ads/new — 숨긴 모델은 안 보인다", () => {
-  it("모델 칩이 hidden 을 거른다", () => {
-    expect(src, "AD_MODELS 를 거르지 않고 그대로 그린다")
-      .toMatch(/AD_MODELS\.filter\(\([^)]*\)\s*=>\s*![^)]*\.hidden\)/);
+// ★★ 2026-08-20 — 거르는 자리가 **등급**으로 옮겨졌다. modelsForTier 가 숨김(아무도 못 씀)과
+//   등급(누가 쓸 수 있나) 둘 다 본다. 화면이 AD_MODELS 를 통째로 그리면 기본 등급 사장님에게
+//   2.5 칩이 보이고, 눌러 봐야 서버가 403 을 낸다.
+// ⚠️ 이것은 **가림막이지 잠금이 아니다** — 잠금은 서버가 한다(tests/tier-gate.test.js).
+describe("/ads/new — 등급이 고를 수 있는 모델만 보인다", () => {
+  it("★ 모델 칩을 등급으로 거른다 — AD_MODELS 를 통째로 그리지 않는다", () => {
+    expect(src, "등급으로 거르지 않는다").toMatch(/modelsForTier\(/);
+    expect(src, "AD_MODELS 를 그대로 그린다").not.toMatch(/AD_MODELS\.map\(/);
+  });
+
+  it("★ 등급은 내 정보에서 읽는다 — 화면이 스스로 정하지 않는다", () => {
+    expect(src).toMatch(/modelsForTier\(\s*me\?\.tier\s*\)/);
   });
 });
 

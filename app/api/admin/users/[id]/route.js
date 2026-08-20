@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { getStore } from "../../../../../lib/store/index.js";
 import { SIGNUP_GRANT, SIGNUP_GRANT_REASON } from "../../../../../lib/pricing.js";
+import { isTier, TIERS } from "../../../../../lib/tiers.js";
 
 // 가입 기본 지급 — **처음 승인될 때 한 번**만 들어간다.
 //
@@ -40,16 +41,22 @@ const ALLOWED_ROLE = new Set(["user", "admin"]);
 export const PATCH = withUser(async (req, { params }, user) => {
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
-  const { status, role } = body || {};
+  const { status, role, tier } = body || {};
 
-  if (status === undefined && role === undefined) {
-    return Response.json({ error: "status 나 role 중 하나는 있어야 해요" }, { status: 400 });
+  if (status === undefined && role === undefined && tier === undefined) {
+    return Response.json({ error: "status·role·tier 중 하나는 있어야 해요" }, { status: 400 });
   }
   if (status !== undefined && !ALLOWED_STATUS.has(status)) {
     return Response.json({ error: "status 는 approved·blocked·pending 중 하나예요" }, { status: 400 });
   }
   if (role !== undefined && !ALLOWED_ROLE.has(role)) {
     return Response.json({ error: "role 은 user·admin 중 하나예요" }, { status: 400 });
+  }
+  // ★ 판정은 lib/tiers.js 하나다 — 여기에 등급 이름을 손으로 적으면 표와 갈린다.
+  //   조용히 받으면 아무 문자열이나 컬럼에 들어가고, 그 계정은 tierOf 가 basic 으로
+  //   떨어뜨려 "올려 줬는데 안 열린다"가 된다.
+  if (tier !== undefined && !isTier(tier)) {
+    return Response.json({ error: `tier 는 ${TIERS.map((t) => t.id).join("·")} 중 하나예요` }, { status: 400 });
   }
 
   const store = getStore();
@@ -80,6 +87,12 @@ export const PATCH = withUser(async (req, { params }, user) => {
       approved_at: status === "approved" ? new Date().toISOString() : null,
     } : {}),
     ...(role !== undefined ? { role } : {}),
+    // ★★ 등급은 **원장에만** 쓴다. app_metadata 는 middleware 가 매 요청 읽는 게이트
+    //   캐시이고(status·role), 등급은 게이트가 아니라 라우트가 필요할 때 읽는 값이다 —
+    //   display_name 이 같은 판단으로 그 자리에 있다(db/schema.sql 의 그 주석).
+    //   거기 두면 이중 쓰기를 지켜야 하는 자리가 하나 더 늘고, 갈리면 "화면은 pro 인데
+    //   서버는 basic"이 된다.
+    ...(tier !== undefined ? { tier } : {}),
   });
 
   // ★ 게이트·원장이 둘 다 성공한 **뒤에** 준다. 앞에 두면 게이트 실패로 502 를 돌려주면서

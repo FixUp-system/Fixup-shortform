@@ -6,6 +6,8 @@ import {
   isAdResolution, adResolutionsFor, DEFAULT_AD_RESOLUTION,
 } from "../../../../lib/ad/models.js";
 import { ownedPhotoKeys } from "../../../../lib/refs-io.js";
+import { getStore } from "../../../../lib/store/index.js";
+import { tierOf, tierAllowsModel } from "../../../../lib/tiers.js";
 import { withUser } from "../../../../lib/auth/require-user.js";
 import { MAX_MATERIAL_TEXT } from "../../../../lib/material.js";
 
@@ -57,6 +59,19 @@ export const PATCH = withUser(async (req, { params }, user) => {
   // adModel() 과 같은 폴백이지만, "모르는지"는 못 가리는 그 함수 대신 isAdModel 로 가른다.
   const model = body?.settings?.model ?? project.settings.model ?? DEFAULT_AD_MODEL;
   if (!isAdModel(model)) return Response.json({ error: "그 영상 모델은 몰라요" }, { status: 400 });
+
+  // ★★ 등급 문 — **세 번째 자리**다(2026-08-20). 만들기·굽기에 이미 달았지만, 여기가
+  //   빠지면 기본 등급 사장님이 2.0 으로 만든 뒤 PATCH 로 2.5 로 바꿔 둘 수 있다.
+  //   굽기가 막으므로 돈은 안 나가지만, 사장님은 **고를 수 있다고 믿고 시나리오까지 만든 뒤**
+  //   굽기에서야 거절당한다 — 그 자리에서 할 수 있는 일이 없다.
+  // ★ 값이 실제로 안 바뀌는 요청은 지나간다(model 을 안 보내면 project 의 것이 그대로다).
+  //   등급이 내려간 뒤에도 옛 문서를 열고 다른 칸을 고칠 수는 있어야 한다.
+  if (body?.settings?.model !== undefined) {
+    const tier = tierOf((await getStore().findProfiles([user.id])).get(user.id));
+    if (!tierAllowsModel(tier, model)) {
+      return Response.json({ error: "지금 등급에서는 고를 수 없는 모델이에요" }, { status: 403 });
+    }
+  }
 
   // ★ 모델을 바꾸면 길이도 **그 모델 기준으로 다시** 본다 — 2.5→2.0 으로 바꾸는데
   // 길이가 그대로 30초면 400 이어야 한다(2.0 은 15초뿐이다).

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { resetMemoryStore } from "../lib/store/memory.js";
+import { resetMemoryStore, memoryStore } from "../lib/store/memory.js";
 
 // LLM 경계만 가짜로 막는다 — 라우트·파이프라인·시나리오 검증은 **진짜로** 돈다.
 // 이 저장소의 기존 방식과 같다(tests/auto-route.test.js:9 참고).
@@ -67,7 +67,37 @@ describe("광고 라우트 — 문서", () => {
   });
 
   // ── Task 21 — 영상 모델 선택(백엔드) ──────────────────────────────────
+  // ★★★ 등급이 **실제로 막는지**를 HTTP 로 잰다(2026-08-20). tests/tier-gate.test.js 는
+  //   "라우트가 그 함수를 부르는가"를 문자열로 볼 뿐이라, 부르고도 결과를 안 쓰면 통과한다.
+  //   2.5 는 그전까지 hidden 으로 화면에서만 가려져 있었고 이 자리는 그대로 통과시켰다.
+  describe("등급이 모델을 막는다", () => {
+    it("★ 기본 등급이 2.5 로 만들려 하면 403 — 화면을 우회해도 안 열린다", async () => {
+      await memoryStore.insertProfile({ id: U, email: "basic@fix-up.kr", status: "approved", role: "user", tier: "basic" });
+      const res = await createAd(post({ ...OK, settings: { ...OK.settings, model: "seedance-2.5", seconds: 15 } }));
+      expect(res.status).toBe(403);
+    });
+
+    it("★ 프로필이 아예 없어도 403 — 모르는 값은 좁은 쪽으로 떨어진다", async () => {
+      const res = await createAd(post({ ...OK, settings: { ...OK.settings, model: "seedance-2.5", seconds: 15 } }));
+      expect(res.status).toBe(403);
+    });
+
+    it("기본 등급도 2.0 은 만든다 — 문을 너무 좁히지 않았는지 함께 본다", async () => {
+      await memoryStore.insertProfile({ id: U, email: "basic@fix-up.kr", status: "approved", role: "user", tier: "basic" });
+      const res = await createAd(post({ ...OK, settings: { ...OK.settings, model: "seedance-2.0", seconds: 15 } }));
+      expect(res.status).toBe(200);
+    });
+  });
+
   describe("영상 모델", () => {
+    // ★★ 2.5 는 **등급이 여는 모델**이다(2026-08-20). 그전에는 hidden 으로 화면에서만
+    //   가려져 있어 이 시험들이 아무 계정으로나 통과했다 — 서버가 안 막고 있었다는 뜻이다.
+    //   이제 서버가 막으므로 이 묶음의 사장님은 pro 등급이어야 한다.
+    //   (기본 등급이 막히는지는 아래 "등급이 모델을 막는다" 와 tests/tier-gate.test.js 가 잰다.)
+    beforeEach(async () => {
+      await memoryStore.insertProfile({ id: U, email: "pro@fix-up.kr", status: "approved", role: "user", tier: "pro" });
+    });
+
     // ① 2.5 로 30초를 만들 수 있고 2.0 으로는 400
     it("★ 2.5 모델은 30초를 만들 수 있다", async () => {
       const res = await createAd(
@@ -423,7 +453,13 @@ describe("광고 라우트 — 시나리오", () => {
 });
 
 describe("광고 라우트 — 굽기", () => {
-  beforeEach(() => resetMemoryStore());
+  // ★★ 굽기도 등급을 본다(2026-08-20) — 만든 뒤 등급이 내려간 계정과, 문서가 다른 경로로
+  //   고쳐진 경우를 막는 자리다(값이 나가는 자리는 여기다). 이 묶음에 2.5 를 쓰는 시험이
+  //   있으므로 pro 로 둔다. 기본 등급이 막히는지는 tests/tier-gate.test.js 가 잰다.
+  beforeEach(async () => {
+    resetMemoryStore();
+    await memoryStore.insertProfile({ id: U, email: "pro@fix-up.kr", status: "approved", role: "user", tier: "pro" });
+  });
 
   async function withScenario() {
     const made = await (await createAd(post(OK))).json();

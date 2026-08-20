@@ -7,6 +7,8 @@ import {
 } from "../../../lib/ad/models.js";
 import { ownedPhotoKeys } from "../../../lib/refs-io.js";
 import { withUser } from "../../../lib/auth/require-user.js";
+import { getStore } from "../../../lib/store/index.js";
+import { tierOf, tierAllowsModel } from "../../../lib/tiers.js";
 import { MAX_MATERIAL_TEXT } from "../../../lib/material.js";
 
 // 사진 상한. base64 는 1.33배로 부는데 fal 요청 본문에 통째로 실린다 —
@@ -33,6 +35,22 @@ export const POST = withUser(async (req, _ctx, user) => {
   const model = body?.settings?.model ?? DEFAULT_AD_MODEL;
   if (!isAdModel(model)) {
     return Response.json({ error: "그 영상 모델은 몰라요" }, { status: 400 });
+  }
+
+  // ★★★ **등급이 여는 모델인가 — 서버가 판정한다**(2026-08-20).
+  //
+  // 2.5 는 그전까지 `hidden: true` 로 숨겨져 있었는데, 그것은 화면에서만 거르는 것이라
+  // (app/ads/new/page.js 의 filter) 이 자리는 그대로 통과시켰다 — 즉 잠금이 아니라
+  // **가림막**이었고 API 를 직접 두드리면 만들어졌다.
+  // 이 저장소가 같은 자리에서 이미 배운 것: "화면 잠금은 한 벌뿐이라 샌다(탭 둘·새로고침
+  // 실패·직접 호출). 그리고 새면 돈이 두 번 나간다"(lib/ad/pipeline.js).
+  // 2.5 는 원가가 2.0 의 3배 이상이다(15초 720p ≈ $6.93) — 새면 그만큼이 나간다.
+  //
+  // ★ 등급은 원장(profiles)에서 읽는다. app_metadata 가 아니다 — 그쪽은 middleware 가 매
+  //   요청 읽는 게이트 캐시이고, 등급은 이 자리에서만 필요하다(db/schema.sql 의 그 주석).
+  const tier = tierOf((await getStore().findProfiles([user.id])).get(user.id));
+  if (!tierAllowsModel(tier, model)) {
+    return Response.json({ error: "지금 등급에서는 고를 수 없는 모델이에요" }, { status: 403 });
   }
 
   // ★ 길이는 고른 모델 기준이다 — 모델마다 고를 수 있는 길이가 다르다(2.0=15초,

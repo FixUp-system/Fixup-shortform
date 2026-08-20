@@ -9,6 +9,7 @@ import { getStore } from "../../../lib/store/index.js";
 import { balanceFor } from "../../../lib/charges.js";
 import { fakeFal } from "../../../lib/fake.js";
 import { creditsEnabled } from "../../../lib/charges.js";
+import { tierOf } from "../../../lib/tiers.js";
 import { displayNameOf, NAME_MAX } from "../../../lib/display-name.js";
 
 export const GET = withUser(async (_req, _ctx, user) => {
@@ -33,6 +34,13 @@ export const GET = withUser(async (_req, _ctx, user) => {
     // ★ 원문 role 을 그대로 흘리지 않는다 — 화면이 쓸 판정 하나만 준다.
     // 사이드바가 이걸 보고 운영자 전용 링크(비용 기록)를 그릴지 정한다.
     isAdmin: user.role === "admin",
+    // ★★ 이용 등급 — 광고 만들기 화면이 **고를 수 있는 모델**을 이 값으로 거른다.
+    //   role 과 달리 원문을 그대로 준다: 등급 자체가 화면이 쓰는 값이고(칩 라벨·안내 문구),
+    //   숨길 것이 없다. 판정은 lib/tiers.js 의 tierOf 하나라 컬럼이 없던 시절 계정도
+    //   기본 등급으로 읽힌다.
+    // ⚠️ 이것은 **가림막이지 잠금이 아니다.** 잠금은 서버가 한다
+    //   (app/api/ads/route.js 와 app/api/ads/[id]/render/route.js).
+    tier: tierOf(profile),
   });
 });
 

@@ -27,6 +27,8 @@ import { priceLabel, adVideoPrice } from "../../../lib/pricing";
 // 단계가 사이드바에 남지 않게 비운다(components/AdProjectContext).
 import { useAdProject } from "../../../components/AdProjectContext";
 import { useMe } from "../../../components/MeContext";
+// 등급이 고를 수 있는 모델 — 표와 판정은 lib/tiers.js 한 벌이다.
+import { modelsForTier } from "../../../lib/tiers";
 import { MAX_MATERIAL_TEXT } from "../../../lib/material";
 
 // 화풍 라벨은 styles.js 에 있지만, 고를 수 있는 것은 AD_STYLE_LINES 에 영상용 문구가 있는
@@ -235,8 +237,13 @@ export default function AdNewPage() {
               <span className="tray-label">모델</span>
               <div className="tray-col">
                 <div className="chips">
-                  {/* 숨긴 모델(hidden)은 안 그린다 — 표에는 남아 있다(lib/ad/models.js 주석) */}
-                  {AD_MODELS.filter((m) => !m.hidden).map((m) => (
+                  {/* ★★ **등급이 고를 수 있는 것만** 그린다(2026-08-20). 숨김(hidden)도
+                      함께 걸러진다 — modelsForTier 가 둘 다 본다.
+                      ⚠️ 이것은 **가림막이지 잠금이 아니다.** 잠금은 서버가 한다
+                      (app/api/ads/route.js · app/api/ads/[id]/render/route.js). 2.5 가
+                      지금까지 열려 있던 이유가 정확히 이것이다 — 화면에서만 거르고
+                      서버는 그대로 받았다. */}
+                  {modelsForTier(me?.tier).map((m) => (
                     <button key={m.id} className={`chip${model === m.id ? " on" : ""}`}
                       onClick={() => onModelChange(m.id)}>
                       {m.label}

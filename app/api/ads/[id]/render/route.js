@@ -4,6 +4,8 @@ import { assertCanAfford, NoCredits, alreadyChargedAd } from "../../../../../lib
 import { adVideoPrice } from "../../../../../lib/pricing.js";
 import { hasRenderedAdVideo } from "../../../../../lib/ad/attempt.js";
 import { loadAd } from "../route.js";
+import { getStore } from "../../../../../lib/store/index.js";
+import { tierOf, tierAllowsModel } from "../../../../../lib/tiers.js";
 
 // ★ 유료 입구다. 청구는 파이프라인이 하지만, **낼 수 있는지는 여기서 먼저 본다** —
 //   그래야 사장님이 402 를 HTTP 로 받는다. 파이프라인은 fire-and-forget 이라
@@ -14,6 +16,17 @@ export const POST = withUser(async (_req, { params }, user) => {
   if (!project) return Response.json({ error: "찾을 수 없어요" }, { status: 404 });
   if (!project.scenario?.text) {
     return Response.json({ error: "시나리오를 먼저 만들어 주세요" }, { status: 400 });
+  }
+
+  // ★★★ 등급을 **여기서 다시 본다**(2026-08-20). 만들기(app/api/ads/route.js)에서 이미
+  //   보지만, 그것만으로는 **만든 뒤 등급이 내려간 계정**과 **문서가 다른 경로로 고쳐진
+  //   경우**를 못 막는다 — 값이 나가는 자리는 여기다.
+  //   이 저장소가 같은 이유로 여러 문을 이중으로 달아 두었다(굽는 중 그리기 금지 등):
+  //   "화면 잠금은 한 벌뿐이라 샌다. 그리고 새면 돈이 두 번 나간다."
+  // ★ 판정은 lib/tiers.js 하나다 — 여기에 모델 id 를 손으로 적으면 표와 갈린다.
+  const tier = tierOf((await getStore().findProfiles([user.id])).get(user.id));
+  if (!tierAllowsModel(tier, project.settings?.model)) {
+    return Response.json({ error: "지금 등급에서는 구울 수 없는 모델이에요" }, { status: 403 });
   }
   if (project.status === "rendering") {
     return Response.json({ error: "이미 만드는 중이에요" }, { status: 400 });

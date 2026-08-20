@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { DEFAULT_GRANT } from "../../lib/pricing";
 // 내역의 말·부호는 사장님 화면과 **같은 표**를 쓴다 — 둘이 다른 말을 하면 안 된다
 import { ledgerLabel } from "../../lib/ledger";
+// 등급 표와 판정은 lib/tiers.js 한 벌이다 — 화면이 등급 이름을 복사하면 서버와 갈린다.
+import { TIERS, tierOf } from "../../lib/tiers";
 import { useDialog } from "../../components/DialogProvider";
 import { useMe } from "../../components/MeContext";
 
@@ -61,6 +63,25 @@ export default function AdminPage() {
   useEffect(() => {
     load();
   }, []);
+
+  // 등급 — status·role 과 **같은 문**(PATCH)을 쓴다. 문을 새로 내면 승인·차단과 갈린다.
+  // ★ 무엇을 보낼지는 lib/tiers.js 의 표가 정한다 — 여기에 등급 이름을 손으로 적으면
+  //   서버가 400 을 내는 값을 화면이 보낼 수 있다.
+  async function setTier(id, tier) {
+    setBusy(id);
+    setErr("");
+    const r = await fetch(`/api/admin/users/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tier }),
+    });
+    if (!r.ok) {
+      const body = await r.json().catch(() => ({}));
+      setErr(body.error || "등급을 바꾸지 못했어요");
+    }
+    await load();
+    setBusy("");
+  }
 
   async function setStatus(id, status) {
     setBusy(id);
@@ -181,6 +202,7 @@ export default function AdminPage() {
                 <th>이메일</th>
                 <th>상태</th>
                 <th>역할</th>
+                <th>등급</th>
                 <th>가입일</th>
                 <th>크레딧</th>
                 <th></th>
@@ -196,6 +218,21 @@ export default function AdminPage() {
                     </span>
                   </td>
                   <td>{u.role}</td>
+                  {/* 등급 — 칩을 눌러 바꾼다. 지금 등급 판정은 lib/tiers.js 의 tierOf 하나다
+                      (컬럼이 없던 시절 계정은 값이 없고, 그때도 기본 등급으로 읽힌다). */}
+                  <td>
+                    {TIERS.map((t) => (
+                      <button
+                        key={t.id}
+                        className={`chip${tierOf(u) === t.id ? " on" : ""}`}
+                        disabled={busy === u.id || tierOf(u) === t.id}
+                        title={t.hint}
+                        onClick={() => setTier(u.id, t.id)}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </td>
                   {/* 언제 들어온 사람인지 — 승인 대기가 쌓였을 때 먼저 볼 줄을 고르는 근거다.
                       날짜 규칙은 마이페이지·크레딧 내역과 같다(ymd: 사장님 시계). */}
                   <td className="mono">{u.created_at ? ymd(u.created_at) : "—"}</td>
@@ -226,7 +263,7 @@ export default function AdminPage() {
                 </tr>,
               ].concat(openId === u.id ? [(
                 <tr key={`${u.id}-ledger`}>
-                  <td colSpan={6}>
+                  <td colSpan={7}>
                     {ledger === null ? (
                       <p className="pgsub">불러오는 중…</p>
                     ) : ledger.length === 0 ? (

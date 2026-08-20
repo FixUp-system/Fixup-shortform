@@ -73,6 +73,17 @@ create table if not exists profiles (
 -- 이중 쓰기를 지켜야 하는 자리가 하나 더 는다.
 alter table profiles add column if not exists display_name text;
 
+-- 이용 등급 — 어떤 영상 모델을 쓸 수 있는가(2026-08-20). 판정은 lib/tiers.js 하나다.
+-- ★ display_name 과 같은 이유로 app_metadata 가 아니라 여기다. app_metadata 는 middleware
+--   가 매 요청 읽는 **게이트용 캐시**이고(status·role), 등급은 게이트가 아니라 라우트가
+--   필요할 때 읽는 값이다. 거기 두면 이중 쓰기를 지켜야 하는 자리가 하나 더 는다.
+-- ⚠️ 기본값은 **lib/tiers.js 의 DEFAULT_TIER 와 같아야 한다.** 갈리면 DB 는 한 값을 넣는데
+--   코드는 다른 값으로 읽는다. 좁은 쪽(basic)이 기본인 이유: 2.5 는 원가가 2.0 의 3배
+--   이상이라(15초 720p ≈ $6.93) 잘못 열면 그만큼이 나가고, 잘못 닫으면 운영자가 올려 주면 된다.
+-- ★ 백필이 필요 없다 — 컬럼이 없던 시절 계정은 tier 가 null 이고, lib/tiers.js 의 tierOf 가
+--   모르는 값을 basic 으로 떨어뜨린다(DB 기본값과 같은 값이다).
+alter table profiles add column if not exists tier text not null default 'basic';
+
 -- 업로드는 프로젝트가 생기기 전에 일어나서 역조회할 대상이 없다.
 -- Storage 키에 owner 를 접두어로 넣는 방법도 있으나 URL 형태가 바뀌어
 -- 문서에 박힌 material.photos[].url 이 깨진다 — 이관에서 지킨 불변조건이다.
