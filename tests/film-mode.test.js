@@ -567,7 +567,7 @@ describe("옷차림이 모든 그림에서 같다고 말한다", () => {
   const sc = {
     ...SCENARIO,
     focus: "product",
-    wardrobe: "oatmeal-beige oversized cotton tee and soft grey lounge pants",
+    wardrobe: "moss-green corduroy jacket and dark denim",
     shots: [{ shows: "a woman holding it", avatar_id: "av-woman-20s", seconds: 5 }],
   };
 
@@ -575,7 +575,7 @@ describe("옷차림이 모든 그림에서 같다고 말한다", () => {
     for (const mode of ["order", "refs"]) {
       const p = imagePlanFor(mode, sc).find((x) => x.avatarId);
       expect(p.prompt).toMatch(/identical in every image/i);
-      expect(p.prompt).toContain("oatmeal-beige");
+      expect(p.prompt).toContain("moss-green corduroy");
     }
   });
 
@@ -602,7 +602,7 @@ describe("첨부가 여럿이면 라벨을 단다", () => {
   const sc = {
     ...SCENARIO,
     focus: "product",
-    wardrobe: "oatmeal-beige tee",
+    wardrobe: "moss-green corduroy jacket",
     shots: [{ shows: "a woman holding it", avatar_id: "av-woman-20s", seconds: 5 }],
   };
   // ⚠️ 실제 호출부(lib/film/pipeline.js)와 **같은 모양**으로 부른다. 처음에 photoCount 만

@@ -558,7 +558,7 @@ describe("라벨과 첨부 순서가 어긋나지 않는다", () => {
   const PERSON_SCENARIO = {
     text: "Vertical 9:16 footage.",
     focus: "product",
-    wardrobe: "oatmeal-beige tee",
+    wardrobe: "moss-green corduroy jacket",
     shots: [{ line: "안녕하세요", seconds: 15, shows: "a woman holding the box", avatar_id: "av-woman-20s" }],
   };
 
