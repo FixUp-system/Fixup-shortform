@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { resetMemoryStore } from "../lib/store/memory.js";
 import { getStore } from "../lib/store/index.js";
-import { createProject, getProject } from "../lib/projects.js";
+import { createProject, getProject, updateProject } from "../lib/projects.js";
 import { runWithActor } from "../lib/actor.js";
+import { putFilm } from "../lib/film/doc.js";
 import { buildFilmPrompt, runFilmImages, startFilmRender } from "../lib/film/pipeline.js";
 
 const SCENARIO = { text: "Vertical 9:16 footage. Scene 1 ...", shots: [{ line: "안녕하세요", seconds: 15, shows: "A rabbit on a table" }] };
@@ -480,5 +481,67 @@ describe("컷이 고른 인물 사진이 참조로 실린다", () => {
     // 사진이 없는 프로젝트라 앵커가 하나 붙는다 — 장면은 하나뿐이고 얼굴은 안 실린다
     expect(seen).toHaveLength(2);
     for (const a of seen) expect(a.refs.some((r) => r.key === "woman-20s.jpg")).toBe(false);
+  });
+});
+
+// ★★ 굽기에 사장님 사진도 함께 넘긴다(2026-08-19).
+//
+// 그전에는 우리가 만든 그림만 갔다(films[mode].images). 그래서 제품이 "사진 → 그림 →
+// 영상"으로 **두 번** 재해석됐다. 광고는 사장님 사진 바이트를 영상 모델에 **직접**
+// 준다(lib/ad/pipeline.js:196) — 한 번뿐이다. 오늘 계속 겪은 "제품이 미묘하게 바뀐다"의
+// 근원일 수 있다.
+//
+// ★ 그림을 **먼저** 둔다. 장면 순서 방식의 문구가 "첫 이미지를 첫 장면에, 순서대로"라
+//   사진이 앞에 오면 장면이 한 칸씩 밀린다.
+describe("굽기가 사장님 사진도 참조로 넘긴다", () => {
+  beforeEach(() => resetMemoryStore());
+
+  const ready = async (photoKeys) => {
+    const p = await makeFilm({ photoKeys });
+    await runWithActor(U, () =>
+      updateProject(p.id, U, (d) => putFilm(d, "order", {
+        status: "images",
+        images: [{ key: "shot-1", url: "https://fal.example/1.png" }, { key: "shot-2", url: "https://fal.example/2.png" }],
+      }))
+    );
+    return p;
+  };
+
+  it("★ 그림 뒤에 사진이 붙는다 — 순서가 뒤바뀌면 장면이 밀린다", async () => {
+    const p = await ready(["keyring.jpg"]);
+    let seen = null;
+    await runWithActor(U, () =>
+      startFilmRender(p.id, U, "order", {
+        submitAdVideo: async (args) => { seen = args; return { done: false, requestId: "r" }; },
+      })
+    );
+    expect(seen.refs.map((r) => r.url || r.key)).toEqual([
+      "https://fal.example/1.png",
+      "https://fal.example/2.png",
+      "keyring.jpg",
+    ]);
+  });
+
+  it("★ 사진은 바이트로 간다 — 비공개 버킷이라 URL 로는 fal 이 못 읽는다", async () => {
+    const p = await ready(["keyring.jpg"]);
+    let seen = null;
+    await runWithActor(U, () =>
+      startFilmRender(p.id, U, "order", {
+        submitAdVideo: async (args) => { seen = args; return { done: false, requestId: "r" }; },
+      })
+    );
+    const photo = seen.refs.find((r) => r.key === "keyring.jpg");
+    expect(photo.bytes.toString()).toBe("bytes:keyring.jpg");
+  });
+
+  it("사진이 없으면 그림만 간다 — 예전 그대로", async () => {
+    const p = await ready([]);
+    let seen = null;
+    await runWithActor(U, () =>
+      startFilmRender(p.id, U, "order", {
+        submitAdVideo: async (args) => { seen = args; return { done: false, requestId: "r" }; },
+      })
+    );
+    expect(seen.refs).toHaveLength(2);
   });
 });
