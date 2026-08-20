@@ -72,3 +72,28 @@ describe("광고 자막 — 배선", () => {
     expect(pipeline, "원본을 안 남긴다").toMatch(/rawUrl|-raw\.mp4/);
   });
 });
+
+// ★★ 자막은 **line** 을 쓴다 — say_as 가 아니다(2026-08-19).
+//
+// say_as 는 모델이 소리 내어 읽을 표기이고("에스더 버니"), 자막에 박히면 사장님 영상에
+// 이상한 띄어쓰기가 남는다. 둘을 나눈 이유가 바로 이것이라, 여기서 못 박는다.
+describe("자막은 읽는 표기가 아니라 자막 글자를 쓴다", () => {
+  const scenario = {
+    shots: [
+      { line: "에스더버니 키링", say_as: "에스더 버니 키링", seconds: 4 },
+      { line: "Giants 에디션", say_as: "자이언츠 에디션", seconds: 4 },
+    ],
+  };
+
+  it("★ 자막에는 line 이 들어간다", () => {
+    const cuts = adSubtitleCuts(scenario, "x");
+    expect(cuts[0].sentence).toBe("에스더버니 키링");
+    expect(cuts[1].sentence).toBe("Giants 에디션");
+  });
+
+  it("★ 읽는 표기는 자막에 안 들어간다", () => {
+    const joined = adSubtitleCuts(scenario, "x").map((c) => c.sentence).join(" ");
+    expect(joined).not.toContain("에스더 버니");
+    expect(joined).not.toContain("자이언츠");
+  });
+});

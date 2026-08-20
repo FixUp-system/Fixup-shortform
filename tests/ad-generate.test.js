@@ -421,3 +421,22 @@ describe("이야기가 지시문에 실린다", () => {
     expect(out({})).toBe("장면 설명.");
   });
 });
+
+// ★★ 읽는 표기가 프롬프트에 실려야 한다 — 자막은 line 을 쓰고 모델에게는 say_as 를 준다.
+describe("say_as 가 프롬프트에 실린다", () => {
+  it("★ say_as 가 있으면 그것을 읽으라고 한다", () => {
+    const out = withSpokenLines("장면.", [{ line: "에스더버니 키링", say_as: "에스더 버니 키링" }]);
+    expect(out).toContain("에스더 버니 키링");
+  });
+
+  it("★ 대사가 지시문에 이미 있어도 읽는 표기는 따로 실린다 — 그 둘은 다른 판정이다", () => {
+    const base = 'the narrator says "에스더버니 키링".';
+    const out = withSpokenLines(base, [{ line: "에스더버니 키링", say_as: "에스더 버니 키링" }]);
+    expect(out).toContain("에스더 버니 키링");
+  });
+
+  it("say_as 가 없으면 예전 그대로다 — 회귀 0", () => {
+    const base = 'the narrator says "안녕하세요".';
+    expect(withSpokenLines(base, [{ line: "안녕하세요" }])).toBe(base);
+  });
+});

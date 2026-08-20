@@ -743,3 +743,37 @@ describe("소재에 적힌 것이 광고 관습을 이긴다", () => {
     expect(s.slice(at, at + 500)).toMatch(/적으셨|적어 주신|적은/);
   });
 });
+
+// ★★ 발음 표기와 자막 표기를 나눈다(2026-08-19 사장님 요청).
+//
+// 실측: "에스더버니" → **"에스터버리"**, "Giants 에디션" → **"지에이턴스 에디전"**.
+// 뒤엣것은 소재를 고쳐 대사를 한글("자이언츠")로 쓰면서 사라졌다 — **표기를 바꾸면
+// 발음이 바뀐다**는 것이 실측으로 확인됐다.
+//
+// ★ 그런데 line 하나가 **자막 글자**이자 **읽을 글자**라, 발음을 고치려고 표기를 바꾸면
+//   자막에도 그 표기가 박힌다("에스더 버니"). 그래서 나눈다.
+describe("say_as — 읽는 표기를 자막과 나눈다", () => {
+  const sys = () => buildScenarioMessages({ settings, material: { text: "소재", photos: [] } }).system;
+  const ok = (shots) => ({ text: "t", focus: "product", voice: "v", shots });
+
+  it("★ shots 칸에 say_as 가 있다", () => {
+    expect(Object.keys(SCENARIO_SCHEMA.properties.shots.items.properties)).toContain("say_as");
+  });
+
+  it("모델이 낸 값이 컷에 남는다", () => {
+    const out = validateScenario(ok([{ beat: "b", line: "에스더버니 키링", say_as: "에스더 버니 키링" }]), 0);
+    expect(out.shots[0].say_as).toBe("에스더 버니 키링");
+  });
+
+  it("★ SYSTEM 이 **필요할 때만** 적으라고 말한다 — 늘 적으면 자막과 갈릴 위험만 는다", () => {
+    const s = sys();
+    expect(s).toMatch(/say_as/);
+    expect(s).toMatch(/say_as[\s\S]{0,400}(필요할 때|어려운|틀리게)/);
+  });
+
+  it("★ SYSTEM 이 자막은 line 을 쓴다고 말한다 — 둘이 다른 값이라는 것이 핵심이다", () => {
+    const s = sys();
+    const at = s.indexOf("say_as");
+    expect(s.slice(at - 200, at + 500)).toMatch(/자막/);
+  });
+});
