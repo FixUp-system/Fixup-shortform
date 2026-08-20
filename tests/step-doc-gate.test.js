@@ -368,7 +368,7 @@ describe("★ 화면이 부르는 주소는 실제로 있는 라우트다", () =
       .slice(1); // 맨 앞 "api" 를 뺀다
 
   const SCREENS = [
-    "app/film/[mode]/page.js", // ★ 이번 사고가 난 자리
+    "app/film/one/[mode]/page.js", // ★ 이번 사고가 난 자리
     "app/archive/[id]/page.js", // 보관함 상세 — 종류마다 문을 차례로 두드린다
   ];
 
@@ -395,7 +395,7 @@ describe("★ 화면이 부르는 주소는 실제로 있는 라우트다", () =
   // film 화면의 읽기 문은 그래서 **한 걸음 더** 못 박는다 — 이 문이 다시 /api/projects 로
   // 돌아가면 단계별 게이트가 그것을 404 로 거절한다.
   it("film 화면은 film 전용 문으로 문서를 읽는다 — 단계별 문으로 돌아가면 안 된다", () => {
-    const src = strip(readFileSync("app/film/[mode]/page.js", "utf8"));
+    const src = strip(readFileSync("app/film/one/[mode]/page.js", "utf8"));
     expect(src, "film 화면이 단계별 문을 두드린다").not.toMatch(/\/api\/projects\//);
     expect(src).toMatch(/`\/api\/film\/\$\{id\}`/);
   });

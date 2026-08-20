@@ -2,7 +2,7 @@ import { withUser } from "../../../../lib/auth/require-user.js";
 import { loadFilmForViewing } from "../../../../lib/film/load.js";
 
 // film 문서를 **읽는 문**. 화면 둘이 이것으로 문서를 읽는다
-// (app/film/[mode]/page.js 의 초기 로드·reload, app/archive/[id]/page.js 의 상세).
+// (app/film/one/[mode]/page.js 의 초기 로드·reload, app/archive/[id]/page.js 의 상세).
 //
 // ★★ 왜 뒤늦게 생겼는가 — 이 자리가 비어 있던 것이 사고였다.
 //   film 문서는 원래 `GET /api/projects/[id]` 를 지나 읽혔다. 그 문이 `kind === "ad"` 만

@@ -14,7 +14,7 @@ import { MAX_MATERIAL_TEXT } from "../lib/material.js";
 const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 const read = (p) => strip(readFileSync(p, "utf8"));
 
-const SCREENS = ["app/film/[mode]/page.js", "app/ads/new/page.js", "app/create/page.js"];
+const SCREENS = ["app/film/one/[mode]/page.js", "app/ads/new/page.js", "app/create/page.js"];
 const SERVERS = ["app/api/film/route.js", "app/api/ads/route.js", "app/api/projects/route.js", "app/api/ads/[id]/route.js"];
 
 describe("소재 글 길이 상한", () => {

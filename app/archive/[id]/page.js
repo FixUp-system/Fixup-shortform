@@ -85,7 +85,7 @@ function ArchiveDetailPageBody() {
   //   그 함수의 주석에 왜 값으로 재야 하는지가 있다.
   const video = archiveVideoUrl(doc);
   // 이어서 작업하는 자리 — 종류마다 제작 화면이 다르다.
-  const workHref = isAd ? `/ads/${id}` : isFilm ? `/film/order?id=${id}` : `/create/${id}/briefing`;
+  const workHref = isAd ? `/ads/${id}` : isFilm ? `/film/one/order?id=${id}` : `/create/${id}/briefing`;
   // 모델은 **전체 이름**으로 적는다 — 여기는 모델 묶음 밖이라 "2.0" 만 적으면 무엇의
   // 2.0 인지 알 수 없다. 이름은 표에서 온다(화면이 짓지 않는다).
   //

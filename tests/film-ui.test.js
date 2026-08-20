@@ -12,7 +12,7 @@ import { filmGates } from "../lib/film/gates.js";
 
 const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 const side = strip(readFileSync("components/Sidebar.jsx", "utf8"));
-const page = strip(readFileSync("app/film/[mode]/page.js", "utf8"));
+const page = strip(readFileSync("app/film/one/[mode]/page.js", "utf8"));
 const cards = strip(readFileSync("components/ProjectCards.jsx", "utf8"));
 
 describe("사이드바", () => {
@@ -22,7 +22,9 @@ describe("사이드바", () => {
     // 만족될 수 없다. 라벨을 표에서 읽는 쪽이 이 태스크의 명시된 계약이므로 그쪽을
     // 지키고, "두 주소가 실제로 선다"는 것은 **표를 함께 검사해** 같은 세기로 잰다.
     expect(side).toMatch(/FILM_MODES\.map/);
-    expect(side).toContain("/film/${");
+    // ★ 2026-08-20 에 이 화면이 `/film/one/<방식>` 으로 비켰다 — `/film/` 바로 뒤는
+    //   이제 프로젝트 id 의 자리다(단계별 흐름). 재는 뜻은 그대로다: 주소가 표에서 나오는가.
+    expect(side).toContain("/film/one/${");
     expect(FILM_MODES.map((m) => m.id)).toEqual(["order", "refs"]);
   });
 
@@ -54,7 +56,9 @@ describe("한 화면이 두 방식을 받는다", () => {
   it("★ [다른 방식으로 굽기]가 있다 — 같은 시나리오로 재야 비교가 성립한다", () => {
     expect(page).toContain("다른 방식으로");
     // 같은 프로젝트를 이어서 봐야 시나리오가 공유된다 — 새 프로젝트로 튀면 비교가 아니다
-    expect(page).toMatch(/\/film\/\$\{[^}]*\}\?id=/);
+    // ★ 같은 자리에서 `/film/one/` 으로 비켰다(2026-08-20). 재는 뜻은 그대로다:
+    //   **같은 프로젝트를 이어서** 보는가(?id= 를 달고 가는가).
+    expect(page).toMatch(/\/film\/one\/\$\{[^}]*\}\?id=/);
   });
 
   it("★ 라벨·귀띔은 표에서 읽는다", () => {

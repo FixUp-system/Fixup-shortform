@@ -164,8 +164,8 @@ export default function Sidebar() {
       {FILM_MODES.map((m) => (
         <Link
           key={m.id}
-          href={`/film/${m.id}`}
-          className={`side-item${pathname === `/film/${m.id}` ? " on" : ""}`}
+          href={`/film/one/${m.id}`}
+          className={`side-item${pathname === `/film/one/${m.id}` ? " on" : ""}`}
         >
           <span className="ic"><Icon name={FILM_ICON[m.id] || "film"} /></span>{m.label}
         </Link>

@@ -3,7 +3,7 @@ import { isAspect, DEFAULT_ASPECT_ID } from "../../../lib/aspects.js";
 import { normalizeAdOptions } from "../../../lib/ad/options.js";
 import { ownedPhotoKeys } from "../../../lib/refs-io.js";
 import { withUser } from "../../../lib/auth/require-user.js";
-// 사진 상한 — 화면(app/film/[mode]/page.js)과 **같은 파일**에서 읽는다. 두 벌이면 화면은
+// 사진 상한 — 화면(app/film/one/[mode]/page.js)과 **같은 파일**에서 읽는다. 두 벌이면 화면은
 // 통과시키는데 서버가 400 을 내고, 사장님은 다 올린 뒤에야 거절당한다.
 import { MAX_PHOTOS } from "../../../lib/photos.js";
 import { MAX_MATERIAL_TEXT } from "../../../lib/material.js";

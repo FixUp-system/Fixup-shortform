@@ -36,7 +36,7 @@ export const POST = withUser(async (req, { params }, user) => {
   //   굽는 길은 굽기 라우트가 films[방식].scenarioTries 로 따로 막는다.
   // ★ 값싸게 간다 — 곧 시나리오 구조 자체가 바뀐다(장면 분할 폐지). 조건이 흔들린 것을
   //   알 수 있게만 하고, 되돌리는 장치는 만들지 않는다(새 프로젝트를 만들면 된다).
-  // ★ 판정은 lib/film/doc.js 의 scenarioLock 하나다 — 화면(app/film/[mode]/page.js)의
+  // ★ 판정은 lib/film/doc.js 의 scenarioLock 하나다 — 화면(app/film/one/[mode]/page.js)의
   //   [다시 쓰기] 버튼도 같은 함수를 본다. 여기서 손으로 다시 계산하면 화면이 열어 준
   //   버튼을 서버가 400 으로 막는 어긋남이 생긴다(실제로 그랬다).
   const lock = scenarioLock(project);

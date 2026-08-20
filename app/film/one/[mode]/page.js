@@ -1,6 +1,10 @@
 "use client";
 
-// /film/[mode] — 한 번에 굽는 영상. **한 화면이 두 방식을 다 받는다.**
+// /film/one/[mode] — 한 번에 굽는 영상(옛 한 화면). **한 화면이 두 방식을 다 받는다.**
+//
+// ★★ 2026-08-20 에 `/film/[mode]` 에서 여기로 **비켰다.** 지운 것이 아니다 — 단계별 흐름이
+//   `/film/<id>/…` 를 쓰는데, Next 는 같은 자리에 이름이 다른 동적 세그먼트를 못 둔다.
+//   두 방식을 나란히 재던 이 화면은 그대로 살아 있다.
 //
 // ★★ 왜 화면이 하나인가: 이 기능의 목적은 "장면 순서 vs 참고 그림 중 어느 쪽이 나은가"를
 //   재는 것이다. 화면을 둘로 두면 한쪽에만 붙은 버튼·한쪽에만 뜬 안내가 그대로 실험 조건의
@@ -192,7 +196,7 @@ export default function FilmPage() {
     if (!res.ok) { setErr(data.error || "만들지 못했어요"); setBusy(""); return; }
     setProject(data);
     // 주소에 id 를 실어 둔다 — 새로고침·뒤로가기가 살고, [다른 방식으로 굽기]가 이 id 를 쓴다.
-    router.replace(`/film/${mode}?id=${data.id}`);
+    router.replace(`/film/one/${mode}?id=${data.id}`);
     setBusy("");
   }
 
@@ -268,7 +272,7 @@ export default function FilmPage() {
         <p className="pgsub warn">모르는 방식이에요 — 아래에서 골라 주세요.</p>
         <div className="step-actions">
           {FILM_MODES.map((m) => (
-            <Link key={m.id} className="mini" href={`/film/${m.id}`}>{m.label}</Link>
+            <Link key={m.id} className="mini" href={`/film/one/${m.id}`}>{m.label}</Link>
           ))}
         </div>
       </>
@@ -525,7 +529,7 @@ export default function FilmPage() {
               방식별 산출물은 films 에 두 벌로 남으므로 이쪽 결과가 지워지지 않는다. */}
           {other && (
             <div className="step-actions">
-              <Link className="mini" href={`/film/${other.id}?id=${id}`}>
+              <Link className="mini" href={`/film/one/${other.id}?id=${id}`}>
                 다른 방식으로 굽기 · {other.label}
               </Link>
               <div className="fwd">
