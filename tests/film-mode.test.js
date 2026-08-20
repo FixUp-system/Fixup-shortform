@@ -585,3 +585,56 @@ describe("옷차림이 모든 그림에서 같다고 말한다", () => {
     }
   });
 });
+
+// ★★ 첨부가 여럿이면 **각자 무엇인지 말해야 한다**(2026-08-20).
+//
+// 이 저장소가 두 번 배운 것이다:
+//   · 2026-07-29 — 인물 사진 두 장을 익명으로 보냈더니 모델이 배역을 뒤바꿨다.
+//   · 2026-08-18 — 같은 처방을 **물건에는 안 써서** 제품이 이름을 못 얻었고,
+//     첨부 둘 중 어느 장이 제품인지 모른 채 전혀 다른 슬리퍼가 나왔다.
+// 단계별은 그 처방을 쓴다(lib/cuts.js 의 "Attached reference images, in order: [1] …").
+// film 은 안 썼다 — 참조를 가리키는 말이 "the attached reference photo" 단수 하나뿐이라,
+// 사진과 얼굴이 함께 실리면 어느 쪽을 가리키는지 모델이 못 듣는다.
+//
+// ★ 이것은 연출을 조이는 규칙이 아니라 **없던 정보**다(사장님 확인 2026-08-20).
+//   그리고 여기는 정지 이미지 모델이라 굽기의 자유도와 무관하다 — 굽기 지시문은 안 건드린다.
+describe("첨부가 여럿이면 라벨을 단다", () => {
+  const sc = {
+    ...SCENARIO,
+    focus: "product",
+    wardrobe: "oatmeal-beige tee",
+    shots: [{ shows: "a woman holding it", avatar_id: "av-woman-20s", seconds: 5 }],
+  };
+  // ⚠️ 실제 호출부(lib/film/pipeline.js)와 **같은 모양**으로 부른다. 처음에 photoCount 만
+  //   넘겼더니 hasPhoto 가 없어 제품 문장 자체가 안 붙었고, "단수 표현이 없다" 시험이
+  //   거짓으로 통과했다 — 없는 문장이 없는 것을 확인한 셈이다.
+  const opts = (photoCount) => ({ photoCount, hasPhoto: photoCount > 0 });
+  const withFace = (o) => imagePlanFor("refs", sc, o).find((p) => p.avatarId);
+
+  it("★ 사진과 얼굴이 함께 실리면 각자 번호를 얻는다", () => {
+    const p = withFace(opts(1));
+    expect(p.prompt).toMatch(/in order:/);
+    expect(p.prompt).toMatch(/\[1\][^[]*\[2\]/);
+  });
+
+  it("★ 사진이 여러 장이면 얼굴은 그 뒤 번호다 — 실제로 실리는 순서와 같아야 한다", () => {
+    const p = withFace(opts(2));
+    expect(p.prompt).toMatch(/\[3\]/);
+    expect(p.prompt).not.toMatch(/\[4\]/);
+  });
+
+  it("★ 제품을 가리키던 단수 표현이 남아 있으면 안 된다 — 그것이 어긋남의 원인이었다", () => {
+    expect(withFace(opts(1)).prompt).not.toMatch(/the attached reference photo/);
+  });
+
+  it("★ 첨부가 하나뿐이면 라벨을 안 단다 — 가리킬 것이 없으면 군말이다", () => {
+    // 사진만(얼굴 없는 축) · 얼굴만(사진 0장) 둘 다 첨부가 하나다
+    const onlyPhoto = imagePlanFor("refs", { ...sc, shots: [{ shows: "a box", avatar_id: "", seconds: 5 }] }, { photoCount: 1 });
+    expect(onlyPhoto[0].prompt).not.toMatch(/in order:/);
+    expect(withFace(opts(0)).prompt).not.toMatch(/in order:/);
+  });
+
+  it("★ 옛 호출부(photoCount 없음)는 예전 그대로다 — 회귀 0", () => {
+    expect(withFace({ hasPhoto: true }).prompt).not.toMatch(/in order:/);
+  });
+});

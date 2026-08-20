@@ -545,3 +545,54 @@ describe("굽기가 사장님 사진도 참조로 넘긴다", () => {
     expect(seen.refs).toHaveLength(2);
   });
 });
+
+// ★★ 라벨이 **실제로 실리는 순서**와 같아야 한다(2026-08-20).
+//
+// 08-18 의 결함이 바로 이 어긋남이었다 — 프롬프트는 "[2] 사람"부터 시작하는데 첨부는
+// 두 장이라, `[1]` 이 무엇인지 모델이 끝내 못 들었다. 번호를 붙이는 코드와 첨부를
+// 싣는 코드가 갈라져 있으면 언제든 다시 어긋난다. 그 둘을 여기서 함께 잰다.
+describe("라벨과 첨부 순서가 어긋나지 않는다", () => {
+  beforeEach(() => resetMemoryStore());
+
+  // 사람이 나오는 시나리오 — 얼굴 사진이 첨부에 더해지는 갈래다.
+  const PERSON_SCENARIO = {
+    text: "Vertical 9:16 footage.",
+    focus: "product",
+    wardrobe: "oatmeal-beige tee",
+    shots: [{ line: "안녕하세요", seconds: 15, shows: "a woman holding the box", avatar_id: "av-woman-20s" }],
+  };
+
+  async function drawWith(photoKeys) {
+    const p = await makeFilm({ photoKeys });
+    const row = await getStore().selectProject(p.id, U);
+    await getStore().updateProjectRow(p.id, U, row.version, { ...row.doc, scenario: PERSON_SCENARIO });
+    const seen = [];
+    await runWithActor(U, () =>
+      runFilmImages(p.id, U, "refs", {
+        generateImage: async (args) => { seen.push(args); return { url: "https://fal.example/x.png" }; },
+      })
+    );
+    return seen;
+  }
+
+  it("★ 라벨이 가리키는 장수와 실제 첨부 장수가 같다", async () => {
+    for (const call of await drawWith(["rabbit.jpg", "box.png"])) {
+      const labels = [...call.prompt.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1]));
+      if (!labels.length) continue; // 첨부가 하나뿐인 축은 라벨을 안 단다
+      expect(Math.max(...labels)).toBe(call.refs.length);
+    }
+  });
+
+  it("★ 얼굴 사진이 실린 축은 마지막 번호가 사람이다 — 그 순서로 실린다", async () => {
+    const withFace = (await drawWith(["rabbit.jpg"])).filter((c) => c.refs.length > 1);
+    expect(withFace.length).toBeGreaterThan(0);
+    for (const call of withFace) {
+      // 마지막 첨부가 아바타(파일명으로 실린 바이트)다
+      expect(call.refs[call.refs.length - 1].key).toMatch(/av-|\.(png|jpg|jpeg|webp)$/i);
+      const last = `[${call.refs.length}]`;
+      const at = call.prompt.indexOf(last);
+      expect(at).toBeGreaterThan(-1);
+      expect(call.prompt.slice(at, at + 60)).toMatch(/person/i);
+    }
+  });
+});
