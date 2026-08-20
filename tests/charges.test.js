@@ -1,7 +1,7 @@
 // 청구 장부 — 잔액의 한쪽이다(다른 쪽은 충전).
 // cost_records(USD 원가)와 **다른 장부**다: 알갱이가 프로젝트·행위 단위다.
 import { describe, it, expect, beforeEach } from "vitest";
-import { resetMemoryStore } from "../lib/store/memory.js";
+import { resetMemoryStore, memoryStore } from "../lib/store/memory.js";
 import { getStore } from "../lib/store/index.js";
 import {
   balanceFor, chargeVideo, chargeRegen, refundVideo, refundRegen,
@@ -318,5 +318,56 @@ describe("장부에는 정수만 들어간다", () => {
     for (const row of await getStore().listCharges(A)) {
       expect(Number.isInteger(Number(row.credits))).toBe(true);
     }
+  });
+});
+
+// ★★ 청구도 **묶음으로** 받는다(2026-08-20). 충전(listGrantsFor)에는 묶음 조회가 있는데
+//   청구에는 없어서, 관리자 목록이 사람 수만큼 따로 물어보고 있었다.
+//
+// 실측(한국에서, 사용자 10명): 사람마다 따로 물어도 요청이 겹쳐서 88ms 였다 — 즉 지금
+// 당장 아픈 것은 아니다. 다만 **사람이 수백이 되면 소켓·연결 한도에 걸린다**. 한 번에
+// 받으면 38ms 다. listGrantsFor 라는 원형이 바로 옆에 있어 값이 싸다.
+describe("listChargesFor — 청구를 한 번에 받는다", () => {
+  beforeEach(() => resetMemoryStore());
+
+  const A = "00000000-0000-4000-8000-0000000000c1";
+  const B = "00000000-0000-4000-8000-0000000000c2";
+  const C = "00000000-0000-4000-8000-0000000000c3";
+
+  async function charge(userId, credits, key) {
+    await memoryStore.insertCharge({ user_id: userId, project_id: null, kind: "video", credits, idem_key: key });
+  }
+
+  it("★ 사람마다 합계를 준다 — sumCharges 를 한 명씩 부른 것과 같은 값이어야 한다", async () => {
+    await charge(A, 25, "a1");
+    await charge(A, 50, "a2");
+    await charge(B, 40, "b1");
+    const map = await memoryStore.listChargesFor([A, B]);
+    expect(map.get(A)).toBe(await memoryStore.sumCharges(A));
+    expect(map.get(B)).toBe(await memoryStore.sumCharges(B));
+    expect(map.get(A)).toBe(75);
+  });
+
+  it("★ 환불(음수)도 그대로 더한다 — 지우지 않고 음수 행으로 남기는 장부다", async () => {
+    await charge(A, 100, "a1");
+    await charge(A, -100, "a2");
+    expect((await memoryStore.listChargesFor([A])).get(A)).toBe(0);
+  });
+
+  it("★ 청구가 없는 사람은 칸이 비어 있다 — 부르는 쪽이 0 으로 읽는다", async () => {
+    await charge(A, 25, "a1");
+    const map = await memoryStore.listChargesFor([A, C]);
+    expect(map.has(C)).toBe(false);
+    expect(map.get(C) || 0).toBe(0);
+  });
+
+  it("빈 목록을 주면 빈 Map 이다 — 없는 사람을 물어보지 않는다", async () => {
+    expect((await memoryStore.listChargesFor([])).size).toBe(0);
+  });
+
+  it("★ 안 물어본 사람은 안 담긴다", async () => {
+    await charge(A, 25, "a1");
+    await charge(B, 40, "b1");
+    expect([...(await memoryStore.listChargesFor([A])).keys()]).toEqual([A]);
   });
 });
