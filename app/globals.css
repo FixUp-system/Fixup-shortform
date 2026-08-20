@@ -773,7 +773,22 @@ a.side-item { text-decoration: none; }
   vertical-align: top;
 }
 .cost-table tr:last-child td { border-bottom: 0; }
-.st-badge { font-size: 12px; border-radius: var(--r-pill); padding: 2px 10px; font-weight: 600; }
+/* ★★ 뱃지는 **제 크기를 지킨다**(2026-08-20). .cost-table 은 table-layout 이 자동이라
+   [프롬프트 보기]로 <details> 가 열리면 브라우저가 칸 너비를 다시 나눈다 — 상태 칸이
+   눌리고 글자가 두 줄로 접혀 찌그러졌다.
+   ★ 이 저장소가 .project-meta .badge 에서 **이미 겪고 고친 결함**이다("없으면 '완성'이
+     '완/성' 두 줄로 찌그러진다"). 그 처방을 표 안의 뱃지에는 안 쓰고 있었다.
+   ★ inline-block 이어야 위아래 여백이 줄 상자를 실제로 밀어낸다(순수 인라인은 안 민다). */
+.st-badge {
+  display: inline-block;
+  white-space: nowrap;
+  font-size: 12px;
+  border-radius: var(--r-pill);
+  padding: 2px 10px;
+  font-weight: 600;
+}
+/* 칸 자체도 안 눌린다 — 뱃지만 고치면 칸이 글자 폭까지 좁아져 옆 칸과 붙어 보인다. */
+.cost-table td:has(.st-badge) { white-space: nowrap; }
 .st-done { background: var(--good-soft); color: var(--good); }
 .st-submitted { background: var(--surface2); color: var(--ink-soft); }
 .st-error { background: var(--warn-soft); color: var(--warn); }

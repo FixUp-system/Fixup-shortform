@@ -66,3 +66,35 @@ describe("카드 아래 제목과 뱃지가 안 겹친다", () => {
     expect(rule(".project-meta .badge")).toMatch(/flex:\s*none/);
   });
 });
+
+// ★★ 비용 기록에서 [프롬프트 보기]를 누르면 상태 뱃지가 깨졌다(2026-08-20 사장님 지적).
+//
+// 원인: .cost-table 은 table-layout 이 자동이라, <details> 가 열려 프롬프트 칸이 넓어지면
+// 브라우저가 칸 너비를 다시 나눈다 — 상태 칸이 눌리고 뱃지 글자가 **두 줄로 접힌다.**
+//
+// ★ 이 저장소는 **같은 결함을 이미 한 번 겪고 고쳤다.** .project-meta .badge 에
+//   "배지는 제 크기를 지킨다 — 없으면 '완성'이 '완/성' 두 줄로 찌그러진다(실측)" 이라고
+//   적어 두었는데, 표 안의 .st-badge 에는 그 처방을 안 썼다.
+describe("상태 뱃지는 칸이 눌려도 안 찌그러진다", () => {
+  const rule = (sel) => {
+    const at = css.indexOf(`${sel} {`);
+    return at === -1 ? "" : css.slice(at, css.indexOf("}", at) + 1);
+  };
+
+  it("★ 규칙이 실제로 있다", () => {
+    expect(rule(".st-badge")).toContain("font-size");
+  });
+
+  it("★ 글자가 두 줄로 안 접힌다", () => {
+    expect(rule(".st-badge"), "nowrap 이 없으면 칸이 좁아질 때 접힌다")
+      .toMatch(/white-space:\s*nowrap/);
+  });
+
+  it("★ 인라인 블록이다 — 순수 인라인이면 위아래 여백이 줄 상자를 안 밀어낸다", () => {
+    expect(rule(".st-badge")).toMatch(/display:\s*inline-block/);
+  });
+
+  it("★ 상태 칸 자체도 안 눌린다 — 뱃지만 고치면 칸이 글자 폭까지 좁아진다", () => {
+    expect(css).toMatch(/\.cost-table td:has\(\.st-badge\)|\.cost-status/);
+  });
+});
