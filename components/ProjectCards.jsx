@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { useDialog } from "./DialogProvider";
+import { FILM_MODES, filmMode } from "../lib/film/mode";
 
 // 홈과 보관함이 같은 카드를 쓴다. 마크업을 두 벌로 두면 한쪽만 고쳐지는 날이 온다.
 
@@ -151,6 +152,12 @@ export default function ProjectCards({ projects, limit, onDeleted, selecting, se
                 {isAd && <span className="badge ai">광고</span>}
                 {/* 종류 표시 — 한 번에 굽는 영상. 옛 문서는 이 배지가 아예 없다 */}
                 {isFilm && <span className="badge ai">한 번에</span>}
+                {/* ★ 어느 방식으로 구웠는지 — film 은 한 프로젝트가 두 편을 담는다.
+                    이름은 표(FILM_MODES)에서 가져온다: 손으로 적으면 방식이 늘 때 빠진다.
+                    아직 안 구웠으면 목록이 빈 배열을 주므로 배지가 안 붙는다. */}
+                {(p.film_modes || []).map((id) => (
+                  <span key={id} className="badge ai">{filmMode(id).label}</span>
+                ))}
                 <span className="badge ai">{label}</span>
                 {selecting && (
                   <span className="card-pick" aria-hidden="true">{selected?.has(p.id) ? "✓" : ""}</span>
