@@ -408,3 +408,16 @@ describe("음악·색처리·외형이 지시문에 실린다", () => {
     expect(out({})).toBe("장면 설명.");
   });
 });
+
+// ★ 이야기(angle)는 영상 모델도 알아야 한다 — 장면을 이어 붙이는 것은 그쪽이다.
+describe("이야기가 지시문에 실린다", () => {
+  const out = (extra) => withSpokenLines("장면 설명.", [], undefined, { text: "장면 설명.", shots: [], ...extra });
+
+  it("★ angle 이 실린다", () => {
+    expect(out({ angle: "마스코트가 키링으로 변해 함께한다" })).toContain("마스코트가 키링으로 변해 함께한다");
+  });
+
+  it("없으면 예전 그대로다", () => {
+    expect(out({})).toBe("장면 설명.");
+  });
+});

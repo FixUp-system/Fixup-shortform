@@ -658,3 +658,55 @@ describe("제품 생김새는 사진이 정한다", () => {
     expect(sys([])).not.toMatch(/사진이 있으면 제품의 생김새/);
   });
 });
+
+// ★★ 이야기(2026-08-19 사장님 요청: "마스코트가 키링으로 변해서 야구장에서 응원하고
+// 일상에서도 함께한다 — 이런 시나리오를 원한다. 이 형식 틀에 갇히나?").
+//
+// 갇혔다. 지금 SYSTEM 이 요구하는 것은 전부 **"어떻게 찍나"**(카메라·조명·음향·무대·
+// 색감·옷차림)이고, **"무슨 이야기인가"**를 적는 자리가 없었다. beat 는 장면 단위라
+// 전체 서사를 담지 못한다. 그래서 format(hero — "등장→클로즈업→쓰는 순간→마무리")의
+// 틀이 그대로 나왔다.
+//
+// ★ 단계별에는 그 칸이 있다(lib/scenario.js): angle — "이 영상을 어떻게 전달하는가 —
+//   무엇을 중심에 두고 어떤 흐름으로 가는가".
+describe("angle — 무슨 이야기인가", () => {
+  const sys = () => buildScenarioMessages({ settings, material: { text: "소재", photos: [] } }).system;
+  const ok = (extra) => ({ text: "t", focus: "product", voice: "v", shots: [{ beat: "b" }], ...extra });
+
+  it("★ 스키마에 있다", () => {
+    expect(Object.keys(SCENARIO_SCHEMA.properties)).toContain("angle");
+    expect(SCENARIO_SCHEMA.required).toContain("angle");
+  });
+
+  it("모델이 낸 이야기가 통과한다", () => {
+    const a = "마스코트가 키링으로 변해 야구장과 일상을 함께한다";
+    expect(validateScenario(ok({ angle: a }), 0).angle).toBe(a);
+  });
+
+  it("★ SYSTEM 이 **먼저** 이야기를 정하라고 말한다 — 장면보다 앞에 나온다", () => {
+    const s = sys();
+    expect(s).toMatch(/흐름|이야기/);
+    expect(s.indexOf("이야기")).toBeLessThan(s.indexOf("카메라"));
+  });
+
+  it("★ SYSTEM 이 사장님이 적은 이야기를 살리라고 말한다 — 틀이 이야기를 덮으면 안 된다", () => {
+    expect(sys()).toMatch(/사장님이 적은|사장님의 이야기|적어 주신/);
+  });
+});
+
+// ★★ 변신을 막던 규칙(2026-08-19). look 이 "사진 그대로 끝까지 유지"라 마스코트에서
+// 키링으로 **변하는** 연출과 정면으로 부딪혔다. 리본 문제를 고치려고 조인 것이 이야기를
+// 막았다 — 지켜야 할 것은 "지어내지 않는 것"이지 "변하지 않는 것"이 아니다.
+describe("변하는 연출을 막지 않는다", () => {
+  const sys = (photos) =>
+    buildScenarioMessages({ settings, material: { text: "소재", photos } }).messages[0].content;
+  const withPhoto = [{ id: "p", url: "/api/uploads/a.jpg", vision: { what: "분홍 토끼", lettering: "Giants" } }];
+
+  it("★ 제품이 변하는 연출이면 무엇에서 무엇으로 변하는지 적으라고 말한다", () => {
+    expect(sys(withPhoto)).toMatch(/변하|변신/);
+  });
+
+  it("생김새를 지어내지 말라는 규칙은 그대로다 — 둘은 다른 얘기다", () => {
+    expect(sys(withPhoto)).toMatch(/다시 적지 마라|지어내지/);
+  });
+});
