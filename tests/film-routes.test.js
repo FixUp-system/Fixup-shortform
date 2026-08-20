@@ -203,6 +203,48 @@ describe("그림 라우트", () => {
   });
 });
 
+// ★★ 그림을 축 하나만 다시 그린다(2026-08-20). 라우트가 지키는 것은 **키가 진짜인가**다 —
+//   모르는 키는 아무것도 안 그려지는데 회차는 먹고, 배열이 아닌 값을 조용히 무시하면
+//   그 자리에서 넉 장을 다 그린다(값이 네 배).
+describe("그림 라우트가 only 를 받는다", () => {
+  beforeEach(() => { resetMemoryStore(); filmMock.images.mockClear(); });
+
+  it("★ 그 방식의 계획에 없는 축 이름은 400 — 모르는 키로 값이 나가면 안 된다", async () => {
+    const p = await readyFilm();
+    const res = await imagesPOST(post({ mode: "refs", only: ["nope"] }), ctx(p.id));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/축|모르는/);
+    expect(filmMock.images).not.toHaveBeenCalled();
+  });
+
+  it("★ only 가 배열이 아니면 400 — 조용히 전부 그리면 값이 네 배다", async () => {
+    const p = await readyFilm();
+    const res = await imagesPOST(post({ mode: "refs", only: "subject" }), ctx(p.id));
+    expect(res.status).toBe(400);
+    expect(filmMock.images).not.toHaveBeenCalled();
+  });
+
+  it("★ 계획에 있는 축은 통과하고 그대로 파이프라인에 넘어간다", async () => {
+    const p = await readyFilm();
+    const res = await imagesPOST(post({ mode: "refs", only: ["subject"] }), ctx(p.id));
+    expect(res.status).toBe(200);
+    expect(filmMock.images).toHaveBeenCalledWith(p.id, U, "refs", { only: ["subject"] });
+  });
+
+  it("★ 앵커는 계획에 없지만 실제 그림에는 있다 — 장면 순서 방식의 첫 장이다", async () => {
+    const p = await readyFilm();
+    const res = await imagesPOST(post({ mode: "order", only: ["anchor"] }), ctx(p.id));
+    expect(res.status).toBe(200);
+  });
+
+  it("only 를 안 주면 예전 그대로 전부 그린다 — 넷째 인자도 안 붙는다", async () => {
+    const p = await readyFilm();
+    const res = await imagesPOST(post({ mode: "refs" }), ctx(p.id));
+    expect(res.status).toBe(200);
+    expect(filmMock.images).toHaveBeenCalledWith(p.id, U, "refs");
+  });
+});
+
 describe("굽기 라우트 — 청구", () => {
   beforeEach(() => {
     resetMemoryStore();

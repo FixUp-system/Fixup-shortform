@@ -1,5 +1,5 @@
 import { withUser } from "../../../../../lib/auth/require-user.js";
-import { isFilmMode } from "../../../../../lib/film/mode.js";
+import { imagePlanFor, isFilmMode } from "../../../../../lib/film/mode.js";
 import { loadFilm } from "../../../../../lib/film/load.js";
 import { runFilmImages } from "../../../../../lib/film/pipeline.js";
 import { updateProject } from "../../../../../lib/projects.js";
@@ -12,13 +12,35 @@ import { filmOf, putFilm, MAX_FILM_IMAGE_TRIES, isDrawLocked } from "../../../..
 //   (굽기만 큐를 탄다 — 거기는 출력 1초당 ≈33.5초라 기다릴 수 없다.)
 export const POST = withUser(async (req, { params }, user) => {
   const { id } = await params;
-  const { mode } = (await req.json().catch(() => ({}))) || {};
+  const { mode, only } = (await req.json().catch(() => ({}))) || {};
   // ★ 입구에서 막는다. 모르는 방식이 안으로 들어가면 어느 칸에 쓸지가 흔들린다 —
   //   그때는 이미 그림값이 나간 뒤다.
   if (!isFilmMode(mode)) return Response.json({ error: "모르는 방식이에요" }, { status: 400 });
 
+  // ★★ only 는 **그 방식의 계획에 있는 키**여야 한다(2026-08-20). 모르는 키를 받으면
+  //   그 축은 아무것도 안 그려지는데 회차는 먹고, 사장님은 "눌렀는데 안 바뀐다"만 본다.
+  //   ⚠️ 배열이 아닌 값을 조용히 무시하면 **전부 다시 그린다** — 값이 네 배다.
+  if (only !== undefined && !Array.isArray(only)) {
+    return Response.json({ error: "다시 그릴 그림을 골라 주세요" }, { status: 400 });
+  }
+
   const project = await loadFilm(id, user.id);
   if (!project) return Response.json({ error: "찾을 수 없어요" }, { status: 404 });
+
+  // 키 검증은 프로젝트를 읽은 **뒤**다 — 계획은 이 프로젝트의 시나리오가 정한다.
+  // ★ 판정은 새로 만들지 않는다 — 파이프라인이 실제로 도는 계획과 **같은 함수**다.
+  if (Array.isArray(only) && only.length) {
+    const keys = new Set(
+      imagePlanFor(mode, project.scenario, {
+        narrationLang: project.settings?.narration_lang,
+      }).map((x) => x.key)
+    );
+    // 앵커는 계획에 없지만 실제 그림에는 있다 — 장면 순서 방식의 첫 장이다.
+    keys.add("anchor");
+    if (only.some((k) => !keys.has(k))) {
+      return Response.json({ error: "모르는 그림이에요" }, { status: 400 });
+    }
+  }
 
   const film = filmOf(project, mode);
   // ★★ 이 자리에는 **청구가 없다**(정가는 굽기에 붙는다). 그런데 그림 한 장에 ≈$0.08 이
@@ -55,7 +77,9 @@ export const POST = withUser(async (req, { params }, user) => {
   );
 
   try {
-    await runFilmImages(id, user.id, mode);
+    // ★ only 가 없으면 **넷째 인자도 안 붙인다** — 옛 호출과 글자 그대로 같아야 한다.
+    if (Array.isArray(only) && only.length) await runFilmImages(id, user.id, mode, { only });
+    else await runFilmImages(id, user.id, mode);
   } catch (e) {
     // ★ 문서에 실패를 적는 자리는 **파이프라인 하나다**(lib/film/pipeline.js 의 failFilm 이
     //   status:"error" 와 문구를 남긴다). 여기서 또 적으면 마지막 쓰기가 이겨 두 자리가

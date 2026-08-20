@@ -54,6 +54,29 @@ describe("남은 화면 — 폴링 한 벌", () => {
     expect(scenario, "②시나리오에 setInterval 이 생겼다 — lib/poll.js 로 가라").not.toMatch(/setInterval\(/);
   });
 
+  // ⚠️ setInterval 금지 그물이 세 파일에 흩어져 있어 **새 화면은 어디에도 안 걸린다**
+  //   (CLAUDE.md). 한 번에 굽는 영상의 방식별 단계 화면 셋을 여기에 손으로 등록한다 —
+  //   등록하지 않으면 자기 루프를 들여도 아무 시험이 빨개지지 않는다.
+  // ★ 폴링이 **있어야 하는** 화면은 4 영상 하나다(굽기가 큐를 탄다). 3 그림·5 완성은
+  //   기다리는 라우트라 루프가 없는 것이 정상이므로 startPolling 을 요구하지 않는다.
+  const FILM_MODE_SCREENS = [
+    ["film 3 그림", "app/film/[id]/[mode]/images/page.js"],
+    ["film 4 영상", "app/film/[id]/[mode]/video/page.js"],
+    ["film 5 완성", "app/film/[id]/[mode]/done/page.js"],
+    ["film 레이아웃", "app/film/[id]/layout.js"],
+  ];
+
+  for (const [name, path] of FILM_MODE_SCREENS) {
+    it(`${name} 이 setInterval 을 직접 돌리지 않는다`, () => {
+      const s = readFileSync(path, "utf8");
+      expect(s, `${name} 에 setInterval 이 생겼다 — lib/poll.js 로 가라`).not.toMatch(/setInterval\(/);
+    });
+  }
+
+  it("film 4 영상은 lib/poll 로 폴링한다 — 굽기가 큐를 탄다", () => {
+    expect(readFileSync("app/film/[id]/[mode]/video/page.js", "utf8")).toMatch(/startPolling/);
+  });
+
   it("③목소리는 네 상태를 구분해 말한다", () => {
     expect(voice).toMatch(/generationState/);
     expect(voice).toMatch(/멈춰/);

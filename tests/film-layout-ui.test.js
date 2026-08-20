@@ -32,3 +32,28 @@ describe("film 레이아웃", () => {
     expect(layout()).not.toMatch(/setInterval/);
   });
 });
+
+// ★★ 모르는 방식을 **조용히 떨어뜨리지 않는다**(2026-08-20).
+//
+// `/film/<id>/nope/images` 로 들어오면 레이아웃이 mode 를 FILM_MODES[0](=order)로 떨어뜨려
+// order 화면을 보여 준다. 사장님은 자기가 무엇을 보고 있는지 모른 채 그 방식으로 그림을
+// 그리고 굽는다 — 값이 나간 뒤에야 다른 방식이었다는 것이 드러난다.
+//
+// lib/film/mode.js 의 filmMode 가 던지는 이유가 정확히 이것이다:
+//   "조용히 한쪽으로 떨어뜨리면 사장님이 고른 방식과 다른 것이 구워지고, 그 회차는
+//    실험으로 못 쓴다 — 그런데 값은 이미 나간 뒤다."
+// 옛 한 화면(app/film/one/[mode]/page.js)은 "모르는 방식이에요" 화면을 줬는데, 단계별
+// 흐름에는 그 자리가 없었다.
+describe("모르는 방식으로 들어오면 말해 준다", () => {
+  const src = () => readFileSync("app/film/[id]/layout.js", "utf8").replace(/\/\/[^\n]*/g, "");
+
+  it("★ 주소의 방식이 표에 없으면 그렇게 말한다 — 조용히 한쪽으로 떨어뜨리지 않는다", () => {
+    expect(src()).toMatch(/모르는 방식/);
+  });
+
+  it("★ 나갈 길을 함께 준다 — 문구만 덩그러니 두면 거기서 막힌다", () => {
+    const s = src();
+    const at = s.indexOf("모르는 방식");
+    expect(s.slice(Math.max(0, at - 400), at + 400)).toMatch(/FILM_MODES|filmStepHref/);
+  });
+});

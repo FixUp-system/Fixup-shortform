@@ -26,6 +26,12 @@ function Inner({ children }) {
   // 공유 단계에는 방식이 없으므로 첫 방식으로 떨어진다(스테퍼의 링크를 만들 때만 쓴다).
   const parts = (pathname || "").split("/").filter(Boolean);
   const fromPath = parts.length === 4 ? parts[2] : null;
+  // ★★ 주소에 방식이 있는데 **표에 없는 값**이면 조용히 떨어뜨리지 않는다(2026-08-20).
+  //   떨어뜨리면 사장님은 자기가 무엇을 보고 있는지 모른 채 그 방식으로 그림을 그리고
+  //   굽는다 — 값이 나간 뒤에야 다른 방식이었다는 것이 드러난다. lib/film/mode.js 의
+  //   filmMode 가 던지는 이유가 정확히 이것이고, 옛 한 화면도 같은 자리를 갈라 두었다.
+  // ★ 방식이 **아예 없는** 것(공유 단계)은 정상이다 — 그때만 첫 방식으로 떨어진다.
+  const unknownMode = fromPath !== null && !isFilmMode(fromPath);
   const mode = isFilmMode(fromPath) ? fromPath : FILM_MODES[0].id;
 
   useEffect(() => {
@@ -48,6 +54,25 @@ function Inner({ children }) {
         <h1 className="pgtitle">{err}</h1>
         <p className="pgsub">주소가 잘못됐거나 다른 계정의 영상일 수 있어요.</p>
         <Link href="/archive" className="cta">보관함으로</Link>
+      </>
+    );
+  }
+  // ★ 모르는 방식 — 문구만 덩그러니 두지 않고 **나갈 길을 함께 준다**. 라벨은 표에서
+  //   읽는다(화면에 복사하면 표와 갈린다). 프로젝트를 아직 못 읽었어도 보여 준다 —
+  //   주소가 이미 틀렸으므로 기다릴 이유가 없다.
+  if (unknownMode) {
+    const step = filmStepFromPathname(pathname);
+    return (
+      <>
+        <h1 className="pgtitle">한 번에 굽는 영상</h1>
+        <p className="pgsub warn">모르는 방식이에요 — 아래에서 골라 주세요.</p>
+        <div className="step-actions">
+          {FILM_MODES.map((m) => (
+            <Link key={m.id} className="mini" href={filmStepHref(step || FILM_STEPS[2], id, m.id)}>
+              {m.label}
+            </Link>
+          ))}
+        </div>
       </>
     );
   }
