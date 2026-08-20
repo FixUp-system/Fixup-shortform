@@ -506,3 +506,57 @@ describe("자리 축은 무대를 재료로 쓴다", () => {
     }
   });
 });
+
+// ★★ 참고 그림 축도 **얼굴 사진을 받아야 한다**(실측 2026-08-20).
+//
+// 떡볶이 실측에서 그림 넉 장에 여자가 **셋** 나왔다 — person 축은 아바타 얼굴,
+// subject 와 subject-in-use 는 각자 지어낸 다른 얼굴에 다른 옷이었다. 그 넷이 그대로
+// 영상 모델의 참조로 들어가므로(lib/film/pipeline.js) 컷마다 얼굴이 바뀐다.
+//
+// 원인은 2026-08-19 에 person 축을 끼워 넣으면서 **얼굴 사진을 그 축에만** 붙인 것이다.
+// 나머지 축의 재료(shows)에는 사람 묘사가 그대로 들어 있는데 참조가 없었다.
+//
+// 판정은 장면 순서 방식과 **같은 자**를 쓴다: 그 축의 재료가 된 장면에 avatar_id 가
+// 있으면 사람이 나오는 것이고, 그러면 얼굴 사진과 옷차림이 함께 붙는다.
+// 자리 축(place)은 예외다 — "empty of people" 이라 얼굴이 끼면 지시가 서로 싸운다.
+describe("참고 그림 축이 얼굴 사진을 받는다", () => {
+  const sc = {
+    ...SCENARIO,
+    focus: "product",
+    wardrobe: "comfy oversized tee and lounge pants",
+    shots: [
+      { shows: "a woman holding the meal kit box, her face clearly visible", avatar_id: "av-woman-20s", seconds: 4 },
+      { shows: "the tteokbokki simmering in a pot", avatar_id: "", seconds: 4 },
+      { shows: "the same woman mid-bite at her table", avatar_id: "av-woman-20s", seconds: 4 },
+    ],
+  };
+  const axis = (plan, key) => plan.find((p) => p.key === key);
+
+  it("★ 제품 축의 재료 장면에 사람이 있으면 얼굴 사진을 받는다", () => {
+    expect(axis(imagePlanFor("refs", sc), "subject").avatarId).toBe("av-woman-20s");
+  });
+
+  it("★ 제품사용 축도 자기 재료 장면의 얼굴을 받는다", () => {
+    expect(axis(imagePlanFor("refs", sc), "subject-in-use").avatarId).toBe("av-woman-20s");
+  });
+
+  it("★ 얼굴을 받는 축은 옷차림도 함께 받는다 — 얼굴만 같고 옷이 바뀌면 소용없다", () => {
+    const plan = imagePlanFor("refs", sc);
+    expect(axis(plan, "subject").prompt).toContain("comfy oversized tee");
+    expect(axis(plan, "subject-in-use").prompt).toContain("comfy oversized tee");
+  });
+
+  it("★ 재료 장면에 사람이 없으면 얼굴도 옷차림도 안 붙는다 — 없는 사람이 그려진다", () => {
+    // 첫 장면·끝 장면 둘 다 사람이 없는 시나리오
+    const noPeople = { ...sc, shots: [sc.shots[1], { ...sc.shots[1], shows: "a close-up of the sauce" }] };
+    const plan = imagePlanFor("refs", noPeople);
+    for (const key of ["subject", "subject-in-use"]) {
+      expect(axis(plan, key).avatarId).toBeFalsy();
+      expect(axis(plan, key).prompt).not.toMatch(/wearing/i);
+    }
+  });
+
+  it("★ 자리 축은 얼굴을 안 받는다 — '사람 없는 곳'과 싸운다", () => {
+    expect(axis(imagePlanFor("refs", sc), "place").avatarId).toBeFalsy();
+  });
+});
