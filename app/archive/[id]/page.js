@@ -18,6 +18,9 @@ import { adModel } from "../../../lib/ad/models";
 import { I2V_MODELS, modelIdForProject, resolutionForProject } from "../../../lib/clip-limits";
 import { axesOf, motionAxisFor } from "../../../lib/motion";
 import { archiveVideoUrl } from "../../../lib/archive/video";
+// 한 번에 굽는 영상의 단계 표 — 주소는 여기서만 만든다(화면이 손으로 적으면 표와 갈린다).
+import { FILM_STEPS, filmStepHref, currentFilmStepKey } from "../../../lib/film/steps";
+import { PICKABLE_FILM_MODES } from "../../../lib/film/mode";
 
 // 한 줄짜리 정보. 값이 없으면 줄째 안 그린다 — 빈 칸을 늘어놓으면 무엇이 없는지가 아니라
 // 화면이 덜 만들어진 것처럼 보인다.
@@ -85,7 +88,18 @@ function ArchiveDetailPageBody() {
   //   그 함수의 주석에 왜 값으로 재야 하는지가 있다.
   const video = archiveVideoUrl(doc);
   // 이어서 작업하는 자리 — 종류마다 제작 화면이 다르다.
-  const workHref = isAd ? `/ads/${id}` : isFilm ? `/film/one/order?id=${id}` : `/create/${id}/briefing`;
+  // ★★ 한 번에 굽는 영상은 **단계별 흐름**으로 보낸다(2026-08-20). 사이드바 메뉴와 같은
+  //   곳이어야 한다 — 갈리면 어느 문으로 들어왔느냐에 따라 다른 화면이 나온다.
+  // ★ 주소를 손으로 적지 않는다. lib/film/steps.js 의 표가 만든다 — 세그먼트를 바꿀 때
+  //   여기만 옛 주소로 남으면 시험은 그린인데 눌러 보면 404 다(오늘 그 사고를 겪었다).
+  // ★ 지금 있어야 할 단계로 보낸다. 시나리오가 없으면 시나리오로, 그림이 있으면 영상으로 —
+  //   가드가 어차피 그리로 돌려보내지만, 처음부터 맞게 보내면 화면이 한 번 덜 튄다.
+  const filmHref = () => {
+    const mode = PICKABLE_FILM_MODES[0].id;
+    const step = FILM_STEPS.find((s) => s.key === currentFilmStepKey(doc, mode));
+    return filmStepHref(step, id, mode);
+  };
+  const workHref = isAd ? `/ads/${id}` : isFilm ? filmHref() : `/create/${id}/briefing`;
   // 모델은 **전체 이름**으로 적는다 — 여기는 모델 묶음 밖이라 "2.0" 만 적으면 무엇의
   // 2.0 인지 알 수 없다. 이름은 표에서 온다(화면이 짓지 않는다).
   //

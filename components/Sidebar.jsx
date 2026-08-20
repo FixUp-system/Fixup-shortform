@@ -12,7 +12,7 @@ import { useMe } from "./MeContext";
 import { STEPS, stepsFor, currentStepKey, isReachable, stepHref } from "../lib/steps";
 import { AD_STEPS, adStepIndex, isAdStepReachable } from "../lib/ad/steps";
 // 한 번에 굽는 영상 — 방식 표. 라벨은 여기서만 읽는다(두 벌이면 갈린다).
-import { FILM_MODES } from "../lib/film/mode";
+import { PICKABLE_FILM_MODES } from "../lib/film/mode";
 
 // 방식별 아이콘. ★ 표(FILM_MODES)에 안 넣는다 — 그 표는 **실험의 축**이고 동결돼 있는데,
 // 아이콘은 화면 사정이다(사이드바에서 나란히 선 항목들이 서로 달라야 한다는 것뿐이다).
@@ -138,6 +138,13 @@ export default function Sidebar() {
   const { project: adProject, view: adView } = useAdProject();
   const inAds = pathname.startsWith("/ads");
   const makeVideoAdHref = makeAdHref(adProject);
+  // 한 번에 굽는 영상 — 단계별 흐름(/film/<id>/…)과 옛 한 화면(/film/one/…) 둘 다 이 메뉴다.
+  // ★ 새로 시작은 언제나 /film/new 다. 작업 중인 프로젝트로 되돌리는 것은 여기서 안 한다 —
+  //   저쪽(makeHref)은 화면이 프로젝트를 컨텍스트로 들고 있어서 되지만, 이 흐름의 프로젝트는
+  //   레이아웃 안에서만 산다(components/FilmProjectContext). 밖에서 읽으려면 컨텍스트를
+  //   한 겹 더 올려야 하고, 그것은 이 메뉴 하나 때문에 치를 값이 아니다.
+  const inFilm = pathname.startsWith("/film");
+  const makeFilmHref = "/film/new";
   return (
     <aside className="side">
       <div className="logo">
@@ -157,17 +164,19 @@ export default function Sidebar() {
       {inAds && adProject?.id && (
         <Link href="/ads/new" className="side-new">+ 새 광고 만들기</Link>
       )}
-      {/* ★ 두 방식을 나란히 둔다 — 사장님이 비교하실 것이므로 **라벨 자체가 실험 조건**을
-          말해야 한다. 표(FILM_MODES)에서 읽는다: 화면에 라벨을 복사하면 표와 갈린다.
-          ★ 하위 단계 목록을 안 붙인다 — 이 경로는 한 화면 안에서 시나리오·그림·굽기가
-            이어지고, 방식(주소)이 곧 자리다. */}
-      {FILM_MODES.map((m) => (
+      {/* ★★ 방식이 **하나로 좁혀졌다**(2026-08-20). 그전에는 두 방식을 나란히 두어 라벨
+          자체가 실험 조건을 말하게 했는데, 재고 나서 참고 그림이 남았다. 이제 메뉴는
+          하나이고 이름도 방식이 아니라 **하는 일**을 말한다.
+          ★ 숨긴 방식은 PICKABLE_FILM_MODES 가 거른다 — 표를 그대로 돌리면 다시 나온다.
+          ★ 주소는 lib/film/steps.js 의 표가 만든다: 화면이 손으로 적으면 세그먼트를
+            바꿀 때 여기만 옛 주소로 남는다. */}
+      {PICKABLE_FILM_MODES.map((m) => (
         <Link
           key={m.id}
-          href={`/film/one/${m.id}`}
-          className={`side-item${pathname === `/film/one/${m.id}` ? " on" : ""}`}
+          href={makeFilmHref}
+          className={`side-item${inFilm ? " on" : ""}`}
         >
-          <span className="ic"><Icon name={FILM_ICON[m.id] || "film"} /></span>{m.label}
+          <span className="ic"><Icon name={FILM_ICON[m.id] || "film"} /></span>영상 만들기 (수정)
         </Link>
       ))}
       <Link

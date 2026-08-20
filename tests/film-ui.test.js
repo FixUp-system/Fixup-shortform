@@ -4,7 +4,7 @@
 // ★ 주석을 반드시 걷어낸다. 이 저장소는 "주석 속 낱말이 계약을 대신 통과시킨" 사고를
 //   반복해서 겪었다 — 특히 화면 파일은 왜 그렇게 했는지를 한국어로 길게 적는다.
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { FILM_MODES } from "../lib/film/mode.js";
 // 문 판정은 순수 함수라 **값으로** 잰다 — 화면 소스 훑기로는 "막다른 길이 안 생기는가"를
 // 재지 못한다(그 질문의 답은 글자가 아니라 동작이다).
@@ -16,22 +16,24 @@ const page = strip(readFileSync("app/film/one/[mode]/page.js", "utf8"));
 const cards = strip(readFileSync("components/ProjectCards.jsx", "utf8"));
 
 describe("사이드바", () => {
-  it("★ 두 방식이 나란히 선다 — 표를 돌려 그리므로 방식이 빠질 수 없다", () => {
-    // 브리프의 원안은 "/film/order"·"/film/refs" 를 글자 그대로 찾았는데, 같은 브리프가
-    // 제시한 구현(FILM_MODES.map + `/film/${m.id}`)에는 그 글자가 없다 — 둘은 동시에
-    // 만족될 수 없다. 라벨을 표에서 읽는 쪽이 이 태스크의 명시된 계약이므로 그쪽을
-    // 지키고, "두 주소가 실제로 선다"는 것은 **표를 함께 검사해** 같은 세기로 잰다.
-    expect(side).toMatch(/FILM_MODES\.map/);
-    // ★ 2026-08-20 에 이 화면이 `/film/one/<방식>` 으로 비켰다 — `/film/` 바로 뒤는
-    //   이제 프로젝트 id 의 자리다(단계별 흐름). 재는 뜻은 그대로다: 주소가 표에서 나오는가.
-    expect(side).toContain("/film/one/${");
+  // ★★ 2026-08-20 에 **동작이 바뀌었다.** 방식이 하나로 좁혀져(참고 그림) 메뉴도 하나다.
+  //   "두 방식이 나란히 선다"는 비교 실험을 하던 시절의 계약이라 더는 참이 아니다.
+  //   지우지 않고 **남은 계약**을 재는 것으로 바꾼다: 표에서 그리는가(라벨을 복사하지 않는가).
+  //   메뉴가 하나뿐인지·이름이 무엇인지는 아래 "방식이 하나로 좁혀졌다" 가 잰다.
+  it("★ 고를 수 있는 방식만 선다 — 숨긴 것이 표에 남아 있어도 메뉴에는 안 나온다", () => {
+    expect(side).toMatch(/PICKABLE_FILM_MODES\.map/);
+    // 표에는 둘이 그대로 남아 있고(옛 문서가 살아야 한다) 고를 수 있는 것만 하나다.
     expect(FILM_MODES.map((m) => m.id)).toEqual(["order", "refs"]);
+    expect(FILM_MODES.filter((m) => !m.hidden).map((m) => m.id)).toEqual(["refs"]);
   });
 
-  it("★ 라벨은 표에서 읽는다 — 화면에 복사하면 표와 갈린다", () => {
-    expect(side).toMatch(/FILM_MODES/);
-    // 라벨을 손으로 적어 두지 않았는지도 본다(표와 갈리는 순간이 그 자리다)
-    for (const m of FILM_MODES) expect(side).not.toContain(`>${m.label}<`);
+  // ★★ 2026-08-20 — **라벨을 표에서 읽지 않게 됐다.** 두 방식을 비교하던 시절에는 라벨
+  //   자체가 실험 조건이라 표에서 읽어야 했지만, 하나로 좁혀진 지금 메뉴 이름은 방식이
+  //   아니라 **하는 일**("영상 만들기 (수정)")을 말한다.
+  //   ★ 남은 계약은 이것이다: 방식 이름이 메뉴로 **새어 나오지 않는가**. 사장님에게
+  //     방식은 더 이상 고를 것이 아니다.
+  it("★ 방식 이름은 메뉴에 안 나온다", () => {
+    for (const m of FILM_MODES) expect(side, m.label).not.toContain(`>${m.label}<`);
   });
 
   it("★ 아이콘이 옆 항목과 겹치지 않는다 — 나란히 서면 눈으로 갈려야 한다", () => {
@@ -296,5 +298,48 @@ describe("film 화면이 조건을 고른다", () => {
   it("★ 길이·화질·모델은 여전히 화면에 없다 — 두 방식의 조건이 같아야 비교가 성립한다", () => {
     expect(page).not.toMatch(/AD_MODELS/);
     expect(page).not.toMatch(/adSecondsFor|adResolutionsFor/);
+  });
+});
+
+// ★★★ 방식이 하나로 좁혀졌다(2026-08-20 사장님 결정). 실측으로 **참고 그림**이 남았다.
+//
+// 이 기능은 "장면 순서 vs 참고 그림 중 어느 쪽이 나은가"를 재려고 만들었고, 재고 나면
+// 한쪽은 지운다는 것이 처음부터의 전제였다(lib/film/mode.js 머리말).
+//
+// ⚠️ **표에서 지우지는 않는다.** 지우면 order 로 이미 만든 영상이 보관함에서 죽는다 —
+//   이 저장소가 seedance-2.0-fast 로 한 번 겪은 사고이고, 2.5 를 hidden 으로 다룬 것과
+//   같은 판단이다. 고르는 길만 닫고 표·엔드포인트·판독은 살려 둔다.
+describe("사이드바 — 방식이 하나로 좁혀졌다", () => {
+  it("★ 장면 순서는 메뉴에 없다 — 고르는 길만 닫는다", () => {
+    expect(side).not.toContain("장면 순서");
+    // 표를 통째로 돌려 그리면 숨긴 방식까지 나온다
+    // ⚠️ 앞에 낱말 경계를 둔다 — 안 두면 PICKABLE_FILM_MODES.map( 안의
+    //   FILM_MODES.map( 에 걸려, 옳게 고쳐도 빨갛다.
+    expect(side, "FILM_MODES 를 거르지 않고 그대로 그린다").not.toMatch(/(^|[^_A-Z])FILM_MODES\.map\(/);
+  });
+
+  it("★ 참고 그림 메뉴가 '영상 만들기 (수정)' 이다", () => {
+    expect(side).toContain("영상 만들기 (수정)");
+  });
+
+  it("★ 그 메뉴는 단계별 흐름으로 간다 — 옛 한 페이지가 아니다", () => {
+    expect(side).toContain("/film/new");
+  });
+
+  it("★ 옛 한 페이지는 지우지 않는다 — 주소로 들어가면 여전히 열린다", () => {
+    expect(existsSync("app/film/one/[mode]/page.js")).toBe(true);
+  });
+});
+
+describe("보관함 — 이어서 작업이 단계별로 간다", () => {
+  const arc = () => readFileSync("app/archive/[id]/page.js", "utf8");
+
+  it("★ 메뉴와 같은 곳을 가리킨다 — 갈리면 들어온 문에 따라 다른 화면이 나온다", () => {
+    expect(arc()).not.toMatch(/\/film\/one\//);
+    expect(arc()).toMatch(/\/film\//);
+  });
+
+  it("★ 주소를 손으로 적지 않는다 — lib/film/steps 의 표가 만든다", () => {
+    expect(arc()).toMatch(/filmStepHref|FILM_STEPS/);
   });
 });
