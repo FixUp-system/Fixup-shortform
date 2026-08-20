@@ -474,3 +474,34 @@ describe("색 처리와 제품 외형이 그림에도 실린다", () => {
     }
   });
 });
+
+// ★★ 자리 축이 장소가 아니라 제품을 그렸다(2026-08-19 실측). 재료가 첫 장면 shows
+// ("the pink plush bunny keyring … standing upright on a white cafe table")라 제품
+// 서술이 통째로 들어갔고, 그 그림에 없던 리본까지 새로 생겼다.
+// environment 를 넣을 때 이 축의 재료를 안 바꿨다 — 무대가 있으면 무대를 써야 한다.
+describe("자리 축은 무대를 재료로 쓴다", () => {
+  const sc = (extra) => ({
+    ...SCENARIO,
+    focus: "product",
+    environment: "a sunlit outdoor cafe terrace on a city street, midday",
+    ...extra,
+  });
+
+  it("★ 무대가 있으면 무대를 재료로 쓴다 — 제품 서술을 안 받는다", () => {
+    const place = imagePlanFor("refs", sc()).find((p) => p.key.startsWith("place"));
+    expect(place.prompt).toContain("sunlit outdoor cafe terrace");
+    expect(place.prompt).not.toContain("a bunny keyring hanging on a tan handbag");
+  });
+
+  it("★ 무대가 없으면 예전처럼 첫 장면을 쓴다 — 옛 문서가 안 죽는다", () => {
+    const place = imagePlanFor("refs", { ...SCENARIO, focus: "product" }).find((p) => p.key.startsWith("place"));
+    expect(place.prompt).toContain("a bunny keyring hanging on a tan handbag");
+  });
+
+  it("★ focus=place 의 두 축도 무대를 쓴다", () => {
+    const plan = imagePlanFor("refs", sc({ focus: "place" }));
+    for (const p of plan.filter((x) => x.key.startsWith("place"))) {
+      expect(p.prompt, p.key).toContain("sunlit outdoor cafe terrace");
+    }
+  });
+});

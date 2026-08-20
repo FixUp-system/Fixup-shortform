@@ -629,3 +629,32 @@ describe("environment 도 제품과 어울려야 한다", () => {
     expect(s.slice(at, at + 400)).toMatch(/어울리|어울려/);
   });
 });
+
+// ★★ 참조 사진이 있으면 제품 생김새를 글로 다시 적지 않는다(2026-08-19 실측).
+//
+// 사고: look 이 "with a pink satin ribbon" 이라고만 하고 **위치를 안 적어** 모델이
+// 리본을 고리에도 목에도 새로 달았다. 원본은 귀에 작은 리본 두 개뿐이다.
+// 앞 회차의 look 에는 "on its ear" 가 있었는데 이번에 빠졌다 — 규칙이 없어서다.
+//
+// ★ 참조 사진이 있으면 **사진이 진실**이다. 글로 또 묘사하면 글이 이긴다
+//   (CLAUDE.md 실측: "참조 사진은 라벤더 토끼·검은 리본인데 프롬프트가 cream-white 를
+//   시켜 크림색 토끼가 나왔다").
+describe("제품 생김새는 사진이 정한다", () => {
+  // ★ 사진 유무는 프로젝트마다 다르므로 SYSTEM(고정)이 아니라 **user 메시지**에 붙는다.
+  const sys = (photos) =>
+    buildScenarioMessages({ settings, material: { text: "소재", photos } }).messages[0].content;
+  const withPhoto = [{ id: "p", url: "/api/uploads/a.jpg", vision: { what: "분홍 토끼", lettering: "Giants" } }];
+
+  it("★ 사진이 있으면 생김새를 다시 적지 말라고 말한다", () => {
+    const s = sys(withPhoto);
+    expect(s).toMatch(/사진이 있으면[\s\S]{0,300}(다시 적|재서술|묘사하지)/);
+  });
+
+  it("★ 사진이 없으면 부위마다 **위치**를 적으라고 말한다 — 안 적으면 모델이 아무 데나 단다", () => {
+    expect(sys([])).toMatch(/어디에|위치/);
+  });
+
+  it("사진이 없는 프로젝트의 지문은 예전과 같다 — 사진 규칙이 안 붙는다", () => {
+    expect(sys([])).not.toMatch(/사진이 있으면 제품의 생김새/);
+  });
+});

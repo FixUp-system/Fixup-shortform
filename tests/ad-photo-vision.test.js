@@ -30,10 +30,16 @@ describe("사진에서 읽은 값이 지문에 실린다", () => {
     expect(msg([photo({ scale: "손바닥 절반 크기" })])).toContain("손바닥 절반");
   });
 
-  it("★ 읽은 값이 하나도 없으면 지문이 예전과 글자 그대로다 — 옛 프로젝트가 안 흔들린다", () => {
-    expect(msg([photo(null)])).toBe(msg([photo(null)]));
-    const before = msg([]);
-    expect(msg([photo(null)]).replace(/첨부 사진: 1장/, "첨부 사진: 0장")).toBe(before);
+  // ★ 판정을 바꿨다(2026-08-19). 이제 **사진 유무가 규칙을 가른다** — 사진이 있으면
+  //   "생김새를 다시 적지 마라"(사진이 이긴다), 없으면 "부위 위치를 적어라"(글이 유일한
+  //   재료다). 그래서 사진 1장과 0장의 지문은 원래 달라야 한다.
+  //   여기서 지켜야 하는 것은 **vision 을 못 읽은 사진이 지문을 흔들지 않는 것**이다.
+  it("★ 읽은 값이 없으면 vision 줄이 안 붙는다 — 옛 프로젝트가 안 흔들린다", () => {
+    const blind = msg([photo(null)]);
+    expect(blind).toBe(msg([photo(null)]));
+    for (const marker of ["에 적힌 글자", "에 보이는 것", "의 크기"]) {
+      expect(blind).not.toContain(marker);
+    }
   });
 });
 
