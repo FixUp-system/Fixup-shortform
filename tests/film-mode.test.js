@@ -309,12 +309,13 @@ describe("그림 프롬프트 — 참조가 이기고, 제품 글자는 남고, 
 
 // film 도 같은 함수를 쓰지만 인자 하나가 빠지면 광고에서만 실린다 — 그 구멍을 막는다.
 describe("buildFilmPrompt 가 음악·색처리·외형도 싣는다", () => {
-  it("★ 셋 다 실린다", () => {
+  // ★ music 은 2026-08-19 에 지시문에서 걷어냈다 — 시나리오 칸은 남지만 프롬프트에는 안 간다.
+  it("★ 색처리·외형은 실리고 음악은 안 실린다", () => {
     const sc = { ...SCENARIO, music: "slow piano", tone: "warm grain", look: "pink bunny, palm-sized" };
     const p = buildFilmPrompt(sc, "order");
-    expect(p).toContain("slow piano");
     expect(p).toContain("warm grain");
     expect(p).toContain("pink bunny, palm-sized");
+    expect(p).not.toContain("slow piano");
   });
 });
 

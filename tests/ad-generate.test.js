@@ -386,13 +386,8 @@ describe("음악·색처리·외형이 지시문에 실린다", () => {
   const sc = (extra) => ({ text: "장면 설명.", shots: [], ...extra });
   const out = (extra) => withSpokenLines(sc(extra).text, [], undefined, sc(extra));
 
-  it("★ music 이 실린다", () => {
-    expect(out({ music: "slow piano, sparse and calm" })).toContain("slow piano, sparse and calm");
-  });
-
-  it("★ 가사 없는 음악이라는 것을 함께 말한다 — 낭독과 겹치면 둘 다 안 들린다", () => {
-    expect(out({ music: "slow piano" })).toMatch(/no lyrics|instrumental/i);
-  });
+  // ★ music 은 2026-08-19 에 지시문에서 걷어냈다(아래 "music 은 지시문에 싣지 않는다").
+  //   분할 생성의 문제를 풀려던 절이라 통짜 굽기에는 통제 과잉이었다.
 
   it("★ tone 이 실리고 '끝까지 같게'를 말한다", () => {
     const t = out({ tone: "warm film grain" });
@@ -438,5 +433,37 @@ describe("say_as 가 프롬프트에 실린다", () => {
   it("say_as 가 없으면 예전 그대로다 — 회귀 0", () => {
     const base = 'the narrator says "안녕하세요".';
     expect(withSpokenLines(base, [{ line: "안녕하세요" }])).toBe(base);
+  });
+});
+
+// ★★ music 을 지시문에서 뺀다(2026-08-19 사장님 결정).
+//
+// 이 절은 **분할 생성의 문제**를 풀려고 만든 것이다. lib/cuts.js 주석:
+//   "배경음은 모델이 컷마다 따로 만든다. 첫 컷은 조용하고 둘째 컷에만 음악이 나오고,
+//    나와도 서로 다른 곡이었다."
+// 통짜로 굽는 광고·film 에는 그 문제가 없다 — 15초를 한 번에 만드니 음악도 하나다.
+// 사장님 원칙("한 번에 생성하니 통제를 자제한다")에 정확히 걸린다.
+//
+// ★ 실측: music 이 든 영상은 오늘 만든 film 셋뿐이고, 광고 일곱 편은 전부 music 없이
+//   만들어졌으며 자연스러웠다. 그리고 이 값이 "hand claps · light percussion" 같은
+//   리듬 강한 소리를 요구해 나레이션을 밀어낼 수 있다(seedance 는 목소리와 음악을
+//   한 트랙에 섞어 내보내므로 우리가 볼륨을 못 고친다).
+//
+// ★ 스키마의 music 칸은 **남긴다** — 되살릴 때 한 줄이면 되고, 우리가 ffmpeg 로 직접
+//   깔 때(buildFfmpegArgs 의 musicPath) 그 값을 쓸 수 있다.
+describe("music 은 지시문에 싣지 않는다", () => {
+  const out = (extra) =>
+    withSpokenLines("장면.", [], undefined, { text: "장면.", shots: [], ...extra });
+
+  it("★ music 이 있어도 지시문에 안 실린다", () => {
+    const t = out({ music: "upbeat acoustic pop with hand claps" });
+    expect(t).not.toContain("upbeat acoustic pop");
+    expect(t).not.toMatch(/background music/i);
+  });
+
+  it("★ 다른 절은 그대로 실린다 — music 만 뺀 것이다", () => {
+    const t = out({ music: "piano", tone: "warm grain", look: "pink bunny" });
+    expect(t).toContain("warm grain");
+    expect(t).toContain("pink bunny");
   });
 });
