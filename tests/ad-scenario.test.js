@@ -572,7 +572,11 @@ describe("wardrobe — 인물 옷차림", () => {
   });
 
   it("★ SYSTEM 이 영상 하나에 하나라고 말한다 — 컷마다 다르면 옷을 갈아입는다", () => {
-    expect(sys()).toMatch(/옷차림[\s\S]{0,300}하나/);
+    // ⚠️ 창을 글자 수(300)로 끊어 뒀더니 규칙에 줄이 늘자 깨졌다 — 규칙은 그대로 있는데
+    //   시험만 깨진 것이라, 재는 자리를 **규칙 하나**로 좁힌다.
+    const s = sys();
+    const rule = s.slice(s.indexOf("옷차림도 정한다")).split(/^★ /m)[0];
+    expect(rule).toMatch(/하나/);
   });
 });
 
@@ -832,5 +836,37 @@ describe("통짜 생성에는 통제를 자제한다", () => {
   it("★ 컷 칸(camera·lighting·action·sound)은 스키마에 남는다 — 화면이 보여 주고 사장님이 고친다", () => {
     const cols = Object.keys(SCENARIO_SCHEMA.properties.shots.items.properties);
     for (const k of ["camera", "lighting", "action", "sound"]) expect(cols).toContain(k);
+  });
+});
+
+// ★★ 인물이 바뀌면 안 된다(2026-08-20 사장님 원칙). 얼굴은 사진으로 고정되는데
+//   옷은 글이라, 옷차림에 **색이 없으면** 그림마다 모델이 색을 새로 고른다.
+//
+// 실측(떡볶이, 2026-08-20): wardrobe 가 "comfy off-work casual — soft oversized tee and
+// lounge pants, hair loosely tied" 였다. 얼굴은 셋 다 같았는데 상의가 크림·회색으로
+// 갈리고 머리도 한 장만 올림머리였다. 영상 한 편 안에서 상의 색이 바뀌면 눈에 띈다.
+//
+// ★ 다만 **막는 것은 없는 것을 지어내는 것이지 이야기가 아니다** — look 이 "사진 그대로
+//   끝까지 유지"라 변신을 막았던 자리(c3f58d3)와 같은 규칙을 옷차림에도 쓴다.
+describe("옷차림이 그림마다 갈리지 않는다", () => {
+  const sys = () => buildScenarioMessages({ settings, material: { text: "소재", photos: [] } }).system;
+  // ⚠️ 창을 글자 수로 끊으면 **다음 규칙까지 넘어간다.** 처음에 700자로 뒀더니 목소리
+  //   규칙의 "음색"·"사람이 바뀐다"에 걸려 두 시험이 거짓으로 통과했다. 규칙 하나만 본다.
+  const wardrobeRule = () => {
+    const s = sys();
+    const at = s.indexOf("옷차림도 정한다");
+    // 다음 최상위 규칙(줄머리 ★)까지 가지 않게 끊는다.
+    return s.slice(at).split(/^★ /m)[0];
+  };
+
+  it("★ 옷차림에 색을 적으라고 말한다 — 색이 없으면 그림마다 다른 색이 나온다", () => {
+    expect(wardrobeRule()).toMatch(/색/);
+  });
+
+  // ⚠️ 이 시험을 처음에 /바뀌|갈아입/ 으로 뒀더니 **거짓으로 통과했다** — 규칙에 이미
+  //   있던 경고문("장면마다 다르게 적으면 인물이 중간에 옷을 갈아입는다")에 걸린 것이다.
+  //   재야 하는 것은 경고가 아니라 **허용**이라, 허용 문장만 가진 말을 본다.
+  it("★ 옷이 바뀌는 이야기는 막지 않는다 — 무엇에서 무엇으로 바뀌는지 적게 한다", () => {
+    expect(wardrobeRule()).toMatch(/옷이 바뀌는 연출/);
   });
 });

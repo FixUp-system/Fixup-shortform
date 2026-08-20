@@ -560,3 +560,28 @@ describe("참고 그림 축이 얼굴 사진을 받는다", () => {
     expect(axis(imagePlanFor("refs", sc), "place").avatarId).toBeFalsy();
   });
 });
+
+// ★★ 옷차림도 **모든 그림에서 같다**고 말한다(2026-08-20). 색처리(tone)가 이미 쓰는
+//   문구와 같은 자리다 — 그림끼리 옷이 갈리면 영상에서 상의 색이 중간에 바뀐다.
+describe("옷차림이 모든 그림에서 같다고 말한다", () => {
+  const sc = {
+    ...SCENARIO,
+    focus: "product",
+    wardrobe: "oatmeal-beige oversized cotton tee and soft grey lounge pants",
+    shots: [{ shows: "a woman holding it", avatar_id: "av-woman-20s", seconds: 5 }],
+  };
+
+  it("★ 사람이 나오는 그림에는 '모든 그림에서 같다'가 붙는다", () => {
+    for (const mode of ["order", "refs"]) {
+      const p = imagePlanFor(mode, sc).find((x) => x.avatarId);
+      expect(p.prompt).toMatch(/identical in every image/i);
+      expect(p.prompt).toContain("oatmeal-beige");
+    }
+  });
+
+  it("옷차림이 없으면 아무 말도 안 붙는다 — 옛 문서 회귀 0", () => {
+    for (const p of imagePlanFor("order", { ...sc, wardrobe: "" })) {
+      expect(p.prompt).not.toMatch(/wearing/i);
+    }
+  });
+});
