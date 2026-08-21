@@ -432,3 +432,26 @@ describe("B3 — 굽기도 컷마다 바로 저장한다(N1 과 같은 처방, �
     expect(doc.cuts[1].video).toBeUndefined(); // 던진 컷은 저장되지 않는다(당연하다 — 값을 못 받았다)
   });
 });
+
+// ────────────────────────────────────────────────────────────────────────
+// Task 12 도중 발견 — GET /api/reel/[id] 가 아예 없었다. reel 을 KINDS 에
+// 더한 순간 isStepDoc 이 GET /api/projects/[id] 를 막았는데(위 "종류 격리" 절),
+// 그 대칭(읽는 문)이 안 채워져 있었다 — film 이 겪은 사고(app/api/film/[id]/route.js
+// 머리말)와 같은 모양이다. 화면(레이아웃)이 이 문으로 문서를 읽는다.
+// ────────────────────────────────────────────────────────────────────────
+describe("GET /api/reel/[id] — 읽는 문", () => {
+  const src = read("app/api/reel/[id]/route.js");
+
+  it("withUser 뒤에 있다", () => {
+    expect(src).toContain("withUser");
+  });
+
+  it("kind 검사가 있다 — 다른 종류 문서를 못 읽는다", () => {
+    expect(src).toContain('kind !== "reel"');
+  });
+
+  it("소유자 범위로 읽는다 — getProjectForViewing(보관함 공유)이 아니다", () => {
+    expect(src).toContain("getProject(");
+    expect(src).not.toContain("getProjectForViewing");
+  });
+});
