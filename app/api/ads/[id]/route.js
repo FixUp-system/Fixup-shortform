@@ -67,8 +67,9 @@ export const PATCH = withUser(async (req, { params }, user) => {
   // ★ 값이 실제로 안 바뀌는 요청은 지나간다(model 을 안 보내면 project 의 것이 그대로다).
   //   등급이 내려간 뒤에도 옛 문서를 열고 다른 칸을 고칠 수는 있어야 한다.
   if (body?.settings?.model !== undefined) {
+    // ★ 관리자는 등급을 안 탄다(2026-08-21) — 만들기·굽기와 같은 판정이다.
     const tier = tierOf((await getStore().findProfiles([user.id])).get(user.id));
-    if (!tierAllowsModel(tier, model)) {
+    if (!tierAllowsModel(tier, model, { admin: user.role === "admin" })) {
       return Response.json({ error: "지금 등급에서는 고를 수 없는 모델이에요" }, { status: 403 });
     }
   }

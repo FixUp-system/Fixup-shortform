@@ -48,8 +48,13 @@ export const POST = withUser(async (req, _ctx, user) => {
   //
   // ★ 등급은 원장(profiles)에서 읽는다. app_metadata 가 아니다 — 그쪽은 middleware 가 매
   //   요청 읽는 게이트 캐시이고, 등급은 이 자리에서만 필요하다(db/schema.sql 의 그 주석).
+  // ★ 관리자는 등급을 안 탄다(2026-08-21) — lib/tiers.js 의 modelsForTier 머리말 참고.
+  //   해상도 게이트(아래)와 **같은 축**을 본다.
+  // ★ 선언이 **두 게이트보다 위**에 있어야 한다 — 아래에 두면 모델 게이트가 선언 전에
+  //   읽어 ReferenceError 로 500 이 난다(const 의 사각지대).
+  const admin = user.role === "admin";
   const tier = tierOf((await getStore().findProfiles([user.id])).get(user.id));
-  if (!tierAllowsModel(tier, model)) {
+  if (!tierAllowsModel(tier, model, { admin })) {
     return Response.json({ error: "지금 등급에서는 고를 수 없는 모델이에요" }, { status: 403 });
   }
 
@@ -68,7 +73,6 @@ export const POST = withUser(async (req, _ctx, user) => {
   // ★★ 관리자 전용 해상도(2.5 의 1080p)는 **서버가 판정한다.** 화면에서만 거르면
   //   가림막이지 잠금이 아니다 — 2.5 를 hidden 으로 두었다가 API 로 뚫린 그 자리다.
   //   한 편에 $15.60~31.20 이라 새면 그만큼이 그대로 나간다.
-  const admin = user.role === "admin";
   const resolution = body?.settings?.resolution ?? adDefaultResolution(model);
   if (!isAdResolution(resolution, model, { admin })) {
     return Response.json(

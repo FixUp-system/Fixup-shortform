@@ -251,7 +251,7 @@ export default function AdNewPage() {
                       (app/api/ads/route.js · app/api/ads/[id]/render/route.js). 2.5 가
                       지금까지 열려 있던 이유가 정확히 이것이다 — 화면에서만 거르고
                       서버는 그대로 받았다. */}
-                  {modelsForTier(me?.tier).map((m) => (
+                  {modelsForTier(me?.tier, { admin }).map((m) => (
                     <button key={m.id} className={`chip${model === m.id ? " on" : ""}`}
                       onClick={() => onModelChange(m.id)}>
                       {m.label}

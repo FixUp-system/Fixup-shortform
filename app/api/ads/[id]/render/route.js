@@ -24,8 +24,10 @@ export const POST = withUser(async (_req, { params }, user) => {
   //   이 저장소가 같은 이유로 여러 문을 이중으로 달아 두었다(굽는 중 그리기 금지 등):
   //   "화면 잠금은 한 벌뿐이라 샌다. 그리고 새면 돈이 두 번 나간다."
   // ★ 판정은 lib/tiers.js 하나다 — 여기에 모델 id 를 손으로 적으면 표와 갈린다.
+  // ★ 관리자는 등급을 안 탄다(2026-08-21). 만들기와 **같은 판정**이어야 한다 —
+  //   갈리면 만들어 놓고 못 굽는(또는 그 반대) 자리가 생긴다.
   const tier = tierOf((await getStore().findProfiles([user.id])).get(user.id));
-  if (!tierAllowsModel(tier, project.settings?.model)) {
+  if (!tierAllowsModel(tier, project.settings?.model, { admin: user.role === "admin" })) {
     return Response.json({ error: "지금 등급에서는 구울 수 없는 모델이에요" }, { status: 403 });
   }
   if (project.status === "rendering") {

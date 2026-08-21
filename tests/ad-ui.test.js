@@ -466,7 +466,10 @@ describe("/ads/new — 등급이 고를 수 있는 모델만 보인다", () => {
   });
 
   it("★ 등급은 내 정보에서 읽는다 — 화면이 스스로 정하지 않는다", () => {
-    expect(src).toMatch(/modelsForTier\(\s*me\?\.tier\s*\)/);
+    // ★ 2026-08-21 — 관리자는 등급을 안 타므로 admin 도 함께 넘긴다. 판정은 여전히
+    //   lib/tiers.js 하나이고, 화면은 "내 정보"에서 읽은 값을 넘길 뿐이다.
+    expect(src).toMatch(/modelsForTier\(\s*me\?\.tier,\s*\{ admin \}\s*\)/);
+    expect(src, "admin 을 내 정보에서 읽지 않는다").toContain("me?.isAdmin === true");
   });
 });
 
