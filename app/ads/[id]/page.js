@@ -43,12 +43,14 @@ const POLL_MS = 2000;
 //  같은 방식을 쓰는 단계별 화면은 지금 ⑥완성의 자막 손보기다.)
 // ★ key 를 editing 으로 가른다 — 편집을 껐다 켜면 저장된 값으로 새로 그린다([취소]가
 // 실제로 되돌리는 자리다).
-function Field({ editing, name, v }) {
+// ★ attr — 걷는 자리를 가르는 속성 이름이다(장면은 data-field, 전역은 data-global).
+//   같은 이름을 쓰면 장면 수집이 전역 칸까지 빨아들인다.
+function Field({ editing, name, v, attr = "data-field" }) {
   return (
     <span
       key={editing ? "edit" : "read"}
       className="editable"
-      data-field={name}
+      {...{ [attr]: name }}
       {...(editing ? { contentEditable: true, suppressContentEditableWarning: true } : {})}
     >
       {v || (editing ? "" : "(없음)")}
@@ -74,6 +76,8 @@ export default function AdDetailPage() {
   const pollRef = useRef(null);
   // 편집한 값을 걷어올 자리(장면 목록). 아래 rewriteWithEdits 주석 참고.
   const editRef = useRef(null);
+  // 전역 값은 editRef 밖에 있다(장면 목록과 다른 덩어리다) — 걷는 자리를 따로 둔다.
+  const globalRef = useRef(null);
 
   // id 가 바뀌면 먼저 비운다 — 안 비우면 방금 전 광고의 상태(사이드바 하위 단계 포함)가
   // 새 광고를 불러오는 동안 잠깐 남는다.
@@ -147,13 +151,21 @@ export default function AdDetailPage() {
 
   // 시나리오 만들기·다시 쓰기·고친 대로 다시 쓰기 — **같은 라우트**다. LLM 만 쓰고 무료다.
   //
-  // ★ edited 를 넘기면 고친 컷이 함께 간다. 무엇이 실제로 고쳐졌는지는 서버가 저장된
-  // 시나리오와 대조해 판정한다 — 화면은 "지금 보이는 장면들"을 그대로 보낼 뿐이다.
+  // ★ edited(`{ shots, globals }`)를 넘기면 고친 컷과 **영상 전체 값**이 함께 간다.
+  // 무엇이 실제로 고쳐졌는지는 서버가 저장된 시나리오와 대조해 판정한다 — 화면은
+  // "지금 보이는 값들"을 그대로 보낼 뿐이다(pickEditedShots · pickEditedGlobals).
+  // ★ 인자 없이 부르면 [다시 쓰기]다. **onClick 에 직접 묶지 마라** — 클릭 이벤트가
+  //   edited 자리로 들어간다(그래서 이 파일의 모든 호출이 `() => makeScenario()` 다).
   async function makeScenario(edited) {
     setBusy(true); setErr("");
     const res = await fetch(`/api/ads/${id}/scenario`, {
       method: "POST",
-      ...(edited ? { headers: { "content-type": "application/json" }, body: JSON.stringify({ shots: edited }) } : {}),
+      ...(edited
+        ? {
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ shots: edited.shots, globals: edited.globals }),
+          }
+        : {}),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) { setErr(data.error || "시나리오를 만들지 못했어요"); setBusy(false); return; }
@@ -169,14 +181,20 @@ export default function AdDetailPage() {
   // ⑥완성 화면(app/create/[id]/done/page.js)의 자막 손보기에서 이미 같은 방식을 쓴다.
   function rewriteWithEdits() {
     const rows = editRef.current?.querySelectorAll("[data-shot]") || [];
-    const edited = Array.from(rows).map((row) => {
+    const shots = Array.from(rows).map((row) => {
       const out = {};
       for (const el of row.querySelectorAll("[data-field]")) {
         out[el.dataset.field] = (el.textContent || "").trim();
       }
       return out;
     });
-    makeScenario(edited);
+    // 영상 전체 값도 같은 방식으로 걷는다. **무엇이 실제로 고쳐졌는지는 서버가 판정한다**
+    // (lib/ad/scenario.js 의 pickEditedGlobals) — 여기서는 지금 화면의 값을 그대로 보낸다.
+    const globals = {};
+    for (const el of globalRef.current?.querySelectorAll("[data-global]") || []) {
+      globals[el.dataset.global] = (el.textContent || "").trim();
+    }
+    makeScenario({ shots, globals });
   }
 
   // 되돌리기 — 직전 시나리오로. LLM 을 안 부르니 회차도 안 먹는다(서버가 지킨다).
@@ -271,7 +289,7 @@ export default function AdDetailPage() {
       {view === "draft" && (
         <section className="panel panel--wide">
           <p className="pgsub">시나리오를 만들어 주세요 — 무료예요. 마음에 안 들면 몇 번이든 다시 쓸 수 있어요.</p>
-          <button className="cta" disabled={busy} onClick={makeScenario}>
+          <button className="cta" disabled={busy} onClick={() => makeScenario()}>
             {busy ? "쓰는 중…" : "시나리오 만들기 →"} <span className="cr">무료</span>
           </button>
         </section>
@@ -282,38 +300,9 @@ export default function AdDetailPage() {
           <h2>시나리오를 확인해 주세요</h2>
           <p className="script-src">{scenario?.text}</p>
 
-          {/* ★★★ **영상 전체에 걸리는 값들**(2026-08-21). 그전에는 지시문(text)과 장면만
-              보여 주어서, 사장님이 "이 사람이 누구고 어디서 찍고 무슨 옷을 입나"를
-              확인할 자리가 없었다 — 정작 그 값들이 굽기 지시문에 실려 화면을 정하는데도.
-              시나리오 단계는 **사람이 멈춰 서는 유일한 자리**라(lib/ad/steps.js 의 waits)
-              여기서 못 보면 어디서도 못 본다.
-              ★ 값이 없는 칸은 줄째로 안 그린다 — 사람이 없는 영상에서 "인물 (빈칸)"이
-                뜨면 빠뜨린 것처럼 보인다. */}
-          {(() => {
-            const rows = [
-              ["이야기", scenario?.angle],
-              ["인물", scenario?.cast],
-              ["옷차림", scenario?.wardrobe],
-              ["무대", scenario?.environment],
-              ["제품", scenario?.look],
-              ["색감", scenario?.tone],
-              ["목소리", scenario?.voice],
-            ].filter(([, v]) => typeof v === "string" && v.trim());
-            if (!rows.length) return null;
-            return (
-              <div className="plan-row">
-                <div className="plan-body">
-                  {rows.map(([k, v]) => (
-                    <div className="plan-field" key={k}>
-                      <b>{k}</b><span className="editable">{v}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* 장면 목록의 머리 — [수정하기]가 1번 장면보다 **위**에 있어야 손이 먼저 닿는다.
+          {/* 편집 머리 — [수정하기]는 **고칠 수 있는 것 전부보다 위**에 있어야 손이 먼저 닿는다.
+              ★ 2026-08-21 — 전역 값(인물·무대…)도 고칠 수 있게 되면서 이 자리가 장면 목록
+                앞이 아니라 **전역 값 앞**으로 올라왔다. 그 아래 두 덩어리가 다 편집 대상이다.
               편집 중에는 [취소]로 바뀐다(같은 자리에서 켜고 끈다). */}
           {/* ★ 편집은 **실제 상태(status)** 로 잠근다. view 로 판정하면 완성본을
               ?step=scenario 로 열었을 때 [수정하기]가 그대로 떠서, 고치는 순간 status 가
@@ -337,10 +326,59 @@ export default function AdDetailPage() {
           </div>
           {editing && (
             <p className="pgsub">
-              고치고 싶은 곳을 눌러 바로 고치세요 — 고친 장면은 그대로 지키고 나머지는 다시 씁니다.
+              고치고 싶은 곳을 눌러 바로 고치세요. <b>인물·무대·옷차림</b> 같은 영상 전체 값도
+              고칠 수 있어요 — 고친 것은 그대로 지키고 나머지를 거기에 맞춰 다시 씁니다.
               장면 길이(초)는 전체 길이에 맞춰져 있어 고칠 수 없어요.
             </p>
           )}
+
+          {/* ★★★ **영상 전체에 걸리는 값들** — 보여 주고(2026-08-21), 고칠 수 있게 한다.
+              그전에는 지시문(text)과 장면만 그려서, 사장님이 "이 사람이 누구고 어디서
+              찍고 무슨 옷을 입나"를 확인할 자리가 없었다 — 정작 그 값들이 굽기 지시문에
+              실려 화면을 정하는데도. 시나리오 단계는 **사람이 멈춰 서는 유일한 자리**라
+              (lib/ad/steps.js 의 waits) 여기서 못 보면 어디서도 못 본다.
+
+              ★★ 그리고 **고칠 수 있어야 한다.** AI 가 "20대 여성"으로 잡았는데 사장님이
+                40대 남성을 원하면, 그전에는 [다시 쓰기]로 통째로 새로 뽑는 수밖에 없었고
+                그러면 마음에 들던 장면·대사까지 다 바뀌었다. 영상 한 편이 $2~7 이라
+                시나리오에서 맞추는 것이 가장 싼 길이다.
+
+              ★ 읽을 때는 **값이 있는 칸만** 그린다 — 사람이 없는 영상에서 "인물 (빈칸)"이
+                뜨면 우리가 빠뜨린 것처럼 보인다.
+              ★ 고칠 때는 **일곱 칸을 다 편다** — 비어 있는 칸이야말로 사장님이 채우고 싶은
+                자리다(사람을 넣고 싶은데 AI 가 안 넣은 경우).
+              ⚠️ 이 목록은 서버(lib/ad/scenario.js 의 EDITABLE_GLOBAL_FIELDS)와 **같아야
+                한다**. 화면은 그 파일을 import 할 수 없어(서버 전용) 목록이 두 벌인데,
+                tests/ad-scenario-globals.test.js 가 둘을 대조한다. */}
+          {(() => {
+            const all = [
+              ["이야기", "angle"],
+              ["인물", "cast"],
+              ["옷차림", "wardrobe"],
+              ["무대", "environment"],
+              ["제품", "look"],
+              ["색감", "tone"],
+              ["목소리", "voice"],
+            ];
+            const rows = editing
+              ? all
+              : all.filter(([, f]) => typeof scenario?.[f] === "string" && scenario[f].trim());
+            if (!rows.length) return null;
+            return (
+              <div className="plan-list" ref={globalRef}>
+                <div className="plan-row">
+                  <div className="plan-body">
+                    {rows.map(([label, f]) => (
+                      <div className="plan-field" key={f}>
+                        <b>{label}</b>
+                        <Field editing={editing} name={f} v={scenario?.[f]} attr="data-global" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="plan-list" ref={editRef}>
             {(scenario?.shots || []).map((shot, i) => (
@@ -476,7 +514,7 @@ export default function AdDetailPage() {
             지금 상태({status || "알 수 없음"})를 이 화면이 몰라요 — 그래도 나갈 길은 있어요.
           </p>
           <div className="step-actions">
-            <button className="mini" disabled={busy} onClick={makeScenario}>
+            <button className="mini" disabled={busy} onClick={() => makeScenario()}>
               {busy ? "쓰는 중…" : scenario?.text ? "다시 쓰기 · 무료" : "시나리오 만들기 · 무료"}
             </button>
             <div className="fwd">

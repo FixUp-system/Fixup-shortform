@@ -364,8 +364,11 @@ describe("/ads/[id] 화면 — 연출 필드·모델 표시 (Task 22)", () => {
 describe("/ads/[id] — 컷 편집", () => {
   it("[수정하기]가 장면 목록보다 위에 있다 — 1번 장면 앞이어야 손이 먼저 닿는다", () => {
     expect(detailSrc).toContain("수정하기");
+    // ★ 2026-08-21 — plan-list 가 둘이 됐다(전역 값 목록 + 장면 목록). 장면 목록은
+    //   ref={editRef} 가 유일하게 가리키므로 그것으로 집는다 — "plan-list" 로 집으면
+    //   전역 값 목록이 먼저 걸려 순서를 잘못 잰다.
     const editBtn = detailSrc.indexOf("수정하기");
-    const shotList = detailSrc.indexOf("plan-list");
+    const shotList = detailSrc.indexOf("ref={editRef}");
     expect(editBtn).toBeGreaterThan(-1);
     expect(shotList).toBeGreaterThan(-1);
     expect(editBtn, "[수정하기]가 장면 목록 아래에 있다").toBeLessThan(shotList);

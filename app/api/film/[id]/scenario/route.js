@@ -1,7 +1,7 @@
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { loadFilm } from "../../../../../lib/film/load.js";
 import { updateProject, getProject } from "../../../../../lib/projects.js";
-import { generateScenario, pickEditedShots, readPhotoVision } from "../../../../../lib/ad/scenario.js";
+import { generateScenario, pickEditedShots, pickEditedGlobals, readPhotoVision } from "../../../../../lib/ad/scenario.js";
 import { MAX_SCENARIO_TRIES } from "../../../../../lib/pricing.js";
 import { scenarioLock } from "../../../../../lib/film/doc.js";
 
@@ -46,6 +46,10 @@ export const POST = withUser(async (req, { params }, user) => {
   // **서버가** 고른다(lib/ad/scenario.js 의 pickEditedShots).
   const body = await req.json().catch(() => null);
   const edits = pickEditedShots(project.scenario?.shots, body?.shots);
+  // 영상 전체 값도 같은 함수로 고른다 — 광고와 두 벌이 되지 않게(이 파일의 규율 그대로).
+  // ★ 이 경로의 화면은 아직 그 칸을 안 그린다. 그래도 배선은 지금 해 둔다: 나중에 화면만
+  //   붙이면 되고, 안 해 두면 "화면은 보내는데 서버가 버리는" 조용한 실패가 생긴다.
+  const globalEdits = pickEditedGlobals(project.scenario, body?.globals);
 
   // ★★ 사진을 먼저 읽는다(2026-08-19). 이 자리에 원래 "사진 읽기는 여기서 하지 않는다 —
   //   이 경로는 사진을 그림 만들기에서 참조 바이트로 직접 넘기므로 우회가 필요 없다"고
@@ -58,7 +62,7 @@ export const POST = withUser(async (req, { params }, user) => {
 
   let scenario;
   try {
-    scenario = await generateScenario({ project: seen, edits });
+    scenario = await generateScenario({ project: seen, edits, globalEdits });
   } catch (e) {
     return Response.json({ error: e?.message || "시나리오를 만들지 못했어요" }, { status: 500 });
   }
