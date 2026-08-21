@@ -3,7 +3,7 @@ import { isAspect, DEFAULT_ASPECT_ID } from "../../../lib/aspects.js";
 import { normalizeAdOptions } from "../../../lib/ad/options.js";
 import {
   isAdSeconds, isAdModel, adSecondsFor, DEFAULT_AD_MODEL,
-  isAdResolution, adResolutionsFor, adDefaultResolution,
+  isAdResolution, adResolutionsFor, adDefaultResolution, adRefMax,
 } from "../../../lib/ad/models.js";
 import { ownedPhotoKeys } from "../../../lib/refs-io.js";
 import { withUser } from "../../../lib/auth/require-user.js";
@@ -85,9 +85,15 @@ export const POST = withUser(async (req, _ctx, user) => {
     return Response.json({ error: "그 화면 비율은 몰라요" }, { status: 400 });
   }
 
+  // ★★ 상한이 **둘이고 좁은 쪽이 이긴다**(2026-08-21):
+  //   · MAX_PHOTOS — **우리 사정**이다(base64 가 요청 본문에 통째로 실린다).
+  //   · adRefMax(model) — **모델 사정**이다(fal 스키마의 maxItems). 세 모델 다 9 장인데,
+  //     나중에 더 좁은 모델이 들어오면 그때는 이쪽이 이겨야 한다.
+  //   둘 중 하나만 보면 "우리는 되는데 fal 이 422" 또는 그 반대가 된다.
   const photos = Array.isArray(body.material.photos) ? body.material.photos : [];
-  if (photos.length > MAX_PHOTOS) {
-    return Response.json({ error: `사진은 ${MAX_PHOTOS}장까지 올릴 수 있어요` }, { status: 400 });
+  const photoMax = Math.min(MAX_PHOTOS, adRefMax(model) || MAX_PHOTOS);
+  if (photos.length > photoMax) {
+    return Response.json({ error: `사진은 ${photoMax}장까지 올릴 수 있어요` }, { status: 400 });
   }
   if (!(await ownedPhotoKeys(photos, user.id))) {
     return Response.json({ error: "본인이 올린 사진만 쓸 수 있어요" }, { status: 400 });

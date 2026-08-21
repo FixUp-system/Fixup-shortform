@@ -7,6 +7,7 @@ import { describe, it, expect } from "vitest";
 import {
   AD_MODELS, adModel, adEndpoint, isAdModel, adSecondsFor, isAdSeconds,
   adResolutionsFor, isAdResolution, adDefaultResolution, isAdminOnlyResolution,
+  adRefField, adRefMax, adRefLabel,
 } from "../lib/ad/models.js";
 import { AD_VIDEO_PRICE, adVideoPrice } from "../lib/pricing.js";
 import { estimateCost, isFakeFor } from "../lib/costs.js";
@@ -138,7 +139,7 @@ describe("fal 입력이 모델마다 다르게 조립된다", () => {
   const scenario = { text: "base", shots: [], voice: "" };
   const refs = [{ key: "a.jpg", bytes: Buffer.from("x") }, { key: "b.jpg", bytes: Buffer.from("y") }];
 
-  it("H3 는 reference_image_urls 로 넘긴다 — image_urls 가 아니다", () => {
+  it("r2v 는 H3 가 reference_image_urls 로 넘긴다 — image_urls 가 아니다", () => {
     const input = buildFalInput({ settings: settingsFor(H3, { resolution: "2K" }), scenario, refs, kind: "r2v", seconds: 15 });
     expect(input.reference_image_urls).toHaveLength(2);
     expect(input.image_urls).toBeUndefined();
@@ -146,10 +147,18 @@ describe("fal 입력이 모델마다 다르게 조립된다", () => {
     expect(input.resolution).toBe("2K");
   });
 
-  it("H3 는 한 장이어도 배열이다 — image_url(단수) 자체가 스키마에 없다", () => {
-    const input = buildFalInput({ settings: settingsFor(H3), scenario, refs: [refs[0]], kind: "i2v", seconds: 15 });
-    expect(input.reference_image_urls).toHaveLength(1);
-    expect(input.image_url).toBeUndefined();
+  // ★ 2026-08-21 정정 — 처음에 "H3 는 image_url 이 없다"고 적었는데 **r2v 스키마만 보고
+  //   쓴 것**이었다. i2v 는 다른 엔드포인트이고 세 모델 다 거기서는 image_url(단수)을
+  //   받는다(minimax/h3/image-to-video 스키마 실측). 갈래는 모델이 아니라 **kind** 다.
+  it("i2v 는 세 모델 다 image_url(단수)로 넘긴다 — 갈래는 모델이 아니라 kind 다", () => {
+    for (const m of AD_MODELS) {
+      const input = buildFalInput({
+        settings: settingsFor(m.id, { resolution: undefined }), scenario, refs: [refs[0]], kind: "i2v", seconds: 15,
+      });
+      expect(input.image_url, `${m.id}`).toBeTruthy();
+      expect(input.image_urls).toBeUndefined();
+      expect(input.reference_image_urls).toBeUndefined();
+    }
   });
 
   it("★ Seedance 는 예전 그대로다 — 손댄 것은 H3 갈래뿐이다", () => {
@@ -199,5 +208,55 @@ describe("H3 지문 토막 — 참조를 이름으로 가리키게 한다", () =
 
   it("★ Seedance 지문은 그대로다 — 그쪽은 넣으면 알아서 쓴다", () => {
     expect(build("seedance-2.0", [{ url: "/a.jpg" }])).not.toContain("Image 1");
+  });
+});
+
+describe("참조 사진 규약 — 모델마다 다르고, 코드가 표를 읽는다", () => {
+  // ★★ 2026-08-21 사고: 지칭 규칙이 **H3 에만** 붙어 있어서, Seedance 로 사진 4장을
+  //   올려도 지시문이 그것을 한 번도 안 가리켰다. fal 스키마가 명시하는데도 그랬다.
+  //   "모델이 늘 때 고쳐야 하는 자리"가 지문·굽기 두 곳에 흩어져 있던 것이 원인이라,
+  //   이제 모델 표 하나가 필드·지칭·상한 셋을 다 쥔다.
+  it("세 모델 다 필드·지칭·상한이 표에 있다 — 하나라도 비면 사진이 조용히 무시된다", () => {
+    for (const m of AD_MODELS) {
+      expect(m.refs, `${m.id} 에 refs 가 없다`).toBeTruthy();
+      expect(adRefField(m.id)).toBeTruthy();
+      expect(adRefMax(m.id)).toBeGreaterThan(0);
+      expect(adRefLabel(m.id, 1)).toContain("1");
+    }
+  });
+
+  it("fal 스키마 원문과 같은 표기다", () => {
+    expect(adRefField("seedance-2.0")).toBe("image_urls");
+    expect(adRefField("minimax-h3")).toBe("reference_image_urls");
+    expect(adRefLabel("seedance-2.0", 2)).toBe("@Image2");
+    expect(adRefLabel("minimax-h3", 2)).toBe("Image 2");
+  });
+
+  it("지문이 그 이름을 부른다 — 두 모델 다", () => {
+    const ask = (model) =>
+      buildScenarioMessages({
+        kind: "ad", settings: settingsFor(model),
+        material: { text: "소재", photos: [{ url: "/a.jpg" }, { url: "/b.jpg" }] },
+      }).messages[0].content;
+    expect(ask("seedance-2.0")).toContain("@Image2");
+    expect(ask("minimax-h3")).toContain("Image 2");
+  });
+
+  it("★ 사진이 없으면 그 줄이 없다 — 없는 이름을 지어내게 두지 않는다", () => {
+    const user = buildScenarioMessages({
+      kind: "ad", settings: settingsFor("seedance-2.0"), material: { text: "소재", photos: [] },
+    }).messages[0].content;
+    expect(user).not.toContain("@Image1");
+  });
+
+  it("굽기가 표의 필드 이름으로 넘긴다 — 모델 id 로 갈래를 만들지 않는다", () => {
+    const scenario = { text: "base", shots: [], voice: "" };
+    const refs = [{ key: "a.jpg", bytes: Buffer.from("x") }];
+    for (const m of AD_MODELS) {
+      const input = buildFalInput({
+        settings: settingsFor(m.id, { resolution: undefined }), scenario, refs, kind: "r2v", seconds: 15,
+      });
+      expect(input[adRefField(m.id)], `${m.id} 가 표의 필드로 안 넘긴다`).toHaveLength(1);
+    }
   });
 });
