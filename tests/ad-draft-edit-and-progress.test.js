@@ -111,3 +111,39 @@ describe("②지금 도는 단계가 보인다", () => {
     expect(detail).toContain("elapsed");
   });
 });
+
+describe("★ 진행 표시를 부르는 화면은 그 함수를 실제로 꺼내야 한다", () => {
+  // ★★ 2026-08-21 사고: /ads/[id] 가 setBusyStep 을 **꺼내지 않고 불러서**
+  //   `startRender` 가 fetch 앞에서 ReferenceError 로 죽었다. 굽기가 시작조차 안 됐는데
+  //   화면은 아무 말도 안 했다(콘솔에만 났다). 진행 표시를 붙이려던 코드가 진행을 막았다.
+  //   ★ 이 시험은 그 부류를 통째로 막는다 — 부르는 곳이 늘어도 자동으로 걸린다.
+  const screens = [
+    ["app/ads/new/page.js", readFileSync("app/ads/new/page.js", "utf8")],
+    ["app/ads/[id]/page.js", detail],
+  ];
+
+  for (const [name, code] of screens) {
+    it(`${name} 이 setBusyStep 을 꺼내 쓴다`, () => {
+      if (!/setBusyStep\(/.test(code)) return; // 안 쓰면 볼 것이 없다
+      const line = code.match(/const \{[^}]*\} = useAdProject\(\);/);
+      expect(line, `${name} 이 useAdProject 에서 값을 안 꺼낸다`).toBeTruthy();
+      expect(line[0], `${name} 이 setBusyStep 을 부르는데 꺼내지 않았다`).toContain("setBusyStep");
+    });
+  }
+
+  // ★ 사장님이 실제로 쓰는 흐름이 여기다: /ads/new 에서 소재를 적고 누르면
+  //   시나리오가 30~50초 돈다. 그 구간에 신호가 없으면 "멈춘 것 같다"가 된다.
+  it("입력 화면도 시나리오 구간을 표시한다 — 가장 긴 무료 구간이다", () => {
+    const src = readFileSync("app/ads/new/page.js", "utf8");
+    expect(src).toMatch(/setBusyStep\("scenario"\)/);
+    const at = src.indexOf('setBusyStep("scenario")');
+    const call = src.indexOf("/scenario`");
+    expect(at, "시나리오 호출보다 뒤에서 세운다 — 도는 동안 안 보인다").toBeLessThan(call);
+  });
+
+  it("실패하면 끈다 — 켜진 채로 남으면 영원히 깜박인다", () => {
+    const src = readFileSync("app/ads/new/page.js", "utf8");
+    const offs = (src.match(/setBusyStep\(null\)/g) || []).length;
+    expect(offs, "끄는 자리가 모자라다").toBeGreaterThanOrEqual(2);
+  });
+});

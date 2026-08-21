@@ -45,7 +45,10 @@ const MAX_PHOTOS = 4;
 
 export default function AdNewPage() {
   const router = useRouter();
-  const { setProject } = useAdProject();
+  // ★ setBusyStep — 사이드바가 "지금 이 단계가 돈다"를 읽는 자리다(2026-08-21).
+  //   ⚠️ 이 화면에 안 붙여 두었던 것이 사장님이 "아무 액션이 없다"고 한 바로 그 자리다:
+  //     소재를 적고 [시나리오 만들기]를 누르면 **30~50초** 동안 아무 신호가 없었다.
+  const { setProject, setBusyStep } = useAdProject();
   // 크레딧을 끈 동안(내부 QA)에는 값 이야기를 안 한다 — 판정은 서버가 내려 준 gated 하나다.
   const { me } = useMe();
   const showCredits = me?.gated !== false;
@@ -108,7 +111,8 @@ export default function AdNewPage() {
   //  두 화면이 같은 규칙을 쓰게 하려고 그쪽으로 옮겼다.)
 
   async function submit() {
-    setBusy(true); setErr("");
+    // ①입력이 도는 중 — 프로젝트를 만드는 짧은 구간이다.
+    setBusy(true); setErr(""); setBusyStep("draft");
     const res = await fetch("/api/ads", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -118,13 +122,18 @@ export default function AdNewPage() {
       }),
     });
     const data = await res.json();
-    if (!res.ok) { setErr(data.error || "생성 실패"); setBusy(false); return; }
+    if (!res.ok) { setErr(data.error || "생성 실패"); setBusy(false); setBusyStep(null); return; }
 
     // 시나리오는 동기다(몇 초) — 만드는 자리에서 바로 이어 부른다. 사장님은 버튼 한 번만 누른다.
+    // ②시나리오가 도는 중 — **여기가 30~50초짜리 구간**이다. 사이드바가 그 줄을 깜박인다.
+    setBusyStep("scenario");
     const res2 = await fetch(`/api/ads/${data.id}/scenario`, { method: "POST" });
     const data2 = await res2.json();
     // 실패해도 써 둔 자료는 화면에 남는다(로컬 state) — app/create/page.js 와 같은 판단.
-    if (!res2.ok) { setErr(data2.error || "시나리오를 만들지 못했어요"); setBusy(false); return; }
+    if (!res2.ok) { setErr(data2.error || "시나리오를 만들지 못했어요"); setBusy(false); setBusyStep(null); return; }
+    // ★ 여기서 끄지 않는다 — 다음 화면(/ads/<id>)이 그 자리를 이어받아 그린다.
+    //   지금 끄면 이동하는 찰나에 깜박임이 한 번 꺼졌다 켜진다.
+    setBusyStep(null);
     router.push(`/ads/${data.id}`);
   }
 
