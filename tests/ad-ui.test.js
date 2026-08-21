@@ -3,7 +3,15 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 
-const src = readFileSync("app/ads/new/page.js", "utf8");
+// ★ 2026-08-21 — 입력 트레이(포맷·분위기·화풍·언어·사이즈·모델·해상도·길이)가
+//   components/AdOptionTray.jsx 로 빠졌다. **입력 수정 화면(/ads/[id]?step=draft)과
+//   나눠 쓰기 위해서**다 — 두 벌이면 한쪽이 낡는다.
+//   이 시험들이 재는 계약은 그대로이므로 **읽는 자리만 넓힌다**: 화면 + 그 화면이 쓰는
+//   트레이를 한 덩어리로 본다. 트레이만 읽으면 화면 쪽 계약(사진·본문)을 놓친다.
+const src = [
+  readFileSync("app/ads/new/page.js", "utf8"),
+  readFileSync("components/AdOptionTray.jsx", "utf8"),
+].join("\n");
 // /ads/[id] — 상태 넷(draft·scenario·rendering·done)을 한 화면이 다룬다.
 const detailSrc = readFileSync("app/ads/[id]/page.js", "utf8");
 // 보관함 카드 — 종류(kind)로 갈라 그리는지.
@@ -468,8 +476,13 @@ describe("/ads/new — 등급이 고를 수 있는 모델만 보인다", () => {
   it("★ 등급은 내 정보에서 읽는다 — 화면이 스스로 정하지 않는다", () => {
     // ★ 2026-08-21 — 관리자는 등급을 안 타므로 admin 도 함께 넘긴다. 판정은 여전히
     //   lib/tiers.js 하나이고, 화면은 "내 정보"에서 읽은 값을 넘길 뿐이다.
-    expect(src).toMatch(/modelsForTier\(\s*me\?\.tier,\s*\{ admin \}\s*\)/);
+    // ★ 2026-08-21 — 트레이가 컴포넌트로 빠지면서 두 조각이 됐다. **둘 다** 본다:
+    //   · 화면이 내 정보의 등급·관리자 여부를 트레이에 넘기는가
+    //   · 트레이가 그 값으로 lib/tiers 의 판정을 부르는가
+    //   하나만 보면 "넘기는데 안 쓰거나" "쓰는데 안 넘기는" 자리를 놓친다.
+    expect(src, "화면이 등급을 트레이에 안 넘긴다").toMatch(/tier=\{me\?\.tier\}/);
     expect(src, "admin 을 내 정보에서 읽지 않는다").toContain("me?.isAdmin === true");
+    expect(src, "트레이가 등급 판정을 안 부른다").toMatch(/modelsForTier\(\s*tier,\s*\{ admin \}\s*\)/);
   });
 });
 

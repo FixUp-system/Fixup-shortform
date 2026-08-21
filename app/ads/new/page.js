@@ -29,6 +29,7 @@ import { priceLabel, adVideoPrice } from "../../../lib/pricing";
 // app/create/page.js 와 같은 이유로 쓴다 — 새 광고를 시작하는 자리에서 이전 광고의
 // 단계가 사이드바에 남지 않게 비운다(components/AdProjectContext).
 import { useAdProject } from "../../../components/AdProjectContext";
+import AdOptionTray from "../../../components/AdOptionTray";
 import { useMe } from "../../../components/MeContext";
 // 등급이 고를 수 있는 모델 — 표와 판정은 lib/tiers.js 한 벌이다.
 import { modelsForTier } from "../../../lib/tiers";
@@ -103,19 +104,8 @@ export default function AdNewPage() {
       e.target.value = "";
     }
   }
-
-  // 모델을 바꾸면 그 모델이 받는 길이·해상도가 바뀐다(lib/ad/models.js — 길이는
-  // 2.0=15초·2.5=15·30초, 해상도는 standard만 1080p까지). 지금 고른 값이 새 모델에서
-  // 유효하지 않으면(예: standard에서 1080p를 골라 둔 채 fast로 바꾸는 경우) 그 모델의
-  // 첫 값으로 되돌린다 — 안 그러면 [시나리오 만들기]가 서버(app/api/ads/route.js 의
-  // isAdSeconds·isAdResolution 검사)에서 400을 받는다.
-  function onModelChange(id) {
-    setModel(id);
-    setSeconds((s) => (isAdSeconds(s, id) ? s : adSecondsFor(id)[0]));
-    // ★ 되돌릴 자리는 **그 모델의 기본 해상도**다(2026-08-21). 목록의 첫 원소를 쓰면
-    //   H3 가 2K 가 아니라 목록 순서에 끌려간다 — 사장님이 정한 기본은 2K 다.
-    setResolution((r) => (isAdResolution(r, id, { admin }) ? r : adDefaultResolution(id)));
-  }
+  // (모델을 바꿀 때 길이·해상도를 되돌리는 일은 이제 AdOptionTray 가 한다 —
+  //  두 화면이 같은 규칙을 쓰게 하려고 그쪽으로 옮겼다.)
 
   async function submit() {
     setBusy(true); setErr("");
@@ -164,139 +154,24 @@ export default function AdNewPage() {
           )}
 
           {/* 고른 것들은 늘 펼쳐 둔다 — 접으면 무엇이 골라져 있는지 보려고 한 번 더 눌러야 한다 */}
-          <div className="composer-tray">
-            <div className="tray-row">
-              <span className="tray-label">포맷</span>
-              <div className="tray-col">
-                <div className="chips">
-                  {AD_FORMATS.map((f) => (
-                    <button key={f.id} className={`chip${format === f.id ? " on" : ""}`}
-                      onClick={() => setFormat(f.id)}>
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="tray-note">{AD_FORMATS.find((f) => f.id === format)?.beat}</div>
-              </div>
-            </div>
-
-            <div className="tray-row">
-              <span className="tray-label">분위기</span>
-              <div className="tray-col">
-                <div className="chips">
-                  {AD_MOODS.map((m) => (
-                    <button key={m.id} className={`chip${mood === m.id ? " on" : ""}`}
-                      onClick={() => setMood(m.id)}>
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="tray-row">
-              <span className="tray-label">화풍</span>
-              <div className="tray-col">
-                <div className="chips">
-                  {AD_STYLES.map((s) => (
-                    <button key={s.id} className={`chip${style === s.id ? " on" : ""}`}
-                      onClick={() => setStyle(s.id)}>
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="tray-note">{AD_STYLES.find((s) => s.id === style)?.desc}</div>
-              </div>
-            </div>
-
-            <div className="tray-row">
-              <span className="tray-label">언어</span>
-              <div className="tray-col">
-                <div className="chips">
-                  {/* 숨긴 언어(hidden)는 안 그린다 — 표에는 남아 있다(lib/ad/options.js 주석) */}
-                  {AD_LANGS.filter((l) => !l.hidden).map((l) => (
-                    <button key={l.id} className={`chip${lang === l.id ? " on" : ""}`}
-                      onClick={() => setLang(l.id)}>
-                      {l.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* 사이즈 — 컷을 만든 뒤에는 못 바꾼다. app/create/page.js 와 같은 이유로 여기가 자리다 */}
-            <div className="tray-row">
-              <span className="tray-label">사이즈</span>
-              <div className="tray-col">
-                <div className="chips">
-                  {ASPECTS.map((a) => (
-                    <button key={a.id} className={`chip${aspect === a.id ? " on" : ""}`}
-                      onClick={() => setAspect(a.id)}>
-                      {a.label} · {a.id}
-                    </button>
-                  ))}
-                </div>
-                <div className="tray-note">{aspectFor(aspect).note}에 맞는 규격이에요</div>
-              </div>
-            </div>
-
-            {/* 모델 — 바꾸면 아래 해상도·길이도 그 모델이 받는 값으로 되돌아간다(onModelChange) */}
-            <div className="tray-row">
-              <span className="tray-label">모델</span>
-              <div className="tray-col">
-                <div className="chips">
-                  {/* ★★ **등급이 고를 수 있는 것만** 그린다(2026-08-20). 숨김(hidden)도
-                      함께 걸러진다 — modelsForTier 가 둘 다 본다.
-                      ⚠️ 이것은 **가림막이지 잠금이 아니다.** 잠금은 서버가 한다
-                      (app/api/ads/route.js · app/api/ads/[id]/render/route.js). 2.5 가
-                      지금까지 열려 있던 이유가 정확히 이것이다 — 화면에서만 거르고
-                      서버는 그대로 받았다. */}
-                  {modelsForTier(me?.tier, { admin }).map((m) => (
-                    <button key={m.id} className={`chip${model === m.id ? " on" : ""}`}
-                      onClick={() => onModelChange(m.id)}>
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="tray-note">{AD_MODELS.find((m) => m.id === model)?.hint}</div>
-              </div>
-            </div>
-
-            {/* 해상도 — 고른 모델이 받는 값만 나온다(adResolutionsFor). standard 만
-                1080p까지 열린다. 모델을 바꾸면 되돌아간다(onModelChange). */}
-            <div className="tray-row">
-              <span className="tray-label">해상도</span>
-              <div className="tray-col">
-                <div className="chips">
-                  {adResolutionsFor(model, { admin }).map((r) => (
-                    <button key={r} className={`chip${resolution === r ? " on" : ""}`}
-                      onClick={() => setResolution(r)}>
-                      {r}{showCredits && ` · ${priceLabel(adVideoPrice(seconds, model, r))}`}
-                      {/* ★ 관리자에게만 보이는 칸이라는 것을 화면이 말한다 — 안 그러면
-                          운영자가 무심코 골라 한 편에 $15~31 이 나간다. */}
-                      {isAdminOnlyResolution(r, model) && <span className="soon-tag">관리자</span>}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* 길이 — 고른 모델이 받는 값만 나온다(adSecondsFor). 정가를 같이 보여
-                사장님이 고르기 전에 값을 알게 한다 — 숫자는 pricing.js 가 만든다. */}
-            <div className="tray-row">
-              <span className="tray-label">길이</span>
-              <div className="tray-col">
-                <div className="chips">
-                  {adSecondsFor(model).map((s) => (
-                    <button key={s} className={`chip${seconds === s ? " on" : ""}`}
-                      onClick={() => setSeconds(s)}>
-                      {s}초{showCredits && ` · ${priceLabel(adVideoPrice(s, model, resolution))}`}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
+          {/* ★ 트레이는 **입력 수정 화면과 나눠 쓴다**(components/AdOptionTray.jsx) —
+              두 벌이면 한쪽이 낡는다. 판정은 그 안에서도 lib 이 쥔다. */}
+          <AdOptionTray
+            value={{ format, mood, style, lang, aspect, model, seconds, resolution }}
+            onChange={(patch) => {
+              if (patch.format !== undefined) setFormat(patch.format);
+              if (patch.mood !== undefined) setMood(patch.mood);
+              if (patch.style !== undefined) setStyle(patch.style);
+              if (patch.lang !== undefined) setLang(patch.lang);
+              if (patch.aspect !== undefined) setAspect(patch.aspect);
+              if (patch.model !== undefined) setModel(patch.model);
+              if (patch.seconds !== undefined) setSeconds(patch.seconds);
+              if (patch.resolution !== undefined) setResolution(patch.resolution);
+            }}
+            showCredits={showCredits}
+            admin={admin}
+            tier={me?.tier}
+          />
 
           <div className="composer-bar">
             <button className="pill" disabled={photos.length >= MAX_PHOTOS}
