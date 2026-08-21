@@ -9,10 +9,12 @@ import { applyCasting } from "../app/api/reel/[id]/scenario/route.js";
 import { mergeImages } from "../app/api/reel/[id]/images/route.js";
 import { runReelClips } from "../lib/reel/pipeline.js";
 import { resolveCutRefs } from "../lib/cast.js";
-import { isReelClipStale } from "../lib/reel/steps.js";
+import {
+  isReelClipStale, isReelStepReachable, currentReelStepKey, reelStepFromPathname,
+} from "../lib/reel/steps.js";
 import {
   isReelRendering, imageTriesLeft, imageTriesLeftLifetime,
-  MAX_REEL_IMAGE_TRIES, MAX_REEL_IMAGE_TRIES_LIFETIME,
+  MAX_REEL_IMAGE_TRIES, MAX_REEL_IMAGE_TRIES_LIFETIME, canBakeReelClips,
 } from "../lib/reel/doc.js";
 
 const read = (p) => readFileSync(p, "utf8");
@@ -41,8 +43,43 @@ describe("값이 나가는 문", () => {
     expect(clips).toContain("requireVideoCharge");
   });
 
-  it("굽기는 프롬프트가 다 찼는지 본다 — 화면과 같은 판정을 쓴다", () => {
-    expect(clips).toContain("isPromptsReady");
+  // ★★ 2026-08-21 리뷰 A2 — isPromptsReady 하나만 보면 그림 없는 컷도 청구를 지난다
+  //   (runReelClips 의 진짜 전제는 프롬프트+그림 둘 다다). 프롬프트뿐 아니라 그림까지
+  //   함께 보는 canBakeReelClips 로 갈았다 — 화면(app/reel/[id]/video/page.js)과
+  //   같은 함수를 본다.
+  it("굽기는 프롬프트뿐 아니라 그림까지 본다 — 화면과 같은 판정을 쓴다", () => {
+    expect(clips).toContain("canBakeReelClips");
+    expect(clips).not.toContain("isPromptsReady");
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────
+// A2 — canBakeReelClips 자체의 판정 (lib/reel/doc.js)
+// ────────────────────────────────────────────────────────────────────────
+describe("A2 — canBakeReelClips", () => {
+  it("프롬프트도 그림도 다 있으면 참이다", () => {
+    expect(canBakeReelClips([
+      { idx: 0, clip_prompt: "a", image: { url: "https://x/0.png" } },
+      { idx: 1, clip_prompt: "b", image: { url: "https://x/1.png" } },
+    ])).toBe(true);
+  });
+
+  it("프롬프트는 다 있는데 그림이 하나라도 없으면 거짓이다", () => {
+    expect(canBakeReelClips([
+      { idx: 0, clip_prompt: "a", image: { url: "https://x/0.png" } },
+      { idx: 1, clip_prompt: "b", image: null },
+    ])).toBe(false);
+  });
+
+  it("그림은 다 있는데 프롬프트가 하나라도 비면 거짓이다", () => {
+    expect(canBakeReelClips([
+      { idx: 0, clip_prompt: "", image: { url: "https://x/0.png" } },
+      { idx: 1, clip_prompt: "b", image: { url: "https://x/1.png" } },
+    ])).toBe(false);
+  });
+
+  it("빈 배열은 거짓이다 — 컷이 없는데 열면 0개를 굽고 완성이 된다", () => {
+    expect(canBakeReelClips([])).toBe(false);
   });
 });
 
@@ -453,5 +490,45 @@ describe("GET /api/reel/[id] — 읽는 문", () => {
   it("소유자 범위로 읽는다 — getProjectForViewing(보관함 공유)이 아니다", () => {
     expect(src).toContain("getProject(");
     expect(src).not.toContain("getProjectForViewing");
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────
+// 2026-08-21 리뷰 A4 — 단계 가드 판정이 app/reel/[id]/layout.js 밖(레이아웃 소비자 하나뿐일
+// 줄 알았던 곳)에서 lib/reel/steps.js 로 옮겨졌다. 보관함 상세(app/archive/[id]/page.js)가
+// 둘째 소비자가 됐기 때문이다 — 두 벌로 손으로 다시 적으면 갈린다.
+// ────────────────────────────────────────────────────────────────────────
+describe("A4 — 단계 가드는 lib/reel/steps.js 하나다", () => {
+  it("컷이 하나도 없으면 ③그림부터 막힌다(시나리오만 있고 컷 분할 전은 없다)", () => {
+    expect(isReelStepReachable("prompts", { scenario: { text: "s" }, cuts: [] })).toBe(false);
+  });
+
+  it("컷마다 그림이 있어야 ④영상 프롬프트가 열린다", () => {
+    const withImages = { scenario: { text: "s" }, cuts: [{ idx: 0, image: { url: "https://x/0.png" } }] };
+    const withoutImages = { scenario: { text: "s" }, cuts: [{ idx: 0, image: null }] };
+    expect(isReelStepReachable("prompts", withImages)).toBe(true);
+    expect(isReelStepReachable("prompts", withoutImages)).toBe(false);
+  });
+
+  it("⑤영상은 canBakeReelClips 와 같은 값이다 — 그림만 있고 프롬프트가 없으면 안 열린다", () => {
+    const project = { scenario: { text: "s" }, cuts: [{ idx: 0, image: { url: "https://x/0.png" }, clip_prompt: "" }] };
+    expect(isReelStepReachable("video", project)).toBe(false);
+  });
+
+  it("⑥완성은 클립이 하나라도 있어야 열린다", () => {
+    const noClip = { scenario: { text: "s" }, cuts: [{ idx: 0, image: { url: "https://x/0.png" }, clip_prompt: "p" }] };
+    const withClip = { scenario: { text: "s" }, cuts: [{ idx: 0, video: { url: "https://x/0.mp4" } }] };
+    expect(isReelStepReachable("done", noClip)).toBe(false);
+    expect(isReelStepReachable("done", withClip)).toBe(true);
+  });
+
+  it("currentReelStepKey 가 순서대로 다음 할 일을 가리킨다", () => {
+    expect(currentReelStepKey({})).toBe("scenario");
+    expect(currentReelStepKey({ scenario: { text: "s" }, cuts: [] })).toBe("images");
+  });
+
+  it("reelStepFromPathname 은 세 칸짜리 주소만 받는다(방식이 없다)", () => {
+    expect(reelStepFromPathname("/reel/abc/scenario")?.key).toBe("scenario");
+    expect(reelStepFromPathname("/reel/abc/other/scenario")).toBeUndefined();
   });
 });

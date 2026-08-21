@@ -15,8 +15,9 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
-import { REEL_STEPS, reelStepHref } from "../../../lib/reel/steps";
-import { isPromptsReady } from "../../../lib/reel/doc";
+import {
+  REEL_STEPS, reelStepHref, isReelStepReachable, currentReelStepKey, reelStepFromPathname,
+} from "../../../lib/reel/steps";
 
 const Ctx = createContext(null);
 
@@ -42,47 +43,12 @@ function ReelProjectProvider({ children }) {
   return <Ctx.Provider value={{ project, setProject, reload }}>{children}</Ctx.Provider>;
 }
 
-// ── 단계 가드 ────────────────────────────────────────────────────────────
-//
-// ★ REEL_STEPS(lib/reel/steps.js)에는 이 판정이 없다 — Task 8 은 표(순서·주소)만 순수
-//   함수로 두었다. film 은 방식이 갈려 표 옆(lib/film/steps.js)에 `isFilmStepReachable`을
-//   함께 두지만, reel 은 방식이 하나뿐이고 이 레이아웃이 유일한 소비자라 여기 둔다 —
-//   화면(다른 단계 페이지)은 이 함수를 다시 안 쓴다(가드는 레이아웃 하나가 전담한다).
-//
-// 순서 그대로 문이 열린다:
-//   ①입력·②시나리오는 항상 열려 있다.
-//   ③그림은 시나리오가 있어야 연다(시나리오 라우트가 컷을 만든다).
-//   ④영상 프롬프트는 컷마다 그림이 있어야 연다 — /clips 가 그림 없는 컷을 거절한다
-//     (lib/reel/pipeline.js 의 runReelClips 가 문 앞에서 그것부터 본다).
-//   ⑤영상(컷별 굽기)은 isPromptsReady 다 — /clips 서버 판정과 같은 값(브리프의 요구).
-//   ⑥완성은 클립을 하나라도 구워야 연다(합성이 구울 재료가 있어야 한다 — /render 의
-//     "영상을 먼저 만들어 주세요" 400 과 같은 조건).
-function isReelStepReachable(key, project) {
-  const cuts = project?.cuts || [];
-  if (key === "material" || key === "scenario") return true;
-  if (key === "images") return !!project?.scenario?.text;
-  if (key === "prompts") return cuts.length > 0 && cuts.every((c) => !!c?.image?.url);
-  if (key === "video") return isPromptsReady(cuts);
-  if (key === "done") return cuts.some((c) => !!c?.video?.url);
-  return false;
-}
-
-// 지금 있어야 할 단계 — 위 판정이 여는 순서를 그대로 따라간다.
-function currentReelStepKey(project) {
-  if (!project?.scenario?.text) return "scenario";
-  const cuts = project?.cuts || [];
-  if (!cuts.length || !cuts.every((c) => !!c?.image?.url)) return "images";
-  if (!isPromptsReady(cuts)) return "prompts";
-  if (!cuts.some((c) => !!c?.video?.url)) return "video";
-  return "done";
-}
-
-function reelStepFromPathname(pathname) {
-  const parts = (pathname || "").split("/").filter(Boolean);
-  if (parts[0] !== "reel" || parts.length !== 3) return undefined;
-  const seg = parts[2];
-  return REEL_STEPS.find((s) => s.seg === seg);
-}
+// ★★ 2026-08-21 Task 12 리뷰 A4 — 단계 가드 판정(`isReelStepReachable`·
+//   `currentReelStepKey`·`reelStepFromPathname`)은 여기 없다. 처음엔 이 레이아웃이
+//   유일한 소비자일 줄 알았는데, 보관함 상세(app/archive/[id]/page.js)가 "이어서
+//   작업하기" 링크를 만들려고 같은 판정을 또 필요로 했다 — 그래서 `lib/reel/steps.js`
+//   (film 이 `currentFilmStepKey` 를 두는 자리와 같다)로 옮겼다. 여기서는 import 해서
+//   쓴다.
 
 function Inner({ children }) {
   const { id } = useParams();
@@ -120,10 +86,12 @@ function Inner({ children }) {
   return (
     <>
       <h1 className="pgtitle">컷마다 말하는 영상</h1>
-      {/* ★ 사이드바에는 이 흐름의 목록이 없다(components/Sidebar.jsx 는 이번 태스크의
-          파일 범위 밖이다) — 그래서 스테퍼를 여기서 그린다. 클래스는 film 이 쓰는
-          side-steps 를 그대로 빌린다(전역 CSS 라 상위 컨테이너에 안 갇혀 있다,
-          app/globals.css 확인). */}
+      {/* ★ 사이드바에는 이 흐름의 진입 링크만 있고 단계 목록은 없다(2026-08-21 리뷰 A1로
+          진입 링크는 생겼다 — components/Sidebar.jsx). film 의 FilmStepList 처럼 목록을
+          거기 그리려면 이 컨텍스트를 루트 레이아웃까지 끌어올려야 하는데, 그것은 이
+          진입 링크 하나 때문에 치를 값이 아니다(위 컨텍스트 주석 참고) — 그래서 스테퍼는
+          여기서 그린다. 클래스는 film 이 쓰는 side-steps 를 그대로 빌린다(전역 CSS 라
+          상위 컨테이너에 안 갇혀 있다, app/globals.css 확인). */}
       <div className="side-steps">
         {REEL_STEPS.map((s) => {
           const open = isReelStepReachable(s.key, project);

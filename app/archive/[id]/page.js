@@ -21,6 +21,11 @@ import { archiveVideoUrl } from "../../../lib/archive/video";
 // 한 번에 굽는 영상의 단계 표 — 주소는 여기서만 만든다(화면이 손으로 적으면 표와 갈린다).
 import { FILM_STEPS, filmStepHref, currentFilmStepKey } from "../../../lib/film/steps";
 import { PICKABLE_FILM_MODES } from "../../../lib/film/mode";
+// reel(컷마다 직접 말하는 영상)의 단계 표 — 같은 이유로 여기서만 주소를 만든다.
+// ★★ 2026-08-21 리뷰 A1·A4 — isReelStepReachable·currentReelStepKey 를
+//   lib/reel/steps.js 로 옮긴 것이 바로 이 소비자 때문이다(이 화면도 film 처럼
+//   "지금 있어야 할 단계"로 보낸다).
+import { REEL_STEPS, reelStepHref, currentReelStepKey } from "../../../lib/reel/steps";
 
 // 한 줄짜리 정보. 값이 없으면 줄째 안 그린다 — 빈 칸을 늘어놓으면 무엇이 없는지가 아니라
 // 화면이 덜 만들어진 것처럼 보인다.
@@ -51,7 +56,10 @@ function ArchiveDetailPageBody() {
       // ★ film 문을 빠뜨리면 film 카드는 **눌러도 아무것도 안 열린다** — /api/ads 도
       //   /api/projects 도 그 문서를 404 로 거절하기 때문이다(2026-08-19에 실제로 그랬다).
       //   종류가 늘 때 여기 한 줄을 더하는 것을 tests/step-doc-gate.test.js 가 잰다.
-      for (const url of [`/api/ads/${id}`, `/api/film/${id}`, `/api/projects/${id}`]) {
+      // ★★ 2026-08-21 리뷰 A1 — reel 이 정확히 그 상태였다: 사이드바 진입점도 없었고
+      //   이 배열에도 없어서 주소를 직접 쳐야만 열렸다. `/api/reel/${id}` 를 더한다
+      //   (app/api/reel/[id]/route.js — 이 태스크(Task 12) 도중에야 생긴 문).
+      for (const url of [`/api/ads/${id}`, `/api/film/${id}`, `/api/reel/${id}`, `/api/projects/${id}`]) {
         try {
           const res = await fetch(url);
           if (!res.ok) continue;
@@ -82,11 +90,21 @@ function ArchiveDetailPageBody() {
   //   [이어서 작업하기]가 단계별 화면(/create/…)을 가리킨다 — 그 화면의 문은 film 문서를
   //   404 로 거절하므로 눌러도 막다른 길이다.
   const isFilm = doc.kind === "film";
+  // ★★ 2026-08-21 리뷰 A1 — reel 도 같은 이유로 갈라 둔다. 안 가르면 "종류가 없는 옛
+  //   문서"로 떨어져 [이어서 작업하기]가 /create/… 를 가리키는데, 그 화면의 문
+  //   (GET /api/projects/[id])은 kind:"reel" 문서를 404 로 거절한다(위 for 루프와 같은
+  //   격리, lib/projects.js 의 isStepDoc).
+  const isReel = doc.kind === "reel";
   const s = doc.settings || {};
   // 완성본 주소 — 종류마다 사는 자리가 다르다. 판정은 순수 함수 한 벌이다(lib/archive/video.js).
   // ★ 화면 안 삼항식으로 두었더니 film 갈래만 **객체**를 내서 재생·내려받기가 둘 다 죽었다.
   //   그 함수의 주석에 왜 값으로 재야 하는지가 있다.
-  const video = archiveVideoUrl(doc);
+  // ★★ 2026-08-21 리뷰 A1 — `archiveVideoUrl` 은 이번 태스크의 파일 범위 밖(lib/archive/
+  //   video.js)이라 reel 을 모른다 — 안 가르면 `doc.render?.url`(단계별 자리)로 떨어져
+  //   완성된 reel 도 "아직 완성본이 없어요"로 보인다. reel 완성본은 `doc.reel.video.url`
+  //   에 산다(app/api/reel/[id]/render/route.js 가 putReel 로 채우는 그 자리) — 그 함수를
+  //   건드리지 않고 이 화면 안에서만 그 자리를 먼저 본다.
+  const video = isReel ? (doc.reel?.video?.url || null) : archiveVideoUrl(doc);
   // 이어서 작업하는 자리 — 종류마다 제작 화면이 다르다.
   // ★★ 한 번에 굽는 영상은 **단계별 흐름**으로 보낸다(2026-08-20). 사이드바 메뉴와 같은
   //   곳이어야 한다 — 갈리면 어느 문으로 들어왔느냐에 따라 다른 화면이 나온다.
@@ -99,7 +117,14 @@ function ArchiveDetailPageBody() {
     const step = FILM_STEPS.find((s) => s.key === currentFilmStepKey(doc, mode));
     return filmStepHref(step, id, mode);
   };
-  const workHref = isAd ? `/ads/${id}` : isFilm ? filmHref() : `/create/${id}/briefing`;
+  // ★★ 2026-08-21 리뷰 A1 — reel 도 같은 결이다: 지금 있어야 할 단계로 보낸다(시나리오가
+  //   없으면 시나리오로, 클립까지 다 있으면 완성으로). 주소는 lib/reel/steps.js 의 표가
+  //   만든다 — 손으로 적으면 세그먼트를 바꿀 때 여기만 옛 주소로 남는다.
+  const reelHref = () => {
+    const step = REEL_STEPS.find((s) => s.key === currentReelStepKey(doc));
+    return reelStepHref(step, id);
+  };
+  const workHref = isAd ? `/ads/${id}` : isFilm ? filmHref() : isReel ? reelHref() : `/create/${id}/briefing`;
   // 모델은 **전체 이름**으로 적는다 — 여기는 모델 묶음 밖이라 "2.0" 만 적으면 무엇의
   // 2.0 인지 알 수 없다. 이름은 표에서 온다(화면이 짓지 않는다).
   //
@@ -116,7 +141,9 @@ function ArchiveDetailPageBody() {
 
   return (
     <>
-      <h1 className="pgtitle">{isAd ? "광고 영상" : isFilm ? "한 번에 굽는 영상" : "영상 만들기 (단계별)"}</h1>
+      <h1 className="pgtitle">
+        {isAd ? "광고 영상" : isFilm ? "한 번에 굽는 영상" : isReel ? "컷마다 말하는 영상" : "영상 만들기 (단계별)"}
+      </h1>
       <p className="pgsub">이 영상이 어떻게 만들어졌는지 볼 수 있어요.</p>
 
       <section className="panel panel--library">
@@ -141,17 +168,21 @@ function ArchiveDetailPageBody() {
 
             </div>
 
-            {/* 영상을 만든 글 — 광고는 시나리오 지시문 하나, 단계별은 원고다.
+            {/* 영상을 만든 글 — 광고·reel 은 시나리오 지시문 하나, 단계별은 원고다.
                 ★ **접어 둔다.** 시나리오는 4,000자까지라 펼쳐 두면 위의 짧은 정보(모델·길이)가
                   저 아래로 밀린다. <details> 를 쓰는 이유: 키보드·스크린리더 동작이 이미
-                  붙어 있다 — useState 로 흉내 내면 그것을 직접 만들어야 하고 대개 빠뜨린다. */}
-            {isAd && doc.scenario?.text && (
+                  붙어 있다 — useState 로 흉내 내면 그것을 직접 만들어야 하고 대개 빠뜨린다.
+                ★★ 2026-08-21 리뷰 A1 — reel 도 doc.scenario.text 다(lib/ad/scenario.js 의
+                  generateScenario 를 그대로 쓴다, app/api/reel/[id]/scenario/route.js) —
+                  광고와 같은 자리라 조건에 더한다. reel 에는 doc.script 가 아예 없어서
+                  안 더하면 이 화면에 프롬프트 글이 통째로 안 보인다. */}
+            {(isAd || isReel) && doc.scenario?.text && (
               <details className="lib-fold">
                 <summary>프롬프트 — 영상 모델에 넘긴 글</summary>
                 <p className="script-src">{doc.scenario.text}</p>
               </details>
             )}
-            {!isAd && doc.script?.text && (
+            {!isAd && !isReel && doc.script?.text && (
               <details className="lib-fold">
                 <summary>프롬프트 — 낭독한 원고</summary>
                 <p className="script-src">{doc.script.text}</p>

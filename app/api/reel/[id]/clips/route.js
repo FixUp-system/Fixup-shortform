@@ -1,7 +1,7 @@
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { runInBackground } from "../../../../../lib/background.js";
 import { runReelClips } from "../../../../../lib/reel/pipeline.js";
-import { isPromptsReady, putReel, reelOf } from "../../../../../lib/reel/doc.js";
+import { canBakeReelClips, putReel, reelOf } from "../../../../../lib/reel/doc.js";
 import { getProject, updateProject } from "../../../../../lib/projects.js";
 import { requireVideoCharge, NoCredits } from "../../../../../lib/charges.js";
 import { modelIdForProject, resolutionForProject } from "../../../../../lib/clip-limits.js";
@@ -23,8 +23,14 @@ export const POST = withUser(async (req, { params }, user) => {
   }
 
   // ★ 화면과 **같은 판정**을 쓴다 — 손으로 적으면 화면이 열어 준 버튼을 서버가 막는다.
-  if (!isPromptsReady(project.cuts)) {
-    return Response.json({ error: "영상 프롬프트를 먼저 만들어 주세요" }, { status: 400 });
+  // ★★ 2026-08-21 리뷰 A2 — 여기가 프롬프트가 다 찼는지 하나만 봤었다. `runReelClips`
+  //   (lib/reel/pipeline.js)의 진짜 전제는 "프롬프트 다 찼다 **그리고** 컷마다 그림도
+  //   있다"인데, 그 조합은 **청구 뒤 백그라운드**에서만 확인됐다 — 프롬프트는 다 찼는데
+  //   그림이 빠진 컷이 있으면 크레딧이 나간 **뒤** `status:"error"` 였다. 청구 앞인
+  //   여기서 그 조합을 함께 보면 그 값은 아예 안 나간다(`canBakeReelClips`, 화면
+  //   게이트와 같은 함수).
+  if (!canBakeReelClips(project.cuts)) {
+    return Response.json({ error: "영상 프롬프트와 그림을 먼저 만들어 주세요" }, { status: 400 });
   }
 
   // ★★ 2026-08-21 리뷰 C2 — 돌고 있는 실행 위에 또 시작하지 않는다. **청구보다 앞**이다.

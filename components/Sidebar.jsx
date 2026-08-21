@@ -200,6 +200,15 @@ export default function Sidebar() {
   //   한 겹 더 올려야 하고, 그것은 이 메뉴 하나 때문에 치를 값이 아니다.
   const inFilm = pathname.startsWith("/film");
   const makeFilmHref = "/film/new";
+  // reel(컷마다 직접 말하는 영상) — **2026-08-21 리뷰 A1 전에는 진입점이 0건이었다.**
+  // 사이드바에 없으면 주소를 직접 쳐야만 열렸다(film 이 자기 읽는 문을 빠뜨렸을 때와
+  // 같은 사고 — "카드는 있는데 눌러도 아무것도 안 열린다"). film 과 같은 결로 둔다:
+  // ★ 새로 시작은 언제나 /reel/new 다 — reel 의 프로젝트도 film 처럼 레이아웃 안에서만
+  //   사는 컨텍스트(app/reel/[id]/layout.js)라, 여기서 "작업 중인 프로젝트로" 되돌리려면
+  //   그 컨텍스트를 루트까지 끌어올려야 한다(같은 판단을 film 이 이미 내렸다). 단계
+  //   목록도 그래서 없다 — 진입 링크 하나 때문에 치를 값이 아니다.
+  const inReel = pathname.startsWith("/reel");
+  const makeReelHref = "/reel/new";
   return (
     <aside className="side">
       <div className="logo">
@@ -235,6 +244,9 @@ export default function Sidebar() {
         </Link>
       ))}
       {inFilm && <FilmStepList pathname={pathname} />}
+      <Link href={makeReelHref} className={`side-item${inReel ? " on" : ""}`}>
+        <span className="ic"><Icon name="home" /></span>영상 만들기 (컷이 직접 말해요)
+      </Link>
       <Link
         href="/archive"
         className={`side-item${pathname === "/archive" ? " on" : ""}`}

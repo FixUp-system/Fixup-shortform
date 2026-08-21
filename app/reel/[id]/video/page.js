@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useReelProject } from "../layout";
-import { reelOf, isPromptsReady, isReelRendering } from "../../../../lib/reel/doc";
+import { reelOf, canBakeReelClips, isReelRendering } from "../../../../lib/reel/doc";
 import { isReelClipStale } from "../../../../lib/reel/steps";
 import { startPolling } from "../../../../lib/poll";
 import { REEL_STEPS, reelStepHref } from "../../../../lib/reel/steps";
@@ -68,7 +68,9 @@ export default function ReelVideoPage() {
   const cuts = live?.cuts || project?.cuts || [];
   const status = live?.status ?? reel.status;
   const rendering = status === "rendering";
-  const ready = isPromptsReady(project?.cuts || []);
+  // ★★ 2026-08-21 리뷰 A2 — 프롬프트뿐 아니라 그림까지 본다(`/clips` 의 청구 앞 검사와
+  //   같은 값). 프롬프트만 보면 화면이 열어 준 버튼이 서버 배경 작업에서 청구 뒤 실패한다.
+  const ready = canBakeReelClips(project?.cuts || []);
   const doneCount = cuts.filter((c) => c?.video?.url).length;
 
   // 진입·새로고침 복원 — 굽는 중이면 폴링을 잇는다.
