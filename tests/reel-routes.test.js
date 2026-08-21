@@ -9,6 +9,11 @@ import { applyCasting } from "../app/api/reel/[id]/scenario/route.js";
 import { mergeImages } from "../app/api/reel/[id]/images/route.js";
 import { runReelClips } from "../lib/reel/pipeline.js";
 import { resolveCutRefs } from "../lib/cast.js";
+import { isReelClipStale } from "../lib/reel/steps.js";
+import {
+  isReelRendering, imageTriesLeft, imageTriesLeftLifetime,
+  MAX_REEL_IMAGE_TRIES, MAX_REEL_IMAGE_TRIES_LIFETIME,
+} from "../lib/reel/doc.js";
 
 const read = (p) => readFileSync(p, "utf8");
 const clips = read("app/api/reel/[id]/clips/route.js");
@@ -197,9 +202,16 @@ describe("N1 — 그림 만들기 실패가 다른 컷의 값을 지운다(재�
   });
 });
 
-describe("N4 — 굽는 중에는 그림도 다시 그리지 않는다(재검토 Important)", () => {
-  it("images 라우트가 reel.status === \"rendering\" 을 409 로 막는다", () => {
-    expect(images).toContain('reel.status === "rendering"');
+describe("N4 — 굽는 중에는 그림도 다시 그리지 않는다(재검토 Important, 실행 가능한 단정)", () => {
+  it("isReelRendering(reel) 이 status:\"rendering\" 을 그대로 잰다", () => {
+    expect(isReelRendering({ status: "rendering" })).toBe(true);
+    expect(isReelRendering({ status: "clips" })).toBe(false);
+    expect(isReelRendering({ status: "draft" })).toBe(false);
+    expect(isReelRendering(undefined)).toBe(false);
+  });
+
+  it("images 라우트가 그 함수를 실제로 부른다 — 손으로 다시 재지 않는다", () => {
+    expect(images).toContain("isReelRendering(reel)");
   });
 });
 
@@ -217,8 +229,38 @@ describe("N2 — 캐스팅 폴백이 컷 단위로 좁혀진다(재검토 Import
 });
 
 describe("N3 — 시나리오 재작성이 그림 회차를 리셋한다(재검토 Important)", () => {
-  it("scenario 라우트가 imageTries 를 0으로 되돌린다", () => {
+  it("scenario 라우트가 imageTries(판별)를 0으로 되돌린다", () => {
     expect(scenario).toContain("imageTries: 0");
+  });
+
+  it("scenario 라우트가 imageTriesTotal(수명)은 안 건드린다 — B2 의 방어선이 살아 있으려면", () => {
+    expect(scenario).not.toContain("imageTriesTotal: 0");
+    expect(scenario).not.toMatch(/imageTriesTotal\s*:/);
+  });
+});
+
+describe("B2 — 그림 재작성이 총량 방어선을 우회하지 않는다(실행 가능한 단정)", () => {
+  it("판별 상한(imageTries)이 리셋돼도 수명 상한(imageTriesTotal)이 남아 있으면 막는다", () => {
+    // N3 처방대로 시나리오를 여러 번 재작성해 imageTries 는 매번 0으로 돌아온다고 해도,
+    // imageTriesTotal 은 절대 안 돌아온다 — 그 값이 수명 상한에 닿으면 판별 상한과
+    // 무관하게 못 그린다. 이게 "20판 재작성으로 $115" 를 막는 유일한 값이다.
+    const reel = { imageTries: 0, imageTriesTotal: MAX_REEL_IMAGE_TRIES_LIFETIME };
+    expect(imageTriesLeft(reel)).toBeGreaterThan(0); // 판별 상한은 방금 리셋돼 남아 있다
+    expect(imageTriesLeftLifetime(reel)).toBe(0); // 그래도 수명 상한이 막는다
+  });
+
+  it("정상 사용(재작성 없음)은 판별 상한이 그대로 막는다 — 수명 상한이 먼저 걸리지 않는다", () => {
+    const reel = { imageTries: MAX_REEL_IMAGE_TRIES, imageTriesTotal: 3 };
+    expect(imageTriesLeft(reel)).toBe(0);
+    expect(imageTriesLeftLifetime(reel)).toBeGreaterThan(0);
+  });
+
+  it("수명 상한은 판별 상한의 배수다 — 최악 비용이 옛 상한의 몇 배 안쪽으로 묶인다", () => {
+    expect(MAX_REEL_IMAGE_TRIES_LIFETIME).toBe(MAX_REEL_IMAGE_TRIES * 4);
+  });
+
+  it("images 라우트가 수명 상한을 실제로 본다", () => {
+    expect(images).toContain("imageTriesLeftLifetime(reel)");
   });
 });
 
@@ -283,5 +325,110 @@ describe("I10 — 종류 격리가 prompts·clips 에도 있다", () => {
 
   it("clips 도 kind 를 본다", () => {
     expect(clips).toContain('kind !== "reel"');
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────
+// 2026-08-21 재검토 2라운드 — B1(그림만 다시 그려도 클립에 반영) · B3(굽기도 병합 저장).
+// ────────────────────────────────────────────────────────────────────────
+
+describe("B1 — 그림만 다시 그려도 클립이 그것을 반영한다", () => {
+  it("clip_prompt 가 같아도 그림이 바뀌면 낡았다고 본다(imageOf 축이 있을 때만)", () => {
+    const cut = {
+      clip_prompt: "a", image: { url: "https://x/new.png" },
+      video: { url: "u", of: "a", imageOf: "https://x/old.png" },
+    };
+    expect(isReelClipStale(cut)).toBe(true);
+  });
+
+  it("그림이 같으면 안 낡았다", () => {
+    const cut = {
+      clip_prompt: "a", image: { url: "https://x/same.png" },
+      video: { url: "u", of: "a", imageOf: "https://x/same.png" },
+    };
+    expect(isReelClipStale(cut)).toBe(false);
+  });
+
+  it("옛 각인(imageOf 없음)은 그림이 있어도 이 축만으로는 안 낡는다 — 형식을 바꿔도 이미 구운 클립이 통째로 낡지 않는다", () => {
+    const cut = { clip_prompt: "a", image: { url: "https://x/whatever.png" }, video: { url: "u", of: "a" } };
+    expect(isReelClipStale(cut)).toBe(false);
+  });
+
+  it("tests/reel-steps.test.js 의 계약(of === clip_prompt 그대로)은 안 건드린다", () => {
+    // 이 저장소가 못 박아 둔 세 가지: image 필드가 아예 없는 컷들.
+    expect(isReelClipStale({ clip_prompt: "b", video: { url: "u", of: "a" } })).toBe(true);
+    expect(isReelClipStale({ clip_prompt: "a", video: { url: "u", of: "a" } })).toBe(false);
+    expect(isReelClipStale({ clip_prompt: "a" })).toBe(false);
+  });
+
+  it("runReelClips 는 그림만 바뀐 컷을 다시 굽고, imageOf 를 새 그림으로 남긴다", async () => {
+    const doc = {
+      id: "pid",
+      settings: { i2v_model: "seedance-2.0", aspect_ratio: "9:16" },
+      scenario: {},
+      cuts: [{
+        idx: 0, shows: "s", clip_prompt: "body0", seconds: 4,
+        // clip_prompt 는 그대로인데 그림만 새로 그려졌다(imageOf 가 옛 그림을 가리킨다).
+        image: { url: "https://x/new.png" },
+        video: { url: "https://x/old.mp4", seconds: 4, of: "body0", imageOf: "https://x/old.png" },
+      }],
+    };
+    const calls = [];
+    await runReelClips("pid", "uid", {
+      getProject: async () => doc,
+      updateProject: async (_id, _owner, fn) => { Object.assign(doc, fn(doc)); return doc; },
+      loadRefs: async () => ({ refs: [], resolved: [], missing: 0 }),
+      makeClip: async (args) => { calls.push(args); return { url: "https://x/rebaked.mp4", seconds: 4 }; },
+    });
+    expect(calls).toHaveLength(1); // 값을 치른 재굽기 — 그림이 바뀌었으니 정당하다
+    expect(doc.cuts[0].video.url).toBe("https://x/rebaked.mp4");
+    expect(doc.cuts[0].video.imageOf).toBe("https://x/new.png"); // 다음부터는 이 그림 기준
+  });
+
+  it("각인 형식(of)은 안 바꾼다 — clip_prompt 그대로이고, 그림 축은 별도 필드다", () => {
+    const pipeline = read("lib/reel/pipeline.js");
+    expect(pipeline).toContain("of: cut.clip_prompt");
+    expect(pipeline).toContain("imageOf: cut.image.url");
+  });
+});
+
+describe("B3 — 굽기도 컷마다 바로 저장한다(N1 과 같은 처방, 가장 비싼 경로)", () => {
+  it("컷 하나가 끝날 때마다 그 컷만 저장한다 — 스냅샷 대체(cuts: next)로 되돌아가지 않았다", () => {
+    const pipeline = read("lib/reel/pipeline.js");
+    // runReelClips 본문만 본다 — runReelPrompts 는 이번 범위 밖이라 그 함수의 `next` 스냅샷
+    // 패턴은 그대로다(같은 파일 안에 있어 전체를 재면 그 줄에 걸린다).
+    const clipsFnBody = pipeline.slice(pipeline.indexOf("export async function runReelClips"));
+    expect(clipsFnBody).not.toMatch(/cuts:\s*next\b/);
+    expect(clipsFnBody).toContain("c.idx === cut.idx");
+  });
+
+  it("컷 2가 던져도 컷 1(먼저 구운 것)의 값은 이 실행 안에 이미 저장돼 있다", async () => {
+    const doc = {
+      id: "pid",
+      settings: { i2v_model: "seedance-2.0", aspect_ratio: "9:16" },
+      scenario: {},
+      cuts: [
+        { idx: 0, shows: "s0", clip_prompt: "body0", seconds: 4, image: { url: "https://x/c0.png" } },
+        { idx: 1, shows: "s1", clip_prompt: "body1", seconds: 4, image: { url: "https://x/c1.png" } },
+      ],
+    };
+    let calls = 0;
+    await expect(
+      runReelClips("pid", "uid", {
+        getProject: async () => doc,
+        updateProject: async (_id, _owner, fn) => { Object.assign(doc, fn(doc)); return doc; },
+        loadRefs: async () => ({ refs: [], resolved: [], missing: 0 }),
+        makeClip: async () => {
+          calls += 1;
+          if (calls === 2) throw new Error("fal 이 두 번째 컷에서 죽었다고 하자");
+          return { url: "https://x/v0.mp4", seconds: 4 };
+        },
+      })
+    ).rejects.toThrow(/두 번째 컷/);
+
+    // ★ 이게 B3 의 핵심 — 컷 1(성공)의 클립이 이 실행 안에서 이미 문서에 남아 있다.
+    //   실패 전 처방(끝에 한 번 저장)이었다면 여기서 undefined 였을 것이다.
+    expect(doc.cuts[0].video?.url).toBe("https://x/v0.mp4");
+    expect(doc.cuts[1].video).toBeUndefined(); // 던진 컷은 저장되지 않는다(당연하다 — 값을 못 받았다)
   });
 });

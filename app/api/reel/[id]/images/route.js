@@ -6,7 +6,9 @@ import { loadCutRefs } from "../../../../../lib/cut-refs.js";
 import { requireVideoCharge, NoCredits } from "../../../../../lib/charges.js";
 import { modelIdForProject, resolutionForProject } from "../../../../../lib/clip-limits.js";
 import { fakeFal } from "../../../../../lib/fake.js";
-import { reelOf, putReel, isImagesLocked, imageTriesLeft } from "../../../../../lib/reel/doc.js";
+import {
+  reelOf, putReel, isImagesLocked, imageTriesLeft, imageTriesLeftLifetime, isReelRendering,
+} from "../../../../../lib/reel/doc.js";
 
 // 만든 그림만 컷에 얹는다 — **컷 목록을 대체하지 않는다.** export 하는 이유: 이것이
 // N1 의 수정 전부다("실패해도 뒤 컷이 살아남는가"), 테스트가 이것을 직접 부른다
@@ -47,7 +49,9 @@ export const POST = withUser(async (req, { params }, user) => {
   //   바로 옆의 `film.status === "rendering"` → 409(app/api/film/[id]/images/route.js)는
   //   안 빌렸다. 이미지·클립 라우트 둘 다 cuts 를 저장하므로, 그 사이 굽기가 끝나면
   //   마지막 쓰기가 이겨 방금 구운 클립이나 방금 그린 그림 한쪽이 조용히 사라진다.
-  if (reel.status === "rendering") {
+  //   판정은 lib/reel/doc.js 의 isReelRendering 하나다(재검토가 요구한 "실행 가능한
+  //   단정"의 대상 — 소스 문자열이 아니라 이 함수를 직접 불러 잰다).
+  if (isReelRendering(reel)) {
     return Response.json({ error: "지금 영상을 만드는 중이에요" }, { status: 409 });
   }
   // ★★ 2026-08-21 리뷰 I7 — 그림에는 청구가 없다(정가는 클립 굽기에 붙는다). 그런데
@@ -58,9 +62,14 @@ export const POST = withUser(async (req, { params }, user) => {
   if (isImagesLocked(reel)) {
     return Response.json({ error: "이미 그리는 중이에요" }, { status: 409 });
   }
-  const triesLeft = imageTriesLeft(reel);
-  if (triesLeft <= 0) {
+  if (imageTriesLeft(reel) <= 0) {
     return Response.json({ error: "그림을 너무 많이 다시 그렸어요" }, { status: 400 });
+  }
+  // ★★ 2026-08-21 재검토 B2 — 시나리오판마다 리셋되는 imageTriesLeft 만으로는 재작성을
+  //   반복해 상한을 우회할 수 있다(N3 가 리셋을 준 바로 그 자리). 절대 안 리셋되는
+  //   프로젝트 수명 상한을 하나 더 본다 — lib/reel/doc.js 의 imageTriesLeftLifetime.
+  if (imageTriesLeftLifetime(reel) <= 0) {
+    return Response.json({ error: "이 프로젝트에서 그림을 너무 많이 다시 그렸어요 — 새로 시작해 주세요" }, { status: 400 });
   }
 
   // 정가 게이트 — 그림도 영상 정가에 포함이다(/clips 와 같은 문). 살아 있는 청구가 있으면
@@ -80,11 +89,15 @@ export const POST = withUser(async (req, { params }, user) => {
   const aspect_ratio = project.settings?.aspect_ratio || "9:16";
   const resolution = imageResolutionFor(project);
   const tries = Number(reel.imageTries) || 0;
+  // ★ 수명 회차는 시나리오 재작성으로도 안 돌아온다(scenario 라우트가 이 필드는 안
+  //   건드린다) — B2 의 총량 방어선이 실제로 총량이려면 이 카운터가 절대 안 줄어야 한다.
+  const triesTotal = Number(reel.imageTriesTotal) || 0;
 
   // 잠금은 **부르기 전에** 건다 — 부른 뒤에 걸면 그 사이에 들어온 둘째 요청이 통과한다.
   // 회차도 여기서 올린다(실패해도 회차는 먹는다 — 실패한 시도에도 그림값은 나갔을 수 있다).
-  await updateProject(id, user.id, (p) =>
-    putReel(p, { imagesDrawing: true, imagesAt: Date.now(), imageTries: tries + 1 }));
+  await updateProject(id, user.id, (p) => putReel(p, {
+    imagesDrawing: true, imagesAt: Date.now(), imageTries: tries + 1, imageTriesTotal: triesTotal + 1,
+  }));
 
   // ★★ 2026-08-21 리뷰 N1 — **만든 것만** 모은다(idx → image). 실패해도 성공해도 이걸로
   //   p.cuts 를 병합한다 — 스냅샷(next=[...])으로 cuts 를 통째로 대체하면, 루프가

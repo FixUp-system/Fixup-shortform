@@ -28,10 +28,12 @@ export const POST = withUser(async (req, { params }, user) => {
   }
 
   // ★★ 2026-08-21 리뷰 C2 — 돌고 있는 실행 위에 또 시작하지 않는다. **청구보다 앞**이다.
-  //   runReelClips 는 살아 있는 클립을 건너뛰지 않는다(무조건 전 컷 재굽기) — 그래서
-  //   두 번 누르면 전 컷이 fal 로 다시 나가는데, 이미 살아 있는 청구가 있으면
-  //   requireVideoCharge 는 그냥 지나가 **크레딧은 0** 이다. 화면 잠금만으로는 안 된다
-  //   (탭 둘·직접 호출이 샌다) — 판정은 서버가 쥔 reel.status 하나다
+  //   (2026-08-21 재검토 N5 정정 — 아래 문구가 한때 거짓이었다: runReelClips 는 이제
+  //   낡지 않은 완성 클립을 건너뛴다. 그래도 이 문은 그대로 필요하다 — 재진입 자체를
+  //   막아야 "돌고 있는 실행 위에 또 시작"이 안 생긴다. 아직 안 구운/낡은 컷이 있으면
+  //   두 실행이 같은 컷을 동시에 구울 수 있고, 그러면 fal 원가가 이중으로 나간다.)
+  //   이미 살아 있는 청구가 있으면 requireVideoCharge 는 그냥 지나가 **크레딧은 0** 이다.
+  //   화면 잠금만으로는 안 된다(탭 둘·직접 호출이 샌다) — 판정은 서버가 쥔 reel.status 하나다
   //   (app/api/projects/[id]/clips/route.js 의 isGenerationLive 409, film 의
   //   status==="rendering" 409 와 같은 결).
   if (reelOf(project).status === "rendering") {

@@ -207,6 +207,13 @@ export const POST = withUser(async (req, { params }, user) => {
     //   남아 있어야 비교가 성립). reel 은 방식이 하나뿐이고 시나리오를 다시 쓰면 이전
     //   컷·그림이 애초에 전부 버려지므로 "비교할 옛 판"이 없다 — 재작성이 곧 새 시작이면,
     //   회차도 새 시작이어야 사장님이 값을 치르고도 그리지 못하는 막다른 길이 안 생긴다.
+    //
+    // ★★ 2026-08-21 재검토 B2 — 이 리셋이 총량 방어선을 20배로 열었다(시나리오 20판 ×
+    //   그림 6회 × 컷 12개 × $0.08 ≈ $115, 전부 크레딧 0). `imageTries`(판별)만 리셋하고
+    //   **`imageTriesTotal`(수명)은 여기서 절대 안 건드린다** — images 라우트만 그 값을
+    //   올린다(lib/reel/doc.js 의 imageTriesLeftLifetime, MAX_REEL_IMAGE_TRIES_LIFETIME
+    //   = 판당 상한의 4배). 재작성이 판별 상한은 새로 열어 주되, 수명 상한은 재작성으로
+    //   못 피하게 남겨 둔다.
     return putReel(updated, { imageTries: 0, imagesDrawing: false, imagesAt: 0 });
   });
   return Response.json({ scenario, cuts: casted.cuts });
