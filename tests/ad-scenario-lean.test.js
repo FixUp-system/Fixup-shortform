@@ -212,3 +212,27 @@ describe("★ user 메시지에도 광고에 없는 칸이 안 나온다", () =>
     expect(withPhoto("film")).toContain("shows");
   });
 });
+
+describe("화질이 지문에 실린다", () => {
+  const build = (resolution) =>
+    buildScenarioMessages({
+      kind: "ad", settings: { ...settings, resolution }, material: { text: "소재", photos: [] },
+    }).messages[0].content;
+
+  it("고른 화질이 값 그대로 실린다 — 두 표기 다", () => {
+    expect(build("1080p")).toContain("화질: 1080p");
+    expect(build("4K")).toContain("화질: 4K");
+  });
+
+  // ★ 480p 에서 "실오라기가 보이는 매크로"를 요구하면 뭉개진 화면이 되고, 그 요구를
+  //   쓰느라 쓴 자리는 그대로 낭비다.
+  it("낮은 화질에만 주의가 붙는다 — 두 표기 다", () => {
+    for (const low of ["480p", "480P"]) expect(build(low)).toContain("화질이 낮다");
+    for (const ok of ["720p", "1080p", "2K", "4K"]) expect(build(ok)).not.toContain("화질이 낮다");
+  });
+
+  it("★ 화질이 없는 옛 문서는 지문이 글자 그대로 예전과 같다", () => {
+    expect(build(undefined)).not.toContain("화질:");
+    expect(build(undefined)).not.toContain("화질이 낮다");
+  });
+});
