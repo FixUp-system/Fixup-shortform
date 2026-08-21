@@ -48,6 +48,14 @@ export default function AdminPage() {
   // ★ 그래서 화면에 그릴 때는 **목록의 최신 줄**로 다시 맞춘다(아래 panelUser) — 크레딧을
   //   넣으면 목록이 갱신되는데, 든 값이 낡으면 모달만 옛 잔액을 보여 준다.
   const [panelId, setPanelId] = useState(null);
+  // ★★ 크레딧 입력 두 칸 — **선언이 통째로 빠져 있었다**(2026-08-21 사장님 지적).
+  //   모달로 옮기는 작업(2026-08-20)에서 쓰는 자리만 옮기고 선언을 안 가져왔다.
+  //   그래서 [관리]를 누르는 순간 `setGrantAmount is not defined` 로 죽어 **관리 화면이
+  //   통째로 안 열렸다**. 화면은 아무 말도 안 했다 — 콘솔에만 났다.
+  // ★ 첫 값은 openPanel 이 세운다(DEFAULT_GRANT · "체험") — 여는 순간 같은 자리로
+  //   되돌려야 지난번에 넣은 숫자가 남아 있지 않다.
+  const [grantAmount, setGrantAmount] = useState("");
+  const [grantReason, setGrantReason] = useState("");
   const panelUser = panelId ? (users || []).find((u) => u.id === panelId) || null : null;
   // ★ showModal() 로 연다 — `open` 속성만 두면 **모달이 아니라 인라인**으로 뜬다(배경도
   //   Esc 도 포커스 가둠도 없다). DialogProvider 와 같은 방식이다.
