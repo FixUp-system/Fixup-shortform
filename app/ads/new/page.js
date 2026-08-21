@@ -16,10 +16,13 @@ import { STYLE_PRESETS } from "../../../lib/styles";
 import { ASPECTS, DEFAULT_ASPECT_ID, aspectFor } from "../../../lib/aspects";
 // 모델·길이·해상도 — Task 21(백엔드)이 만든 표를 그대로 읽는다. 라벨·길이·해상도 목록을
 // 여기 손으로 다시 적으면 모델이 하나 늘 때 화면만 낡는다(위 화풍과 같은 이유).
-// ★ Task 24 — 해상도가 셋째 축이다(adResolutionsFor·isAdResolution·DEFAULT_AD_RESOLUTION).
+// ★ Task 24 — 해상도가 셋째 축이다(adResolutionsFor·isAdResolution).
+// ★ 2026-08-21 — 기본 해상도가 **모델별**이 됐다(adDefaultResolution): H3 에는 720p 가
+//   아예 없어서 전역 기본값을 쓰면 서버가 400 을 낸다. 그리고 관리자 전용 해상도
+//   (2.5 1080p)가 생겨 목록·검사가 admin 을 받는다.
 import {
   AD_MODELS, DEFAULT_AD_MODEL, adSecondsFor, isAdSeconds,
-  adResolutionsFor, isAdResolution, DEFAULT_AD_RESOLUTION,
+  adResolutionsFor, isAdResolution, adDefaultResolution, isAdminOnlyResolution,
 } from "../../../lib/ad/models";
 // 길이 칩에 정가를 같이 보여준다 — 사장님이 고르기 전에 값을 알아야 한다. 숫자는 여기 안 적는다.
 import { priceLabel, adVideoPrice } from "../../../lib/pricing";
@@ -45,6 +48,9 @@ export default function AdNewPage() {
   // 크레딧을 끈 동안(내부 QA)에는 값 이야기를 안 한다 — 판정은 서버가 내려 준 gated 하나다.
   const { me } = useMe();
   const showCredits = me?.gated !== false;
+  // ★ 관리자 전용 해상도(2.5 1080p)를 여는 열쇠. **화면은 보여 줄 뿐이고 판정은 서버가
+  //   한다**(app/api/ads/route.js) — 여기만 믿으면 가림막이지 잠금이 아니다.
+  const admin = me?.isAdmin === true;
   const [text, setText] = useState("");
   const [photos, setPhotos] = useState([]); // {id, filename, url}
   const [format, setFormat] = useState(DEFAULT_AD_OPTIONS.format);
@@ -54,7 +60,7 @@ export default function AdNewPage() {
   const [aspect, setAspect] = useState(DEFAULT_ASPECT_ID);
   const [model, setModel] = useState(DEFAULT_AD_MODEL);
   const [seconds, setSeconds] = useState(adSecondsFor(DEFAULT_AD_MODEL)[0]);
-  const [resolution, setResolution] = useState(DEFAULT_AD_RESOLUTION);
+  const [resolution, setResolution] = useState(adDefaultResolution(DEFAULT_AD_MODEL));
   const [busy, setBusy] = useState(false);
   // 사진이 아직 올라가는 중인가. ★ busy 로 겸할 수 없다 — busy 는 "만드는 중"이라
   // 버튼 글자까지 바꾼다. 무엇보다 이 값이 없으면 화면은 사진이 붙었는지 모른 채
@@ -106,7 +112,9 @@ export default function AdNewPage() {
   function onModelChange(id) {
     setModel(id);
     setSeconds((s) => (isAdSeconds(s, id) ? s : adSecondsFor(id)[0]));
-    setResolution((r) => (isAdResolution(r, id) ? r : adResolutionsFor(id)[0]));
+    // ★ 되돌릴 자리는 **그 모델의 기본 해상도**다(2026-08-21). 목록의 첫 원소를 쓰면
+    //   H3 가 2K 가 아니라 목록 순서에 끌려간다 — 사장님이 정한 기본은 2K 다.
+    setResolution((r) => (isAdResolution(r, id, { admin }) ? r : adDefaultResolution(id)));
   }
 
   async function submit() {
@@ -260,10 +268,13 @@ export default function AdNewPage() {
               <span className="tray-label">해상도</span>
               <div className="tray-col">
                 <div className="chips">
-                  {adResolutionsFor(model).map((r) => (
+                  {adResolutionsFor(model, { admin }).map((r) => (
                     <button key={r} className={`chip${resolution === r ? " on" : ""}`}
                       onClick={() => setResolution(r)}>
                       {r}{showCredits && ` · ${priceLabel(adVideoPrice(seconds, model, r))}`}
+                      {/* ★ 관리자에게만 보이는 칸이라는 것을 화면이 말한다 — 안 그러면
+                          운영자가 무심코 골라 한 편에 $15~31 이 나간다. */}
+                      {isAdminOnlyResolution(r, model) && <span className="soon-tag">관리자</span>}
                     </button>
                   ))}
                 </div>

@@ -275,10 +275,20 @@ describe("광고 라우트 — 문서", () => {
       expect(res.status).toBe(400);
     });
 
-    it("해상도를 안 주면 기본값(720p)이 명시 저장된다", async () => {
+    // ★ 2026-08-21 — 기본 해상도가 **모델별**이 됐다(adDefaultResolution). 기본 모델은
+    //   2.0 이라 여전히 720p 이지만, 값의 출처가 전역 상수에서 모델 표로 옮겨졌다.
+    it("해상도를 안 주면 그 모델의 기본값이 명시 저장된다", async () => {
       const res = await createAd(post(OK));
       const doc = await res.json();
       expect(doc.settings.resolution).toBe("720p");
+    });
+
+    it("★ H3 는 720p 가 아예 없다 — 안 주면 2K 가 저장된다", async () => {
+      const res = await createAd(
+        post({ ...OK, settings: { ...OK.settings, model: "minimax-h3" } })
+      );
+      expect(res.status).toBe(200);
+      expect((await res.json()).settings.resolution).toBe("2K");
     });
 
     it("★ standard 는 1080p 를 고를 수 있다", async () => {

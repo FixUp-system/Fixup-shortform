@@ -51,7 +51,9 @@ describe("모르는 값은 좁은 쪽으로 떨어진다", () => {
 
 describe("등급이 쓸 수 있는 모델", () => {
   it("★ 기본 등급은 2.0 만 쓴다", () => {
-    expect(modelsForTier("basic").map((m) => m.id)).toEqual(["seedance-2.0"]);
+    // ★ 2026-08-21 — H3 가 기본 등급에 들어왔다. 등급의 근거는 원가이고 H3 는 그 축에서
+    //   가장 싸다(15초 2K $1.95 < 2.0 720p $4.55) — 좁힐 이유가 없다.
+    expect(modelsForTier("basic").map((m) => m.id)).toEqual(["seedance-2.0", "minimax-h3"]);
   });
 
   it("★ 프로 등급은 2.5 도 쓴다", () => {
@@ -59,7 +61,7 @@ describe("등급이 쓸 수 있는 모델", () => {
   });
 
   it("★ 모르는 등급은 기본 등급과 같다 — 조용히 열어 주지 않는다", () => {
-    expect(modelsForTier("nope").map((m) => m.id)).toEqual(["seedance-2.0"]);
+    expect(modelsForTier("nope").map((m) => m.id)).toEqual(["seedance-2.0", "minimax-h3"]);
   });
 
   it("★ 돌려주는 것은 모델 표의 원소다 — 화면이 label·hint 를 그대로 쓴다", () => {

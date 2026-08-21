@@ -278,7 +278,7 @@ describe("/ads/new 화면 — 모델·길이 선택 (Task 22)", () => {
 
   // ★ Task 24 — 해상도 칩. 모델·길이 칩과 같은 결(표에서 읽고, 정가를 같이 보여준다).
   it("해상도 칩이 lib/ad/models 의 adResolutionsFor(model) 에서 온다 — 배열을 손으로 안 적는다", () => {
-    expect(src).toMatch(/adResolutionsFor\(model\)\.map\(/);
+    expect(src).toMatch(/adResolutionsFor\(model, \{ admin \}\)\.map\(/);
   });
 
   it("해상도 칩마다 정가를 priceLabel(adVideoPrice(...)) 로 보여준다", () => {
@@ -291,7 +291,7 @@ describe("/ads/new 화면 — 모델·길이 선택 (Task 22)", () => {
     const bodyEnd = src.indexOf("\n}", fnIdx);
     const body = src.slice(fnIdx, bodyEnd);
     expect(body, "되돌림 판정에 isAdResolution 을 안 쓴다").toContain("isAdResolution");
-    expect(body, "되돌릴 값이 adResolutionsFor(id)[0] 가 아니다").toMatch(/adResolutionsFor\(id\)\[0\]/);
+    expect(body, "되돌릴 값이 adDefaultResolution(id) 가 아니다").toMatch(/adDefaultResolution\(id\)/);
   });
 
   it("[시나리오 만들기]가 고른 resolution 을 서버로 보낸다", () => {

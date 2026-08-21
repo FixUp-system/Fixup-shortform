@@ -151,13 +151,23 @@ describe("광고 청구", () => {
       expect(paid.credits).toBe(AD_VIDEO_PRICE["seedance-2.0"][15]["720p"]);
     });
 
-    // ★ 값이 있는데 그 모델·길이가 안 받는 해상도(2.5 에 1080p)면 조용히 새지 않고 던진다.
+    // ★ 값이 있는데 그 모델이 안 받는 해상도면 조용히 새지 않고 던진다.
+    //   ★ 2026-08-21 — 예시를 바꿨다. 2.5 의 1080p 는 이제 **관리자 전용으로 열려 있고
+    //     가격도 있다**. 여기서 재는 것은 "표에 없는 값이 들어오면 던지는가"이므로
+    //     어느 모델도 안 받는 값(H3 의 2K 를 Seedance 에)으로 바꾼다.
     it("★ 값이 있는데 그 모델이 안 받는 해상도면 청구가 조용히 안 새고 던진다", async () => {
       await grant(1000);
       await expect(
-        chargeAd({ userId: U, projectId: P, seconds: 15, model: "seedance-2.5", resolution: "1080p" })
+        chargeAd({ userId: U, projectId: P, seconds: 15, model: "seedance-2.5", resolution: "2K" })
       ).rejects.toThrow(/그 해상도를 지원하지 않아요/);
       expect(await balanceFor(U)).toBe(1000);
+    });
+
+    it("★ 관리자 전용 해상도(2.5 1080p)는 가격이 있고 그 값으로 청구된다 — 기록이 비면 안 된다", async () => {
+      await grant(1000);
+      const paid = await chargeAd({ userId: U, projectId: P, seconds: 15, model: "seedance-2.5", resolution: "1080p" });
+      expect(paid.credits).toBe(AD_VIDEO_PRICE["seedance-2.5"][15]["1080p"]);
+      expect(await balanceFor(U)).toBe(1000 - paid.credits);
     });
 
     // adVideoPrice(seconds, modelId, resolution) 을 라우트가 부르는 것과 같은 조합 — 화면
