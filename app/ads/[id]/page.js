@@ -129,7 +129,9 @@ export default function AdDetailPage() {
   // 저장 — PATCH 하나다. 판정(등급·길이·해상도)은 전부 서버가 한다.
   async function saveDraft() {
     if (!dirty) return true;
-    setBusy(true); setErr(""); setSaved(false);
+    // ★ 저장하는 동안에도 ①입력 줄이 깜박여야 한다 — [시나리오 만들기]는 저장 뒤에
+    //   시나리오를 부르므로, 이 자리가 비어 있으면 **몇 초 동안 아무 신호가 없다**.
+    setBusy(true); setErr(""); setSaved(false); setBusyStep("draft");
     const res = await fetch(`/api/ads/${id}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
@@ -143,7 +145,7 @@ export default function AdDetailPage() {
       }),
     });
     const data = await res.json().catch(() => ({}));
-    setBusy(false);
+    setBusy(false); setBusyStep(null);
     if (!res.ok) { setErr(data.error || "저장하지 못했어요"); return false; }
     setProject(data);
     setSaved(true);
