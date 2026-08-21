@@ -2,7 +2,7 @@ import { withUser } from "../../../../../lib/auth/require-user.js";
 import { getProject, updateProject } from "../../../../../lib/projects.js";
 import { generateScenario, pickEditedShots, readPhotoVision } from "../../../../../lib/ad/scenario.js";
 import { isNarrationSpeaker } from "../../../../../lib/cuts.js";
-import { scenarioLock } from "../../../../../lib/reel/doc.js";
+import { scenarioLock, putReel } from "../../../../../lib/reel/doc.js";
 import { MAX_SCENARIO_TRIES } from "../../../../../lib/pricing.js";
 import {
   availableAvatars, buildCastMessages, resolveCastRefs, mergeCastIntoCuts, mergePropsIntoCuts,
@@ -51,7 +51,8 @@ function buildReelCuts(scenario) {
 //   `loadCutRefs` 가 항상 빈 배열을 돌려주고, 그러면 `generateClip` 이 `refList` 를 못 받아
 //   **i2v 로 조용히 떨어진다** — "컷마다 참조를 들고 r2v 로 굽는다"는 이 흐름의 표제
 //   기능이 한 번도 실행되지 않는다. 그래서 진짜 캐스팅(`runCasting`)을 먼저 돌리고,
-//   **아무도 못 찾았을 때만** 이 폴백으로 목소리 하나를 화면 안 대사 컷 전부에 묶는다.
+//   **캐스팅이 안 덮은 컷만** 이 폴백으로 목소리 하나를 묶는다(호출부의 `cuts` 인자가
+//   그 안 덮인 목록이다 — 재검토 N2, 아래 참고).
 // ★ C3 정정 — 예전엔 `!voice` 도 함께 보고 통째로 [] 를 줬다. `validateScenario`
 //   (lib/ad/scenario.js) 는 `voice: ""` 를 정상값으로 허용하므로, 그러면 화면 안 대사가
 //   있는 조용한(목소리를 안 정한) 시나리오에서 speechFor 가 매치를 아예 못 찾아
@@ -161,31 +162,52 @@ export const POST = withUser(async (req, { params }, user) => {
   const shots = Array.isArray(scenario.shots) ? scenario.shots : [];
   const speakers = shots.map((s) => s?.speaker || "");
 
-  // ★★ C5 — 진짜 캐스팅을 돌린다. 캐스팅이 사람을 하나라도 찾으면 그 결과(사람마다
-  //   다른 목소리 + ref_ids)를 쓴다. 아무도 못 찾았을 때만(제품만 나오는 영상 등)
-  //   buildReelCast 의 목소리 폴백으로 좁힌다 — 어느 쪽이든 speechFor 가 화면 안 대사에서
-  //   목소리를 찾을 수 있어야 한다는 계약은 지켜진다.
+  // ★★ C5 — 진짜 캐스팅을 돌린다.
   const casted = await runCasting(cuts, { ...seen, id }, speakers);
-  const cast = casted.cast.length ? casted.cast : buildReelCast(scenario, casted.cuts);
 
-  await updateProject(id, user.id, (p) => ({
-    ...p,
-    scenario: {
-      ...scenario,
-      // ★★ C4 — speechFor 의 내레이션 갈래(lib/cuts.js:1456)는 scenario.narrator_voice 를
-      //   읽는데 validateScenario 는 그 필드를 안 만든다(voice 만 만든다). 광고형 시나리오는
-      //   "내레이션" 화자인 컷이 기본이라, 안 채우면 그 컷 전부가 Voice: 절 없이 나가
-      //   컷마다 목소리가 바뀐다 — 이 저장소의 정지 게이트(컷 간 목소리 일관성)가 정확히
-      //   그 자리다. scenario.voice 를 그대로 별칭한다(한 영상에 화자는 하나라는 시나리오
-      //   프롬프트의 전제와 일치한다).
-      narrator_voice: scenario.voice,
-      tries: tries + 1,
-    },
-    cuts: casted.cuts,
-    cast,
-    status: "scenario",
-    // 읽은 사진값을 남긴다 — 안 남기면 다시 쓸 때마다 사진을 또 읽는다(사진당 값이 든다).
-    ...(seen !== project ? { material: { ...p.material, photos: seen.material.photos } } : {}),
-  }));
+  // ★★ 2026-08-21 리뷰 N2 — 폴백을 **cast 가 비었을 때**가 아니라 **캐스팅이 안 덮은
+  //   화면 안 대사 컷** 단위로 좁힌다. `validateCast` 는 `who` 없음·`cuts` 없음 항목을
+  //   조용히 버리므로, 캐스팅이 사람을 찾긴 했는데 화면 안 대사 컷 일부만 덮는 경우가
+  //   있다 — 그때 이전 처방(cast.length 로 통째로 켜고 끄기)은 안 덮인 컷을 그대로
+  //   비워 뒀고, speechFor 가 거기서 매치를 못 찾아 **C3 이 고친 증상이 다른 입구로
+  //   남아 있었다.** 진짜 cast 가 덮은 컷은 그대로 두고, 안 덮인 컷만 폴백이 맡는다 —
+  //   두 목록이 서로 다른 컷 번호를 가리키므로 한 cast 배열에 같이 둬도 안 겹친다.
+  const coveredIdx = new Set(casted.cast.flatMap((c) => c.cuts || []));
+  const uncovered = casted.cuts.filter((c) => c.sentence && !c.narration && !coveredIdx.has(c.idx));
+  const fallback = buildReelCast(scenario, uncovered);
+  const cast = [...casted.cast, ...fallback];
+
+  await updateProject(id, user.id, (p) => {
+    const updated = {
+      ...p,
+      scenario: {
+        ...scenario,
+        // ★★ C4 — speechFor 의 내레이션 갈래(lib/cuts.js:1456)는 scenario.narrator_voice 를
+        //   읽는데 validateScenario 는 그 필드를 안 만든다(voice 만 만든다). 광고형 시나리오는
+        //   "내레이션" 화자인 컷이 기본이라, 안 채우면 그 컷 전부가 Voice: 절 없이 나가
+        //   컷마다 목소리가 바뀐다 — 이 저장소의 정지 게이트(컷 간 목소리 일관성)가 정확히
+        //   그 자리다. scenario.voice 를 그대로 별칭한다(한 영상에 화자는 하나라는 시나리오
+        //   프롬프트의 전제와 일치한다).
+        narrator_voice: scenario.voice,
+        tries: tries + 1,
+      },
+      cuts: casted.cuts,
+      cast,
+      status: "scenario",
+      // 읽은 사진값을 남긴다 — 안 남기면 다시 쓸 때마다 사진을 또 읽는다(사진당 값이 든다).
+      ...(seen !== project ? { material: { ...p.material, photos: seen.material.photos } } : {}),
+    };
+    // ★★ 2026-08-21 리뷰 N3 — 시나리오를 다시 쓰면 그림 회차도 새로 시작한다. 컷이
+    //   통째로 갈리므로(위 cuts 대체) 옛 그림은 어차피 다음 컷에 안 맞고 전부 다시
+    //   그려야 하는데, imageTries 는 리셋 없이 프로젝트 수명 동안 계속 쌓이는 상수였다
+    //   — 재작성을 몇 번 하는 사이에 상한(6회)을 다 쓰면 **정가는 냈는데 그림을 영영
+    //   못 그리는** 프로젝트가 된다. film 은 반대로 "상한을 다 쓴 방식이 있으면 시나리오
+    //   재작성을 막는다"(scenarioLock 의 images_exhausted)를 고르는데, 그건 film 이
+    //   **두 방식을 나란히 비교**하는 게 목적이라 판이 섞이면 안 되기 때문이다(그림이
+    //   남아 있어야 비교가 성립). reel 은 방식이 하나뿐이고 시나리오를 다시 쓰면 이전
+    //   컷·그림이 애초에 전부 버려지므로 "비교할 옛 판"이 없다 — 재작성이 곧 새 시작이면,
+    //   회차도 새 시작이어야 사장님이 값을 치르고도 그리지 못하는 막다른 길이 안 생긴다.
+    return putReel(updated, { imageTries: 0, imagesDrawing: false, imagesAt: 0 });
+  });
   return Response.json({ scenario, cuts: casted.cuts });
 });

@@ -8,6 +8,13 @@ import { modelIdForProject, resolutionForProject } from "../../../../../lib/clip
 import { fakeFal } from "../../../../../lib/fake.js";
 import { reelOf, putReel, isImagesLocked, imageTriesLeft } from "../../../../../lib/reel/doc.js";
 
+// 만든 그림만 컷에 얹는다 — **컷 목록을 대체하지 않는다.** export 하는 이유: 이것이
+// N1 의 수정 전부다("실패해도 뒤 컷이 살아남는가"), 테스트가 이것을 직접 부른다
+// (tests/reel-routes.test.js).
+export function mergeImages(cuts, made) {
+  return (cuts || []).map((c) => (made.has(c.idx) ? { ...c, image: made.get(c.idx) } : c));
+}
+
 // 그림 만들기 — 컷마다 한 장. film 의 images 라우트와 같은 결이다: 동기로 기다린다
 // (컷 서넛 × 한 장이라 서버리스 상한 안에서 끝나고, 기다리면 실패가 HTTP 로 보인다).
 //
@@ -35,12 +42,19 @@ export const POST = withUser(async (req, { params }, user) => {
   }
   const wanted = Array.isArray(only) && only.length ? new Set(only) : null;
 
+  const reel = reelOf(project);
+  // ★★ 2026-08-21 리뷰 N4 — 굽는 중에는 그리지 않는다. film 의 isDrawLocked 는 빌렸는데
+  //   바로 옆의 `film.status === "rendering"` → 409(app/api/film/[id]/images/route.js)는
+  //   안 빌렸다. 이미지·클립 라우트 둘 다 cuts 를 저장하므로, 그 사이 굽기가 끝나면
+  //   마지막 쓰기가 이겨 방금 구운 클립이나 방금 그린 그림 한쪽이 조용히 사라진다.
+  if (reel.status === "rendering") {
+    return Response.json({ error: "지금 영상을 만드는 중이에요" }, { status: 409 });
+  }
   // ★★ 2026-08-21 리뷰 I7 — 그림에는 청구가 없다(정가는 클립 굽기에 붙는다). 그런데
   //   only 로 같은 컷을 무한히 다시 그릴 수 있었고(컷당 $0.08 이 매번 나가는데 크레딧은
   //   0), 동기 대기라 두 탭이면 파이프라인 둘이 같은 문서를 갈아 썼다. film 의
   //   isDrawLocked/MAX_FILM_IMAGE_TRIES 와 같은 처방 — 재진입 잠금 + 횟수 상한
   //   (lib/reel/doc.js 에 reel 전용 상수로 새로 뒀다, 이 흐름 소유라 허용됐다).
-  const reel = reelOf(project);
   if (isImagesLocked(reel)) {
     return Response.json({ error: "이미 그리는 중이에요" }, { status: 409 });
   }
@@ -72,26 +86,38 @@ export const POST = withUser(async (req, { params }, user) => {
   await updateProject(id, user.id, (p) =>
     putReel(p, { imagesDrawing: true, imagesAt: Date.now(), imageTries: tries + 1 }));
 
-  const next = [];
-  try {
-    for (const cut of cuts) {
-      const has = !!cut?.image?.url;
-      const wantIt = wanted ? wanted.has(cut.idx) : !has;
-      if (!wantIt) { next.push(cut); continue; }
+  // ★★ 2026-08-21 리뷰 N1 — **만든 것만** 모은다(idx → image). 실패해도 성공해도 이걸로
+  //   p.cuts 를 병합한다 — 스냅샷(next=[...])으로 cuts 를 통째로 대체하면, 루프가
+  //   중간에 던졌을 때 아직 안 지나온 컷들(이미 구운 클립·다른 필드까지)이 저장 자리에서
+  //   통째로 사라진다. "수정 전에는 아예 저장을 안 해서 이 손실이 없었다 — 지금이 더
+  //   나쁘다"는 지적을 그대로 받아, 성공 경로도 같은 병합형으로 통일한다.
+  const made = new Map();
+  let failure = null;
+  for (const cut of cuts) {
+    const has = !!cut?.image?.url;
+    const wantIt = wanted ? wanted.has(cut.idx) : !has;
+    if (!wantIt) continue;
+    try {
       const { refs } = await loadCutRefs(cut, project);
       const prompt = buildImagePrompt(cut, project, refs);
       const out = await generateImage({ prompt, aspect_ratio, refs, projectId: id, resolution });
-      next.push({ ...cut, image: { url: out.url, of: prompt } });
+      made.set(cut.idx, { url: out.url, of: prompt });
+    } catch (e) {
+      failure = e;
+      break;
     }
-  } catch (e) {
-    // ★★ 2026-08-21 리뷰 I8 — 중간 실패가 앞 컷의 값을 버리고 있었다. `next` 는 try 를
-    //   무사히 빠져나와야만 저장됐는데, 컷 4 에서 던지면 컷 1~3 의 그림(이미 $0.08 씩
-    //   나갔다)이 그 자리에서 통째로 사라졌다. 여기까지 만든 것은 그대로 저장한다.
-    await updateProject(id, user.id, (p) =>
-      putReel({ ...p, cuts: next }, { imagesDrawing: false })).catch(() => {});
-    return Response.json({ error: e?.message || "그림을 만들지 못했어요" }, { status: 400 });
   }
 
-  await updateProject(id, user.id, (p) => putReel({ ...p, cuts: next }, { imagesDrawing: false }));
+  // ★ 병합은 **저장 시점의 최신 p.cuts** 위에서 한다(위 스냅샷 cuts 가 아니다) — updateProject
+  //   가 CAS 재시도로 patchFn 을 다시 부를 수 있어(lib/projects.js), 그때마다 그 사이에
+  //   들어온 다른 쓰기(예: 사장님이 clip_prompt 를 고친 것) 위에 이미지만 얹혀야 한다.
+  const merge = (p) => putReel({ ...p, cuts: mergeImages(p.cuts, made) }, { imagesDrawing: false });
+
+  if (failure) {
+    await updateProject(id, user.id, merge).catch(() => {});
+    return Response.json({ error: failure?.message || "그림을 만들지 못했어요" }, { status: 400 });
+  }
+
+  await updateProject(id, user.id, merge);
   return Response.json({ ok: true });
 });

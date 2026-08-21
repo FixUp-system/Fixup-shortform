@@ -6,6 +6,9 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { isStepDoc, createProject } from "../lib/projects.js";
 import { applyCasting } from "../app/api/reel/[id]/scenario/route.js";
+import { mergeImages } from "../app/api/reel/[id]/images/route.js";
+import { runReelClips } from "../lib/reel/pipeline.js";
+import { resolveCutRefs } from "../lib/cast.js";
 
 const read = (p) => readFileSync(p, "utf8");
 const clips = read("app/api/reel/[id]/clips/route.js");
@@ -164,9 +167,105 @@ describe("I7 — 그림 재진입 잠금과 횟수 상한", () => {
 });
 
 describe("I8 — 그림 만들기 중간 실패가 앞 컷의 값을 지키는가", () => {
-  it("catch 안에서도 여기까지 만든 cuts 를 저장한다", () => {
-    const catchBlock = images.slice(images.indexOf("} catch (e) {"));
-    expect(catchBlock).toContain("cuts: next");
+  it("실패해도 성공해도 같은 병합 함수(mergeImages)로 저장한다 — 스냅샷 대체가 아니다", () => {
+    expect(images).toContain("mergeImages(p.cuts, made)");
+    // ★ N1(리뷰 재검토) — snapshot 대체(next=[...])로 되돌아가지 않았는지 못 박는다.
+    expect(images).not.toMatch(/cuts:\s*next\b/);
+  });
+});
+
+describe("N1 — 그림 만들기 실패가 다른 컷의 값을 지운다(재검토 Critical)", () => {
+  it("만든 그림만 얹는다 — 컷 목록 길이도 다른 필드도 안 줄어든다", () => {
+    const cuts = [
+      { idx: 0, video: { url: "https://x/v0.mp4" } }, // 이미 구운 클립 — 이번 요청과 무관
+      { idx: 1 }, // 이번 요청에서 성공
+      { idx: 2, clip_prompt: "이미 써 둔 프롬프트" }, // 루프가 여기서 던졌다고 하자 — 시도 전
+    ];
+    const made = new Map([[1, { url: "https://x/img1.png", of: "prompt1" }]]);
+    const out = mergeImages(cuts, made);
+
+    expect(out).toHaveLength(3); // ★ 컷이 안 잘려 나간다 — 이게 N1 의 핵심
+    expect(out[0].video.url).toBe("https://x/v0.mp4"); // 구운 클립이 안 사라진다
+    expect(out[1].image.url).toBe("https://x/img1.png"); // 새로 만든 것은 얹힌다
+    expect(out[2].clip_prompt).toBe("이미 써 둔 프롬프트"); // 안 건드린 컷의 다른 필드도 그대로
+    expect(out[2].image).toBeUndefined(); // 시도 전이라 그림은 없다 — 조작하지 않는다
+  });
+
+  it("빈 cuts·빈 made 에도 안 던진다", () => {
+    expect(mergeImages([], new Map())).toEqual([]);
+    expect(mergeImages(undefined, new Map())).toEqual([]);
+  });
+});
+
+describe("N4 — 굽는 중에는 그림도 다시 그리지 않는다(재검토 Important)", () => {
+  it("images 라우트가 reel.status === \"rendering\" 을 409 로 막는다", () => {
+    expect(images).toContain('reel.status === "rendering"');
+  });
+});
+
+describe("N2 — 캐스팅 폴백이 컷 단위로 좁혀진다(재검토 Important)", () => {
+  it("cast.length 로 통째로 켜고 끄지 않는다 — 안 덮인 컷만 폴백이 맡는다", () => {
+    // ★ 예전 처방(리뷰 전): `casted.cast.length ? casted.cast : buildReelCast(...)`.
+    //   그러면 캐스팅이 화면 안 대사 컷 일부만 덮어도 폴백이 통째로 꺼져, 안 덮인 컷은
+    //   speechFor 매치를 못 찾는다(C3 이 고친 증상이 다른 입구로 남는다).
+    expect(scenario).not.toMatch(/casted\.cast\.length \? casted\.cast : buildReelCast/);
+    expect(scenario).toContain("coveredIdx");
+    expect(scenario).toContain("!coveredIdx.has(c.idx)");
+    // 두 결과를 합친다 — 진짜 cast 가 덮은 컷과 폴백이 덮은 컷은 서로 다른 번호라 안 겹친다.
+    expect(scenario).toMatch(/\[\.\.\.casted\.cast,\s*\.\.\.fallback\]/);
+  });
+});
+
+describe("N3 — 시나리오 재작성이 그림 회차를 리셋한다(재검토 Important)", () => {
+  it("scenario 라우트가 imageTries 를 0으로 되돌린다", () => {
+    expect(scenario).toContain("imageTries: 0");
+  });
+});
+
+describe("N5 — 굽기 재진입이 완성 클립을 다시 굽지 않는다(재검토 Critical, 제 판정)", () => {
+  it("runReelClips 는 낡지 않은 완성 클립을 건너뛴다 — makeClip 이 안 불린다", async () => {
+    const doc = {
+      id: "pid",
+      settings: { i2v_model: "seedance-2.0", aspect_ratio: "9:16" },
+      scenario: { environment: "a sunlit kitchen counter" },
+      cuts: [
+        // 이미 구웠고 clip_prompt 가 그대로다 — 낡지 않았다. 다시 구우면 안 된다.
+        {
+          idx: 0, shows: "a hand reaching for the kettle", clip_prompt: "body0", seconds: 4,
+          image: { url: "https://x/c0.png" }, video: { url: "https://x/v0.mp4", seconds: 4, of: "body0" },
+        },
+        // clip_prompt 를 고쳐서 각인(video.of)과 갈렸다 — 낡았다. 다시 구워야 한다.
+        {
+          idx: 1, shows: "a mug on a wooden desk", clip_prompt: "body1-edited", seconds: 4,
+          image: { url: "https://x/c1.png" }, video: { url: "https://x/v1.mp4", seconds: 4, of: "body1" },
+        },
+      ],
+    };
+    const calls = [];
+    await runReelClips("pid", "uid", {
+      getProject: async () => doc,
+      updateProject: async (_id, _owner, fn) => { Object.assign(doc, fn(doc)); return doc; },
+      loadRefs: async () => ({ refs: [], resolved: [], missing: 0 }),
+      makeClip: async (args) => { calls.push(args); return { url: "https://x/new.mp4", seconds: 4 }; },
+    });
+    expect(calls).toHaveLength(1); // 컷 1만 다시 구웠다
+    expect(doc.cuts[0].video.url).toBe("https://x/v0.mp4"); // 컷 0 은 그대로 — 재청구·이중지출이 없다
+    expect(doc.cuts[1].video.url).toBe("https://x/new.mp4"); // 컷 1 은 새로 구워졌다
+  });
+
+  it("pipeline.js 가 isReelClipStale 로 판정한다 — 화면과 같은 값", () => {
+    const pipeline = read("lib/reel/pipeline.js");
+    expect(pipeline).toContain("isReelClipStale");
+  });
+});
+
+describe("r2v 가 실제로 켜지는 증거 — ref_ids 가 refs 로 풀린다(재검토가 요구)", () => {
+  it("resolveCutRefs(cut, project) 가 비어 있지 않은 목록을 준다", () => {
+    const cut = { idx: 0, ref_ids: ["p1"] };
+    const project = { material: { photos: [{ id: "p1", url: "/api/uploads/p1.png" }] }, cast: [] };
+    const refs = resolveCutRefs(cut, project);
+    expect(refs.length).toBeGreaterThan(0);
+    expect(refs[0].kind).toBe("thing");
   });
 });
 
