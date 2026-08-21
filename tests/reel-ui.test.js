@@ -95,3 +95,24 @@ describe("A1 — reel 이 사장님에게 존재한다", () => {
     expect(archive).toContain("reelStepHref");
   });
 });
+
+// ────────────────────────────────────────────────────────────────────────
+// Task 12b (Ruling 14) — 화질을 사장님이 고른다. 480p 와 720p 는 값이 2배(15초
+// 40 대 80 크레딧)라 안 보여 주면 사장님이 모르고 비싼 쪽을 고른다.
+// ────────────────────────────────────────────────────────────────────────
+describe("화질 고르기", () => {
+  const nw = read("app/reel/new/page.js");
+
+  it("고르는 칸이 있다", () => {
+    expect(nw).toMatch(/resolution/);
+  });
+
+  it("고른 조합의 값을 보여 준다 — 480p 와 720p 는 2배 차이다", () => {
+    expect(nw).toContain("videoPrice");
+    expect(nw).toContain("priceLabel");
+  });
+
+  it("광고 가격표를 쓰지 않는다", () => {
+    expect(nw).not.toContain("adVideoPrice");
+  });
+});

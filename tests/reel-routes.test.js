@@ -532,3 +532,28 @@ describe("A4 — 단계 가드는 lib/reel/steps.js 하나다", () => {
     expect(reelStepFromPathname("/reel/abc/other/scenario")).toBeUndefined();
   });
 });
+
+// ────────────────────────────────────────────────────────────────────────
+// Task 12b (Ruling 14) — 화질을 사장님이 고른다. POST /api/reel 이 settings.resolution
+// 을 저장하지 않아 resolutionForProject 가 조용히 720p 로 떨어졌다(480p 15초=40크레딧 ·
+// 720p 15초=80크레딧, 2배 차이). 안 고른/모르는 값은 400 — 조용히 기본값으로 떨어뜨리면
+// 사장님이 고른 것과 다른 값에 청구된다.
+// ────────────────────────────────────────────────────────────────────────
+describe("화질", () => {
+  const route = readFileSync("app/api/reel/route.js", "utf8");
+
+  it("고른 화질을 저장한다", () => {
+    expect(route).toMatch(/resolution/);
+    expect(route).toMatch(/settings:\s*\{[\s\S]*resolution/);
+  });
+
+  it("모르는 값은 400 이다 — 조용히 기본값으로 안 떨어뜨린다", () => {
+    expect(route).toContain("isResolutionFor");
+    expect(route).toMatch(/status:\s*400/);
+  });
+
+  it("광고 표가 아니라 이 흐름의 표를 쓴다", () => {
+    expect(route).not.toContain("isAdResolution");
+    expect(route).not.toContain("DEFAULT_AD_RESOLUTION");
+  });
+});

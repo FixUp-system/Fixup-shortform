@@ -4,7 +4,7 @@ import { ownedPhotoKeys } from "../../../lib/refs-io.js";
 import { withUser } from "../../../lib/auth/require-user.js";
 import { MAX_PHOTOS } from "../../../lib/photos.js";
 import { MAX_MATERIAL_TEXT } from "../../../lib/material.js";
-import { DEFAULT_I2V_MODEL } from "../../../lib/clip-limits.js";
+import { DEFAULT_I2V_MODEL, isResolutionFor } from "../../../lib/clip-limits.js";
 import { TARGET_CHOICES } from "../../../lib/script.js";
 import { normalizeAdOptions } from "../../../lib/ad/options.js";
 
@@ -29,6 +29,23 @@ export const POST = withUser(async (req, _ctx, user) => {
   const target = body?.settings?.target_seconds;
   if (!TARGET_CHOICES.includes(target)) {
     return Response.json({ error: "영상 길이를 골라 주세요" }, { status: 400 });
+  }
+
+  // ★★ Task 12b(Ruling 14) — 화질(해상도)도 명시로 요구한다. 안 받으면
+  //   resolutionForProject(lib/clip-limits.js)가 저장된 값이 없어 **조용히 720p** 로
+  //   떨어진다 — 480p 15초=40크레딧 vs 720p 15초=80크레딧, 2배 차이다. 조용히 떨어뜨리면
+  //   사장님이 고른 것과 다른(더 비싼) 값에 청구되는 길을 만든다(target_seconds 와 같은
+  //   판단 — 위 I6 주석 참고). 모델은 서버가 박으므로(DEFAULT_I2V_MODEL) 그 값으로 이
+  //   프로젝트가 열 수 있는 해상도 목록을 얻는다 — isResolutionFor(lib/clip-limits.js) 는
+  //   `resolutionsForProject`(project.settings.i2v_model 을 읽는다)를 그대로 타므로,
+  //   실제 project 객체가 아직 없어도 그 모양만 흉내 내면 같은 판정을 쓸 수 있다.
+  //   ★ 여기는 reel 전용 표(videoPrice·I2V_MODELS·isResolutionFor)를 쓴다 — 광고 쪽의
+  //   짝(모델별 해상도 판정 함수·그 기본값)을 쓰면 화면이 말하는 값과 실제 청구
+  //   (requireVideoCharge 가 보는 VIDEO_PRICE)가 갈린다(app/api/reel/[id]/clips/route.js
+  //   가 그 표를 본다).
+  const resolution = body?.settings?.resolution;
+  if (!isResolutionFor(resolution, { settings: { i2v_model: DEFAULT_I2V_MODEL } })) {
+    return Response.json({ error: "화질을 골라 주세요" }, { status: 400 });
   }
 
   // ★★ generateScenario(lib/ad/scenario.js) → buildScenarioMessages 는 settings.format·
@@ -58,6 +75,9 @@ export const POST = withUser(async (req, _ctx, user) => {
       ...options,
       aspect_ratio: aspect,
       target_seconds: target,
+      // ★ Task 12b — 위에서 검증한 값을 그대로 저장한다. resolutionForProject·videoPrice·
+      //   requireVideoCharge 가 전부 이 필드를 읽는다(charges.js 의 chargeVideo 참고).
+      resolution,
       // ★ buildScenarioMessages 는 `settings.seconds` 를 읽는다(광고 옵션 체계의 이름이라
       //   reel 의 target_seconds 와 다르다) — 별칭을 둔다. target_seconds 는 정가
       //   (videoPrice)·청구(requireVideoCharge)가 읽고, seconds 는 시나리오 생성이 읽는다.
