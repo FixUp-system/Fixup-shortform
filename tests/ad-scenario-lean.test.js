@@ -195,3 +195,20 @@ describe("시나리오 확인 화면이 전역 값을 보여 준다", () => {
     expect(src).toMatch(/\.filter\(\(\[, v\]\) => typeof v === "string" && v\.trim\(\)\)/);
   });
 });
+
+describe("★ user 메시지에도 광고에 없는 칸이 안 나온다", () => {
+  // SYSTEM 만 검사하면 못 잡는다 — 사진 안내는 user 메시지에 실린다.
+  // 실제로 `look 과 shows 에서는…` 한 줄이 광고 지문에도 그대로 나가고 있었다.
+  const withPhoto = (kind) =>
+    buildScenarioMessages({
+      kind, settings, material: { text: "소재", photos: [{ url: "/a.jpg" }] },
+    }).messages[0].content;
+
+  it("광고 지문(user)에 shows 가 없다", () => {
+    expect(withPhoto("ad")).not.toContain("shows");
+  });
+
+  it("film 지문(user)에는 그대로 있다 — 그쪽은 그 칸으로 그림을 만든다", () => {
+    expect(withPhoto("film")).toContain("shows");
+  });
+});
