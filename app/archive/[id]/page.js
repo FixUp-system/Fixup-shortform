@@ -99,12 +99,10 @@ function ArchiveDetailPageBody() {
   // 완성본 주소 — 종류마다 사는 자리가 다르다. 판정은 순수 함수 한 벌이다(lib/archive/video.js).
   // ★ 화면 안 삼항식으로 두었더니 film 갈래만 **객체**를 내서 재생·내려받기가 둘 다 죽었다.
   //   그 함수의 주석에 왜 값으로 재야 하는지가 있다.
-  // ★★ 2026-08-21 리뷰 A1 — `archiveVideoUrl` 은 이번 태스크의 파일 범위 밖(lib/archive/
-  //   video.js)이라 reel 을 모른다 — 안 가르면 `doc.render?.url`(단계별 자리)로 떨어져
-  //   완성된 reel 도 "아직 완성본이 없어요"로 보인다. reel 완성본은 `doc.reel.video.url`
-  //   에 산다(app/api/reel/[id]/render/route.js 가 putReel 로 채우는 그 자리) — 그 함수를
-  //   건드리지 않고 이 화면 안에서만 그 자리를 먼저 본다.
-  const video = isReel ? (doc.reel?.video?.url || null) : archiveVideoUrl(doc);
+  // ★★ 2026-08-21 리뷰 C2 — reel 갈래도 그 함수 **안에** 있다(lib/archive/video.js).
+  //   한때 이 화면 안에서 doc.reel?.video?.url 을 직접 판독했는데, 그것이 바로 그 파일이
+  //   막으려는 사고였다(판독이 화면으로 되돌아가면 다음 종류가 늘 때 또 갈릴 수 있다).
+  const video = archiveVideoUrl(doc);
   // 이어서 작업하는 자리 — 종류마다 제작 화면이 다르다.
   // ★★ 한 번에 굽는 영상은 **단계별 흐름**으로 보낸다(2026-08-20). 사이드바 메뉴와 같은
   //   곳이어야 한다 — 갈리면 어느 문으로 들어왔느냐에 따라 다른 화면이 나온다.
