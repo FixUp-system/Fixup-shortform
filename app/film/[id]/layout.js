@@ -9,7 +9,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
-import { FilmProjectProvider, useFilmProject } from "../../../components/FilmProjectContext";
+import { useFilmProject } from "../../../components/FilmProjectContext";
 import {
   FILM_STEPS, filmStepHref, filmStepFromPathname, currentFilmStepKey, isFilmStepReachable,
 } from "../../../lib/film/steps";
@@ -81,40 +81,16 @@ function Inner({ children }) {
   return (
     <>
       <h1 className="pgtitle">한 번에 굽는 영상</h1>
-      {/* ★ 스테퍼의 클래스는 이 저장소가 **실제로 쓰는** 것을 그대로 쓴다 —
-          components/Sidebar.jsx 의 side-steps/side-step(on·passed·locked)이다.
-          계획서가 적어 둔 stepper/stepper-item 은 코드에도 app/globals.css 에도 없다. */}
-      <nav className="side-steps">
-        {FILM_STEPS.map((s) => {
-          const open = isFilmStepReachable(s.key, project, mode);
-          const on = step?.key === s.key;
-          const passed = !on && open && s.key !== currentFilmStepKey(project, mode);
-          const cls = `side-step${on ? " on" : ""}${passed ? " passed" : ""}`;
-          return open ? (
-            <Link
-              key={s.key}
-              href={filmStepHref(s, id, mode)}
-              className={cls}
-              aria-current={on ? "step" : undefined}
-            >
-              <i>{s.no}</i>{s.label}
-            </Link>
-          ) : (
-            <span key={s.key} className={`${cls} locked`} aria-disabled="true">
-              <i>{s.no}</i>{s.label}
-            </span>
-          );
-        })}
-      </nav>
+      {/* ★★ 단계 목록은 **사이드바**가 그린다(components/Sidebar.jsx 의 FilmStepList).
+          다른 두 흐름(단계별·광고)과 같은 자리다. 여기에 그렸더니 사이드바용
+          클래스(side-steps)가 본문에 들어가 모양이 깨졌다(2026-08-21 사장님 지적). */}
       {children}
     </>
   );
 }
 
+// ★ 공급자를 여기서 다시 감싸지 않는다 — app/layout.js(루트)에 있다. 두 벌이면
+//   사이드바와 화면이 **서로 다른 프로젝트**를 보게 된다.
 export default function FilmLayout({ children }) {
-  return (
-    <FilmProjectProvider>
-      <Inner>{children}</Inner>
-    </FilmProjectProvider>
-  );
+  return <Inner>{children}</Inner>;
 }

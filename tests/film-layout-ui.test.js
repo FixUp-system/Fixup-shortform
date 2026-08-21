@@ -57,3 +57,44 @@ describe("모르는 방식으로 들어오면 말해 준다", () => {
     expect(s.slice(Math.max(0, at - 400), at + 400)).toMatch(/FILM_MODES|filmStepHref/);
   });
 });
+
+// ★★★ 스테퍼가 **본문에 그려지고 있었다**(2026-08-21 사장님 지적).
+//
+// 이 저장소의 규약은 "단계 목록은 **사이드바**가 그린다"이다 — 단계별 흐름은
+// components/Sidebar.jsx 의 StepList 가, 광고는 AdStepList 가 그린다. film 만 레이아웃
+// 본문에 그렸고, 게다가 **사이드바용 클래스**(side-steps/side-step)를 본문에 써서
+// 모양이 깨졌다.
+//
+// 원인은 배치가 아니라 **공급자 위치**였다: ProjectProvider·AdProjectProvider 는
+// app/layout.js(루트)에 있어 사이드바가 읽는데, FilmProjectProvider 만 app/film/[id]/
+// layout.js 안에 있어 사이드바보다 아래였다 — 읽을 방법이 없으니 본문에 그린 것이다.
+describe("film 스테퍼는 사이드바가 그린다", () => {
+  const side = () => readFileSync("components/Sidebar.jsx", "utf8");
+
+  it("★ 사이드바가 film 단계 목록을 그린다 — 다른 두 흐름과 같은 자리다", () => {
+    expect(side()).toMatch(/FilmStepList/);
+  });
+
+  it("★ 사이드바가 film 단계 표를 읽는다", () => {
+    expect(side()).toMatch(/lib\/film\/steps/);
+  });
+
+  // ⚠️ 주석을 걷고 본다 — 왜 여기서 안 그리는지를 주석으로 남겨 두었는데, 그대로 재면
+  //   그 설명 때문에 빨개진다(오늘 여러 번 밟은, 시험이 주석을 재는 함정의 반대편이다).
+  it("★ 레이아웃 본문에는 단계 목록이 없다 — 사이드바용 클래스를 본문에 쓰면 깨진다", () => {
+    // JSX 주석({/* … */})과 줄 주석(//) 둘 다 걷는다. 줄 주석은 줄머리(^ + m)로 끊는다 —
+    // 이스케이프를 쓰면 스크립트로 넣을 때 한 겹 먹힌다(이 저장소가 반복해 밟은 함정).
+    const code = layout()
+      .split("\n").filter((l) => !l.trim().startsWith("//")).join("\n")
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+    expect(code).not.toMatch(/side-steps/);
+  });
+
+  it("★ 공급자가 루트에 있다 — 사이드바보다 아래면 읽을 방법이 없다", () => {
+    expect(readFileSync("app/layout.js", "utf8")).toMatch(/FilmProjectProvider/);
+  });
+
+  it("★ 레이아웃이 공급자를 다시 감싸지 않는다 — 두 벌이면 사이드바와 화면이 서로 다른 프로젝트를 본다", () => {
+    expect(layout()).not.toMatch(/<FilmProjectProvider/);
+  });
+});

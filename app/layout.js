@@ -3,6 +3,7 @@ import { GeistSans } from "geist/font/sans";
 import localFont from "next/font/local";
 import { ProjectProvider } from "../components/ProjectContext";
 import { AdProjectProvider } from "../components/AdProjectContext";
+import { FilmProjectProvider } from "../components/FilmProjectContext";
 import AppShell from "../components/AppShell";
 import DialogProvider from "../components/DialogProvider";
 
@@ -47,9 +48,15 @@ export default function RootLayout({ children }) {
           {/* 광고와 단계별 만들기가 각자 공유본을 쥔다. 팝업은 그 둘 안쪽에서
               어느 화면이든 부를 수 있어야 한다(components/DialogProvider.jsx). */}
           <AdProjectProvider>
-            <DialogProvider>
-              <AppShell>{children}</AppShell>
-            </DialogProvider>
+            {/* ★★ 한 번에 굽는 영상의 공유본도 **여기**다(2026-08-21). 처음에는
+                app/film/[id]/layout.js 안에 두었는데, 그러면 사이드바보다 **아래**라
+                사이드바가 못 읽는다 — 그래서 단계 목록을 본문에 그렸고, 사이드바용
+                클래스를 본문에 써서 모양이 깨졌다. 옆의 둘과 같은 자리에 둔다. */}
+            <FilmProjectProvider>
+              <DialogProvider>
+                <AppShell>{children}</AppShell>
+              </DialogProvider>
+            </FilmProjectProvider>
           </AdProjectProvider>
         </ProjectProvider>
       </body>

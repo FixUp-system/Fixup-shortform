@@ -12,7 +12,13 @@ import { useMe } from "./MeContext";
 import { STEPS, stepsFor, currentStepKey, isReachable, stepHref } from "../lib/steps";
 import { AD_STEPS, adStepIndex, isAdStepReachable } from "../lib/ad/steps";
 // 한 번에 굽는 영상 — 방식 표. 라벨은 여기서만 읽는다(두 벌이면 갈린다).
-import { PICKABLE_FILM_MODES } from "../lib/film/mode";
+import { PICKABLE_FILM_MODES, isFilmMode } from "../lib/film/mode";
+// 단계 표·주소·열림 판정 — 화면이 손으로 적으면 표와 갈린다.
+import {
+  FILM_STEPS, filmStepHref, filmStepFromPathname, currentFilmStepKey, isFilmStepReachable,
+} from "../lib/film/steps";
+// 공유본은 루트(app/layout.js)에서 온다 — 여기서 자기 fetch 를 만들지 않는다.
+import { useFilmProject } from "./FilmProjectContext";
 
 // 방식별 아이콘. ★ 표(FILM_MODES)에 안 넣는다 — 그 표는 **실험의 축**이고 동결돼 있는데,
 // 아이콘은 화면 사정이다(사이드바에서 나란히 선 항목들이 서로 달라야 한다는 것뿐이다).
@@ -118,6 +124,55 @@ function AdStepList({ adProject, view }) {
   );
 }
 
+// 한 번에 굽는 영상의 단계 목록 — StepList·AdStepList 와 **같은 자리·같은 모양**이다.
+//
+// ★★ 처음에는 app/film/[id]/layout.js 본문에 그렸는데, 사이드바용 클래스(side-steps)를
+//   본문에 쓴 셈이라 모양이 깨졌다(2026-08-21 사장님 지적). 원인은 배치가 아니라 공급자
+//   위치였다 — FilmProjectProvider 가 사이드바보다 아래에 있어 여기서 읽을 수가 없었다.
+//   지금은 app/layout.js(루트)에 있어 옆의 둘과 똑같이 읽는다.
+//
+// ★ 주소에서 방식을 읽는다 — 방식별 단계는 `/film/<id>/<mode>/<seg>` 네 칸이다.
+//   공유 단계(입력·시나리오)에는 방식이 없으므로 그때는 고를 수 있는 첫 방식으로 떨어진다
+//   (링크를 만들 때만 쓴다 — 그 단계들은 어느 방식이든 같은 화면이다).
+function FilmStepList({ pathname }) {
+  const { project } = useFilmProject();
+  const parts = (pathname || "").split("/").filter(Boolean);
+  const id = parts[1];
+  const fromPath = parts.length === 4 ? parts[2] : null;
+  const mode = isFilmMode(fromPath) ? fromPath : PICKABLE_FILM_MODES[0].id;
+  // 프로젝트를 아직 못 읽었으면 그리지 않는다 — 빈 목록이 깜빡이는 것보다 없는 편이 낫다.
+  if (!project || project.id !== id) return null;
+
+  const here = currentFilmStepKey(project, mode);
+  const step = filmStepFromPathname(pathname);
+  return (
+    <div className="side-steps">
+      {FILM_STEPS.map((s) => {
+        const open = isFilmStepReachable(s.key, project, mode);
+        const active = step?.key === s.key;
+        // ★ 지나옴은 **지금 단계가 아니면서 열려 있는** 것이다 — StepList 와 같은 판정.
+        const passed = !active && open && s.key !== here;
+        const cls = `side-step${active ? " on" : ""}${passed ? " passed" : ""}`;
+        return open ? (
+          <Link
+            key={s.key}
+            href={filmStepHref(s, id, mode)}
+            className={cls}
+            aria-current={active ? "step" : undefined}
+          >
+            <i>{passed ? <><Icon name="check" size={12} /><span className="sr-only">완료</span></> : s.no}</i>
+            {s.label}
+          </Link>
+        ) : (
+          <span key={s.key} className={`${cls} locked`} aria-disabled="true">
+            <i>{s.no}</i>{s.label}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function Sidebar() {
   const pathname = usePathname();
   const { project } = useProject();
@@ -179,6 +234,7 @@ export default function Sidebar() {
           <span className="ic"><Icon name={FILM_ICON[m.id] || "film"} /></span>영상 만들기 (수정)
         </Link>
       ))}
+      {inFilm && <FilmStepList pathname={pathname} />}
       <Link
         href="/archive"
         className={`side-item${pathname === "/archive" ? " on" : ""}`}
