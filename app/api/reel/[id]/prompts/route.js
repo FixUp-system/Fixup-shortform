@@ -1,6 +1,7 @@
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { runReelPrompts } from "../../../../../lib/reel/pipeline.js";
 import { getProject, updateProject } from "../../../../../lib/projects.js";
+import { LEDGER_PROMPT_MAX } from "../../../../../lib/costs.js";
 
 // 영상 프롬프트 만들기.
 //
@@ -8,6 +9,15 @@ import { getProject, updateProject } from "../../../../../lib/projects.js";
 //   끝나고, 기다리면 실패가 **HTTP 로** 보인다 — 상태 라우트를 한 겹 더 두지 않아도 된다.
 export const POST = withUser(async (req, { params }, user) => {
   const { id } = await params;
+  // ★★ 2026-08-21 리뷰 I10 — 종류 격리가 빠져 있었다. 옛 문서(kind 없음)에 이 라우트를
+  //   부르면 clip_prompt 가 그 문서의 컷에 그대로 저장된다 — 단계별 화면은 그 필드를
+  //   "덮어쓰기 프롬프트"로 읽으므로(lib/steps.js 의 clipOverride), 각인이 갈려 이미 산
+  //   클립이 통째로 낡는다.
+  const project = await getProject(id, user.id);
+  if (!project || project.kind !== "reel") {
+    return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
+  }
+
   const { only } = (await req.json().catch(() => ({}))) || {};
   // ⚠️ 배열이 아닌 값을 조용히 무시하면 **전부 다시 만든다** — 각인이 흔들려 이미 산 클립이
   //    통째로 낡는다(컷당 12크레딧).
@@ -32,9 +42,21 @@ export const PATCH = withUser(async (req, { params }, user) => {
   const text = typeof body === "string" ? body.trim() : "";
   // 빈 값으로 덮으면 굽기가 문 앞에서 막힌다 — 여기서 막는 편이 사장님에게 가깝다.
   if (!text) return Response.json({ error: "프롬프트를 비워 둘 수 없어요" }, { status: 400 });
+  // ★★ 2026-08-21 리뷰 I9 — 이 값은 본문을 통째로 대체해 **그대로 유료 fal 호출로
+  //   나간다**. 상한이 없으면 사장님이 붙여 넣은 긴 글이 원장(cost_records)에서
+  //   LEDGER_PROMPT_MAX 로 잘려 "무엇을 보냈는가"를 확인할 채널이 막힌다
+  //   (app/api/projects/[id]/route.js 의 clip_prompt 상한과 같은 처방).
+  if (text.length > LEDGER_PROMPT_MAX) {
+    return Response.json(
+      { error: `영상 프롬프트는 ${LEDGER_PROMPT_MAX}자까지예요 (지금 ${text.length}자).` },
+      { status: 400 }
+    );
+  }
 
   const project = await getProject(id, user.id);
-  if (!project) return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
+  if (!project || project.kind !== "reel") {
+    return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
+  }
   if (!Array.isArray(project.cuts) || !project.cuts[idx]) {
     return Response.json({ error: "그 컷이 없어요" }, { status: 400 });
   }

@@ -5,6 +5,8 @@ import { withUser } from "../../../lib/auth/require-user.js";
 import { MAX_PHOTOS } from "../../../lib/photos.js";
 import { MAX_MATERIAL_TEXT } from "../../../lib/material.js";
 import { DEFAULT_I2V_MODEL } from "../../../lib/clip-limits.js";
+import { TARGET_CHOICES } from "../../../lib/script.js";
+import { normalizeAdOptions } from "../../../lib/ad/options.js";
 
 // reel 프로젝트를 만든다 — kind:"reel" 로, 옛 단계별 흐름(isStepDoc)과 격리된다
 // (lib/projects.js 의 KINDS, 2026-08-21).
@@ -17,6 +19,27 @@ export const POST = withUser(async (req, _ctx, user) => {
   const aspect = body?.settings?.aspect_ratio ?? DEFAULT_ASPECT_ID;
   if (!isAspect(aspect)) {
     return Response.json({ error: "그 화면 비율은 몰라요" }, { status: 400 });
+  }
+
+  // ★★ Task 11 리뷰 I6 — 길이를 안 받으면 lib/pricing.js 의 videoPrice 가
+  //   `table[NaN]` → undefined → **조용히 30초 칸**으로 떨어진다(60초 영상을 30초 값에
+  //   판다). 옛 단계별 흐름(app/api/projects/route.js)은 안 고르면 null 을 허용하지만
+  //   그건 원고 길이로 추정하는 대체 경로가 있어서다 — reel 에는 그 대체가 없으므로
+  //   여기서는 **명시로 요구한다**(조용히 접는 방향이 늘 비싼 쪽이라는 이 저장소의 규칙).
+  const target = body?.settings?.target_seconds;
+  if (!TARGET_CHOICES.includes(target)) {
+    return Response.json({ error: "영상 길이를 골라 주세요" }, { status: 400 });
+  }
+
+  // ★★ generateScenario(lib/ad/scenario.js) → buildScenarioMessages 는 settings.format·
+  //   mood·narration_lang·style 을 **필수로 읽는다**(없으면 `need()` 가 던진다). film 의
+  //   창작 라우트도 같은 이유로 이 함수를 쓴다 — 두 벌을 만들지 않고 그대로 빌린다.
+  //   모르는 값은 던지고, 없는 값은 기본값으로 채운다(정의는 lib/ad/options.js 하나).
+  let options;
+  try {
+    options = normalizeAdOptions(body?.settings);
+  } catch (e) {
+    return Response.json({ error: e.message }, { status: 400 });
   }
 
   const photos = Array.isArray(body.material.photos) ? body.material.photos : [];
@@ -32,7 +55,14 @@ export const POST = withUser(async (req, _ctx, user) => {
     kind: "reel",
     material: { text: body.material.text.slice(0, MAX_MATERIAL_TEXT), photos },
     settings: {
+      ...options,
       aspect_ratio: aspect,
+      target_seconds: target,
+      // ★ buildScenarioMessages 는 `settings.seconds` 를 읽는다(광고 옵션 체계의 이름이라
+      //   reel 의 target_seconds 와 다르다) — 별칭을 둔다. target_seconds 는 정가
+      //   (videoPrice)·청구(requireVideoCharge)가 읽고, seconds 는 시나리오 생성이 읽는다.
+      //   하나를 빠뜨리면 값이 틀리거나(정가) 시나리오 생성이 죽는다(포맷 문구가 없다).
+      seconds: target,
       // ★★ 이 모델로 고정한다 — reel 은 "클립이 직접 말한다"(speaks:true) 위에 서 있다.
       //   여기서 안 박으면 modelIdForProject 가 없는 값을 LEGACY_I2V_MODEL(kling-v3,
       //   speaks:false) 로 떨어뜨려 대사가 통째로 사라진다(lib/clip-limits.js).

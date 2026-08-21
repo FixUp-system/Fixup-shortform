@@ -3,6 +3,12 @@ import { getProject, updateProject } from "../../../../../lib/projects.js";
 import { generateScenario, pickEditedShots, readPhotoVision } from "../../../../../lib/ad/scenario.js";
 import { isNarrationSpeaker } from "../../../../../lib/cuts.js";
 import { scenarioLock } from "../../../../../lib/reel/doc.js";
+import { MAX_SCENARIO_TRIES } from "../../../../../lib/pricing.js";
+import {
+  availableAvatars, buildCastMessages, resolveCastRefs, mergeCastIntoCuts, mergePropsIntoCuts,
+} from "../../../../../lib/cast.js";
+import { validateCast, validateProps } from "../../../../../lib/validate.js";
+import { callJson as callCastJson } from "../../../../../lib/llm.js";
 
 // 시나리오의 shot 하나가 컷 하나다 — 옮기는 것은 코드다(LLM 이 두 번 답하면 화면이 본
 // 대사와 실제로 만들어지는 대사가 갈릴 수 있다, lib/cuts.js 의 shotsToCuts 와 같은 이유).
@@ -39,20 +45,63 @@ function buildReelCuts(scenario) {
   });
 }
 
-// 화면 안에서 말하는 컷에 목소리를 붙인다 — lib/cuts.js 의 speechFor 가 project.cast 에서
-// `cuts.includes(cut.idx)` 인 인물을 찾아 대사에 실을 목소리를 정한다.
+// 화면 안에서 말하는 컷에 목소리를 붙인다 — **폴백 한 줄이다** (2026-08-21 리뷰 C5).
 //
-// ★ reel 에는 캐스팅 단계가 없다(REEL_STEPS 에 없다 — ③목소리가 없는 것과 같은 이유로,
-//   시나리오가 이미 "이 영상의 화자는 하나"(scenario.voice)라고 답했다). 그래서 인물별
-//   캐스팅 대신 **화면 안에서 말하는 컷 전부**를 하나의 화자에 묶는 합성 캐스팅 한 줄을
-//   만든다 — 시나리오 프롬프트가 이미 "한 영상에 화자는 하나다"를 못 박아 두었으므로
-//   여러 인물을 구분할 필요가 없다. 이것이 없으면 speechFor 가 매치를 못 찾아 화면 안
-//   대사가 조용히 사라진다(내레이션은 이 캐스팅과 무관하게 spokenOf 가 따로 처리한다).
+// ★★ 원래는 이것이 유일한 캐스팅이었다. 그런데 이것만으로는 컷에 `ref_ids` 가 안 생겨
+//   `loadCutRefs` 가 항상 빈 배열을 돌려주고, 그러면 `generateClip` 이 `refList` 를 못 받아
+//   **i2v 로 조용히 떨어진다** — "컷마다 참조를 들고 r2v 로 굽는다"는 이 흐름의 표제
+//   기능이 한 번도 실행되지 않는다. 그래서 진짜 캐스팅(`runCasting`)을 먼저 돌리고,
+//   **아무도 못 찾았을 때만** 이 폴백으로 목소리 하나를 화면 안 대사 컷 전부에 묶는다.
+// ★ C3 정정 — 예전엔 `!voice` 도 함께 보고 통째로 [] 를 줬다. `validateScenario`
+//   (lib/ad/scenario.js) 는 `voice: ""` 를 정상값으로 허용하므로, 그러면 화면 안 대사가
+//   있는 조용한(목소리를 안 정한) 시나리오에서 speechFor 가 매치를 아예 못 찾아
+//   **전 컷이 "No talking faces or lip sync." 로 구워졌다.** 이제는 화자만 있으면 캐스팅
+//   항목을 만든다 — voice 가 비어도 buildClipPrompt 는 그 절을 그냥 안 붙일 뿐이다.
 function buildReelCast(scenario, cuts) {
   const voice = typeof scenario?.voice === "string" ? scenario.voice.trim() : "";
   const speakingCuts = cuts.filter((c) => c.sentence && !c.narration).map((c) => c.idx);
-  if (!voice || !speakingCuts.length) return [];
+  if (!speakingCuts.length) return [];
   return [{ id: "reel-voice", who: "", look: "", voice, cuts: speakingCuts }];
+}
+
+// 캐스팅이 찾은 사람·사물을 컷에 꽂는다 — **순수 함수**(네트워크 결과만 받는다).
+// export 하는 이유: 이것이 r2v 를 켜는 유일한 근거라, 테스트가 이것을 직접 부른다
+// (tests/reel-routes.test.js — "컷에 ref_ids 가 실제로 생기는가").
+export function applyCasting(cuts, cast, props, photos, avatarIds) {
+  const castWithRefs = resolveCastRefs(cast, photos, avatarIds);
+  const withRefs = mergeCastIntoCuts(mergePropsIntoCuts(cuts, props), castWithRefs);
+  return { cuts: withRefs, cast: castWithRefs };
+}
+
+// 진짜 캐스팅 — **단계별 파이프라인이 컷 분할 뒤에 하는 바로 그 일**이다
+// (lib/pipeline.js 의 splitCuts 안, `buildCastMessages` → LLM → `resolveCastRefs` →
+// `mergeCastIntoCuts`+`mergePropsIntoCuts`). 새 장치를 만들지 않는다 — 그대로 빌린다.
+//
+// ★ LLM 호출은 lib/llm.js 의 callJson 이다(lib/ad/llm.js 가 아니다) — 캐스팅은 시나리오
+//   갈래와 무관한 기존 장치라, 단계별이 부르는 것과 같은 모듈을 그대로 쓴다.
+async function runCasting(cuts, project, speakers) {
+  const avatars = await availableAvatars();
+  const photos = project.material?.photos || [];
+  // 사물 사진만 캐스팅에 넘긴다 — 인물 사진은 resolveCastRefs 가 인물에 붙인다
+  // (lib/pipeline.js 와 같은 판정: vision.person 이 아닌 사진만 사물이다).
+  const things = photos.filter((p) => !p.vision?.person).map((p) => ({ id: p.id, what: p.vision?.what || "" }));
+  const thingIds = things.map((t) => t.id);
+  const msgs = buildCastMessages(cuts, avatars, "", things, { speakers });
+
+  let cast = [];
+  let props = [];
+  try {
+    const raw = await callCastJson({
+      system: msgs.system, messages: msgs.messages, stage: "캐스팅", projectId: project.id,
+    });
+    cast = validateCast(raw, avatars.map((a) => a.id), cuts.length) || [];
+    props = validateProps(raw, thingIds, cuts.length);
+  } catch (e) {
+    // ★ 캐스팅이 죽어도 시나리오 자체는 살린다 — 참조 없이(i2v 로) 계속 진행한다.
+    //   앞서 컷 분할 값(LLM 호출)은 이미 나갔으므로, 여기서 던지면 그 값도 헛되이 버려진다.
+    console.error("reel 캐스팅 실패 — 참조 없이 진행합니다:", e?.message);
+  }
+  return applyCasting(cuts, cast, props, photos, avatars.map((a) => a.id));
 }
 
 // 시나리오 + 컷 분할 — reel 은 방식이 하나뿐이라 film 처럼 갈릴 것이 없다.
@@ -70,8 +119,27 @@ export const POST = withUser(async (req, { params }, user) => {
   const lock = scenarioLock(project);
   if (lock) return Response.json({ error: lock.message }, { status: 400 });
 
+  // ★★ 2026-08-21 리뷰 I5 — scenarioLock 은 "구운 완성본"과 "굽는 중"만 본다(film 과
+  //   같은 결). 컷별 클립(컷당 12크레딧)은 그 사이에 있다 — 클립을 다 만든 뒤에도
+  //   reel.status 는 "rendering" 이 아니므로 위 잠금을 그냥 지난다. 여기서 안 막으면
+  //   시나리오를 다시 쓰는 순간 cuts 를 통째로 갈아 끼워, 이미 산 클립이 경고 없이
+  //   사라진다. 그림($0.08)·clip_prompt(0원)는 막지 않는다 — film 도 그림은 "아직 값을
+  //   안 치렀고 다시 그릴 수 있다"며 허용한다(같은 판단).
+  if ((project.cuts || []).some((c) => c.video?.url)) {
+    return Response.json(
+      { error: "이미 만든 클립이 있어요 — 시나리오를 바꾸려면 새로 시작해 주세요" },
+      { status: 400 }
+    );
+  }
+
   if (!project.material?.text?.trim()) {
     return Response.json({ error: "만들고 싶은 영상을 먼저 적어 주세요" }, { status: 400 });
+  }
+
+  // 무료지만 무제한은 아니다 — 광고·film 과 같은 상한(lib/pricing.js 하나, I5).
+  const tries = Number(project.scenario?.tries) || 0;
+  if (tries >= MAX_SCENARIO_TRIES) {
+    return Response.json({ error: "시나리오를 너무 많이 다시 썼어요" }, { status: 400 });
   }
 
   // 사장님이 고친 컷 — 화면이 보낸 목록을 그대로 믿지 않고 저장된 시나리오와 대조해
@@ -90,16 +158,34 @@ export const POST = withUser(async (req, { params }, user) => {
   }
 
   const cuts = buildReelCuts(scenario);
-  const cast = buildReelCast(scenario, cuts);
+  const shots = Array.isArray(scenario.shots) ? scenario.shots : [];
+  const speakers = shots.map((s) => s?.speaker || "");
+
+  // ★★ C5 — 진짜 캐스팅을 돌린다. 캐스팅이 사람을 하나라도 찾으면 그 결과(사람마다
+  //   다른 목소리 + ref_ids)를 쓴다. 아무도 못 찾았을 때만(제품만 나오는 영상 등)
+  //   buildReelCast 의 목소리 폴백으로 좁힌다 — 어느 쪽이든 speechFor 가 화면 안 대사에서
+  //   목소리를 찾을 수 있어야 한다는 계약은 지켜진다.
+  const casted = await runCasting(cuts, { ...seen, id }, speakers);
+  const cast = casted.cast.length ? casted.cast : buildReelCast(scenario, casted.cuts);
 
   await updateProject(id, user.id, (p) => ({
     ...p,
-    scenario,
-    cuts,
+    scenario: {
+      ...scenario,
+      // ★★ C4 — speechFor 의 내레이션 갈래(lib/cuts.js:1456)는 scenario.narrator_voice 를
+      //   읽는데 validateScenario 는 그 필드를 안 만든다(voice 만 만든다). 광고형 시나리오는
+      //   "내레이션" 화자인 컷이 기본이라, 안 채우면 그 컷 전부가 Voice: 절 없이 나가
+      //   컷마다 목소리가 바뀐다 — 이 저장소의 정지 게이트(컷 간 목소리 일관성)가 정확히
+      //   그 자리다. scenario.voice 를 그대로 별칭한다(한 영상에 화자는 하나라는 시나리오
+      //   프롬프트의 전제와 일치한다).
+      narrator_voice: scenario.voice,
+      tries: tries + 1,
+    },
+    cuts: casted.cuts,
     cast,
     status: "scenario",
     // 읽은 사진값을 남긴다 — 안 남기면 다시 쓸 때마다 사진을 또 읽는다(사진당 값이 든다).
     ...(seen !== project ? { material: { ...p.material, photos: seen.material.photos } } : {}),
   }));
-  return Response.json({ scenario, cuts });
+  return Response.json({ scenario, cuts: casted.cuts });
 });
