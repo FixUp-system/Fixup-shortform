@@ -4,6 +4,7 @@
 // 그리고 이 변경은 "지문이 짧아졌다"가 눈으로 안 보이는 종류다 — film 쪽이 조용히 같이
 // 짧아지면 그림 단계가 무엇을 그릴지 모른 채 돌아간다.
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "fs";
 import { buildScenarioMessages, validateScenario } from "../lib/ad/scenario.js";
 import { SCENARIO_SCHEMA, scenarioSchemaFor } from "../lib/ad/llm.js";
 import { withSpokenLines } from "../lib/ad/generate.js";
@@ -172,5 +173,25 @@ describe("컨셉(포맷) 정의가 지문과 싸우지 않는다", () => {
       "hero", "unboxing", "before_after", "story", "testimonial",
     ]);
     for (const f of AD_FORMATS) expect(f.beat.length).toBeGreaterThan(10);
+  });
+});
+
+describe("시나리오 확인 화면이 전역 값을 보여 준다", () => {
+  // ★ 시나리오는 **사람이 멈춰 서는 유일한 자리**다(lib/ad/steps.js 의 waits: true).
+  //   그 값들이 굽기 지시문에 실려 화면을 정하는데 화면에 안 보이면 어디서도 못 본다.
+  const src = readFileSync(new URL("../app/ads/[id]/page.js", import.meta.url), "utf8");
+
+  for (const [label, field] of [
+    ["인물", "cast"], ["옷차림", "wardrobe"], ["무대", "environment"],
+    ["이야기", "angle"], ["제품", "look"], ["색감", "tone"], ["목소리", "voice"],
+  ]) {
+    it(`${label}(${field})을 그린다`, () => {
+      expect(src).toContain(`scenario?.${field}`);
+      expect(src).toContain(`"${label}"`);
+    });
+  }
+
+  it("★ 값이 없는 칸은 줄째로 안 그린다 — 빈칸이 뜨면 빠뜨린 것처럼 보인다", () => {
+    expect(src).toMatch(/\.filter\(\(\[, v\]\) => typeof v === "string" && v\.trim\(\)\)/);
   });
 });

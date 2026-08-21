@@ -282,6 +282,37 @@ export default function AdDetailPage() {
           <h2>시나리오를 확인해 주세요</h2>
           <p className="script-src">{scenario?.text}</p>
 
+          {/* ★★★ **영상 전체에 걸리는 값들**(2026-08-21). 그전에는 지시문(text)과 장면만
+              보여 주어서, 사장님이 "이 사람이 누구고 어디서 찍고 무슨 옷을 입나"를
+              확인할 자리가 없었다 — 정작 그 값들이 굽기 지시문에 실려 화면을 정하는데도.
+              시나리오 단계는 **사람이 멈춰 서는 유일한 자리**라(lib/ad/steps.js 의 waits)
+              여기서 못 보면 어디서도 못 본다.
+              ★ 값이 없는 칸은 줄째로 안 그린다 — 사람이 없는 영상에서 "인물 (빈칸)"이
+                뜨면 빠뜨린 것처럼 보인다. */}
+          {(() => {
+            const rows = [
+              ["이야기", scenario?.angle],
+              ["인물", scenario?.cast],
+              ["옷차림", scenario?.wardrobe],
+              ["무대", scenario?.environment],
+              ["제품", scenario?.look],
+              ["색감", scenario?.tone],
+              ["목소리", scenario?.voice],
+            ].filter(([, v]) => typeof v === "string" && v.trim());
+            if (!rows.length) return null;
+            return (
+              <div className="plan-row">
+                <div className="plan-body">
+                  {rows.map(([k, v]) => (
+                    <div className="plan-field" key={k}>
+                      <b>{k}</b><span className="editable">{v}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* 장면 목록의 머리 — [수정하기]가 1번 장면보다 **위**에 있어야 손이 먼저 닿는다.
               편집 중에는 [취소]로 바뀐다(같은 자리에서 켜고 끈다). */}
           {/* ★ 편집은 **실제 상태(status)** 로 잠근다. view 로 판정하면 완성본을
