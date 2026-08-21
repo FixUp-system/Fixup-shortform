@@ -23,6 +23,15 @@ describe("writeClipPromptBody", () => {
     expect(seen.fake()).toHaveProperty("body");
   });
 
+  it("자기 스키마를 넘긴다 — SCENARIO_SCHEMA 가 아니다", async () => {
+    let seen = null;
+    await writeClipPromptBody(cut, project, {
+      callJsonImpl: async (args) => { seen = args; return { body: "b" }; },
+    });
+    expect(seen.schema.required).toEqual(["body"]);
+    expect(seen.schema.additionalProperties).toBe(false);
+  });
+
   it("본문 문자열을 돌려준다", async () => {
     const out = await writeClipPromptBody(cut, project, {
       callJsonImpl: async () => ({ body: "  the mug sits still  " }),

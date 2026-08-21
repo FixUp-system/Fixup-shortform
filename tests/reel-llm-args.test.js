@@ -3,7 +3,7 @@
 // ★ 재는 것은 둘이다: 가짜 응답을 부르는 쪽이 정하는가 / 거절 문구가 stage 를 말하는가.
 //   그리고 **안 넘기면 예전 그대로**여야 한다(광고 경로 회귀 0).
 import { describe, it, expect } from "vitest";
-import { callJson } from "../lib/ad/llm.js";
+import { callJson, SCENARIO_SCHEMA } from "../lib/ad/llm.js";
 import { runWithActor } from "../lib/actor.js";
 
 // 거절 문구 테스트는 진짜 경로(fakeLlm() 없음)를 타 assertBudget → costActor() 까지
@@ -41,6 +41,46 @@ describe("callJson 의 fake 인자", () => {
       expect(Array.isArray(out.shots)).toBe(true);
       expect(typeof out.text).toBe("string");
     });
+  });
+});
+
+describe("callJson 의 schema 인자", () => {
+  // 진짜 경로(fakeLlm() 없음)를 타므로 fetchImpl 로 요청 본문을 잡는다. 응답 자체는
+  // 이 테스트의 관심사가 아니라 파싱만 되면 되는 최소 모양을 준다.
+  const capture = (seen) => (url, init) => {
+    seen.body = JSON.parse(init.body);
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        model: "claude-fable-5", stop_reason: "end_turn",
+        content: [{ type: "text", text: '{"ok":true}' }],
+        usage: { input_tokens: 1, output_tokens: 1 },
+      }),
+    });
+  };
+
+  it("안 넘기면 SCENARIO_SCHEMA 가 나간다 — 광고 경로 회귀 0", async () => {
+    const seen = {};
+    await runWithActor(A, () =>
+      callJson({
+        system: "s", messages: [{ role: "user", content: "m" }],
+        apiKey: "test-key", fetchImpl: capture(seen),
+      })
+    );
+    expect(seen.body.output_config.format.schema).toEqual(SCENARIO_SCHEMA);
+  });
+
+  it("넘기면 그 스키마가 나간다", async () => {
+    const seen = {};
+    const mySchema = { type: "object", properties: { body: { type: "string" } }, required: ["body"], additionalProperties: false };
+    await runWithActor(A, () =>
+      callJson({
+        system: "s", messages: [{ role: "user", content: "m" }],
+        apiKey: "test-key", fetchImpl: capture(seen), schema: mySchema,
+      })
+    );
+    expect(seen.body.output_config.format.schema).toEqual(mySchema);
   });
 });
 
