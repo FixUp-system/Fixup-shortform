@@ -638,3 +638,78 @@ describe("첨부가 여럿이면 라벨을 단다", () => {
     expect(withFace({ hasPhoto: true }).prompt).not.toMatch(/in order:/);
   });
 });
+
+// ★★★ 손이 셋 나왔다(실측 2026-08-21, 스킨 토너).
+//
+// `subject-in-use` 축은 재료 장면 뒤에 **자기 문장을 무조건 덧붙인다**:
+//   "The same object being **used or held**, close-up, in: <마지막 장면의 shows>"
+// 그런데 그 장면이 이랬다:
+//   "a young woman ... **fingertips resting lightly on her cheeks**"
+// 두 손이 이미 뺨에 있는데 "들고 있으라"까지 요구하니, 모델이 둘 다 지키려고 손을
+// 하나 더 그렸다. **프롬프트가 자기 안에서 모순**이다.
+//
+// ★ 이 저장소가 아는 자리다: "못 그리는 것은 애초에 요구하지 않는다" — 단계별의 motion
+//   규칙이 "손가락을 세밀하게 쓰는 동작은 적지 않는다(지금 기술로는 뭉개진다)"로 같은
+//   판단을 이미 하고 있다. 그 규율을 이 축에도 쓴다.
+// ★ 이것은 통제를 **줄이는** 쪽이다 — 손을 어떻게 하라고 말하지 않는 것이다.
+describe("제품 사용 축이 손을 요구하지 않는다", () => {
+  const sc = {
+    ...SCENARIO,
+    focus: "product",
+    shots: [
+      { shows: "the toner bottle standing alone on a pale surface", avatar_id: "", seconds: 5 },
+      { shows: "a young woman with dewy skin, fingertips resting lightly on her cheeks", avatar_id: "av-woman-20s", seconds: 5 },
+    ],
+  };
+  const inUse = () => imagePlanFor("refs", sc).find((p) => p.key === "subject-in-use");
+
+  it("★ 축은 그대로 있다 — 제품을 맥락 안에서 보여 주는 자리다", () => {
+    expect(inUse()).toBeTruthy();
+  });
+
+  it("★ '들고 있으라'고 하지 않는다 — 재료가 이미 손을 쓰고 있으면 손이 하나 더 생긴다", () => {
+    expect(inUse().prompt, "held/holding 요구가 남아 있다").not.toMatch(/\b(held|holding|hand|hands)\b/i);
+  });
+
+  it("★ 그래도 제품이 그 장면에 있어야 한다 — 없으면 제품 참조가 한 장 줄어든다", () => {
+    expect(inUse().prompt).toMatch(/object|product/i);
+  });
+
+  it("★ 재료 장면은 그대로 쓴다 — 무대·분위기가 거기서 온다", () => {
+    expect(inUse().prompt).toContain("fingertips resting lightly on her cheeks");
+  });
+});
+
+// ★★★ 굽기 지시문이 그림을 **"정확히 그대로"** 못 박고 있었다(2026-08-21 사장님 지적).
+//
+// 광고와 film 의 프롬프트를 실제로 재 보니(2,211자 vs 2,492자) **딱 한 문단만** 다르고
+// 나머지는 글자 그대로 같았다. 그 한 문단의 끝이 이것이었다:
+//   "Keep the subject, the person and the place looking **exactly as in these images**."
+//
+// 그 한 문장이 셋을 한꺼번에 한다:
+//   ① AI 그림의 결함(손 셋·지어낸 포장·뭉개진 작은 글자)을 **지켜야 할 사실**로 만든다
+//   ② 진실(사장님 사진 1장)을 해석본(그림 4장) 속에 묻는다 — 비율이 4:1 이다
+//   ③ 영상 모델이 잘하는 것(움직임 속에서 스스로 일관성을 만드는 것)을 막는다
+//
+// ★ 이것도 **분할 생성의 처방**이다. 컷마다 따로 구울 때 컷 사이 얼굴·제품이 달라지는
+//   것을 막으려고 넣었는데, 통짜로 굽는 지금은 한 번에 만들어지므로 그 문제가 없다.
+//   광고에는 이 문장이 아예 없고, 사장님 실측에서 광고 쪽이 더 좋았다.
+describe("굽기 지시문이 그림을 못 박지 않는다", () => {
+  const clause = () => attachClauseFor("refs");
+
+  it("★ 참조가 무엇인지는 여전히 말한다 — 안 말하면 첨부가 익명이 된다", () => {
+    expect(clause()).toMatch(/appearance references/i);
+  });
+
+  it("★ 순서로 읽지 말라는 말은 남는다 — 그것이 이 방식의 정의다", () => {
+    expect(clause()).toMatch(/not read them as a sequence/i);
+  });
+
+  it("★ '정확히 그대로'로 못 박지 않는다 — 그림의 결함까지 사실이 된다", () => {
+    expect(clause(), "exactly 가 남아 있다").not.toMatch(/exactly as in these images/i);
+  });
+
+  it("★ 장면 순서 방식은 안 건드린다 — 그쪽은 그림이 곧 장면이라 그대로여야 한다", () => {
+    expect(attachClauseFor("order")).toMatch(/faithful to its image/i);
+  });
+});
