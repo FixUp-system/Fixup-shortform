@@ -31,7 +31,9 @@ describe("system", () => {
   it("★ 금지 목록을 쌓지 않는다 — 짧게 유지한다", () => {
     // fable 은 지시가 과하게 박히면 품질이 떨어진다. 임계는 감이 아니라 규율이다:
     // 지금 길이를 상한으로 못 박아 두어 다음 사람이 조용히 늘리지 못하게 한다.
-    expect(CLIP_PROMPT_SYSTEM.length).toBeLessThan(1200);
+    // ★ 2026-08-21: 실측 319자. 450 은 거기에 여유 40%를 준 값 — 감이 아니라 실측
+    //   분포에서 뽑는다(예전 1200은 감이었고, 그물이 안 물렸다).
+    expect(CLIP_PROMPT_SYSTEM.length).toBeLessThan(450);
   });
 });
 
