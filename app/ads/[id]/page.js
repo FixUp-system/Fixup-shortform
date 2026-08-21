@@ -65,7 +65,10 @@ export default function AdDetailPage() {
   const searchParams = useSearchParams();
   // project·setProject·load 는 컨텍스트에서 온다(null = 아직 못 불러왔다) — 사이드바가
   // 같은 값을 읽어 하위 단계를 그린다. 이 화면이 유일한 발신자이고, 사이드바는 수신만 한다.
-  const { project, setProject, load, setView } = useAdProject();
+  // ★ setBusyStep — 사이드바가 "지금 이 단계가 돈다"를 읽는 자리다(2026-08-21).
+  //   ⚠️ 이걸 빠뜨렸다가 startRender 가 fetch 를 부르기 **전에** ReferenceError 로 죽어
+  //     굽기가 시작조차 안 됐다. 화면은 아무 말도 안 했다(콘솔에만 났다).
+  const { project, setProject, load, setView, setBusyStep } = useAdProject();
   // 크레딧을 끈 동안(내부 QA)에는 값 이야기를 안 한다 — 판정은 서버가 내려 준 gated 하나다.
   const { me } = useMe();
   const showCredits = me?.gated !== false;
