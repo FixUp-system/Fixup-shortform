@@ -20,3 +20,18 @@ dev.log
 
 # 세션 중 dev 서버 로그 — 저장소에 들어가면 안 된다
 dev-*.log
+
+# 탐침 산출물 (2026-08-24, 스토리보드 실측) — 스크립트는 커밋하고 결과물은 안 한다.
+# 이미지는 장당 19MB 라 저장소에 넣을 것이 아니고, 재현하려면 스크립트를 다시 돌린다.
+storyboard*.png
+photo-sb-*.png
+my-*-*.png
+sb*.jpg
+cut[0-9].jpg
+cuts-view.jpg
+psb-*.jpg
+probe-scenario.json
+probe-storyboard-prompt.txt
+photo-storyboard-prompt.txt
+my-prompt.txt
+dev-fal.log
