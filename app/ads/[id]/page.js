@@ -112,6 +112,7 @@ export default function AdDetailPage() {
     setDraftOpts({
       format: st.format, mood: st.mood, style: st.style, lang: st.narration_lang,
       aspect: st.aspect_ratio, model: st.model, seconds: st.seconds, resolution: st.resolution,
+      voiceStyle: st.voice_style,
     });
   }, [project]);
 
@@ -122,6 +123,7 @@ export default function AdDetailPage() {
     draftOpts.format !== project.settings.format ||
     draftOpts.mood !== project.settings.mood ||
     draftOpts.style !== project.settings.style ||
+    draftOpts.voiceStyle !== project.settings.voice_style ||
     draftOpts.lang !== project.settings.narration_lang ||
     draftOpts.aspect !== project.settings.aspect_ratio ||
     draftOpts.model !== project.settings.model ||
@@ -142,7 +144,7 @@ export default function AdDetailPage() {
         material: { text: draftText },
         settings: {
           format: draftOpts.format, mood: draftOpts.mood, style: draftOpts.style,
-          narration_lang: draftOpts.lang, aspect_ratio: draftOpts.aspect,
+          narration_lang: draftOpts.lang, voice_style: draftOpts.voiceStyle, aspect_ratio: draftOpts.aspect,
           model: draftOpts.model, seconds: draftOpts.seconds, resolution: draftOpts.resolution,
         },
       }),

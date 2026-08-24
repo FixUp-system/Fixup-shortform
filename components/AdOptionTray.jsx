@@ -15,7 +15,7 @@ import {
   AD_MODELS, adSecondsFor, isAdSeconds,
   adResolutionsFor, isAdResolution, adDefaultResolution, isAdminOnlyResolution,
 } from "../lib/ad/models";
-import { AD_FORMATS, AD_MOODS, AD_LANGS, AD_STYLE_LINES } from "../lib/ad/options";
+import { AD_FORMATS, AD_MOODS, AD_LANGS, AD_STYLE_LINES, AD_VOICES } from "../lib/ad/options";
 import { STYLE_PRESETS } from "../lib/styles";
 import { ASPECTS, aspectFor } from "../lib/aspects";
 import { priceLabel, adVideoPrice } from "../lib/pricing";
@@ -26,7 +26,7 @@ import { modelsForTier } from "../lib/tiers";
 const AD_STYLES = STYLE_PRESETS.filter((s) => Object.keys(AD_STYLE_LINES).includes(s.id));
 
 export default function AdOptionTray({ value, onChange, showCredits = true, admin = false, tier }) {
-  const { format, mood, style, lang, aspect, model, seconds, resolution } = value;
+  const { format, mood, style, lang, aspect, model, seconds, resolution, voiceStyle } = value;
   const set = (k, v) => onChange({ [k]: v });
 
   // 모델을 바꾸면 길이·해상도가 그 모델에서 유효한지 다시 본다 — 안 그러면 서버가 400 을
@@ -102,6 +102,25 @@ export default function AdOptionTray({ value, onChange, showCredits = true, admi
 
                 {/* 사이즈 — 컷을 만든 뒤에는 못 바꾼다. app/create/page.js 와 같은 이유로 여기가 자리다 */}
                 <div className="tray-row">
+              <span className="tray-label">목소리</span>
+              <div className="tray-col">
+                <div className="chips">
+                  {/* ★★ 목소리를 **사장님이 고른다**(2026-08-24). 지문이 정하게 두었더니
+                      6건 중 5건이 "20대 후반 한국 여성"이었다 — 지문의 예시를 베낀 것이다.
+                      ★ 모델은 바꿀 수 있다(실측: F0 78.8Hz vs 307.7Hz, 3.9배). 못 하는 게
+                        아니라 안 시킨 것이었다.
+                      ★ "자동"이 기본이다 — 안 고르면 예전처럼 시나리오가 정한다. */}
+                  {AD_VOICES.map((v) => (
+                    <button key={v.id} className={`chip${voiceStyle === v.id ? " on" : ""}`}
+                      onClick={() => set('voiceStyle', v.id)}>
+                      {v.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="tray-row">
                   <span className="tray-label">사이즈</span>
                   <div className="tray-col">
                     <div className="chips">

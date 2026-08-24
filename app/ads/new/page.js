@@ -61,6 +61,7 @@ export default function AdNewPage() {
   const [mood, setMood] = useState(DEFAULT_AD_OPTIONS.mood);
   const [lang, setLang] = useState(DEFAULT_AD_OPTIONS.narration_lang);
   const [style, setStyle] = useState(DEFAULT_AD_OPTIONS.style);
+  const [voiceStyle, setVoiceStyle] = useState(DEFAULT_AD_OPTIONS.voice_style);
   const [aspect, setAspect] = useState(DEFAULT_ASPECT_ID);
   const [model, setModel] = useState(DEFAULT_AD_MODEL);
   const [seconds, setSeconds] = useState(adSecondsFor(DEFAULT_AD_MODEL)[0]);
@@ -118,7 +119,7 @@ export default function AdNewPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         material: { text, photos },
-        settings: { format, mood, narration_lang: lang, style, aspect_ratio: aspect, model, seconds, resolution },
+        settings: { format, mood, narration_lang: lang, style, voice_style: voiceStyle, aspect_ratio: aspect, model, seconds, resolution },
       }),
     });
     const data = await res.json();
@@ -166,11 +167,12 @@ export default function AdNewPage() {
           {/* ★ 트레이는 **입력 수정 화면과 나눠 쓴다**(components/AdOptionTray.jsx) —
               두 벌이면 한쪽이 낡는다. 판정은 그 안에서도 lib 이 쥔다. */}
           <AdOptionTray
-            value={{ format, mood, style, lang, aspect, model, seconds, resolution }}
+            value={{ format, mood, style, lang, aspect, model, seconds, resolution, voiceStyle }}
             onChange={(patch) => {
               if (patch.format !== undefined) setFormat(patch.format);
               if (patch.mood !== undefined) setMood(patch.mood);
               if (patch.style !== undefined) setStyle(patch.style);
+              if (patch.voiceStyle !== undefined) setVoiceStyle(patch.voiceStyle);
               if (patch.lang !== undefined) setLang(patch.lang);
               if (patch.aspect !== undefined) setAspect(patch.aspect);
               if (patch.model !== undefined) setModel(patch.model);
