@@ -35,3 +35,18 @@ probe-storyboard-prompt.txt
 photo-storyboard-prompt.txt
 my-prompt.txt
 dev-fal.log
+
+# 실측 산출물 (2026-08-25) — 저장소 루트에 떨어지는 굽기 결과물·중간 파일.
+# 스크립트(scripts/measure/)는 커밋하고 결과물은 안 한다. 243MB 였다.
+# 루트만 잡는다(맨 앞 /) — public/samples/, assets/ 의 폰트·샘플은 그대로 커밋된다.
+/*.png
+/*.jpg
+/*.jpeg
+/*.mp4
+/*.mp3
+/*.zip
+/reel-*.json
+/reel-*.txt
+/storyboard-*.txt
+# 세션 중 급조한 로더·조각 — 정식판은 scripts/measure/ext-loader*.mjs 다
+/tmp-*.mjs
