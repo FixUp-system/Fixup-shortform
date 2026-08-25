@@ -28,7 +28,12 @@ import { useRouter } from "next/navigation";
 // 주소는 단계 표 한 벌이 만든다 — 화면이 `/reel/<id>/scenario` 를 손으로 적으면 두 벌이 된다.
 import { REEL_STEPS, reelStepHref } from "../../../lib/reel/steps";
 import { DEFAULT_ASPECT_ID } from "../../../lib/aspects";
-import { AD_FORMATS, AD_MOODS, AD_LANGS, AD_STYLE_LINES, DEFAULT_AD_OPTIONS } from "../../../lib/ad/options";
+import { AD_MOODS, AD_LANGS, AD_STYLE_LINES, DEFAULT_AD_OPTIONS } from "../../../lib/ad/options";
+// ★★ 컨셉은 **reel 자기 표**다(2026-08-25 사장님 지시). 예전에는 AD_FORMATS(광고 포맷)를
+//   그대로 그렸는데, 다섯이 전부 "팔 물건이 있다"를 전제로 해서 범용 영상에는 좁았다
+//   — 그 다섯은 새 표의 "제품 홍보" 한 칸 안에 다 들어간다.
+//   ★ 광고 화면(app/ads/new)은 여전히 AD_FORMATS 를 쓴다 — 그 흐름은 남겨 둔다.
+import { REEL_CONCEPTS, DEFAULT_REEL_CONCEPT } from "../../../lib/reel/concepts";
 import { STYLE_PRESETS } from "../../../lib/styles";
 import { TARGET_CHOICES } from "../../../lib/script";
 // 모델은 서버가 박는다(DEFAULT_I2V_MODEL) — 화면은 그 모델이 여는 해상도 목록만 읽는다
@@ -52,7 +57,7 @@ export default function ReelNewPage() {
 
   const [text, setText] = useState("");
   const [photos, setPhotos] = useState([]); // {id, filename, url}
-  const [format, setFormat] = useState(DEFAULT_AD_OPTIONS.format);
+  const [concept, setConcept] = useState(DEFAULT_REEL_CONCEPT);
   const [mood, setMood] = useState(DEFAULT_AD_OPTIONS.mood);
   const [style, setStyle] = useState(DEFAULT_AD_OPTIONS.style);
   const [lang, setLang] = useState(DEFAULT_AD_OPTIONS.narration_lang);
@@ -101,7 +106,7 @@ export default function ReelNewPage() {
         material: { text, photos },
         settings: {
           aspect_ratio: DEFAULT_ASPECT_ID, target_seconds: target, resolution,
-          format, mood, style, narration_lang: lang,
+          concept, mood, style, narration_lang: lang,
         },
       }),
     });
@@ -115,7 +120,9 @@ export default function ReelNewPage() {
 
   return (
     <>
-      <h1 className="pgtitle">컷마다 말하는 영상</h1>
+      {/* ★ 2026-08-25 사장님 지시 — "컷마다 말하는 영상"은 **안쪽 사정**(클립이 직접
+          말한다는 구현 방식)을 제목으로 쓴 것이었다. 사이드바 메뉴 이름과 맞춘다. */}
+      <h1 className="pgtitle">영상 만들기</h1>
       <p className="pgsub">소재와 사진을 주시면 시나리오부터 함께 만들어요 — 컷 안에서 직접 말해요.</p>
       {err && <p className="pgsub warn">{err}</p>}
 
@@ -151,14 +158,18 @@ export default function ReelNewPage() {
               <span className="tray-label">컨셉</span>
               <div className="tray-col">
                 <div className="chips">
-                  {AD_FORMATS.map((f) => (
-                    <button key={f.id} className={`chip${format === f.id ? " on" : ""}`}
-                      disabled={locked} onClick={() => setFormat(f.id)}>
-                      {f.label}
+                  {REEL_CONCEPTS.map((c) => (
+                    <button key={c.id} className={`chip${concept === c.id ? " on" : ""}`}
+                      disabled={locked} onClick={() => setConcept(c.id)}>
+                      {c.label}
                     </button>
                   ))}
                 </div>
-                <div className="tray-note">{AD_FORMATS.find((f) => f.id === format)?.beat}</div>
+                {/* ★ [알아서]는 구성이 없으므로 설명(desc)을 대신 보여 준다 —
+                    빈 줄로 남기면 고르면 안 되는 칩처럼 읽힌다. */}
+                <div className="tray-note">
+                  {(() => { const c = REEL_CONCEPTS.find((x) => x.id === concept); return c?.beat || c?.desc || ""; })()}
+                </div>
               </div>
             </div>
 
@@ -227,11 +238,11 @@ export default function ReelNewPage() {
                   {TARGET_CHOICES.map((s) => (
                     <button key={s} className={`chip${target === s ? " on" : ""}`}
                       disabled={locked} onClick={() => setTarget(s)}>
-                      {s}초 · {priceLabel(videoPrice(s, DEFAULT_I2V_MODEL, resolution))}
+                      {/* ★ 크레딧 표기를 뗐다(2026-08-25 사장님 지시 — "일단 제거"). */}
+                      {s}초
                     </button>
                   ))}
                 </div>
-                <div className="tray-note">정가가 길이·화질에서 나와요 — 굽기 전에 미리 알 수 있어요</div>
               </div>
             </div>
           </div>

@@ -7,6 +7,7 @@ import { MAX_MATERIAL_TEXT } from "../../../lib/material.js";
 import { DEFAULT_I2V_MODEL, isResolutionFor } from "../../../lib/clip-limits.js";
 import { TARGET_CHOICES } from "../../../lib/script.js";
 import { normalizeAdOptions } from "../../../lib/ad/options.js";
+import { normalizeReelConcept } from "../../../lib/reel/concepts.js";
 import { isSubtitleLang, DEFAULT_SPEECH_LANG } from "../../../lib/subtitle-langs.js";
 
 // reel 프로젝트를 만든다 — kind:"reel" 로, 옛 단계별 흐름(isStepDoc)과 격리된다
@@ -74,6 +75,14 @@ export const POST = withUser(async (req, _ctx, user) => {
     material: { text: body.material.text.slice(0, MAX_MATERIAL_TEXT), photos },
     settings: {
       ...options,
+      // ★★ 컨셉 — reel 은 **광고 포맷이 아니라 큰 범주**를 고른다(2026-08-25 사장님 지시,
+      //   lib/reel/concepts.js). options.format 은 normalizeAdOptions 가 채워 넣은 광고
+      //   기본값이라 여기 그대로 남지만, reel 의 시나리오 라우트는 그것을 **안 읽는다**
+      //   (conceptLine 을 넘기면 조회 자체를 건너뛴다). 지우지 않는 이유는 광고 옵션
+      //   한 벌을 그대로 저장하는 모양을 깨지 않으려는 것뿐이다.
+      // ★ 모르는 값은 던지지 않고 [알아서]로 떨어진다 — 컨셉은 값을 가르는 축이 아니라서
+      //   (길이·화질과 다르다) 조용히 기본값이 되어도 돈이 새지 않는다.
+      concept: normalizeReelConcept(body?.settings?.concept),
       aspect_ratio: aspect,
       target_seconds: target,
       // ★ Task 12b — 위에서 검증한 값을 그대로 저장한다. resolutionForProject·videoPrice·

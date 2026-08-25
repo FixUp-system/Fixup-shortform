@@ -4,6 +4,7 @@ import { generateScenario, pickEditedShots, readPhotoVision } from "../../../../
 import { isNarrationSpeaker } from "../../../../../lib/cuts.js";
 import { scenarioLock, putReel } from "../../../../../lib/reel/doc.js";
 import { reelSceneCountRule } from "../../../../../lib/reel/scenario-rules.js";
+import { reelConceptLine } from "../../../../../lib/reel/concepts.js";
 import { MAX_SCENARIO_TRIES } from "../../../../../lib/pricing.js";
 import {
   availableAvatars, buildCastMessages, resolveCastRefs, mergeCastIntoCuts, mergePropsIntoCuts,
@@ -173,6 +174,12 @@ export const POST = withUser(async (req, { params }, user) => {
       edits,
       note,
       sceneCountRule: reelSceneCountRule(seen?.settings?.seconds),
+      // ★★ 컨셉 — 사장님이 고른 큰 범주가 여기서 **구성 한 줄**이 된다
+      //   (2026-08-25, lib/reel/concepts.js). [알아서]면 null 이라 그 줄이 아예 안 실리고,
+      //   그때는 모델이 소재를 읽고 스스로 구성한다.
+      // ★ 이 키가 있으면 buildScenarioMessages 는 광고 포맷(AD_FORMATS) 조회를 건너뛴다 —
+      //   reel 은 그 값을 안 쓰므로, 옛 프로젝트에 든 모르는 format 때문에 죽지 않는다.
+      conceptLine: reelConceptLine(seen?.settings?.concept),
     });
   } catch (e) {
     return Response.json({ error: e?.message || "시나리오를 만들지 못했어요" }, { status: 500 });
