@@ -21,13 +21,14 @@
 //   로 서버가 고정한다) — 광고 쪽 짝(모델별 해상도·정가 함수)을 쓰면 화면이 보여 주는
 //   값과 실제 청구가 갈린다.
 //
-// ★ 사이즈(화면 비율) 선택지는 없다. reel 은 "숏폼"이 표제 기능이라 DEFAULT_ASPECT_ID(9:16)
-//   하나로 보낸다 — film·광고처럼 여러 채널에 맞추는 것이 목적이 아니다.
+// ★★ 사이즈(화면 비율)를 고른다(2026-08-25 사장님 지시로 열렸다). 옛 주석은 "reel 은
+//   숏폼이 표제 기능이라 9:16 하나로 보낸다"였는데 그 결정이 뒤집혔다. 기본은 여전히
+//   세로이고, 뒷단은 이미 비율을 받아 돌아가고 있었다(막힌 것은 화면뿐이었다).
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 // 주소는 단계 표 한 벌이 만든다 — 화면이 `/reel/<id>/scenario` 를 손으로 적으면 두 벌이 된다.
 import { REEL_STEPS, reelStepHref } from "../../../lib/reel/steps";
-import { ASPECTS, DEFAULT_ASPECT_ID } from "../../../lib/aspects";
+import { ASPECTS, DEFAULT_ASPECT_ID, aspectFor } from "../../../lib/aspects";
 import { AD_MOODS, AD_LANGS, AD_STYLE_LINES, DEFAULT_AD_OPTIONS } from "../../../lib/ad/options";
 // ★★ 컨셉은 **reel 자기 표**다(2026-08-25 사장님 지시). 예전에는 AD_FORMATS(광고 포맷)를
 //   그대로 그렸는데, 다섯이 전부 "팔 물건이 있다"를 전제로 해서 범용 영상에는 좁았다
@@ -238,7 +239,10 @@ export default function ReelNewPage() {
                     </button>
                   ))}
                 </div>
-                <div className="tray-note">{ASPECTS.find((a) => a.id === aspect)?.note}</div>
+                {/* ★ 문구도 광고 화면과 맞춘다(2026-08-25 사장님 지시 — "광고 영상에
+                    맞춰서"). 두 흐름이 같은 것을 고르는데 말투가 다르면 사장님이
+                    화면마다 다른 사용법을 익혀야 한다. */}
+                <div className="tray-note">{aspectFor(aspect).note}에 맞는 규격이에요</div>
               </div>
             </div>
 
