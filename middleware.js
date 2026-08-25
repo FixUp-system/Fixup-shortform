@@ -146,5 +146,8 @@ export async function middleware(req) {
 // ★ matcher 가 곧 보안 경계다. 여기 안 걸리는 경로는 신원 헤더 없이 라우트에 닿고,
 // requireUser 가 500 으로 드러낸다(조용히 통과하지 않는다).
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|fonts/).*)"],
+// ★ samples/ — 가짜 모드가 쓰는 스토리보드 표본(public/samples).
+  //   빼지 않으면 로그인 벽에 막혀 **307 이 되고 그림이 통째로 안 뜼다**
+  //   (2026-08-25 실측). fonts/ 와 같은 성격이다 — 신원과 무관한 정적 파일.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|fonts/|samples/).*)"],
 };

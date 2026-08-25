@@ -1,7 +1,8 @@
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { runInBackground } from "../../../../../lib/background.js";
-import { runReelClips } from "../../../../../lib/reel/pipeline.js";
-import { canBakeReelClips, putReel, reelOf } from "../../../../../lib/reel/doc.js";
+import { runReelClips, runReelOneShot } from "../../../../../lib/reel/pipeline.js";
+import { planReelBake, canBakeReel } from "../../../../../lib/reel/oneshot.js";
+import { putReel, reelOf } from "../../../../../lib/reel/doc.js";
 import { getProject, updateProject } from "../../../../../lib/projects.js";
 import { requireVideoCharge, NoCredits } from "../../../../../lib/charges.js";
 import { modelIdForProject, resolutionForProject } from "../../../../../lib/clip-limits.js";
@@ -29,8 +30,19 @@ export const POST = withUser(async (req, { params }, user) => {
   //   그림이 빠진 컷이 있으면 크레딧이 나간 **뒤** `status:"error"` 였다. 청구 앞인
   //   여기서 그 조합을 함께 보면 그 값은 아예 안 나간다(`canBakeReelClips`, 화면
   //   게이트와 같은 함수).
-  if (!canBakeReelClips(project.cuts)) {
-    return Response.json({ error: "영상 프롬프트와 그림을 먼저 만들어 주세요" }, { status: 400 });
+  // ★★ 2026-08-25 — 갈래가 둘이다. 15초 이하 + 스토리보드면 **한 번에 통짜로** 굽고
+  //   (스토리보드 한 장 + 프롬프트 하나 → r2v 한 번), 그 밖이면 예전처럼 컷별로 굽는다.
+  //   45·60초는 Seedance 2.0 이 한 번에 못 굽는 길이라(15초가 최대) 컷별이 유일한 길이다.
+  //   판정은 lib/reel/oneshot.js 의 planReelBake **하나**다 — 여기서 초를 다시 세면
+  //   화면과 갈린다. 게이트도 마찬가지로 canBakeReel 하나다(컷별 갈래에서는 예전
+  //   canBakeReelClips 를 글자 그대로 부른다).
+  const plan = planReelBake(project);
+  if (!canBakeReel(project)) {
+    return Response.json({
+      error: plan.mode === "oneshot"
+        ? "시나리오와 그림을 먼저 만들어 주세요"
+        : "영상 프롬프트와 그림을 먼저 만들어 주세요",
+    }, { status: 400 });
   }
 
   // ★★ 2026-08-21 리뷰 C2 — 돌고 있는 실행 위에 또 시작하지 않는다. **청구보다 앞**이다.
@@ -64,7 +76,7 @@ export const POST = withUser(async (req, { params }, user) => {
   // ★ **약속(promise)을 넘긴다 — 콜백이 아니다.** 콜백으로 넘기면 파이프라인이 요청 범위
   //   밖에서 시작하고, 비용 주체는 AsyncLocalStorage 에서 읽으므로 costActor() 가 던진다.
   runInBackground(
-    runReelClips(id, user.id)
+    (plan.mode === "oneshot" ? runReelOneShot(id, user.id) : runReelClips(id, user.id))
       // ★★ 2026-08-21 리뷰 C1 — 성공이 문서에 안 남고 있었다. runReelClips 는 cuts 만
       //   저장하고 reel.status 를 안 건드리므로, 여기서 옮기지 않으면 status 가 영원히
       //   "rendering" 으로 남아 화면은 영영 "만드는 중", scenarioLock 은 영구 잠금이 된다.

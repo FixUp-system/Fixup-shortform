@@ -2,6 +2,7 @@ import { withUser } from "../../../../../lib/auth/require-user.js";
 import { runReelPrompts } from "../../../../../lib/reel/pipeline.js";
 import { getProject, updateProject } from "../../../../../lib/projects.js";
 import { LEDGER_PROMPT_MAX } from "../../../../../lib/costs.js";
+import { putReel } from "../../../../../lib/reel/doc.js";
 
 // 영상 프롬프트 만들기.
 //
@@ -18,14 +19,17 @@ export const POST = withUser(async (req, { params }, user) => {
     return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
   }
 
-  const { only } = (await req.json().catch(() => ({}))) || {};
+  // ★★ note — 사장님이 **한국어로** 고쳐 달라고 적은 것(2026-08-25). 컷마다 같은 말이
+  //   실린다(단위는 전체 한 번이다). 문자열이 아니면 파이프라인이 그냥 무시한다 —
+  //   안 실으면 지문이 예전과 글자 그대로다.
+  const { only, note } = (await req.json().catch(() => ({}))) || {};
   // ⚠️ 배열이 아닌 값을 조용히 무시하면 **전부 다시 만든다** — 각인이 흔들려 이미 산 클립이
   //    통째로 낡는다(컷당 12크레딧).
   if (only !== undefined && !Array.isArray(only)) {
     return Response.json({ error: "다시 만들 컷을 골라 주세요" }, { status: 400 });
   }
   try {
-    await runReelPrompts(id, user.id, { only });
+    await runReelPrompts(id, user.id, { only, note });
   } catch (e) {
     return Response.json({ error: e?.message || "영상 프롬프트를 못 만들었어요" }, { status: 500 });
   }
@@ -36,7 +40,14 @@ export const POST = withUser(async (req, { params }, user) => {
 export const PATCH = withUser(async (req, { params }, user) => {
   const { id } = await params;
   const { idx, body } = (await req.json().catch(() => ({}))) || {};
-  if (!Number.isInteger(idx) || idx < 0) {
+  // ★★ 2026-08-25 — **idx 를 안 주면 전체 프롬프트다**(통짜 갈래, 15초 이하). 컷별 프롬프트가
+  //   없는 갈래라 고칠 자리도 컷이 아니라 한 편 전체다 — `reel.prompt` 에 산다.
+  //   ★ 시나리오 `text` 를 직접 덮지 않는다: 그 값은 컷·그림의 원천이라(scenarioLock 이
+  //     지키는 그 값) 고치면 그림까지 낡는다. 읽을 때 reel.prompt 가 먼저 이긴다
+  //     (lib/reel/oneshot.js 의 reelWholePrompt).
+  //   ★ idx 를 준 옛 경로는 **한 글자도 안 바뀐다**.
+  const whole = idx === undefined || idx === null;
+  if (!whole && (!Number.isInteger(idx) || idx < 0)) {
     return Response.json({ error: "어느 컷인지 알 수 없어요" }, { status: 400 });
   }
   const text = typeof body === "string" ? body.trim() : "";
@@ -56,6 +67,10 @@ export const PATCH = withUser(async (req, { params }, user) => {
   const project = await getProject(id, user.id);
   if (!project || project.kind !== "reel") {
     return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
+  }
+  if (whole) {
+    await updateProject(id, user.id, (p) => putReel(p, { prompt: text }));
+    return Response.json({ ok: true });
   }
   if (!Array.isArray(project.cuts) || !project.cuts[idx]) {
     return Response.json({ error: "그 컷이 없어요" }, { status: 400 });

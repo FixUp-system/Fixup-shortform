@@ -30,12 +30,16 @@ const CUTS = [
 ];
 
 describe("composeVideo", () => {
-  it("가짜 모드에서는 파일을 만들지 않고 그렇다고 말한다", async () => {
-    // 재생 안 되는 더미를 돌려주면 "합성이 깨졌다"로 오해한다 — 없다고 말하는 편이 낫다
+  // ★ 2026-08-25 — 가짜 모드가 **실제 영상 표본**을 준다(사장님 지시).
+  //   옛 단정은 url 이 null 이었고, 그 이유는 "재생 안 되는 더미를 주면
+  //   합성이 깨졌다고 오해한다"였다. **진짜 재생되는 표본**이면 그 오해가
+  //   생기지 않고, 반대로 ⑥완성의 배치·자막을 0원으로 검토할 수 있다.
+  //   변하지 않는 것: **파일을 만들지 않는다**(fake:true)와 **길이 계산**.
+  it("가짜 모드에서는 파일을 만들지 않고 표본을 준다", async () => {
     process.env.SHOTFORM_FAKE = "1";
     const r = await composeVideo({ projectId: "p1", cuts: CUTS, aspect_ratio: "9:16" });
     expect(r.fake).toBe(true);
-    expect(r.url).toBe(null);
+    expect(r.url).toBe("/samples/reel-15s.mp4");
     expect(r.seconds).toBe(17); // 4 + 13, 소리 기준
   });
 

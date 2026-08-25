@@ -1,5 +1,7 @@
 import { withUser } from "../../../../lib/auth/require-user.js";
-import { getProject } from "../../../../lib/projects.js";
+import { getProject, updateProject } from "../../../../lib/projects.js";
+// 자막 설정의 되돌리기 규칙은 lib 하나가 쥔다 — 라우트가 다시 적으면 갈린다.
+import { normalizeSubtitle } from "../../../../lib/subtitles.js";
 
 // reel 문서를 **읽는 문**.
 //
@@ -29,4 +31,40 @@ export const GET = withUser(async (_req, { params }, user) => {
     return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
   }
   return Response.json(project);
+});
+
+// reel 문서에 **자막 설정을 저장하는 문**(2026-08-25).
+//
+// ★★ 왜 새 문이 필요한가: 단계별 흐름이 쓰는 `/api/projects/[id]` 는 종류가 있는 문서를
+//   `isStepDoc` 로 막아 404 를 준다(그 파일의 PATCH). reel 은 kind 가 있으니 그 문으로는
+//   못 저장한다 — 그래서 이 문이다. **보내는 값의 모양은 단계별과 같다**
+//   (`{ settings: { subtitle } }`) — 화면 하나(components/SubtitleEditor.jsx)가 두 흐름을
+//   다 그리므로, 모양까지 갈리면 화면이 흐름마다 다른 몸통을 만들어야 한다.
+//
+// ★ 되돌리기 규칙을 여기서 새로 적지 않는다 — 목록 밖 글꼴·잘못된 색·범위 밖 크기·화면 밖
+//   자리는 lib/subtitles.js 의 normalizeSubtitle 하나가 조용히 되돌린다(단계별 라우트와
+//   같은 함수다). 400 으로 막지 않는 이유도 같다: 슬라이더를 끌다가 400 이 뜨면 성가시고,
+//   되돌려도 사장님이 잃는 것이 없다.
+//
+// ★ **자막 설정만 받는다.** settings 를 통째로 머지하면 비율·모델·길이처럼 값이 나가는
+//   설정이 이 문으로 함께 들어온다 — 그것들은 닫힌 목록과 결제 잠금이 붙어 있는 값이라
+//   (app/api/projects/[id]/route.js 참고) 그물 없는 문을 새로 여는 셈이 된다.
+export const PATCH = withUser(async (req, { params }, user) => {
+  const { id } = await params;
+  const body = await req.json().catch(() => ({}));
+  if (body?.settings?.subtitle === undefined) {
+    return Response.json({ error: "저장할 자막 설정이 없어요" }, { status: 400 });
+  }
+
+  try {
+    const project = await updateProject(id, user.id, (p) => {
+      // ★ 격리는 양방향이다 — 다른 종류의 문서가 이 문으로 들어오면 없는 것과 같이 답한다
+      //   (다른 reel 라우트들과 같은 결, 위 GET 의 검사와 같은 문구다).
+      if (p?.kind !== "reel") throw new Error("프로젝트를 찾을 수 없어요");
+      return { ...p, settings: { ...p.settings, subtitle: normalizeSubtitle(body.settings.subtitle) } };
+    });
+    return Response.json(project);
+  } catch (e) {
+    return Response.json({ error: e.message }, { status: 404 });
+  }
 });

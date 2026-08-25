@@ -30,7 +30,11 @@ afterEach(() => { delete process.env.SHOTFORM_FAKE; });
 // 즉 레거시(Kling v3, 3~15초 범위)를 전제로 쓰여 있다.
 // 열거 눈금(LTX)의 올림은 순수 함수(fitDurationFor)로만 확인한다 — 고를 수 있는 모델이 아니다.
 describe("generateClip", () => {
-  it("가짜 모드에서는 이미지 URL을 그대로 클립으로 돌려준다", async () => {
+  // ★ 2026-08-25 — 가짜 모드가 **실제 영상 표본**을 준다(사장님 지시).
+  //   전에는 imageUrl 을 그대로 돌려줘 정지 그림이었고, 그래서 재생해도 아무
+  //   일도 안 일어나 화면 배치를 0원으로 검토할 수 없었다.
+  //   변하지 않는 것: **fal 을 안 부른다**와 **길이는 진짜와 같은 값이다**.
+  it("가짜 모드에서는 fal 을 안 부르고 영상 표본을 돌려준다", async () => {
     process.env.SHOTFORM_FAKE = "1";
     let called = false;
     const r = await generateClip({
@@ -39,7 +43,7 @@ describe("generateClip", () => {
     });
     expect(called).toBe(false);
     // 2초는 Kling 하한(3초)보다 짧아 3초로 올라간다 — 가짜 모드도 진짜와 같은 값을 돌려줘야 한다
-    expect(r).toEqual({ url: "data:image/svg+xml;base64,AAA", seconds: 3, truncated: false });
+    expect(r).toEqual({ url: "/samples/reel-15s.mp4", seconds: 3, truncated: false });
   });
 
   // 관통에서 낭독 실측(9초·5초)을 그대로 보냈다가 네 컷 전부 422 로 거절당했다:

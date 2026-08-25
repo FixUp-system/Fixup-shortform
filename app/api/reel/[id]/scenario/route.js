@@ -3,6 +3,7 @@ import { getProject, updateProject } from "../../../../../lib/projects.js";
 import { generateScenario, pickEditedShots, readPhotoVision } from "../../../../../lib/ad/scenario.js";
 import { isNarrationSpeaker } from "../../../../../lib/cuts.js";
 import { scenarioLock, putReel } from "../../../../../lib/reel/doc.js";
+import { reelSceneCountRule } from "../../../../../lib/reel/scenario-rules.js";
 import { MAX_SCENARIO_TRIES } from "../../../../../lib/pricing.js";
 import {
   availableAvatars, buildCastMessages, resolveCastRefs, mergeCastIntoCuts, mergePropsIntoCuts,
@@ -22,7 +23,10 @@ import { callJson as callCastJson } from "../../../../../lib/llm.js";
 //   못 박은 값). 컷마다 복사해 두는 이유는 lib/cuts.js 의 stageOf·clipContextClause 가
 //   **컷 단위**로 읽기 때문이다(project.scenario 를 직접 안 본다) — 그림·클립 프롬프트가
 //   "전 컷이 같은 무대·색"이라고 말하려면 그 값이 컷에도 있어야 한다.
-function buildReelCuts(scenario) {
+// ★ export 하는 이유: 측정 스크립트가 같은 함수를 써야 한다.
+//   2026-08-21 에 이것을 스크립트로 옆겨 적다가 speaker 한 줄을 빠뜨렸고,
+//   그래서 전 컷이 화면 안 대사로 떨어졌다. 두 벌을 만들지 않는다.
+export function buildReelCuts(scenario) {
   const shots = Array.isArray(scenario?.shots) ? scenario.shots : [];
   const environment = typeof scenario?.environment === "string" ? scenario.environment.trim() : "";
   const tone = typeof scenario?.tone === "string" ? scenario.tone.trim() : "";
@@ -147,13 +151,29 @@ export const POST = withUser(async (req, { params }, user) => {
   // 서버가 고른다(film 라우트와 같은 처방, lib/ad/scenario.js 의 pickEditedShots).
   const body = await req.json().catch(() => null);
   const edits = pickEditedShots(project.scenario?.shots, body?.shots);
+  // ★★ 사장님이 **말로** 적은 수정 요청(2026-08-25). edits 와 다른 축이라 따로 나른다 —
+  //   둘 다 올 수 있고, 없으면 지문이 예전과 글자 그대로다(lib/ad/scenario.js 의 note 블록).
+  // ★ 길이를 여기서 자르지 않는다 — 자르는 자리는 지문을 조립하는 곳 하나다(slice(0,1000)).
+  const note = typeof body?.note === "string" ? body.note : "";
 
   // 사진을 먼저 읽는다(film 라우트와 같은 이유) — 시나리오가 제품의 글자·색·크기를 알아야 한다.
   const seen = await readPhotoVision(project);
 
   let scenario;
   try {
-    scenario = await generateScenario({ project: seen, edits });
+    // ★★ reel 은 **자기 장면 수 규칙**을 들고 간다. 광고의 그 대목은 "한 번에 통째로
+    //   만들어진다"를 근거로 다는데, reel 은 컷마다 따로 굽고 ffmpeg 가 잉는다 — 그 근거가
+    //   여기서는 거짓이다. 그리고 그림은 **스토리보드 한 장**이라 컷 수가 곳 격자 칸 수이고,
+    //   그 칸 수는 nano-banana 2 가 받는 프리셋 비율로만 떨어진다(lib/reel/scenario-rules.js).
+    // ★ 길이는 settings.seconds 를 읽는다 — buildScenarioMessages 가 "길이: N초"를 쓸 때
+    //   보는 그 값이다(app/api/reel/route.js 가 target_seconds 의 별칭으로 둔다). 둘을
+    //   따로 읽으면 지시문 안에서 두 길이가 어긋난다.
+    scenario = await generateScenario({
+      project: seen,
+      edits,
+      note,
+      sceneCountRule: reelSceneCountRule(seen?.settings?.seconds),
+    });
   } catch (e) {
     return Response.json({ error: e?.message || "시나리오를 만들지 못했어요" }, { status: 500 });
   }

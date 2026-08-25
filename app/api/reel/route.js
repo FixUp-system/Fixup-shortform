@@ -7,6 +7,7 @@ import { MAX_MATERIAL_TEXT } from "../../../lib/material.js";
 import { DEFAULT_I2V_MODEL, isResolutionFor } from "../../../lib/clip-limits.js";
 import { TARGET_CHOICES } from "../../../lib/script.js";
 import { normalizeAdOptions } from "../../../lib/ad/options.js";
+import { isSubtitleLang, DEFAULT_SPEECH_LANG } from "../../../lib/subtitle-langs.js";
 
 // reel 프로젝트를 만든다 — kind:"reel" 로, 옛 단계별 흐름(isStepDoc)과 격리된다
 // (lib/projects.js 의 KINDS, 2026-08-21).
@@ -87,6 +88,16 @@ export const POST = withUser(async (req, _ctx, user) => {
       //   여기서 안 박으면 modelIdForProject 가 없는 값을 LEGACY_I2V_MODEL(kling-v3,
       //   speaks:false) 로 떨어뜨려 대사가 통째로 사라진다(lib/clip-limits.js).
       i2v_model: DEFAULT_I2V_MODEL,
+      // ★★ 음성 언어 — **칩 하나가 둘 다 정한다**(2026-08-25 사장님 결정).
+      //
+      // 이것이 없어서 버그가 있었다: 화면은 narration_lang 만 보내는데
+      // buildClipPrompt(lib/cuts.js)는 **speech_lang** 을 읽는다(speechLangOf).
+      // 그래서 일본어를 골라도 음성 언어가 기본값 "ko" 로 떨어져
+      // `Says exactly, in Korean: "일본어 대사"` 라는 **모순된 지시**가 나갔다.
+      // ★ 드러나는 자리가 **돈을 치른 뒤**라서 더 나쁘다(클립을 굽고 나서 들린다).
+      // ★ 모르는 값은 기본값으로 떨어뜼린다 — 던지지 않는다(app/api/projects/route.js 와 같은 처방).
+      speech_lang: isSubtitleLang(options.narration_lang) ? options.narration_lang : DEFAULT_SPEECH_LANG,
+
     },
   });
   return Response.json(project);

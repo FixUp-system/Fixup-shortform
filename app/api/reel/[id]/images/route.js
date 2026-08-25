@@ -9,6 +9,10 @@ import { fakeFal } from "../../../../../lib/fake.js";
 import {
   reelOf, putReel, isImagesLocked, imageTriesLeft, imageTriesLeftLifetime, isReelRendering,
 } from "../../../../../lib/reel/doc.js";
+import {
+  planReelImages, buildStoryboardPrompt, storyboardImageSize,
+  cropStoryboardCells, saveStoryboardCells, fetchImageBytes,
+} from "../../../../../lib/reel/storyboard.js";
 
 // 만든 그림만 컷에 얹는다 — **컷 목록을 대체하지 않는다.** export 하는 이유: 이것이
 // N1 의 수정 전부다("실패해도 뒤 컷이 살아남는가"), 테스트가 이것을 직접 부른다
@@ -17,8 +21,15 @@ export function mergeImages(cuts, made) {
   return (cuts || []).map((c) => (made.has(c.idx) ? { ...c, image: made.get(c.idx) } : c));
 }
 
-// 그림 만들기 — 컷마다 한 장. film 의 images 라우트와 같은 결이다: 동기로 기다린다
-// (컷 서넛 × 한 장이라 서버리스 상한 안에서 끝나고, 기다리면 실패가 HTTP 로 보인다).
+// 그림 만들기 — **스토리보드 한 장을 사서 칸을 자른다**(2026-08-25). film 의 images
+// 라우트와 같은 결이다: 동기로 기다린다(호출이 한 번이라 서버리스 상한 안에서 끝나고,
+// 기다리면 실패가 HTTP 로 보인다).
+//
+// ★★ 왜 한 장인가: 값이 한 자리 다르다 — 9컷이면 한 장 $0.401 대 컷별 아홉 장 $3.61
+//   (2026-08-24 실측). 게다가 한 장에 함께 그려지므로 인물·옷·색이 저절로 같다.
+// ★★ 갈래 판정은 lib/reel/storyboard.js 의 planReelImages **하나**다 — 여기서 격자 표를
+//   다시 읽지 않는다. 컷 수가 격자 밖(5·7·8…)이거나 컷 하나만 다시 그리는 것(only)이면
+//   **예전 방식(컷별)이 그대로 산다** — 던지지 않는다.
 //
 // ★ 프롬프트는 lib/cuts.js 의 buildImagePrompt 를 그대로 쓴다 — 그 함수가 컷의 shows·
 //   environment·tone(시나리오 라우트가 컷에 옮겨 둔 값)과 project.cast(캐스팅) 를 읽는다.
@@ -37,12 +48,17 @@ export const POST = withUser(async (req, { params }, user) => {
   const cuts = project.cuts || [];
   if (!cuts.length) return Response.json({ error: "시나리오를 먼저 만들어 주세요" }, { status: 400 });
 
-  const { only } = (await req.json().catch(() => ({}))) || {};
+  // ★★ note — 사장님이 **말로** 고쳐 달라고 적은 것(2026-08-25).
+  //   스토리보드 갈래에서만 쓴다 — 전체 한 장을 다시 그리는 요청이라 컷별에는 뜻이 없다.
+  const { only, note, auto } = (await req.json().catch(() => ({}))) || {};
   // ★ 배열이 아닌 값을 조용히 무시하면 전부 다시 그린다 — 컷당 $0.08 이 통째로 나간다.
   if (only !== undefined && !Array.isArray(only)) {
     return Response.json({ error: "다시 그릴 그림을 골라 주세요" }, { status: 400 });
   }
-  const wanted = Array.isArray(only) && only.length ? new Set(only) : null;
+
+  // 갈래와 대상은 순수 함수 하나가 정한다 — 라우트가 손으로 다시 세면 화면·측정과 갈린다.
+  const plan = planReelImages(cuts, only);
+  const targets = new Set(plan.targets);
 
   const reel = reelOf(project);
   // ★★ 2026-08-21 리뷰 N4 — 굽는 중에는 그리지 않는다. film 의 isDrawLocked 는 빌렸는데
@@ -106,25 +122,62 @@ export const POST = withUser(async (req, { params }, user) => {
   //   나쁘다"는 지적을 그대로 받아, 성공 경로도 같은 병합형으로 통일한다.
   const made = new Map();
   let failure = null;
-  for (const cut of cuts) {
-    const has = !!cut?.image?.url;
-    const wantIt = wanted ? wanted.has(cut.idx) : !has;
-    if (!wantIt) continue;
+
+  if (plan.mode === "storyboard") {
+    // ★★ 생성 호출이 **한 번**이다 — 그래서 원장·예산에도 한 번만 적힌다(generateImage 가
+    //   호출마다 한 줄을 적는다). 칸으로 나누는 것은 그 뒤의 우리 일이라 값이 안 붙는다.
+    // ★ 치수는 칸 수에서 역산한다 — 칸 하나가 굽기 해상도(720×1280)가 되도록
+    //   (storyboardImageSize). 비율·해상도 축으로는 표현할 수 없어 imageSize 로 넘긴다.
+    // ★ 레퍼런스는 안 싣는다. 참조는 **컷 단위**로 꽂히는데 이 호출은 컷 전체를 한 장에
+    //   그리므로, 컷 하나의 참조를 통째로 실으면 다른 칸까지 그 사진을 닮는다.
+    //   생김새·옷·무대는 시나리오(look·wardrobe·environment)가 말로 붙든다.
     try {
-      const { refs } = await loadCutRefs(cut, project);
-      const prompt = buildImagePrompt(cut, project, refs);
-      const out = await generateImage({ prompt, aspect_ratio, refs, projectId: id, resolution });
-      made.set(cut.idx, { url: out.url, of: prompt });
+      const prompt = buildStoryboardPrompt(project, cuts, plan.grid, note);
+      const out = await generateImage({
+        prompt,
+        aspect_ratio: plan.grid.canvas,
+        projectId: id,
+        resolution,
+        imageSize: storyboardImageSize(plan.grid, aspect_ratio),
+      });
+      // 여기서부터는 **우리 바이트**다 — 내려받아 자르고 우리 버킷에 둔다.
+      // 어디에 왜 두는지는 lib/reel/storyboard.js 의 saveStoryboardCells 머리말에 있다.
+      const cells = await cropStoryboardCells(await fetchImageBytes(out.url), plan.grid, { aspect: aspect_ratio });
+      const urls = await saveStoryboardCells(cells, user.id);
+      cuts.forEach((cut, i) => {
+        if (!urls[i]) return;
+        made.set(cut.idx, { url: urls[i], of: prompt, sheet: out.url, cell: i });
+      });
     } catch (e) {
       failure = e;
-      break;
+    }
+  } else {
+    // ── 컷별 — 예전 방식 그대로다(격자 밖 칸 수 · 컷 하나만 다시 그리기 · 빈 칸 채우기).
+    for (const cut of cuts) {
+      if (!targets.has(cut.idx)) continue;
+      try {
+        const { refs } = await loadCutRefs(cut, project);
+        const prompt = buildImagePrompt(cut, project, refs);
+        const out = await generateImage({ prompt, aspect_ratio, refs, projectId: id, resolution });
+        made.set(cut.idx, { url: out.url, of: prompt });
+      } catch (e) {
+        failure = e;
+        break;
+      }
     }
   }
 
   // ★ 병합은 **저장 시점의 최신 p.cuts** 위에서 한다(위 스냅샷 cuts 가 아니다) — updateProject
   //   가 CAS 재시도로 patchFn 을 다시 부를 수 있어(lib/projects.js), 그때마다 그 사이에
   //   들어온 다른 쓰기(예: 사장님이 clip_prompt 를 고친 것) 위에 이미지만 얹혀야 한다.
-  const merge = (p) => putReel({ ...p, cuts: mergeImages(p.cuts, made) }, { imagesDrawing: false });
+  // ★★ 자동 생성은 **한 번뿐**이다(2026-08-25). 그 사실을 문서에 남긴다 —
+  //   화면의 ref 로만 막으면 새로고침 한 번에 그 기억이 사라져 또 나간다($0.401).
+  //   ★ 성공·실패를 가리지 않고 적는다 — 실패했다고 자동으로 또 시도하면 같은 사유로
+  //     계속 돈이 나간다. 다시 하는 것은 사장님의 버튼 몱이다.
+  const merge = (p) => putReel(
+    { ...p, cuts: mergeImages(p.cuts, made) },
+    { imagesDrawing: false, ...(auto ? { autoImaged: true } : {}) },
+  );
 
   if (failure) {
     await updateProject(id, user.id, merge).catch(() => {});
