@@ -13,6 +13,7 @@
 //   이 파일이 그 둘을 갈라 못 박는다.
 import { describe, it, expect } from "vitest";
 import { buildCues } from "../lib/subtitles.js";
+import { subtitleCutsOf, composeSeconds } from "../lib/compose.js";
 
 // 통짜 한 편 — 클립은 cut[0] 에만 있고 whole 표시가 붙는다(lib/reel/pipeline.js 의 runReelOneShot).
 const wholeCuts = [
@@ -68,5 +69,41 @@ describe("합성이 두 축을 가른다", () => {
 
   it("이어 붙이는 것은 여전히 usable 이다 — 클립 없는 컷을 붙일 수는 없다", () => {
     expect(src).toMatch(/usable/);
+  });
+});
+
+describe("통짜 갈래의 **시각과 길이**", () => {
+  // ★★ 사장님 실측에서 reel.video.seconds 가 **29** 로 찍혔다(목표 15초).
+  //   cutSeconds(컷1) 이 통짜 한 편의 길이(15)를 돌려주는데, 그 값이 "컷 1의 화면 시간"
+  //   으로 쓰여 나머지 컷 초(14)가 그 위에 또 더해진 것이다 — 15 + 14 = 29.
+  //   같은 값이 자막 누적에도 쓰여 **컷 2 자막이 15초부터** 시작한다(영상 밖이다).
+  it("★ 총 길이는 **한 편의 길이**다 — 컷 초를 더하지 않는다", () => {
+    expect(composeSeconds(wholeCuts, wholeCuts.filter((c) => c.video?.url))).toBe(15);
+  });
+
+  it("컷별 갈래는 예전 그대로 — 컷 초의 합이다", () => {
+    const percut = [
+      { idx: 0, seconds: 4, video: { url: "a", seconds: 4 } },
+      { idx: 1, seconds: 5, video: { url: "b", seconds: 5 } },
+    ];
+    expect(composeSeconds(percut, percut)).toBe(9);
+  });
+
+  it("★★ 자막이 **영상 안에** 있다 — 마지막 자막이 15초를 안 넘는다", () => {
+    const cues = buildCues(subtitleCutsOf(wholeCuts, wholeCuts.filter((c) => c.video?.url)), opts);
+    for (const q of cues) {
+      expect(q.start, `자막이 ${q.start}초에 시작한다 — 영상은 15초다`).toBeLessThan(15);
+      expect(q.end, `자막이 ${q.end}초에 끝난다 — 영상은 15초다`).toBeLessThanOrEqual(15.01);
+    }
+  });
+
+  it("★ 컷 초가 목표를 넘어도(반올림) 비례로 눌러 담는다", () => {
+    // 이번 실측이 그랬다: 계획 초 합이 17 인데 실제 한 편은 15 초였다
+    // (LLM 이 2.5 초를 내면 buildReelCuts 의 Math.round 가 3 으로 올린다).
+    const planned = wholeCuts.reduce((s, c) => s + c.seconds, 0);
+    expect(planned).toBe(17);
+    const scaled = subtitleCutsOf(wholeCuts, wholeCuts.filter((c) => c.video?.url));
+    const total = scaled.reduce((s, c) => s + (Number(c.seconds) || 0), 0);
+    expect(total).toBeCloseTo(15, 5);
   });
 });
