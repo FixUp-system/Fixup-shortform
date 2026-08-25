@@ -43,10 +43,16 @@ describe("그림을 크게 본다", () => {
     }
   });
 
-  // ★ 세로 영상이다 — 가로 비율로 보여 주면 잘린 것처럼 읽힌다.
-  it("9:16 로 보여 준다", () => {
-    const at = css.indexOf(".cut-shot");
+  // ★ 세로 영상이면 가로 비율로 보여 주면 안 된다 — 잘린 것처럼 읽힌다.
+  // ★★ 2026-08-25 — 비율 고르기가 열리면서 **박아 둘 수 없게 됐다**(가로를 고르면
+  //   세로 상자에 넣는 셈이다). 비율의 출처는 프로젝트 하나이고 화면이 --ar 로
+  //   실어 준다(components/SubtitleEditor.jsx 가 먼저 쓴 처방).
+  //   ★ 기본값으로 9/16 은 그대로 남는다 — 옛 문서가 갑자기 넓어지지 않게 한다.
+  it("비율은 프로젝트가 정한다 — 9:16 은 기본값으로 남는다", () => {
+    const at = css.indexOf(".cut-shot {");
     expect(at).toBeGreaterThan(-1);
-    expect(css.slice(at, at + 500)).toMatch(/aspect-ratio:\s*9\s*\/\s*16/);
+    const body = css.slice(at, at + 400);
+    expect(body).toMatch(/aspect-ratio:\s*var\(--ar/);
+    expect(body, "기본값이 9:16 이 아니다").toMatch(/9\s*\/\s*16/);
   });
 });

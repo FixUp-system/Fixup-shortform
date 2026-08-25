@@ -19,6 +19,7 @@ import {
   reelOf, canDrawReelImages, isReelRendering, isImagesLocked, imageTriesLeft, imageTriesLeftLifetime,
 } from "../../../../lib/reel/doc";
 import { reelSheetUrl } from "../../../../lib/reel/oneshot";
+import { aspectFor } from "../../../../lib/aspects";
 
 export default function ReelImagesPage() {
   const { id } = useParams();
@@ -63,6 +64,12 @@ export default function ReelImagesPage() {
     setBusy("");
   }
 
+  // ★ 컷 상자의 비율 — 출처는 프로젝트 하나다(--ar). CSS 에 박아 두면 가로 영상이
+  //   세로 상자에 들어가 잘려 보인다(2026-08-25 비율 고르기가 열리며 생긴 자리).
+  // ★ aspectFor 는 모르는 값이면 기본(9:16)으로 떨어진다 — 던지지 않는다.
+  const ar = aspectFor(project?.settings?.aspect_ratio);
+  const arStyle = { "--ar": `${ar.width} / ${ar.height}` };
+
   const promptsStep = REEL_STEPS.find((s) => s.key === "prompts");
 
   // ★ 그리는 버튼은 **한 번만 적는다** — 자리가 둘(프롬프트 칸 안 / 그림이 아직 없을 때의
@@ -105,7 +112,11 @@ export default function ReelImagesPage() {
       ) : cuts.length > 0 && (
         <div className="cut-shots">
           {cuts.map((c) => (
-            <div key={c.idx} className="cut-shot">
+            /* ★ 비율은 **프로젝트가 정한다**(2026-08-25 — 비율 고르기가 열렸다).
+               예전에는 CSS 에 9/16 이 박혀 있어, 가로 영상을 그 상자에 넣으면
+               잘려 보였다. 출처는 프로젝트 하나여야 한다(--ar, SubtitleEditor 와 같은 처방).
+               ★ 값이 없으면 CSS 기본값 9/16 이 그대로 산다 — 옛 문서가 안 넓어진다. */
+            <div key={c.idx} className="cut-shot" style={arStyle}>
               {c.image?.url && (
                 <img src={c.image.url} alt={`컷 ${c.idx + 1}`} />
               )}

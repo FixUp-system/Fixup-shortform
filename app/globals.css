@@ -2083,9 +2083,12 @@ h1.login-head { margin-inline: auto; }
   gap: var(--sp-3);
   margin-top: var(--sp-4);
 }
+/* ★ 비율은 **프로젝트가 정한다**(2026-08-25 — 비율 고르기가 열렸다). 화면이 --ar 로
+   실어 준다(components/SubtitleEditor.jsx 가 먼저 쓴 처방 — 출처는 프로젝트 하나여야 한다).
+   기본값 9/16 은 --ar 이 안 왔을 때다 — 옛 화면이 갑자기 넓어지지 않게 한다. */
 .cut-shot {
   position: relative;
-  aspect-ratio: 9 / 16;
+  aspect-ratio: var(--ar, 9 / 16);
   border-radius: var(--r-card);
   overflow: hidden;
   border: 1px solid var(--line);

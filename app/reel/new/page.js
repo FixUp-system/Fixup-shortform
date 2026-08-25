@@ -27,7 +27,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 // 주소는 단계 표 한 벌이 만든다 — 화면이 `/reel/<id>/scenario` 를 손으로 적으면 두 벌이 된다.
 import { REEL_STEPS, reelStepHref } from "../../../lib/reel/steps";
-import { DEFAULT_ASPECT_ID } from "../../../lib/aspects";
+import { ASPECTS, DEFAULT_ASPECT_ID } from "../../../lib/aspects";
 import { AD_MOODS, AD_LANGS, AD_STYLE_LINES, DEFAULT_AD_OPTIONS } from "../../../lib/ad/options";
 // ★★ 컨셉은 **reel 자기 표**다(2026-08-25 사장님 지시). 예전에는 AD_FORMATS(광고 포맷)를
 //   그대로 그렸는데, 다섯이 전부 "팔 물건이 있다"를 전제로 해서 범용 영상에는 좁았다
@@ -67,6 +67,12 @@ export default function ReelNewPage() {
   // 안 고르면 서버가 400 이다 — 그래서 여기서도 빈 값(안 고름)을 허용하지 않는다
   // (아래 create 의 disabled 조건). 기본으로 미리 골라 두면 사장님이 못 보고 지나간다.
   const [target, setTarget] = useState(null);
+  // ★★ 비율(사이즈) — 2026-08-25 사장님 지시로 열었다("영상 비율이 빠졌어").
+  //   그전에는 화면이 DEFAULT_ASPECT_ID 를 박아 보냈다. **뒷단은 이미 비율을 받아
+  //   돌아가고 있었다** — 라우트가 isAspect 로 검증하고, 스토리보드 치수도 칸 자르기도
+  //   비율을 인자로 받는다(storyboardImageSize · cropStoryboardCells). 막힌 것은 화면뿐이었다.
+  //   ★ 기본은 여전히 세로다 — 숏폼이 이 흐름의 표제 기능이다.
+  const [aspect, setAspect] = useState(DEFAULT_ASPECT_ID);
   // ★ 화질은 길이와 달리 **기본값을 미리 골라 둔다**(720p) — film·광고 화면과 같은 관례
   // (app/ads/new/page.js 의 DEFAULT_AD_RESOLUTION). 안 고르면 막는 것은 길이 하나로
   // 충분하다 — 화질까지 강제로 고르게 하면 처음 오는 사장님에게 선택지가 둘로 는다.
@@ -108,7 +114,7 @@ export default function ReelNewPage() {
       body: JSON.stringify({
         material: { text, photos },
         settings: {
-          aspect_ratio: DEFAULT_ASPECT_ID, target_seconds: target, resolution,
+          aspect_ratio: aspect, target_seconds: target, resolution,
           concept, mood, style, narration_lang: lang,
         },
       }),
@@ -216,6 +222,23 @@ export default function ReelNewPage() {
                     </button>
                   ))}
                 </div>
+              </div>
+            </div>
+
+            {/* ★ 사이즈(비율) — 2026-08-25 사장님 지시로 생겼다. 화질 앞에 둔다:
+                무엇을 만들지(비율)가 얼마나 곱게 만들지(화질)보다 앞선 결정이다. */}
+            <div className="tray-row">
+              <span className="tray-label">사이즈</span>
+              <div className="tray-col">
+                <div className="chips">
+                  {ASPECTS.map((a) => (
+                    <button key={a.id} className={`chip${aspect === a.id ? " on" : ""}`}
+                      disabled={locked} onClick={() => setAspect(a.id)}>
+                      {a.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="tray-note">{ASPECTS.find((a) => a.id === aspect)?.note}</div>
               </div>
             </div>
 
