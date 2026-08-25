@@ -719,6 +719,11 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
   display: block;
 }
 .vid-result.wide { width: 340px; }
+/* ★ ⑤영상의 재생기는 **가운데** 선다(2026-08-25 사장님 지시).
+   9:16 세로 영상이라 왼쪽에 붙여 두면 넓은 화면에서 한쪽으로 쏠려 보인다.
+   ★ 갈래를 따로 둔다 — .vid-result 자체를 가운데로 돌리면 이 클래스를 쓰는
+   다른 자리(왼쪽 정렬이 맞는 목록 안)까지 같이 움직인다. */
+.vid-result--center { margin-left: auto; margin-right: auto; }
 .res-ops { display: flex; gap: 7px; margin-top: 10px; flex-wrap: wrap; }
 .mini {
   /* ★ <Link>(a 태그)로 쓰면 브라우저 기본 밑줄이 뜼다 — 버튼처럼 보이는 것에

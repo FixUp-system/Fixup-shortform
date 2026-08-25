@@ -131,17 +131,31 @@ export default function ReelVideoPage() {
     ? cuts[0]
     : (cuts.find((c) => c.idx === playIdx && c.video?.url) || cuts.find((c) => c.video?.url));
 
+  // 수정 요청 칸이 뜨는 조건 — 만든 뒤이고, 굽는 중이 아닐 때다.
+  // ★ 굽는 버튼의 자리가 이 값으로 갈린다(둘은 **동시에 안 뜬다**).
+  const asking = doneCount > 0 && !rendering;
+
+  // ★★ 굽는 버튼은 **한 번만 적는다**(2026-08-25 사장님 지시 — ②③④와 통일).
+  //   ②시나리오·③이미지가 이미 이 모양이다: 자리가 둘(수정 요청 칸 안 / 아직 안 만들었을
+  //   때의 실행줄)인데 둘이 동시에 안 뜨므로 손으로 두 번 적으면 라벨이 갈린다.
+  //   ★ 생김새도 맞춘다 — ②③④가 전부 `.mini` 다. 여기만 `.cta` 라 다른 종류로 보였다.
+  //   ★ "그 줄에 혼자 선다"는 규율은 그대로다: 칸 안에서도 이 버튼 하나뿐이고,
+  //     아직 안 만들었을 때의 실행줄에도 이것 하나뿐이다(되돌아가는 링크는 아래 줄이다).
+  const bakeBtn = (
+    <button className="mini" disabled={rendering || !!busy || !ready} onClick={startClips}>
+      {/* ★ 화살표를 안 붙인다 — 굽는 버튼이지 다음 화면으로 가는 버튼이 아니다. */}
+      {busy === "clips" ? "시작하는 중…" : doneCount > 0 ? "다시 만들기" : "영상 만들기"}
+    </button>
+  );
+
   return (
     <section className="panel panel--wide">
       <h2>영상</h2>
-      {/* ★ 통짜 갈래는 "컷 N개 중 M개"가 거짓말이다 — 한 번에 한 편을 굽는다. */}
-      <p className="pgsub">
-        {oneShot
-          ? (doneCount > 0
-            ? `스토리보드 한 장으로 ${cuts.length}컷짜리 한 편을 만들었어요`
-            : `스토리보드 한 장을 통째로 넘겨 ${cuts.length}컷을 한 편으로 만들어요`)
-          : `컷 ${cuts.length}개 중 ${doneCount}개를 만들었어요`}
-      </p>
+      {/* ★★ 통짜 갈래에서는 아무 말도 안 한다(2026-08-25 사장님 지시 — "스토리보드 한 장으로
+          N컷" 문구 삭제). 스토리보드 한 장을 통째로 넘긴다는 것은 **안쪽 사정**이지
+          사장님이 알아야 할 일이 아니다(이 화면의 말투 규칙과 같다).
+          ★ 컷별 갈래의 "컷 N개 중 M개"는 남긴다 — 그것은 안쪽 사정이 아니라 진척이다. */}
+      {!oneShot && <p className="pgsub">컷 {cuts.length}개 중 {doneCount}개를 만들었어요</p>}
       {err && <p className="pgsub warn">{err}</p>}
       {(live?.error || reel.error) && <p className="pgsub warn">{live?.error || reel.error}</p>}
       {/* ★★ 굽는 동안 **되고 있다는 것이 보여야 한다**(2026-08-25 사장님 지시:
@@ -171,7 +185,7 @@ export default function ReelVideoPage() {
           ★ 자동재생은 안 건다 — 소리가 있어 화면에 들어서자마자 울린다. */}
       {playing?.video?.url && (
         <video
-          className="vid-result"
+          className="vid-result vid-result--center"
           key={playing.video.url}
           src={playing.video.url}
           controls
@@ -179,25 +193,34 @@ export default function ReelVideoPage() {
           preload="metadata"
         />
       )}
+      {/* ★ 낡음 경고가 갈 곳이 없어졌다 — 통짜 갈래는 영상이 나오면 아래 칸을 안 그린다
+          (그 칸의 배지가 원래 이 말을 했다). 재생기 옆에서 말한다. */}
+      {oneShot && oneShotStale && cuts[0]?.video?.url && (
+        <p className="pgsub warn">그림이나 시나리오가 바뀌었어요 — 다시 만들어 주세요.</p>
+      )}
 
+      {/* ★★ 통짜 갈래에서 **영상이 나온 뒤에는 이 칸을 안 그린다**(2026-08-25 사장님 지시).
+          위에 재생기가 서 있는데 그 아래 86px 네모가 같은 것을 한 번 더 보여 주고 있었다.
+          굽기 전·굽는 중에만 남긴다 — 그때는 보여 줄 것이 스토리보드뿐이라 이 칸이 유일하다.
+          ★ 컷별 갈래의 썸네일은 그대로 둔다 — 그것은 중복이 아니라 **고르는 자리**다. */}
       {oneShot ? (
-        <div className="uploads">
-          <div className="up photo-mark">
-            {cuts[0]?.video?.url ? (
-              <video className="thumb-media" src={cuts[0].video.url} muted playsInline preload="metadata" />
-            ) : sheetUrl ? (
-              <img className="thumb-media" src={sheetUrl} alt="스토리보드" />
-            ) : (
-              <div className="thumb-media" />
-            )}
-            {/* ★ 덮개다(absolute) — 스토리보드를 지우지 않고 그 위에서 돈다.
-                무엇을 굽는 중인지 옛 그림으로 알 수 있다. */}
-            {rendering && !cuts[0]?.video?.url && (
-              <div className="frame-busy"><span className="spinner" aria-hidden="true" /></div>
-            )}
-            {oneShotStale && <span className="tag warn">다시 만들어야 해요</span>}
+        !cuts[0]?.video?.url && (
+          <div className="uploads">
+            <div className="up photo-mark">
+              {sheetUrl ? (
+                <img className="thumb-media" src={sheetUrl} alt="스토리보드" />
+              ) : (
+                <div className="thumb-media" />
+              )}
+              {/* ★ 덮개다(absolute) — 스토리보드를 지우지 않고 그 위에서 돈다.
+                  무엇을 굽는 중인지 옛 그림으로 알 수 있다. */}
+              {rendering && (
+                <div className="frame-busy"><span className="spinner" aria-hidden="true" /></div>
+              )}
+              {oneShotStale && <span className="tag warn">다시 만들어야 해요</span>}
+            </div>
           </div>
-        </div>
+        )
       ) : cuts.length > 0 && (
         <div className="uploads">
           {cuts.map((c) => (
@@ -233,7 +256,7 @@ export default function ReelVideoPage() {
           적은 말은 [다시 만들기]를 누를 때 **전체 프롬프트에 반영된 뒤** 굽기로 간다.
           ★ 자동으로 안 나간다 — 영상은 이 흐름에서 가장 비싸다.
           ★ 만든 뒤에만 보인다 — 만들기 전에는 고칠 것이 없다. */}
-      {doneCount > 0 && !rendering && (
+      {asking && (
         <div className="note-form">
           <textarea
             className="field"
@@ -243,18 +266,21 @@ export default function ReelVideoPage() {
             onChange={(e) => setNote(e.target.value)}
             placeholder="고치고 싶은 것을 적어 주세요 — 예) 마지막을 좀 더 천천히 끝내 줘"
           />
+          {/* ★ 안내문은 버튼 바로 왼쪽 — ②③④와 같은 모양이다. */}
+          <div className="note-act">
+            <p className="pgsub note-hint">다시 만들면 지금 영상은 사라져요.</p>
+            {bakeBtn}
+          </div>
         </div>
       )}
 
-      <div className="step-actions step-actions--bare">
-        <div className="fwd">
-          <button className="cta" disabled={rendering || !!busy || !ready} onClick={startClips}>
-            {/* ★ 화살표를 안 붙인다(2026-08-25 사장님 지시 — ③이미지와 이름을 맞춘다).
-                화살표는 "다음 화면으로 간다"는 뜻인데 이 버튼은 굽는 버튼이다. */}
-            {busy === "clips" ? "시작하는 중…" : doneCount > 0 ? "다시 만들기" : "영상 만들기"}
-          </button>
+      {/* ★ 아직 안 만들었거나 굽는 중일 때만 여기 선다 — 그때는 위 칸이 안 보인다.
+          지우지 않는 이유는 처음 굽는 유일한 길이라서다(②시나리오와 같은 처방). */}
+      {!asking && (
+        <div className="step-actions step-actions--bare">
+          <div className="fwd">{bakeBtn}</div>
         </div>
-      </div>
+      )}
 
       {/* ★ 맨 아래 줄 — 왼쪽 끝이 [이전으로], 오른쪽이 다음이다(.fwd 가 margin-left:auto).
           이전 버튼은 components/ReelBack.jsx 하나가 그린다 — 화면마다 손으로 적어서
