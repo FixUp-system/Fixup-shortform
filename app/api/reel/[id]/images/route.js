@@ -2,7 +2,7 @@ import { withUser } from "../../../../../lib/auth/require-user.js";
 import { getProject, updateProject } from "../../../../../lib/projects.js";
 import { generateImage, imageResolutionFor } from "../../../../../lib/imagegen.js";
 import { buildImagePrompt } from "../../../../../lib/cuts.js";
-import { loadCutRefs } from "../../../../../lib/cut-refs.js";
+import { loadCutRefs, loadStoryboardRefs } from "../../../../../lib/cut-refs.js";
 import { requireVideoCharge, NoCredits } from "../../../../../lib/charges.js";
 import { modelIdForProject, resolutionForProject } from "../../../../../lib/clip-limits.js";
 import { fakeFal } from "../../../../../lib/fake.js";
@@ -128,16 +128,25 @@ export const POST = withUser(async (req, { params }, user) => {
     //   호출마다 한 줄을 적는다). 칸으로 나누는 것은 그 뒤의 우리 일이라 값이 안 붙는다.
     // ★ 치수는 칸 수에서 역산한다 — 칸 하나가 굽기 해상도(720×1280)가 되도록
     //   (storyboardImageSize). 비율·해상도 축으로는 표현할 수 없어 imageSize 로 넘긴다.
-    // ★ 레퍼런스는 안 싣는다. 참조는 **컷 단위**로 꽂히는데 이 호출은 컷 전체를 한 장에
-    //   그리므로, 컷 하나의 참조를 통째로 실으면 다른 칸까지 그 사진을 닮는다.
-    //   생김새·옷·무대는 시나리오(look·wardrobe·environment)가 말로 붙든다.
+    // ★★ 2026-08-25 — **레퍼런스를 싣는다.** 옛 주석은 "컷 하나의 참조를 통째로 실으면
+    //   다른 칸까지 그 사진을 닮는다"였고 그래서 안 실었는데, 사장님이 제품 사진을
+    //   첨부했더니 **완전히 다른 제품**이 그려졌다. 원인이 둘 겹쳐 있었다:
+    //     ① 시나리오는 사진이 있으면 생김새를 **글로 안 쓴다**(lib/ad/scenario.js)
+    //     ② 여기서 그 사진을 **안 실었다**
+    //   → 제품을 정의하는 것이 아무것도 없어 모델이 지어낼 수밖에 없었다.
+    // ★ 옛 걱정은 **인물 사진** 이야기다. 제품은 반대로 모든 칸에 같은 것이 나와야 맞으므로
+    //   격자에서는 그 성질이 부작용이 아니라 목적이다 — 지문도 그렇게 말한다(refLine).
+    // ★ 참조는 **프로젝트 전체의 합집합**이다(컷마다가 아니다) — 한 장에 다 그리기 때문이고,
+    //   바이트는 키마다 한 번만 읽는다(loadStoryboardRefs).
     try {
-      const prompt = buildStoryboardPrompt(project, cuts, plan.grid, note);
+      const { refs } = await loadStoryboardRefs(project);
+      const prompt = buildStoryboardPrompt(project, cuts, plan.grid, note, refs);
       const out = await generateImage({
         prompt,
         aspect_ratio: plan.grid.canvas,
         projectId: id,
         resolution,
+        refs,
         imageSize: storyboardImageSize(plan.grid, aspect_ratio),
       });
       // 여기서부터는 **우리 바이트**다 — 내려받아 자르고 우리 버킷에 둔다.
