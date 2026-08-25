@@ -4,7 +4,9 @@ import { ownedPhotoKeys } from "../../../lib/refs-io.js";
 import { withUser } from "../../../lib/auth/require-user.js";
 import { MAX_PHOTOS } from "../../../lib/photos.js";
 import { MAX_MATERIAL_TEXT } from "../../../lib/material.js";
-import { DEFAULT_I2V_MODEL, isResolutionFor, secondsForModel } from "../../../lib/clip-limits.js";
+import { DEFAULT_I2V_MODEL, isResolutionFor, secondsForModel, isReelModel } from "../../../lib/clip-limits.js";
+import { tierOf, tierAllowsModel } from "../../../lib/tiers.js";
+import { getStore } from "../../../lib/store/index.js";
 import { normalizeAdOptions } from "../../../lib/ad/options.js";
 import { normalizeReelConcept } from "../../../lib/reel/concepts.js";
 import { isSubtitleLang, DEFAULT_SPEECH_LANG } from "../../../lib/subtitle-langs.js";
@@ -33,9 +35,24 @@ export const POST = withUser(async (req, _ctx, user) => {
   //   들어올 수 있었다.
   // ★ 화면과 **같은 함수**를 본다(secondsForModel). 한쪽만 좁히면 화면 밖에서 뚫린다 —
   //   이 저장소가 "화면은 통과시키는데 서버가 400" 을 여러 번 겪은 그 자리의 반대편이다.
-  // ★ 모델은 서버가 박는다(DEFAULT_I2V_MODEL) — 그래서 여기서도 그 값으로 잰다.
+  // ★★ 모델 — 2026-08-25 사장님 지시로 사장님이 고른다. 그전에는 서버가 박았다.
+  //   ★ **잠금은 여기다.** 화면의 목록(reelModelsForTier)은 가림막일 뿐이다 — 광고에서
+  //     화면만 거르고 서버는 그대로 받아 API 로 뚫렸던 사고가 그 근거다
+  //     (lib/ad/models.js 의 seedance-2.5 주석).
+  //   ★ 두 겹으로 막는다: ① reel 이 여는 모델인가(isReelModel — Kling v3 는 speaks:false
+  //     라 대사가 사라지고, 2.5 는 아직 안 연다) ② 그 등급이 쓸 수 있는가(tierAllowsModel).
+  //   ★ 안 보내면 기본값이다 — 옛 화면·스크립트가 그대로 돈다.
+  const model = body?.settings?.i2v_model ?? DEFAULT_I2V_MODEL;
+  if (!isReelModel(model)) {
+    return Response.json({ error: "그 모델은 아직 쓸 수 없어요" }, { status: 400 });
+  }
+  const tier = tierOf((await getStore().findProfiles([user.id])).get(user.id));
+  if (!tierAllowsModel(tier, model)) {
+    return Response.json({ error: "이 모델은 프로 등급부터 쓸 수 있어요" }, { status: 403 });
+  }
+
   const target = body?.settings?.target_seconds;
-  if (!secondsForModel(DEFAULT_I2V_MODEL).includes(target)) {
+  if (!secondsForModel(model).includes(target)) {
     return Response.json({ error: "영상 길이를 골라 주세요" }, { status: 400 });
   }
 
@@ -43,8 +60,7 @@ export const POST = withUser(async (req, _ctx, user) => {
   //   resolutionForProject(lib/clip-limits.js)가 저장된 값이 없어 **조용히 720p** 로
   //   떨어진다 — 480p 15초=40크레딧 vs 720p 15초=80크레딧, 2배 차이다. 조용히 떨어뜨리면
   //   사장님이 고른 것과 다른(더 비싼) 값에 청구되는 길을 만든다(target_seconds 와 같은
-  //   판단 — 위 I6 주석 참고). 모델은 서버가 박으므로(DEFAULT_I2V_MODEL) 그 값으로 이
-  //   프로젝트가 열 수 있는 해상도 목록을 얻는다 — isResolutionFor(lib/clip-limits.js) 는
+  //   판단 — 위 I6 주석 참고). 고른 모델로 이 프로젝트가 열 수 있는 해상도 목록을 얻는다 — isResolutionFor(lib/clip-limits.js) 는
   //   `resolutionsForProject`(project.settings.i2v_model 을 읽는다)를 그대로 타므로,
   //   실제 project 객체가 아직 없어도 그 모양만 흉내 내면 같은 판정을 쓸 수 있다.
   //   ★ 여기는 reel 전용 표(videoPrice·I2V_MODELS·isResolutionFor)를 쓴다 — 광고 쪽의
@@ -52,7 +68,7 @@ export const POST = withUser(async (req, _ctx, user) => {
   //   (requireVideoCharge 가 보는 VIDEO_PRICE)가 갈린다(app/api/reel/[id]/clips/route.js
   //   가 그 표를 본다).
   const resolution = body?.settings?.resolution;
-  if (!isResolutionFor(resolution, { settings: { i2v_model: DEFAULT_I2V_MODEL } })) {
+  if (!isResolutionFor(resolution, { settings: { i2v_model: model } })) {
     return Response.json({ error: "화질을 골라 주세요" }, { status: 400 });
   }
 
@@ -99,10 +115,12 @@ export const POST = withUser(async (req, _ctx, user) => {
       //   (videoPrice)·청구(requireVideoCharge)가 읽고, seconds 는 시나리오 생성이 읽는다.
       //   하나를 빠뜨리면 값이 틀리거나(정가) 시나리오 생성이 죽는다(포맷 문구가 없다).
       seconds: target,
-      // ★★ 이 모델로 고정한다 — reel 은 "클립이 직접 말한다"(speaks:true) 위에 서 있다.
-      //   여기서 안 박으면 modelIdForProject 가 없는 값을 LEGACY_I2V_MODEL(kling-v3,
-      //   speaks:false) 로 떨어뜨려 대사가 통째로 사라진다(lib/clip-limits.js).
-      i2v_model: DEFAULT_I2V_MODEL,
+      // ★★ 사장님이 고른 모델을 **명시로** 저장한다(2026-08-25 — 그전에는 여기서 박았다).
+      //   modelIdForProject 는 없는 값을 LEGACY_I2V_MODEL(kling-v3, speaks:false)로
+      //   떨어뜨리므로 **명시 저장이 곧 대사를 지키는 자리**다. reel 은 "클립이 직접
+      //   말한다"(speaks:true) 위에 서 있어서, 그 자리가 비면 대사가 통째로 사라진다.
+      //   ★ 고를 수 있는 것 자체를 isReelModel 이 speaks:true 인 모델로 좁힌다(위 검증).
+      i2v_model: model,
       // ★★ 음성 언어 — **칩 하나가 둘 다 정한다**(2026-08-25 사장님 결정).
       //
       // 이것이 없어서 버그가 있었다: 화면은 narration_lang 만 보내는데

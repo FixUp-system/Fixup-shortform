@@ -39,7 +39,12 @@ import { STYLE_PRESETS } from "../../../lib/styles";
 // 모델은 서버가 박는다(DEFAULT_I2V_MODEL) — 화면은 그 모델이 여는 해상도 목록만 읽는다
 // (resolutionsForModel). isResolutionFor 는 라우트와 같은 판정이라 여기서는 안 쓴다(화면은
 // 목록에서 고르므로 애초에 모르는 값이 안 생긴다 — 검증은 서버 몫).
-import { resolutionsForModel, secondsForModel, DEFAULT_I2V_MODEL, DEFAULT_RESOLUTION } from "../../../lib/clip-limits";
+import {
+  resolutionsForModel, secondsForModel, reelModelsForTier,
+  DEFAULT_I2V_MODEL, DEFAULT_RESOLUTION,
+} from "../../../lib/clip-limits";
+// 등급은 서버가 판정해 /api/me 로 내려준다 — 화면이 profile 을 직접 읽지 않는다.
+import { useMe } from "../../../components/MeContext";
 // ★★ 이 화면은 **값을 한 글자도 말하지 않는다**(2026-08-25 사장님 지시). 예전에는 길이·화질
 //   칩 뒤에 크레딧이 붙었다(화질 쪽은 길이를 고른 뒤에만 나타났다) — 둘 다 뗐고, 그것을
 //   설명하던 문구("정가가 길이·화질에서 나와요", "화질이 정가를 바꿔요")도 같이 뺐다.
@@ -77,6 +82,16 @@ export default function ReelNewPage() {
   // ★ 화질은 길이와 달리 **기본값을 미리 골라 둔다**(720p) — film·광고 화면과 같은 관례
   // (app/ads/new/page.js 의 DEFAULT_AD_RESOLUTION). 안 고르면 막는 것은 길이 하나로
   // 충분하다 — 화질까지 강제로 고르게 하면 처음 오는 사장님에게 선택지가 둘로 는다.
+  // ★★ 모델 — 2026-08-25 사장님 지시로 칸이 생겼다("광고 영상에 맞추서 … 모델 선택 칩
+  //   구성해줘. 모델선택은 똑같이 2.5는 프로 이상만 접근가능하도록"). 그전에는 화면에
+  //   칸이 아예 없었고 서버가 값을 박아 버렸다.
+  //   ★ 목록은 **등급이 가른다**(reelModelsForTier) — 광고 화면과 같은 모양이다.
+  //   ★★ 다만 지금은 어느 등급이든 2.0 하나다. 2.5 는 reel 이 아직 안 연다
+  //     (lib/clip-limits.js 의 REEL_MODEL_IDS 주석 — 프로필·통짜 상한·컷 최소·정가 넷이
+  //      먼저다). 배선만 깔아 두고 그 한 줄이 늘면 열린다.
+  const { me } = useMe();
+  const models = reelModelsForTier(me?.tier);
+  const [model, setModel] = useState(DEFAULT_I2V_MODEL);
   const [resolution, setResolution] = useState(DEFAULT_RESOLUTION);
   const [busy, setBusy] = useState("");
   // 사진이 아직 올라가는 중인가. ★ busy 로 겸할 수 없다(app/film/new/page.js 의 같은
@@ -86,6 +101,19 @@ export default function ReelNewPage() {
   const fileRef = useRef(null);
 
   const locked = !!busy || uploading;
+
+  // ★★ 모델을 바꾸면 **그 모델이 안 받는 값을 들고 있을 수 있다** — 광고 화면의
+  //   onModelChange 와 같은 처방이다(app/ads/new/page.js). 예: 2.0 에서 1080p 를 골라
+  //   둔 채 1080p 를 안 받는 모델로 바꾸면, 화면은 그 값을 쥔 채 서버가 400 을 낸다.
+  //   그래서 지금 값이 새 모델에서 유효하지 않으면 그 모델의 첫 값으로 되돌린다.
+  // ★ 길이는 되돌리지 않고 **비운다** — 안 고르면 서버가 400 인 축이라(위 target 주석),
+  //   임의로 골라 두면 사장님이 못 보고 지나간다.
+  function onModelChange(next) {
+    setModel(next);
+    const res = resolutionsForModel(next);
+    if (res.length && !res.includes(resolution)) setResolution(res[0]);
+    if (target !== null && !secondsForModel(next).includes(target)) setTarget(null);
+  }
 
   async function onFiles(e) {
     const files = Array.from(e.target.files);
@@ -115,7 +143,7 @@ export default function ReelNewPage() {
       body: JSON.stringify({
         material: { text, photos },
         settings: {
-          aspect_ratio: aspect, target_seconds: target, resolution,
+          aspect_ratio: aspect, target_seconds: target, resolution, i2v_model: model,
           concept, mood, style, narration_lang: lang,
         },
       }),
@@ -226,6 +254,26 @@ export default function ReelNewPage() {
               </div>
             </div>
 
+            {/* ★★ 모델 — 광고 화면과 같은 자리·같은 모양이다(2026-08-25 사장님 지시).
+                바꾸면 아래 사이즈·화질·길이가 그 모델이 받는 값으로 되돌아간다.
+                ⚠️ 이 목록은 **가림막이지 잠금이 아니다.** 잠금은 서버가 한다
+                (app/api/reel/route.js) — 광고에서 화면만 거르고 서버는 그대로 받아
+                API 로 뚫렸던 사고가 그 근거다. */}
+            <div className="tray-row">
+              <span className="tray-label">모델</span>
+              <div className="tray-col">
+                <div className="chips">
+                  {models.map((m) => (
+                    <button key={m.id} className={`chip${model === m.id ? " on" : ""}`}
+                      disabled={locked} onClick={() => onModelChange(m.id)}>
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="tray-note">{models.find((m) => m.id === model)?.hint}</div>
+              </div>
+            </div>
+
             {/* ★ 사이즈(비율) — 2026-08-25 사장님 지시로 생겼다. 화질 앞에 둔다:
                 무엇을 만들지(비율)가 얼마나 곱게 만들지(화질)보다 앞선 결정이다. */}
             <div className="tray-row">
@@ -250,7 +298,7 @@ export default function ReelNewPage() {
               <span className="tray-label">화질</span>
               <div className="tray-col">
                 <div className="chips">
-                  {resolutionsForModel(DEFAULT_I2V_MODEL).map((r) => (
+                  {resolutionsForModel(model).map((r) => (
                     <button key={r} className={`chip${resolution === r ? " on" : ""}`}
                       disabled={locked} onClick={() => setResolution(r)}>
                       {/* ★ 크레딧 표기를 뗐다(2026-08-25 사장님 지시). 길이 칩과 같다.
@@ -269,7 +317,7 @@ export default function ReelNewPage() {
               <span className="tray-label">길이</span>
               <div className="tray-col">
                 <div className="chips">
-                  {secondsForModel(DEFAULT_I2V_MODEL).map((s) => (
+                  {secondsForModel(model).map((s) => (
                     <button key={s} className={`chip${target === s ? " on" : ""}`}
                       disabled={locked} onClick={() => setTarget(s)}>
                       {/* ★ 크레딧 표기를 뗐다(2026-08-25 사장님 지시 — "일단 제거"). */}
