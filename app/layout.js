@@ -4,6 +4,7 @@ import localFont from "next/font/local";
 import { ProjectProvider } from "../components/ProjectContext";
 import { AdProjectProvider } from "../components/AdProjectContext";
 import { FilmProjectProvider } from "../components/FilmProjectContext";
+import { ReelProjectProvider } from "../components/ReelProjectContext";
 import AppShell from "../components/AppShell";
 import DialogProvider from "../components/DialogProvider";
 
@@ -53,9 +54,14 @@ export default function RootLayout({ children }) {
                 사이드바가 못 읽는다 — 그래서 단계 목록을 본문에 그렸고, 사이드바용
                 클래스를 본문에 써서 모양이 깨졌다. 옆의 둘과 같은 자리에 둔다. */}
             <FilmProjectProvider>
-              <DialogProvider>
-                <AppShell>{children}</AppShell>
-              </DialogProvider>
+              {/* ★★ reel(컷마다 말하는 영상)의 공유본도 **여기**다(2026-08-25). 바로 위
+                  film 이 치른 값과 같은 값이다 — 공급자가 app/reel/[id]/layout.js 안에
+                  있으면 사이드바보다 아래라 단계 목록을 사이드바에서 그릴 수 없다. */}
+              <ReelProjectProvider>
+                <DialogProvider>
+                  <AppShell>{children}</AppShell>
+                </DialogProvider>
+              </ReelProjectProvider>
             </FilmProjectProvider>
           </AdProjectProvider>
         </ProjectProvider>

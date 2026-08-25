@@ -247,7 +247,7 @@ export default function ReelNewPage() {
             <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={onFiles} />
             <span className="spacer" />
             <button className="cta" disabled={locked || !text.trim() || !target} onClick={create}>
-              {busy === "create" ? "만드는 중…" : uploading ? "사진 올리는 중…" : "시작하기 →"} <span className="cr">무료</span>
+              {busy === "create" ? "만드는 중…" : uploading ? "사진 올리는 중…" : "시작하기 →"}
             </button>
           </div>
         </div>

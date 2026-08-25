@@ -5,18 +5,35 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useReelProject } from "../layout";
 import { isPromptsReady } from "../../../../lib/reel/doc";
+import { planReelBake, reelSheetUrl, reelWholePrompt, canBakeReel } from "../../../../lib/reel/oneshot";
 import { REEL_STEPS, reelStepHref } from "../../../../lib/reel/steps";
+import ReelBack from "../../../../components/ReelBack";
 
 // 4 영상 프롬프트 — **굽기 전이다.** 여기서 고치는 것은 값이 들지 않는다.
 //
 // ★ 프로젝트는 레이아웃이 읽어 컨텍스트에 담아 둔 것을 쓴다 — 화면마다 자기 fetch 를
 //   두면 같은 문서를 여섯 번 읽고, 한 화면이 갱신한 값을 옆 화면이 모른다.
+//
+// ★★ 2026-08-25 — **갈래가 둘이다.** 15초 이하이고 스토리보드가 있으면 컷별 프롬프트가
+//   아예 없다: 스토리보드 한 장을 통째로 넘기고 지문도 한 벌(시나리오 원문)이다.
+//   16초 이상은 통짜가 물리적으로 불가라(Seedance 2.0 은 한 번에 15초가 최대) 예전 화면
+//   그대로다. 판정은 lib/reel/oneshot.js 의 planReelBake 하나 — 화면이 초를 다시 세지 않는다.
 export default function ReelPromptsPage() {
   const { id } = useParams();
   const { project, reload } = useReelProject();
   const cuts = project?.cuts || [];
   const [saving, setSaving] = useState("");
   const [err, setErr] = useState("");
+  // ★ 사장님이 한국어로 적는 수정 요청. 보낸 뒤에는 비운다 — 남아 있으면 다음에
+  //   또 누를 때 같은 요청이 두 번 실린다(②시나리오·③이미지와 같은 처방).
+  const [note, setNote] = useState("");
+
+  // 갈래·재료는 전부 lib 이 판정한다. **선언을 쓰는 자리보다 앞에 둔다** — 뒤에 두면
+  // 그 자리에서 화면이 통째로 죽는다(2026-08-25 에 실제로 겪었다).
+  const plan = planReelBake(project);
+  const oneShot = plan.mode === "oneshot";
+  const sheetUrl = reelSheetUrl(cuts);
+  const whole = reelWholePrompt(project);
 
   async function save(idx, body) {
     setSaving(`save-${idx}`); setErr("");
@@ -31,13 +48,56 @@ export default function ReelPromptsPage() {
     setSaving("");
   }
 
+  // 전체 프롬프트 저장 — **idx 를 안 보낸다.** 그것이 "한 편 전체"라는 뜻이고,
+  // 라우트는 그때 reel.prompt 에 적는다(시나리오 원문은 안 덮는다).
+  async function saveWhole(body) {
+    setSaving("whole"); setErr("");
+    const res = await fetch(`/api/reel/${id}/prompts`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ body }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) setErr(data.error || "저장하지 못했어요");
+    await reload(id).catch((e) => setErr(e.message));
+    // ★ 보낸 뒤에는 비운다 — 남아 있으면 다음에 또 누를 때 같은 말이 두 번 붙는다.
+    setNote("");
+    setSaving("");
+  }
+
+  // 단위는 **전체 한 번**이다 — 컷 하나만 손보는 것은 위 직접 편집(textarea)이 맡는다.
   async function makeAll() {
     setSaving("all"); setErr("");
-    const res = await fetch(`/api/reel/${id}/prompts`, { method: "POST" });
+    // ★ 이미 쓰인 컷이 있으면 **명시로 전부**(all idx)를 보낸다 — only 를 안 주면
+    //   파이프라인은 "비어 있는 칸만"으로 읽어(has 판정) 수정 요청이 아무 컷에도 안 닿는다.
+    //   ★ 요청이 있을 때만 note 를 실는다 — 안 실으면 지문이 예전과 글자 그대로다.
+    const payload = {
+      ...(cuts.some((c) => c?.clip_prompt) ? { only: cuts.map((_, i) => i) } : {}),
+      ...(note.trim() ? { note: note.trim() } : {}),
+    };
+    const res = await fetch(`/api/reel/${id}/prompts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) setErr(data.error || "영상 프롬프트를 못 만들었어요");
     await reload(id).catch((e) => setErr(e.message));
+    setNote("");
     setSaving("");
+  }
+
+  // 통짜 갈래의 [이대로 고치기] — **LLM 을 안 부른다.** 이 갈래의 프롬프트는 시나리오
+  // 원문 그대로라 다시 쓸 것이 없다. 적은 말을 전체 프롬프트 끝에 붙여 저장하면 그것이
+  // 그대로 굽기에 나가고, 위 글(.script-src)에도 그대로 보인다. 0원이다.
+  //
+  // ⚠️ 여기서 makeAll(POST /prompts) 을 부르면 안 된다 — 그것은 **컷별** 지문을 LLM 으로
+  //   다시 쓰는 문이고, 통짜 굽기는 컷별 지문을 아예 안 읽는다. 값(LLM 호출)은 나가는데
+  //   사장님이 적은 말은 완성될 영상에 한 글자도 안 닿는다.
+  function applyNote() {
+    const ask = note.trim();
+    if (!ask) return;
+    saveWhole([whole, ask].join("\n\n"));
   }
 
   async function rewrite(idx) {
@@ -53,22 +113,66 @@ export default function ReelPromptsPage() {
     setSaving("");
   }
 
-  const ready = isPromptsReady(cuts);
+  // 굽기 게이트 — 서버(app/api/reel/[id]/clips/route.js)와 **같은 함수**다.
+  // 통짜 갈래는 컷별 프롬프트를 안 본다(없는 것이 정상이다).
+  // ★ 굽기 게이트는 **갈래를 아는 한 함수**다 — 컷별 갈래에서는 프롬프트뿐 아니라
+  //   그림까지 본다(canBakeReelClips 그대로). 여기서 isPromptsReady 하나만 보면
+  //   그림이 빠진 채 ⑤로 보내고 서버가 400 으로 막는다.
+  const ready = canBakeReel(project);
   const videoStep = REEL_STEPS.find((s) => s.key === "video");
 
   return (
     <section className="panel panel--wide">
       <h2>영상 프롬프트</h2>
       {/* ★ 이 단계를 따로 둔 이유 — 브리프의 요구대로 사장님 말로 적는다. */}
-      <p className="pgsub">여기서 고치는 것은 무료예요 — 영상을 만들기 전이니까요. 굽고 나서 고치면 컷당 값이 나가요.</p>
       {err && <p className="pgsub warn">{err}</p>}
 
       {!cuts.length ? (
         <p className="pgsub">시나리오와 그림을 먼저 만들어 주세요.</p>
+      ) : oneShot ? (
+        /* ── 통짜 갈래 — 스토리보드 한 장 + 프롬프트 하나 ─────────────────
+           ★ 컷별 목록을 안 그린다. 이 갈래에는 컷별 프롬프트가 **아예 없다** —
+             보여 주면 사장님이 고칠 수 있는 것처럼 보이는데 굽기는 안 읽는다. */
+        <section className="panel">
+          {sheetUrl && (
+            <div className="sheet-view">
+              <img src={sheetUrl} alt="스토리보드" />
+            </div>
+          )}
+
+          {/* ★★ ②시나리오와 **같은 형식**이다(2026-08-25 사장님 지시):
+              결과는 읽는 글로 보여 주고(.script-src), 고치는 것은 아래에서 **한국어로
+              적는다**(.note-form). 두 화면이 같은 일을 하는데 조작이 다르면 사장님이
+              화면마다 다른 사용법을 익혀야 한다. */}
+          <p className="script-src">{whole}</p>
+
+          {/* ★ 한국어로 고쳐 달라고 적는 자리 — ②·③와 같은 모양이다.
+              요청은 makeAll() 이 실어 보낸다(안 실으면 지문이 예전과 글자 그대로다). */}
+          <div className="note-form">
+            <textarea
+              className="field"
+              rows={3}
+              value={note}
+              disabled={!!saving}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="고치고 싶은 것을 적어 주세요 — 예) 카메라를 더 천천히 움직여 줘"
+            />
+            <p className="pgsub">적은 말이 전체 프롬프트 끝에 붙어요 — 붙고 나면 위 글에 그대로 보여요.</p>
+            <div className="note-act">
+              {saving === "whole" ? (
+                <p className="pgsub">고치는 중…</p>
+              ) : (
+                <button className="mini" disabled={!!saving || !note.trim()} onClick={applyNote}>
+                  이대로 고치기
+                </button>
+              )}
+            </div>
+          </div>
+        </section>
       ) : !cuts.some((c) => c?.clip_prompt) ? (
         <div className="step-actions">
           <button className="mini" disabled={!!saving} onClick={makeAll}>
-            {saving === "all" ? "쓰는 중…" : "영상 프롬프트 만들기 · 무료"}
+            {saving === "all" ? "쓰는 중…" : "영상 프롬프트 만들기"}
           </button>
         </div>
       ) : (
@@ -82,22 +186,56 @@ export default function ReelPromptsPage() {
               onBlur={(e) => { if (e.target.value.trim() !== (c.clip_prompt || "")) save(i, e.target.value); }}
             />
             <button type="button" className="tag" disabled={!!saving} onClick={() => rewrite(i)}>
-              {saving === `rewrite-${i}` ? "다시 쓰는 중…" : "다시 쓰기 · 무료"}
+              {saving === `rewrite-${i}` ? "다시 쓰는 중…" : "다시 쓰기"}
             </button>
           </section>
         ))
       )}
 
+      {/* ★★ 영상 프롬프트 수정 요청 — **전체 한 번** 단위다(2026-08-25 사장님 결정).
+          컷 하나만 손보는 것은 위 칸을 직접 고치는 쪽이 맡는다. 여기 적은 말은 **모든
+          컷의 지문에 같이** 실린다 — "전체적으로 더 천천히" 같은 요청이 한 컷에만 먹으면
+          그 컷만 다른 영상이 된다.
+          ★ 프롬프트가 있을 때만 보인다 — 없으면 고칠 것이 없다(위에 만들기 버튼이 있다).
+          ★ 통짜 갈래에는 안 보인다 — 거기서는 고칠 것이 위 칸 하나뿐이고, 다시 쓸 LLM
+            호출 자체가 없다(프롬프트가 시나리오 원문이다). */}
+      {!oneShot && cuts.some((c) => c?.clip_prompt) && (
+        <div className="note-form">
+          <textarea
+            className="field"
+            rows={3}
+            value={note}
+            disabled={!!saving}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="고치고 싶은 것을 적어 주세요 — 예) 전체적으로 카메라를 더 천천히 움직여 줘"
+          />
+          {/* 다시 쓰면 지금 프롬프트는 사라진다 — 모르면 고친 것을 잃는다. */}
+          <p className="pgsub">전체 컷을 다시 써요 — 지금 적힌 프롬프트는 사라져요.</p>
+          <div className="note-act">
+            <button type="button" className="mini" disabled={!!saving} onClick={makeAll}>
+              {saving === "all" ? "쓰는 중…" : note.trim() ? "이대로 고치기" : "전부 다시 쓰기"}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="step-actions">
-        <span className="hint">{ready ? "모든 컷에 영상 프롬프트가 있어요." : "아직 비어 있는 컷이 있어요."}</span>
+        <ReelBack step="prompts" id={id} />
+        <span className="hint">
+          {oneShot
+            ? (ready ? "" : "시나리오와 그림을 먼저 만들어 주세요.")
+            : ready ? ""
+            : isPromptsReady(cuts) ? "그림이 빠진 컷이 있어요."
+            : "아직 비어 있는 컷이 있어요."}
+        </span>
         <div className="fwd">
-          {/* 판정은 서버(app/api/reel/[id]/clips/route.js)와 같은 함수(isPromptsReady) 다 —
+          {/* 판정은 서버(app/api/reel/[id]/clips/route.js)와 같은 함수(canBakeReel) 다 —
               손으로 다시 적으면 화면이 열어 준 버튼을 서버가 400 으로 막는 어긋남이 생긴다. */}
           <Link
             className="cta"
-            aria-disabled={!isPromptsReady(cuts)}
-            href={isPromptsReady(cuts) ? reelStepHref(videoStep, id) : "#"}
-            onClick={(e) => { if (!isPromptsReady(cuts)) e.preventDefault(); }}
+            aria-disabled={!ready}
+            href={ready ? reelStepHref(videoStep, id) : "#"}
+            onClick={(e) => { if (!ready) e.preventDefault(); }}
           >
             영상 만들기 →
           </Link>

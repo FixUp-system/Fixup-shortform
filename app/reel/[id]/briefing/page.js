@@ -21,25 +21,71 @@ const labelOf = (list, id) => list.find((x) => x.id === id)?.label || id;
 
 export default function ReelBriefingPage() {
   const { id } = useParams();
+  // ★ 제목은 **표가 쉠다** — 화면이 손으로 적으면 라벨을 바꿀 때 여기만 낡는다.
+  const stepLabel = REEL_STEPS.find((x) => x.key === "material")?.label || "";
   const { project } = useReelProject();
   const s = project?.settings || {};
   const next = REEL_STEPS.find((x) => x.key === "scenario");
 
+  const photos = project?.material?.photos || [];
+  // ★ 라벨과 값을 한 자리에 모은다 — 화면이 칩만 늘어놓으면
+  //   "story" 가 컨셉인지 분위기인지 사장님이 알 수 없다.
+  const facts = [
+    ["컨셉", labelOf(AD_FORMATS, s.format)],
+    ["분위기", labelOf(AD_MOODS, s.mood)],
+    ["화풍", labelOf(STYLE_PRESETS, s.style)],
+    ["언어", labelOf(AD_LANGS, s.narration_lang)],
+    ["사이즈", `${aspectFor(s.aspect_ratio)?.label || ""} · ${s.aspect_ratio}`],
+    ["길이", `${s.target_seconds}초`],
+  ];
+
   return (
     <section className="panel panel--wide">
-      <h2>입력</h2>
-      <p className="script-src">{project?.material?.text}</p>
-      <div className="chips">
-        <span className="chip on">{labelOf(AD_FORMATS, s.format)}</span>
-        <span className="chip on">{labelOf(AD_MOODS, s.mood)}</span>
-        <span className="chip on">{labelOf(STYLE_PRESETS, s.style)}</span>
-        <span className="chip on">{labelOf(AD_LANGS, s.narration_lang)}</span>
-        <span className="chip on">{aspectFor(s.aspect_ratio)?.label} · {s.aspect_ratio}</span>
-        <span className="chip on">{s.target_seconds}초</span>
+      <h2>{stepLabel}</h2>
+
+      <div className="recap">
+        {/* ★ 사장님이 쓴 글이 **이 화면의 주인공**이다. 전에는 .script-src
+            (12px 회색)라 각주처럼 보였다 — 정보 위계가 뒤집혀 있었다. */}
+        <div className="recap-block">
+          <span className="recap-label">소재</span>
+          <p className="recap-text">{project?.material?.text}</p>
+        </div>
+
+        {/* ★★ 올린 사진을 **실제로 보여 준다.** 전에는 "사진 3장"이라는 숫자뿐이라
+            내가 무엇을 올렸는지 확인할 길이 없었다 — 그런데 이 사진이 제품의 생김새를
+            정하는 재료다(lib/cut-refs.js).
+            ★ 주소는 저장된 것을 그대로 쓴다 — 비공개 버킷이라 /api/uploads/<name> 으로
+            흘려주는 규약이 있고(CLAUDE.md), 화면이 손으로 조립하면 그 규약이 바뀔 때 여기만 낡는다. */}
+        {photos.length > 0 && (
+          <div className="recap-block">
+            <span className="recap-label">사진 {photos.length}장</span>
+            <div className="recap-photos">
+              {photos.map((p, i) => (
+                <div key={p.url || i} className="recap-photo">
+                  <img src={p.url} alt={`올린 사진 ${i + 1}`} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="recap-block">
+          <span className="recap-label">조건</span>
+          <dl className="recap-facts">
+            {facts.map(([k, v]) => (
+              <div key={k} className="recap-fact">
+                <dt>{k}</dt>
+                <dd>{v}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
       </div>
-      <p className="pgsub">사진 {(project?.material?.photos || []).length}장</p>
+
       <div className="step-actions">
-        <Link className="cta" href={reelStepHref(next, id)}>시나리오로</Link>
+        <div className="fwd">
+          <Link className="cta" href={reelStepHref(next, id)}>시나리오로 →</Link>
+        </div>
       </div>
     </section>
   );

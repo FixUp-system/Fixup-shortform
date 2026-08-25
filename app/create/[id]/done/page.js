@@ -5,24 +5,10 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { useProject } from "../../../../components/ProjectContext";
 import BackButton from "../../../../components/BackButton";
-import {
-  cutSeconds,
-  SUBTITLE_POSITIONS,
-  DEFAULT_SUBTITLE,
-  SUBTITLE_FONTS,
-  SIZE_MIN,
-  SIZE_MAX,
-  normalizeSubtitle,
-  clampPos,
-  outlineFor,
-  rimFor,
-  buildCues,
-  subtitleTextFor,
-  subtitleStyle,
-  posFromLegacyPosition,
-  SUBTITLE_LINE_HEIGHT,
-} from "../../../../lib/subtitles";
-import { aspectFor } from "../../../../lib/aspects";
+import { cutSeconds } from "../../../../lib/subtitles";
+// 자막 편집기는 한 벌이다 — reel 완성 화면도 같은 컴포넌트를 쓴다(2026-08-25).
+// 초기값 규칙(seedSubtitle)도 거기 산다: 두 화면이 각자 적으면 갈린다.
+import SubtitleEditor, { seedSubtitle } from "../../../../components/SubtitleEditor";
 import { isRenderStale, isClipStale, isImageStale, isSubtitleOnlyStale } from "../../../../lib/steps";
 import { SUBTITLE_LANGS, speechLangOf } from "../../../../lib/subtitle-langs";
 import { isSubtitleStale } from "../../../../lib/translate";
@@ -30,40 +16,9 @@ import { isSubtitleStale } from "../../../../lib/translate";
 // images_error 를 영영 못 보던 버그가 났다(2026-08-14). 한 벌에서 온다.
 import { startPolling } from "../../../../lib/poll";
 
-// 옛 프로젝트가 쥔 자막 위치(위·중간·아래)를 자유 위치 비율로 옮기는 일은 lib 이 한다
-// (posFromLegacyPosition). 정렬 기준마다 marginV 의 뜻이 달라 글자 블록 높이까지 봐야 하는데,
-// 그 식은 자막 크기를 정하는 곳(subtitleStyle) 옆에 있어야 갈라지지 않는다.
-
-// 화면이 쥘 초기값. settings.subtitle 이 있으면 그것이 진실이고, 없는 옛 프로젝트는
-// 옛 위치를 이어받는다. 되돌리기·범위 판정은 늘 lib 의 normalizeSubtitle 을 지난다.
-function seedSubtitle(project) {
-  const saved = project?.settings?.subtitle;
-  if (saved) return normalizeSubtitle(saved);
-  return normalizeSubtitle({
-    ...DEFAULT_SUBTITLE,
-    pos: posFromLegacyPosition(project?.settings?.subtitle_position),
-  });
-}
-
-// 빠른 위치 — 드래그가 자유롭다고 칩이 쓸모없어지지 않는다. "대충 아래로"를 한 번에 하는 길이다.
-//
-// 자리는 posFromLegacyPosition 하나에서 온다(값이 세 벌이 되면 안 된다). 목록도 lib 의
-// SUBTITLE_POSITIONS 를 그대로 쓰고, 화면이 더하는 것은 한국어 이름뿐이다.
-// 순서는 y 로 정렬한다 — 표의 키 순서(아래·중간·위)가 아니라 사장님이 보는 위→아래 순이다.
-const POSITION_LABELS = { top: "위", middle: "중간", bottom: "아래" };
-const POSITION_PRESETS = SUBTITLE_POSITIONS.map((id) => ({
-  id,
-  label: POSITION_LABELS[id] || id,
-  pos: posFromLegacyPosition(id),
-})).sort((a, b) => a.pos[1] - b.pos[1]);
-
-// 켜진 칩은 pos 에서 거꾸로 판정한다 — settings.subtitle_position 을 읽으면 화면이 거짓말을
-// 한다(드래그로 옮겨도 칩은 켜진 채다). 드래그해서 어느 프리셋과도 다르면 아무 칩도 안 켜진다.
-// 눈금 하나 차이로 꺼지지 않게 아주 작은 여유만 둔다.
-// 드래그로 옮겨 어느 프리셋과도 안 맞을 때 목록이 가리킬 자리. 저장되는 값이 아니다.
-const CUSTOM_POS = "custom";
-
-const samePos = (a, b) => Math.abs(a[0] - b[0]) < 0.005 && Math.abs(a[1] - b[1]) < 0.005;
+// 자막의 모양(크기·글꼴·색·자리)을 고르는 자리는 components/SubtitleEditor.jsx 하나다 —
+// 초기값 규칙(seedSubtitle)·빠른 위치 목록·드래그도 함께 거기 산다. 이 화면이 남겨 둔 것은
+// **이 흐름에만 있는 것**뿐이다: 자막 언어·번역 검토·[영상에 적용]의 두 갈래.
 
 export default function DoneStepPage() {
   const { id } = useParams();
@@ -84,13 +39,9 @@ export default function DoneStepPage() {
   // 사장님이 고른 자막 설정. 화면이 값을 새로 정하지 않는다 — 기본값·되돌리기·범위는
   // lib/subtitles.js 하나가 쥔다(두 벌이 되면 언젠가 갈린다).
   const [sub, setSub] = useState(() => seedSubtitle(project));
-  // 미리보기 상자의 실제 크기(px). 글자 크기를 완성본과 **같은 함수**로 재려면 화면에서의
-  // 치수가 필요하다 — subtitleStyle 이 치수에서 비례로 뽑으므로 상자 치수를 그대로 넣으면 된다.
-  const [box, setBox] = useState({ width: 0, height: 0 });
   const [applying, setApplying] = useState(false);
-  const stageRef = useRef(null);
-  // 드래그 중에 잡은 지점과 자막 자리의 차이. null 이면 드래그 중이 아니다.
-  const dragRef = useRef(null);
+  // 드래그 중인가 — 컴포넌트가 알려 준다. 그동안은 서버 값으로 덮어쓰지 않는다.
+  const dragRef = useRef(false);
 
   useEffect(() => () => { stopRef.current?.(); stopRef.current = null; }, []);
 
@@ -107,59 +58,6 @@ export default function DoneStepPage() {
     if (dragRef.current) return;
     setSub(seedSubtitle(project));
   }, [savedSubtitle]);
-
-  // 상자 크기는 창 너비·비율에 따라 바뀐다. 한 번만 재면 창을 줄였을 때 글자만 안 따라온다.
-  useEffect(() => {
-    const el = stageRef.current;
-    if (!el) return;
-    const measure = () => setBox({ width: el.clientWidth, height: el.clientHeight });
-    measure();
-    if (typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [rawUrl]);
-
-  // 드래그 — 상자 안에서의 비율로 옮기고, 화면 밖은 lib 의 clampPos 가 되돌린다.
-  //
-  // 잡은 지점과 자막 자리의 차이(grab)를 쥐고 간다. 커서 자리를 그대로 pos 로 삼으면
-  // 누르는 순간 자막이 튄다 — pos 는 글자 블록의 아랫변이라, 한가운데를 잡아도 블록이
-  // 제 높이의 절반만큼 위로 솟는다.
-  function moveTo(e) {
-    const el = stageRef.current;
-    const grab = dragRef.current;
-    if (!el || !grab) return;
-    const r = el.getBoundingClientRect();
-    if (!r.width || !r.height) return;
-    setSub((s) => ({
-      ...s,
-      pos: clampPos([
-        (e.clientX - r.left) / r.width + grab.dx,
-        (e.clientY - r.top) / r.height + grab.dy,
-      ]),
-    }));
-  }
-  function onPointerDown(e) {
-    if (!rawUrl || applying) return;
-    const r = stageRef.current?.getBoundingClientRect();
-    if (!r?.width || !r?.height) return;
-    dragRef.current = {
-      dx: sub.pos[0] - (e.clientX - r.left) / r.width,
-      dy: sub.pos[1] - (e.clientY - r.top) / r.height,
-    };
-    // 포인터를 붙잡아 둔다 — 안 그러면 빨리 끌 때 커서가 자막 밖으로 나가며 드래그가 끊긴다
-    e.currentTarget.setPointerCapture?.(e.pointerId);
-    e.preventDefault();
-    moveTo(e);
-  }
-  function onPointerMove(e) {
-    if (dragRef.current) moveTo(e);
-  }
-  function onPointerUp(e) {
-    if (!dragRef.current) return;
-    dragRef.current = null;
-    e.currentTarget.releasePointerCapture?.(e.pointerId);
-  }
 
   // [영상에 적용] — 설정을 저장한 뒤 **영상에 반영한다.** 길은 코드가 고른다:
   // 컷·소리·그림이 낡았으면 전체를 다시 합치고, 자막만 달라졌으면 원본 위에 자막만 굽는다
@@ -348,104 +246,23 @@ export default function DoneStepPage() {
     ? "자막을 바꿨어요 — 다시 합치면 새 자막으로 나와요"
     : "컷을 고친 뒤라 이 영상은 옛 소리·옛 그림으로 만든 것이에요 — 다시 합쳐 주세요";
 
-  // ★ 미리보기 상자의 비율은 **프로젝트 비율**이다 — CSS 가 9:16 으로 고정하고 영상을
-  // object-fit: cover 로 채우던 때는, 16:9·1:1 프로젝트에서 영상이 잘려 보였다. 그러면
-  // ①드래그한 자리가 잘린 프레임 기준이라 최종과 다른 자리를 가리키고, ②글자 크기를
-  // box.height(=폭×16/9)로 재는데 ffmpeg 는 실제 높이로 재서 크기까지 어긋났다.
-  // 값은 lib/aspects 에서 가져온다 — 화면이 손으로 적으면 값이 두 벌이 된다.
   // 고치는 중인가 — 저장된 설정과 지금 고른 값이 다른가.
   //
   // ★ 이것이 재생기의 갈림이다. 옛 화면은 **늘 자막 없는 원본**을 틀어서, 적용이 실제로
   // 되고 있어도(구운 파일은 설정을 정확히 반영한다) 사장님 눈에는 "영상이 그대로"였다.
   // 고치는 중에는 미리보기(원본 + 브라우저가 그리는 자막), 아니면 **진짜 완성본**을 튼다.
+  // 그 갈림 자체는 편집기(components/SubtitleEditor.jsx)가 쥔다 — 두 흐름이 같아야 한다.
   const dirty = JSON.stringify(sub) !== JSON.stringify(seedSubtitle(project));
 
   // ★ 완성본 URL 은 늘 같다(/api/renders/<id>.mp4) — 다시 구워도 <video> 는 옛 파일을
   // 그대로 쓴다. 각인(render.ts)을 실어 다른 주소로 만든다. 라우트는 질의문자를 안 본다.
   const finalSrc = render?.url ? `${render.url}?v=${render.ts || 0}` : null;
-  const previewSrc = dirty || !finalSrc ? rawUrl || finalSrc : finalSrc;
-
-  const aspect = aspectFor(project?.settings?.aspect_ratio);
-  const frameStyle = {
-    position: "relative",
-    touchAction: "none",
-    aspectRatio: `${aspect.width} / ${aspect.height}`,
-    // 세로가 긴 비율에서 화면 밖으로 넘치지 않게 — CSS 의 9:16 고정값을 비율에서 다시 뽑는다
-    maxWidth: `calc((100vh - 210px) * ${aspect.width} / ${aspect.height})`,
-  };
-  // 미리보기를 **가로 560 · 세로 640 상자**에 가둔다. 상자 치수는 CSS 가 쥐고, 비율만
-  // 여기서 넘긴다(--ar) — 비율의 출처는 프로젝트 하나여야 한다(위 aspectFor).
-  // 9:16 이면 640×9/16 = 360 이라 지금과 한 픽셀도 안 바뀐다.
-  const previewStyle = { "--ar": aspect.width / aspect.height };
-
-  // 미리보기에 띄울 자막 — **완성본과 같은 함수로 나눈다.**
-  //
-  // ★ 문장을 통째로 흘리면 상자 폭에 따라 여섯 줄이 되는데 완성본은 두 줄이다. pos 가 글자
-  // 블록의 아랫변 기준이라 줄 수가 다르면 자막이 차지하는 자리가 통째로 달라지고, 낱말도
-  // 아무 데서나 잘린다("하/이톱"). 나누는 규칙은 lib 하나여야 한다.
-  // ★ 언어를 싣는다 — 안 실으면 사장님은 한국어 원문을 검토하는데 구워지는 것은
-  // 일본어·중국어라 검토와 결과가 갈린다(리뷰가 잡은 결함). buildCues 안의
-  // subtitleTextFor 가 번역이 없거나 낡았으면 한국어로 떨어지므로, 번역이 아직
-  // 안 된 컷도 빈칸이 아니라 원문으로 뜬다.
-  const sampleCut = cuts.find((c) => (c.sentence || "").trim());
-  const sampleText = (box.height && sampleCut
-    ? buildCues([sampleCut], { width: box.width, height: box.height, subtitle: sub, lang })[0]?.text
-    : sampleCut && subtitleTextFor(sampleCut, lang)) || "자막 미리보기";
-  const font = SUBTITLE_FONTS.find((f) => f.id === sub.font) || SUBTITLE_FONTS[0];
-  // ★ 완성본과 **같은 함수**로 잰다. 여기서 따로 곱하면 미리보기와 최종이 갈린다.
-  const previewFontSize = box.height
-    ? subtitleStyle({ width: box.width, height: box.height, subtitle: sub }).fontSize
-    : 0;
-  // 외곽선 색은 사장님이 고르지 않는다 — lib 의 같은 규칙(글자색의 반대 명도)을 쓴다.
-  // ASS 의 외곽선을 브라우저에서는 그림자 여덟 방향으로 흉내 낸다.
-  const outline = outlineFor(sub.color);
-  // ★ 두께도 lib 이 정한다 — 글꼴이 가늘수록·글자가 클수록 두꺼워진다(rimFor).
-  // 여기서 2px 로 못 박아 두면 고른 것과 다른 결과가 나온다.
-  // 미리보기 상자 치수로 잰 글자 크기를 넘기므로 값이 이미 미리보기 픽셀이다.
-  const rim = rimFor(sub.font, previewFontSize);
-  const outlineShadow = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]]
-    .map(([x, y]) => `${x * rim.outline}px ${y * rim.outline}px 0 ${outline}`)
-    // ASS 의 Shadow 는 오른쪽 아래로 떨어지는 그림자다 — 밝은 배경에서 아랫변을 떼어 놓는다
-    .concat(`${rim.shadow}px ${rim.shadow}px ${rim.shadow}px rgba(0,0,0,0.55)`)
-    .join(", ");
-  const overlayStyle = {
-    position: "absolute",
-    left: `${sub.pos[0] * 100}%`,
-    top: `${sub.pos[1] * 100}%`,
-    // ★ pos 는 글자 블록의 **아랫변** 기준이다 — ffmpeg 의 \pos + Alignment 2 와 같은 뜻.
-    // 기준이 갈리면 미리보기와 완성본의 자막 높이가 어긋나고, 두 줄이 되면 덜컹거린다.
-    transform: "translate(-50%, -100%)",
-    // 완성본을 틀 때는 자막이 **영상 안에** 이미 구워져 있다 — 미리보기까지 그리면 둘로 보인다.
-    // 지우지 않고 감추기만 하는 이유는 **끄는 자리**를 남겨 두려고다: 사장님이 영상 속 자막을
-    // 그대로 끌면 그 순간 고치는 중이 되어 미리보기가 다시 나타난다.
-    opacity: dirty ? 1 : 0,
-    textAlign: "center",
-    // ★ 줄바꿈은 이미 lib 이 정했다(buildCues) — 여기서 폭을 걸어 **다시** 접으면 완성본과
-    // 다른 줄 수가 나온다. 실제로 두 줄짜리가 미리보기에서만 네 줄이 되고 낱말이 잘렸다
-    // ("하/이톱"). ffmpeg 는 \N 자리에서만 끊으므로 미리보기도 그래야 같은 그림이다.
-    whiteSpace: "pre",
-    fontSize: previewFontSize,
-    // 줄 높이도 lib 이 쥔다 — 옛 위치를 옮길 때 쓰는 글자 블록 높이와 같은 값이어야 한다
-    lineHeight: SUBTITLE_LINE_HEIGHT,
-    fontWeight: 700,
-    // ★ 브라우저에는 **cssFamily** 를 쓴다(ffmpeg 의 family 가 아니다). CSS 패밀리 이름은
-    // 대소문자를 안 가려서, 파일 내부 이름을 그대로 쓰면 next/font/local 이 내는 UI 폰트
-    // 이름과 한 가족이 된다 — 어느 쪽이 이길지가 빌드 산출물 순서에 달린다.
-    // app/globals.css 의 @font-face 가 public/fonts/ 의 파일을 이 이름으로 물린다.
-    // 뒤의 sans-serif 는 폰트를 받는 동안(font-display: swap) 대신 그릴 글씨다.
-    fontFamily: `"${font.cssFamily}", sans-serif`,
-    color: sub.color,
-    textShadow: outlineShadow,
-    cursor: applying ? "default" : "move",
-    userSelect: "none",
-    touchAction: "none",
-  };
 
   if (!clipCount) return <p className="pgsub">영상을 먼저 만들어 주세요.</p>;
 
   // ★ panel--stage — 완성 화면 전용 폭이다. panel--narrow(760 고정)는 대본·구성·브리핑도
   // 함께 쓰므로 건드리지 않는다. 여기만 내용에 맞춰 자라고(최대 960), 그 폭을 정하는 것은
-  // 영상 비율이다(위 previewStyle).
+  // 영상 비율이다(편집기가 상자에 --ar 로 실어 준다).
   return (
     <section className="panel panel--narrow panel--stage">
       <h2>완성본을 내려받습니다 <span className="badge vlm">완성</span></h2>
@@ -494,232 +311,110 @@ export default function DoneStepPage() {
               이 합성 방식에서는 자막이 들어가지 않아요 (SHOTFORM_COMPOSER=fal)
             </div>
           )}
-          {/* ★ 조절판을 **영상 왼쪽**에 세운다(2026-08-13 사용자 요청). 아래위로 두면
-              조절판을 만지는 동안 영상이 화면 밖으로 밀려, 고친 결과를 보려고 매번
-              스크롤해야 했다. 좁은 화면에서는 다시 위아래로 쌓인다(globals.css). */}
-          <div className="done-stage">
-          {/* ★ 제목을 조절판 **밖**으로 뺐다(2026-08-13 사용자 요청). 안에 두면 제목 높이
-              만큼 회색 상자가 아래로 밀려, 영상 윗변과 31px 어긋나 보였다. 무대가 격자라
-              제목은 1행 왼쪽 칸, 상자와 영상은 2행에 나란히 선다 — 숫자를 박아 미는 것이
-              아니라 격자가 맞춘다. */}
-          {rawUrl && (
-            <div className="eyebrow sub-eyebrow">
-              수정 <small>끌어서 옮기고 글꼴·색·크기를 골라요</small>
-            </div>
-          )}
-          {rawUrl && (
-              <div className="sub-editor">
-              {/* 네 가지 결정을 한 장에 같은 리듬으로 둔다. 예전에는 위치 칩과 글꼴 칩이
-                  라벨 없이 두 줄로 붙어 있어, 어느 줄이 무엇을 고르는 줄인지 알 수 없었다. */}
-              <div className="subpanel">
-                <div className="sub-row">
-                  <span className="sub-label">언어</span>
-                  {/* 켜진 칩은 project.settings.subtitle_lang(서버가 저장한 값)에서만 나온다 —
-                      고르는 순간 낙관적으로 켜면, 라우트가 번역을 못 써 저장을 접었을 때(502)
-                      화면만 바뀐 채로 남는다. */}
-                  <div className="chips">
-                    {SUBTITLE_LANGS.map((l) => (
-                      <button
-                        key={l.id}
-                        className={`chip${lang === l.id ? " on" : ""}`}
-                        disabled={langBusy || applying}
-                        onClick={() => pickLang(l.id)}
-                      >
-                        {l.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {/* ★ 옮기는 데 한참 걸린다 — 그 동안 바뀌는 것이 "칩이 회색이 된다" 하나뿐이면
-                    사장님 눈에는 눌리지 않은 것과 같다. 셋을 함께 말한다: **무엇을**(고른 언어
-                    이름) · **하는 중**(도는 표시) · **왜 걸리는지**(컷마다 옮긴다).
-                    자리는 오류 문구와 같은 자리다 — 언어 줄 바로 아래라 시선이 이미 거기 있다.
-                    ⚠️ 칩 안에 넣지 않는다: 이 줄의 칩은 줄바꿈이 막혀 있어(.sub-row .chips)
-                       글자가 늘면 칩이 칸 밖으로 밀린다. */}
-                {langBusy && (
-                  <p className="pgsub">
-                    <span className="spinner" />
-                    {SUBTITLE_LANGS.find((l) => l.id === langBusy)?.label}로 옮기는 중이에요 — 컷마다 옮겨서 잠깐 걸려요
-                  </p>
-                )}
-                {langErr && <p className="pgsub warn">{langErr}</p>}
-                <div className="sub-row">
-                  <span className="sub-label">위치</span>
-                  {/* 고른 값은 pos 에서 거꾸로 판정한다 — 끌어서 옮기면 어느 자리와도 안 맞으므로
-                      "직접 옮김"으로 떨어진다(그때 목록을 비우면 화면이 거짓말을 한다). */}
-                  <div className="sub-select-wrap">
-                    <select
-                      className="sub-select"
-                      aria-label="자막 위치"
-                      value={POSITION_PRESETS.find((p) => samePos(sub.pos, p.pos))?.id || CUSTOM_POS}
-                      disabled={applying}
-                      onChange={(e) => {
-                        const preset = POSITION_PRESETS.find((p) => p.id === e.target.value);
-                        if (preset) setSub((s) => ({ ...s, pos: clampPos(preset.pos) }));
-                      }}
-                    >
-                      {POSITION_PRESETS.map((p) => (
-                        <option key={p.id} value={p.id}>{p.label}</option>
-                      ))}
-                      <option value={CUSTOM_POS} disabled>직접 옮김</option>
-                    </select>
-                  </div>
-                </div>
-                {lang === "ko" ? (
+          {/* ★ 자막 편집기는 **한 벌이다**(components/SubtitleEditor.jsx) — reel 완성 화면도
+              같은 것을 쓴다. 조절판을 **영상 왼쪽**에 세우는 것도(2026-08-13 사용자 요청)
+              그 안이다. 여기서 넘기는 것은 **이 흐름에만 있는 것**뿐이다:
+              언어 줄(topSlot) · 번역 검토(children) · [영상에 적용]의 두 갈래. */}
+          <SubtitleEditor
+            cuts={cuts}
+            aspectRatio={project?.settings?.aspect_ratio}
+            lang={lang}
+            sub={sub}
+            onChange={setSub}
+            rawUrl={rawUrl}
+            finalSrc={finalSrc}
+            dirty={dirty}
+            /* 자막 없는 원본이 없는 옛 프로젝트에서는 조절판을 안 그린다 —
+                구워진 자막 위에 미리보기를 얹으면 자막이 둘로 보인다. */
+            editable={!!rawUrl}
+            applying={applying}
+            busy={busy}
+            onDragging={(v) => { dragRef.current = v; }}
+            onApply={applyToVideo}
+            /* ★★ 잠금이 `dirty` 하나였다(2026-08-18 사장님 지적: "언어를 바꾸면 적용
+                버튼이 안 눌려"). 그 값은 **자막 설정**만 비교하는데, 언어는 고르는 즉시
+                서버에 저장되므로(pickLang) 거기 안 걸린다 — 영상에는 옛 언어가 구워져
+                있는데 버튼은 잠긴 채 "적용됨"이라고 말했다.
+                ★ 잠금과 문구가 **같은 값**을 본다. 갈리면 잠긴 버튼이 "영상에 적용"이라
+                  하거나 눌리는 버튼이 "적용됨"이라 한다. */
+            applyDisabled={applying || busy || (!dirty && !stale)}
+            applyLabel={applying || busy ? "영상에 반영하는 중…" : (dirty || stale) ? "영상에 적용" : "적용됨"}
+            topSlot={(
+              <>
                   <div className="sub-row">
-                    <span className="sub-label">글꼴</span>
-                    {/* ★ 고른 글꼴을 **그 글꼴로** 보여 준다 — 이름만 보고 고르면 "부드럽게"가 어떤
-                        글씨인지 모른 채 고르게 된다. 이름(label)·글꼴 이름(cssFamily) 둘 다 lib 에서
-                        온다. 브라우저용 이름이라야 한다(ffmpeg 의 family 가 아니다).
-                        목록 안 글자까지 그 글꼴로 그릴지는 브라우저가 정한다 — 못 그려도 닫힌
-                        상태에서는 늘 제 글꼴로 보이므로 고르는 근거가 사라지지 않는다. */}
-                    <div className="sub-select-wrap">
-                      <select
-                        className="sub-select face"
-                        aria-label="자막 글꼴"
-                        style={{ fontFamily: font.cssFamily }}
-                        value={sub.font}
-                        disabled={applying}
-                        onChange={(e) => setSub((s) => ({ ...s, font: e.target.value }))}
-                      >
-                        {SUBTITLE_FONTS.map((f) => (
-                          <option key={f.id} value={f.id} style={{ fontFamily: f.cssFamily }}>
-                            {f.label}
-                          </option>
-                        ))}
-                      </select>
+                    <span className="sub-label">언어</span>
+                    {/* 켜진 칩은 project.settings.subtitle_lang(서버가 저장한 값)에서만 나온다 —
+                        고르는 순간 낙관적으로 켜면, 라우트가 번역을 못 써 저장을 접었을 때(502)
+                        화면만 바뀐 채로 남는다. */}
+                    <div className="chips">
+                      {SUBTITLE_LANGS.map((l) => (
+                        <button
+                          key={l.id}
+                          className={`chip${lang === l.id ? " on" : ""}`}
+                          disabled={langBusy || applying}
+                          onClick={() => pickLang(l.id)}
+                        >
+                          {l.label}
+                        </button>
+                      ))}
                     </div>
                   </div>
-                ) : null /* ★ 2026-08-18 사용자 지시로 안내를 걷었다.
-                    옛 문구는 글꼴 선택이 감춰진 이유를 폰트 사정으로 설명하고 있었다 — 그것은
-                    **우리 사정**이고 사장님이 알 일이 아니다. 고를 것이 없으면 그 줄이 아예 없는
-                    것이 자연스럽다(이 화면이 "뒷단 낱말을 흘리지 않는다"로 이미 고쳐 온 결이다).
-                    ⚠️ 원래 그 문구를 둔 이유는 "말없이 사라지면 고장으로 보인다"였다 — 한국어에서
-                    일본어로 바꾸면 글꼴 줄이 사라진다. 그것이 고장처럼 읽힌다는 지적이 나오면
-                    문구가 아니라 **줄을 남기고 값을 비활성으로 보여 주는** 쪽이 다음 후보다. */}
-                <div className="sub-row">
-                  <span className="sub-label">색</span>
-                  {/* 테두리 색은 사장님이 고르는 것이 아니다 — 미리보기가 이미 보여 주므로
-                      값을 글자로 적지 않는다(옛 화면은 테두리 색의 hex 를 그대로 적었다). */}
-                  <div className="sub-control">
-                    <input
-                      className="sub-swatch"
-                      type="color"
-                      aria-label="자막 글자색"
-                      value={sub.color}
-                      disabled={applying}
-                      onChange={(e) => setSub((s) => ({ ...s, color: e.target.value.toUpperCase() }))}
-                    />
-                    <span className="sub-value mono">{sub.color}</span>
-                  </div>
-                </div>
-                <div className="sub-row">
-                  <span className="sub-label">크기</span>
-                  <div className="sub-control">
-                    {/* 범위는 lib 이 쥔다 — 두 벌이면 슬라이더 끝과 저장되는 값이 갈린다 */}
-                    <input
-                      className="sub-slider"
-                      type="range"
-                      aria-label="자막 크기"
-                      min={SIZE_MIN}
-                      max={SIZE_MAX}
-                      step="0.05"
-                      value={sub.size}
-                      disabled={applying}
-                      onChange={(e) => setSub((s) => ({ ...s, size: Number(e.target.value) }))}
-                    />
-                    <span className="sub-value mono">{sub.size.toFixed(2)}배</span>
-                  </div>
-                </div>
-                {/* 실행도 이 격자 안이다 — 카드 밖에 두면 어느 카드에 딸린 버튼인지 흐려진다.
-                    주 버튼은 미리보기 패널의 선례(.mini.confirm-btn)를 그대로 쓴다 —
-                    이 화면의 .cta 는 [내려받기]다(한 화면에 하나). */}
-                <div className="sub-row sub-row--actions">
-                  {/* 되돌리기 값도 lib 이 쥔다 — 화면이 기본값을 다시 적지 않는다 */}
-                  <button className="mini" disabled={applying || busy} onClick={() => setSub(normalizeSubtitle(DEFAULT_SUBTITLE))}>
-                    기본으로
-                  </button>
-                  {/* ★ 영상을 만드는 버튼은 이 하나다. 자막만 굽는지 전체를 다시 합치는지는
-                      코드가 고른다(applyToVideo) — 사장님이 고를 일이 아니다.
-                      고친 게 없으면 누를 것이 없다 — 재생 중인 그 영상이 이미 결과다. */}
-                  {/* ★★ 잠금이 `dirty` 하나였다(2026-08-18 사장님 지적: "언어를 바꾸면 적용
-                      버튼이 안 눌려"). 그 값은 **자막 설정**만 비교하는데, 언어는 고르는 즉시
-                      서버에 저장되므로(pickLang) 거기 안 걸린다 — 영상에는 옛 언어가 구워져
-                      있는데 버튼은 잠긴 채 "적용됨"이라고 말했다. 화면이 거짓말을 하는 자리다.
-                      각인은 이미 알고 있었다(언어가 바뀌면 stale 이 참이고 경고까지 떴다) —
-                      **아는데 문이 안 열린 것**이다.
-                      ★ 잠금과 문구가 같은 값을 본다. 갈리면 잠긴 버튼이 "영상에 적용"이라 하거나
-                        눌리는 버튼이 "적용됨"이라 한다(지금이 뒤쪽이었다). */}
-                  <button className="mini confirm-btn" disabled={applying || busy || (!dirty && !stale)} onClick={applyToVideo}>
-                    {applying || busy ? "영상에 반영하는 중…" : (dirty || stale) ? "영상에 적용" : "적용됨"}
-                  </button>
-                </div>
-              </div>
-              {/* 번역 검토 — 한국어에서는 자막이 곧 원문이라 검토할 것이 없다.
-                  ②대본 화면의 문장 손보기와 같은 방식(contentEditable + onBlur)을 그대로
-                  쓴다 — 새 편집 UI를 만들지 않는다. */}
-              {lang !== "ko" && (
-                <div className="plan-list sub-translations">
-                  <div className="eyebrow">번역 검토 <small>눌러서 고쳐요 — 고치면 지금 원문 기준으로 다시 낡지 않아요</small></div>
-                  {cuts.filter((c) => !c.silent).map((c) => {
-                    const stale = isSubtitleStale(c, lang, sourceLang);
-                    const translated = c.subtitles?.[lang]?.text || "";
-                    return (
-                      <div className="plan-row" key={c.idx}>
-                        <span className="num">{c.idx + 1}</span>
-                        <div className="plan-body">
-                          <div className="preview-sentence">“{c.sentence}”</div>
-                          <div className="plan-field">
-                            <b>번역</b>
-                            <span
-                              contentEditable
-                              suppressContentEditableWarning
-                              className="editable"
-                              onBlur={(e) => {
-                                const v = e.currentTarget.textContent.trim();
-                                if (v && v !== translated) saveTranslation(c.idx, v);
-                              }}
-                            >
-                              {translated || "(아직 번역이 없어요)"}
-                            </span>
-                          </div>
-                          {stale && (
-                            <div className="badges">
-                              <span className="badge warn">번역이 낡았어요</span>
-                              <button className="mini" disabled={langBusy} onClick={() => pickLang(lang)}>
-                                다시 번역
-                              </button>
-                            </div>
-                          )}
+                  {/* ★ 옮기는 데 한참 걸린다 — 그 동안 바뀌는 것이 "칩이 회색이 된다" 하나뿐이면
+                      사장님 눈에는 눌리지 않은 것과 같다. 셋을 함께 말한다: **무엇을**(고른 언어
+                      이름) · **하는 중**(도는 표시) · **왜 걸리는지**(컷마다 옮긴다).
+                      자리는 오류 문구와 같은 자리다 — 언어 줄 바로 아래라 시선이 이미 거기 있다.
+                      ⚠️ 칩 안에 넣지 않는다: 이 줄의 칩은 줄바꿈이 막혀 있어(.sub-row .chips)
+                         글자가 늘면 칩이 칸 밖으로 밀린다. */}
+                  {langBusy && (
+                    <p className="pgsub">
+                      <span className="spinner" />
+                      {SUBTITLE_LANGS.find((l) => l.id === langBusy)?.label}로 옮기는 중이에요 — 컷마다 옮겨서 잠깐 걸려요
+                    </p>
+                  )}
+                  {langErr && <p className="pgsub warn">{langErr}</p>}
+              </>
+            )}
+          >
+            {lang !== "ko" && (
+              <div className="plan-list sub-translations">
+                <div className="eyebrow">번역 검토 <small>눌러서 고쳐요 — 고치면 지금 원문 기준으로 다시 낡지 않아요</small></div>
+                {cuts.filter((c) => !c.silent).map((c) => {
+                  const stale = isSubtitleStale(c, lang, sourceLang);
+                  const translated = c.subtitles?.[lang]?.text || "";
+                  return (
+                    <div className="plan-row" key={c.idx}>
+                      <span className="num">{c.idx + 1}</span>
+                      <div className="plan-body">
+                        <div className="preview-sentence">“{c.sentence}”</div>
+                        <div className="plan-field">
+                          <b>번역</b>
+                          <span
+                            contentEditable
+                            suppressContentEditableWarning
+                            className="editable"
+                            onBlur={(e) => {
+                              const v = e.currentTarget.textContent.trim();
+                              if (v && v !== translated) saveTranslation(c.idx, v);
+                            }}
+                          >
+                            {translated || "(아직 번역이 없어요)"}
+                          </span>
                         </div>
+                        {stale && (
+                          <div className="badges">
+                            <span className="badge warn">번역이 낡았어요</span>
+                            <button className="mini" disabled={langBusy} onClick={() => pickLang(lang)}>
+                              다시 번역
+                            </button>
+                          </div>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                    </div>
+                  );
+                })}
               </div>
-          )}
-          {/* ★ 자막 없는 원본을 재생하고 그 위에 브라우저가 자막을 그린다 — 구워진 자막 위에
-              미리보기를 얹으면 자막이 둘로 보인다. 원본이 없는 옛 프로젝트는 완성본 그대로다. */}
-          <div className="preview-pane done-preview" style={previewStyle}>
-            <div className="preview-frame" ref={stageRef} style={frameStyle}>
-              {/* key 로 다시 만든다 — src 만 바꾸면 브라우저가 이미 물고 있던 스트림을 이어 튼다 */}
-              <video key={previewSrc} className="preview-video" controls src={previewSrc} />
-              {rawUrl && (
-                <div
-                  style={overlayStyle}
-                  onPointerDown={onPointerDown}
-                  onPointerMove={onPointerMove}
-                  onPointerUp={onPointerUp}
-                  onPointerCancel={onPointerUp}
-                >
-                  {sampleText}
-                </div>
-              )}
-            </div>
-          </div>
-
-          </div>
+            )}
+          </SubtitleEditor>
 
           {/* 원본이 없는 옛 프로젝트 — 자막이 이미 구워져 있어 그 위에 미리보기를 얹을 수 없다.
               조절 UI 를 그냥 숨기기만 하면 사장님은 이 기능이 있는지조차 모른다. 아래에 이미

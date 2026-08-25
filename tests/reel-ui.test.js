@@ -58,11 +58,10 @@ describe("영상 프롬프트 화면", () => {
     expect(prompts).toContain("PATCH");
   });
 
-  it("굽기 전이라는 것을 사장님에게 말한다 — 실제 화면 문구다, 주석이 아니다", () => {
-    // ★ stripComments 뒤에 잰다(A3) — 안 그러면 이 단정은 머리말 주석의 "값이 들지"
-    //   한 마디로도 그린이 되고, 화면 본문 문구를 통째로 지워도 못 잡는다.
-    expect(stripComments(prompts)).toMatch(/무료|0원|공짜|값이 들지/);
-  });
+  // ★★ 2026-08-25 뒤집힘 — 여기에는 "④는 무료라고 화면이 말해야 한다"는 단정이 있었다.
+  //   사장님이 값·크레딧을 말하는 문구를 **전부 빼라**고 했다("버튼 옆에 붙는 설명 전부 제거").
+  //   값을 말하는 자리는 실제로 돈이 나가는 ⑤영상 하나로 모았다. 그래서 이 단정은 지운다 —
+  //   남겨 두면 지시와 정반대인 문구를 테스트가 강제한다.
 });
 
 // ────────────────────────────────────────────────────────────────────────
@@ -71,8 +70,12 @@ describe("영상 프롬프트 화면", () => {
 describe("A2 — 굽기 게이트는 그림까지 본다", () => {
   const video = read("app/reel/[id]/video/page.js");
 
-  it("video 화면이 canBakeReelClips 를 부른다 — isPromptsReady 하나만 보지 않는다", () => {
-    expect(video).toContain("canBakeReelClips");
+  // ★★ 2026-08-25 — 이름이 canBakeReel 로 넓어졌다(lib/reel/oneshot.js). 굽기 갈래가
+  //   둘이 되면서(통짜 15초 이하 · 컷별) 게이트도 갈래를 봐야 하는데, **컷별 갈래에서는
+  //   canBakeReelClips 를 글자 그대로 부른다** — A2 가 지키려던 것(프롬프트뿐 아니라
+  //   그림까지 본다)은 그대로다. tests/reel-oneshot.test.js 가 그 위임을 값으로 잰다.
+  it("video 화면이 canBakeReel 을 부른다 — isPromptsReady 하나만 보지 않는다", () => {
+    expect(video).toContain("canBakeReel");
   });
 });
 
@@ -114,5 +117,19 @@ describe("화질 고르기", () => {
 
   it("광고 가격표를 쓰지 않는다", () => {
     expect(nw).not.toContain("adVideoPrice");
+  });
+});
+
+describe("①입력 — 시작 버튼", () => {
+  // ★ "무료" 배지를 뗄다(2026-08-25 사장님 지시).
+  //   이 단계가 실제로 공짜인 것은 맞지만, 시작 버튼에 값 배지를 달면
+  //   그 뒤 단계들까지 공짜인 것처럼 읽힌다 — 돈이 나가는 곳은 ④그림·⑤영상이다.
+  // ★ 줄로 안 가르고 **주변 문자열**로 재다 — heredoc 에서 역슬래시가 먹혀
+  //   개행 리터럴이 깨진다(CLAUDE.md 경고. 이번에 세 번 밟았다).
+  it("시작하기에 무료 배지가 없다", () => {
+    const src = stripComments(read("app/reel/new/page.js"));
+    const at = src.indexOf("시작하기");
+    expect(at, "시작하기를 못 찾았다").toBeGreaterThan(-1);
+    expect(src.slice(at, at + 140)).not.toContain("무료");
   });
 });
