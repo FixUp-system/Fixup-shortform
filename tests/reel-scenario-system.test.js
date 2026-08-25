@@ -6,7 +6,7 @@
 //   buildScenarioMessages 가 실제로 내는 system 문자열을 본다.
 import { describe, it, expect } from "vitest";
 import { buildScenarioMessages, generateScenario } from "../lib/ad/scenario.js";
-import { reelSceneCountRule } from "../lib/reel/scenario-rules.js";
+import { reelSceneCountRule, reelCutChoicesFor } from "../lib/reel/scenario-rules.js";
 import { readFileSync } from "fs";
 
 const project = {
@@ -21,7 +21,9 @@ describe("장면 수 규칙 주입", () => {
   it("reel 규칙을 넘기면 system 이 그것을 말한다", () => {
     const { system } = buildScenarioMessages(project, { sceneCountRule: reelSceneCountRule(45) });
     expect(system).toContain("쓸 수 있는 장면 수는");
-    expect(system).toContain("3 · 4 · 6 · 9 · 10 · 12 · 16");
+    // ★ 목록을 손으로 적지 않는다 — 화질이 정하므로(2026-08-25) 여기 박으면 화질을
+    //   바꾸는 날 이 단정만 낡는다.
+    expect(system).toContain(reelCutChoicesFor("720p").join(" · "));
   });
 
   it("reel 규칙을 넘기면 광고의 '넷을 넘기지 마라' 가 사라진다", () => {
@@ -53,7 +55,7 @@ describe("generateScenario 가 규칙을 실제로 싣는다", () => {
         },
       },
     });
-    expect(seen).toContain("3 · 4 · 6 · 9 · 10 · 12 · 16");
+    expect(seen).toContain(reelCutChoicesFor("720p").join(" · "));
     expect(seen).not.toContain("넷을 넘기지 마라");
   });
 });

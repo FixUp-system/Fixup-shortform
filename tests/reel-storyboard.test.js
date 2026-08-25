@@ -12,6 +12,7 @@
 //   4) 저장(saveStoryboardCells) — **우리 바이트**가 어디로 가고 어떤 URL 이 되는가
 //   5) 굽기로 넘어가는 길(toFalImageUrl) — 비공개 URL 은 fal 이 못 읽는다 → data URI
 import { describe, it, expect } from "vitest";
+import { reelCutChoicesFor } from "../lib/reel/scenario-rules.js";
 import sharp from "sharp";
 import {
   planReelImages, storyboardGridFor, storyboardImageSize, buildStoryboardPrompt,
@@ -36,20 +37,32 @@ describe("planReelImages — 한 장인가 컷별인가", () => {
   it("격자에 떨어지는 칸 수 + 아무것도 안 그려졌으면 스토리보드 한 장이다", () => {
     const plan = planReelImages(cutsOf(9));
     expect(plan.mode).toBe("storyboard");
-    expect(plan.grid).toEqual({ rows: 3, cols: 3, canvas: "9:16" });
+    // ★ 2026-08-25 — canvas 는 프리셋 이름이 아니라 **실제 치수 비**다(격자를 계산으로
+    //   바꾸면서). rows·cols 가 계약이고, canvas 는 nano 갈래로 되돌아갈 때의 참고값이다.
+    expect({ rows: plan.grid.rows, cols: plan.grid.cols }).toEqual({ rows: 3, cols: 3 });
     expect(plan.targets).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
   });
 
-  it("격자 목록(3·4·6·9·10·12·16) 전부가 한 장으로 간다", () => {
-    for (const n of [3, 4, 6, 9, 10, 12, 16]) {
-      expect(planReelImages(cutsOf(n)).mode).toBe("storyboard");
+  // ★★ 2026-08-25 — 목록이 **화질마다 다르다**(reelCutChoicesFor). 기본(720p)에서는
+  //   5·8·15 가 새로 열렸고 16 이 빠졌다 — 16 은 720p 칸(1280)을 어떻게 배치해도
+  //   상한 3840 을 넘는다.
+  it("그 화질이 여는 칸 수 전부가 한 장으로 간다", () => {
+    for (const n of reelCutChoicesFor("720p")) {
+      expect(planReelImages(cutsOf(n), null, { resolution: "720p" }).mode, `${n}컷`).toBe("storyboard");
     }
   });
 
+  it("★ 화질이 넓으면 더 많이 열린다 — 480p 는 16컷도 한 장이다", () => {
+    expect(planReelImages(cutsOf(16), null, { resolution: "480p" }).mode).toBe("storyboard");
+    expect(planReelImages(cutsOf(16), null, { resolution: "720p" }).mode).toBe("percut");
+  });
+
   // ★★ 완료 기준 2 — 던지지 않는다. 격자가 없으면 예전 방식(컷별)이 그대로 산다.
-  it("★ 격자 밖 칸 수(5·7·8·11)는 컷별로 떨어진다 — 던지지 않는다", () => {
-    for (const n of [5, 7, 8, 11, 13]) {
-      const plan = planReelImages(cutsOf(n));
+  // ★ 빈 칸이 생기는 수(7·11·13·14)는 **아직 안 연다**(사장님 결정: "빈칸이 없는 것만").
+  //   그때는 예전처럼 컷별로 떨어진다 — 던지지 않는다.
+  it("★ 아직 안 여는 칸 수는 컷별로 떨어진다 — 던지지 않는다", () => {
+    for (const n of [7, 11, 13, 14]) {
+      const plan = planReelImages(cutsOf(n), null, { resolution: "720p" });
       expect(plan.mode).toBe("percut");
       expect(plan.grid).toBe(null);
       expect(plan.targets).toHaveLength(n);
@@ -85,9 +98,11 @@ describe("planReelImages — 한 장인가 컷별인가", () => {
     expect(planReelImages([])).toEqual({ mode: "percut", grid: null, targets: [] });
   });
 
-  it("storyboardGridFor 는 표(REEL_GRIDS) 하나만 본다 — 판정을 새로 만들지 않는다", () => {
-    expect(storyboardGridFor(6)).toEqual({ rows: 2, cols: 3, canvas: "4:5" });
-    expect(storyboardGridFor(7)).toBe(null);
+  it("storyboardGridFor 는 계산 하나만 본다 — 판정을 새로 만들지 않는다", () => {
+    const g = storyboardGridFor(6, { resolution: "720p" });
+    expect(g.rows * g.cols).toBe(6);
+    // 빈 칸이 생기는 수는 아직 안 연다.
+    expect(storyboardGridFor(7, { resolution: "720p" })).toBe(null);
   });
 });
 
@@ -104,8 +119,10 @@ describe("storyboardImageSize — 칸 하나가 굽기 해상도가 되도록", 
   });
 
   it("긴 변 3840 을 넘지 않는다 — 넘으면 비율을 지킨 채 줄인다", () => {
-    for (const n of [3, 4, 6, 9, 10, 12, 16]) {
-      const { width, height } = storyboardImageSize(storyboardGridFor(n));
+    // ★ 2026-08-25 — 목록을 손으로 적지 않는다. 화질이 여는 칸 수를 그대로 돈다
+    //   (720p 는 16 을 아예 안 열므로 옛 목록을 그대로 두면 없는 격자를 재게 된다).
+    for (const n of reelCutChoicesFor("720p")) {
+      const { width, height } = storyboardImageSize(storyboardGridFor(n, { resolution: "720p" }), "9:16", "720p");
       expect(Math.max(width, height)).toBeLessThanOrEqual(3840);
       expect(width % 8).toBe(0);
       expect(height % 8).toBe(0);

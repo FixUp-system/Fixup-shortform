@@ -13,7 +13,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { ASPECTS, DEFAULT_ASPECT_ID } from "../lib/aspects.js";
 import { storyboardImageSize } from "../lib/reel/storyboard.js";
-import { REEL_GRIDS, reelCutChoices } from "../lib/reel/scenario-rules.js";
+import { reelGridFor, reelCutChoicesFor } from "../lib/reel/scenario-rules.js";
 
 const strip = (src) =>
   src
@@ -71,34 +71,33 @@ describe("격자는 비율마다 성립한다 — 열기 전에 실제로 잰다
   // ★★ 이것이 이 변경의 유일한 진짜 위험이었다. REEL_GRIDS 는 "칸이 9:16 일 때" 를
   //   전제로 전수조사한 표라, 다른 비율에서 칸이 깨지면 통짜 갈래의 근거가 무너진다.
   //   재 보니 성립한다 — 치수가 비율에서 나오기 때문이다(storyboardImageSize).
-  it("어느 비율에서도 캔버스가 모델 상한(3840) 안에 든다", () => {
+  it("어느 비율·화질에서도 캔버스가 모델 상한(3840) 안에 든다", () => {
     for (const a of ASPECTS) {
-      for (const n of reelCutChoices()) {
-        const { width, height } = storyboardImageSize(REEL_GRIDS[n], a.id);
-        expect(Math.max(width, height), `${a.id} ${n}칸이 상한을 넘는다`).toBeLessThanOrEqual(3840);
+      for (const res of ["480p", "720p", "1080p"]) {
+        for (const n of reelCutChoicesFor(res, a.id)) {
+          const g = reelGridFor(n, { resolution: res, aspect: a.id });
+          const { width, height } = storyboardImageSize(g, a.id, res);
+          expect(Math.max(width, height), `${a.id} ${res} ${n}칸이 상한을 넘는다`).toBeLessThanOrEqual(3840);
+        }
       }
     }
   });
 
-  // ★★ **실측이 잡은 것** — 세로(9:16)는 어느 칸 수에서도 480p(긴 변 854)를 채우는데,
-  //   정사각·가로에서는 **10칸만** 768px 로 못 채운다(2×5 격자가 캔버스 상한 3840 에
-  //   걸려 줄어든다). 720p(1280)는 원래 9:16 에서도 16칸이 960 이라 못 채웠다 —
-  //   즉 새로 생긴 구멍이 아니라 **한 칸 넓어진 것**이다.
-  // ★ 막지 않고 적어 둔다: 칸이 굽기 해상도보다 작으면 화질이 깎일 뿐 깨지지는 않고,
-  //   칸 수는 LLM 이 고르므로 10칸이 늘 나오는 것도 아니다. 막으려면 비율마다 칸 수를
-  //   거르는 자리가 필요한데, 그것은 지금 요구가 아니다.
-  const SHORT_AT_480 = { "1:1": [10], "16:9": [10], "9:16": [] };
-
-  it("★ 480p 미달은 **정사각·가로의 10칸 하나뿐**이다 — 그 밖에는 다 확보된다", () => {
+  // ★★ 2026-08-25 — 옛 단정은 **결함을 기록한 것**이었다: 정사각·가로에서 10칸만 칸이
+  //   768px 로 480p(854)에 못 미쳤다. 격자를 계산으로 바꾸면서 **그 결함 자체가 사라졌다**
+  //   — 담기지 않는 칸 수는 애초에 목록에 안 들어간다. 그래서 단정을 뒤집는다:
+  //   "미달이 이만큼 있다"가 아니라 **"미달이 없다"** 를 잰다.
+  it("★★ 어느 비율·화질에서도 칸이 굽기 해상도 이상이다 — 미달이 0 이다", () => {
+    const NEED = { "480p": 854, "720p": 1280, "1080p": 1920 };
     for (const a of ASPECTS) {
-      const short = [];
-      for (const n of reelCutChoices()) {
-        const g = REEL_GRIDS[n];
-        const { width, height } = storyboardImageSize(g, a.id);
-        const cellLong = Math.max(Math.round(width / g.cols), Math.round(height / g.rows));
-        if (cellLong < 854) short.push(n);
+      for (const [res, need] of Object.entries(NEED)) {
+        for (const n of reelCutChoicesFor(res, a.id)) {
+          const g = reelGridFor(n, { resolution: res, aspect: a.id });
+          const { width, height } = storyboardImageSize(g, a.id, res);
+          const cellLong = Math.max(Math.round(width / g.cols), Math.round(height / g.rows));
+          expect(cellLong, `${a.id} ${res} ${n}칸의 칸이 굽기보다 작다`).toBeGreaterThanOrEqual(need - 8);
+        }
       }
-      expect(short, `${a.id} 의 480p 미달 칸 수가 달라졌다`).toEqual(SHORT_AT_480[a.id]);
     }
   });
 });

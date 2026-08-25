@@ -173,7 +173,13 @@ export const POST = withUser(async (req, { params }, user) => {
       project: seen,
       edits,
       note,
-      sceneCountRule: reelSceneCountRule(seen?.settings?.seconds),
+      // ★ 화질이 담을 수 있는 칸 수를 정한다(2026-08-25) — 480p 32컷 · 720p 15컷 ·
+      //   1080p 6컷. 안 넘기면 720p 로 재서 1080p 프로젝트에 못 담는 수를 권한다.
+      sceneCountRule: reelSceneCountRule(
+        seen?.settings?.seconds,
+        seen?.settings?.resolution,
+        seen?.settings?.aspect_ratio,
+      ),
       // ★★ 컨셉 — 사장님이 고른 큰 범주가 여기서 **구성 한 줄**이 된다
       //   (2026-08-25, lib/reel/concepts.js). [알아서]면 null 이라 그 줄이 아예 안 실리고,
       //   그때는 모델이 소재를 읽고 스스로 구성한다.

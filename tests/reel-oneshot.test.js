@@ -54,7 +54,8 @@ describe("갈래 판정 — planReelBake", () => {
     const p = planReelBake(doc());
     expect(p.mode).toBe("oneshot");
     expect(p.sheet).toBe("https://fal/sheet.png");
-    expect(p.grid).toEqual({ rows: 1, cols: 3, canvas: "16:9" });
+    // ★ 2026-08-25 — canvas 는 프리셋 이름이 아니라 실제 치수 비다(격자가 계산이 됐다).
+    expect({ rows: p.grid.rows, cols: p.grid.cols }).toEqual({ rows: 1, cols: 3 });
     expect(p.seconds).toBe(15);
   });
 
@@ -69,10 +70,13 @@ describe("갈래 판정 — planReelBake", () => {
     expect(planReelBake(d).mode).toBe("percut");
   });
 
-  it("칸 수가 격자 표 밖이면 컷별이다 — 던지지 않는다", () => {
+  it("★ 안 여는 칸 수면 컷별이다 — 던지지 않는다", () => {
     const d = doc();
-    d.cuts = [cut(0), cut(1)];
+    d.cuts = [cut(0), cut(1)];          // 2컷 — 하한(3) 아래라 안 연다
     expect(planReelBake(d).mode).toBe("percut");
+    const d7 = doc();
+    d7.cuts = [0, 1, 2, 3, 4, 5, 6].map(cut);  // 7컷 — 빈 칸이 생겨 아직 안 연다
+    expect(planReelBake(d7).mode).toBe("percut");
   });
 
   it("컷이 없으면 컷별이다 — 0개를 굽고 완성이 되지 않는다", () => {
@@ -84,9 +88,10 @@ describe("갈래 판정 — planReelBake", () => {
     expect(planReelBake({}).mode).toBe("percut");
   });
 
-  it("격자 판정은 표(REEL_GRIDS) 하나다 — 여기서 새로 만들지 않는다", () => {
-    expect(storyboardGridFor(9)).toEqual({ rows: 3, cols: 3, canvas: "9:16" });
-    expect(storyboardGridFor(7)).toBe(null);
+  it("격자 판정은 계산 하나다 — 여기서 새로 만들지 않는다", () => {
+    const g = storyboardGridFor(9, { resolution: "720p" });
+    expect({ rows: g.rows, cols: g.cols }).toEqual({ rows: 3, cols: 3 });
+    expect(storyboardGridFor(7, { resolution: "720p" })).toBe(null);
   });
 });
 

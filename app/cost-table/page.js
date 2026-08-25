@@ -97,14 +97,6 @@ export default function CostTablePage() {
           환율 1달러 = {USD_KRW.toLocaleString("ko-KR")}원 ({RATE_AT} 기준). 참고용이라 실제 청구 시점의 환율과 달라요.
         </p>
       </section>
-
-      <section className="panel panel--wide">
-        <h2>표에 안 들어간 것</h2>
-        <p className="pgsub">
-          시나리오를 쓰는 값과 자막 시각을 재는 값은 합쳐도 편당 100원이 안 돼서 뺐어요.
-          그림을 다시 만들면 이미지값이 그만큼 또 들어요.
-        </p>
-      </section>
     </>
   );
 }

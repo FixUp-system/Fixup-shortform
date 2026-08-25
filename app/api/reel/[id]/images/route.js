@@ -57,7 +57,12 @@ export const POST = withUser(async (req, { params }, user) => {
   }
 
   // 갈래와 대상은 순수 함수 하나가 정한다 — 라우트가 손으로 다시 세면 화면·측정과 갈린다.
-  const plan = planReelImages(cuts, only);
+  // ★ 격자는 **이 프로젝트의 화질·비율**로 잰다(2026-08-25) — 720p 로 고정해 재면
+  //   480p 가 담을 수 있는 칸 수를 놓치고, 1080p 는 못 담는 수를 담긴다고 잘못 읽는다.
+  const plan = planReelImages(cuts, only, {
+    resolution: resolutionForProject(project),
+    aspect: project.settings?.aspect_ratio,
+  });
   const targets = new Set(plan.targets);
 
   const reel = reelOf(project);
@@ -147,7 +152,7 @@ export const POST = withUser(async (req, { params }, user) => {
         projectId: id,
         resolution,
         refs,
-        imageSize: storyboardImageSize(plan.grid, aspect_ratio),
+        imageSize: storyboardImageSize(plan.grid, aspect_ratio, resolutionForProject(project)),
       });
       // 여기서부터는 **우리 바이트**다 — 내려받아 자르고 우리 버킷에 둔다.
       // 어디에 왜 두는지는 lib/reel/storyboard.js 의 saveStoryboardCells 머리말에 있다.
