@@ -4,8 +4,7 @@ import { ownedPhotoKeys } from "../../../lib/refs-io.js";
 import { withUser } from "../../../lib/auth/require-user.js";
 import { MAX_PHOTOS } from "../../../lib/photos.js";
 import { MAX_MATERIAL_TEXT } from "../../../lib/material.js";
-import { DEFAULT_I2V_MODEL, isResolutionFor } from "../../../lib/clip-limits.js";
-import { TARGET_CHOICES } from "../../../lib/script.js";
+import { DEFAULT_I2V_MODEL, isResolutionFor, secondsForModel } from "../../../lib/clip-limits.js";
 import { normalizeAdOptions } from "../../../lib/ad/options.js";
 import { normalizeReelConcept } from "../../../lib/reel/concepts.js";
 import { isSubtitleLang, DEFAULT_SPEECH_LANG } from "../../../lib/subtitle-langs.js";
@@ -28,8 +27,15 @@ export const POST = withUser(async (req, _ctx, user) => {
   //   판다). 옛 단계별 흐름(app/api/projects/route.js)은 안 고르면 null 을 허용하지만
   //   그건 원고 길이로 추정하는 대체 경로가 있어서다 — reel 에는 그 대체가 없으므로
   //   여기서는 **명시로 요구한다**(조용히 접는 방향이 늘 비싼 쪽이라는 이 저장소의 규칙).
+  // ★★ 2026-08-25 — 길이는 **모델이 정한다**(사장님 지시: "각 모델이 제공하는 영상
+  //   길이만큼만. 2.0 은 15초가 한계이니까 15초 이내로"). 그전에는 TARGET_CHOICES
+  //   (15·30·45·60)를 모델과 무관하게 받아서, 한 번에 15초가 최대인 모델에 60초가
+  //   들어올 수 있었다.
+  // ★ 화면과 **같은 함수**를 본다(secondsForModel). 한쪽만 좁히면 화면 밖에서 뚫린다 —
+  //   이 저장소가 "화면은 통과시키는데 서버가 400" 을 여러 번 겪은 그 자리의 반대편이다.
+  // ★ 모델은 서버가 박는다(DEFAULT_I2V_MODEL) — 그래서 여기서도 그 값으로 잰다.
   const target = body?.settings?.target_seconds;
-  if (!TARGET_CHOICES.includes(target)) {
+  if (!secondsForModel(DEFAULT_I2V_MODEL).includes(target)) {
     return Response.json({ error: "영상 길이를 골라 주세요" }, { status: 400 });
   }
 

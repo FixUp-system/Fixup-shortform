@@ -35,11 +35,10 @@ import { AD_MOODS, AD_LANGS, AD_STYLE_LINES, DEFAULT_AD_OPTIONS } from "../../..
 //   ★ 광고 화면(app/ads/new)은 여전히 AD_FORMATS 를 쓴다 — 그 흐름은 남겨 둔다.
 import { REEL_CONCEPTS, DEFAULT_REEL_CONCEPT } from "../../../lib/reel/concepts";
 import { STYLE_PRESETS } from "../../../lib/styles";
-import { TARGET_CHOICES } from "../../../lib/script";
 // 모델은 서버가 박는다(DEFAULT_I2V_MODEL) — 화면은 그 모델이 여는 해상도 목록만 읽는다
 // (resolutionsForModel). isResolutionFor 는 라우트와 같은 판정이라 여기서는 안 쓴다(화면은
 // 목록에서 고르므로 애초에 모르는 값이 안 생긴다 — 검증은 서버 몫).
-import { resolutionsForModel, DEFAULT_I2V_MODEL, DEFAULT_RESOLUTION } from "../../../lib/clip-limits";
+import { resolutionsForModel, secondsForModel, DEFAULT_I2V_MODEL, DEFAULT_RESOLUTION } from "../../../lib/clip-limits";
 // ★★ 이 화면은 **값을 한 글자도 말하지 않는다**(2026-08-25 사장님 지시). 예전에는 길이·화질
 //   칩 뒤에 크레딧이 붙었다(화질 쪽은 길이를 고른 뒤에만 나타났다) — 둘 다 뗐고, 그것을
 //   설명하던 문구("정가가 길이·화질에서 나와요", "화질이 정가를 바꿔요")도 같이 뺐다.
@@ -243,7 +242,7 @@ export default function ReelNewPage() {
               <span className="tray-label">길이</span>
               <div className="tray-col">
                 <div className="chips">
-                  {TARGET_CHOICES.map((s) => (
+                  {secondsForModel(DEFAULT_I2V_MODEL).map((s) => (
                     <button key={s} className={`chip${target === s ? " on" : ""}`}
                       disabled={locked} onClick={() => setTarget(s)}>
                       {/* ★ 크레딧 표기를 뗐다(2026-08-25 사장님 지시 — "일단 제거"). */}
