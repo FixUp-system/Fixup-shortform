@@ -155,30 +155,25 @@ export default function ReelDonePage() {
         />
       )}
 
+      {/* ★★ 실행줄은 **하나다**(2026-08-25 사장님 지시). 예전에는 [이대로 완성하기]가
+          자기 줄을 따로 갖고 그 아래에 [이전으로] 줄이 또 있었다 — 줄이 둘이면 어느
+          것이 이 화면의 맨 아래인지 흐려진다. 왼쪽 끝이 [이전으로], 오른쪽이 실행이다.
+          ★ 이 줄은 **항상** 그린다 — 아직 영상을 못 만든 사장님에게도 돌아갈 길이 있어야 한다. */}
       <div className="step-actions">
+        <ReelBack step="done" id={id} />
         <div className="fwd">
           {/* ★ 남긴 것은 하나다 — 고친 자막이 아직 영상에 안 들어갔다는 사실.
               이건 설명이 아니라 **모르면 고친 것을 잃는** 경고다.
-              값이나 안쪽 사정(무료·컷을 잉는다)은 버튼 옆에서 설명하지 않는다(2026-08-25). */}
+              값이나 안쪽 사정(무료·컷을 잇는다)은 버튼 옆에서 설명하지 않는다(2026-08-25). */}
           {dirty && !rendering && (
-            <span className="hint">고친 자막은 아래 버튼을 눌러야 영상에 들어가요</span>
+            <span className="hint">고친 자막은 옆 버튼을 눌러야 영상에 들어가요</span>
           )}
           <button className="cta" disabled={rendering || !!busy || !hasClips} onClick={startRender}>
-            {busy === "render" ? "시작하는 중…" : reel.video?.url ? "다시 만들기 →" : "이대로 완성하기 →"}
+            {/* ★ 화살표를 안 붙인다 — 다음 화면으로 가는 버튼이 아니라 굽는 버튼이다. */}
+            {busy === "render" ? "시작하는 중…" : reel.video?.url ? "다시 만들기" : "이대로 완성하기"}
           </button>
+          {reel.video?.url && <Link className="cta" href="/archive">보관함으로 →</Link>}
         </div>
-      </div>
-
-      {/* ★ 이 줄은 **항상** 그린다 — [이전으로]가 이 화면의 맨 아래 왼쪽 끝이라서다
-          (2026-08-25 사장님 지시). 예전에는 영상이 있을 때만 그려서, 아직 못 만든
-          사장님에게는 돌아갈 길이 위쪽 줄에 섞여 있었다. */}
-      <div className="step-actions">
-        <ReelBack step="done" id={id} />
-        {reel.video?.url && (
-          <div className="fwd">
-            <Link className="cta" href="/archive">보관함으로 →</Link>
-          </div>
-        )}
       </div>
     </section>
   );

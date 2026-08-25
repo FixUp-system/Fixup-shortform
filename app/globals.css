@@ -375,7 +375,11 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
 /* 프롬프트 칸 안의 [고치기] — **칸 오른쪽 아래**다(2026-08-25 사장님 지시).
    실행줄(.step-actions)로 내보내면 "이 칸을 고치는 일"이 아니라 "다음으로 가는 일"처럼
    읽힌다. 고치는 버튼은 고칠 대상 안에 있어야 한다. */
-.note-act { display: flex; justify-content: flex-end; margin-top: var(--sp-3); }
+.note-act { display: flex; align-items: center; gap: var(--sp-3); justify-content: flex-end; margin-top: var(--sp-3); }
+/* ★ 안내문은 버튼 **바로 왼쪽**이다(2026-08-25 사장님 지시 — 줄의 왼쪽 끝이 아니다).
+   둘이 같이 오른쪽으로 붙어 한 덩어리로 읽힌다 — 띄워 놓으면 안내가 버튼과
+   상관없는 말처럼 보인다. */
+.note-act .note-hint { margin: 0; text-align: right; }
 
 .step-actions {
   display: flex;

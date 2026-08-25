@@ -48,22 +48,9 @@ export default function ReelPromptsPage() {
     setSaving("");
   }
 
-  // 전체 프롬프트 저장 — **idx 를 안 보낸다.** 그것이 "한 편 전체"라는 뜻이고,
-  // 라우트는 그때 reel.prompt 에 적는다(시나리오 원문은 안 덮는다).
-  async function saveWhole(body) {
-    setSaving("whole"); setErr("");
-    const res = await fetch(`/api/reel/${id}/prompts`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) setErr(data.error || "저장하지 못했어요");
-    await reload(id).catch((e) => setErr(e.message));
-    // ★ 보낸 뒤에는 비운다 — 남아 있으면 다음에 또 누를 때 같은 말이 두 번 붙는다.
-    setNote("");
-    setSaving("");
-  }
+  // ★ 전체 프롬프트를 **손으로 고쳐 저장하는** 길(PATCH, idx 없음)은 라우트에 그대로
+  //   있지만 이 화면은 안 쓴다 — 여기서는 읽는 글로 보여 주고 고치는 것은 한국어 요청
+  //   하나로 받는다(applyNote). 죽은 함수를 남겨 두면 다음 사람이 어느 쪽이 진짜인지 모른다.
 
   // 단위는 **전체 한 번**이다 — 컷 하나만 손보는 것은 위 직접 편집(textarea)이 맡는다.
   async function makeAll() {
@@ -87,17 +74,31 @@ export default function ReelPromptsPage() {
     setSaving("");
   }
 
-  // 통짜 갈래의 [이대로 고치기] — **LLM 을 안 부른다.** 이 갈래의 프롬프트는 시나리오
-  // 원문 그대로라 다시 쓸 것이 없다. 적은 말을 전체 프롬프트 끝에 붙여 저장하면 그것이
-  // 그대로 굽기에 나가고, 위 글(.script-src)에도 그대로 보인다. 0원이다.
+  // 통짜 갈래의 [이대로 고치기] — 적은 말을 반영해 **전체 프롬프트를 다시 쓴다**.
   //
-  // ⚠️ 여기서 makeAll(POST /prompts) 을 부르면 안 된다 — 그것은 **컷별** 지문을 LLM 으로
-  //   다시 쓰는 문이고, 통짜 굽기는 컷별 지문을 아예 안 읽는다. 값(LLM 호출)은 나가는데
-  //   사장님이 적은 말은 완성될 영상에 한 글자도 안 닿는다.
-  function applyNote() {
+  // ★★ 2026-08-25 사장님 지적으로 바뀐 자리다. 예전에는 LLM 을 안 부르고 적은 말을 전체
+  //   프롬프트 **끝에 글자 그대로 붙였다**(0원). 그런데 붙인 한국어가 위 글(.script-src)에
+  //   그대로 보였다 — "붙고 나면 위 글에 그대로 보여요. 삭제."
+  //   지금은 라우트가 LLM 으로 한 문단을 다시 써서 그 자리를 **대체한다**(붙는 자리가 없다).
+  //
+  // ⚠️ 여기서 makeAll 을 부르면 안 된다 — 그것은 **컷별** 지문을 다시 쓰는 문이고,
+  //   통짜 굽기는 컷별 지문을 아예 안 읽는다. 값은 나가는데 적은 말이 영상에 안 닿는다.
+  //   그래서 같은 POST 라도 `whole: true` 로 **다른 문**을 연다.
+  async function applyNote() {
     const ask = note.trim();
     if (!ask) return;
-    saveWhole([whole, ask].join("\n\n"));
+    setSaving("whole"); setErr("");
+    const res = await fetch(`/api/reel/${id}/prompts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ whole: true, note: ask }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) setErr(data.error || "프롬프트를 다시 쓰지 못했어요");
+    await reload(id).catch((e) => setErr(e.message));
+    // ★ 성공했을 때만 비운다 — 실패했는데 지우면 사장님이 적은 말이 사라진다.
+    if (res.ok) setNote("");
+    setSaving("");
   }
 
   async function rewrite(idx) {
@@ -157,8 +158,9 @@ export default function ReelPromptsPage() {
               onChange={(e) => setNote(e.target.value)}
               placeholder="고치고 싶은 것을 적어 주세요 — 예) 카메라를 더 천천히 움직여 줘"
             />
-            <p className="pgsub">적은 말이 전체 프롬프트 끝에 붙어요 — 붙고 나면 위 글에 그대로 보여요.</p>
+            {/* ★ 안내문은 버튼 바로 왼쪽이다(②③와 같은 모양). */}
             <div className="note-act">
+              <p className="pgsub note-hint">적은 말을 반영해 위 글을 다시 써요.</p>
               {saving === "whole" ? (
                 <p className="pgsub">고치는 중…</p>
               ) : (

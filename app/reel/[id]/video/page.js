@@ -25,6 +25,8 @@ export default function ReelVideoPage() {
   // ★ 사장님이 한국어로 적는 수정 요청 — ②③④와 같은 모양이다.
   const [note, setNote] = useState("");
   const [err, setErr] = useState("");
+  // 큰 재생기에 트는 컷 번호(컷별 갈래에서만 쓴다). null 이면 첫 완성 컷이다.
+  const [playIdx, setPlayIdx] = useState(null);
   // 상태 라우트가 준 마지막 응답. 문서(GET /api/reel/[id])보다 최신이다 — 폴링이 두드릴
   // 때마다 상태 라우트가 그 사이 완성된 컷을 이미 읽었을 수 있어서다.
   const [live, setLive] = useState(null);
@@ -61,21 +63,27 @@ export default function ReelVideoPage() {
   // 화면이 먼저 잠그는 이유는 사장님이 400/409 를 보기 전에 못 누르게 하는 것이다.
   async function startClips() {
     setBusy("clips"); setErr("");
-    // ★★ 수정 요청이 적혀 있으면 **굽기 전에 전체 프롬프트에 반영한다**(2026-08-25).
-    //   ④가 쓰는 것과 같은 문이다(PATCH /prompts, idx 없으면 전체). 그래야
-    //   굽기가 새 지문을 쓰고, 각인(video.of)도 그 값을 따라 난음 판정이 맞는다.
-    // ★ 저장이 실패하면 **굽지 않는다** — 사장님이 적은 말이 한 글자도 안 닿은 채
-    //   돈이 나가는 것을 막는다(⑥의 저장→합성 순서와 같은 규율).
+    // ★★ 수정 요청이 적혀 있으면 **굽기 전에 프롬프트에 반영한다**(2026-08-25).
+    //   ④가 쓰는 것과 **같은 문**이다(POST /prompts). 그래야 굽기가 새 지문을 쓰고,
+    //   각인(video.of)도 그 값을 따라 낡음 판정이 맞는다.
+    // ★★ 예전에는 적은 말을 전체 프롬프트 **끝에 글자 그대로 붙였다**. 붙인 한국어가
+    //   ④의 위 글에 그대로 보여 사장님이 지웠다("삭제") — 지금은 LLM 이 다시 쓴다.
+    // ★ 갈래마다 고칠 자리가 다르다: 통짜는 **한 벌 전체**(whole), 컷별은 **모든 컷의
+    //   지문**(only 에 전 컷). 컷별에서 whole 로 보내면 굽기가 안 읽는 자리에 적히고,
+    //   값은 나가는데 적은 말이 영상에 한 글자도 안 닿는다.
+    // ★ 반영이 실패하면 **굽지 않는다** — 적은 말이 안 닿은 채 돈이 나가는 것을 막는다.
     const ask = note.trim();
     if (ask) {
       const saved = await fetch(`/api/reel/${id}/prompts`, {
-        method: "PATCH",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body: [wholePrompt, ask].join("\n\n") }),
+        body: JSON.stringify(
+          oneShot ? { whole: true, note: ask } : { only: cuts.map((_, i) => i), note: ask }
+        ),
       });
       if (!saved.ok) {
         const d = await saved.json().catch(() => ({}));
-        setErr(d.error || "수정 요청을 저장하지 못했어요");
+        setErr(d.error || "수정 요청을 반영하지 못했어요");
         setBusy("");
         return;
       }
@@ -117,6 +125,12 @@ export default function ReelVideoPage() {
   const promptsStep = REEL_STEPS.find((s) => s.key === "prompts");
   const doneStep = REEL_STEPS.find((s) => s.key === "done");
 
+  // 큰 자리에서 트는 것 — 통짜는 늘 그 한 편, 컷별은 사장님이 고른 컷(없으면 첫 완성 컷).
+  // ★ 번호를 쥐고 객체를 안 쥔다 — 폴링이 새 문서를 주면 옛 객체는 낡은 주소를 가리킨다.
+  const playing = oneShot
+    ? cuts[0]
+    : (cuts.find((c) => c.idx === playIdx && c.video?.url) || cuts.find((c) => c.video?.url));
+
   return (
     <section className="panel panel--wide">
       <h2>영상</h2>
@@ -130,20 +144,56 @@ export default function ReelVideoPage() {
       </p>
       {err && <p className="pgsub warn">{err}</p>}
       {(live?.error || reel.error) && <p className="pgsub warn">{live?.error || reel.error}</p>}
+      {/* ★★ 굽는 동안 **되고 있다는 것이 보여야 한다**(2026-08-25 사장님 지시:
+          "영상 생성 같은 경우에는 시간이 오래걸리기 때문에 꼭 필요한 작업이야").
+          한 줄짜리 안내만 두면 멈춘 것과 구별이 안 된다 — 도는 표시와 함께 **어디까지
+          왔는지**를 같이 말한다.
+          ★ 통짜 갈래는 "컷 n/m"이 거짓말이다 — 한 번에 한 편을 굽는다.
+          ⚠️ 이 화면의 상태 라우트는 progress·stalled_for_ms 를 안 싣는다
+          (app/api/reel/[id]/status/route.js 의 계약). 그래서 단계별 흐름처럼 "멈춘 것
+          같아요"까지는 못 가른다 — 실어 보내게 되면 그때 generationState 로 옮긴다. */}
       {rendering && (
-        <p className="pgsub">영상을 만드는 중이에요 — 다 되면 여기에 나타나요.</p>
+        <p className="pgsub">
+          <span className="spinner" aria-hidden="true" />{" "}
+          {oneShot
+            ? "한 편을 통째로 굽고 있어요 — 몇 분 걸려요. 다 되면 여기에 나타나요."
+            : `컷 ${doneCount}/${cuts.length} 만드는 중이에요 — 다 되면 여기에 나타나요.`}
+        </p>
       )}
 
-      {/* 통짜 갈래 — 보여 줄 것이 **한 편**이다(굽기 전에는 스토리보드 원본). */}
+      {/* 통짜 갈래 — 보여 줄 것이 **한 편**이다(굽기 전에는 스토리보드 원본).
+          ★★ 만든 영상은 **볼 수 있어야 한다**(2026-08-25 사장님 지시). 예전에는
+          muted·loop 에 controls 가 없어 첫 프레임만 박힌 그림처럼 서 있었다 — 만들어
+          놓고 ⑥까지 가야 볼 수 있었다. 이제 여기서 바로 재생한다.
+          ★ 자동재생은 안 건다 — 소리가 있는 영상이라 화면에 들어서자마자 울린다. */}
+      {/* ★ 만들어진 영상은 **여기서 튼다**. 옛 화면은 86px 썸네일뿐이라 ⑥완성까지 가야
+          볼 수 있었다. 통짜는 한 편이니 그것을, 컷별은 **고른 컷**을 큰 자리에 튼다.
+          ★ 자동재생은 안 건다 — 소리가 있어 화면에 들어서자마자 울린다. */}
+      {playing?.video?.url && (
+        <video
+          className="vid-result"
+          key={playing.video.url}
+          src={playing.video.url}
+          controls
+          playsInline
+          preload="metadata"
+        />
+      )}
+
       {oneShot ? (
         <div className="uploads">
           <div className="up photo-mark">
             {cuts[0]?.video?.url ? (
-              <video className="thumb-media" src={cuts[0].video.url} muted loop />
+              <video className="thumb-media" src={cuts[0].video.url} muted playsInline preload="metadata" />
             ) : sheetUrl ? (
               <img className="thumb-media" src={sheetUrl} alt="스토리보드" />
             ) : (
               <div className="thumb-media" />
+            )}
+            {/* ★ 덮개다(absolute) — 스토리보드를 지우지 않고 그 위에서 돈다.
+                무엇을 굽는 중인지 옛 그림으로 알 수 있다. */}
+            {rendering && !cuts[0]?.video?.url && (
+              <div className="frame-busy"><span className="spinner" aria-hidden="true" /></div>
             )}
             {oneShotStale && <span className="tag warn">다시 만들어야 해요</span>}
           </div>
@@ -151,13 +201,23 @@ export default function ReelVideoPage() {
       ) : cuts.length > 0 && (
         <div className="uploads">
           {cuts.map((c) => (
-            <div key={c.idx} className="up photo-mark">
+            <div
+              key={c.idx}
+              className="up photo-mark"
+              /* ★ 누르면 위 재생기가 그 컷으로 바뀐다 — 컷마다 재생기를 두면 4초짜리
+                 조각 열두 개가 각자 조작판을 달고 서 있다. */
+              onClick={() => c.video?.url && setPlayIdx(c.idx)}
+            >
               {c.video?.url ? (
-                <video className="thumb-media" src={c.video.url} muted loop />
+                <video className="thumb-media" src={c.video.url} muted playsInline preload="metadata" />
               ) : c.image?.url ? (
                 <img className="thumb-media" src={c.image.url} alt={`컷 ${c.idx + 1}`} />
               ) : (
                 <div className="thumb-media" />
+              )}
+              {/* ★ 아직 안 나온 컷만 돈다 — 끝난 컷은 이미 영상이다. */}
+              {rendering && !c.video?.url && (
+                <div className="frame-busy"><span className="spinner" aria-hidden="true" /></div>
               )}
               {(c.stale ?? isReelClipStale(c)) && c.video?.url && (
                 <span className="tag warn">다시 만들어야 해요</span>
@@ -189,7 +249,9 @@ export default function ReelVideoPage() {
       <div className="step-actions step-actions--bare">
         <div className="fwd">
           <button className="cta" disabled={rendering || !!busy || !ready} onClick={startClips}>
-            {busy === "clips" ? "시작하는 중…" : doneCount > 0 ? "다시 만들기 →" : "영상 만들기 →"}
+            {/* ★ 화살표를 안 붙인다(2026-08-25 사장님 지시 — ③이미지와 이름을 맞춘다).
+                화살표는 "다음 화면으로 간다"는 뜻인데 이 버튼은 굽는 버튼이다. */}
+            {busy === "clips" ? "시작하는 중…" : doneCount > 0 ? "다시 만들기" : "영상 만들기"}
           </button>
         </div>
       </div>

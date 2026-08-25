@@ -76,7 +76,7 @@ export default function ReelImagesPage() {
       disabled={!canDraw || drawingNow || !scenario?.text}
       onClick={() => draw(hasImages ? cuts.map((c) => c.idx) : null)}
     >
-      {drawingNow ? "그리는 중…" : hasImages ? "전부 다시 만들기" : "그림 만들기"}
+      {drawingNow ? "그리는 중…" : hasImages ? "다시 만들기" : "그림 만들기"}
     </button>
   );
 
@@ -132,8 +132,11 @@ export default function ReelImagesPage() {
             onChange={(e) => setNote(e.target.value)}
             placeholder="고치고 싶은 것을 적어 주세요 — 예) 전체적으로 더 밝게 해 줘"
           />
-          <p className="pgsub">이미지를 다시 만들면 이전 그림은 사라져요.</p>
-          <div className="note-act">{drawBtn}</div>
+          {/* ★ 안내문과 버튼은 **같은 줄**이다(2026-08-25 사장님 지시). */}
+          <div className="note-act">
+            <p className="pgsub note-hint">이미지를 다시 만들면 이전 그림은 사라져요.</p>
+            {drawBtn}
+          </div>
         </div>
       )}
 

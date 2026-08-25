@@ -140,8 +140,12 @@ export default function ReelScenarioPage() {
           {/* ⚠️ 시나리오를 고치면 컷이 바뀌고, 그러면 그 컷을 근거로 만든 이미지가
               안 맞게 된다. **항상** 말한다 — 그림이 있을 때만 띄우면 그림을 만들기 전에
               고치려는 사람은 이 사실을 모른 채 지나간다. */}
-          <p className="pgsub">시나리오를 수정하면 이미지를 다시 생성해야 해요.</p>
-          <div className="note-act">{rewriteBtn}</div>
+          {/* ★ 안내문과 버튼은 **같은 줄**이다(2026-08-25 사장님 지시).
+              줄을 나누면 안내가 본문처럼 읽히고 버튼과 상관없는 말로 보인다. */}
+          <div className="note-act">
+            <p className="pgsub note-hint">시나리오를 수정하면 이미지를 다시 생성해야 해요.</p>
+            {rewriteBtn}
+          </div>
         </div>
       )}
 

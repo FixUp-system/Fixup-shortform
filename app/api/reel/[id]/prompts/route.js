@@ -3,6 +3,8 @@ import { runReelPrompts } from "../../../../../lib/reel/pipeline.js";
 import { getProject, updateProject } from "../../../../../lib/projects.js";
 import { LEDGER_PROMPT_MAX } from "../../../../../lib/costs.js";
 import { putReel } from "../../../../../lib/reel/doc.js";
+import { rewriteWholePrompt } from "../../../../../lib/reel/whole-prompt.js";
+import { reelWholePrompt } from "../../../../../lib/reel/oneshot.js";
 
 // 영상 프롬프트 만들기.
 //
@@ -22,7 +24,34 @@ export const POST = withUser(async (req, { params }, user) => {
   // ★★ note — 사장님이 **한국어로** 고쳐 달라고 적은 것(2026-08-25). 컷마다 같은 말이
   //   실린다(단위는 전체 한 번이다). 문자열이 아니면 파이프라인이 그냥 무시한다 —
   //   안 실으면 지문이 예전과 글자 그대로다.
-  const { only, note } = (await req.json().catch(() => ({}))) || {};
+  const { only, note, whole } = (await req.json().catch(() => ({}))) || {};
+
+  // ★★ 통짜 갈래(2026-08-25) — 고칠 것이 컷별 지문이 아니라 **한 벌 전체**다.
+  //   예전에는 화면이 적은 말을 그 한 벌 **끝에 글자 그대로 이어 붙였다**. 0원이었지만
+  //   대가가 둘이었다: 붙인 한국어가 위 글에 그대로 보였고(사장님 지적: "삭제"),
+  //   영어 지시문 끝에 한국어 한 줄이 매달린 채 fal 로 나갔다. 이제 LLM 이 다시 쓴다.
+  // ★ 컷별 갈래(only/note)의 옛 경로는 **한 글자도 안 바뀐다**.
+  if (whole) {
+    const ask = typeof note === "string" ? note.trim() : "";
+    if (!ask) return Response.json({ error: "고치고 싶은 것을 적어 주세요" }, { status: 400 });
+    let next;
+    try {
+      next = await rewriteWholePrompt(reelWholePrompt(project), ask, { projectId: id });
+    } catch (e) {
+      return Response.json({ error: e?.message || "프롬프트를 다시 쓰지 못했어요" }, { status: 500 });
+    }
+    // ★ 상한은 PATCH 와 **같은 값**이다 — 여기만 열어 두면 원장(cost_records)이 잘려
+    //   "무엇을 보냈는가"를 확인할 채널이 막힌다. 넘으면 저장하지 않는다(옛 글이 남는다).
+    if (next.length > LEDGER_PROMPT_MAX) {
+      return Response.json(
+        { error: `영상 프롬프트는 ${LEDGER_PROMPT_MAX}자까지예요 (지금 ${next.length}자).` },
+        { status: 400 }
+      );
+    }
+    await updateProject(id, user.id, (p) => putReel(p, { prompt: next }));
+    return Response.json({ ok: true });
+  }
+
   // ⚠️ 배열이 아닌 값을 조용히 무시하면 **전부 다시 만든다** — 각인이 흔들려 이미 산 클립이
   //    통째로 낡는다(컷당 12크레딧).
   if (only !== undefined && !Array.isArray(only)) {
