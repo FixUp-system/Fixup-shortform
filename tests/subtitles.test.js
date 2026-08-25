@@ -664,8 +664,11 @@ describe("자막 설정 — 자유롭되 코드가 막는다", () => {
     expect(DEFAULT_SUBTITLE).toEqual({ pos: [0.5, 0.82], font: "basic", color: "#FFFFFF", size: 1 });
   });
 
-  it("폰트는 셋이고 basic 이 기본이다", () => {
-    expect(SUBTITLE_FONTS.map((f) => f.id)).toEqual(["basic", "impact", "soft"]);
+  // ★ 2026-08-25 — 결이 다른 셋을 더했다(명조·손글씨·둥글게).
+  //   재는 뜻은 그대로다: **첫째가 basic 이고**(기본값과 같다)
+  //   **모두 label · family 를 가진다**(하나라도 비면 화면이나 굽기가 깨진다).
+  it("basic 이 첫째이고 모든 폰트가 이름을 가진다", () => {
+    expect(SUBTITLE_FONTS[0].id).toBe("basic");
     expect(SUBTITLE_FONTS.every((f) => f.label && f.family)).toBe(true);
   });
 

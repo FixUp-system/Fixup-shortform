@@ -51,12 +51,20 @@ describe("자막 폰트 파일", () => {
     basic: "assets/subtitle-font.otf",
     impact: "assets/subtitle-impact.ttf",
     soft: "assets/subtitle-soft.ttf",
+    // ★ 2026-08-25 사장님 지시로 셋 추가(명조·손글씨·둥글게). 전부 SIL OFL 1.1 —
+    //   출처와 파일에서 직접 읽은 라이선스는 assets/SUBTITLE-FONTS-LICENSE-NOTE.md 에 있다.
+    serif: "assets/subtitle-serif.ttf",
+    hand: "assets/subtitle-hand.ttf",
+    round: "assets/subtitle-round.ttf",
   };
   // 브라우저 미리보기가 읽는 사본(app/globals.css 의 @font-face)
   const WEB_FILES = {
     basic: "public/fonts/subtitle-basic.otf",
     impact: "public/fonts/subtitle-impact.ttf",
     soft: "public/fonts/subtitle-soft.ttf",
+    serif: "public/fonts/subtitle-serif.ttf",
+    hand: "public/fonts/subtitle-hand.ttf",
+    round: "public/fonts/subtitle-round.ttf",
   };
 
   for (const f of SUBTITLE_FONTS) {

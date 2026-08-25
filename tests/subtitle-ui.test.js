@@ -5,7 +5,16 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync, statSync } from "node:fs";
 import { SUBTITLE_FONTS } from "../lib/subtitles.js";
 
-const src = readFileSync("app/create/[id]/done/page.js", "utf8");
+// ★★ 2026-08-25 — 자막 편집기를 **공용 컴포넌트**로 뺐다(reel 완성 화면도 같은 것을 쓴다).
+// 그래서 이 파일이 재는 계약은 이제 화면 하나가 아니라 **화면 + 편집기**가 함께 만족한다.
+// 둘을 이어 붙여 훑는다 — 단정을 한 벌씩 어느 파일로 옮길지 손으로 나누면, 마크업이
+// 다시 움직일 때마다 그 나눔이 낡는다(그리고 그 낡음은 조용하다).
+// 이어 붙이는 **순서**가 화면 → 편집기다: 자리(무대 → 제목 → 조절판 → 영상)를 보는
+// 단정들이 그 순서에 기댄다.
+const page = readFileSync("app/create/[id]/done/page.js", "utf8");
+const componentSrc = readFileSync("components/SubtitleEditor.jsx", "utf8");
+const src = `${page}
+${componentSrc}`;
 
 describe("⑥완성 — 자막 조절", () => {
   // ★ 필드 이름은 **camelCase 다**(render.rawUrl). 문서가 대체로 snake_case 라 `raw_url` 로
@@ -216,8 +225,10 @@ describe("⑥완성 — 원본이 없는 옛 프로젝트", () => {
     expect(at, "rawUrl 정의가 없다").toBeGreaterThan(-1);
     const line = src.slice(at, src.indexOf(";", at));
     expect(line, "rawUrl 이 render.rawUrl 에서 오지 않는다").toContain("render?.rawUrl");
-    // 조절 UI 는 rawUrl 조건 안에서만 렌더된다
-    expect(src).toMatch(/\{rawUrl &&/);
+    // 조절 UI 를 그릴지는 화면이 **rawUrl 유무로** 정해 편집기에 넘기고(editable),
+    // 편집기는 그 값 하나로 조절판·자막 그리기를 함께 가린다(2026-08-25 공용화).
+    expect(page, "원본 유무를 편집기에 안 넘긴다").toMatch(/editable=\{!!rawUrl\}/);
+    expect(componentSrc, "편집기가 그 값으로 조절판을 안 가린다").toMatch(/\{editable && \(/);
   });
 
   // 숨기기만 하면 사장님은 이 기능이 있는지조차 모른다 — 다시 만들 길을 알려야 한다.
@@ -230,7 +241,7 @@ describe("⑥완성 — 원본이 없는 옛 프로젝트", () => {
   it("원본이 없으면 완성본을 재생한다", () => {
     // 재생기는 previewSrc 하나를 본다. 그 식이 원본이 없을 때 완성본으로 떨어져야 한다
     // (rawUrl 이 없으면 미리보기를 얹을 수 없으니 구워진 자막이 있는 완성본을 튼다).
-    expect(src).toMatch(/const previewSrc =[^;]*rawUrl \|\| finalSrc/);
+    expect(src).toMatch(/const previewSrc = showingRaw \? rawUrl : finalSrc \|\| rawUrl/);
     expect(src).toContain("src={previewSrc}");
   });
 });
@@ -266,9 +277,13 @@ describe("⑥완성 — 고르는 것을 그 모습대로 보여 준다", () => 
 
   // [적용]이 켜진 칩과 같은 옷을 입으면 실행이 선택으로 읽힌다.
   it("[적용]은 선택 칩이 아니다", () => {
-    const apply = src.match(/<button[^>]*applyToVideo[^>]*>/);
-    expect(apply, "적용 버튼을 못 찾았다").toBeTruthy();
-    expect(apply[0], "실행 버튼이 켜진 칩(chip on)으로 그려진다").not.toMatch(/chip on/);
+    // 공용화 뒤 실행 버튼은 편집기 안에 있고, 무엇을 할지는 화면이 넘긴다(onApply).
+    expect(page, "화면이 실행을 안 넘긴다").toMatch(/onApply=\{applyToVideo\}/);
+    const at = componentSrc.indexOf("{onApply && (");
+    expect(at, "적용 버튼을 못 찾았다").toBeGreaterThan(-1);
+    const apply = componentSrc.slice(at, componentSrc.indexOf("</button>", at));
+    expect(apply, "실행 버튼이 켜진 칩(chip on)으로 그려진다").not.toMatch(/chip on/);
+    expect(apply, "실행 버튼이 선례(.mini.confirm-btn)를 안 쓴다").toContain("mini confirm-btn");
   });
 });
 

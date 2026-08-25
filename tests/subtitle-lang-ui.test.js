@@ -5,7 +5,13 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { SUBTITLE_LANGS } from "../lib/subtitle-langs.js";
 
-const src = readFileSync("app/create/[id]/done/page.js", "utf8");
+// ★ 2026-08-25 — 자막 편집기를 공용 컴포넌트로 뺐다. 언어 줄·번역 검토는 이 화면에 남고
+// 글꼴 줄·미리보기는 편집기로 갔다 — 계약은 **둘이 함께** 만족한다(subtitle-ui.test.js 와
+// 같은 방식으로 이어 붙여 훑는다).
+const src = [
+  readFileSync("app/create/[id]/done/page.js", "utf8"),
+  readFileSync("components/SubtitleEditor.jsx", "utf8"),
+].join("\n");
 
 describe("⑥완성 — 자막 언어 칩", () => {
   it("언어 목록을 lib/subtitle-langs 에서 가져온다 — 손으로 세 개를 다시 적지 않는다", () => {
