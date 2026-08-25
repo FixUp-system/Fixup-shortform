@@ -10,44 +10,27 @@ const page = readFileSync("app/reel/[id]/video/page.js", "utf8");
 const css = readFileSync("app/globals.css", "utf8");
 const clean = page.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
-describe("영상과 버튼 사이 선이 없다", () => {
-  // ★ .step-actions 의 border-top 은 다른 화면도 쓴다 — 여기만 끄는 갈래가 필요하다.
-  it("선 없는 갈래가 CSS 에 있다", () => {
-    expect(css).toMatch(/step-actions--bare|\.no-rule/);
+describe("실행 버튼은 **선 아래**, 이전으로와 같은 줄이다", () => {
+  // ★★ 2026-08-25 — 사장님이 앞서의 결정을 **뒤집었다**: "영상 만들기 버튼이 이전으로랑
+  //   다른 위치에 배치되어 있어. 라인 위에 배치되어 있어서 라인 아래 배치로 변경해줘."
+  //   그전에는 선 없는 줄(step-actions--bare)에 혼자 서서 **구분선 위**에 있었다 —
+  //   그 배치의 근거였던 "돈 나가는 버튼은 그 줄에 혼자 선다"도 같은 분이 뒤집은 것이다
+  //   (⑥완성이 먼저 한 줄로 합쳐졌고 여기가 그 짝이다).
+  it("★ 굽는 버튼이 [이전으로]와 **같은 줄**에 있다", () => {
+    const at = clean.indexOf('<div className="step-actions">');
+    expect(at, "맨 아래 실행줄을 못 찾겠다").toBeGreaterThan(-1);
+    const row = clean.slice(at, at + 500);
+    expect(row).toContain("ReelBack");
+    expect(row, "굽는 버튼이 그 줄에 없다").toContain("bakeBtn");
   });
 
-  it("만들기 줄이 그 갈래를 쓴다", () => {
-    // ★★ 2026-08-25 — 재던 방식을 바꿨다. 예전에는 `startClips` 에서 거슬러 올라가 가장
-    //   가까운 `step-actions` 를 봤는데, 굽는 버튼이 **한 곳에서만 그려지도록**(bakeBtn)
-    //   위로 올라가면서 그 거리 재기가 깨졌다. 지키려는 것은 위치가 아니라 **선이 없다**는
-    //   것이므로, 그 줄이 선 없는 갈래를 쓰는지를 직접 본다.
-    expect(clean, "만들기 버튼 줄이 선 없는 갈래를 안 쓴다").toContain('className="step-actions step-actions--bare"');
-    // ★ 그 줄에 들어가는 것은 굽는 버튼 하나다(되돌아가는 링크는 아래 줄이다).
-    expect(clean).toMatch(/step-actions--bare"[\s\S]{0,120}bakeBtn/);
-  });
-});
-
-describe("굽는 버튼은 ②③④와 같은 모양이다", () => {
-  // ★★ 2026-08-25 사장님 지시: "영상에서의 다시 만들기 버튼이 이미지 생성과 시나리오
-  //   영상프롬프팅과 달라서 통일 시켜줘." 앞의 셋은 전부 **수정 요청 칸 안 오른쪽 아래**에
-  //   `.mini` 로 서 있는데 여기만 칸 밖 별도 줄의 `.cta` 였다.
-  it("한 곳에서만 그린다 — 자리가 둘이어도 라벨이 안 갈린다", () => {
-    expect(clean).toContain("const bakeBtn");
-    // 굽기를 부르는 자리가 하나뿐이다(버튼을 손으로 두 번 적지 않는다).
-    expect(clean.match(/onClick=\{startClips\}/g) || []).toHaveLength(1);
+  it("★ 선 없는 갈래를 더 이상 쓰지 않는다 — 그것이 '선 위'의 원인이었다", () => {
+    expect(clean).not.toContain("step-actions--bare");
   });
 
-  it("생김새가 앞의 셋과 같다 — .mini 다", () => {
-    const at = clean.indexOf("const bakeBtn");
-    expect(clean.slice(at, at + 200)).toContain('className="mini"');
-  });
-
-  it("수정 요청 칸 안에서는 안내문 오른쪽에 선다", () => {
-    const at = clean.indexOf("note-act");
-    expect(at, "수정 요청 칸에 실행 자리가 없다").toBeGreaterThan(-1);
-    const box = clean.slice(at, at + 220);
-    expect(box).toContain("note-hint");
-    expect(box.indexOf("note-hint")).toBeLessThan(box.indexOf("bakeBtn"));
+  it("수정 요청 칸이 떠 있을 때는 그 칸 안에 있다 — 둘은 동시에 안 뜬다", () => {
+    // bakeBtn 은 한 곳에서만 그려지고 자리는 asking 하나로 갈린다.
+    expect(clean).toMatch(/\{!asking && bakeBtn\}/);
   });
 });
 

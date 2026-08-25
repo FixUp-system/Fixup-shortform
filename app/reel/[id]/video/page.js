@@ -274,26 +274,27 @@ export default function ReelVideoPage() {
         </div>
       )}
 
-      {/* ★ 아직 안 만들었거나 굽는 중일 때만 여기 선다 — 그때는 위 칸이 안 보인다.
-          지우지 않는 이유는 처음 굽는 유일한 길이라서다(②시나리오와 같은 처방). */}
-      {!asking && (
-        <div className="step-actions step-actions--bare">
-          <div className="fwd">{bakeBtn}</div>
-        </div>
-      )}
-
-      {/* ★ 맨 아래 줄 — 왼쪽 끝이 [이전으로], 오른쪽이 다음이다(.fwd 가 margin-left:auto).
+      {/* ★ 맨 아래 줄 — 왼쪽 끝이 [이전으로], 오른쪽이 실행·다음이다(.fwd 가 margin-left:auto).
           이전 버튼은 components/ReelBack.jsx 하나가 그린다 — 화면마다 손으로 적어서
-          이름도 자리도 갈렸던 것이 원래 문제였다(2026-08-25 사장님 지적). */}
-      {/* ★ 굽기 전에도 되돌아갈 수 있어야 한다 — 이 줄은 doneCount 와 무관하게
-          항상 그리고, [완성으로]만 조건부로 둔다. */}
+          이름도 자리도 갈렸던 것이 원래 문제였다(2026-08-25 사장님 지적).
+          ★ 굽기 전에도 되돌아갈 수 있어야 한다 — 이 줄은 doneCount 와 무관하게 항상 그린다.
+
+          ★★ 2026-08-25 — [영상 만들기]를 **이 줄 안으로** 들였다(사장님 지적: "영상 만들기
+             버튼이 이전으로랑 다른 위치에 배치되어 있어, 라인 위에 배치되어 있어서 라인
+             아래 배치로 변경해줘"). 그전에는 선 없는 줄(step-actions--bare)에 혼자 서서
+             **구분선 위**에 있었다.
+             ⚠️ 같은 날 앞서 정한 "돈 나가는 버튼은 그 줄에 혼자 선다"를 **사장님이
+             뒤집은 것**이다 — ⑥완성이 먼저 한 줄로 합쳐졌고 여기가 그 짝이다.
+          ★ 위 수정 요청 칸이 떠 있을 때(asking)는 버튼이 그 칸 안에 있으므로 여기 안 선다 —
+            둘은 동시에 안 뜬다(bakeBtn 을 한 곳에서만 그리는 이유). */}
       <div className="step-actions">
         <ReelBack step="video" id={id} />
-        {doneCount > 0 && (
-          <div className="fwd">
+        <div className="fwd">
+          {!asking && bakeBtn}
+          {doneCount > 0 && (
             <Link className="cta" href={reelStepHref(doneStep, id)}>완성으로 →</Link>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </section>
   );

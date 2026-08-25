@@ -2189,10 +2189,10 @@ h1.login-head { margin-inline: auto; }
 /* 상한에 걸리면 높이가 기준이 되고 가로는 비율대로 따라온다. */
 .sheet-view img { max-height: 68vh; max-width: 100%; width: auto; height: auto; display: block; }
 
-/* ── 줄 위의 선을 끄는 갈래(2026-08-25 사장님 지시).
-   ★ .step-actions 는 여러 화면이 쓰고 그중 대부분은 선이 맞다 — 본문과 버튼을 가른다.
-   다만 바로 위가 **영상**이면 그 선이 화면을 두 도막 내는 것처럼 보인다. */
-.step-actions--bare { border-top: 0; padding-top: 0; }
+/* ── 줄 위의 선을 끄는 갈래는 **지웠다**(2026-08-25). ⑤영상의 [영상 만들기]가 그 갈래를
+   쓰던 유일한 자리였는데, 사장님이 "라인 위에 있으니 라인 아래로"라고 해서 그 버튼이
+   맨 아래 실행줄(.step-actions) 안으로 들어갔다 — 쓰는 곳이 0 이 된 규칙은 남기지 않는다.
+   되살릴 일이 생기면 `border-top: 0; padding-top: 0;` 한 줄이다. */
 
 
 /* ── 실제 비용 표(app/cost-table/page.js) — 2026-08-25 사장님 지시로 생겼다.
