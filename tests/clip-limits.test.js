@@ -138,8 +138,11 @@ describe("하위호환 — 화면이 쓰는 이름은 기본 모델의 값이다
 });
 
 describe("영상 모델 표", () => {
-  it("고를 수 있는 것은 둘이고 기본은 Seedance 다", () => {
-    expect(I2V_MODEL_IDS).toEqual(["seedance-2.0", "kling-v3"]);
+  it("고를 수 있는 것은 셋이고 기본은 Seedance 2.0 이다", () => {
+    // ★ 2026-08-25 — Seedance 2.5 가 들어왔다(사장님: "등급에 따라서 사용 가능하게").
+    //   ★ 표에 있다고 아무나 고를 수 있는 것은 아니다: reel 은 REEL_MODEL_IDS 로 한 번,
+    //     등급(lib/tiers.js)으로 또 한 번 좁힌다(tests/reel-model-pick.test.js).
+    expect(I2V_MODEL_IDS).toEqual(["seedance-2.0", "seedance-2.5", "kling-v3"]);
     expect(DEFAULT_I2V_MODEL).toBe("seedance-2.0");
     expect(LEGACY_I2V_MODEL).toBe("kling-v3");
   });

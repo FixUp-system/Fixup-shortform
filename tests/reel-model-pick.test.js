@@ -28,8 +28,8 @@ const strip = (src) =>
 const read = (p) => strip(readFileSync(p, "utf8"));
 
 describe("reel 이 여는 모델", () => {
-  it("★ 지금은 Seedance 2.0 하나다 — 2.5 는 아직 안 연다", () => {
-    expect(REEL_MODEL_IDS).toEqual(["seedance-2.0"]);
+  it("★ 2.0 과 2.5 둘이다 — 2.5 는 2026-08-25 에 열렸다", () => {
+    expect(REEL_MODEL_IDS).toEqual(["seedance-2.0", "seedance-2.5"]);
   });
 
   it("★★ Kling v3 는 안 연다 — speaks:false 라 대사가 통째로 사라진다", () => {
@@ -37,16 +37,27 @@ describe("reel 이 여는 모델", () => {
     expect(isReelModel("kling-v3")).toBe(false);
   });
 
-  it("등급이 더 열어 주지 못한다 — 프로도 2.5 를 못 고른다(아직)", () => {
-    for (const t of TIERS) {
-      const ids = reelModelsForTier(t.id).map((m) => m.id);
-      expect(ids, `${t.id} 등급에 안 여는 모델이 있다`).toEqual(["seedance-2.0"]);
-    }
+  it("★ 기본 등급은 2.0 만 — 2.5 는 프로부터다", () => {
+    expect(reelModelsForTier("basic").map((m) => m.id)).toEqual(["seedance-2.0"]);
   });
 
-  it("등급이 모르는 값이어도 던지지 않는다 — 화면이 부르는 자리다", () => {
+  it("★ 프로는 둘 다 고른다", () => {
+    expect(reelModelsForTier("pro").map((m) => m.id)).toEqual(["seedance-2.0", "seedance-2.5"]);
+  });
+
+  it("등급이 모르는 값이면 기본 등급으로 본다 — 던지지 않는다(화면이 부르는 자리다)", () => {
     expect(reelModelsForTier(undefined).map((m) => m.id)).toEqual(["seedance-2.0"]);
     expect(reelModelsForTier("없는등급").map((m) => m.id)).toEqual(["seedance-2.0"]);
+  });
+
+  it("★ 등급 표와 갈리지 않는다 — 프로가 여는 것 중 reel 이 여는 것만 나온다", () => {
+    for (const t of TIERS) {
+      const ids = reelModelsForTier(t.id).map((m) => m.id);
+      for (const id of ids) {
+        expect(t.models, `${t.id} 등급이 ${id} 를 안 여는데 나온다`).toContain(id);
+        expect(REEL_MODEL_IDS, `reel 이 ${id} 를 안 여는데 나온다`).toContain(id);
+      }
+    }
   });
 
   it("고르는 값에는 라벨이 있다 — 칩에 쓴다", () => {

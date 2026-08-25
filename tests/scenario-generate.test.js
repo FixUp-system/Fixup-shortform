@@ -100,10 +100,21 @@ describe("가짜 모드(SHOTFORM_FAKE=all)에서 ②시나리오가 통과한다
     else process.env.SHOTFORM_FAKE = prev;
   });
 
-  // 길이 넷 × 모델 전부 — 하한이 모델마다 달라(Seedance 4 · Kling 3) 한 길이만 재면
+  // 길이 넷 × 모델 — 하한이 모델마다 달라(Seedance 2.0 은 4 · Kling 은 3) 한 길이만 재면
   // 다른 모델에서 조용히 깨진다.
+  //
+  // ★★ 2026-08-25 — **Seedance 2.5 는 이 흐름에서 뺀다.** 그 모델은 클립 하한이 15초인데
+  //   이 흐름은 **컷마다 따로 굽는다** — 장면 하나가 클립 하나라 15초 이상이어야 하는데,
+  //   그림 한 장의 콘텐츠 상한은 8초다(lib/cuts.js 의 CONTENT_MAX_SECONDS, 모델 무관).
+  //   15 이상이면서 8 이하인 길이는 없으므로 **유효한 시나리오가 아예 없다.**
+  //   ★ 그래서 2.5 는 **통짜로 굽는 reel 에서만** 열린다(lib/clip-limits.js 의
+  //     REEL_MODEL_IDS · sceneMinSecondsFor). 통짜는 한 판을 굽기 때문에 장면이 클립이
+  //     아니라 스토리보드 칸이고, 그때는 클립 하한이 애초에 안 걸린다.
+  //   ★ 이 흐름들(단계별·film)은 지금 사이드바에서 꺼져 있다(SIDEBAR_FLOWS) — 즉 2.5 를
+  //     고를 화면 자체가 없다. 여기서 빼는 것은 **닿을 수 없는 조합**을 재지 않으려는 것이다.
+  const PERCUT_MODELS = I2V_MODEL_IDS.filter((id) => id !== "seedance-2.5");
   for (const target of TARGET_CHOICES) {
-    for (const i2v_model of I2V_MODEL_IDS) {
+    for (const i2v_model of PERCUT_MODELS) {
       it(`${target}초 · ${i2v_model}`, async () => {
         process.env.SHOTFORM_FAKE = "all";
         const p = { ...project, settings: { i2v_model, target_seconds: target } };
@@ -117,6 +128,19 @@ describe("가짜 모드(SHOTFORM_FAKE=all)에서 ②시나리오가 통과한다
         expect(checkScenario(got.scenario, p).ok).toBe(true);
       });
     }
+  }
+
+  // ★★ 그 대신 **통짜(reel)에서는 2.5 가 성립한다**는 것을 여기서 못 박는다.
+  //   장면 하한이 클립 하한을 안 따르는 자리가 정확히 이것이다(sceneMinSecondsFor).
+  for (const target of [15, 30]) {
+    it(`${target}초 · seedance-2.5 · reel(통짜)`, async () => {
+      process.env.SHOTFORM_FAKE = "all";
+      const p = { ...project, kind: "reel", settings: { i2v_model: "seedance-2.5", target_seconds: target } };
+      const got = await generateScenario(p);
+      expect(got.problems).toEqual([]);
+      expect(got.scenario.shots.reduce((a, s) => a + s.seconds, 0)).toBe(target);
+      expect(checkScenario(got.scenario, p).ok).toBe(true);
+    });
   }
 
   it("길이를 안 고른 프로젝트도 관통한다 — 합 규칙이 아예 안 걸린다", async () => {

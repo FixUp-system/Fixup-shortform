@@ -35,7 +35,15 @@ describe("순수 규율", () => {
   it("fs·env 로 이어지는 import 가 없다 — 같은 lib/reel 안의 순수 모듈만 허용", () => {
     const src = readFileSync("lib/reel/oneshot.js", "utf8");
     const specs = [...src.matchAll(/^import\s[^;]*?from\s+["']([^"']+)["'];?\s*$/gm)].map((m) => m[1]);
+    // ★★ 2026-08-25 — 한 칸 넓혔다. 지키려는 것은 "사슬 끝에 fs·env 가 안 닿는 것"이지
+    //   경로 모양이 아니다(tests/reel-steps.test.js 가 같은 이유로 먼저 넓혔다).
+    //   lib/clip-limits.js 는 스스로 순수하고 lib/tiers.js → lib/ad/models.js 만 무는데
+    //   그 둘도 순수하다. 통짜 상한을 **모델이 정하게** 하면서 필요해진 자리다 —
+    //   여기서 다시 15 를 적으면 2.5(30초)에서 두 값이 갈린다.
+    // ★ `../` 를 통째로 열지 않는다 — 이 한 파일만 허용한다.
+    const ALLOWED_OUTSIDE = ["../clip-limits.js"];
     for (const spec of specs) {
+      if (ALLOWED_OUTSIDE.includes(spec)) continue;
       expect(spec, `허용 밖의 import: ${spec}`).toMatch(/^\.\//);
     }
   });
