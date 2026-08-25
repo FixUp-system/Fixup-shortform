@@ -30,6 +30,12 @@ describe("①입력에서 비율을 고른다", () => {
     expect(nw).toContain("ASPECTS");
   });
 
+  // ★ 2026-08-25 사장님 지적 "라벨 부분이 안맞아" — 광고는 `세로 · 9:16` 처럼
+  //   **비율까지** 적는데 reel 만 이름만 적었다. "세로"만으로는 9:16 인지 4:5 인지 모른다.
+  it("칩이 이름과 비율을 같이 적는다 — 광고 화면과 같은 모양", () => {
+    expect(nw).toContain("{a.label} · {a.id}");
+  });
+
   it("★ 고른 값을 보낸다 — 예전에는 기본값을 박아 보냈다", () => {
     expect(nw).toContain("aspect_ratio: aspect");
     expect(nw, "기본값을 아직 박아 보낸다").not.toContain("aspect_ratio: DEFAULT_ASPECT_ID");

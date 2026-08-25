@@ -283,7 +283,10 @@ export default function ReelNewPage() {
                   {ASPECTS.map((a) => (
                     <button key={a.id} className={`chip${aspect === a.id ? " on" : ""}`}
                       disabled={locked} onClick={() => setAspect(a.id)}>
-                      {a.label}
+                      {/* ★ 이름만이 아니라 **비율까지** 적는다 — 광고 화면과 같은 모양이다
+                          (2026-08-25 사장님 지적: "라벨 부분이 안맞아"). "세로"만으로는
+                          9:16 인지 4:5 인지 알 수 없다. */}
+                      {a.label} · {a.id}
                     </button>
                   ))}
                 </div>
