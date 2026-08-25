@@ -110,9 +110,23 @@ describe("화질 고르기", () => {
     expect(nw).toMatch(/resolution/);
   });
 
-  it("고른 조합의 값을 보여 준다 — 480p 와 720p 는 2배 차이다", () => {
-    expect(nw).toContain("videoPrice");
-    expect(nw).toContain("priceLabel");
+  // ★★ 2026-08-25 뒤집혔다. 사장님이 길이·화질 칩의 크레딧 표기를 **둘 다 빼라**고 했다
+  //   ("일단 제거" · "화질이 정가를 바꿔요 텍스트 제거해줘"). 그래서 이 화면은 값을 한
+  //   글자도 말하지 않고, lib/pricing 을 import 하지도 않는다.
+  //   ⚠️ **판정은 그대로다** — 화질이 정가를 바꾸는 것 자체는 변함이 없고, 청구는 서버가
+  //     settings.resolution 을 읽어 한다(tests/reel-routes.test.js 가 그것을 잰다).
+  //     문구만 뺀 것이지 값이 바뀐 것이 아니므로, 그 자리를 여기서 다시 강제하지 않는다.
+  it("★ 값을 말하지 않는다 — 값은 ⑤영상에서만 말한다", () => {
+    // ★ 주석을 걷고 잰다 — 왜 뺐는지는 주석에 남아야 하고(그러려면 "크레딧"이라는
+    //   말을 써야 한다), 그 글자가 단정에 걸리면 안 된다. 이 저장소가 반복해 밟은
+    //   "시험이 주석을 재는" 함정이다.
+    const code = nw
+      .split("\n").filter((l) => !l.trim().startsWith("//")).join("\n")
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
+      .replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(code).not.toContain("priceLabel");
+    expect(code).not.toContain("videoPrice");
+    expect(code, "화면이 아직 값을 말한다").not.toContain("크레딧");
   });
 
   it("광고 가격표를 쓰지 않는다", () => {

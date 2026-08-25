@@ -40,9 +40,13 @@ import { TARGET_CHOICES } from "../../../lib/script";
 // (resolutionsForModel). isResolutionFor 는 라우트와 같은 판정이라 여기서는 안 쓴다(화면은
 // 목록에서 고르므로 애초에 모르는 값이 안 생긴다 — 검증은 서버 몫).
 import { resolutionsForModel, DEFAULT_I2V_MODEL, DEFAULT_RESOLUTION } from "../../../lib/clip-limits";
-// 화질 칩에 정가를 같이 보여준다 — 480p 와 720p 는 값이 2배라, 안 보여 주면 사장님이
-// 모르고 비싼 쪽을 고른다. 이 흐름의 표(videoPrice)를 쓴다 — 광고 쪽 정가 함수가 아니다.
-import { priceLabel, videoPrice } from "../../../lib/pricing";
+// ★★ 이 화면은 **값을 한 글자도 말하지 않는다**(2026-08-25 사장님 지시). 예전에는 길이·화질
+//   칩 뒤에 크레딧이 붙었다(화질 쪽은 길이를 고른 뒤에만 나타났다) — 둘 다 뗐고, 그것을
+//   설명하던 문구("정가가 길이·화질에서 나와요", "화질이 정가를 바꿔요")도 같이 뺐다.
+//   그래서 lib/pricing 을 **더 이상 import 하지 않는다.** 값을 말하는 자리는 실제로 돈이
+//   나가는 ⑤영상 하나뿐이다.
+//   ⚠️ 판정은 그대로다 — 화질이 정가를 바꾸는 것 자체는 변함이 없고(videoPrice), 청구는
+//     서버가 settings.resolution 을 읽어 한다. 문구만 뺀 것이지 값이 바뀐 것이 아니다.
 // 사진 상한 — 서버(app/api/reel/route.js)와 **같은 파일**에서 읽는다. 손으로 두 벌 적으면
 // 화면은 통과시키는데 서버가 400 을 내고, 사장님은 다 올린 뒤에야 거절당한다.
 import { MAX_PHOTOS } from "../../../lib/photos";
@@ -223,11 +227,15 @@ export default function ReelNewPage() {
                   {resolutionsForModel(DEFAULT_I2V_MODEL).map((r) => (
                     <button key={r} className={`chip${resolution === r ? " on" : ""}`}
                       disabled={locked} onClick={() => setResolution(r)}>
-                      {r}{target && ` · ${priceLabel(videoPrice(target, DEFAULT_I2V_MODEL, r))}`}
+                      {/* ★ 크레딧 표기를 뗐다(2026-08-25 사장님 지시). 길이 칩과 같다.
+                          예전에는 길이를 고른 뒤에만 붙었다(`target &&`) — 그래서
+                          "길이를 선택했을 때 보여"였다. */}
+                      {r}
                     </button>
                   ))}
                 </div>
-                <div className="tray-note">화질이 정가를 바꿔요 — 480p 가 720p 보다 싸요</div>
+                {/* ★ 설명 줄이 없다(2026-08-25 사장님 지시 — "화질이 정가를 바꿔요 텍스트
+                    제거해줘"). 값을 말하는 자리는 실제로 돈이 나가는 ⑤영상 하나뿐이다. */}
               </div>
             </div>
 
