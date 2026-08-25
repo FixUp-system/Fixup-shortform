@@ -120,7 +120,11 @@ export default function ReelDonePage() {
   //   자막은 합성에서 굽히니 클립에는 아직 자막이 없고, 비율도 같다. 덕분에 처음 굽기
   //   **전에도** 자막을 골라 볼 수 있다 — 이 흐름에서는 그쪽이 더 자연스럽다.
   const rawUrl = reel.video?.rawUrl || cuts.find((c) => c?.video?.url)?.video?.url || null;
-  const finalSrc = reel.video?.url || null;
+  // ★★ 완성본 주소는 **늘 같다**(/api/renders/<id>.mp4) — 다시 구워도 <video> 는 옛
+  //   파일을 그대로 쓴다. 각인(video.ts)을 실어 다른 주소로 만든다. 라우트는 질의문자를
+  //   안 본다. 단계별 흐름이 먼저 쓴 처방 그대로다(app/create/[id]/done/page.js).
+  //   ⚠️ 이것이 없어서 사장님이 "자막이 안 바뀐다"를 두 번 겪었다(2026-08-25).
+  const finalSrc = reel.video?.url ? `${reel.video.url}?v=${reel.video.ts || 0}` : null;
   // 고치는 중인가 — 저장된 설정과 지금 고른 값이 다른가. 편집기가 이 값으로 재생기를 가른다.
   const dirty = JSON.stringify(sub) !== JSON.stringify(seedSubtitle(project));
   // 자막 언어 — 굽는 쪽과 같은 자를 쓴다(app/api/reel/[id]/render/route.js).

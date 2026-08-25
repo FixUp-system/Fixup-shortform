@@ -70,7 +70,16 @@ export const POST = withUser(async (req, { params }, user) => {
     })
       .then(async (result) => {
         await updateProject(id, user.id, (p) =>
-          putReel(p, { status: "done", video: { url: result.url, seconds: result.seconds }, error: null }));
+          putReel(p, {
+            status: "done",
+            // ★★ ts — **각인 시각**이다(2026-08-25). 완성본 주소는 다시 구워도 늘 같아서
+            //   (/api/renders/<id>.mp4) 이 값이 없으면 브라우저가 옛 파일을 그대로 쓴다.
+            //   단계별 흐름은 이미 이 처방을 쓴다(app/create/[id]/done/page.js 의 ?v=).
+            //   ★ app/api/renders/[name]/route.js 의 ETag 도 이 값을 읽는다 — 없으면
+            //     ETag 가 아예 안 나가 볼 때마다 전량이 다시 전송된다.
+            video: { url: result.url, seconds: result.seconds, ts: Date.now() },
+            error: null,
+          }));
       })
       .catch(async (e) => {
         console.error("reel render error:", e);
