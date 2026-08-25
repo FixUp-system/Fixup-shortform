@@ -2194,3 +2194,13 @@ h1.login-head { margin-inline: auto; }
    다만 바로 위가 **영상**이면 그 선이 화면을 두 도막 내는 것처럼 보인다. */
 .step-actions--bare { border-top: 0; padding-top: 0; }
 
+
+/* ── 실제 비용 표(app/cost-table/page.js) — 2026-08-25 사장님 지시로 생겼다.
+   ★ 좁은 화면에서 **표만** 옆으로 구른다(tablewrap) — 본문이 가로로 구르면 안 된다.
+   ★ 숫자는 오른쪽 정렬에 tabular-nums — 자릿수가 세로로 맞아야 눈으로 비교된다. */
+.tablewrap { overflow-x: auto; margin-top: var(--sp-4); }
+.costtable { width: 100%; border-collapse: collapse; font-size: 14px; }
+.costtable th, .costtable td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+.costtable th { color: var(--ink-soft); font-weight: 400; font-size: 12px; }
+.costtable td.num, .costtable th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.costtable tbody tr:last-child td { border-bottom: 0; }

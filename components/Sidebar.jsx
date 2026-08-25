@@ -352,6 +352,16 @@ export default function Sidebar() {
       >
         <span className="ic"><Icon name="archive" /></span>보관함
       </Link>
+      {/* ★★ 실제 비용 — **모든 사용자**가 본다(2026-08-25 사장님 지시: "지금은 내부 테스트
+          단계이니까 사용자들이 확인할 수 있게"). 아래 운영자 전용 [비용 기록]과 **다른
+          것**이다: 저기는 실제로 나간 지출 원장이고, 여기는 "한 편에 얼마 드는가" 표다.
+          ★ isAdmin 으로 감싸지 않는다 — 감싸면 이 지시가 통째로 무효가 된다. */}
+      <Link
+        href="/cost-table"
+        className={`side-item${pathname === "/cost-table" ? " on" : ""}`}
+      >
+        <span className="ic"><Icon name="clock" /></span>실제 비용
+      </Link>
       <button className="side-item soon" disabled>
         <span className="ic"><Icon name="template" /></span>템플릿
         <span className="soon-tag">준비 중</span>
