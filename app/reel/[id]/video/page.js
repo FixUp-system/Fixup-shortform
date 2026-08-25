@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useReelProject } from "../layout";
-import { reelOf, isReelRendering } from "../../../../lib/reel/doc";
+import { reelOf, reelErrorFor, isReelRendering } from "../../../../lib/reel/doc";
 // ★★ 2026-08-25 — 굽기 갈래가 둘이다(통짜 · 컷별). 판정은 lib 의 순수 함수 하나다 —
 //   canBakeReel 은 컷별 갈래에서 예전 canBakeReelClips 를 글자 그대로 부른다.
 import { planReelBake, canBakeReel, isReelOneShotStale, reelSheetUrl, reelWholePrompt } from "../../../../lib/reel/oneshot";
@@ -157,7 +157,11 @@ export default function ReelVideoPage() {
           ★ 컷별 갈래의 "컷 N개 중 M개"는 남긴다 — 그것은 안쪽 사정이 아니라 진척이다. */}
       {!oneShot && <p className="pgsub">컷 {cuts.length}개 중 {doneCount}개를 만들었어요</p>}
       {err && <p className="pgsub warn">{err}</p>}
-      {(live?.error || reel.error) && <p className="pgsub warn">{live?.error || reel.error}</p>}
+      {/* ★ 상태 라우트가 준 값이 먼저다(문서보다 최신이다). 문서 쪽은 **이 단계의 것만**
+          읽는다 — ⑥완성의 합성 실패가 여기 뜨면 안 된다(reelErrorFor). */}
+      {(live?.error || reelErrorFor(reel, "video")) && (
+        <p className="pgsub warn">{live?.error || reelErrorFor(reel, "video")}</p>
+      )}
       {/* ★★ 굽는 동안 **되고 있다는 것이 보여야 한다**(2026-08-25 사장님 지시:
           "영상 생성 같은 경우에는 시간이 오래걸리기 때문에 꼭 필요한 작업이야").
           한 줄짜리 안내만 두면 멈춘 것과 구별이 안 된다 — 도는 표시와 함께 **어디까지

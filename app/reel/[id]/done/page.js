@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useReelProject } from "../layout";
-import { reelOf, isReelRendering } from "../../../../lib/reel/doc";
+import { reelOf, reelErrorFor, isReelRendering } from "../../../../lib/reel/doc";
 import { startPolling } from "../../../../lib/poll";
 import { REEL_STEPS, reelStepHref } from "../../../../lib/reel/steps";
 import ReelBack from "../../../../components/ReelBack";
@@ -134,7 +134,8 @@ export default function ReelDonePage() {
     <section className="panel panel--wide">
       <h2>완성</h2>
       {err && <p className="pgsub warn">{err}</p>}
-      {reel.error && <p className="pgsub warn">{reel.error}</p>}
+      {/* ★ 이 단계(합성)의 오류만 읽는다 — ⑤영상의 실패가 여기 뜨면 안 된다. */}
+      {reelErrorFor(reel, "done") && <p className="pgsub warn">{reelErrorFor(reel, "done")}</p>}
       {/* ★★ 2026-08-25 — 도는 표시를 붙이고 **busy 도 함께 본다**(사장님: "이대로 완성하기
           누르면 지금 진행되고 있는지 잘 모르겠어").
           ★ 왜 busy 인가: 누른 직후에는 busy 만 참이다. reel.status 가 "rendering" 이 되고
@@ -187,6 +188,17 @@ export default function ReelDonePage() {
             {/* ★ 화살표를 안 붙인다 — 다음 화면으로 가는 버튼이 아니라 굽는 버튼이다. */}
             {busy === "render" ? "시작하는 중…" : reel.video?.url ? "다시 만들기" : "이대로 완성하기"}
           </button>
+          {/* ★★ 내려받기(2026-08-25 사장님 지적: "영상 다운 버튼도 없다"). 단계별
+              흐름과 보관함에는 있는데 reel 만 빠져 있었다 — 완성 화면을 만들 때
+              자막 편집기만 가져오고 그 주변 장치를 안 가져온 것이다.
+              ★ 완성본이 있으면 사장님이 하고 싶은 일은 **내려받기**다 — 보관함보다 앞에 둔다.
+              ★ ?dl=1 — 서명 URL 로 302 하면 다른 출처가 되어 아래 속성이 무시된다.
+                첨부로 내려줄지를 Storage 가 정하게 하는 신호다(app/api/renders/[name]).
+              ★ 각인(?v=)이 붙은 finalSrc 를 쓰지 않는다 — 내려받기는 늘 최신 파일을
+                받으면 되고, 질의문자가 둘이면 라우트가 읽는 이름이 헷갈린다. */}
+          {reel.video?.url && (
+            <a className="cta" href={`${reel.video.url}?dl=1`} download>내려받기</a>
+          )}
           {reel.video?.url && <Link className="cta" href="/archive">보관함으로 →</Link>}
         </div>
       </div>

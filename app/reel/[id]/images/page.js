@@ -16,7 +16,7 @@ import { useReelProject } from "../layout";
 import { REEL_STEPS, reelStepHref } from "../../../../lib/reel/steps";
 import ReelBack from "../../../../components/ReelBack";
 import {
-  reelOf, canDrawReelImages, isReelRendering, isImagesLocked, imageTriesLeft, imageTriesLeftLifetime,
+  reelOf, reelErrorFor, canDrawReelImages, isReelRendering, isImagesLocked, imageTriesLeft, imageTriesLeftLifetime,
 } from "../../../../lib/reel/doc";
 import { reelSheetUrl } from "../../../../lib/reel/oneshot";
 import { aspectFor } from "../../../../lib/aspects";
@@ -91,7 +91,10 @@ export default function ReelImagesPage() {
     <section className="panel panel--wide">
       <h2>{stepLabel}</h2>
       {err && <p className="pgsub warn">{err}</p>}
-      {reel.error && <p className="pgsub warn">{reel.error}</p>}
+      {/* ★★ **이 단계의 오류만** 읽는다(2026-08-25). 그전에는 reel.error 를 그대로 읽어
+          ⑤영상의 fal 422 가 이 화면에 떴다 — 반대로 그림이 진짜 실패했을 때도 남의
+          오류에 가려졌다. 판정은 lib/reel/doc.js 의 reelErrorFor 하나다. */}
+      {reelErrorFor(reel, "images") && <p className="pgsub warn">{reelErrorFor(reel, "images")}</p>}
       {/* ★★ 2026-08-25 — 도는 표시를 붙인다(사장님: "로딩 마크가 안 떠서 사용자가
           인지하기가 어려울 것 같아"). 스토리보드 한 장은 수십 초가 걸리는데 글자만
           있으면 멎은 것과 구별이 안 된다. ⑤영상이 같은 날 쓴 처방과 같은 모양이다. */}

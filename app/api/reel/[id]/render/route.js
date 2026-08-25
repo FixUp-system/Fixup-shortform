@@ -84,7 +84,8 @@ export const POST = withUser(async (req, { params }, user) => {
       .catch(async (e) => {
         console.error("reel render error:", e);
         await updateProject(id, user.id, (p) =>
-          putReel(p, { status: "error", error: e?.message || "합성하지 못했어요" })).catch(() => {});
+          // ★ 어느 단계의 실패인지 적는다(2026-08-25) — reelErrorFor 가 이 값으로 가른다.
+          putReel(p, { status: "error", error: e?.message || "합성하지 못했어요", errorStep: "done" })).catch(() => {});
       })
   );
   return Response.json({ ok: true });

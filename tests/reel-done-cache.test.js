@@ -48,3 +48,21 @@ describe("단계별 흐름과 같은 처방이다", () => {
     expect(create).toMatch(/\?v=\$\{render\.ts/);
   });
 });
+
+describe("내려받기", () => {
+  // ★ 사장님 지적(2026-08-25): "영상 다운 버튼도 없다." 단계별 흐름과 보관함에는 있는데
+  //   reel 완성 화면만 빠져 있었다 — 자막 편집기만 가져오고 주변 장치를 안 가져왔다.
+  it("★ 완성본이 있으면 내려받기 링크가 있다", () => {
+    expect(page).toMatch(/\?dl=1/);
+    expect(page).toContain("내려받기");
+  });
+
+  it("보관함 링크보다 **앞**에 있다 — 완성본이 있으면 하고 싶은 일은 내려받기다", () => {
+    expect(page.indexOf("내려받기")).toBeLessThan(page.indexOf("보관함으로"));
+  });
+
+  it("보관함도 같은 신호를 쓴다 — 두 자리가 갈리면 한쪽만 고쳐진다", () => {
+    const archive = strip(readFileSync("app/archive/[id]/page.js", "utf8"));
+    expect(archive).toMatch(/\?dl=1/);
+  });
+});

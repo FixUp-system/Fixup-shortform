@@ -88,7 +88,9 @@ export const POST = withUser(async (req, { params }, user) => {
       })
       .catch(async (e) => {
         await updateProject(id, user.id, (p) =>
-          putReel(p, { status: "error", error: e?.message || "영상을 못 만들었어요" })).catch(() => {});
+          // ★ 어느 단계의 실패인지 적는다(2026-08-25) — 안 적으면 ③이미지 화면이 이 문구를
+          //   자기 오류처럼 보여 준다(lib/reel/doc.js 의 reelErrorFor).
+          putReel(p, { status: "error", error: e?.message || "영상을 못 만들었어요", errorStep: "video" })).catch(() => {});
       })
   );
   return Response.json({ ok: true });
