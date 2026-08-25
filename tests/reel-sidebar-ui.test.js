@@ -100,3 +100,27 @@ describe("reel 은 표의 조건 안에서만 그려진다", () => {
     expect(next).toBeGreaterThan(list);
   });
 });
+
+describe("새로 시작할 길이 화면에 있다", () => {
+  // ★★ 2026-08-25 사장님 지적: "새로 만들 수가 없어."
+  //   같은 날 진입 링크를 **이어서 할 자리**로 바꾸면서(makeReelHref) 새 프로젝트를
+  //   시작할 길이 사이드바에서 통째로 사라졌다 — 주소를 직접 쳐야만 열렸다.
+  //   옆의 둘(create·ad)은 이미 이 링크를 갖고 있어, reel 만 빠져 있던 것이다.
+  it("reel 에도 + 새로 만들기 링크가 있다", () => {
+    const code = strip(sidebar());
+    const at = code.indexOf("SIDEBAR_FLOWS.reel");
+    expect(at, "reel 블록을 못 찾겠다").toBeGreaterThan(-1);
+    const next = code.indexOf('href="/archive"', at);
+    const block = code.slice(at, next);
+    expect(block, "새로 시작할 길이 없다").toContain('href="/reel/new"');
+    expect(block).toContain("side-new");
+  });
+
+  it("옆의 둘과 같은 조건이다 — 프로젝트 안에서만 뜬다", () => {
+    const code = strip(sidebar());
+    const at = code.indexOf('href="/reel/new"');
+    expect(at).toBeGreaterThan(-1);
+    // 링크 바로 앞에 "프로젝트가 있는가" 판정이 있어야 한다(create·ad 와 같은 모양).
+    expect(code.slice(Math.max(0, at - 160), at)).toMatch(/reelProject\?\.id/);
+  });
+});

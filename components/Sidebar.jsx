@@ -336,6 +336,14 @@ export default function Sidebar() {
             <span className="ic"><Icon name="home" /></span>영상 만들기
           </Link>
           {inReel && <ReelStepList pathname={pathname} />}
+          {/* ★★ 2026-08-25 사장님 지적: "새로 만들 수가 없어."
+              같은 날 위 [영상 만들기]를 **작업 중이던 자리로 되돌아가게** 고치면서,
+              새로 시작할 길이 화면에서 통째로 사라졌다 — 주소(/reel/new)를 직접 쳐야만
+              열렸다. 옆의 둘(create·ad)은 이미 이 링크를 갖고 있다.
+              ★ 프로젝트 안에 있을 때만 뜬다 — /reel/new 에서는 이미 그 화면이다. */}
+          {inReel && reelProject?.id && (
+            <Link href="/reel/new" className="side-new">+ 새로 만들기</Link>
+          )}
         </>
       )}
       <Link
