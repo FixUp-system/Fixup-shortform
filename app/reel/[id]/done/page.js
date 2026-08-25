@@ -135,7 +135,18 @@ export default function ReelDonePage() {
       <h2>완성</h2>
       {err && <p className="pgsub warn">{err}</p>}
       {reel.error && <p className="pgsub warn">{reel.error}</p>}
-      {rendering && <p className="pgsub">영상을 이어 붙이는 중이에요 — 다 되면 여기에 나타나요.</p>}
+      {/* ★★ 2026-08-25 — 도는 표시를 붙이고 **busy 도 함께 본다**(사장님: "이대로 완성하기
+          누르면 지금 진행되고 있는지 잘 모르겠어").
+          ★ 왜 busy 인가: 누른 직후에는 busy 만 참이다. reel.status 가 "rendering" 이 되고
+            폴링이 그것을 읽어 오기 전까지 rendering 은 아직 거짓이라, 그 사이 **아무
+            표시도 없이 버튼만 잠겨** 있었다. 그 빈 구간이 바로 사장님이 겪은 자리다.
+          ⚠️ 진척(n/m)은 못 쓴다 — 합성은 ffmpeg 단일 작업이라 중간값이 없다(단계별 흐름도
+            같은 이유로 합성을 멈춤 판정에서 뺐다: STALL_EXEMPT_PHASES). */}
+      {(rendering || busy === "render") && (
+        <p className="pgsub">
+          <span className="spinner" aria-hidden="true" /> 영상을 이어 붙이는 중이에요 — 몇 분 걸려요. 다 되면 여기에 나타나요.
+        </p>
+      )}
 
       {(rawUrl || finalSrc) && (
         <SubtitleEditor

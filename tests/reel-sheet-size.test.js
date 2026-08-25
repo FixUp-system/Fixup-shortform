@@ -16,9 +16,13 @@ describe("크기에 상한이 있다", () => {
   });
 
   // ★ 상한에 걸려 줄어들 때 가로가 남으므로 가운데로 모은다.
+  // ★ 2026-08-25 — 잘라 보는 길이(500자)를 쓰지 않는다. 규칙에 주석이 붙자 그 창을
+  //   벗어나 **멀쩡한 CSS 가 실패로 나왔다.** 규칙 블록 끝까지를 본다.
   it("가운데로 모인다", () => {
-    const at = css.indexOf(".sheet-view");
-    expect(css.slice(at, at + 500)).toMatch(/margin[^;]*auto|justify-content|align-items/);
+    const at = css.indexOf(".sheet-view {");
+    expect(at, ".sheet-view 규칙을 못 찾겠다").toBeGreaterThan(-1);
+    const block = css.slice(at, css.indexOf("}", at) + 1);
+    expect(block).toMatch(/margin[^;]*auto|justify-content|align-items/);
   });
 });
 

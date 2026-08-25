@@ -92,7 +92,14 @@ export default function ReelImagesPage() {
       <h2>{stepLabel}</h2>
       {err && <p className="pgsub warn">{err}</p>}
       {reel.error && <p className="pgsub warn">{reel.error}</p>}
-      {drawingNow && <p className="pgsub">그림을 그리는 중이에요 — 다 되면 여기에 나타나요.</p>}
+      {/* ★★ 2026-08-25 — 도는 표시를 붙인다(사장님: "로딩 마크가 안 떠서 사용자가
+          인지하기가 어려울 것 같아"). 스토리보드 한 장은 수십 초가 걸리는데 글자만
+          있으면 멎은 것과 구별이 안 된다. ⑤영상이 같은 날 쓴 처방과 같은 모양이다. */}
+      {drawingNow && (
+        <p className="pgsub">
+          <span className="spinner" aria-hidden="true" /> 그림을 그리는 중이에요 — 다 되면 여기에 나타나요.
+        </p>
+      )}
       {rendering && <p className="pgsub warn">지금 영상을 만드는 중이에요 — 끝난 뒤에 다시 그릴 수 있어요.</p>}
 
       {/* ★ 남은 횟수·값 안내를 걷어냈다(2026-08-25 사장님 지시).
@@ -108,6 +115,9 @@ export default function ReelImagesPage() {
       {sheetUrl ? (
         <div className="sheet-view">
           <img src={sheetUrl} alt="스토리보드" />
+          {/* ★ 덮개다(absolute) — 옛 그림을 **지우지 않고** 그 위에서 돈다. 무엇을 다시
+              그리는 중인지 옛 그림으로 알 수 있다(⑤영상의 같은 처방). */}
+          {drawingNow && <div className="frame-busy"><span className="spinner" aria-hidden="true" /></div>}
         </div>
       ) : cuts.length > 0 && (
         <div className="cut-shots">
@@ -120,6 +130,8 @@ export default function ReelImagesPage() {
               {c.image?.url && (
                 <img src={c.image.url} alt={`컷 ${c.idx + 1}`} />
               )}
+              {/* ★ 그리는 중인 칸 위에서 돈다 — 옛 그림은 그대로 둔다. */}
+              {drawingNow && <div className="frame-busy"><span className="spinner" aria-hidden="true" /></div>}
               <span className="no">{c.idx + 1}</span>
               <button className="tag" disabled={!canDraw || drawingNow} onClick={() => draw([c.idx])}>
                 {c.image?.url ? "다시 만들기" : "이 컷 그리기"}

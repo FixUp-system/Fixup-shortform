@@ -2171,6 +2171,9 @@ h1.login-head { margin-inline: auto; }
    ★ 비율을 강제하지 않는다 — 격자 캔버스는 칸 수마다 다르다(9:16 · 3:4 · 4:5 · 16:9).
    고정하면 가로 한 줄짜리(3칸)가 잘려 보인다. */
 .sheet-view {
+  /* ★ 덮개(.frame-busy)가 absolute 라 기준이 필요하다 — 없으면 그리는 중 표시가
+     화면 전체를 덮는다(2026-08-25). */
+  position: relative;
   margin-top: var(--sp-4);
   border: 1px solid var(--line);
   border-radius: var(--r-card);

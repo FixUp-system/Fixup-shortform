@@ -29,11 +29,20 @@ describe("쓰는 동안에는 버튼이 없다", () => {
   // ★ 2026-08-25: 버튼이 한 군데에 그려지고 두 자리에서 쓰인다(rewriteBtn) —
   //   프롬프트 칸 안, 그리고 시나리오가 아직 없을 때의 실행줄. 그래서 감추는 판정은
   //   **선언 자리 한 곳**에 있다. 뜻은 그대로다: 쓰는 동안에는 버튼이 없다.
-  it("busy 일 때 버튼을 감춘다", () => {
+  // ★★ 2026-08-25 — **뒤집혔다.** 옛 단정은 "busy 면 버튼을 통째로 감춘다"였는데,
+  //   자리가 비니 **눌렀는지조차 알 수 없었다** — 사장님이 그래서 "프로덕션에 반영이
+  //   안 되는 것 같다"고 했다(실제로는 정상적으로 돌아 컷까지 바뀌어 있었다).
+  //   이제 그 자리에 도는 표시와 "쓰는 중…" 을 남긴다. 뜻은 유지된다: **누를 것이
+  //   있는 것처럼 보이지 않는다**(버튼이 아니라 글이다).
+  it("busy 일 때 버튼 자리에 '쓰는 중' 이 남는다 — 비우지 않는다", () => {
     const c = clean(scenario);
     const at = c.indexOf("const rewriteBtn");
     expect(at, "버튼 선언을 못 찾았다").toBeGreaterThan(-1);
-    expect(c.slice(at, at + 200), "busy 로 감싸는 조건이 없다").toMatch(/busy \?\s*null/);
+    const decl = c.slice(at, at + 400);
+    expect(decl, "busy 로 가르는 조건이 없다").toMatch(/busy \?/);
+    expect(decl, "자리를 비운다").not.toMatch(/busy \?\s*null/);
+    expect(decl).toMatch(/쓰는 중/);
+    expect(decl, "그 자리가 버튼이면 누를 것처럼 보인다").toMatch(/<p /);
   });
 
   it("버튼 문구에서 쓰는 중 표시가 빠진다", () => {

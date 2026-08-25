@@ -105,8 +105,14 @@ export default function ReelScenarioPage() {
 
   // ★ 다시 쓰는 버튼은 **한 번만 적는다** — 자리가 둘(프롬프트 칸 안 / 시나리오가 아직
   //   없을 때의 실행줄)이지만 둘은 동시에 안 뜬다. 손으로 두 번 적으면 라벨이 갈린다.
-  // ★ 쓰는 동안에는 아예 감춘다 — disabled 로 두면 누를 것이 있는 것처럼 보이기만 한다.
-  const rewriteBtn = busy ? null : (
+  // ★★ 2026-08-25 — 쓰는 동안 **감추지 않는다.** 옛 코드는 `busy ? null` 로 버튼을 통째로
+  //   지웠는데, 자리가 비니 **눌렀는지조차 알 수 없었다** — 사장님이 그래서 "프로덕션에
+  //   반영이 안 되는 것 같다"고 했다(실제로는 정상적으로 돌아 컷까지 바뀌어 있었다).
+  //   그 자리에 도는 표시와 함께 "쓰는 중…" 을 남긴다. 누를 것이 있는 것처럼 보이지
+  //   않게 버튼이 아니라 **글**로 둔다(④프롬프트의 같은 자리와 모양을 맞춘다).
+  const rewriteBtn = busy ? (
+    <p className="pgsub"><span className="spinner" aria-hidden="true" /> 쓰는 중…</p>
+  ) : (
     <button className="mini" disabled={!!lock} onClick={makeScenario}>
       {note.trim() ? "이대로 고치기" : "다시 쓰기"}
     </button>
@@ -116,10 +122,19 @@ export default function ReelScenarioPage() {
     <section className="panel panel--wide">
       <h2>{stepLabel}</h2>
       {err && <p className="pgsub warn">{err}</p>}
+      {/* ★ 다시 쓰는 중에도 알린다 — 아래 버튼 자리에만 표시가 있으면, 긴 글을 읽고
+          있던 사장님은 그 자리를 안 본다. */}
+      {busy && scenario?.text && (
+        <p className="pgsub"><span className="spinner" aria-hidden="true" /> 시나리오를 다시 쓰고 있어요 — 다 되면 위 글이 바뀌어요.</p>
+      )}
       {scenario?.text ? (
         <p className="script-src">{scenario.text}</p>
       ) : (
-        <p className="pgsub">{busy ? "시나리오를 쓰고 있어요 — 잠시만 기다려 주세요." : "아직 시나리오가 없어요 — 아래에서 다시 쓸 수 있어요."}</p>
+        <p className="pgsub">
+          {busy ? (
+            <><span className="spinner" aria-hidden="true" /> 시나리오를 쓰고 있어요 — 잠시만 기다려 주세요.</>
+          ) : "아직 시나리오가 없어요 — 아래에서 다시 쓸 수 있어요."}
+        </p>
       )}
       {lock && <p className="pgsub">{lock.message}</p>}
 
