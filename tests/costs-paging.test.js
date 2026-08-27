@@ -32,6 +32,18 @@ async function seed(n, { actor = ADMIN, at = day(20) } = {}) {
 describe("읽는 양 — 창으로 자른다", () => {
   beforeEach(() => { resetMemoryStore(); seq = 0; });
 
+  // ★★ 2026-08-27 실측 — 이 판은 **라이브 조회에서 잡힌 것**을 못 박는다.
+  //   `cost_records.ts` 는 timestamptz 인데(db/schema.sql) 에폭 밀리초를 그대로 넘겨
+  //   `date/time field value out of range: 1787756400000` 로 죽었다. 메모리 저장소는
+  //   숫자를 그대로 다뤄서 이 판 밖에서는 안 드러난다 — 그래서 **소스**로 잰다.
+  it("★ 기간은 시각 문자열로 넘긴다 — 숫자를 주면 라이브에서 죽는다", () => {
+    const sb = readFileSync("lib/store/supabase.js", "utf8");
+    const at = sb.indexOf("async listCosts(");
+    const body = sb.slice(at, at + 900);
+    expect(body, "에폭 밀리초를 그대로 넘긴다").not.toMatch(/gte\("ts", from\)/);
+    expect(body).toContain("toISOString");
+  });
+
   it("★ 저장소에 창을 여는 문이 있다 — 없으면 늘 전부 읽는다", () => {
     expect(typeof memoryStore.listCosts).toBe("function");
     // supabase 쪽도 같은 계약이어야 한다(둘이 갈리면 로컬만 빨라진다).
