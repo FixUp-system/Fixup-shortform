@@ -26,10 +26,15 @@ describe("시나리오 자동 생성", () => {
 
   // ★★ 잠금(scenarioLock)을 존중한다 — 클립을 이미 구운 뒤에는 다시 쓰면 안 된다.
   //   화면과 서버가 같은 판정을 본다는 이 저장소 규율(파일 머리말 참고).
+  // ★★ 2026-08-27 — 재는 자리를 바꿨다. 옛 판정은 **첫 `useEffect` 부터 700자**를 봤는데,
+  //   그 첫 매치는 effect 가 아니라 `import { useEffect … }` 줄이라 실제로는 "파일 머리에서
+  //   700바이트 안에 lock 이 있나"를 재고 있었다(경계에서 9자 남아 있었고, 무관한 주석 한
+  //   줄에 깨졌다). 재려던 것은 **자동 생성이 잠금을 보는가**이므로 그 effect 를 본다.
   it("잠겨 있으면 자동 생성하지 않는다", () => {
-    const at = clean.indexOf("useEffect");
-    expect(at).toBeGreaterThan(-1);
-    expect(clean.slice(at, at + 700)).toContain("lock");
+    const at = clean.indexOf("autoRef.current = true");
+    expect(at, "자동 생성 effect 를 못 찾았다").toBeGreaterThan(-1);
+    const body = clean.slice(Math.max(0, at - 400), at);
+    expect(body, "자동 생성이 잠금을 안 본다").toContain("lock");
   });
 
   // ★★ 두 번 부르지 않는다. React 개발 모드는 effect 를 두 번 돌린다 — 막지 않으면

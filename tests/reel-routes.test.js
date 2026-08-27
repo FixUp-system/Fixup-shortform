@@ -487,9 +487,23 @@ describe("GET /api/reel/[id] — 읽는 문", () => {
     expect(src).toContain('kind !== "reel"');
   });
 
-  it("소유자 범위로 읽는다 — getProjectForViewing(보관함 공유)이 아니다", () => {
-    expect(src).toContain("getProject(");
-    expect(src).not.toContain("getProjectForViewing");
+  // ★★ 2026-08-27 — **뒤집혔다.** 옛 단정은 "소유자 범위로 읽는다 — 보관함 공유가 아니다"
+  //   였고 근거는 "reel 에는 그 요구가 없다, 좁게 시작하는 쪽이 되돌리기 쉽다"였다.
+  //   그 요구가 생겼다: 사장님이 레퍼런스 체크를 위해 **로그인 없이도** 보관함 전체를
+  //   보게 해 달라고 했다. film·광고가 이미 같은 모양이라 그 결로 맞췄다.
+  //   ★ 열린 것은 **읽기뿐**이다 — 고치는 문(PATCH)은 그대로 소유자 전용이고,
+  //     tests/guest-archive.test.js 가 그 경계를 잰다.
+  it("읽기는 보관함 공유다 — 남이 만든 것도 보인다(mine 으로 가른다)", () => {
+    const get = src.slice(src.indexOf("export const GET"), src.indexOf("export const PATCH"));
+    expect(get).toContain("getProjectForViewing");
+    expect(get, "mine 을 안 실어 보내면 화면이 쓰기 버튼을 그린다").toContain("mine");
+  });
+
+  it("고치는 문은 그대로 소유자 전용이다 — 저장에 소유자를 넘긴다", () => {
+    const patch = src.slice(src.indexOf("export const PATCH"));
+    expect(patch).toMatch(/updateProject\(id, user\.id/);
+    expect(patch, "고치는 문이 보기 전용 판독으로 샜다").not.toContain("getProjectForViewing");
+    expect(patch, "고치는 문이 손님에게 열렸다").not.toContain("guest: true");
   });
 });
 

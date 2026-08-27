@@ -1,5 +1,5 @@
 import { withUser } from "../../../../lib/auth/require-user.js";
-import { getProject, updateProject } from "../../../../lib/projects.js";
+import { getProject, getProjectForViewing, updateProject } from "../../../../lib/projects.js";
 // 자막 설정의 되돌리기 규칙은 lib 하나가 쥔다 — 라우트가 다시 적으면 갈린다.
 import { normalizeSubtitle } from "../../../../lib/subtitles.js";
 
@@ -12,10 +12,8 @@ import { normalizeSubtitle } from "../../../../lib/subtitles.js";
 //   채웠다. film 이 같은 사고를 이미 겪었고(app/api/film/[id]/route.js 머리말 참고),
 //   그 선례를 계획에 못 옮긴 것이 이 구멍의 원인이다.
 //
-// ★ film 과 다르게 **소유자 범위**로 좁힌다 — 보기 전용(누구나 보는) 문이 아니라
-//   `getProject` 를 쓴다. film 은 보관함 전체 공유가 요구지만 reel 에는 그런 요구가
-//   없다 — 넓게 시작하면 나중에 좁힐 때 이미 공유된 것이 끊긴다. 좁게 시작하는 쪽이
-//   되돌리기 쉽다.
+// ★ 읽기는 **보기 전용 문**이다(2026-08-27 에 바뀌었다 — 아래 GET 머리말 참고).
+//   고치는 문(PATCH)은 그대로 소유자 전용이다: updateProject 에 소유자를 넘긴다.
 //
 // ★ `kind !== "reel"` 검사 — 다른 reel 라우트들과 같은 결로 격리를 양방향으로 지킨다
 //   (예: app/api/reel/[id]/clips/route.js 의 같은 검사, 2026-08-21 리뷰 I10).
@@ -24,14 +22,21 @@ import { normalizeSubtitle } from "../../../../lib/subtitles.js";
 //   다른 말을 하면 안 된다.
 //
 // ★ 읽는 문과 만드는 문을 가른다 — 이 GET 은 아무것도 안 만들고 아무 값도 안 쓴다.
+// ★★ 2026-08-27 — **보기 전용 문으로 바꿨다.** 옛 주석(바로 위)은 "reel 에는 보관함 전체
+//   공유 요구가 없다 — 좁게 시작하는 쪽이 되돌리기 쉽다"였는데, 그 요구가 생겼다:
+//   사장님이 레퍼런스 체크를 위해 **로그인 없이도** 보관함 전체를 보게 해 달라고 했다.
+//   film·광고가 이미 같은 모양이라(loadFilmForViewing·loadAdForViewing) 그 결로 맞춘다.
+//   ★ `mine` 을 함께 실어 보낸다 — 화면이 고치는 버튼을 그릴지 정하는 근거다.
+//   ★ 고치는 문(PATCH, 아래)은 **그대로 소유자 전용**이다. 열린 것은 읽기뿐이다.
 export const GET = withUser(async (_req, { params }, user) => {
   const { id } = await params;
-  const project = await getProject(id, user.id);
+  const viewed = await getProjectForViewing(id, user?.id ?? null);
+  const project = viewed?.doc || null;
   if (!project || project.kind !== "reel") {
     return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
   }
-  return Response.json(project);
-});
+  return Response.json({ ...project, mine: viewed.mine });
+}, { guest: true });
 
 // reel 문서에 **자막 설정을 저장하는 문**(2026-08-25).
 //

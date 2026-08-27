@@ -17,10 +17,11 @@ import { loadFilmForViewing } from "../../../../lib/film/load.js";
 //
 // ★ 문구는 film 라우트의 다른 자리와 같다("찾을 수 없어요") — status·render 와 갈리면
 //   같은 화면이 문에 따라 다른 말을 한다.
+// ★ 손님(비로그인)도 읽는다(lib/auth/guest.js) — mine 은 늘 false 다.
 export const GET = withUser(async (_req, { params }, user) => {
   const { id } = await params;
-  const viewed = await loadFilmForViewing(id, user.id);
+  const viewed = await loadFilmForViewing(id, user?.id ?? null);
   if (!viewed) return Response.json({ error: "찾을 수 없어요" }, { status: 404 });
   // mine — 화면이 쓰기 버튼을 그릴지 정하는 근거다(만든 사람이 누구인지는 안 준다).
   return Response.json({ ...viewed.project, mine: viewed.mine });
-});
+}, { guest: true });

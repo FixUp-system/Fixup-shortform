@@ -78,31 +78,39 @@ describe("가격표", () => {
 });
 
 describe("모델별 정가", () => {
-  it("Seedance 는 원가 비례로 비싸다", () => {
-    expect(videoPrice(15, "seedance-2.0")).toBe(80);
-    expect(videoPrice(30, "seedance-2.0")).toBe(160);
-    expect(videoPrice(45, "seedance-2.0")).toBe(240);
-    expect(videoPrice(60, "seedance-2.0")).toBe(320);
+  // ★★ 2026-08-27 — **값을 손으로 적지 않는다.** 옛 판은 80/160/240/320 처럼 표를 그대로
+  //   베껴 적어서, 정가를 1회 생성 기준으로 갱신하자 여덟 줄이 한꺼번에 깨졌다. 그런데
+  //   여기서 재려던 것은 그 숫자가 아니라 **"모델·길이가 값을 가르는가"** 다.
+  //   숫자가 맞는지는 원가에서 다시 계산해 대조하는 판이 따로 본다
+  //   (tests/pricing-covers-cost.test.js) — 그쪽이 진짜 값 검사다.
+  it("Seedance 는 원가 비례로 비싸다 — 길수록·비쌀수록 오른다", () => {
+    const P = (s) => videoPrice(s, "seedance-2.0");
+    expect(P(15)).toBeLessThan(P(30));
+    expect(P(30)).toBeLessThan(P(45));
+    expect(P(45)).toBeLessThan(P(60));
+    // 같은 길이에서 Kling 보다 비싸다 — 초당 단가가 3.6배다.
+    expect(P(30)).toBeGreaterThan(videoPrice(30, "kling-v3") * 2);
   });
 
-  it("Kling 정가는 그대로다 — 옛 프로젝트의 값이 바뀌면 안 된다", () => {
-    expect(videoPrice(15, "kling-v3")).toBe(25);
-    expect(videoPrice(30, "kling-v3")).toBe(50);
-    expect(videoPrice(45, "kling-v3")).toBe(75);
-    expect(videoPrice(60, "kling-v3")).toBe(100);
+  it("Kling 은 표의 그 값이다 — 옛 프로젝트가 다른 표로 새면 안 된다", () => {
+    for (const s of [15, 30, 45, 60]) {
+      expect(videoPrice(s, "kling-v3")).toBe(VIDEO_PRICE["kling-v3"][RES][s]);
+    }
   });
 
   // ★★ 모델을 안 넘긴 옛 호출은 옛 프로젝트다 — Kling 으로 봐야 한다
   it("모델을 안 주면 Kling 값이다", () => {
-    expect(videoPrice(30)).toBe(50);
-    expect(videoPrice(30, undefined)).toBe(50);
-    expect(videoPrice(30, "뒤죽박죽")).toBe(50);
+    const kling30 = VIDEO_PRICE["kling-v3"][RES][30];
+    expect(videoPrice(30)).toBe(kling30);
+    expect(videoPrice(30, undefined)).toBe(kling30);
+    expect(videoPrice(30, "뒤죽박죽")).toBe(kling30);
   });
 
   it("길이를 모르면 30초 값으로 본다 — 모델별로", () => {
-    expect(videoPrice(null, "seedance-2.0")).toBe(160);
-    expect(videoPrice(7, "seedance-2.0")).toBe(160);
-    expect(videoPrice(null, "kling-v3")).toBe(50);
+    const sd30 = VIDEO_PRICE["seedance-2.0"][RES][30];
+    expect(videoPrice(null, "seedance-2.0")).toBe(sd30);
+    expect(videoPrice(7, "seedance-2.0")).toBe(sd30);
+    expect(videoPrice(null, "kling-v3")).toBe(VIDEO_PRICE["kling-v3"][RES][30]);
   });
 
   it("클립 재생성도 모델을 탄다", () => {
@@ -141,34 +149,39 @@ describe("모델별 정가", () => {
 
 describe("해상도별 가격", () => {
   it("옛 호출(해상도 없음)은 720p 값과 같다", () => {
-    // 이 작업의 하드 제약 — 이미 만든 프로젝트의 가격이 소급해 바뀌면 안 된다
-    expect(videoPrice(30, "seedance-2.0")).toBe(160);
-    expect(videoPrice(30, "seedance-2.0", "720p")).toBe(160);
-    expect(videoPrice(15, "seedance-2.0")).toBe(80);
+    // 이 작업의 하드 제약 — 해상도를 안 넘긴 옛 호출이 다른 열로 새면 안 된다.
+    // ★ 값을 손으로 적지 않는다(2026-08-27) — 재는 것은 "어느 열로 떨어지는가"다.
+    for (const sec of [15, 30, 45, 60]) {
+      expect(videoPrice(sec, "seedance-2.0")).toBe(VIDEO_PRICE["seedance-2.0"]["720p"][sec]);
+      expect(videoPrice(sec, "seedance-2.0", "720p")).toBe(VIDEO_PRICE["seedance-2.0"]["720p"][sec]);
+    }
   });
 
-  // 1080p 는 원가비(2.25)가 크레딧에 **그대로** 살아 있다 — 그러니 관계식으로 적는다.
-  // 하드코딩 숫자만 보면 표를 만질 때 관계가 깨져도 통과한다.
-  it("1080p 는 720p 의 2.25배다 — 픽셀수 비", () => {
-    expect(videoPrice(30, "seedance-2.0", "1080p")).toBe(videoPrice(30, "seedance-2.0") * 2.25);
-    expect(videoPrice(15, "seedance-2.0", "1080p")).toBe(videoPrice(15, "seedance-2.0") * 2.25);
-    expect(videoPrice(30, "seedance-2.0", "1080p")).toBe(360);
-    expect(videoPrice(15, "seedance-2.0", "1080p")).toBe(180);
-  });
-
-  // ★ 480p 는 관계식으로 못 적는다 — 원가비는 4/9(≈0.444)인데 크레딧은 그것을 5의 배수로
-  //   올려 결과가 **1/2** 이 됐다(lib/pricing.js 의 표 주석 참고). 이름이 "4/9" 라고 적혀
-  //   있으면 본문이 재는 것과 달라서, 값이 4/9 가 아닌데도 초록이라 아무도 안 잡는다.
-  it("480p 는 720p 의 절반이다 — 원가비 4/9 를 5의 배수로 올린 값", () => {
-    expect(videoPrice(30, "seedance-2.0", "480p")).toBe(videoPrice(30, "seedance-2.0") / 2);
-    expect(videoPrice(15, "seedance-2.0", "480p")).toBe(videoPrice(15, "seedance-2.0") / 2);
-    expect(videoPrice(30, "seedance-2.0", "480p")).toBe(80);
-    expect(videoPrice(15, "seedance-2.0", "480p")).toBe(40);
+  // ★★ 2026-08-27 — **비율 규칙이 바뀌었다.** 옛 판은 "1080p = 720p × 2.25(원가비)"·
+  //   "480p = 720p ÷ 2" 를 못 박았는데, 정가를 1회 생성 기준으로 갱신하면서 모든 열에
+  //   **고정비**(스토리보드 한 장 + LLM·TTS·음성인식)가 똑같이 얹혔다. 고정비는 해상도를
+  //   안 타므로 열 사이 비율이 **원가비보다 1 에 가까워진다** — 그것이 지금의 사실이다.
+  //   그래서 재는 것을 등호에서 **띠**로 바꾼다(방향과 폭은 그대로 못 박는다).
+  it("화질이 오르면 값도 오른다 — 다만 원가비만큼은 아니다(고정비가 함께 얹힌다)", () => {
+    for (const sec of [15, 30, 45, 60]) {
+      const p480 = videoPrice(sec, "seedance-2.0", "480p");
+      const p720 = videoPrice(sec, "seedance-2.0", "720p");
+      const p1080 = videoPrice(sec, "seedance-2.0", "1080p");
+      expect(p480).toBeLessThan(p720);
+      expect(p720).toBeLessThan(p1080);
+      // 클립 원가비는 2.25 — 고정비가 얹혀 그보다 낮고, 2배는 넘는다.
+      expect(p1080 / p720).toBeGreaterThan(2);
+      expect(p1080 / p720).toBeLessThan(2.25);
+      // 클립 원가비는 4/9(≈0.444) — 같은 이유로 그보다 높고, 0.6 은 안 넘는다.
+      expect(p480 / p720).toBeGreaterThan(4 / 9);
+      expect(p480 / p720).toBeLessThan(0.6);
+    }
   });
 
   it("Kling 은 해상도를 안 받는다 — 무엇을 줘도 같은 값이다", () => {
-    expect(videoPrice(30, "kling-v3")).toBe(50);
-    expect(videoPrice(30, "kling-v3", "1080p")).toBe(50);
+    const kling30 = VIDEO_PRICE["kling-v3"][RES][30];
+    expect(videoPrice(30, "kling-v3")).toBe(kling30);
+    expect(videoPrice(30, "kling-v3", "1080p")).toBe(kling30);
   });
 
   it("재생성도 해상도를 탄다", () => {
@@ -195,7 +208,7 @@ describe("해상도별 가격", () => {
   it("모르는 해상도는 720p 로 본다", () => {
     // 던지지 않는다 — 가격은 화면이 부르는 자리라 죽으면 페이지가 안 뜬다.
     // 값이 틀리는 것보다 나쁜 것은 화면이 통째로 사라지는 것이다.
-    expect(videoPrice(30, "seedance-2.0", "2160p")).toBe(160);
+    expect(videoPrice(30, "seedance-2.0", "2160p")).toBe(VIDEO_PRICE["seedance-2.0"]["720p"][30]);
   });
 
   // ★ 두 목록이 갈릴 자리를 코드가 판정한다 — tests/ad-options.test.js 와 같은 방식.
@@ -323,7 +336,8 @@ describe("광고 영상 정가", () => {
   it("adVideoPrice(seconds, modelId, resolution) 가 모델·길이·해상도 조합대로 값을 낸다", () => {
     expect(adVideoPrice(15, "seedance-2.0", "720p")).toBe(80);
     expect(adVideoPrice(15, "seedance-2.0", "1080p")).toBe(175);
-    expect(adVideoPrice(15, "seedance-2.0", "480p")).toBe(35);
+    // ★ 2026-08-27 — 35 → 40. 원가($2.02 + LLM $0.20)를 35 크레딧($2.10)이 밑돌았다.
+    expect(adVideoPrice(15, "seedance-2.0", "480p")).toBe(40);
     expect(adVideoPrice(15, "seedance-2.5", "720p")).toBe(120);
     expect(adVideoPrice(30, "seedance-2.5", "720p")).toBe(240);
     expect(adVideoPrice(30, "seedance-2.5", "480p")).toBe(110);

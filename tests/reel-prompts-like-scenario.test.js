@@ -38,3 +38,38 @@ describe("②시나리오와 같은 형식", () => {
     }
   });
 });
+
+// ★★ 2026-08-27 — **다시 쓰는 동안의 모양까지** 같아야 한다(사장님 지시: "영상 프롬프트도
+//   시나리오 다시쓰기와 동일한 형태로"). ②가 정한 규칙 넷:
+//     ① 옛 글 대신 **한 줄**만 뜬다(곧 사라질 글을 읽게 두지 않는다)
+//     ② 도는 표시와 함께 뜬다(글자만 있으면 멎은 것과 구별이 안 된다)
+//     ③ 입력폼은 **그대로 서 있는다**(칸이 사라지면 화면이 접혔다 펴진다)
+//     ④ 안내문은 **누르기 전에만** 뜨고, 버튼은 자리를 지키되 잠긴다
+describe("다시 쓰는 동안의 모양도 ②와 같다", () => {
+  it("① 옛 글 대신 한 줄이 뜬다 — 그 줄이 script-src 보다 앞에 있다", () => {
+    const busy = clean.indexOf('영상 프롬프트를 다시 쓰고 있어요');
+    expect(busy, "다시 쓰는 중 문구가 없다").toBeGreaterThan(-1);
+    expect(clean.indexOf("script-src"), "옛 글이 busy 갈래보다 앞에 있다").toBeGreaterThan(busy);
+  });
+
+  it("② 도는 표시가 함께 뜬다", () => {
+    const at = clean.indexOf('영상 프롬프트를 다시 쓰고 있어요');
+    expect(clean.slice(Math.max(0, at - 200), at)).toContain('className="spinner"');
+  });
+
+  it("③ 입력폼은 다시 쓰는 동안에도 사라지지 않는다", () => {
+    // note-form 을 그리는 조건에 saving 이 끼면 칸이 통째로 사라진다.
+    expect(clean, "쓰는 동안 칸을 감춘다").not.toMatch(/saving !== "whole" && \(\s*<div className="note-form"/);
+  });
+
+  it("④ 안내문은 누르기 전에만 뜨고 버튼은 잠긴 채 서 있는다", () => {
+    expect(clean).toMatch(/saving !== "whole" && \(/);
+    // 버튼 자리를 "고치는 중…" 같은 글로 바꾸지 않는다 — ②가 그 방식을 버렸다.
+    expect(clean, "버튼 자리가 글로 바뀐다").not.toContain("고치는 중");
+    expect(clean, "버튼이 안 잠긴다").toMatch(/disabled=\{!!saving \|\| !note\.trim\(\)\}/);
+  });
+
+  it("★ 버튼 라벨이 진행을 말하지 않는다 — 말하는 자리는 위 한 곳이다", () => {
+    expect(clean, "버튼이 쓰는 중이라고 말한다").not.toContain('"쓰는 중…"');
+  });
+});

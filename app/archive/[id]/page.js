@@ -26,6 +26,9 @@ import { PICKABLE_FILM_MODES } from "../../../lib/film/mode";
 //   lib/reel/steps.js 로 옮긴 것이 바로 이 소비자 때문이다(이 화면도 film 처럼
 //   "지금 있어야 할 단계"로 보낸다).
 import { REEL_STEPS, reelStepHref, currentReelStepKey } from "../../../lib/reel/steps";
+// reel 은 **한 장 + 한 벌**로 만든다 — 보여 줄 프롬프트가 둘이다(아래 주석 참고).
+//   판정은 lib 하나다(planReelBake) — 화면이 초를 다시 세면 제작 화면과 갈린다.
+import { planReelBake, reelWholePrompt } from "../../../lib/reel/oneshot";
 
 // 한 줄짜리 정보. 값이 없으면 줄째 안 그린다 — 빈 칸을 늘어놓으면 무엇이 없는지가 아니라
 // 화면이 덜 만들어진 것처럼 보인다.
@@ -96,6 +99,29 @@ function ArchiveDetailPageBody() {
   //   격리, lib/projects.js 의 isStepDoc).
   const isReel = doc.kind === "reel";
   const s = doc.settings || {};
+  // ★★ 2026-08-27 — reel 이 보여 주는 것은 **컷별 지시가 아니라 프롬프트 둘**이다
+  //   (사장님 지시: "영상 생성하는 방식이 변경되었기 때문에 이미지 생성 프롬프트와
+  //   영상 프롬프트로 변경해줘").
+  //
+  //   뿌리 — 이 흐름은 이제 **스토리보드 한 장**을 그리고 그 한 장을 통째로 넘겨 굽는다.
+  //   컷마다 문장·화면·움직임을 적어 컷별로 만들던 시절의 표를 그대로 보여 주면,
+  //   **이 영상이 실제로 어떻게 만들어졌는지를 잘못 말하는 화면**이 된다.
+  //
+  //   · 이미지 생성 프롬프트 — 그 한 장을 그린 글. 칸마다 같은 값이 각인돼 있다
+  //     (app/api/reel/[id]/images/route.js 의 `of`) — 그래서 **첫 값 하나**면 된다.
+  //   · 영상 프롬프트 — 통짜는 한 벌(reelWholePrompt: 사장님이 ④에서 고쳤으면 그 글,
+  //     아니면 시나리오 원문), 컷별(16초 이상)은 컷마다의 지문이다.
+  //     ★ 여기서 doc.scenario.text 를 그냥 쓰면 **고친 프롬프트가 안 보인다** — 옛 화면이
+  //       그랬다(고쳐 놓고도 보관함에는 원문이 떴다).
+  const reelImagePrompt = isReel ? (doc.cuts || []).map((c) => c.image?.of).find(Boolean) || "" : "";
+  const reelOneShot = isReel && planReelBake(doc).mode === "oneshot";
+  const reelWhole = isReel ? reelWholePrompt(doc) : "";
+  const reelCutPrompts = isReel ? (doc.cuts || []).map((c) => c.clip_prompt || "") : [];
+  const reelHasCutPrompts = reelCutPrompts.some(Boolean);
+  // 한 벌로 보여 줄 것인가 — 통짜이거나, 컷별 지문이 아직 하나도 없을 때다(그때는
+  // 굽기가 읽을 글이 시나리오 원문 하나다).
+  const reelShowsWhole = reelOneShot || !reelHasCutPrompts;
+  const reelHasVideoPrompt = reelShowsWhole ? !!reelWhole : reelHasCutPrompts;
   // 완성본 주소 — 종류마다 사는 자리가 다르다. 판정은 순수 함수 한 벌이다(lib/archive/video.js).
   // ★ 화면 안 삼항식으로 두었더니 film 갈래만 **객체**를 내서 재생·내려받기가 둘 다 죽었다.
   //   그 함수의 주석에 왜 값으로 재야 하는지가 있다.
@@ -174,10 +200,43 @@ function ArchiveDetailPageBody() {
                   generateScenario 를 그대로 쓴다, app/api/reel/[id]/scenario/route.js) —
                   광고와 같은 자리라 조건에 더한다. reel 에는 doc.script 가 아예 없어서
                   안 더하면 이 화면에 프롬프트 글이 통째로 안 보인다. */}
-            {(isAd || isReel) && doc.scenario?.text && (
+            {isAd && doc.scenario?.text && (
               <details className="lib-fold">
                 <summary>프롬프트 — 영상 모델에 넘긴 글</summary>
                 <p className="script-src">{doc.scenario.text}</p>
+              </details>
+            )}
+
+            {/* ── reel — **프롬프트 둘**이다(2026-08-27). 만드는 방식이 그렇기 때문이다:
+                한 장을 그리고(이미지 생성 프롬프트) 그 한 장을 통째로 넘겨 굽는다(영상 프롬프트). */}
+            {isReel && reelImagePrompt && (
+              <details className="lib-fold">
+                <summary>이미지 생성 프롬프트</summary>
+                <p className="script-src">{reelImagePrompt}</p>
+              </details>
+            )}
+            {isReel && reelHasVideoPrompt && (
+              <details className="lib-fold">
+                <summary>
+                  영상 프롬프트
+                  {/* ★ 컷별 갈래(16초 이상)에서만 개수를 말한다 — 통짜는 한 벌이라
+                      "1개"라고 적으면 없는 단위를 지어내는 것이다. */}
+                  {reelShowsWhole ? "" : ` — 컷 ${reelCutPrompts.length}개`}
+                </summary>
+                {reelShowsWhole ? (
+                  <p className="script-src">{reelWhole}</p>
+                ) : (
+                  <div className="plan-list">
+                    {reelCutPrompts.map((body, i) => (
+                      <div className="plan-row" key={i}>
+                        <span className="num">{i + 1}</span>
+                        <div className="plan-body">
+                          <span className="script-src">{body || "-"}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </details>
             )}
             {!isAd && !isReel && doc.script?.text && (
@@ -187,8 +246,11 @@ function ArchiveDetailPageBody() {
               </details>
             )}
 
-            {/* 장면·컷 — 광고는 shots, 단계별은 cuts. 이름만 다르고 사장님이 보는 것은 같다. */}
-            {(isAd ? doc.scenario?.shots : doc.cuts)?.length > 0 && (
+            {/* 장면·컷 — 광고는 shots, 단계별은 cuts. 이름만 다르고 사장님이 보는 것은 같다.
+                ★★ reel 은 여기 안 온다(2026-08-27) — 위의 프롬프트 둘이 그 자리를 대신한다.
+                   컷별 문장·화면·움직임은 **컷마다 따로 굽던 시절**의 표라, 한 장으로 만드는
+                   지금 그것을 보여 주면 만들어진 방식을 잘못 말하게 된다. */}
+            {!isReel && (isAd ? doc.scenario?.shots : doc.cuts)?.length > 0 && (
               <details className="lib-fold">
                 <summary>장면 {(isAd ? doc.scenario.shots : doc.cuts).length}개 — 컷별 지시</summary>
                 <div className="plan-list">

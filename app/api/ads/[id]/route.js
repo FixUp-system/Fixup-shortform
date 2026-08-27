@@ -31,13 +31,14 @@ async function loadAdForViewing(id, viewerId) {
   return { project: viewed.doc, mine: viewed.mine };
 }
 
+// ★ 손님(비로그인)도 읽는다(lib/auth/guest.js) — mine 은 늘 false 다.
 export const GET = withUser(async (_req, { params }, user) => {
   const { id } = await params;
-  const viewed = await loadAdForViewing(id, user.id);
+  const viewed = await loadAdForViewing(id, user?.id ?? null);
   if (!viewed) return Response.json({ error: "찾을 수 없어요" }, { status: 404 });
   // mine — 화면이 쓰기 버튼을 그릴지 정하는 근거다(만든 사람이 누구인지는 안 준다).
   return Response.json({ ...viewed.project, mine: viewed.mine });
-});
+}, { guest: true });
 
 export const PATCH = withUser(async (req, { params }, user) => {
   const { id } = await params;

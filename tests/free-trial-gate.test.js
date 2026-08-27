@@ -4,7 +4,7 @@ import { memoryStore, resetMemoryStore } from "../lib/store/memory.js";
 import { runWithActor } from "../lib/actor.js";
 import { assertBudget, BudgetExceeded } from "../lib/costs.js";
 import { requireVideoCharge, refundVideo } from "../lib/charges.js";
-import { FREE_TRIAL_USD } from "../lib/pricing.js";
+import { videoPrice, FREE_TRIAL_USD } from "../lib/pricing.js";
 
 const A = "00000000-0000-4000-8000-00000000000a";
 
@@ -86,8 +86,10 @@ describe("체험 한도", () => {
     const P = "p-paid";
 
     it("정가를 내면 잔액이 0 이 되는데, 그 뒤에도 컷이 계속 나가야 한다", async () => {
-      await memoryStore.insertGrant({ user_id: A, amount_credits: 50, reason: "충전" });
-      // 30초 한 편 = 50 크레딧. 내고 나면 잔액이 정확히 0 이다.
+      // ★ 값을 손으로 적지 않는다(2026-08-27) — 정가표가 바뀌면 이 판이 "잔액 0" 이라는
+      //   전제를 잃는다. 실제로 그렇게 깨졌다(50 → 55). 표에서 읽어 정확히 그만큼 채운다.
+      await memoryStore.insertGrant({ user_id: A, amount_credits: videoPrice(30), reason: "충전" });
+      // 30초 한 편 값을 그대로 냈으니 잔액이 정확히 0 이다.
       await requireVideoCharge({ userId: A, projectId: P, seconds: 30 });
       // 30초 한 편 원가가 $3.06 이라 컷 두어 개면 체험 한도($0.5)를 훌쩍 넘는다.
       await spend(FREE_TRIAL_USD * 6);
@@ -97,7 +99,7 @@ describe("체험 한도", () => {
     // 실패 → 환불 → 재시도. 옛 판정에서는 재시도 때마다 잔액이 다시 0 이 되어
     // 같은 자리에서 또 막혔다 — 빠져나갈 문이 없는 무한 루프였다.
     it("실패해서 되돌려받고 다시 돌려도 갇히지 않는다", async () => {
-      await memoryStore.insertGrant({ user_id: A, amount_credits: 50, reason: "충전" });
+      await memoryStore.insertGrant({ user_id: A, amount_credits: videoPrice(30), reason: "충전" });
       await requireVideoCharge({ userId: A, projectId: P, seconds: 30 });
       await spend(FREE_TRIAL_USD * 6);
       await refundVideo({ userId: A, projectId: P });      // 못 준 것은 받지 않는다

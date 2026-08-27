@@ -14,6 +14,8 @@ import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "./lib/auth/headers.js";
 // components/AppShell.jsx의 BARE_PATHS(사이드바 경계)도 같은 파일을 본다 — 왜 둘로 나뉘는지는
 // lib/auth/paths.js 주석 참고. 여기서 합치면 안 된다.
 import { matchesSegment, isPublicPath, isAdminPath } from "./lib/auth/paths.js";
+// 손님(비로그인) 읽기 — **보관함만**, **GET 만**, **env 로 켤 때만**이다.
+import { isGuestRequest } from "./lib/auth/guest.js";
 
 // setAll 이 어느 시점의 응답에 쓰든, 최종적으로 브라우저에 나가는 응답에는 그 쿠키가
 // 실려 있어야 한다. res 를 여러 번 새로 만드는 이 middleware 에서 이 옮겨싣기를 빠뜨리면
@@ -106,6 +108,13 @@ export async function middleware(req) {
 
   if (!user) {
     if (isPublicPath(pathname)) return cookieRes;
+    // ★★ 손님으로 통과시키는 유일한 자리(2026-08-27). 신원 헤더를 **안 넣는다** —
+    //   라우트는 그 없음을 보고 손님으로 읽는다(withUser 의 guest 옵션).
+    //   ★ 판정은 lib/auth/guest.js 하나다: 스위치가 켜져 있고, GET 이고, 그 목록에 있는
+    //     자리일 때만이다. 여기서 조건을 손으로 다시 적으면 그 사본이 조용히 넓어진다.
+    //   ★ 로그인한 사람은 이 갈래를 안 지난다 — 위에서 이미 신원이 붙었다. 그래서
+    //     "내 것"(mine) 표시나 승인 게이트가 예전과 글자 그대로 돈다.
+    if (isGuestRequest(pathname, req.method)) return cookieRes;
     if (isApi) {
       return copyCookies(cookieRes, NextResponse.json({ error: "로그인이 필요해요" }, { status: 401 }));
     }

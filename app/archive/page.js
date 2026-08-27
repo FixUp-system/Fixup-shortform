@@ -18,6 +18,9 @@ function ArchiveBody() {
   // ★ 첫 탭은 **주소**가 정한다(2026-08-19). 상세에서 [보관함으로]로 돌아올 때 보던 탭이
   //   실려 오므로, 화면 안 상태로만 기억하면 돌아올 때마다 [내 영상]으로 떨어진다.
   const params = useSearchParams();
+  // ★ 로그인 없이 보고 있는가. 손님에게는 **"내 영상"이라는 개념이 없다** — 그 칸을
+  //   그리면 누를 수 없는 자리를 누른 것처럼 보인다(라우트는 늘 전체로 답한다).
+  const [guest, setGuest] = useState(false);
   const [scope, setScope] = useState(() => (params.get("scope") === "all" ? "all" : "mine"));
 
   // 정리는 몰아서 하는 일이다 — 하나씩 지우면 스무 편을 치우는 데 스무 번을 묻는다.
@@ -33,10 +36,12 @@ function ArchiveBody() {
     let alive = true;
     setProjects(null);
     setErr("");
-    loadProjects(fetch, scope).then(({ projects, err }) => {
+    loadProjects(fetch, scope).then(({ projects, err, guest }) => {
       if (!alive) return;
       setProjects(projects);
       setErr(err);
+      // 손님(비로그인)인가 — 라우트가 말해 준다(lib/auth/guest.js). 짐작하지 않는다.
+      setGuest(guest);
     });
     return () => {
       alive = false;
@@ -126,7 +131,13 @@ function ArchiveBody() {
           </div>
         ) : (
           <div className="chips">
-            {/* 보는 범위 — 내부 팀이라 남이 만든 것도 볼 수 있다(읽기 전용) */}
+            {/* 보는 범위 — 내부 팀이라 남이 만든 것도 볼 수 있다(읽기 전용).
+                ★ 손님에게는 이 두 칸과 [수정]을 안 그린다(2026-08-27) — 고를 것도 지울
+                  것도 없다. 대신 무엇을 보고 있는지 한 줄로 말한다. */}
+            {guest ? (
+              <span className="hint">로그인 없이 전체 결과물을 보고 있어요 — 보기 전용이에요.</span>
+            ) : (
+              <>
             <button
               className="mini"
               aria-pressed={!isAll}
@@ -147,6 +158,8 @@ function ArchiveBody() {
               <button className="mini" onClick={() => setSelecting(true)}>
                 수정
               </button>
+            )}
+              </>
             )}
             <Link href="/create" className="cta">
               + 새 영상 만들기

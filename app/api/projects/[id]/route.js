@@ -37,9 +37,10 @@ class ResolutionLocked extends Error {
 //   서로 볼 수 있어야 한다 — 그래서 보기 전용 문(getProjectForViewing)으로 읽는다.
 //   이 파일의 PATCH·DELETE 와 아래 20곳 넘는 제작 라우트는 그대로 getProject 를 지난다:
 //   돈이 나가거나 지우는 문은 여전히 소유자만 연다.
+// ★ 손님(비로그인)도 읽는다 — mine 은 늘 false 다(고치는 버튼이 안 그려진다).
 export const GET = withUser(async (req, { params }, user) => {
   const { id } = await params;
-  const viewed = await getProjectForViewing(id, user.id);
+  const viewed = await getProjectForViewing(id, user?.id ?? null);
   const project = viewed?.doc || null;
   // ★ 이 경로는 **종류가 없는 옛 문서**만 다룬다 — 광고는 /api/ads/*, film 은 /api/film/* 이 다룬다.
   // 없는 것과 같이 404 다: 남의 것이 아니라 "이 문 뒤에 없는 것"이라서다.
@@ -58,7 +59,7 @@ export const GET = withUser(async (req, { params }, user) => {
     // 내가 만든 것인가 — 화면이 쓰기 버튼([이어서 작업하기])을 그릴지 정하는 근거다.
     mine: viewed.mine,
   });
-});
+}, { guest: true });
 
 export const PATCH = withUser(async (req, { params }, user) => {
   const { id } = await params;

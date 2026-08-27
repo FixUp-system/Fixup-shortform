@@ -9,7 +9,7 @@ import {
 } from "../lib/charges.js";
 // 정가는 길이 × 모델로 갈린다. 이 장부 함수들은 모델을 안 넘기므로
 // 레거시(Kling) 표를 읽는다 — lib/pricing.js 의 폴백이 가리키는 그 표다.
-import { VIDEO_PRICE, REGEN_PRICE } from "../lib/pricing.js";
+import { VIDEO_PRICE, REGEN_PRICE , videoPrice } from "../lib/pricing.js";
 
 const A = "00000000-0000-4000-8000-00000000000a";
 const B = "00000000-0000-4000-8000-00000000000b";
@@ -233,14 +233,16 @@ describe("청구가 모델을 탄다", () => {
   it("Seedance 프로젝트는 정가가 세 배다", async () => {
     await 충전();
     await chargeVideo({ userId: A, projectId: P, seconds: 30, model: "seedance-2.0" });
-    expect(await balanceFor(A)).toBe(500 - 160);
+    // ★ 숫자를 손으로 적지 않는다(2026-08-27 정가 갱신에서 깨졌다). 재는 것은
+    //   "모델대로 걷히는가"지 특정 값이 아니다 — 표에서 읽는다.
+    expect(await balanceFor(A)).toBe(500 - videoPrice(30, "seedance-2.0"));
   });
 
   // ★★ 모델을 안 넘기면 조용히 싼 값이 청구된다 — 이것이 이 태스크의 유일한 실패 방식이다
   it("모델을 안 넘기면 Kling 정가다", async () => {
     await 충전();
     await chargeVideo({ userId: A, projectId: P, seconds: 30 });
-    expect(await balanceFor(A)).toBe(500 - 50);
+    expect(await balanceFor(A)).toBe(500 - videoPrice(30, "kling-v3"));
   });
 
   it("클립 재생성도 모델을 탄다 — Seedance 25, Kling 8", async () => {
@@ -274,7 +276,7 @@ describe("청구가 모델을 탄다", () => {
   it("requireVideoCharge 도 모델을 탄다", async () => {
     await 충전();
     await requireVideoCharge({ userId: A, projectId: P, seconds: 30, model: "seedance-2.0" });
-    expect(await balanceFor(A)).toBe(500 - 160);
+    expect(await balanceFor(A)).toBe(500 - videoPrice(30, "seedance-2.0"));
   });
 
   // 잔액이 Kling 값(50)은 넘지만 Seedance 값(160)에는 못 미치는 자리 —

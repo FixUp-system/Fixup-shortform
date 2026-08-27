@@ -5,8 +5,13 @@
 // ★★ 왜 `/reel/<id>/briefing` 과 따로인가: 단계 레이아웃(app/reel/[id]/layout.js)은
 //   프로젝트를 읽어 스테퍼와 가드를 건다 — 읽을 문서가 없으면 할 일이 없다. 그래서
 //   "만들기 전"만 여기에 두고, 만든 뒤의 입력 화면은 `/reel/<id>/briefing` 이 보여 준다.
-//   이 화면만 useReelProject 를 안 쓴다(레이아웃 밖이다). 부르는 문은 `POST /api/reel`
-//   하나뿐이고, 만들자마자 시나리오 단계로 넘긴다.
+//   부르는 문은 `POST /api/reel` 하나뿐이고, 만들자마자 시나리오 단계로 넘긴다.
+//
+// ★★ 2026-08-27 — 옛 주석은 "이 화면만 useReelProject 를 안 쓴다(레이아웃 밖이다)"였는데
+//   **둘 다 사실이 아니다**: 공급자는 루트(app/layout.js)에 있어 이 화면도 읽을 수 있고,
+//   실제로 **읽어야 한다.** 안 읽었던 것이 사장님이 겪은 결함의 뿌리다 —
+//   [+ 새로 만들기]를 누르고 다른 화면에 다녀오면 사이드바의 「영상 만들기」가
+//   **옛 프로젝트**로 되돌려 보냈다(공유본에 옛 문서가 그대로 살아 있어서다).
 //
 // ★ 컨셉·분위기·화풍·언어는 사장님이 고른다(app/api/reel/route.js 가 normalizeAdOptions
 //   로 이 넷을 요구한다). 길이도 사장님이 고른다 — 안 고르면 서버가 400 이다(그 라우트의
@@ -24,8 +29,10 @@
 // ★★ 사이즈(화면 비율)를 고른다(2026-08-25 사장님 지시로 열렸다). 옛 주석은 "reel 은
 //   숏폼이 표제 기능이라 9:16 하나로 보낸다"였는데 그 결정이 뒤집혔다. 기본은 여전히
 //   세로이고, 뒷단은 이미 비율을 받아 돌아가고 있었다(막힌 것은 화면뿐이었다).
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+// 프로젝트 공유본 — 루트가 들고 사이드바가 읽는다. 여기서는 **놓는다**(아래 useEffect).
+import { useReelProject } from "../../../components/ReelProjectContext";
 // 주소는 단계 표 한 벌이 만든다 — 화면이 `/reel/<id>/scenario` 를 손으로 적으면 두 벌이 된다.
 import { REEL_STEPS, reelStepHref } from "../../../lib/reel/steps";
 import { ASPECTS, DEFAULT_ASPECT_ID, aspectFor } from "../../../lib/aspects";
@@ -63,6 +70,21 @@ const AD_STYLES = STYLE_PRESETS.filter((s) => Object.keys(AD_STYLE_LINES).includ
 
 export default function ReelNewPage() {
   const router = useRouter();
+  const { setProject } = useReelProject();
+
+  // ★★ 이 화면에 들어섰다는 것이 곧 **"새로 시작한다"**는 뜻이다 — 그래서 공유본을 놓는다.
+  //
+  // 안 놓으면: 사이드바의 「영상 만들기」가 공유본을 보고 갈 곳을 정하므로
+  // (lib/reel/resume.js 의 makeReelHref) 여기서 나갔다가 그 링크를 누르는 순간
+  // **옛 프로젝트**로 되돌아간다. 사장님이 겪은 경로가 정확히 그것이다.
+  //
+  // ★ 놓는 자리가 [시작하기] 버튼 안이면 안 된다 — 눌러 보기 전에 다른 화면에 다녀오는
+  //   그 경로가 그대로 남는다. 들어서는 순간이어야 한다.
+  // ★ **문서를 지우는 것이 아니다.** 옛 프로젝트는 보관함에 그대로 있다 — 지금 화면이
+  //   그것을 들고 있지 않을 뿐이다.
+  useEffect(() => {
+    setProject(null);
+  }, [setProject]);
 
   const [text, setText] = useState("");
   const [photos, setPhotos] = useState([]); // {id, filename, url}

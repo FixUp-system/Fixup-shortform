@@ -32,7 +32,9 @@ export const GET = withUser(async (req, { params }, user) => {
   // ★ 소유자가 아니어도 재생된다(보관함 전체 공유) — 내부 팀이라 서로의 결과물을 본다.
   //   그래도 **로그인은 지난다**(withUser): 주소를 아는 아무나에게 열지는 않는다.
   //   프로젝트가 없으면 그대로 404 다 — 파일명만 찍어 보는 길은 여전히 막혀 있다.
-  const project = (await getProjectForViewing(m[1], user.id))?.doc || null;
+  // ★ 손님(비로그인)도 본다(2026-08-27, lib/auth/guest.js) — 그래도 **프로젝트가 있어야**
+  //   흘려준다. 파일명만 찍어 보는 길은 그대로 막혀 있다.
+  const project = (await getProjectForViewing(m[1], user?.id ?? null))?.doc || null;
   if (!project) return new Response("없음", { status: 404 });
 
   // ── 캐시 ────────────────────────────────────────────────────────────────
@@ -98,4 +100,4 @@ export const GET = withUser(async (req, { params }, user) => {
     // 버킷에 없다 = 아직 이관되지 않았거나 지워진 것. 파일이 없던 때와 같은 답이다.
     return new Response("없음", { status: 404 });
   }
-});
+}, { guest: true });

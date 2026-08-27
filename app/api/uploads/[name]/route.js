@@ -9,7 +9,7 @@ const MIME = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" };
 const BUCKET = "uploads";
 
 // user 는 이제 안 쓴다 — withUser 는 그대로 둔다(로그인 자체는 여전히 문이다).
-export const GET = withUser(async (_req, { params }) => {
+export const GET = withUser(async (req, { params }) => {
   const { name } = await params;
   // 경로 조작 방지 — 버킷 키에 슬래시나 상위 경로가 들어가면 안 된다
   if (!/^[a-z0-9-]+\.(jpg|png|webp)$/.test(name)) {
@@ -33,11 +33,19 @@ export const GET = withUser(async (_req, { params }) => {
     console.error(`업로드 조회 실패: ${name} — ${e?.message || e}`);
     return new Response("파일을 찾을 수 없어요", { status: 404 });
   }
+  // ★ ?dl=1 이면 **내려받기**로 준다(2026-08-27 사장님 요청: 이미지 다운로드 버튼).
+  //   같은 출처라 <a download> 만으로도 대개 되지만, 이 헤더가 있어야 파일 이름이
+  //   버킷 키(uuid)가 아니라 우리가 정한 이름으로 저장된다(완성본 라우트와 같은 처방).
+  //   ★ `new URL(req.url)` 로 파싱하지 않는다 — 주소가 상대경로인 요청(테스트 픽스처가
+  //     그렇다)에서 **던진다**. 사진 한 장을 흘려주는 자리가 파라미터 하나 때문에 500 이
+  //     되면 안 된다. 있는지만 보면 되는 값이라 글자로 찾는다.
+  const wantsDownload = /[?&]dl=1(&|$)/.test(String(req?.url || ""));
   return new Response(buf, {
     headers: {
       "Content-Type": MIME[name.split(".").pop()],
+      ...(wantsDownload ? { "Content-Disposition": `attachment; filename="${name}"` } : {}),
       // 업로드는 내용이 바뀌지 않는다(이름이 UUID다) — 오래 캐시해도 된다
       "Cache-Control": "private, max-age=31536000, immutable",
     },
   });
-});
+}, { guest: true });

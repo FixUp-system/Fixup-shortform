@@ -145,7 +145,16 @@ export default function ReelPromptsPage() {
               결과는 읽는 글로 보여 주고(.script-src), 고치는 것은 아래에서 **한국어로
               적는다**(.note-form). 두 화면이 같은 일을 하는데 조작이 다르면 사장님이
               화면마다 다른 사용법을 익혀야 한다. */}
-          <p className="script-src">{whole}</p>
+          {/* ★★ 2026-08-27 — ②시나리오와 **글자 그대로 같은 모양**이다(사장님 지시).
+              다시 쓰는 동안에는 옛 글을 안 보여 준다 — 곧 사라질 글을 읽고 있으면 바뀐
+              줄도 모른다. 진행을 말하는 자리는 **여기 하나**다(버튼 옆이 아니다). */}
+          {saving === "whole" ? (
+            <p className="pgsub">
+              <span className="spinner" aria-hidden="true" /> 영상 프롬프트를 다시 쓰고 있어요
+            </p>
+          ) : (
+            <p className="script-src">{whole}</p>
+          )}
 
           {/* ★ 한국어로 고쳐 달라고 적는 자리 — ②·③와 같은 모양이다.
               요청은 makeAll() 이 실어 보낸다(안 실으면 지문이 예전과 글자 그대로다). */}
@@ -159,22 +168,28 @@ export default function ReelPromptsPage() {
               placeholder="고치고 싶은 것을 적어 주세요 — 예) 카메라를 더 천천히 움직여 줘"
             />
             {/* ★ 안내문은 버튼 바로 왼쪽이다(②③와 같은 모양). */}
+            {/* ★ 안내문은 **누르기 전에만** 뜨고, 버튼은 자리를 지키되 잠긴다
+                (②시나리오와 같은 규칙 — 자리가 사라지면 화면이 접혔다 펴진다). */}
             <div className="note-act">
-              <p className="pgsub note-hint">적은 말을 반영해 위 글을 다시 써요.</p>
-              {saving === "whole" ? (
-                <p className="pgsub">고치는 중…</p>
-              ) : (
-                <button className="mini" disabled={!!saving || !note.trim()} onClick={applyNote}>
-                  이대로 고치기
-                </button>
+              {saving !== "whole" && (
+                <p className="pgsub note-hint">적은 말을 반영해 위 글을 다시 써요.</p>
               )}
+              <button className="mini" disabled={!!saving || !note.trim()} onClick={applyNote}>
+                이대로 고치기
+              </button>
             </div>
           </div>
         </section>
+      ) : saving === "all" ? (
+        /* ★ 컷별 갈래도 같은 규칙이다 — 다시 쓰는 동안에는 옛 지문을 안 보여 주고
+           이 한 줄만 말한다(②시나리오·위 통짜 갈래와 같은 모양). */
+        <p className="pgsub">
+          <span className="spinner" aria-hidden="true" /> 영상 프롬프트를 다시 쓰고 있어요
+        </p>
       ) : !cuts.some((c) => c?.clip_prompt) ? (
         <div className="step-actions">
           <button className="mini" disabled={!!saving} onClick={makeAll}>
-            {saving === "all" ? "쓰는 중…" : "영상 프롬프트 만들기"}
+            영상 프롬프트 만들기
           </button>
         </div>
       ) : (
@@ -211,11 +226,14 @@ export default function ReelPromptsPage() {
             onChange={(e) => setNote(e.target.value)}
             placeholder="고치고 싶은 것을 적어 주세요 — 예) 전체적으로 카메라를 더 천천히 움직여 줘"
           />
-          {/* 다시 쓰면 지금 프롬프트는 사라진다 — 모르면 고친 것을 잃는다. */}
-          <p className="pgsub">전체 컷을 다시 써요 — 지금 적힌 프롬프트는 사라져요.</p>
+          {/* 다시 쓰면 지금 프롬프트는 사라진다 — 모르면 고친 것을 잃는다.
+              ★ 누르기 전에만 뜬다(②시나리오와 같은 규칙) — 이미 누른 뒤에 읽을 말이 아니다. */}
+          {saving !== "all" && (
+            <p className="pgsub">전체 컷을 다시 써요 — 지금 적힌 프롬프트는 사라져요.</p>
+          )}
           <div className="note-act">
             <button type="button" className="mini" disabled={!!saving} onClick={makeAll}>
-              {saving === "all" ? "쓰는 중…" : note.trim() ? "이대로 고치기" : "전부 다시 쓰기"}
+              {note.trim() ? "이대로 고치기" : "전부 다시 쓰기"}
             </button>
           </div>
         </div>

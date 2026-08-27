@@ -42,15 +42,36 @@ describe("돌고 있으면 도는 표시가 뜬다", () => {
   });
 });
 
-describe("②시나리오 — 버튼을 감추지 않는다", () => {
+// ★★ 2026-08-27 — ②시나리오만 규칙이 **한 칸 옮겨졌다**(사장님 지시).
+//   08-25 에는 버튼 자리에 "쓰는 중…"을 남기게 했는데, 그러면 도는 표시가 **두 곳**에
+//   생겼다 — 시나리오 자리와 [이전으로] 옆이다. 사장님: "이전으로 옆에는 표시될 필요가
+//   없다 · 다시 쓸 때는 원래 시나리오 자리에 '시나리오를 다시 쓰고 있어요'만 보이면 된다."
+//   ★ 지켜야 하는 것은 여전히 규칙 ①이다: **쓰는 동안 아무 표시도 없어서는 안 된다.**
+//     그 사고(사장님이 "반영이 안 되는 것 같다"고 한 것)의 원인은 침묵이었지 자리가 아니다.
+//     지금은 말하는 자리가 시나리오 칸 하나로 모였다.
+describe("②시나리오 — 쓰는 동안 말하는 자리는 하나다", () => {
   const src = read("app/reel/[id]/scenario/page.js");
 
-  it("★★ busy 일 때 버튼 자리가 비지 않는다 — 눌렀는지조차 알 수 없었다", () => {
-    expect(src, "busy 면 버튼을 통째로 감춘다").not.toMatch(/busy \? null/);
+  it("★★ 쓰는 동안 도는 표시와 문구가 시나리오 자리에 뜬다 — 침묵이 원래의 사고였다", () => {
+    const at = src.indexOf("busy ? (");
+    expect(at, "busy 로 가르는 자리가 없다").toBeGreaterThan(-1);
+    const block = src.slice(at, at + 400);
+    expect(block, "도는 표시가 없다").toContain('className="spinner"');
+    expect(block).toMatch(/다시 쓰고 있어요/);
+    expect(block).toMatch(/쓰고 있어요/);
   });
 
-  it("그 자리에 '쓰는 중' 을 남긴다", () => {
-    expect(src).toMatch(/쓰는 중/);
+  it("★ 다시 쓰는 동안에는 옛 시나리오를 안 보여 준다 — 곧 사라질 글이다", () => {
+    const at = src.indexOf("busy ? (");
+    // 옛 글(script-src)은 busy 가 아닐 때만 그린다 — 그 갈래보다 **뒤**에 있어야 한다.
+    expect(src.indexOf("script-src"), "옛 글이 busy 갈래보다 앞에 있다").toBeGreaterThan(at);
+  });
+
+  it("★ [이전으로] 옆에는 아무 표시도 없다 — 진행은 위에서 이미 말했다", () => {
+    const at = src.indexOf("<ReelBack");
+    expect(at).toBeGreaterThan(-1);
+    const row = src.slice(at, at + 300);
+    expect(row, "되돌아가는 버튼 옆에 도는 표시가 남아 있다").not.toMatch(/쓰는 중|spinner/);
   });
 });
 

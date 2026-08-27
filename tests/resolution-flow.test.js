@@ -14,7 +14,7 @@ import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js"
 import { runWithActor } from "../lib/actor.js";
 import { generateClip } from "../lib/i2v.js";
 import { clipKey } from "../lib/steps.js";
-import { videoPrice } from "../lib/pricing.js";
+import { videoPrice, VIDEO_PRICE } from "../lib/pricing.js";
 import { modelIdForProject, resolutionForProject } from "../lib/clip-limits.js";
 
 const A = "00000000-0000-4000-8000-00000000000a";
@@ -71,8 +71,10 @@ describe("화질이 저장부터 각인까지 관통한다", () => {
 
     // ① 가격 — 라우트들이 넘기는 것과 같은 모양이다(modelIdForProject·resolutionForProject).
     const price = videoPrice(project.settings.target_seconds, modelIdForProject(project), resolutionForProject(project));
-    expect(price).toBe(360);
-    // 720p 값(160)으로 걷히면 원가 2.25배를 우리가 문다 — 같은 숫자가 아님을 못 박는다.
+    // ★ 숫자를 손으로 적지 않는다(2026-08-27 정가 갱신에서 깨졌다) — 여기서 재는 것은
+    //   "고른 화질이 값까지 관통하는가"지 특정 숫자가 아니다. 표에서 읽어 대조한다.
+    expect(price).toBe(VIDEO_PRICE["seedance-2.0"]["1080p"][30]);
+    // 720p 값으로 걷히면 원가 2.25배를 우리가 문다 — 같은 숫자가 아님을 못 박는다.
     expect(price).not.toBe(videoPrice(project.settings.target_seconds, modelIdForProject(project), "720p"));
 
     // ② 요청 — 실제로 fal 로 나가는 본문을 찍는다.
@@ -91,7 +93,8 @@ describe("화질이 저장부터 각인까지 관통한다", () => {
     expect((await patch({ resolution: "480p" })).status).toBe(200);
     const project = await saved();
 
-    expect(videoPrice(30, modelIdForProject(project), resolutionForProject(project))).toBe(80);
+    expect(videoPrice(30, modelIdForProject(project), resolutionForProject(project)))
+      .toBe(VIDEO_PRICE["seedance-2.0"]["480p"][30]);
 
     const { box, fetchImpl } = captor();
     await runWithActor("t-user", () =>

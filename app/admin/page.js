@@ -7,6 +7,8 @@ import { DEFAULT_GRANT } from "../../lib/pricing";
 import { ledgerLabel } from "../../lib/ledger";
 // 등급 표와 판정은 lib/tiers.js 한 벌이다 — 화면이 등급 이름을 복사하면 서버와 갈린다.
 import { TIERS, tierOf } from "../../lib/tiers";
+// 표시명 규칙 한 벌 — /me·원장과 같은 값을 써야 한다(이름이 없으면 이메일 앞부분).
+import { displayNameOf } from "../../lib/display-name";
 import { useDialog } from "../../components/DialogProvider";
 import { useMe } from "../../components/MeContext";
 
@@ -48,6 +50,15 @@ export default function AdminPage() {
   // ★ 그래서 화면에 그릴 때는 **목록의 최신 줄**로 다시 맞춘다(아래 panelUser) — 크레딧을
   //   넣으면 목록이 갱신되는데, 든 값이 낡으면 모달만 옛 잔액을 보여 준다.
   const [panelId, setPanelId] = useState(null);
+
+  // ★★ 2026-08-27 — **이 두 줄이 없었다.** 모달 개편(dd223aa)에서 크레딧 입력칸을 모달
+  //   안으로 옮기면서 값은 쓰는데 선언을 안 했다 — 그래서 [관리]를 누르는 순간
+  //   `ReferenceError: setGrantAmount is not defined` 로 화면이 통째로 죽었다
+  //   (프로덕션에서 "Application error: a client-side exception" 로 보였다).
+  // ★ 열 때마다 기본값으로 되돌린다(openPanel) — 앞 계정에 적던 값이 남으면 **엉뚱한
+  //   사람에게** 그 값이 들어간다. 그래서 초깃값도 그 기본값과 같은 것을 쓴다.
+  const [grantAmount, setGrantAmount] = useState(String(DEFAULT_GRANT));
+  const [grantReason, setGrantReason] = useState("체험");
   const panelUser = panelId ? (users || []).find((u) => u.id === panelId) || null : null;
   // ★ showModal() 로 연다 — `open` 속성만 두면 **모달이 아니라 인라인**으로 뜬다(배경도
   //   Esc 도 포커스 가둠도 없다). DialogProvider 와 같은 방식이다.
@@ -198,10 +209,15 @@ export default function AdminPage() {
     }
   }
 
-  // 이메일과 id 로 찾는다 — 문의는 대개 이메일로 오지만, 로그·장부에는 id 만 남는다.
+  // 이름·이메일·id 로 찾는다 — 문의는 대개 이메일로 오지만, 로그·장부에는 id 만 남고,
+  // 사람 이야기를 할 때는 이름으로 부른다(2026-08-27 사장님 요청으로 이름이 열렸다).
   const q = query.trim().toLowerCase();
   const found = (users || []).filter(
-    (u) => !q || u.email?.toLowerCase().includes(q) || u.id?.toLowerCase().includes(q)
+    (u) =>
+      !q ||
+      displayNameOf(u).toLowerCase().includes(q) ||
+      u.email?.toLowerCase().includes(q) ||
+      u.id?.toLowerCase().includes(q)
   );
 
   return (
@@ -235,6 +251,7 @@ export default function AdminPage() {
           <table className="cost-table">
             <thead>
               <tr>
+                <th>이름</th>
                 <th>이메일</th>
                 <th>상태</th>
                 <th>역할</th>
@@ -247,6 +264,9 @@ export default function AdminPage() {
             <tbody>
               {found.flatMap((u) => (
                 [<tr key={u.id}>
+                  {/* ★ 이름이 먼저다 — 사람을 부르는 말이고, 이메일은 신원이다.
+                      이름을 안 적은 사람은 이메일 앞부분이 뜬다(displayNameOf). */}
+                  <td>{displayNameOf(u)}</td>
                   <td className="mono">{u.email}</td>
                   <td>
                     <span className={`st-badge st-${u.status === "approved" ? "done" : u.status === "blocked" ? "error" : "submitted"}`}>
@@ -311,10 +331,12 @@ export default function AdminPage() {
           onClick={(e) => { if (e.target === panelRef.current) closePanel(); }}
         >
           <div className="dlg-box admin-panel">
-            <h2 className="dlg-title">{panelUser.email}</h2>
+            {/* ★ 이름이 제목, 이메일은 그 아래 신원이다(2026-08-27) — 사람을 부르는 말과
+                계정을 가리키는 값은 다른 축이다. */}
+            <h2 className="dlg-title">{displayNameOf(panelUser)}</h2>
             <p className="dlg-body">
-              {STATUS_LABEL[panelUser.status] || panelUser.status} · {panelUser.role} ·
-              {" "}잔액 {panelUser.balance ?? 0} 크레딧
+              {panelUser.email} · {STATUS_LABEL[panelUser.status] || panelUser.status} ·
+              {" "}{panelUser.role} · 잔액 {panelUser.balance ?? 0} 크레딧
             </p>
 
             {/* ★★ 크레딧 넣기 — **여기서 끝난다**(2026-08-20). 그전에는 prompt 를 두 번

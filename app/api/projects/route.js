@@ -14,11 +14,17 @@ import { MAX_MATERIAL_TEXT } from "../../../lib/material.js";
 //   기본은 내 것이다 — 실수로 전체가 기본이 되면 보관함을 연 사람마다 남의 목록이
 //   쏟아진다. 여는 쪽이 명시적이어야 한다.
 // ★ 읽기만 여는 것이라 이 문은 mine 만 실어 준다 — 만든 사람이 누구인지는 안 준다.
+// ★ 손님(비로그인)도 읽는다 — 보관함 레퍼런스 체크용이다(lib/auth/guest.js).
+//   손님에게는 **내 것이라는 개념이 없다**: scope 를 무엇으로 주든 [전체]로 답한다
+//   (listProjects 는 소유자를 요구해서 그대로 넘기면 던진다).
 export const GET = withUser(async (req, _ctx, user) => {
   const scope = new URL(req.url).searchParams.get("scope");
+  // ★ 손님이라는 사실을 **화면에 말해 준다** — 안 말하면 화면이 "내 영상" 칸을 누른 채
+  //   전체 목록을 보여 주게 된다(고를 수 없는 자리를 고른 것처럼 그린다).
+  if (!user) return Response.json({ projects: await listAllProjects(null), guest: true });
   const projects = scope === "all" ? await listAllProjects(user.id) : await listProjects(user.id);
   return Response.json({ projects });
-});
+}, { guest: true });
 
 export const POST = withUser(async (req, ctx, user) => {
   const body = await req.json().catch(() => null);

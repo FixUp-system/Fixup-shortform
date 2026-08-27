@@ -7,6 +7,8 @@ import { getProject, updateProject } from "../../../../../lib/projects.js";
 import { requireVideoCharge, NoCredits } from "../../../../../lib/charges.js";
 import { modelIdForProject, resolutionForProject } from "../../../../../lib/clip-limits.js";
 import { fakeFal } from "../../../../../lib/fake.js";
+import { isGenerationLive } from "../../../../../lib/progress.js";
+import { reelProgress } from "../../../../../lib/reel/pipeline.js";
 
 // ★★ 응답을 보낸 뒤에도 이 일이 계속 돌아야 한다 — 그것을 **플랫폼에 말해 줘야 한다**
 //    (2026-08-18 프로덕션 실측). 둘 다 없어서 **클립 3개를 결제하고 2개만 저장됐다**
@@ -54,7 +56,17 @@ export const POST = withUser(async (req, { params }, user) => {
   //   화면 잠금만으로는 안 된다(탭 둘·직접 호출이 샌다) — 판정은 서버가 쥔 reel.status 하나다
   //   (app/api/projects/[id]/clips/route.js 의 isGenerationLive 409, film 의
   //   status==="rendering" 409 와 같은 결).
-  if (reelOf(project).status === "rendering") {
+  // ★★ 2026-08-27 — status 하나만 보던 시절엔 이 잠금이 **영영 안 풀렸다.** 함수가 응답
+  //   뒤에 얼어붙으면 status 를 "clips"·"error" 로 옮기는 코드도 같이 안 돌아서, 사장님은
+  //   "이미 만드는 중이에요"만 보며 재시도에 영원히 못 닿는다(이 저장소가 다른 자리에서
+  //   이미 겪은 사고다). 그래서 **심장박동으로 함께 잰다** — 표식은 아무도 안 지워도
+  //   저절로 낡는다(2분, lib/progress.js 의 STALL_MS).
+  //   ★ 이것이 안전한 것은 굽기가 30초마다 시계로 뛰기 때문이다(runReelClips·
+  //     runReelOneShot 의 startHeartbeat). 살아 있는 실행은 임계에 못 닿는다.
+  //   ★ 심장박동을 모르는 옛 문서는 **막지 않는다** — 판정할 근거가 없을 때 갇히는 쪽이
+  //     더 나쁘다. 다시 굽더라도 낡지 않은 완성 클립은 건너뛰고(N5), 살아 있는 청구가
+  //     있으면 크레딧은 0 이다.
+  if (reelOf(project).status === "rendering" && isGenerationLive(project.progress, "video", Date.now())) {
     return Response.json({ error: "이미 만드는 중이에요 — 잠시 기다렸다가 다시 눌러 주세요" }, { status: 409 });
   }
 
@@ -72,7 +84,13 @@ export const POST = withUser(async (req, { params }, user) => {
     }
   }
 
-  await updateProject(id, user.id, (p) => putReel(p, { status: "rendering", error: null }));
+  // ★★ 접수하는 그 자리에서 심장박동을 **한 번 찍는다.** 파이프라인의 첫 박동(30초 뒤)을
+  //   기다리면 그 틈에 두 번 눌려 같은 컷에 파이프라인이 둘 뜬다(fal 원가 이중지출) —
+  //   위 잠금이 표식을 근거로 삼기 때문이다. 단계별 흐름의 생성 라우트 셋과 같은 처방이다.
+  const at = Date.now();
+  await updateProject(id, user.id, (p) =>
+    reelProgress(putReel(p, { status: "rendering", error: null }), "video", at)
+  );
   // ★ **약속(promise)을 넘긴다 — 콜백이 아니다.** 콜백으로 넘기면 파이프라인이 요청 범위
   //   밖에서 시작하고, 비용 주체는 AsyncLocalStorage 에서 읽으므로 costActor() 가 던진다.
   runInBackground(

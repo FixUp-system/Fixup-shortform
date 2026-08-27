@@ -105,15 +105,18 @@ export default function ReelScenarioPage() {
 
   // ★ 다시 쓰는 버튼은 **한 번만 적는다** — 자리가 둘(프롬프트 칸 안 / 시나리오가 아직
   //   없을 때의 실행줄)이지만 둘은 동시에 안 뜬다. 손으로 두 번 적으면 라벨이 갈린다.
-  // ★★ 2026-08-25 — 쓰는 동안 **감추지 않는다.** 옛 코드는 `busy ? null` 로 버튼을 통째로
-  //   지웠는데, 자리가 비니 **눌렀는지조차 알 수 없었다** — 사장님이 그래서 "프로덕션에
-  //   반영이 안 되는 것 같다"고 했다(실제로는 정상적으로 돌아 컷까지 바뀌어 있었다).
-  //   그 자리에 도는 표시와 함께 "쓰는 중…" 을 남긴다. 누를 것이 있는 것처럼 보이지
-  //   않게 버튼이 아니라 **글**로 둔다(④프롬프트의 같은 자리와 모양을 맞춘다).
-  const rewriteBtn = busy ? (
-    <p className="pgsub"><span className="spinner" aria-hidden="true" /> 쓰는 중…</p>
-  ) : (
-    <button className="mini" disabled={!!lock} onClick={makeScenario}>
+  //
+  // ★★ 2026-08-27 — 쓰는 동안에는 **이 버튼도 그 옆의 안내문도 안 그린다**(사장님 지시).
+  //   그전에는 그 자리에 "쓰는 중…" 을 글로 남겼는데, 그러면 도는 표시가 **두 곳**에
+  //   생겼다 — 시나리오 자리와 [이전으로] 옆이다. 사장님 말: "이전으로 옆에는 표시될
+  //   필요가 없다 · 다시 쓸 때는 원래 시나리오 자리에 '시나리오를 다시 쓰고 있어요'만
+  //   보이면 된다."
+  //   ★ 08-25 의 규율("버튼을 감추면 눌렀는지조차 알 수 없다")은 깨지지 않는다 —
+  //     그때 진짜 문제는 **아무 표시도 없던 것**이었다. 지금은 시나리오 자리 한 곳이
+  //     도는 표시와 함께 무슨 일이 일어나는지 말한다. 말하는 자리가 하나로 모였을 뿐이다.
+  //   ★ 지우는 것이 아니다 — busy 가 풀리면 돌아온다(실패했을 때 다시 누를 유일한 길).
+  const rewriteBtn = (
+    <button className="mini" disabled={!!lock || busy} onClick={makeScenario}>
       {note.trim() ? "이대로 고치기" : "다시 쓰기"}
     </button>
   );
@@ -122,19 +125,22 @@ export default function ReelScenarioPage() {
     <section className="panel panel--wide">
       <h2>{stepLabel}</h2>
       {err && <p className="pgsub warn">{err}</p>}
-      {/* ★ 다시 쓰는 중에도 알린다 — 아래 버튼 자리에만 표시가 있으면, 긴 글을 읽고
-          있던 사장님은 그 자리를 안 본다. */}
-      {busy && scenario?.text && (
-        <p className="pgsub"><span className="spinner" aria-hidden="true" /> 시나리오를 다시 쓰고 있어요 — 다 되면 위 글이 바뀌어요.</p>
-      )}
-      {scenario?.text ? (
+      {/* ★★ 무슨 일이 일어나는지 말하는 자리는 **여기 하나**다(2026-08-27 사장님 지시).
+          다시 쓰는 동안에는 **옛 글을 안 보여 준다** — 곧 사라질 글을 읽고 있으면 바뀐
+          줄도 모르고, 그 위아래로 도는 표시가 여럿이면 어디를 봐야 할지 알 수 없다.
+          ★ 처음 쓰는 것과 다시 쓰는 것은 다른 말이다 — "다시"를 잘못 붙이면 없는 이력을
+            지어내는 것이다(lib/progress.js 의 busyLabel 과 같은 결). */}
+      {busy ? (
+        <p className="pgsub">
+          <span className="spinner" aria-hidden="true" />{" "}
+          {/* ★ 꼬리말을 안 붙인다(2026-08-27 사장님 지시) — "다 되면 …" 은 화면을 보면
+              아는 일이라 말할수록 길어진다. */}
+          {scenario?.text ? "시나리오를 다시 쓰고 있어요" : "시나리오를 쓰고 있어요"}
+        </p>
+      ) : scenario?.text ? (
         <p className="script-src">{scenario.text}</p>
       ) : (
-        <p className="pgsub">
-          {busy ? (
-            <><span className="spinner" aria-hidden="true" /> 시나리오를 쓰고 있어요 — 잠시만 기다려 주세요.</>
-          ) : "아직 시나리오가 없어요 — 아래에서 다시 쓸 수 있어요."}
-        </p>
+        <p className="pgsub">아직 시나리오가 없어요 — 아래에서 다시 쓸 수 있어요.</p>
       )}
       {lock && <p className="pgsub">{lock.message}</p>}
 
@@ -142,6 +148,11 @@ export default function ReelScenarioPage() {
           칸을 직접 고치는 것(edits)과 다른 축이다 — "이 문구를 이렇게 바꿔 줘"를
           그대로 적으면 그 말이 지시문에 실린다(lib/ad/scenario.js 의 note 블록).
           ★ 잠겼으면 안 보인다 — 누를 수 없는 칸을 보여 주면 고칠 수 있는 것처럼 읽힌다. */}
+      {/* ★★ 쓰는 동안에도 이 칸은 **그대로 서 있다**(2026-08-27 사장님 지시: "사용자
+          입력폼은 유지된 상태에서 상단에 …만 뜨면 될 것 같아"). 칸이 통째로 사라지면
+          화면이 접혔다 펴져 어디를 보고 있었는지 잃는다.
+          ★ 다만 **안내문은 누르기 전에만** 뜬다(같은 지시) — 이미 누른 뒤에 읽어야 할
+            말이 아니다. 도는 표시는 위 시나리오 자리 하나가 맡는다. */}
       {!lock && scenario?.text && (
         <div className="note-form">
           <textarea
@@ -158,7 +169,7 @@ export default function ReelScenarioPage() {
           {/* ★ 안내문과 버튼은 **같은 줄**이다(2026-08-25 사장님 지시).
               줄을 나누면 안내가 본문처럼 읽히고 버튼과 상관없는 말로 보인다. */}
           <div className="note-act">
-            <p className="pgsub note-hint">시나리오를 수정하면 이미지를 다시 생성해야 해요.</p>
+            {!busy && <p className="pgsub note-hint">시나리오를 수정하면 이미지를 다시 생성해야 해요.</p>}
             {rewriteBtn}
           </div>
         </div>
@@ -167,11 +178,16 @@ export default function ReelScenarioPage() {
       <div className="step-actions">
         <ReelBack step="scenario" id={id} />
         {/* ★ 시나리오가 아직 없을 때만 여기 선다 — 있을 때는 위 프롬프트 칸 안에 있다.
-            둘은 동시에 안 뜬다. 지우지 않는 이유는 실패했을 때 다시 누를 유일한 길이라서다. */}
-        {!scenario?.text && rewriteBtn}
+            둘은 동시에 안 뜬다. 지우지 않는 이유는 실패했을 때 다시 누를 유일한 길이라서다.
+            ★★ 2026-08-27 — 쓰는 동안에는 이 자리를 **비운다**(사장님 지시). 자동 생성 중에
+            [이전으로] 옆에 "쓰는 중…"이 서 있었는데, 진행은 위 시나리오 자리가 이미 말한다. */}
+        {!scenario?.text && !busy && rewriteBtn}
         {scenario?.text && (
           <div className="fwd">
-            <Link className="cta" href={reelStepHref(imagesStep, id)}>그림으로 →</Link>
+            {/* ★ 이름은 **가서 무엇이 되는가**로 적는다(2026-08-27 사장님 지시) — 다음 화면에서
+                이미지가 만들어진다. 단계 이름("그림")을 빌리면 그 화면이 무엇을 하는
+                자리인지는 말하지 않는다. */}
+            <Link className="cta" href={reelStepHref(imagesStep, id)}>이미지 생성 →</Link>
           </div>
         )}
       </div>

@@ -34,15 +34,36 @@ describe("쓰는 동안에는 버튼이 없다", () => {
   //   안 되는 것 같다"고 했다(실제로는 정상적으로 돌아 컷까지 바뀌어 있었다).
   //   이제 그 자리에 도는 표시와 "쓰는 중…" 을 남긴다. 뜻은 유지된다: **누를 것이
   //   있는 것처럼 보이지 않는다**(버튼이 아니라 글이다).
-  it("busy 일 때 버튼 자리에 '쓰는 중' 이 남는다 — 비우지 않는다", () => {
+  // ★★ 2026-08-27 — 다시 뒤집혔다(사장님 지시). 버튼 자리에 "쓰는 중…"을 남기니 도는
+  //   표시가 **두 곳**이 됐다(시나리오 자리 · [이전으로] 옆). 이제 쓰는 동안에는 버튼도
+  //   그 자리의 글도 안 그린다 — 말하는 자리는 시나리오 칸 하나다.
+  //   ★ 08-25 의 진짜 규율(**침묵 금지**)은 그대로다: tests/reel-busy-ui.test.js 가
+  //     "쓰는 동안 시나리오 자리에 도는 표시와 문구가 뜬다"를 잰다.
+  //   ★ 버튼을 **지우는 것이 아니다** — busy 가 풀리면 돌아온다(실패했을 때 다시 누를
+  //     유일한 길). 그것을 아래 "실패하면 버튼이 돌아온다"가 잰다.
+  // ★ 자리마다 규칙이 다르다(2026-08-27 사장님 지시):
+  //   · 실행줄([이전으로] 옆) — 쓰는 동안 **아무것도 안 선다**. 진행은 위가 말한다.
+  //   · 수정 요청 칸 — **그대로 서 있는다**("사용자 입력폼은 유지된 상태에서"). 다만
+  //     버튼은 잠기고 그 옆 안내문은 누르기 전에만 뜬다.
+  it("쓰는 동안 [이전으로] 옆에는 아무것도 안 선다", () => {
+    const c = clean(scenario);
+    expect(c, "실행줄이 busy 를 안 본다").toMatch(/!scenario\?\.text && !busy && rewriteBtn/);
+  });
+
+  it("★ 수정 요청 칸은 쓰는 동안에도 사라지지 않는다 — 화면이 접혔다 펴지면 안 된다", () => {
+    const c = clean(scenario);
+    expect(c, "쓰는 동안 칸을 통째로 감춘다").not.toMatch(/scenario\?\.text && !busy && \(/);
+    // 대신 버튼이 잠기고 안내문만 물러난다.
+    expect(c, "쓰는 동안 버튼이 안 잠긴다").toMatch(/disabled=\{!!lock \|\| busy\}/);
+    expect(c, "안내문이 누른 뒤에도 남는다").toMatch(/!busy && <p className="pgsub note-hint"/);
+  });
+
+  it("실패하면 버튼이 돌아온다 — 지우는 것이 아니다", () => {
     const c = clean(scenario);
     const at = c.indexOf("const rewriteBtn");
     expect(at, "버튼 선언을 못 찾았다").toBeGreaterThan(-1);
-    const decl = c.slice(at, at + 400);
-    expect(decl, "busy 로 가르는 조건이 없다").toMatch(/busy \?/);
-    expect(decl, "자리를 비운다").not.toMatch(/busy \?\s*null/);
-    expect(decl).toMatch(/쓰는 중/);
-    expect(decl, "그 자리가 버튼이면 누를 것처럼 보인다").toMatch(/<p /);
+    // 선언 자체에는 busy 조건이 없다 — busy 는 **그리는 자리**가 본다.
+    expect(c.slice(at, at + 200)).toContain("onClick={makeScenario}");
   });
 
   it("버튼 문구에서 쓰는 중 표시가 빠진다", () => {

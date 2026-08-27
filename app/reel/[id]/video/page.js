@@ -12,7 +12,11 @@ import { useReelProject } from "../layout";
 import { reelOf, reelErrorFor, isReelRendering } from "../../../../lib/reel/doc";
 // ★★ 2026-08-25 — 굽기 갈래가 둘이다(통짜 · 컷별). 판정은 lib 의 순수 함수 하나다 —
 //   canBakeReel 은 컷별 갈래에서 예전 canBakeReelClips 를 글자 그대로 부른다.
-import { planReelBake, canBakeReel, isReelOneShotStale, reelSheetUrl, reelWholePrompt } from "../../../../lib/reel/oneshot";
+import { planReelBake, canBakeReel, isReelOneShotStale, reelSheetUrl, reelWholePrompt, reelBakeCounts } from "../../../../lib/reel/oneshot";
+// ★★ "안 눌렀다 / 되고 있다 / 멈춘 것 같다 / 실패했다 / 끝났다" — 판정은 lib 한 벌이
+//   한다(단계별 흐름의 화면 다섯이 이미 이것을 본다). 화면이 스스로 재면 그 사본이
+//   조용히 갈린다.
+import { generationState } from "../../../../lib/progress";
 import { isReelClipStale } from "../../../../lib/reel/steps";
 import { startPolling } from "../../../../lib/poll";
 import { REEL_STEPS, reelStepHref } from "../../../../lib/reel/steps";
@@ -115,6 +119,27 @@ export default function ReelVideoPage() {
   const sheetUrl = reelSheetUrl(project?.cuts || []);
   const oneShotStale = oneShot && isReelOneShotStale(project);
 
+  // ★★ 2026-08-27 — 여기까지는 `rendering` 하나로 "만드는 중"만 말했다. 그러면 **돌고
+  //   있는 것과 2분째 아무 일도 없는 것이 같은 화면**이라, 사장님은 기다려야 하는지 손을
+  //   써야 하는지 알 수 없다. 이제 상태 라우트가 심장박동(progress)과 멈춘 경과를
+  //   실어 보내므로(app/api/reel/[id]/status/route.js) 단계별 흐름과 같은 자로 가른다.
+  // ★ 세는 단위는 reelBakeCounts 하나다 — 통짜는 컷이 여럿이어도 한 편이 하나다.
+  //   화면이 쥔 최신 컷(live)으로 센다.
+  const counts = reelBakeCounts(project, cuts);
+  const gen = generationState({
+    ...counts,
+    // 상태 라우트가 준 값이 먼저다(문서보다 최신이다). 이 단계의 오류만 본다 —
+    // ⑥완성의 합성 실패가 여기 뜨면 안 된다(reelErrorFor).
+    error: live?.error || reelErrorFor(reel, "video"),
+    phase: live?.progress?.phase ?? project?.progress?.phase ?? null,
+    stepPhase: "video",
+    // ★ 멈춘 경과는 **서버가 잰 값**이다. 브라우저가 자기 시계로 빼면 PC 시계가 빠른
+    //   사장님에게는 시작하자마자 "멈췄어요"가 뜬다.
+    stalledForMs: live?.stalled_for_ms ?? null,
+    // 누른 직후에는 아직 심장박동이 화면에 안 닿았다 — 그 구간을 idle 로 떨어뜨리지 않는다.
+    busy: !!busy || rendering,
+  });
+
   // 진입·새로고침 복원 — 굽는 중이면 폴링을 잇는다.
   useEffect(() => {
     if (!id) return;
@@ -142,7 +167,10 @@ export default function ReelVideoPage() {
   //   ★ "그 줄에 혼자 선다"는 규율은 그대로다: 칸 안에서도 이 버튼 하나뿐이고,
   //     아직 안 만들었을 때의 실행줄에도 이것 하나뿐이다(되돌아가는 링크는 아래 줄이다).
   const bakeBtn = (
-    <button className="mini" disabled={rendering || !!busy || !ready} onClick={startClips}>
+    /* ★★ 잠그는 것은 **정말로 도는 중일 때**다(gen.kind). `rendering` 으로 잠그면
+       얼어붙은 실행에서 status 가 영영 "rendering" 이라 사장님이 다시 만들 문이 없다 —
+       서버의 잠금도 같은 임계(심장박동 2분)로 함께 풀린다. */
+    <button className="mini" disabled={gen.kind === "running" || !!busy || !ready} onClick={startClips}>
       {/* ★ 화살표를 안 붙인다 — 굽는 버튼이지 다음 화면으로 가는 버튼이 아니다. */}
       {busy === "clips" ? "시작하는 중…" : doneCount > 0 ? "다시 만들기" : "영상 만들기"}
     </button>
@@ -157,25 +185,36 @@ export default function ReelVideoPage() {
           ★ 컷별 갈래의 "컷 N개 중 M개"는 남긴다 — 그것은 안쪽 사정이 아니라 진척이다. */}
       {!oneShot && <p className="pgsub">컷 {cuts.length}개 중 {doneCount}개를 만들었어요</p>}
       {err && <p className="pgsub warn">{err}</p>}
-      {/* ★ 상태 라우트가 준 값이 먼저다(문서보다 최신이다). 문서 쪽은 **이 단계의 것만**
-          읽는다 — ⑥완성의 합성 실패가 여기 뜨면 안 된다(reelErrorFor). */}
-      {(live?.error || reelErrorFor(reel, "video")) && (
-        <p className="pgsub warn">{live?.error || reelErrorFor(reel, "video")}</p>
-      )}
+      {/* ★ 실패는 **사장님 말로** 옮겨서 보인다(lib/failure.js 의 classifyFailure —
+          generationState 가 부른다). 못 알아본 문구는 원문 그대로 나온다.
+          ★ 어느 단계의 실패인지는 reelErrorFor 가 이미 가른다 — ⑥완성의 합성 실패가
+          여기 뜨면 안 된다. */}
+      {gen.kind === "failed" && <p className="pgsub warn">⚠ {gen.reason.message}</p>}
       {/* ★★ 굽는 동안 **되고 있다는 것이 보여야 한다**(2026-08-25 사장님 지시:
           "영상 생성 같은 경우에는 시간이 오래걸리기 때문에 꼭 필요한 작업이야").
           한 줄짜리 안내만 두면 멈춘 것과 구별이 안 된다 — 도는 표시와 함께 **어디까지
           왔는지**를 같이 말한다.
           ★ 통짜 갈래는 "컷 n/m"이 거짓말이다 — 한 번에 한 편을 굽는다.
-          ⚠️ 이 화면의 상태 라우트는 progress·stalled_for_ms 를 안 싣는다
-          (app/api/reel/[id]/status/route.js 의 계약). 그래서 단계별 흐름처럼 "멈춘 것
-          같아요"까지는 못 가른다 — 실어 보내게 되면 그때 generationState 로 옮긴다. */}
-      {rendering && (
+          ★★ 2026-08-27 — 여기가 `rendering` 하나만 보던 시절에는 **멈춘 것도 같은
+             화면**이었다. 이제 심장박동으로 가른다(gen.kind). */}
+      {gen.kind === "running" && (
         <p className="pgsub">
           <span className="spinner" aria-hidden="true" />{" "}
           {oneShot
-            ? "한 편을 통째로 굽고 있어요 — 몇 분 걸려요. 다 되면 여기에 나타나요."
+            ? "한 편을 통째로 만들고 있어요 — 몇 분 걸려요. 다 되면 여기에 나타나요."
             : `컷 ${doneCount}/${cuts.length} 만드는 중이에요 — 다 되면 여기에 나타나요.`}
+        </p>
+      )}
+      {/* ★★ 멈춤은 **의심이지 종료가 아니다.** 파이프라인이 아직 살아 있을 수 있으므로
+          "실패했다"고 말하지 않는다 — 2분 동안 아무 소식이 없었다는 사실만 말한다.
+          ★ 다시 만드는 길은 **막지 않는다.** 서버의 잠금도 같은 임계로 함께 풀리고
+          (app/api/reel/[id]/clips/route.js), 다시 만들어도 이미 만든 컷은 건너뛰며
+          살아 있는 청구가 있으면 크레딧은 0 이다. 여기서 잠그면 정말로 얼어붙은
+          실행에서 사장님이 나올 문이 없다. */}
+      {gen.kind === "stalled" && (
+        <p className="pgsub warn">
+          ⚠ {oneShot ? "" : `컷 ${gen.done}/${gen.total}에서 `}한동안 진행이 없어요 —
+          아직 만들고 있을 수도 있어요. 잠시 기다렸다가 새로고침해 주세요.
         </p>
       )}
 
@@ -218,7 +257,9 @@ export default function ReelVideoPage() {
               )}
               {/* ★ 덮개다(absolute) — 스토리보드를 지우지 않고 그 위에서 돈다.
                   무엇을 굽는 중인지 옛 그림으로 알 수 있다. */}
-              {rendering && (
+              {/* ★ 실제로 돌고 있을 때만 돈다 — 멈춘 뒤에도 도는 표시가 남아 있으면
+                  그 표시 자체가 거짓말이 된다(gen.kind). */}
+              {gen.kind === "running" && (
                 <div className="frame-busy"><span className="spinner" aria-hidden="true" /></div>
               )}
               {oneShotStale && <span className="tag warn">다시 만들어야 해요</span>}
@@ -243,7 +284,7 @@ export default function ReelVideoPage() {
                 <div className="thumb-media" />
               )}
               {/* ★ 아직 안 나온 컷만 돈다 — 끝난 컷은 이미 영상이다. */}
-              {rendering && !c.video?.url && (
+              {gen.kind === "running" && !c.video?.url && (
                 <div className="frame-busy"><span className="spinner" aria-hidden="true" /></div>
               )}
               {(c.stale ?? isReelClipStale(c)) && c.video?.url && (

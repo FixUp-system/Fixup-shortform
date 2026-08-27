@@ -40,8 +40,12 @@ describe("순수 규율", () => {
     //   lib/clip-limits.js 는 스스로 순수하고 lib/tiers.js → lib/ad/models.js 만 무는데
     //   그 둘도 순수하다. 통짜 상한을 **모델이 정하게** 하면서 필요해진 자리다 —
     //   여기서 다시 15 를 적으면 2.5(30초)에서 두 값이 갈린다.
-    // ★ `../` 를 통째로 열지 않는다 — 이 한 파일만 허용한다.
-    const ALLOWED_OUTSIDE = ["../clip-limits.js"];
+    // ★★ 2026-08-27 — 한 칸 더 넓혔다. lib/progress.js 는 스스로 순수하고
+    //   (import 는 lib/failure.js 하나, 그 파일은 import 0 건) 화면 다섯이 이미 읽는다.
+    //   "끝났는가"의 판정(isCutDone)을 여기서 다시 적으면 파이프라인과 조용히 갈린다 —
+    //   그 갈림이 images_error 버그(2026-08-14)의 뿌리였다.
+    // ★ `../` 를 통째로 열지 않는다 — 이 둘만 허용한다.
+    const ALLOWED_OUTSIDE = ["../clip-limits.js", "../progress.js"];
     for (const spec of specs) {
       if (ALLOWED_OUTSIDE.includes(spec)) continue;
       expect(spec, `허용 밖의 import: ${spec}`).toMatch(/^\.\//);
