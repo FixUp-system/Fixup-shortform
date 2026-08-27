@@ -62,14 +62,19 @@ describe("스키마도 같은 갈래를 본다", () => {
     expect(scenarioSchemaFor(undefined)).toBe(SCENARIO_SCHEMA);
   });
 
-  it("걷어낸 것 말고는 광고도 그대로다 — 대사·화자·초는 남는다", () => {
+  // ★★ 2026-08-27 — 광고 장면에 남은 것은 **셋뿐**이다(beat·line·seconds).
+  //   카메라·조명·동작·소리·화자·읽는표기는 전부 영상 프롬프트(text) 안으로 들어갔다.
+  it("광고 장면에는 beat·line·seconds 만 남는다", () => {
     const shot = scenarioSchemaFor("ad").properties.shots.items;
-    for (const f of ["beat", "camera", "lighting", "action", "sound", "seconds"]) {
-      expect(shot.required).toContain(f);
-    }
-    expect(shot.properties).toHaveProperty("line");
-    expect(shot.properties).toHaveProperty("say_as");
-    expect(shot.required).toContain("speaker");
+    expect(Object.keys(shot.properties).sort()).toEqual(["beat", "line", "seconds"]);
+    expect(shot.required).toEqual(["beat", "seconds"]);
+  });
+
+  // ★ 최상위도 셋뿐이다 — text(영상 프롬프트) · angle(사장님이 읽는 한 줄) · shots(자막용).
+  it("광고 최상위에는 text·angle·shots 만 남는다", () => {
+    const ad = scenarioSchemaFor("ad");
+    expect(Object.keys(ad.properties).sort()).toEqual(["angle", "shots", "text"]);
+    expect(ad.required.sort()).toEqual(["angle", "shots", "text"]);
   });
 
   it("원본 스키마를 망가뜨리지 않는다 — 광고 스키마를 만들어도 SCENARIO_SCHEMA 는 그대로", () => {
@@ -83,13 +88,17 @@ describe("사람 칸(cast) — 옷 칸이 사람까지 떠맡던 것", () => {
   // ★ 실측 2026-08-21(3/3 재현): cast 가 없을 때 wardrobe 가 "the climber…; the instructor…"
   //   로 두 사람을 한 칸에 우겨 넣었고, 그 값이 "the person wears ___" 틀에 들어가
   //   말이 안 되는 영어로 fal 에 나갔다.
-  it("두 경로 다 cast 를 묻는다 — 사람은 그림 유무와 무관하다", () => {
-    expect(build("ad").system).toContain("(cast)");
+  // ★★ 2026-08-27 — 광고에서는 이 칸들이 사라졌다. 인물·옷은 이제 영상 프롬프트의
+  //   3단("인물과 옷") 안에 글로 들어간다 — 칸으로 또 받으면 같은 것을 두 번 적게 된다.
+  //   film 은 그림 계획이 이 칸들을 읽으므로 **그대로 남는다**.
+  it("film 만 cast 를 묻는다 — 광고는 프롬프트 안에서 다룬다", () => {
+    expect(build("ad").system).not.toContain("(cast)");
     expect(build("film").system).toContain("(cast)");
   });
 
-  it("옷 칸에는 옷만 적으라고 못 박는다 — 두 칸이 같은 것을 말하면 갈린다", () => {
-    expect(build("ad").system).toContain("**옷만 적는다**");
+  it("옷 칸 규칙은 film 지문에만 남는다", () => {
+    expect(build("film").system).toContain("**옷만 적는다**");
+    expect(build("ad").system).not.toContain("**옷만 적는다**");
   });
 
   it("validateScenario 가 cast 를 실어 나른다", () => {

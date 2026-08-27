@@ -16,8 +16,11 @@ describe("시나리오가 이미지용 영어 한 줄을 낸다", () => {
     expect(src).toMatch(/"shows"/);
   });
 
-  it("★ 사장님이 고칠 수 있는 칸에도 들어간다", () => {
-    expect(src).toMatch(/EDITABLE_SHOT_FIELDS[^\]]*"shows"/);
+  // ★★ 2026-08-27 — EDITABLE_SHOT_FIELDS 에서 shows 를 뺐다. 그 목록은 **광고 화면**이
+  //   그리는 칸과 짝인데(data-shot/plan-field 를 그리는 화면은 app/ads/[id] 하나뿐이다),
+  //   광고 장면에는 이제 beat·line 뿐이다. film 쪽 shows 는 스키마와 지문에 그대로 있다.
+  it("★ 스키마와 지문에는 그대로 있다 — 그림을 만드는 값이다", () => {
+    expect(src).toMatch(/SHOWS_FIELD/);
   });
 });
 

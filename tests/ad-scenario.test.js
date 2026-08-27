@@ -9,26 +9,31 @@ const settings = {
   format: "hero", style: "photo", mood: "premium", model: "seedance-2.0-fast",
 };
 
-describe("자동 배치", () => {
-  it("사진 0장이면 t2v 로 고정 — LLM 에 안 묻는다", () => {
+// ★★ 2026-08-27 — 배치는 **사진 수만 본다**(사장님 확정). i2v 분기를 걷어냈다:
+//   사진을 첫 프레임으로 박아 버려서, 제품 사진 한 장으로 광고를 만들 때 화면이 그
+//   사진에서 출발하는 것 말고는 못 했다. 그래서 LLM 에게 물을 것도 없어졌다 —
+//   시나리오 JSON 의 endpoint 칸도 광고 스키마에서 사라졌다.
+describe("자동 배치 — 사진 수만 본다", () => {
+  it("사진 0장이면 t2v", () => {
+    expect(pickEndpointKind(0)).toBe("t2v");
+  });
+
+  it("사진이 한 장이라도 있으면 r2v", () => {
+    expect(pickEndpointKind(1)).toBe("r2v");
+    expect(pickEndpointKind(2)).toBe("r2v");
+    expect(pickEndpointKind(9)).toBe("r2v");
+  });
+
+  // ★ 둘째 인자를 아예 안 본다 — 옛 호출 자리가 남아 있어도 사진 수가 이긴다.
+  it("LLM 이 뭐라 하든 사진 수가 이긴다", () => {
     expect(pickEndpointKind(0, "i2v")).toBe("t2v");
-    expect(pickEndpointKind(0, undefined)).toBe("t2v");
+    expect(pickEndpointKind(1, "i2v")).toBe("r2v");
+    expect(pickEndpointKind(1, "t2v")).toBe("r2v");
   });
 
-  it("사진 2장 이상이면 r2v 로 고정 — i2v 는 1장만 받는다", () => {
-    expect(pickEndpointKind(2, "i2v")).toBe("r2v");
-    expect(pickEndpointKind(4, "t2v")).toBe("r2v");
-  });
-
-  it("사진 1장일 때만 LLM 의 선택을 받는다", () => {
-    expect(pickEndpointKind(1, "i2v")).toBe("i2v");
-    expect(pickEndpointKind(1, "r2v")).toBe("r2v");
-  });
-
-  it("★ 모르는 값은 r2v 로 떨어진다 — 안전한 쪽", () => {
-    expect(pickEndpointKind(1, "x2v")).toBe("r2v");
-    expect(pickEndpointKind(1, undefined)).toBe("r2v");
-    expect(pickEndpointKind(1, "t2v")).toBe("r2v");   // 사진이 있는데 t2v 면 사진이 버려진다
+  it("모르는 값은 0장으로 본다 — 사진이 없으면 t2v 가 맞다", () => {
+    expect(pickEndpointKind(undefined)).toBe("t2v");
+    expect(pickEndpointKind(null)).toBe("t2v");
   });
 });
 
@@ -172,12 +177,13 @@ describe("시나리오 검증", () => {
 
   it("장면과 본문을 받아 정리해서 돌려준다", () => {
     const out = validateScenario(
-      { text: "전체 시나리오", shots: [{ beat: "등장", camera: "slow push-in", action: "병이 놓인다" }], endpoint: "i2v" },
+      { text: "전체 시나리오", shots: [{ beat: "등장", line: "병이 놓인다" }], endpoint: "i2v" },
       1
     );
     expect(out.shots.length).toBe(1);
     expect(out.text).toBe("전체 시나리오");
-    expect(out.endpoint).toBe("i2v");
+    // ★ 사진이 한 장이라도 있으면 r2v 다 — 모델이 낸 endpoint 는 안 본다.
+    expect(out.endpoint).toBe("r2v");
   });
 
   it("★ 사진 수가 LLM 선택을 이긴다", () => {

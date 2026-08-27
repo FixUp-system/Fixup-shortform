@@ -112,7 +112,6 @@ export default function AdDetailPage() {
     setDraftOpts({
       format: st.format, mood: st.mood, style: st.style, lang: st.narration_lang,
       aspect: st.aspect_ratio, model: st.model, seconds: st.seconds, resolution: st.resolution,
-      voiceStyle: st.voice_style,
     });
   }, [project]);
 
@@ -123,7 +122,6 @@ export default function AdDetailPage() {
     draftOpts.format !== project.settings.format ||
     draftOpts.mood !== project.settings.mood ||
     draftOpts.style !== project.settings.style ||
-    draftOpts.voiceStyle !== project.settings.voice_style ||
     draftOpts.lang !== project.settings.narration_lang ||
     draftOpts.aspect !== project.settings.aspect_ratio ||
     draftOpts.model !== project.settings.model ||
@@ -144,7 +142,7 @@ export default function AdDetailPage() {
         material: { text: draftText },
         settings: {
           format: draftOpts.format, mood: draftOpts.mood, style: draftOpts.style,
-          narration_lang: draftOpts.lang, voice_style: draftOpts.voiceStyle, aspect_ratio: draftOpts.aspect,
+          narration_lang: draftOpts.lang, aspect_ratio: draftOpts.aspect,
           model: draftOpts.model, seconds: draftOpts.seconds, resolution: draftOpts.resolution,
         },
       }),
@@ -477,12 +475,6 @@ export default function AdDetailPage() {
           {(() => {
             const all = [
               ["이야기", "angle"],
-              ["인물", "cast"],
-              ["옷차림", "wardrobe"],
-              ["무대", "environment"],
-              ["제품", "look"],
-              ["색감", "tone"],
-              ["목소리", "voice"],
             ];
             const rows = editing
               ? all
@@ -512,20 +504,11 @@ export default function AdDetailPage() {
                   {/* 초 — 장면 머리에 작게. Number.isFinite 로 감싼다: 이 필드가 없는(연출
                       필드 개편 전에 만든) 옛 시나리오에서는 undefined가 그대로 안 뜨게 한다. */}
                   {Number.isFinite(shot.seconds) && <span className="badge">{shot.seconds}초</span>}
+                  {/* ★★ 2026-08-27 — 카메라·조명·음향·동작 칸을 걷었다. 그 값들은 이제
+                      **영상 프롬프트(위 script-src)** 안에 있고, 시나리오는 그것을 장면별로
+                      옮겨 적은 자막용 목록이다. 없는 값을 빈칸으로 그리면 우리가 빠뜨린
+                      것처럼 보인다. */}
                   <div className="plan-field"><b>역할</b><Field editing={editing} name="beat" v={shot.beat} /></div>
-                  <div className="plan-field"><b>카메라</b><Field editing={editing} name="camera" v={shot.camera} /></div>
-                  {/* 조명·음향 — CF 연출·촬영 감독 SYSTEM(be1cc9c)이 새로 낸다. 컨트롤러 판단:
-                      전부 보여주되 한 줄씩 작게(나중에 줄이는 게 늘리는 것보다 쉽다). 옛
-                      시나리오엔 없을 수 있어 있을 때만 그린다.
-                      ★ 편집 중에는 비어 있어도 그린다 — 안 그러면 옛 시나리오에서 그 줄을
-                      **채워 넣을 길이 없다**(고칠 수는 있는데 만들 수는 없는 상태가 된다). */}
-                  {(editing || shot.lighting) && (
-                    <div className="plan-field"><b>조명</b><Field editing={editing} name="lighting" v={shot.lighting} /></div>
-                  )}
-                  {(editing || shot.sound) && (
-                    <div className="plan-field"><b>음향</b><Field editing={editing} name="sound" v={shot.sound} /></div>
-                  )}
-                  <div className="plan-field"><b>동작</b><Field editing={editing} name="action" v={shot.action} /></div>
                   {(editing || shot.line) && (
                     <div className="plan-field"><b>대사</b><Field editing={editing} name="line" v={shot.line} /></div>
                   )}

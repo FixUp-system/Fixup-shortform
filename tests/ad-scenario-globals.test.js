@@ -30,13 +30,13 @@ const build = (globalEdits) =>
     .messages[0].content;
 
 describe("서버가 고친 값을 판정한다 — 화면 주장을 믿지 않는다", () => {
+  // ★★ 2026-08-27 — 고칠 수 있는 칸이 **angle 하나**로 줄었다. cast·wardrobe·environment·
+  //   look·tone·voice 는 광고 시나리오가 더는 만들지 않는 칸이다(전부 영상 프롬프트 text
+  //   안으로 들어갔다). 목록에만 남기면 "화면에는 있는데 서버가 못 쓰는" 값이 된다.
   it("실제로 다른 칸만 고른다", () => {
-    const out = pickEditedGlobals(saved, {
-      ...saved,
-      cast: "a man in his forties, short hair, sturdy build, warm expression",
-    });
-    expect(Object.keys(out)).toEqual(["cast"]);
-    expect(out.cast).toContain("forties");
+    const out = pickEditedGlobals(saved, { ...saved, angle: "끝까지 혼자 오른다" });
+    expect(Object.keys(out)).toEqual(["angle"]);
+    expect(out.angle).toContain("혼자");
   });
 
   // ★ 안 고친 값까지 "이대로 쓴다"로 실으면 전체 재작성이 아니라 옛 시나리오의 번역이 된다.
@@ -45,16 +45,25 @@ describe("서버가 고친 값을 판정한다 — 화면 주장을 믿지 않�
   });
 
   it("앞뒤 공백만 다른 것은 고친 것이 아니다", () => {
-    expect(pickEditedGlobals(saved, { ...saved, cast: `  ${saved.cast}  ` })).toEqual({});
+    expect(pickEditedGlobals(saved, { ...saved, angle: `  ${saved.angle}  ` })).toEqual({});
   });
 
   // ★ 비운 것도 **사장님의 판단**이다 — "이 영상에는 사람이 안 나온다".
   it("값을 비운 것은 고친 것으로 본다", () => {
-    expect(pickEditedGlobals(saved, { ...saved, cast: "" })).toEqual({ cast: "" });
+    expect(pickEditedGlobals(saved, { ...saved, angle: "" })).toEqual({ angle: "" });
   });
 
   it("빈 칸을 채운 것도 고친 것이다 — 비어 있는 칸이야말로 채우고 싶은 자리다", () => {
-    expect(pickEditedGlobals(saved, { ...saved, look: "a black tumbler" })).toEqual({ look: "a black tumbler" });
+    expect(pickEditedGlobals({ ...saved, angle: "" }, { ...saved, angle: "새 이야기" }))
+      .toEqual({ angle: "새 이야기" });
+  });
+
+  // ★ 걷어낸 칸은 **이제 목록 밖**이다 — 들어와도 안 받는다.
+  it("걷어낸 칸(cast·wardrobe·environment·look·tone·voice)은 받지 않는다", () => {
+    expect(pickEditedGlobals(saved, {
+      ...saved, cast: "딴사람", wardrobe: "딴옷", environment: "딴곳",
+      look: "딴것", tone: "딴색", voice: "딴목소리",
+    })).toEqual({});
   });
 
   it("목록 밖의 칸은 받지 않는다 — 화면에 없는 것을 서버가 받으면 두 벌이 갈린다", () => {
@@ -62,11 +71,11 @@ describe("서버가 고친 값을 판정한다 — 화면 주장을 믿지 않�
   });
 
   it("문자열이 아닌 값은 무시한다", () => {
-    expect(pickEditedGlobals(saved, { cast: 42, wardrobe: null, angle: {} })).toEqual({});
+    expect(pickEditedGlobals(saved, { angle: {} })).toEqual({});
   });
 
   it("저장된 시나리오나 들어온 값이 없으면 빈 객체다 — 던지지 않는다", () => {
-    expect(pickEditedGlobals(null, { cast: "x" })).toEqual({});
+    expect(pickEditedGlobals(null, { angle: "x" })).toEqual({});
     expect(pickEditedGlobals(saved, null)).toEqual({});
     expect(pickEditedGlobals(saved, "nope")).toEqual({});
   });
