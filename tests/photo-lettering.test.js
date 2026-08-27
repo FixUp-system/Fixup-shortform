@@ -76,7 +76,7 @@ describe("프롬프트가 철자를 그대로 준다", () => {
 // 쓰되, 광고에는 그 판정 자체가 없었으므로 한 번 돌려 문서에 남긴다(사진당 한 번).
 describe("광고 시나리오도 철자를 받는다", () => {
   it("★ 지문에 사진마다의 글자가 실린다", async () => {
-    const { buildScenarioMessages } = await import("../lib/ad/scenario.js");
+    const { buildScenarioMessages } = await import("../lib/film/scenario.js");
     const project = {
       settings: { seconds: 15, aspect_ratio: "9:16", narration_lang: "ko", format: "hero", mood: "premium", style: "photo" },
       material: {
@@ -94,7 +94,7 @@ describe("광고 시나리오도 철자를 받는다", () => {
   });
 
   it("★ 읽은 글자가 없으면 지문이 예전과 글자 그대로다", async () => {
-    const { buildScenarioMessages } = await import("../lib/ad/scenario.js");
+    const { buildScenarioMessages } = await import("../lib/film/scenario.js");
     const project = {
       settings: { seconds: 15, aspect_ratio: "9:16", narration_lang: "ko", format: "hero", mood: "premium", style: "photo" },
       material: { text: "키링 광고", photos: [{ id: "p1" }] },

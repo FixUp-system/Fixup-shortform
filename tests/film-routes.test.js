@@ -57,7 +57,7 @@ vi.mock("../lib/film/pipeline.js", () => ({
 const scenarioMock = vi.hoisted(() => ({
   make: vi.fn(async () => ({ text: "Vertical footage.", shots: [{ line: "안녕하세요", seconds: 15 }] })),
 }));
-vi.mock("../lib/ad/scenario.js", async (importOriginal) => ({
+vi.mock("../lib/film/scenario.js", async (importOriginal) => ({
   ...(await importOriginal()),
   generateScenario: (...a) => scenarioMock.make(...a),
 }));

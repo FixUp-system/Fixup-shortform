@@ -10,14 +10,15 @@
 //   덧붙였다.** 이제 Fable 이 처음부터 한 편을 쓰고 코드는 아무것도 안 붙인다.
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { systemFor, buildScenarioMessages, photoBlocks, generateScenario, validateScenario } from "../lib/ad/scenario.js";
+import { AD_SYSTEM, buildScenarioMessages, photoBlocks, generateScenario, validateScenario } from "../lib/ad/scenario.js";
+import { systemFor as filmSystemFor } from "../lib/film/scenario.js";
 import { withSpokenLines } from "../lib/ad/generate.js";
 
 const settings = {
   seconds: 15, aspect_ratio: "9:16", narration_lang: "ko",
   format: "hero", style: "photo", mood: "premium", model: "seedance-2.0", resolution: "720p",
 };
-const AD = systemFor("ad");
+const AD = AD_SYSTEM;
 
 describe("일곱 단을 다 요구한다", () => {
   // ★ 단 이름이 아니라 **각 단이 요구하는 일**을 잰다 — 번호만 맞고 내용이 빠지면
@@ -120,14 +121,15 @@ describe("걷어낸 칸을 지문이 더는 안 묻는다", () => {
 });
 
 describe("★ film 지문은 손대지 않았다 — 광고만 바꾼 것이지 둘 다가 아니다", () => {
-  const film = systemFor("film");
+  const film = filmSystemFor();
   it("film 은 예전 그대로 칸들을 묻는다", () => {
     for (const f of ["(cast)", "(wardrobe)", "(look)", "(tone)", "(music)", "shows", "avatar_id"]) {
       expect(film, `film 에서 ${f} 가 사라졌다`).toContain(f);
     }
   });
-  it("모르는 kind 는 film 쪽이다", () => {
-    expect(systemFor(undefined)).toBe(film);
+  // ★ 두 지문이 이제 **다른 파일**에 산다 — 갈래를 고르는 함수 자체가 사라졌다.
+  it("광고 지문과 film 지문이 서로 다른 글이다", () => {
+    expect(AD).not.toBe(film);
   });
 });
 
@@ -198,35 +200,36 @@ describe("★★ 코드가 프롬프트에 아무것도 안 붙인다 — 사장
     text: 'A 15-second ad. The narrator says "안녕하세요".',
     angle: "한국어 이야기 한 줄",
     shots: [{ beat: "등장", line: "안녕하세요", seconds: 15 }],
-    // 옛 문서에서 흘러들어올 수 있는 값들 — lean 에서는 하나도 안 붙어야 한다.
+    // 옛 문서에서 흘러들어올 수 있는 값들 — 하나도 안 붙어야 한다.
     cast: "a woman", wardrobe: "a coat", environment: "a cafe", look: "a jar",
     tone: "warm grain", voice: "a calm man",
   };
 
-  it("lean 이면 꼬리 절이 하나도 안 붙는다", () => {
-    const out = withSpokenLines(scenario.text, scenario.shots, scenario.voice, scenario, { lean: true });
-    expect(out).toBe(scenario.text);
+  // ★★ withSpokenLines 는 이제 **대사 보강만** 한다. 나머지 일곱 절은 film 으로 갔다
+  //   (lib/film/pipeline.js 의 filmClauses) — 인자도 둘로 줄었다.
+  it("대사가 이미 들어 있으면 프롬프트가 글자 그대로 나간다", () => {
+    expect(withSpokenLines(scenario.text, scenario.shots)).toBe(scenario.text);
   });
 
   it("한국어 angle 이 영어 프롬프트 안으로 새지 않는다", () => {
-    const out = withSpokenLines(scenario.text, scenario.shots, scenario.voice, scenario, { lean: true });
+    const out = withSpokenLines(scenario.text, scenario.shots);
     expect(out).not.toContain("한국어 이야기 한 줄");
-    expect(out).not.toMatch(/[가-힣]/.source === "" ? /$^/ : /The story this film tells/);
+    expect(out).not.toContain("The story this film tells");
   });
 
-  // ★ 다만 **대사 보강은 lean 에서도 남긴다.** 지시문에 대사가 빠지면 모델이 자기가 지어낸
-  //   말을 하고 자막과 전혀 다른 영상이 나온다(2026-08-19 실측). 그것이 이 함수가 생긴 이유다.
-  it("대사가 text 에 빠져 있으면 lean 이어도 보강한다", () => {
-    const out = withSpokenLines("A 15-second ad with no dialogue written.", scenario.shots, "", scenario, { lean: true });
+  it("옛 문서의 무대·옷차림·목소리 절도 안 붙는다", () => {
+    const out = withSpokenLines(scenario.text, scenario.shots);
+    for (const s of ["The whole film takes place", "Wardrobe, keep identical", "Voice:", "Color treatment"]) {
+      expect(out, `${s} 절이 아직 붙는다`).not.toContain(s);
+    }
+  });
+
+  // ★ 다만 **대사 보강은 남긴다.** 프롬프트에 대사가 빠지면 모델이 자기가 지어낸 말을 하고
+  //   자막과 전혀 다른 영상이 나온다(2026-08-19 실측). 그것이 이 함수가 생긴 이유다.
+  it("대사가 text 에 빠져 있으면 보강한다", () => {
+    const out = withSpokenLines("A 15-second ad with no dialogue written.", scenario.shots);
     expect(out).toContain("안녕하세요");
     expect(out).toContain("word for word");
-  });
-
-  it("★ film 은 예전 그대로 절이 붙는다 — lean 을 안 넘기면 글자 하나 안 바뀐다", () => {
-    const out = withSpokenLines(scenario.text, scenario.shots, scenario.voice, scenario);
-    expect(out).toContain("The whole film takes place in a cafe.");
-    expect(out).toContain("Wardrobe, keep identical throughout");
-    expect(out).toContain("Voice: a calm man");
   });
 });
 
@@ -251,17 +254,17 @@ describe("목소리를 고르는 축이 어디에도 안 남았다", () => {
 
 describe("★ 지문이 실제로 짧아졌다 — 규칙 목록에서 양식으로", () => {
   it("광고 지문이 film 지문보다 짧다", () => {
-    expect(AD.length).toBeLessThan(systemFor("film").length);
+    expect(AD.length).toBeLessThan(filmSystemFor().length);
   });
 
   // ★ 사진이 있을 때만 참조 이름 안내가 붙는다(모델마다 표기가 다르다 — @Image1 vs Image 1).
   it("사진이 있으면 그 모델의 호칭으로 가리키라고 알려 준다", () => {
     const withPhoto = buildScenarioMessages({
-      kind: "ad", settings, material: { text: "소재", photos: [{ url: "/api/uploads/a.jpg" }] },
+      settings, material: { text: "소재", photos: [{ url: "/api/uploads/a.jpg" }] },
     }).messages[0].content;
     expect(withPhoto).toContain("@Image1");
     const h3 = buildScenarioMessages({
-      kind: "ad", settings: { ...settings, model: "minimax-h3" }, material: { text: "소재", photos: [{ url: "/api/uploads/a.jpg" }] },
+      settings: { ...settings, model: "minimax-h3" }, material: { text: "소재", photos: [{ url: "/api/uploads/a.jpg" }] },
     }).messages[0].content;
     expect(h3).toContain("Image 1");
   });
@@ -269,7 +272,7 @@ describe("★ 지문이 실제로 짧아졌다 — 규칙 목록에서 양식으
   // ★ 없는 칸(look·shows)을 가리키는 지시가 광고 user 메시지에 남아 있으면 모델이 헷갈린다.
   it("광고 user 메시지가 없는 칸을 가리키지 않는다", () => {
     const u = buildScenarioMessages({
-      kind: "ad", settings, material: { text: "소재", photos: [{ url: "/api/uploads/a.jpg" }] },
+      settings, material: { text: "소재", photos: [{ url: "/api/uploads/a.jpg" }] },
     }).messages[0].content;
     expect(u).not.toContain("look 에서는");
     expect(u).not.toContain("shows");

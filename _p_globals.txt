@@ -1,0 +1,46 @@
+// ★ kind 를 받는다 — 그림 단계가 있는 경로(film)와 없는 경로(ad)가 다른 지문을 받는다
+//   (systemFor 머리말 참고). generateScenario 가 project 를 통째로 펼쳐 넘기므로
+//   `project.kind` 가 그대로 여기 온다.
+// 사장님이 **영상 전체 값**을 고쳤을 때 그것을 고른다 — 장면(pickEditedShots)과 같은 결이다.
+//
+// ★★ 왜 필요한가: 그전에는 고칠 수 있는 것이 장면 칸뿐이었다. AI 가 "20대 여성"으로
+//   잡았는데 사장님이 40대 남성을 원하면 [다시 쓰기]로 **통째로** 새로 뽑는 수밖에 없었고,
+//   그러면 마음에 들던 장면과 대사까지 다 바뀌었다. 영상 한 편이 $2~7 이라 시나리오
+//   단계에서 맞추는 것이 가장 싼 길인데, 맞출 손잡이가 없었다.
+//
+// ★ **서버가 판정한다.** 화면이 "이걸 고쳤다"고 주장하는 것을 믿지 않는다 — 저장된
+//   시나리오와 대조해 실제로 다른 것만 고른 것으로 본다(pickEditedShots 와 같은 이유).
+//   안 고친 값까지 "그대로 쓴다"로 실으면 전체 재작성이 아니라 옛 시나리오의 번역이 된다.
+//
+// ★ music·focus 는 **없다.** 화면이 그 둘을 안 그리므로 사장님이 고칠 길이 없고,
+//   목록에만 두면 "화면에 없는데 서버는 받는" 자리가 생긴다(두 벌이 갈리는 씨앗이다).
+//
+// ⚠️ 이 목록은 화면(app/ads/[id]/page.js)이 그리는 칸과 **같아야 한다**. 화면은 이 파일을
+//   import 할 수 없다(여기는 서버 전용이다 — vlm.js 를 통해 fs 가 딸려 온다). 그래서
+//   목록이 두 벌인데, tests/ad-scenario-globals.test.js 가 둘을 대조해 어긋나면 실패한다.
+// ★★ 2026-08-27 — **하나로 줄었다.** cast·wardrobe·environment·look·tone·voice 는 광고
+//   시나리오가 더는 만들지 않는 칸이다(전부 영상 프롬프트 text 안으로 들어갔다). 목록에만
+//   남겨 두면 "화면에는 있는데 서버가 어디에도 못 쓰는" 값이 되고, 사장님이 공들여 고친
+//   것이 말없이 사라진다. 남은 하나는 이야기(angle) — 사장님이 읽는 한국어 한 줄이다.
+export const EDITABLE_GLOBAL_FIELDS = ["angle"];
+
+// 길이 상한 — validateScenario 의 칸별 상한 중 **가장 큰 값**(angle 400)으로 통일한다.
+// 여기서 나온 값은 지문에 실릴 뿐이고 문서에 그대로 저장되지 않는다(다시 생성된 값이
+// 저장된다) — 그래서 칸마다 다른 상한을 또 적을 이유가 없다.
+const GLOBAL_EDIT_MAX = 400;
+
+export function pickEditedGlobals(savedScenario, incoming) {
+  if (!savedScenario || !incoming || typeof incoming !== "object") return {};
+  const out = {};
+  for (const f of EDITABLE_GLOBAL_FIELDS) {
+    const got = incoming[f];
+    if (typeof got !== "string") continue;
+    const now = got.trim();
+    if (now === String(savedScenario[f] ?? "").trim()) continue;
+    // ★ 빈 값도 **고침으로 본다** — "이 영상에는 사람이 안 나온다"는 사장님의 판단이다.
+    //   다만 지문에는 그 뜻을 말로 적는다(빈 줄을 실으면 모델이 무슨 뜻인지 모른다).
+    out[f] = now.slice(0, GLOBAL_EDIT_MAX);
+  }
+  return out;
+}
+

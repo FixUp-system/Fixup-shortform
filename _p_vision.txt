@@ -1,0 +1,29 @@
+// 사진을 한 번 읽어 photos[].vision 에 붙인다 — **광고와 film 이 같은 함수를 쓴다**.
+//
+// ★★ 원래 lib/ad/pipeline.js 안에 인라인으로 있었고 film 라우트는 그 경로를 안 지나서
+//   **사진을 한 번도 안 읽었다**(2026-08-19 실측). 그래서 시나리오가 제품의 글자도 색도
+//   크기도 모른 채 쓰였다. 베끼면 두 벌이 되므로 여기로 뺀다.
+// ★ 아직 안 본 사진만 읽는다 — 다시 쓰기를 눌러도 사진값이 다시 안 든다.
+// ★ 실패는 흘려보낸다 — 사진 하나를 못 읽었다고 시나리오를 못 만들 이유가 없다.
+// ★ 아무것도 못 읽었으면 **받은 project 를 그대로** 돌려준다(문서를 헛되이 안 바꾼다).
+export async function readPhotoVision(project, deps = {}) {
+  const photos = project?.material?.photos || [];
+  if (!photos.length) return project;
+  const describe = deps.describePhoto || defaultDescribePhoto;
+  const readBytes = deps.readRefBytes || defaultReadRefBytes;
+
+  const out = [];
+  let readAny = false;
+  for (const ph of photos) {
+    const key = ph.url?.split("/").pop();
+    if (ph.vision || !key) { out.push(ph); continue; }
+    const bytes = await readBytes({ source: "upload", key });
+    if (!bytes) { out.push(ph); continue; }
+    const vision = await describe({ photoBytes: bytes, photoKey: key, projectId: project.id });
+    const judged = vision?.person || vision?.what || vision?.lettering;
+    if (judged) readAny = true;
+    out.push(judged ? { ...ph, vision } : ph);
+  }
+  return readAny ? { ...project, material: { ...project.material, photos: out } } : project;
+}
+

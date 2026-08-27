@@ -1,0 +1,18 @@
+// ★ 사진 수가 LLM 선택을 이긴다. 검증이 판정의 마지막 자리다.
+// 이 영상의 **중심** — 넷 중 하나다. lib/film/mode.js 의 imagePlanFor 가 이 값으로
+// 그림 계획을 가른다(무엇을 여러 장 그리고 무엇을 고정할지).
+//
+// ★ 컨셉(AD_FORMATS)과 다른 질문이다: 컨셉은 "어떤 형식으로 보여줄까", 이건 "무엇을
+//   지켜야 하나"다. 제품 히어로 형식이어도 중심은 인물일 수 있다(사람이 쓰는 장면이
+//   주인공인 제품 광고). 그래서 합치지 않는다.
+export const FOCUSES = Object.freeze(["product", "person", "info", "place"]);
+const DEFAULT_FOCUS = "product";
+
+// ★★ 모르는 값에 **던지지 않는다.** 옵션(normalizeAdOptions)은 사장님이 고른 값이라
+//   던지는 것이 맞지만 — 고른 것과 만들어지는 것이 달라지면 아무도 못 알아본다 —
+//   이건 **모델이 낸 값**이다. 던지면 시나리오 한 편이 통째로 날아가는데 그 호출값은
+//   이미 치렀다. 안전한 쪽으로 떨어뜨린다.
+export function pickFocus(v) {
+  return FOCUSES.includes(v) ? v : DEFAULT_FOCUS;
+}
+

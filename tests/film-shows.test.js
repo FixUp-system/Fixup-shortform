@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { imagePlanFor } from "../lib/film/mode.js";
 
-const src = readFileSync("lib/ad/scenario.js", "utf8");
+const src = readFileSync("lib/film/scenario.js", "utf8");
 
 const SCENARIO = {
   shots: [
