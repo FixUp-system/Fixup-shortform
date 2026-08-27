@@ -131,6 +131,27 @@ describe("화면과 서버가 같은 목록을 본다", () => {
     expect(src).toMatch(/JSON\.stringify\(\{ shots: edited\.shots, globals: edited\.globals \}\)/);
   });
 
+  // ★★★ 2026-08-27 에 뚫려 있던 자리다. 전역 칸(EDITABLE_GLOBAL_FIELDS)은 이 파일이 화면과
+  //   대조하는데 **장면 칸(EDITABLE_SHOT_FIELDS)은 아무도 대조하지 않았다.** 서버 목록이
+  //   ["beat","line"] 로 줄었을 때 화면이 그대로 카메라·조명 칸을 그리고 있었어도 이 그물에
+  //   안 걸렸을 것이다 — 그러면 사장님이 고친 값이 서버에서 말없이 버려진다.
+  //   ⚠️ 화면은 lib/ad/scenario.js 를 import 할 수 없다(서버 전용). 그래서 목록이 두 벌이고,
+  //     이 시험이 둘을 맞춰 준다 — 전역 칸에 이미 쓰던 처방과 같다.
+  it("★ 장면 칸도 화면과 서버가 같은 목록을 본다", () => {
+    const server = readFileSync("lib/ad/scenario.js", "utf8");
+    const list = server.match(/const EDITABLE_SHOT_FIELDS = \[([^\]]*)\]/)[1]
+      .split(",").map((s) => s.trim().replace(/^"|"$/g, "")).filter(Boolean);
+    expect(list.length, "장면 편집 칸이 하나도 없다").toBeGreaterThan(0);
+
+    // 화면이 그리는 name= 칸을 뽑는다(주석은 걷는다 — 걷어낸 칸 이름이 주석에 남아 있다).
+    const code = src.replace(/\{\/\*[\s\S]*?\*\/\}/g, " ").replace(/^\s*\/\/.*$/gm, " ");
+    const drawn = [...code.matchAll(/<Field editing=\{editing\} name="(\w+)"/g)].map((m) => m[1]);
+    const inShots = drawn.filter((n) => n !== "angle");
+
+    for (const f of list) expect(inShots, `서버는 ${f} 를 받는데 화면이 안 그린다`).toContain(f);
+    for (const f of inShots) expect(list, `화면은 ${f} 를 그리는데 서버가 안 받는다`).toContain(f);
+  });
+
   // ★ 편집 중에는 **일곱 칸을 다 편다** — 비어 있는 칸이야말로 사장님이 채우고 싶은 자리다.
   it("편집 중에는 빈 칸도 그린다", () => {
     expect(src).toMatch(/const rows = editing\s*\n?\s*\? all/);
