@@ -247,6 +247,10 @@ const SIDEBAR_FLOWS = Object.freeze({
 export default function Sidebar() {
   const pathname = usePathname();
   const { project } = useProject();
+  // ★★ 손님(로그인 안 함)인가 — 2026-08-27. 보관함은 손님도 보지만, **원가 표**는
+  //   우리 지출 구조라 회원의 것이다(아래 [실제 비용]). 만들기 링크는 남긴다:
+  //   누르면 로그인 화면으로 가고, 거기서 가입한다(그 길이 곧 가입 유도다).
+
   // 운영자 여부만 서버에서 읽는다. GET /api/me 가 `isAdmin` 하나로 답한다(원문 role 이
   // 아니다). 직접 부르지 않고 공유본에서 받는다 — 예전에는 상단바와 여기가 같은 요청을
   // 각각 한 번씩, 한 화면에서 두 번 보냈다(components/MeContext.jsx).
@@ -255,7 +259,11 @@ export default function Sidebar() {
   // 실패해도 null 로 남아 `!!me?.isAdmin` 은 false 다. 비용 기록은 전사 원장이라 남의
   // 지출이 담긴다. "모르겠으면 보여주기"는 여기서 새는 쪽이다. 링크를 숨겨도 운영자는
   // 주소로 들어갈 수 있고, 진짜 경계는 middleware 의 역할 게이트다.
-  const { me } = useMe();
+  // ★★ 손님(로그인 안 함) 여부도 여기서 함께 꺼낸다(2026-08-27) — 보관함은 손님도 보지만
+  //   **원가 표**는 우리 지출 구조라 회원의 것이다(아래 [실제 비용]). 만들기 링크는 남긴다:
+  //   누르면 로그인 화면으로 가고 거기서 가입한다(그 길이 곧 가입 유도다).
+  //   ★ useMe() 를 두 번 부르지 않는다 — 공유본 하나에서 둘을 꺼낸다.
+  const { me, guest } = useMe();
   const isAdmin = !!me?.isAdmin;
   const inCreate = pathname.startsWith("/create");
   // 진행 중인 프로젝트가 있으면 그 프로젝트로, 없으면 새로 시작 화면으로.
@@ -356,12 +364,17 @@ export default function Sidebar() {
           단계이니까 사용자들이 확인할 수 있게"). 아래 운영자 전용 [비용 기록]과 **다른
           것**이다: 저기는 실제로 나간 지출 원장이고, 여기는 "한 편에 얼마 드는가" 표다.
           ★ isAdmin 으로 감싸지 않는다 — 감싸면 이 지시가 통째로 무효가 된다. */}
-      <Link
-        href="/cost-table"
-        className={`side-item${pathname === "/cost-table" ? " on" : ""}`}
-      >
-        <span className="ic"><Icon name="clock" /></span>실제 비용
-      </Link>
+      {/* ★ 손님에게는 안 보인다(2026-08-27) — "사용자들이 확인할 수 있게"의 사용자는
+          로그인한 사람이다. 게다가 이 자리는 손님에게 열린 목록에 없어서(lib/auth/guest.js)
+          눌러도 로그인 화면으로 튕긴다 — 막다른 링크를 그리지 않는다. */}
+      {!guest && (
+        <Link
+          href="/cost-table"
+          className={`side-item${pathname === "/cost-table" ? " on" : ""}`}
+        >
+          <span className="ic"><Icon name="clock" /></span>실제 비용
+        </Link>
+      )}
       <button className="side-item soon" disabled>
         <span className="ic"><Icon name="template" /></span>템플릿
         <span className="soon-tag">준비 중</span>

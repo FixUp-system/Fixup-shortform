@@ -30,7 +30,7 @@ export default function UserMenu() {
   // 공유본이 진입 때 한 번 읽는다. 실패하면 여기서는 조용히 넘긴다(값이 null 로 남을 뿐) —
   // 상단 띠가 오류로 시끄러워질 자리가 아니다. 다만 **묶음을 통째로 숨기지는 않는다**
   // (아래 주석 참고). 마이페이지가 이름을 저장한 뒤 공유본을 다시 읽으면 이 버튼도 함께 바뀐다.
-  const { me } = useMe();
+  const { me, guest } = useMe();
   const [open, setOpen] = useState(false);
   const box = useRef(null);
 
@@ -51,6 +51,21 @@ export default function UserMenu() {
   // 못 읽었다고 묶음을 통째로 숨기면 **세션을 끊을 방법이 아무 데도 없어진다** — 라이브
   // GET /api/me 가 실제로 500 이었다(profiles.display_name 컬럼 없음). 데이터가 있어야
   // 하는 것(크레딧)만 가리고, 이름 자리는 기본 라벨로 채워 빈 버튼을 만들지 않는다.
+  // ★★ 손님에게는 **[로그인] 하나**다(2026-08-27 사장님 지시: 보관함은 그냥 보고,
+  //   상세 기능을 쓰려면 로그인·회원가입). 계정 메뉴(마이페이지·로그아웃)를 그리면
+  //   있지도 않은 계정을 가진 것처럼 읽힌다.
+  //   ★ 가입도 그 화면에 있다(app/login/page.js 의 탭) — 문을 둘로 만들지 않는다.
+  if (guest) {
+    return (
+      <div className="um">
+        <Link href="/login" className="um-btn">
+          <span className="ic"><Icon name="user" size={16} /></span>
+          로그인
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="um" ref={box}>
       {/* ★ 크레딧을 끈 동안(내부 QA)에는 안 보여준다 — 판정은 서버가 내려 준 gated

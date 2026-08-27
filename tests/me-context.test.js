@@ -24,8 +24,10 @@ describe("내 정보 공유본", () => {
     expect(page).not.toMatch(/fetch\("\/api\/me"\)/);
   });
 
-  it("읽은 값·실패 여부·다시 읽는 함수 셋을 내준다", () => {
-    expect(ctx).toMatch(/\{\s*me,\s*failed,\s*load\s*\}/);
+  // ★ 2026-08-27 — **손님 축이 하나 늘었다**(guest). 401 은 "못 읽었다"가 아니라
+  //   "아직 로그인 안 했다"라서, 상단바가 그 자리에 [로그인]을 그린다(UserMenu).
+  it("읽은 값·실패 여부·손님 여부·다시 읽는 함수를 내준다", () => {
+    expect(ctx).toMatch(/\{\s*me,\s*failed,\s*guest,\s*load\s*\}/);
     expect(ctx).toMatch(/const load = useCallback/);
   });
 

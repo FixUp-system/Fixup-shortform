@@ -9,6 +9,7 @@
 //     ② **GET 만** — 만들기·고치기·지우기는 그대로 로그인이 필요하다
 //     ③ **정확한 자리만** — 접두사로 열면 그 아래 값이 나가는 문까지 함께 열린다
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { readFileSync } from "fs";
 import { guestArchiveOn, isGuestPath, isGuestRequest } from "../lib/auth/guest.js";
 
 const ID = "0f8c1a2b-3c4d-5e6f-7a8b-9c0d1e2f3a4b";
@@ -34,6 +35,7 @@ describe("스위치 — 기본은 닫힘이다", () => {
 
 describe("열린 자리 — 보관함을 보는 데 필요한 것뿐이다", () => {
   const open = [
+    "/",
     "/archive",
     `/archive/${ID}`,
     "/api/projects",
@@ -150,5 +152,46 @@ describe("손님이 보는 목록", () => {
     delete process.env.SHOTFORM_PUBLIC_ARCHIVE;
     const res = await GET(new Request("http://x/api/projects"), {});
     expect(res.status).toBe(500); // 신원 헤더가 없다 = matcher 밖이거나 손님 금지
+  });
+});
+
+// ── 들어오는 문 ──────────────────────────────────────────────────────────
+//
+// 사장님 지시(2026-08-27): "기본으로 보관함 바로 확인하고 상세 기능들을 사용하려면
+// 로그인 및 회원가입 해야 볼 수 있는 걸로". 즉 첫 화면이 로그인 벽이면 안 된다.
+describe("루트가 신원에 따라 갈린다", () => {
+  const src = readFileSync("app/page.js", "utf8");
+
+  it("로그인했으면 만들기 화면, 아니면 보관함", () => {
+    expect(src).toContain("/reel/new");
+    expect(src).toContain("/archive");
+    // 신원은 middleware 가 넣어 준 헤더를 읽기만 한다 — 세션을 여기서 다시 확인하지 않는다.
+    expect(src).toContain("USER_HEADER");
+    expect(src, "화면이 세션을 다시 판정한다").not.toContain("createServerClient");
+  });
+
+  it("★ 루트가 손님 목록에 있다 — 없으면 첫 화면에서 로그인 벽을 만난다", () => {
+    expect(isGuestPath("/", "GET")).toBe(true);
+  });
+});
+
+describe("손님에게 보이는 상단바", () => {
+  const src = readFileSync("components/UserMenu.jsx", "utf8");
+
+  it("로그인 버튼 하나만 그린다 — 없는 계정의 메뉴를 그리지 않는다", () => {
+    const at = src.indexOf("if (guest)");
+    expect(at, "손님 갈래가 없다").toBeGreaterThan(-1);
+    // ★ 그 갈래**만** 자른다 — 넉넉히 잘랐더니 뒤따르는 로그인 사용자용 코드(크레딧·
+    //   로그아웃)까지 들어와 거짓 경보가 났다(2026-08-27).
+    const block = src.slice(at, src.indexOf("\n  }", at));
+    expect(block).toContain("/login");
+    expect(block, "손님에게 로그아웃을 그린다").not.toContain("로그아웃");
+    expect(block, "손님에게 크레딧을 그린다").not.toContain("크레딧");
+  });
+
+  it("★ 401 을 실패와 가른다 — 일시적 오류에 로그인 버튼이 뜨면 안 된다", () => {
+    const me = readFileSync("components/MeContext.jsx", "utf8");
+    expect(me).toContain("res.status === 401");
+    expect(me).toContain("setGuest");
   });
 });

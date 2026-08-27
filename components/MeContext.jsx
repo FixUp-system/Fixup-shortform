@@ -23,6 +23,10 @@ const Ctx = createContext(null);
 export function MeProvider({ children }) {
   const [me, setMe] = useState(null);
   const [failed, setFailed] = useState(false);
+  // ★★ 손님(로그인 안 함)인가 — **실패와 다른 축이다**(2026-08-27). 401 은 "못 읽었다"가
+  //   아니라 "아직 로그인 안 했다"이고, 상단바가 그 자리에 [로그인]을 그려야 한다.
+  //   failed 하나로 뭉치면 일시적인 오류에도 로그인 버튼이 뜬다.
+  const [guest, setGuest] = useState(false);
 
   // ★ ProjectContext.load 와 달리 **던지지 않는다.** 소비자가 셋인데 그중 둘(상단바·
   // 사이드바)은 실패를 조용히 넘기면 되고, 마이페이지는 `failed` 로 화면에 드러낸다.
@@ -34,7 +38,9 @@ export function MeProvider({ children }) {
   const load = useCallback(async () => {
     try {
       const res = await fetch("/api/me");
+      if (res.status === 401) { setGuest(true); setFailed(false); return; }
       if (!res.ok) throw new Error("내 정보를 읽지 못했어요");
+      setGuest(false);
       const data = await res.json();
       setMe(data);
       setFailed(false);
@@ -47,7 +53,7 @@ export function MeProvider({ children }) {
 
   useEffect(() => { load(); }, [load]);
 
-  const value = useMemo(() => ({ me, failed, load }), [me, failed, load]);
+  const value = useMemo(() => ({ me, failed, guest, load }), [me, failed, guest, load]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
