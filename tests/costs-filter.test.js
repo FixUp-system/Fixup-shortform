@@ -44,7 +44,7 @@ describe("날짜로 좁힌다", () => {
   });
 
   it("빈 값은 조건이 아니다 — 아무것도 안 고르면 전부 보인다", () => {
-    expect(filterRecords(rows, { from: "", to: "", actor: "", flow: "" }).length).toBe(4);
+    expect(filterRecords(rows, { from: "", to: "", person: "", flow: "" }).length).toBe(4);
     expect(filterRecords(rows, {}).length).toBe(4);
   });
 
@@ -53,22 +53,43 @@ describe("날짜로 좁힌다", () => {
   });
 });
 
-describe("사람으로 좁힌다", () => {
-  it("고른 사람 것만 남는다", () => {
-    expect(filterRecords(rows, { actor: "u1" }).map((r) => r.request_id)).toEqual(["a", "b"]);
+// ★★ 2026-08-27 — **고르기에서 찾기로 바뀌었다**(사장님 지시: "사용자는 검색할 수 있게").
+//   사람이 늘면 목록을 훑는 것이 일이 된다. 이제 이름·이메일 조각을 적으면 좁혀진다.
+describe("사람으로 좁힌다 — 적어서 찾는다", () => {
+  it("이름 조각으로 찾는다", () => {
+    expect(filterRecords(rows, { person: "재찬" }).map((r) => r.request_id)).toEqual(["a", "b"]);
   });
 
-  it("★ 고르는 값은 actor 다 — 이름이 같은 계정이 둘일 수 있다", () => {
+  it("이메일 조각으로도 찾는다 — 같은 이름 둘을 가르는 길이다", () => {
+    expect(filterRecords(rows, { person: "b@x" }).map((r) => r.request_id)).toEqual(["c"]);
+  });
+
+  it("대소문자를 안 가린다", () => {
+    expect(filterRecords(rows, { person: "A@X.KR" }).map((r) => r.request_id)).toEqual(["a", "b"]);
+  });
+
+  it("원장에 적힌 actor 값으로도 찾는다 — 문자열 actor(admin·local)가 그렇게 걸린다", () => {
+    expect(filterRecords(rows, { person: "admin" }).map((r) => r.request_id)).toEqual(["d"]);
+  });
+
+  it("아무것도 안 맞으면 빈 목록이다 — 조건 없음으로 뭉개지 않는다", () => {
+    expect(filterRecords(rows, { person: "없는사람" })).toEqual([]);
+  });
+
+  it("빈 칸은 조건이 아니다", () => {
+    expect(filterRecords(rows, { person: "   " }).length).toBe(4);
+  });
+
+  it("★ 거들어 주는 목록은 **보이는 말**이다 — 적어 넣는 칸이라 값이 곧 글자다", () => {
     const opts = actorOptions(rows);
-    expect(opts.map((o) => o.value).sort()).toEqual(["admin", "u1", "u2"]);
-    // 이름을 앞세우고 신원을 곁들인다.
-    expect(opts.find((o) => o.value === "u1").label).toBe("재찬 (a@x.kr)");
+    expect(opts).toContain("재찬");
+    expect(opts).toContain("a@x.kr");
     // 이름과 신원이 같으면 되풀이하지 않는다.
-    expect(opts.find((o) => o.value === "admin").label).toBe("admin");
+    expect(opts.filter((o) => o === "admin").length).toBe(1);
   });
 
-  it("원장에 없는 사람은 목록에 없다 — 고를 수 없는 이름을 두지 않는다", () => {
-    expect(actorOptions(rows).some((o) => o.value === "u9")).toBe(false);
+  it("원장에 없는 사람은 목록에 없다", () => {
+    expect(actorOptions(rows)).not.toContain("없는사람");
   });
 });
 
@@ -95,10 +116,24 @@ describe("흐름(광고 · 영상 만들기)을 가른다", () => {
     expect(sumByFlow([rows[1]]).map((f) => f.flow)).toEqual(["ad"]);
   });
 
-  it("표 순서를 따른다 — 값 크기로 정렬하면 날마다 순서가 바뀐다", () => {
+  // ★★ 2026-08-27 — 고르는 목록은 **제품 둘만**이다(사장님 지시). 그래도 옛 흐름의
+  //   지출은 합계에서 안 버린다 — 버리면 흐름별 합이 누적과 안 맞아 "어디로 샜지"가 된다.
+  it("표 순서를 따르고, 옛 흐름은 그 뒤에 선다", () => {
     const order = sumByFlow(rows).map((f) => f.flow);
-    const want = FLOWS.map((f) => f.id).filter((id) => order.includes(id));
-    expect(order).toEqual(want);
+    expect(order.slice(0, 2)).toEqual(["reel", "ad"]);
+    expect(order).toContain("step");
+    expect(order).toContain("etc");
+  });
+
+  it("고를 수 있는 종류는 지금 파는 둘뿐이다", () => {
+    expect(FLOWS.map((f) => f.id)).toEqual(["reel", "ad"]);
+    expect(FLOWS.map((f) => f.label)).toEqual(["영상 만들기", "광고 영상"]);
+  });
+
+  it("옛 흐름도 표에서는 사람 말로 보인다 — 안쪽 이름을 그대로 보여 주지 않는다", () => {
+    expect(flowLabel("film")).toBe("한 번에 굽기");
+    expect(flowLabel("step")).toBe("단계별");
+    expect(flowLabel("etc")).toBe("기타");
   });
 
   it("흐름으로 좁힐 수 있다", () => {
@@ -113,7 +148,7 @@ describe("흐름(광고 · 영상 만들기)을 가른다", () => {
 
 describe("합계는 한 곳에서 낸다", () => {
   it("고른 것만 더한다", () => {
-    expect(sumCost(filterRecords(rows, { actor: "u1" }))).toBe(3);
+    expect(sumCost(filterRecords(rows, { person: "재찬" }))).toBe(3);
   });
 
   it("금액이 없는 줄도 죽지 않는다", () => {

@@ -5,7 +5,7 @@ import { loadCostsRecords } from "../../lib/costs-client.js";
 // ★ 좁히는 판정과 흐름 구분은 **순수 모듈 한 벌**이다 — 화면에서 다시 세면 표와 합계가
 //   갈린다(lib/costs-filter.js 머리말).
 import {
-  filterRecords, actorOptions, sumCost, sumByFlow, flowOf, flowLabel, FLOWS,
+  actorOptions, sumCost, sumByFlow, flowOf, flowLabel, FLOWS,
 } from "../../lib/costs-filter.js";
 
 function fmtTime(ts) {
@@ -30,20 +30,41 @@ export default function CostsPage() {
   // 좁히는 조건 셋 — 빈 값은 **조건 없음**이다(lib/costs-filter.js).
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [actor, setActor] = useState("");
+  // ★ 사람은 **찾는다**(고르지 않는다) — 목록이 길어지면 훑는 것이 일이 된다.
+  const [person, setPerson] = useState("");
   const [flow, setFlow] = useState("");
+  // 얼마나 걸렸는지 · 잘렸는지 — 서버가 말해 준다(app/api/costs/route.js).
+  const [matched, setMatched] = useState(0);
+  const [truncated, setTruncated] = useState(false);
+  // 몇 쪽째인가. 조건이 바뀌면 첫 쪽으로 돌아간다(아래 useEffect).
+  const [page, setPage] = useState(0);
 
+  // ★★ 좁히는 일은 **서버가 한다**(2026-08-27) — 원장은 계속 쌓이는 표라 전부 받아
+  //   화면에서 거르면 행이 늘수록 그대로 느려진다.
+  // ★ 사람 검색은 **한 박자 늦춘다**(300ms) — 글자마다 요청을 보내면 타자 한 번에
+  //   대여섯 번이 나간다. 날짜·종류는 한 번에 정해지는 값이라 바로 보낸다.
   useEffect(() => {
-    loadCostsRecords().then(({ records, err }) => {
-      setRecords(records);
-      setErr(err);
-    });
-  }, []);
+    let alive = true;
+    const go = () => {
+      loadCostsRecords(fetch, { from, to, person, flow }).then((r) => {
+        if (!alive) return;
+        setRecords(r.records);
+        setErr(r.err);
+        setMatched(r.matched);
+        setTruncated(r.truncated);
+        setPage(0);
+      });
+    };
+    const t = setTimeout(go, person ? 300 : 0);
+    return () => { alive = false; clearTimeout(t); };
+  }, [from, to, person, flow]);
 
-  const all = records || [];
-  // ★ 고른 것만 본다 — 표도 합계도 **같은 목록**을 쓴다. 화면에서 따로 더하면 갈린다.
-  const shown = filterRecords(all, { from, to, actor, flow });
-  const narrowed = !!(from || to || actor || flow);
+  // 서버가 이미 걸렀다 — 화면은 그대로 그린다.
+  // ★ 여기서 한 번 더 거르지 않는다: 같은 판정을 두 곳에서 하면 "서버는 300개를 줬는데
+  //   화면에는 280개"처럼 두 수가 갈린다.
+  const shown = records || [];
+  const all = shown;
+  const narrowed = !!(from || to || person || flow);
   const total = sumCost(shown);
   const todayStart = new Date().setHours(0, 0, 0, 0);
   const todayTotal = sumCost(shown.filter((r) => r.ts >= todayStart));
@@ -53,6 +74,14 @@ export default function CostsPage() {
   const people = actorOptions(all);
   // 고를 수 있는 흐름은 **원장에 실제로 있는 것만**이다 — 빈 칸을 고르게 두지 않는다.
   const flowsInLedger = FLOWS.filter((f) => all.some((r) => flowOf(r) === f.id));
+
+  // ★★ 100개씩 넘긴다(2026-08-27 사장님 지시). 한 쪽에 수백 줄을 쌓으면 눈으로 못 훑고
+  //   브라우저도 무겁다. 더 많은 것을 보려면 **좁히는 것**이 답이다(위 필터).
+  const PER_PAGE = 100;
+  const pageCount = Math.max(1, Math.ceil(shown.length / PER_PAGE));
+  // ★ 쪽 번호를 범위 안으로 묶는다 — 조건이 바뀌어 줄이 줄면 빈 쪽에 서 있게 된다.
+  const safePage = Math.min(page, pageCount - 1);
+  const pageRows = shown.slice(safePage * PER_PAGE, (safePage + 1) * PER_PAGE);
 
   return (
     <>
@@ -79,28 +108,41 @@ export default function CostsPage() {
             </label>
             <label>
               <small>사용자</small>
-              <select className="field" value={actor} onChange={(e) => setActor(e.target.value)}>
-                <option value="">전체</option>
-                {people.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+              {/* ★ 적어서 찾는다 — 이름·이메일 조각이면 된다(부분일치). 아래 목록은
+                  거들어 주는 것일 뿐이고, 목록에 없는 글자도 그대로 좁힌다. */}
+              <input
+                className="field cost-filter-q"
+                type="search"
+                list="cost-people"
+                value={person}
+                onChange={(e) => setPerson(e.target.value)}
+                placeholder="이름 또는 이메일"
+              />
+              <datalist id="cost-people">
+                {people.map((name) => (
+                  <option key={name} value={name} />
                 ))}
-              </select>
+              </datalist>
             </label>
             <label>
               <small>종류</small>
-              <select className="field" value={flow} onChange={(e) => setFlow(e.target.value)}>
-                <option value="">전체</option>
-                {flowsInLedger.map((f) => (
-                  <option key={f.id} value={f.id}>{f.label}</option>
-                ))}
-              </select>
+              {/* ★ 모양은 이 저장소의 고르기 칸 하나다(.sub-select) — `.field` 는 input
+                  전용이라 select 에 붙이면 **브라우저 기본 흰 칸**이 된다(그 상태였다). */}
+              <span className="sub-select-wrap cost-filter-pick">
+                <select className="sub-select" value={flow} onChange={(e) => setFlow(e.target.value)}>
+                  <option value="">전체</option>
+                  {flowsInLedger.map((f) => (
+                    <option key={f.id} value={f.id}>{f.label}</option>
+                  ))}
+                </select>
+              </span>
             </label>
             {/* 되돌리는 길을 남긴다 — 조건 넷을 손으로 되돌리게 두지 않는다. */}
             {narrowed && (
               <button
                 type="button"
                 className="mini"
-                onClick={() => { setFrom(""); setTo(""); setActor(""); setFlow(""); }}
+                onClick={() => { setFrom(""); setTo(""); setPerson(""); setFlow(""); }}
               >
                 조건 지우기
               </button>
@@ -139,6 +181,12 @@ export default function CostsPage() {
         </>
       )}
 
+      {/* ★ 잘렸으면 **그 사실을 말한다** — 말 안 하면 사장님은 그것이 전부인 줄 안다. */}
+      {truncated && (
+        <p className="pgsub warn">
+          조건에 맞는 {matched}건 중 최근 {shown.length}건만 불러왔어요 — 기간·사용자·종류로 좁혀 주세요.
+        </p>
+      )}
       {err ? null : records === null ? (
         <p className="pgsub">불러오는 중…</p>
       ) : records.length === 0 ? (
@@ -162,7 +210,7 @@ export default function CostsPage() {
               </tr>
             </thead>
             <tbody>
-              {shown.map((r) => (
+              {pageRows.map((r) => (
                 <tr key={r.request_id}>
                   <td className="mono">{fmtTime(r.ts)}</td>
                   <td>{flowLabel(flowOf(r))}</td>
@@ -194,6 +242,25 @@ export default function CostsPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* 쪽 넘기기 — 한 쪽이면 안 그린다(누를 것이 없는 줄을 두지 않는다). */}
+      {pageCount > 1 && (
+        <div className="cost-pager">
+          <button className="mini" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>
+            이전
+          </button>
+          <span className="pgsub">
+            {safePage + 1} / {pageCount}
+          </span>
+          <button
+            className="mini"
+            disabled={safePage >= pageCount - 1}
+            onClick={() => setPage(safePage + 1)}
+          >
+            다음
+          </button>
         </div>
       )}
     </>

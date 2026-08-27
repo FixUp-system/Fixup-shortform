@@ -269,11 +269,21 @@ describe("★ 쓰기 라우트는 보기 전용 문을 부르지 않는다", () 
     expect(offenders, "쓰기 핸들러가 소유자 검사를 건너뛰는 문을 쓴다").toEqual([]);
   });
 
-  it("소유자 검사 문에 '건너뛰기' 옵션이 안 생겼다", () => {
+  // ★★ 2026-08-27 — 이 판의 **뜻은 그대로, 문구만 바뀌었다.** 운영자는 남의 영상도
+  //   고칠 수 있게 됐는데(사장님 지시), 그 넓힘이 **호출부가 넘기는 옵션**이면 안 된다:
+  //   옵션은 뜻을 모른 채 복사되고, 그렇게 복사된 자리가 조용히 남의 것을 건드린다.
+  //   그래서 넓히는 판정은 **요청의 역할**에서만 온다(lib/actor.js 의 currentRole) —
+  //   호출부는 예전과 글자 그대로 `(id, ownerId)` 를 넘긴다.
+  it("소유자 검사를 **인자로** 건너뛸 수 없다", () => {
     const src = strip(readFileSync("lib/projects.js", "utf8"));
-    // getProject 는 여전히 requireOwner 를 지난다
-    expect(src).toMatch(/export async function getProject\(id, ownerId\)\s*\{\s*requireOwner\(ownerId\)/);
+    // 시그니처가 안 늘었다 — 우회할 인자 자체가 없다.
+    expect(src).toMatch(/export async function getProject\(id, ownerId\)/);
+    expect(src).toMatch(/export async function updateProject\(id, ownerId, patchFn\)/);
     expect(src).not.toMatch(/skipOwner|ignoreOwner|bypassOwner|allowAnyOwner/);
+    // 소유자를 안 넘긴 것은 여전히 사고다 — 넓히기 전에 그 검사를 지난다.
+    expect(src).toMatch(/function ownerScope\(ownerId\)\s*\{\s*requireOwner\(ownerId\)/);
+    // 넓히는 근거는 역할 하나다.
+    expect(src).toMatch(/currentRole\(\) === "admin"/);
   });
 });
 

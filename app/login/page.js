@@ -5,6 +5,7 @@
 // /pending 에서 아무것도 못 한다 — 그 사실을 가입 탭이 미리 알린다.
 //
 // 이 저장소의 다른 화면과 같은 패널·버튼 클래스를 쓴다(app/globals.css, tests/design-system.test.js).
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -107,6 +108,15 @@ export default function LoginPage() {
       {/* 두 사이트 다 이 자리에 "비밀번호 찾기"를 둔다. 우리는 자가 재설정이 없어
           운영자에게 보낸다 — 없는 화면으로 보내지 않는 것이 요점이다. */}
       <p className="login-help">비밀번호를 잊으셨다면 운영자에게 문의해 주세요.</p>
+
+      {/* ★★ 2026-08-27 — **보관함으로 가는 문**(사장님 지적: "보관함을 확인할 수 있어야
+          해"). 첫 화면은 이미 보관함으로 가지만, 이 화면에 닿는 길이 여럿이다 —
+          로그아웃 직후 · 주소창 자동완성 · 만들기 화면에서 튕겨 온 경우.
+          그때 여기서 나갈 길이 없으면 로그인이 **유일한 문**처럼 보인다.
+          ★ 로그인은 그대로 위에 있다 — 이건 보는 길일 뿐 문을 대신하지 않는다. */}
+      <p className="login-help">
+        <Link href="/archive">로그인 없이 보관함 보기 →</Link>
+      </p>
     </>
   );
 }

@@ -175,6 +175,23 @@ describe("루트가 신원에 따라 갈린다", () => {
   });
 });
 
+// ★ 첫 화면은 보관함이지만, 로그인 화면에 닿는 길은 여럿이다(로그아웃 직후 · 주소창
+//   자동완성 · 만들기 화면에서 튕겨 옴). 그 자리에서 나갈 길이 없으면 로그인이
+//   **유일한 문**처럼 보인다 — 사장님이 "보관함을 확인할 수 있어야 해"라고 한 그 지점이다.
+describe("로그인 화면에서도 보관함으로 갈 수 있다", () => {
+  const src = readFileSync("app/login/page.js", "utf8");
+
+  it("보관함으로 가는 길이 있다", () => {
+    expect(src).toContain("/archive");
+    expect(src).toContain("로그인 없이 보관함 보기");
+  });
+
+  it("로그인·가입은 그대로다 — 보는 길이 문을 대신하지 않는다", () => {
+    expect(src).toContain("회원가입");
+    expect(src).toMatch(/type="submit"/);
+  });
+});
+
 describe("손님에게 보이는 상단바", () => {
   const src = readFileSync("components/UserMenu.jsx", "utf8");
 

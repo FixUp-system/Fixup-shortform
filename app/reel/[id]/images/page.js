@@ -21,7 +21,7 @@ import {
 import { reelSheetUrl, storyboardGridFor } from "../../../../lib/reel/oneshot";
 // ★ 칸에 실리는 지문 한 줄 — **지문을 만드는 쪽과 같은 함수**다(lib/reel/panels.js).
 //   화면에서 다시 조립하면 실제로 나간 글과 갈린다.
-import { panelBody, buildStoryboardPrompt } from "../../../../lib/reel/panels";
+import { panelBody, panelSay, buildStoryboardPrompt } from "../../../../lib/reel/panels";
 import { aspectFor } from "../../../../lib/aspects";
 
 export default function ReelImagesPage() {
@@ -176,12 +176,21 @@ export default function ReelImagesPage() {
           한다. 통합본은 전체 흐름을 한눈에 보는 제 일만 하면 된다.
           ★ 내려받기는 라우트를 지난다(app/api/reel/[id]/sheet) — 그 한 장은 fal 에 있어
             다른 출처라, 링크에 download 를 붙여도 저장이 아니라 그냥 열린다. */}
+      {/* ★★ 스토리보드를 **접는다**(2026-08-27, 안 A). 그전에는 늘 펼쳐져 있어서 306px 을
+          먹었고, 그 아래 카드 한 줄(450px)과 합쳐 756px — 첫 화면에 남는 높이(약 700px)를
+          넘겼다. 그래서 카드가 늘 잘려 보였다.
+          ★ 없애는 것이 아니다 — 전체 흐름은 **가끔** 보는 것이라 필요할 때 펴는 자리로
+            내린다(같은 날 통째로 뺐다가 되돌린 적이 있어 이번에는 접기다).
+          ★ [전체 내려받기]는 **접힘 밖**이다 — 펴지 않고도 받을 수 있어야 한다. */}
       {sheetUrl && (
         <div className="sheet-block">
-          <div className="sheet-view sheet-view--sm">
-            <img src={sheetUrl} alt="스토리보드" />
-            {drawingNow && <div className="frame-busy"><span className="spinner" aria-hidden="true" /></div>}
-          </div>
+          <details className="lib-fold sheet-foldable">
+            <summary>스토리보드 한 장 보기</summary>
+            <div className="sheet-view sheet-view--sm">
+              <img src={sheetUrl} alt="스토리보드" />
+              {drawingNow && <div className="frame-busy"><span className="spinner" aria-hidden="true" /></div>}
+            </div>
+          </details>
           <div className="panel-act">
             <a className="mini" href={`/api/reel/${id}/sheet`} download>전체 내려받기</a>
           </div>
@@ -224,10 +233,12 @@ export default function ReelImagesPage() {
       {/* ★ 컷 상자(.cut-shots)가 뜨는 갈래에서는 안 그린다 — 그쪽은 썸네일과 [다시 만들기]가
           이미 컷마다 서 있어서, 여기까지 그리면 같은 그림이 두 줄로 겹친다. */}
       {cuts.length > 0 && (sheetUrl || !hasImages) && (
-        <ol className="panel-lines">
+        <ul className="panel-cards">
           {cuts.map((c, i) => (
-            <li className="panel-line" key={c.idx ?? i}>
-              <span className="panel-no">{i + 1}</span>
+            /* ★ 카드는 **누를 것이 없는 자리**다 — 초점도 안 받는다(2026-08-27 사장님
+               지시로 위 스토리보드에 윤곽을 켜던 연결을 걷어냈다). 아무 일도 안 하는
+               자리가 키보드 순서에 끼면 탭이 카드 수만큼 헛돈다. */
+            <li className="panel-card" key={c.idx ?? i}>
               <div className="panel-thumb" style={arStyle}>
                 {c.image?.url ? (
                   <img src={c.image.url} alt={`컷 ${i + 1}`} />
@@ -235,18 +246,29 @@ export default function ReelImagesPage() {
                   drawingNow && <span className="spinner" aria-hidden="true" />
                 )}
               </div>
-              {/* 아직 안 적힌 칸은 그렇게 말한다 — 빈 줄을 남기면 화면이 덜 만들어진 것처럼 보인다. */}
-              {/* ★ 글과 내려받기가 **한 칸 안에서 위아래**로 선다(2026-08-27 사장님 지시:
-                  "내려받기는 하단에 배치해줘 우측 하단에"). 이 저장소의 규칙과 같은 자리다 —
-                  프롬프트를 고치는 버튼도 그 칸 안 오른쪽 아래에 선다(.note-act). */}
               <div className="panel-main">
-                <p className="panel-body">{panelBody(c) || "아직 적힌 내용이 없어요"}</p>
-                {/* ★ 내려받기(2026-08-27 사장님 요청). `?dl=1` 이 붙어야 파일 이름이 버킷
-                    키(uuid)가 아니라 사람이 읽는 이름으로 저장된다(app/api/uploads).
-                    ★ 우리 버킷 주소일 때만 붙인다 — fal 주소는 다른 출처라 그 파라미터를
-                      모르고, download 속성도 안 먹는다(그때는 그냥 열린다).
-                    ★ 모양은 보관함·⑥완성의 [내려받기]와 같다(.mini) — 같은 일을 하는
-                      버튼이 화면마다 다르게 생기면 사장님이 그때마다 다시 배운다. */}
+                {/* ★ 번호는 장식이 아니다 — 지문이 "Panel 1 은 왼쪽 위"라고 말하는 그 수다.
+                    위 스토리보드에서 그 칸을 찾는 열쇠이기도 하다.
+                    ★ 초를 곁들인다 — 컷 길이는 이 화면에서 판단에 쓰이는 값이다. */}
+                <span className="panel-no">
+                  {i + 1}
+                  {Number(c.seconds) > 0 ? ` · ${c.seconds}초` : ""}
+                </span>
+                {/* ★★ **대사가 먼저다**(2026-08-27, 안 A). 영어 지문만 있으면 "몇 번째
+                    장면인지"를 머리로 맞춰야 한다 — 사장님 말로 적힌 이 줄이 그것을 바로
+                    잡아 준다. 말 없는 컷에는 이 줄이 아예 없다(빈 줄을 남기지 않는다). */}
+                {panelSay(c) && <p className="panel-say">「{panelSay(c)}」</p>}
+                {/* 아직 안 적힌 칸은 그렇게 말한다 — 빈 줄을 남기면 덜 만들어진 것처럼 보인다. */}
+                {/* ★ 마우스를 올리면 전체가 뜬다(title) — 스크롤이 번거로울 때의 지름길이다.
+                    잘린 글을 **볼 길이 둘**인 셈이고, 어느 쪽도 이 화면을 떠나지 않는다. */}
+                <p className="panel-body" title={panelBody(c)}>
+                  {panelBody(c) || "아직 적힌 내용이 없어요"}
+                </p>
+                {/* ★ 내려받기는 카드 안 **오른쪽 아래**다(2026-08-27 사장님 지시).
+                    `?dl=1` 이 붙어야 파일 이름이 버킷 키(uuid)가 아니라 사람이 읽는 이름으로
+                    저장된다(app/api/uploads). fal 주소는 다른 출처라 그 파라미터를 모르고
+                    download 속성도 안 먹는다 — 그때는 그냥 열린다.
+                    ★ 모양은 보관함·⑥완성의 [내려받기]와 같다(.mini). */}
                 {c.image?.url && (
                   <div className="panel-act">
                     <a
@@ -263,7 +285,7 @@ export default function ReelImagesPage() {
               </div>
             </li>
           ))}
-        </ol>
+        </ul>
       )}
 
       {/* ★ 접어 둔다 — 지문이 길어서 펼쳐 두면 위의 컷 목록이 저 아래로 밀린다.

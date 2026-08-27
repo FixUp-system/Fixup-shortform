@@ -789,10 +789,16 @@ a.side-item { text-decoration: none; }
    같은 타일을 쓰되 조금 작게 둔다: 위가 "얼마 썼나", 아래가 "무엇에 썼나"다. */
 .cost-summary--flow { margin-top: -8px; }
 .cost-summary--flow .cost-tile { padding: 10px 16px; min-width: 96px; }
-.cost-summary--flow .cost-tile b { font-size: 18px; }
-.cost-tile-sub { color: var(--ink-soft); font-size: 12px; }
+.cost-summary--flow .cost-tile b { font-size: 18px; display: block; }
+/* ★ 건수는 **아랫줄**이다(2026-08-27 사장님 지적: "$6.08 38건 이런식으로 붙어 있어").
+   금액 옆에 붙이면 "6.0838" 처럼 한 수로 읽힌다. */
+.cost-tile-sub { color: var(--ink-soft); font-size: 12px; display: block; margin-top: 2px; }
 
-/* 좁히는 자리 — 날짜·사용자·종류. 칸들이 한 줄에 서고 좁으면 접힌다. */
+/* 좁히는 자리 — 날짜·사용자·종류. 칸들이 한 줄에 서고 좁으면 접힌다.
+   ★★ 2026-08-27 — 칸마다 키·바탕이 달랐다(사장님 지적: "시작, 종료, 필터링 ui가 안 맞아").
+      원인 둘: ① `.field` 는 **input 전용** 규칙이라 select 에 붙여도 아무것도 안 걸려
+      브라우저 기본 흰 칸이 됐다 ② 날짜칸은 본문용 큰 여백(13px/16px)을 그대로 써서
+      옆의 고르기 칸보다 컸다. 이제 **셋이 같은 키(--ctl-h)**로 선다. */
 .cost-filters {
   display: flex;
   gap: 12px;
@@ -801,9 +807,32 @@ a.side-item { text-decoration: none; }
   margin-bottom: 16px;
 }
 .cost-filters label { display: block; }
-.cost-filters small { color: var(--ink-soft); font-size: 12px; display: block; margin-bottom: 4px; }
-/* 날짜·선택 칸은 본문 칸(.field)보다 좁아야 네 개가 한 줄에 선다. */
-.cost-filters .field { width: auto; min-width: 150px; padding: 8px 10px; }
+.cost-filters small { color: var(--ink-soft); font-size: 12px; display: block; margin-bottom: 6px; }
+/* 날짜·검색 칸 — 고르기 칸(.sub-select)과 같은 키·같은 테두리다. */
+.cost-filters input.field {
+  width: auto;
+  height: var(--ctl-h);
+  min-width: 150px;
+  padding: 0 12px;
+  font-size: 14px;
+  line-height: normal;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+/* 달력 아이콘이 어두운 바탕에서 안 보인다 — 밝게 뒤집는다. */
+.cost-filters input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.7); cursor: pointer; }
+.cost-filter-q { min-width: 200px; }
+/* 고르기 칸은 이 줄에서만 좁게 — 기본 폭(--ctl-w 234px)은 이 줄에 과하다. */
+.cost-filter-pick { width: 160px; }
+
+/* 쪽 넘기기 — 표 아래 가운데. 한 쪽이면 화면이 이 줄을 아예 안 그린다. */
+.cost-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: var(--sp-4);
+}
 
 .cost-table-wrap {
   background: var(--surface);
@@ -2216,53 +2245,92 @@ h1.login-head { margin-inline: auto; }
    목록이고, 이 한 장은 전체 흐름을 한눈에 보는 자리다.
    ④·⑤에서 쓰는 기본 크기(68vh)는 그대로다 — 거기서는 이 한 장이 본문이다. */
 .sheet-block { margin-top: var(--sp-4); }
+/* 접힌 스토리보드 — 펴기 전에는 한 줄(약 40px)이다. 펴면 그 아래에 한 장이 선다. */
+.sheet-foldable > summary { cursor: pointer; }
+.sheet-foldable[open] > summary { margin-bottom: 10px; }
 .sheet-view--sm, .sheet-view--sm img { max-height: 34vh; }
 
-/* 컷 하나 = 그림 + 그 칸에 실린 지문 한 줄(2026-08-27). 그림만 보면 흐름은 읽히지만
-   어느 칸이 어느 문장이었는지는 안 보인다 — 고칠 자리를 찾으려면 그 짝이 필요하다. */
-.panel-lines { list-style: none; margin: var(--sp-4) 0 0; padding: 0; display: grid; gap: 10px; }
-.panel-line {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
+/* ── 컷 카드 — 그림과 그 칸의 지문을 **한 덩어리**로 (2026-08-27) ──────────────
+   왜 줄(가로)이 아니라 카드(세로)인가: 이 화면이 하는 일은 "이 그림이 내가 말한 그
+   장면인가"를 판정하는 것이다. 줄로 늘어놓으면 그림이 손톱만 해지고(9:16 이라 더),
+   눈이 좌우로 왕복한다. 카드는 그림을 크게 두고 지문을 **바로 아래** 붙인다 —
+   눈이 위아래로만 움직이고, 여러 컷이 한 화면에 들어온다. */
+.panel-cards {
+  list-style: none;
+  margin: var(--sp-4) 0 0;
+  padding: 0;
+  display: grid;
+  /* ★★ 칸 폭을 **150px 로 고정**한다(2026-08-27, 안 A). 늘어나게 두면 컷이 셋일 때
+     카드가 화면 폭까지 벌어져 그림 하나가 화면을 먹고, 9:16 이라 폭이 곧 높이여서
+     첫 화면이 그만큼 줄어든다. 고정하면 컷이 셋이든 열둘이든 그림 크기가 안 흔들리고
+     넓은 화면에서 여섯 컷이 한 줄에 선다. */
+  grid-template-columns: repeat(auto-fill, 150px);
+  gap: 14px;
+}
+.panel-card {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-card);
-  padding: 10px 12px;
-}
-/* 번호는 지문의 "Panel N" 과 같은 수다 — 사장님이 한 장에서 그 칸을 찾는 열쇠다. */
-.panel-no {
-  flex: none;
-  width: 20px;
-  color: var(--ink-soft);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  padding-top: 2px;
-}
-/* 썸네일은 컷 비율 그대로 — 값은 프로젝트가 정한다(--ar).
-   ★ 2026-08-27 — 64 → 132px 로 키웠다(사장님 지시: "이미지를 좀 더 키우고"). 그림이
-     작으면 무엇이 그려졌는지 이 화면에서 판단할 수 없어 원본을 다시 열어야 했다. */
-.panel-thumb {
-  flex: none;
-  width: 132px;
-  aspect-ratio: var(--ar, 9 / 16);
-  border-radius: var(--r-ctl);
   overflow: hidden;
+  /* ★ 세로로 쌓아 **아래를 맞춘다** — 지문 길이가 카드마다 달라서, 안 맞추면
+     [내려받기]가 카드마다 다른 높이에 서고 줄이 들쭉날쭉해진다. */
+  display: flex;
+  flex-direction: column;
+}
+.panel-card:hover { border-color: var(--ink-soft); }
+/* 썸네일은 컷 비율 그대로 — 값은 프로젝트가 정한다(--ar). 카드 폭을 꽉 채운다. */
+.panel-thumb {
+  width: 100%;
+  aspect-ratio: var(--ar, 9 / 16);
   background: var(--surface2);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .panel-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-/* 글과 버튼이 한 칸 안에서 위아래로 선다 — 버튼은 그 칸의 **오른쪽 아래**다
-   (프롬프트 수정 버튼이 서는 자리와 같은 규칙, .note-act). */
-/* ★ 지문의 **가로폭을 줄인다**(2026-08-27 사장님 지시) — 한 줄이 화면 끝까지 늘어나면
-   눈이 되돌아올 자리를 잃는다. 읽기 좋은 폭(약 60자)에서 멈추고 남는 자리는 비워 둔다. */
-.panel-main { flex: 1 1 auto; min-width: 0; max-width: 60ch; }
-.panel-body { margin: 0; font-size: 14px; line-height: 1.55; color: var(--ink); }
-.panel-act { display: flex; justify-content: flex-end; margin-top: 8px; }
-/* 모양은 .mini 가 만든다(보관함·⑥완성의 [내려받기]와 같은 버튼) — 여기서는 자리만 잡는다. */
+.panel-main { padding: 10px 12px 12px; display: flex; flex-direction: column; flex: 1; }
+/* 번호는 지문의 "Panel N" 과 같은 수다 — 위 스토리보드에서 그 칸을 찾는 열쇠다. */
+.panel-no {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 4px;
+}
+/* ★★ 대사 — **카드에서 먼저 읽히는 줄**이다(2026-08-27, 안 A). 지문(영어)보다 앞에 서고
+   조금 더 진하다: "무엇을 말하는 컷인가"가 잡혀야 "몇 번째 장면인지"가 잡힌다. */
+.panel-say { margin: 0 0 4px; font-size: 14px; line-height: 1.45; color: var(--ink); }
+/* 지문은 그 아래에서 흐리게 **세 줄 높이**. 남는 자리를 먹어 버튼을 카드 바닥에 붙인다.
+   ★ 높이를 묶는 이유: 길이가 카드마다 달라 격자가 들쭉날쭉해진다.
+   ★★ 2026-08-27 — 잘라 **버리지** 않는다(사장님 지적: "짤려서 … 확인할 수 있었으면").
+      옛 방식(-webkit-line-clamp)은 넘치는 글을 아예 안 그려서 그 칸에서는 볼 길이 없었다.
+      이제 세 줄 높이의 **창**이고 안에서 스크롤된다 — 끌거나 굴려서 마저 읽고, 글자를
+      드래그해 복사할 수도 있다. 전문은 아래 [이미지 생성 지문 전체]에도 그대로 있다. */
+.panel-body {
+  margin: 0;
+  flex: 1;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  /* 세 줄 = 12px × 1.5 × 3 */
+  max-height: 54px;
+  overflow-y: auto;
+  /* 끝까지 굴렸을 때 페이지가 따라 움직이지 않게 한다 — 카드 안에서 끝난다. */
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+/* 웹킷 계열에서도 같은 두께로 — 기본 막대는 12px 라 좁은 카드에서 글을 밀어낸다. */
+.panel-body::-webkit-scrollbar { width: 6px; }
+/* ★ 반경을 안 준다 — 이 저장소의 모서리는 토큰 셋뿐이고(디자인 규율), 6px 막대에
+   맞는 값이 그중에 없다. 각진 막대가 토큰을 어기는 것보다 낫다. */
+.panel-body::-webkit-scrollbar-thumb { background: var(--line); }
+.panel-body::-webkit-scrollbar-track { background: transparent; }
+/* 내려받기는 카드 안 오른쪽 아래 — 프롬프트 수정 버튼이 서는 자리와 같은 규칙(.note-act). */
+.panel-act { display: flex; justify-content: flex-end; margin-top: 10px; }
 .panel-dl { flex: none; }
+
+
 
 
 /* ── 줄 위의 선을 끄는 갈래는 **지웠다**(2026-08-25). ⑤영상의 [영상 만들기]가 그 갈래를

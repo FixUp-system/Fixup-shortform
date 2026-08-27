@@ -63,7 +63,7 @@ describe("보여 주는 것은 컷별 [그림 · 지문] 이다", () => {
   //   아래 컷별 목록이 맡는다. 둘 다 있어야 각자 제 일만 한다.
   it("통합 한 장이 **맨 위**에 있다 — 컷별 목록보다 앞이다", () => {
     const sheet = src.indexOf("sheet-view");
-    const lines = src.indexOf("panel-lines");
+    const lines = src.indexOf("panel-cards");
     expect(sheet, "통합본이 없다").toBeGreaterThan(-1);
     expect(lines, "컷별 목록이 없다").toBeGreaterThan(-1);
     expect(sheet, "통합본이 컷별 목록보다 아래에 있다").toBeLessThan(lines);
@@ -78,34 +78,97 @@ describe("보여 주는 것은 컷별 [그림 · 지문] 이다", () => {
     expect(route, "주소를 문서에서 안 판다").toContain("reelSheetUrl");
   });
 
-  it("컷마다 한 줄씩 선다", () => {
-    expect(src).toContain("panel-lines");
+  // ★★ 2026-08-27 (넷째) — **줄에서 카드로.** 줄로 늘어놓으니 9:16 그림이 손톱만 해져서
+  //   "이 그림이 내가 말한 그 장면인가"를 이 화면에서 판정할 수 없었다(원본을 따로 열어야
+  //   했다). 카드는 그림을 카드 폭만큼 키우고 지문을 **바로 아래** 붙인다 — 눈이 좌우로
+  //   왕복하지 않고, 컷 여럿이 한 화면에 들어온다.
+  it("컷마다 카드 하나 — 그림과 지문이 한 덩어리다", () => {
+    expect(src).toContain("panel-cards");
     expect(src).toContain("panel-thumb");
     expect(src).toContain("panel-body");
+    // 지문이 그림 **아래**여야 한다 — 위에 두면 그림을 보기 전에 글부터 읽는다.
+    const at = src.indexOf("panel-thumb");
+    expect(src.indexOf("panel-body"), "지문이 그림보다 위에 있다").toBeGreaterThan(at);
   });
 
-  it("★ 지문은 굽기와 **같은 함수**가 만든다 — 화면이 조립하면 실제와 갈린다", () => {
-    expect(src, "panelBody 를 안 쓴다").toContain("panelBody");
-    // shows 를 화면에서 직접 그리면 카메라가 빠져 실제 지문과 달라진다.
-    expect(src, "shows 를 화면이 직접 그린다").not.toMatch(/c\.shows/);
+  // ★ 한때 카드를 가리키면 위 스토리보드의 그 칸에 윤곽을 켰다(2026-08-27) —
+  //   사장님이 "없어도 될 것 같다"고 해서 걷어냈다. 카드는 이제 **보는 자리**일 뿐이라
+  //   초점도 안 받는다(아무 일도 안 하는 자리가 키보드 순서에 끼면 탭이 헛돈다).
+  // ★★ 2026-08-27 (안 A) — 첫 화면에 여섯 컷이 다 들어오게 셋을 바꿨다:
+  //   (1) 스토리보드를 **접는다**(306px -> 한 줄) (2) 카드 폭을 **150px 로 고정**한다
+  //   (3) 카드에 **그 컷의 대사**를 한 줄 얹는다(영어 지문보다 먼저 읽힌다).
+  //   근거: 306 + 450 = 756px 인데 첫 화면에 남는 높이가 약 700px 이라 늘 잘렸다.
+  it("(1) 스토리보드가 접혀 있다 — 펴기 전에는 한 줄이다", () => {
+    expect(src, "접는 자리가 없다").toContain("sheet-foldable");
+    expect(src).toContain("스토리보드 한 장 보기");
+    const at = src.indexOf("sheet-foldable");
+    expect(src.slice(at, at + 120), "펼친 채로 열린다").not.toContain("open");
+  });
+
+  it("★ [전체 내려받기]는 접힘 **밖**이다 — 펴지 않고도 받을 수 있어야 한다", () => {
+    expect(src.indexOf("전체 내려받기"), "내려받기가 접힘 안에 있다").toBeGreaterThan(src.indexOf("</details>"));
+  });
+
+  it("(2) 카드 폭이 고정이다 — 늘어나면 그림 하나가 화면을 먹는다", () => {
+    const css = readFileSync("app/globals.css", "utf8");
+    expect(css).toMatch(/repeat\(auto-fill, 150px\)/);
+  });
+
+  it("(3) 대사가 지문보다 **먼저** 온다 — 그것이 잡혀야 장면이 잡힌다", () => {
+    expect(src).toContain("panelSay");
+    const say = src.indexOf("panel-say");
+    expect(say, "대사 줄이 없다").toBeGreaterThan(-1);
+    expect(src.indexOf("panel-body"), "지문이 대사보다 앞에 있다").toBeGreaterThan(say);
+  });
+
+  it("★ 말 없는 컷에는 그 줄이 아예 없다 — 빈 줄을 남기지 않는다", () => {
+    expect(src).toMatch(/panelSay\(c\) &&/);
+  });
+
+  // ★★ 2026-08-27 — 세 줄에서 **자르지 않고 창으로 묶는다**(사장님 지적: "짤려서 …
+  //   확인할 수 있었으면"). 옛 방식(-webkit-line-clamp)은 넘치는 글을 아예 안 그려서
+  //   그 칸에서는 볼 길이 없었다. 이제 세 줄 높이의 창이고 안에서 스크롤된다.
+  it("지문은 세 줄 높이로 묶이되 **읽을 수 있다**", () => {
+    const css = readFileSync("app/globals.css", "utf8");
+    const at = css.indexOf(".panel-body {");
+    const rule = css.slice(at, at + 480);
+    expect(rule, "높이를 안 묶는다 — 격자가 들쭉날쭉해진다").toContain("max-height");
+    expect(rule, "넘치는 글을 볼 길이 없다").toContain("overflow-y: auto");
+    expect(rule, "잘라 버리는 옛 방식이 남아 있다").not.toContain("-webkit-line-clamp");
+    // 카드 안에서 끝난다 — 끝까지 굴렸다고 페이지가 따라 움직이면 안 된다.
+    expect(rule).toContain("overscroll-behavior: contain");
+  });
+
+  it("★ 마우스를 올리면 전체가 뜬다 — 스크롤이 번거로울 때의 지름길", () => {
+    expect(src).toMatch(/title=\{panelBody\(c\)\}/);
+  });
+
+  it("카드는 누를 것도 초점도 없는 자리다", () => {
+    const at = src.indexOf("panel-cards");
+    const block = src.slice(at, src.indexOf("</ul>", at));
+    expect(block, "카드가 초점을 받는다").not.toContain("tabIndex");
+    expect(block).not.toContain("onMouseEnter");
+    expect(src, "걷어낸 덮개가 남아 있다").not.toContain("sheet-cell");
   });
 
   it("그림이 없어도 그린다 — 굽기 전에도 무엇을 그릴지 읽을 수 있다", () => {
-    const at = src.indexOf("panel-lines");
+    const at = src.indexOf("panel-cards");
     const cond = src.slice(Math.max(0, at - 200), at);
     expect(cond, "그림이 있을 때만 그린다").not.toMatch(/hasImages &&\s*\(?\s*$/);
   });
 
   it("여기에는 버튼이 없다 — 칸 하나만 다시 그리면 그 칸만 딴 사람이 된다", () => {
-    const at = src.indexOf("panel-lines");
-    const block = src.slice(at, src.indexOf("</ol>", at));
+    const at = src.indexOf("panel-cards");
+    const block = src.slice(at, src.indexOf("</ul>", at));
     expect(block).not.toContain("<button");
   });
 
-  it("CSS 에 그 줄이 있다 — 클래스만 적고 스타일이 없으면 아무렇게나 쌓인다", () => {
+  it("CSS 에 그 카드가 있다 — 클래스만 적고 스타일이 없으면 아무렇게나 쌓인다", () => {
     const css = readFileSync("app/globals.css", "utf8");
-    expect(css).toMatch(/^\.panel-lines \{/m);
+    expect(css).toMatch(/^\.panel-cards \{/m);
     expect(css).toMatch(/^\.panel-thumb \{/m);
+    // 걷어낸 규칙은 CSS 에도 안 남는다 — 쓰는 곳이 0 인 규칙을 두지 않는다.
+    expect(css, "죽은 규칙이 남아 있다").not.toMatch(/^\.sheet-cell \{/m);
   });
 
   it("컷별 갈래의 상자는 남는다 — 거기에는 칸마다 [다시 만들기] 가 붙어 있다", () => {
