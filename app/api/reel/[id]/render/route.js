@@ -7,6 +7,7 @@ import { speechLangOf } from "../../../../../lib/subtitle-langs.js";
 // 자막 시각 — 모델이 **언제** 말했는지를 재서 붙인다(2026-08-25 실측).
 import { probeSpeech } from "../../../../../lib/speech-probe.js";
 import { alignSpeech, needsSpeechProbe } from "../../../../../lib/speech-timing.js";
+import { narrationUnits } from "../../../../../lib/reel/narration.js";
 
 // 완성 — 컷마다 만든 클립을 이어 붙이고 자막을 태운다. lib/compose.js 의 composeVideo
 // 하나가 그 둘을 다 한다(합성이 곧 자막 굽기다) — 새 장치를 만들지 않는다.
@@ -59,10 +60,22 @@ export const POST = withUser(async (req, { params }, user) => {
     }
   }
 
+  // ★★ 2026-08-27 — 자막 원천이 **한 벌**이면 그것을 넘긴다. 새 길에서는 말이 컷이 아니라
+  //   `scenario.narration` 에 살아 컷의 sentence 가 비므로, 안 넘기면 완성본에 자막이
+  //   통째로 없다(lib/reel/narration.js 의 narrationUnits · lib/compose.js 의 subtitleCutsOf).
+  // ★ 길이는 **구운 클립의 합**이다 — 계획 초가 아니라 실제로 화면에 있는 시간이라야
+  //   마지막 자막이 영상 밖으로 안 나간다(whisper 블록이 쓰는 그 값과 같은 자다).
+  // ★ 옛 문서는 null 이라 그 자리가 통째로 없다 — 예전 길 그대로다.
+  const units = narrationUnits(
+    project,
+    cuts.reduce((a, c) => a + (Number(c?.video?.seconds) || 0), 0)
+  );
+
   runInBackground(
     composeVideo({
       projectId: id,
       cuts: timed,
+      narrationUnits: units,
       aspect_ratio: project.settings?.aspect_ratio || "9:16",
       subtitle: project.settings?.subtitle,
       lang: project.settings?.subtitle_lang || speechLangOf(project),

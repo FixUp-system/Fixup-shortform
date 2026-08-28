@@ -17,6 +17,8 @@ import { useReelProject } from "../layout";
 import { REEL_STEPS, reelStepHref } from "../../../../lib/reel/steps";
 import { scenarioLock } from "../../../../lib/reel/doc";
 import ReelBack from "../../../../components/ReelBack";
+import { reelNarration, narrationLimit } from "../../../../lib/reel/narration";
+import { speechLangOf } from "../../../../lib/subtitle-langs";
 
 export default function ReelScenarioPage() {
   const { id } = useParams();
@@ -31,6 +33,14 @@ export default function ReelScenarioPage() {
 
   const scenario = project?.scenario;
   const lock = scenarioLock(project);
+  // ★ 판독은 lib/reel/narration.js 하나다 — 화면이 `scenario.narration.text` 를 손으로 읽으면
+  //   지시문·자막과 판정이 갈린다(그 파일 머리말). 옛 문서에서는 null 이다.
+  const narration = reelNarration(project);
+  // 상한은 목표 초에서 나온다(15초 → 82자). 못 재면 0 이고, 그때는 분모를 안 적는다.
+  const narrationCap = narrationLimit(
+    project?.settings?.target_seconds || project?.settings?.seconds,
+    speechLangOf(project)
+  );
   const imagesStep = REEL_STEPS.find((x) => x.key === "images");
 
   // 시나리오 — 무료(LLM 만 쓴다)다.
@@ -141,6 +151,25 @@ export default function ReelScenarioPage() {
         <p className="script-src">{scenario.text}</p>
       ) : (
         <p className="pgsub">아직 시나리오가 없어요 — 아래에서 다시 쓸 수 있어요.</p>
+      )}
+
+      {/* ★★ 내레이션 **한 벌**(2026-08-27). 지금까지 말은 위 지시문 안에 장면마다 흩어져
+          있어 사장님이 "무슨 말을 하는 영상인가"를 한눈에 볼 수 없었다. 이제 그 말이 한
+          덩어리라 여기 그대로 보인다.
+          ★ **읽는 글이다** — 고치는 칸을 따로 열지 않는다. 이 화면의 수정 축은 아래 한국어
+            칸 하나이고, 한 벌만 직접 고치면 지시문(text)과 갈려 그림까지 어긋난다.
+          ★ 글자 수는 **게이트가 재는 값과 같은 함수**로 적는다(narrationLimit) — 두 벌로
+            재면 화면이 "넉넉하다"고 말하는데 말이 잘리는 일이 생긴다.
+          ★ 옛 문서에는 이 자리가 **아예 안 뜬다**(reelNarration 이 null 이다) — 빈 칸을
+            만들면 없는 기능이 있는 것처럼 읽힌다. */}
+      {!busy && narration && (
+        <div className="narration-one">
+          <p className="pgsub">
+            내레이션 · {narration.text.length}
+            {narrationCap ? `/${narrationCap}` : ""}자
+          </p>
+          <p className="script-src">{narration.text}</p>
+        </div>
       )}
       {lock && <p className="pgsub">{lock.message}</p>}
 

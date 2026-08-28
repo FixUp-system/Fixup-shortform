@@ -5,6 +5,7 @@ import { isNarrationSpeaker } from "../../../../../lib/cuts.js";
 import { scenarioLock, putReel } from "../../../../../lib/reel/doc.js";
 import { reelSceneCountRule } from "../../../../../lib/reel/scenario-rules.js";
 import { reelConceptLine } from "../../../../../lib/reel/concepts.js";
+import { narrationRuleLine } from "../../../../../lib/reel/narration.js";
 import { MAX_SCENARIO_TRIES } from "../../../../../lib/pricing.js";
 import {
   availableAvatars, buildCastMessages, resolveCastRefs, mergeCastIntoCuts, mergePropsIntoCuts,
@@ -186,6 +187,12 @@ export const POST = withUser(async (req, { params }, user) => {
       // ★ 이 키가 있으면 buildScenarioMessages 는 광고 포맷(AD_FORMATS) 조회를 건너뛴다 —
       //   reel 은 그 값을 안 쓰므로, 옛 프로젝트에 든 모르는 format 때문에 죽지 않는다.
       conceptLine: reelConceptLine(seen?.settings?.concept),
+      // ★★ 2026-08-27 — 내레이션을 **한 벌**로 낸다(사장님 지시: "컷마다 음성이 끊기고
+      //   그 컷을 설명할려고 해 … 영상 전체를 설명하는거야"). 이 줄이 있으면 시나리오가
+      //   대사를 장면마다 흩지 않고 `narration` 한 벌로 낸다(lib/ad/scenario.js).
+      // ★ **reel 만 넘긴다** — 광고 갈래는 이 키가 없어 글자 그대로 예전이다.
+      // ★ 초를 모르면 빈 줄이라 갈래가 안 켜진다(narrationRuleLine) — 그때는 옛 길이다.
+      narrationRule: narrationRuleLine(seen?.settings?.seconds, seen?.settings?.narration_lang),
     });
   } catch (e) {
     return Response.json({ error: e?.message || "시나리오를 만들지 못했어요" }, { status: 500 });
