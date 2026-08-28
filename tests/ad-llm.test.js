@@ -3,7 +3,7 @@
 //
 // ★ 진짜 Claude 는 절대 안 부른다 — fetchImpl 주입으로 응답을 흉내 낸다.
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
-import { callJson, CLAUDE_MODEL, SCENARIO_SCHEMA } from "../lib/ad/llm.js";
+import { callJson, CLAUDE_MODEL } from "../lib/ad/llm.js";
 import { validateScenario } from "../lib/ad/scenario.js";
 import { runWithActor } from "../lib/actor.js";
 import { estimateLlmCost, spentForProject } from "../lib/costs.js";
@@ -263,24 +263,3 @@ describe("가짜 판정이 게이트보다 먼저다 — SHOTFORM_FAKE=all 이�
 // ★ 실측(2026-08-19): 저장된 프로젝트 8개 전부 shots[].shows 가 0개였다.
 //
 // 원인은 SYSTEM 이 아니라 **스키마**다. SYSTEM(lib/ad/scenario.js)은 "shows: 이 장면에
-// 보이는 것 — 영어 한 줄"이라고 분명히 요구하는데, SCENARIO_SCHEMA 의 shots.items 에
-// shows 칸이 없고 additionalProperties:false 라 모델이 낼 길 자체가 막혀 있었다.
-//
-// ⚠️ 이 결함을 **SYSTEM 문자열을 재는 기존 테스트로는 못 잡는다** — SYSTEM 은 처음부터
-//   옳았기 때문이다. 그래서 여기서 스키마를 직접 잰다. 무엇이 나가는지가 아니라
-//   무엇이 **돌아올 수 있는지**를 재는 자리다.
-describe("SCENARIO_SCHEMA — 모델이 shows 를 낼 수 있어야 한다", () => {
-  const shot = () => SCENARIO_SCHEMA.properties.shots.items;
-
-  it("shots 의 칸에 shows 가 있다", () => {
-    expect(Object.keys(shot().properties)).toContain("shows");
-  });
-
-  it("shows 는 required 다 — imagePlanFor 가 없으면 한국어 beat 로 떨어져 이미지 모델에 한국어가 나간다", () => {
-    expect(shot().required).toContain("shows");
-  });
-
-  it("additionalProperties 는 false 그대로다 — 스키마가 칸을 열거하는 성질을 깨지 않는다", () => {
-    expect(shot().additionalProperties).toBe(false);
-  });
-});

@@ -24,6 +24,13 @@ export function AdProjectProvider({ children }) {
   // "볼 수 있는 단계인가" 판정이 두 벌이 되어 언젠가 갈린다(그 판정은 lib/ad/steps.js 의
   // isAdStepReachable 하나뿐이어야 한다).
   const [view, setView] = useState(null);
+  // ★★ **무엇이 지금 돌고 있는가**(2026-08-21 사장님 지적: "생성 중인지 멈춘 건지 알 수
+  //   없다"). status 만으로는 부족하다 — 시나리오 만들기는 **동기 호출**이라 끝날 때까지
+  //   status 가 그대로이고, 그동안 사이드바에는 아무 신호가 없다. 그래서 화면이 "지금
+  //   이 단계가 돌고 있다"를 여기 올려 두고 사이드바가 읽어 깜박인다.
+  // ★ 값은 **단계 key**다(lib/ad/steps.js 의 AD_STEPS[].key). 불리언이면 어느 단계가
+  //   도는지 모른다 — 사이드바는 그 한 줄만 깜박여야 한다.
+  const [busyStep, setBusyStep] = useState(null);
 
   const load = useCallback(async (id) => {
     const res = await fetch(`/api/ads/${id}`);
@@ -37,8 +44,8 @@ export function AdProjectProvider({ children }) {
   }, []);
 
   const value = useMemo(
-    () => ({ project, setProject, load, view, setView }),
-    [project, load, view]
+    () => ({ project, setProject, load, view, setView, busyStep, setBusyStep }),
+    [project, load, view, busyStep]
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

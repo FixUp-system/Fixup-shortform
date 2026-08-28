@@ -3,7 +3,7 @@ import { isAspect } from "../../../../lib/aspects.js";
 import { normalizeAdOptions } from "../../../../lib/ad/options.js";
 import {
   isAdSeconds, isAdModel, adSecondsFor, DEFAULT_AD_MODEL,
-  isAdResolution, adResolutionsFor, DEFAULT_AD_RESOLUTION,
+  isAdResolution, adResolutionsFor, DEFAULT_AD_RESOLUTION, adRefMax,
 } from "../../../../lib/ad/models.js";
 import { ownedPhotoKeys } from "../../../../lib/refs-io.js";
 import { getStore } from "../../../../lib/store/index.js";
@@ -11,7 +11,6 @@ import { tierOf, tierAllowsModel } from "../../../../lib/tiers.js";
 import { withUser } from "../../../../lib/auth/require-user.js";
 import { MAX_MATERIAL_TEXT } from "../../../../lib/material.js";
 
-const MAX_PHOTOS = 4;
 
 // 광고 문서만 다룬다. 기존 문서는 **404** 다 — 양방향 격리의 한쪽이다.
 // (반대쪽은 app/api/projects/[id]/** 가 kind:"ad" 를 404 로 거절한다.)
@@ -68,8 +67,9 @@ export const PATCH = withUser(async (req, { params }, user) => {
   // ★ 값이 실제로 안 바뀌는 요청은 지나간다(model 을 안 보내면 project 의 것이 그대로다).
   //   등급이 내려간 뒤에도 옛 문서를 열고 다른 칸을 고칠 수는 있어야 한다.
   if (body?.settings?.model !== undefined) {
+    // ★ 관리자는 등급을 안 탄다(2026-08-21) — 만들기·굽기와 같은 판정이다.
     const tier = tierOf((await getStore().findProfiles([user.id])).get(user.id));
-    if (!tierAllowsModel(tier, model)) {
+    if (!tierAllowsModel(tier, model, { admin: user.role === "admin" })) {
       return Response.json({ error: "지금 등급에서는 고를 수 없는 모델이에요" }, { status: 403 });
     }
   }
@@ -97,8 +97,12 @@ export const PATCH = withUser(async (req, { params }, user) => {
   let photos = project.material.photos;
   if (body?.material?.photos !== undefined) {
     photos = Array.isArray(body.material.photos) ? body.material.photos : [];
-    if (photos.length > MAX_PHOTOS) {
-      return Response.json({ error: `사진은 ${MAX_PHOTOS}장까지 올릴 수 있어요` }, { status: 400 });
+    // ★ 상한은 **이 프로젝트가 고른 모델**이 정한다(2026-08-28). body 에 모델이 함께
+    //   왔으면 그 값으로 잰다 — 모델과 사진을 한 번에 바꿀 때 옛 모델의 상한으로 재면
+    //   2.5(30장)로 갈아타면서 올린 사진이 거절된다.
+    const photoMax = adRefMax(body?.settings?.model || project.settings?.model);
+    if (photos.length > photoMax) {
+      return Response.json({ error: `사진은 ${photoMax}장까지 올릴 수 있어요` }, { status: 400 });
     }
     if (!(await ownedPhotoKeys(photos, user.id))) {
       return Response.json({ error: "본인이 올린 사진만 쓸 수 있어요" }, { status: 400 });

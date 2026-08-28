@@ -3,7 +3,15 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 
-const src = readFileSync("app/ads/new/page.js", "utf8");
+// ★ 2026-08-21 — 입력 트레이(포맷·분위기·화풍·언어·사이즈·모델·해상도·길이)가
+//   components/AdOptionTray.jsx 로 빠졌다. **입력 수정 화면(/ads/[id]?step=draft)과
+//   나눠 쓰기 위해서**다 — 두 벌이면 한쪽이 낡는다.
+//   이 시험들이 재는 계약은 그대로이므로 **읽는 자리만 넓힌다**: 화면 + 그 화면이 쓰는
+//   트레이를 한 덩어리로 본다. 트레이만 읽으면 화면 쪽 계약(사진·본문)을 놓친다.
+const src = [
+  readFileSync("app/ads/new/page.js", "utf8"),
+  readFileSync("components/AdOptionTray.jsx", "utf8"),
+].join("\n");
 // /ads/[id] — 상태 넷(draft·scenario·rendering·done)을 한 화면이 다룬다.
 const detailSrc = readFileSync("app/ads/[id]/page.js", "utf8");
 // 보관함 카드 — 종류(kind)로 갈라 그리는지.
@@ -54,12 +62,20 @@ describe("/ads/new 화면", () => {
     expect(src).not.toMatch(/\.css["']/);
   });
 
-  it("사진은 서버와 같은 상한(4장)을 쓰고, 넘는 선택은 실제로 자른다", () => {
-    expect(src).toMatch(/MAX_PHOTOS\s*=\s*4/);
-    // 상수만 있고 안 쓰면 사장님이 5장을 골라도 전부 업로드된 뒤 서버 400 을 만난다.
+  // ★★★ 2026-08-28 — 상한이 **모델마다 다르다.** 그전에는 화면·생성 라우트·수정 라우트·
+  //   lib/photos.js 네 군데에 `MAX_PHOTOS = 4` 가 손으로 적혀 있었는데, fal 스키마 실측으로
+  //   실제 상한은 2.0=9 · 2.5=**30** · H3=9 였다. 우리 4는 근거 없이 좁힌 값이었다.
+  //   이제 모델 표 하나(lib/ad/models.js 의 adRefMax)가 정하고 화면·서버가 그것을 본다.
+  it("사진 상한을 고른 모델에서 읽는다 — 손으로 안 적는다", () => {
+    expect(src, "아직 4장으로 박혀 있다").not.toMatch(/MAX_PHOTOS\s*=\s*\d/);
+    expect(src).toMatch(/adRefMax\(model\)/);
+  });
+
+  it("넘는 선택은 실제로 자른다", () => {
+    // 상수만 있고 안 쓰면 사장님이 넘겨 골라도 전부 업로드된 뒤 서버 400 을 만난다.
     // slice 로 실제로 자르는지까지 구조로 확인한다.
     expect(src).toMatch(/files\.slice\(0,\s*Math\.max\(room,\s*0\)\)/);
-    expect(src).toMatch(/disabled=\{photos\.length >= MAX_PHOTOS\}/);
+    expect(src).toMatch(/disabled=\{photos\.length >= maxPhotos\}/);
   });
 
   it("사진은 기존 업로드 라우트(POST /api/uploads)로 올린다", () => {
@@ -278,7 +294,7 @@ describe("/ads/new 화면 — 모델·길이 선택 (Task 22)", () => {
 
   // ★ Task 24 — 해상도 칩. 모델·길이 칩과 같은 결(표에서 읽고, 정가를 같이 보여준다).
   it("해상도 칩이 lib/ad/models 의 adResolutionsFor(model) 에서 온다 — 배열을 손으로 안 적는다", () => {
-    expect(src).toMatch(/adResolutionsFor\(model\)\.map\(/);
+    expect(src).toMatch(/adResolutionsFor\(model, \{ admin \}\)\.map\(/);
   });
 
   it("해상도 칩마다 정가를 priceLabel(adVideoPrice(...)) 로 보여준다", () => {
@@ -291,7 +307,7 @@ describe("/ads/new 화면 — 모델·길이 선택 (Task 22)", () => {
     const bodyEnd = src.indexOf("\n}", fnIdx);
     const body = src.slice(fnIdx, bodyEnd);
     expect(body, "되돌림 판정에 isAdResolution 을 안 쓴다").toContain("isAdResolution");
-    expect(body, "되돌릴 값이 adResolutionsFor(id)[0] 가 아니다").toMatch(/adResolutionsFor\(id\)\[0\]/);
+    expect(body, "되돌릴 값이 adDefaultResolution(id) 가 아니다").toMatch(/adDefaultResolution\(id\)/);
   });
 
   it("[시나리오 만들기]가 고른 resolution 을 서버로 보낸다", () => {
@@ -318,22 +334,28 @@ describe("/ads/[id] 화면 — 연출 필드·모델 표시 (Task 22)", () => {
     expect(detailSrc).toMatch(/\{Number\.isFinite\(shot\.seconds\)\s*&&/);
   });
 
-  it("조명·음향은 각각 있을 때만 한 줄로 그린다", () => {
-    // ★ 컷 편집이 붙으며 가드가 (editing || shot.X) 로 넓어졌다 — **편집 중에만** 빈 줄을
-    // 그린다(옛 시나리오에 조명·음향이 없으면 채워 넣을 길이 없어서다). 볼 때의 계약은
-    // 그대로다: 값이 없으면 안 그린다.
-    expect(detailSrc, "shot.lighting 가드가 없다").toMatch(/\(editing \|\| shot\.lighting\)\s*&&/);
-    expect(detailSrc, "shot.sound 가드가 없다").toMatch(/\(editing \|\| shot\.sound\)\s*&&/);
+  // ★★ 2026-08-27 — 조명·음향·카메라·동작 칸을 **걷어냈다.** 그 값들은 이제 영상
+  //   프롬프트(text) 안에 있고, 시나리오의 장면 목록은 자막을 태우려고 쓰는 색인이다.
+  //   없는 값을 빈칸으로 그리면 우리가 빠뜨린 것처럼 보인다.
+  it("걷어낸 연출 칸을 더는 그리지 않는다", () => {
+    for (const name of ["camera", "lighting", "sound", "action"]) {
+      expect(detailSrc, `${name} 칸이 아직 남아 있다`).not.toMatch(new RegExp(`name=["']${name}["']`));
+    }
   });
 
   // ★ 라벨 글자가 아니라 **필드**를 잰다(2026-08-19). 이 테스트의 뜻은 "칸이 사라지지
   //   않았는가"인데 라벨 문자열로 재고 있었다 — 그래서 "비트"를 사장님이 읽을 수 있는
   //   "역할"로 바꾸자 뜻은 그대로인데 테스트가 깨졌다. 라벨은 앞으로도 다듬어질 말이고,
   //   칸이 살아 있다는 보장은 name 으로 재야 흔들리지 않는다.
-  it("기존 beat·camera·action·line 필드는 그대로 남아 있다", () => {
-    for (const name of ["beat", "camera", "action", "line"]) {
+  it("남은 두 칸(beat·line)은 그대로 있다", () => {
+    for (const name of ["beat", "line"]) {
       expect(detailSrc, `${name} 칸이 사라졌다`).toMatch(new RegExp(`name=["']${name}["']`));
     }
+  });
+
+  // ★ 영상 프롬프트 원문이 진짜 결과물이다 — 화면에서 볼 수 있어야 한다.
+  it("영상 프롬프트(text) 원문을 보여준다", () => {
+    expect(detailSrc).toMatch(/scenario\?\.text/);
   });
 
   it("★ 내부 용어를 화면 라벨로 쓰지 않는다", () => {
@@ -364,8 +386,11 @@ describe("/ads/[id] 화면 — 연출 필드·모델 표시 (Task 22)", () => {
 describe("/ads/[id] — 컷 편집", () => {
   it("[수정하기]가 장면 목록보다 위에 있다 — 1번 장면 앞이어야 손이 먼저 닿는다", () => {
     expect(detailSrc).toContain("수정하기");
+    // ★ 2026-08-21 — plan-list 가 둘이 됐다(전역 값 목록 + 장면 목록). 장면 목록은
+    //   ref={editRef} 가 유일하게 가리키므로 그것으로 집는다 — "plan-list" 로 집으면
+    //   전역 값 목록이 먼저 걸려 순서를 잘못 잰다.
     const editBtn = detailSrc.indexOf("수정하기");
-    const shotList = detailSrc.indexOf("plan-list");
+    const shotList = detailSrc.indexOf("ref={editRef}");
     expect(editBtn).toBeGreaterThan(-1);
     expect(shotList).toBeGreaterThan(-1);
     expect(editBtn, "[수정하기]가 장면 목록 아래에 있다").toBeLessThan(shotList);
@@ -463,7 +488,15 @@ describe("/ads/new — 등급이 고를 수 있는 모델만 보인다", () => {
   });
 
   it("★ 등급은 내 정보에서 읽는다 — 화면이 스스로 정하지 않는다", () => {
-    expect(src).toMatch(/modelsForTier\(\s*me\?\.tier\s*\)/);
+    // ★ 2026-08-21 — 관리자는 등급을 안 타므로 admin 도 함께 넘긴다. 판정은 여전히
+    //   lib/tiers.js 하나이고, 화면은 "내 정보"에서 읽은 값을 넘길 뿐이다.
+    // ★ 2026-08-21 — 트레이가 컴포넌트로 빠지면서 두 조각이 됐다. **둘 다** 본다:
+    //   · 화면이 내 정보의 등급·관리자 여부를 트레이에 넘기는가
+    //   · 트레이가 그 값으로 lib/tiers 의 판정을 부르는가
+    //   하나만 보면 "넘기는데 안 쓰거나" "쓰는데 안 넘기는" 자리를 놓친다.
+    expect(src, "화면이 등급을 트레이에 안 넘긴다").toMatch(/tier=\{me\?\.tier\}/);
+    expect(src, "admin 을 내 정보에서 읽지 않는다").toContain("me?.isAdmin === true");
+    expect(src, "트레이가 등급 판정을 안 부른다").toMatch(/modelsForTier\(\s*tier,\s*\{ admin \}\s*\)/);
   });
 });
 

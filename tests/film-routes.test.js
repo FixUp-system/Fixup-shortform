@@ -57,7 +57,7 @@ vi.mock("../lib/film/pipeline.js", () => ({
 const scenarioMock = vi.hoisted(() => ({
   make: vi.fn(async () => ({ text: "Vertical footage.", shots: [{ line: "안녕하세요", seconds: 15 }] })),
 }));
-vi.mock("../lib/ad/scenario.js", async (importOriginal) => ({
+vi.mock("../lib/film/scenario.js", async (importOriginal) => ({
   ...(await importOriginal()),
   generateScenario: (...a) => scenarioMock.make(...a),
 }));
@@ -502,9 +502,12 @@ describe("film 시나리오가 사진을 읽는다", () => {
     expect(src).toMatch(/readPhotoVision/);
   });
 
-  it("★ 광고 파이프라인도 같은 함수를 쓴다 — 베끼면 두 벌이 된다", () => {
+  // ★★ 2026-08-27 — **광고는 이제 이 함수를 안 쓴다.** gpt-4o 로 사진을 읽어 글로 옮기는
+  //   대신 사진 원본을 Fable 에 직접 붙인다(lib/ad/scenario.js 의 photoBlocks). film 은
+  //   그림 계획이 그 판정값을 읽으므로 그대로 남는다.
+  it("★ 광고는 더는 gpt-4o 로 사진을 읽지 않는다", () => {
     const src = strip(readFileSync("lib/ad/pipeline.js", "utf8"));
-    expect(src).toMatch(/readPhotoVision/);
+    expect(src).not.toMatch(/readPhotoVision\(/);
     // 인라인으로 다시 적지 않았는지 — describePhoto 를 직접 부르는 자리가 없어야 한다
     expect(src).not.toMatch(/describePhoto\)\(\{/);
   });

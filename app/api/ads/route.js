@@ -3,7 +3,7 @@ import { isAspect, DEFAULT_ASPECT_ID } from "../../../lib/aspects.js";
 import { normalizeAdOptions } from "../../../lib/ad/options.js";
 import {
   isAdSeconds, isAdModel, adSecondsFor, DEFAULT_AD_MODEL,
-  isAdResolution, adResolutionsFor, DEFAULT_AD_RESOLUTION,
+  isAdResolution, adResolutionsFor, adDefaultResolution, adRefMax,
 } from "../../../lib/ad/models.js";
 import { ownedPhotoKeys } from "../../../lib/refs-io.js";
 import { withUser } from "../../../lib/auth/require-user.js";
@@ -11,9 +11,14 @@ import { getStore } from "../../../lib/store/index.js";
 import { tierOf, tierAllowsModel } from "../../../lib/tiers.js";
 import { MAX_MATERIAL_TEXT } from "../../../lib/material.js";
 
-// 사진 상한. base64 는 1.33배로 부는데 fal 요청 본문에 통째로 실린다 —
-// 10MB 짜리 아홉 장이면 100MB 를 넘는다. 실측하고 올린다.
-const MAX_PHOTOS = 4;
+// ★★★ 2026-08-28 — 사진 상한을 **모델 표 하나**(lib/ad/models.js 의 adRefMax)가 정한다.
+//   그전에는 `MAX_PHOTOS = 4` 가 네 군데에 손으로 적혀 있었다(화면·생성 라우트·수정 라우트·
+//   lib/photos.js). 네 벌이면 한쪽만 고쳐도 아무도 안 잡는다 — 이 저장소가 "같은 값을 두
+//   군데 두지 않는다"로 부르는 규율을 정면으로 어긴 자리였다.
+//   fal 스키마 실측(2026-08-28): Seedance 2.0 = 9장 · Seedance 2.5 = **30장** · H3 = 9장.
+//   ⚠️ 사진 한 장은 10MB 까지 올라가고 fal 에는 base64(1.33배)로 실린다. 30장을 꽉 채우면
+//     요청이 아주 커진다 — 접수가 실패하면 크레딧은 환불되지만(failAndRefund) 그때 실측해
+//     총 바이트 상한을 따로 걸어야 한다.
 
 export const POST = withUser(async (req, _ctx, user) => {
   const body = await req.json().catch(() => null);
@@ -48,8 +53,13 @@ export const POST = withUser(async (req, _ctx, user) => {
   //
   // ★ 등급은 원장(profiles)에서 읽는다. app_metadata 가 아니다 — 그쪽은 middleware 가 매
   //   요청 읽는 게이트 캐시이고, 등급은 이 자리에서만 필요하다(db/schema.sql 의 그 주석).
+  // ★ 관리자는 등급을 안 탄다(2026-08-21) — lib/tiers.js 의 modelsForTier 머리말 참고.
+  //   해상도 게이트(아래)와 **같은 축**을 본다.
+  // ★ 선언이 **두 게이트보다 위**에 있어야 한다 — 아래에 두면 모델 게이트가 선언 전에
+  //   읽어 ReferenceError 로 500 이 난다(const 의 사각지대).
+  const admin = user.role === "admin";
   const tier = tierOf((await getStore().findProfiles([user.id])).get(user.id));
-  if (!tierAllowsModel(tier, model)) {
+  if (!tierAllowsModel(tier, model, { admin })) {
     return Response.json({ error: "지금 등급에서는 고를 수 없는 모델이에요" }, { status: 403 });
   }
 
@@ -63,10 +73,15 @@ export const POST = withUser(async (req, _ctx, user) => {
   // ★ Task 24 — 해상도도 모델에 딸린 닫힌 목록이다(길이와 같은 결). 안 보내면 기본
   // 해상도(720p)를 명시 저장한다 — 옛 문서 보호 규칙과 같은 값이라 "생략=720p"가
   // 만드는 시점부터 저장된 시점까지 한 번도 안 갈린다.
-  const resolution = body?.settings?.resolution ?? DEFAULT_AD_RESOLUTION;
-  if (!isAdResolution(resolution, model)) {
+  // ★★ 기본 해상도는 **모델이 정한다**(2026-08-21) — H3 에는 720p 가 아예 없어서
+  //   전역 DEFAULT_AD_RESOLUTION 을 쓰면 그 자리에서 400 이 난다.
+  // ★★ 관리자 전용 해상도(2.5 의 1080p)는 **서버가 판정한다.** 화면에서만 거르면
+  //   가림막이지 잠금이 아니다 — 2.5 를 hidden 으로 두었다가 API 로 뚫린 그 자리다.
+  //   한 편에 $15.60~31.20 이라 새면 그만큼이 그대로 나간다.
+  const resolution = body?.settings?.resolution ?? adDefaultResolution(model);
+  if (!isAdResolution(resolution, model, { admin })) {
     return Response.json(
-      { error: `이 모델은 ${adResolutionsFor(model).join("·")} 만 만들 수 있어요` },
+      { error: `이 모델은 ${adResolutionsFor(model, { admin }).join("·")} 만 만들 수 있어요` },
       { status: 400 }
     );
   }
@@ -75,9 +90,11 @@ export const POST = withUser(async (req, _ctx, user) => {
     return Response.json({ error: "그 화면 비율은 몰라요" }, { status: 400 });
   }
 
+  //   상한은 **모델 표 하나**가 정한다(lib/ad/models.js 의 adRefMax). 화면도 같은 함수를 본다.
   const photos = Array.isArray(body.material.photos) ? body.material.photos : [];
-  if (photos.length > MAX_PHOTOS) {
-    return Response.json({ error: `사진은 ${MAX_PHOTOS}장까지 올릴 수 있어요` }, { status: 400 });
+  const photoMax = adRefMax(model);
+  if (photos.length > photoMax) {
+    return Response.json({ error: `사진은 ${photoMax}장까지 올릴 수 있어요` }, { status: 400 });
   }
   if (!(await ownedPhotoKeys(photos, user.id))) {
     return Response.json({ error: "본인이 올린 사진만 쓸 수 있어요" }, { status: 400 });

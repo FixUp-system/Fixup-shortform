@@ -13,6 +13,7 @@ import { priceLabel, adVideoPrice } from "../../../lib/pricing";
 // 이 프로젝트가 어느 모델로 만들어지는지 — 사장님이 값을 치르기 전에 알아야 한다.
 // adModel 은 모르는/없는 id 도 기본 모델로 안전하게 떨어진다(옛 문서 보호).
 import { adModel } from "../../../lib/ad/models";
+import { prettyPrompt } from "../../../lib/ad/prompt-view";
 // 지나온 단계를 다시 볼 수 있는가 — 사이드바와 **같은 판정**을 쓴다(두 벌이면 갈린다).
 import { adViewStep } from "../../../lib/ad/steps";
 // 큐 대기 상한 — 서버(lib/ad/generate.js)와 같은 계산을 여기서도 부른다(Task 23).
@@ -23,6 +24,8 @@ import { adPollTimeoutMs, adEstimatedMinutes } from "../../../lib/ad/timing";
 // 사이드바와 공유하는 광고 프로젝트(components/AdProjectContext) — 사이드바의 하위 단계
 // 표시가 여기서 읽어들인 값을 그대로 본다. 사이드바가 따로 fetch·폴링하지 않아도 되는 이유.
 import { useAdProject } from "../../../components/AdProjectContext";
+import AdOptionTray from "../../../components/AdOptionTray";
+import { MAX_MATERIAL_TEXT } from "../../../lib/material";
 import { useMe } from "../../../components/MeContext";
 
 // 폴링 주기 — 기존 단계 화면들(app/create/[id]/*/page.js)과 같다. ★ 이건 "화면이 서버
@@ -43,12 +46,14 @@ const POLL_MS = 2000;
 //  같은 방식을 쓰는 단계별 화면은 지금 ⑥완성의 자막 손보기다.)
 // ★ key 를 editing 으로 가른다 — 편집을 껐다 켜면 저장된 값으로 새로 그린다([취소]가
 // 실제로 되돌리는 자리다).
-function Field({ editing, name, v }) {
+// ★ attr — 걷는 자리를 가르는 속성 이름이다(장면은 data-field, 전역은 data-global).
+//   같은 이름을 쓰면 장면 수집이 전역 칸까지 빨아들인다.
+function Field({ editing, name, v, attr = "data-field" }) {
   return (
     <span
       key={editing ? "edit" : "read"}
       className="editable"
-      data-field={name}
+      {...{ [attr]: name }}
       {...(editing ? { contentEditable: true, suppressContentEditableWarning: true } : {})}
     >
       {v || (editing ? "" : "(없음)")}
@@ -61,7 +66,10 @@ export default function AdDetailPage() {
   const searchParams = useSearchParams();
   // project·setProject·load 는 컨텍스트에서 온다(null = 아직 못 불러왔다) — 사이드바가
   // 같은 값을 읽어 하위 단계를 그린다. 이 화면이 유일한 발신자이고, 사이드바는 수신만 한다.
-  const { project, setProject, load, setView } = useAdProject();
+  // ★ setBusyStep — 사이드바가 "지금 이 단계가 돈다"를 읽는 자리다(2026-08-21).
+  //   ⚠️ 이걸 빠뜨렸다가 startRender 가 fetch 를 부르기 **전에** ReferenceError 로 죽어
+  //     굽기가 시작조차 안 됐다. 화면은 아무 말도 안 했다(콘솔에만 났다).
+  const { project, setProject, load, setView, setBusyStep } = useAdProject();
   // 크레딧을 끈 동안(내부 QA)에는 값 이야기를 안 한다 — 판정은 서버가 내려 준 gated 하나다.
   const { me } = useMe();
   const showCredits = me?.gated !== false;
@@ -74,6 +82,85 @@ export default function AdDetailPage() {
   const pollRef = useRef(null);
   // 편집한 값을 걷어올 자리(장면 목록). 아래 rewriteWithEdits 주석 참고.
   const editRef = useRef(null);
+  // 전역 값은 editRef 밖에 있다(장면 목록과 다른 덩어리다) — 걷는 자리를 따로 둔다.
+  const globalRef = useRef(null);
+
+  // ①입력을 고치는 상태. **저장된 값에서 시작한다** — 그것이 "기존 입력이 유지된 화면"이다.
+  // ★ project 가 늦게 오므로(컨텍스트가 불러온다) 도착하면 한 번 채운다. 그 뒤에는
+  //   사장님이 고친 값을 덮지 않는다 — 폴링이 project 를 새로 받을 때마다 입력이
+  //   되돌아가면 글을 쓸 수가 없다.
+  const [draftText, setDraftText] = useState("");
+  const [draftOpts, setDraftOpts] = useState(null);
+  const [saved, setSaved] = useState(false);
+  // 굽기가 몇 분째인가 — 기준은 **문서의 시작 시각**이다(ad_job.startedAt). 화면이
+  // 자기 시계로 세면 새로고침할 때마다 0 분으로 되돌아가 "멈춘 것 같다"가 더 심해진다.
+  const [elapsed, setElapsed] = useState(null);
+  useEffect(() => {
+    const startedAt = Number(project?.ad_job?.startedAt) || 0;
+    if (project?.status !== "rendering" || !startedAt) { setElapsed(null); return; }
+    const tick = () => setElapsed(Math.max(0, Math.floor((Date.now() - startedAt) / 60000)));
+    tick();
+    const t = setInterval(tick, 30000);
+    return () => clearInterval(t);
+  }, [project?.status, project?.ad_job?.startedAt]);
+
+  const filledRef = useRef(false);
+  useEffect(() => {
+    if (filledRef.current || !project?.settings) return;
+    filledRef.current = true;
+    setDraftText(project.material?.text || "");
+    const st = project.settings;
+    setDraftOpts({
+      format: st.format, mood: st.mood, style: st.style, lang: st.narration_lang,
+      aspect: st.aspect_ratio, model: st.model, seconds: st.seconds, resolution: st.resolution,
+    });
+  }, [project]);
+
+  // 무엇이 바뀌었나 — 안 바뀐 것을 PATCH 로 보내면 라우트가 등급·해상도를 다시 재는데,
+  // 등급이 내려간 뒤 옛 문서를 열기만 해도 403 이 날 수 있다(그 라우트 주석 참고).
+  const dirty = !!draftOpts && !!project?.settings && (
+    draftText !== (project.material?.text || "") ||
+    draftOpts.format !== project.settings.format ||
+    draftOpts.mood !== project.settings.mood ||
+    draftOpts.style !== project.settings.style ||
+    draftOpts.lang !== project.settings.narration_lang ||
+    draftOpts.aspect !== project.settings.aspect_ratio ||
+    draftOpts.model !== project.settings.model ||
+    draftOpts.seconds !== project.settings.seconds ||
+    draftOpts.resolution !== project.settings.resolution
+  );
+
+  // 저장 — PATCH 하나다. 판정(등급·길이·해상도)은 전부 서버가 한다.
+  async function saveDraft() {
+    if (!dirty) return true;
+    // ★ 저장하는 동안에도 ①입력 줄이 깜박여야 한다 — [시나리오 만들기]는 저장 뒤에
+    //   시나리오를 부르므로, 이 자리가 비어 있으면 **몇 초 동안 아무 신호가 없다**.
+    setBusy(true); setErr(""); setSaved(false); setBusyStep("draft");
+    const res = await fetch(`/api/ads/${id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        material: { text: draftText },
+        settings: {
+          format: draftOpts.format, mood: draftOpts.mood, style: draftOpts.style,
+          narration_lang: draftOpts.lang, aspect_ratio: draftOpts.aspect,
+          model: draftOpts.model, seconds: draftOpts.seconds, resolution: draftOpts.resolution,
+        },
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setBusy(false); setBusyStep(null);
+    if (!res.ok) { setErr(data.error || "저장하지 못했어요"); return false; }
+    setProject(data);
+    setSaved(true);
+    return true;
+  }
+
+  // 고친 것이 있으면 **저장하고 나서** 시나리오를 만든다 — 안 그러면 사장님이 방금 고친
+  // 값이 아니라 저장된 옛 값으로 시나리오가 쓰인다(고친 것이 조용히 버려진다).
+  async function saveThenScenario() {
+    if (await saveDraft()) makeScenario();
+  }
 
   // id 가 바뀌면 먼저 비운다 — 안 비우면 방금 전 광고의 상태(사이드바 하위 단계 포함)가
   // 새 광고를 불러오는 동안 잠깐 남는다.
@@ -108,6 +195,9 @@ export default function AdDetailPage() {
       clearInterval(pollRef.current);
       pollRef.current = null;
       setBusy(false);
+      // ★ 사이드바 깜박임도 여기서 끈다 — 끄는 자리를 한 군데로 모은다(성공·실패·시간
+      //   초과가 전부 이 함수를 지난다). 따로 두면 어느 갈래에서 켜진 채로 남는다.
+      setBusyStep(null);
       if (timedOut) {
         setPollTimedOut(true);
         setErr("만드는 데 오래 걸리고 있어요 — 새로고침하거나 다시 시도해 주세요");
@@ -140,6 +230,8 @@ export default function AdDetailPage() {
   useEffect(() => {
     if (project?.status === "rendering" && !pollRef.current && !pollTimedOut) {
       setBusy(true);
+      // 새로고침으로 들어와도 "굽는 중"이 사이드바에 보여야 한다.
+      setBusyStep("rendering");
       startPolling();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -147,19 +239,29 @@ export default function AdDetailPage() {
 
   // 시나리오 만들기·다시 쓰기·고친 대로 다시 쓰기 — **같은 라우트**다. LLM 만 쓰고 무료다.
   //
-  // ★ edited 를 넘기면 고친 컷이 함께 간다. 무엇이 실제로 고쳐졌는지는 서버가 저장된
-  // 시나리오와 대조해 판정한다 — 화면은 "지금 보이는 장면들"을 그대로 보낼 뿐이다.
+  // ★ edited(`{ shots, globals }`)를 넘기면 고친 컷과 **영상 전체 값**이 함께 간다.
+  // 무엇이 실제로 고쳐졌는지는 서버가 저장된 시나리오와 대조해 판정한다 — 화면은
+  // "지금 보이는 값들"을 그대로 보낼 뿐이다(pickEditedShots · pickEditedGlobals).
+  // ★ 인자 없이 부르면 [다시 쓰기]다. **onClick 에 직접 묶지 마라** — 클릭 이벤트가
+  //   edited 자리로 들어간다(그래서 이 파일의 모든 호출이 `() => makeScenario()` 다).
   async function makeScenario(edited) {
-    setBusy(true); setErr("");
+    // ★ 사이드바가 깜박일 수 있게 **어느 단계가 도는지** 올린다(2026-08-21).
+    //   시나리오 만들기는 동기 호출이라 status 가 안 바뀐다 — 이 값이 유일한 신호다.
+    setBusy(true); setErr(""); setBusyStep("scenario");
     const res = await fetch(`/api/ads/${id}/scenario`, {
       method: "POST",
-      ...(edited ? { headers: { "content-type": "application/json" }, body: JSON.stringify({ shots: edited }) } : {}),
+      ...(edited
+        ? {
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ shots: edited.shots, globals: edited.globals }),
+          }
+        : {}),
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) { setErr(data.error || "시나리오를 만들지 못했어요"); setBusy(false); return; }
+    if (!res.ok) { setErr(data.error || "시나리오를 만들지 못했어요"); setBusy(false); setBusyStep(null); return; }
     setProject(data);
     setEditing(false);
-    setBusy(false);
+    setBusy(false); setBusyStep(null);
   }
 
   // 고친 대로 다시 쓰기 — 편집 중인 화면에서 값을 걷어 위 함수에 넘긴다.
@@ -169,14 +271,20 @@ export default function AdDetailPage() {
   // ⑥완성 화면(app/create/[id]/done/page.js)의 자막 손보기에서 이미 같은 방식을 쓴다.
   function rewriteWithEdits() {
     const rows = editRef.current?.querySelectorAll("[data-shot]") || [];
-    const edited = Array.from(rows).map((row) => {
+    const shots = Array.from(rows).map((row) => {
       const out = {};
       for (const el of row.querySelectorAll("[data-field]")) {
         out[el.dataset.field] = (el.textContent || "").trim();
       }
       return out;
     });
-    makeScenario(edited);
+    // 영상 전체 값도 같은 방식으로 걷는다. **무엇이 실제로 고쳐졌는지는 서버가 판정한다**
+    // (lib/ad/scenario.js 의 pickEditedGlobals) — 여기서는 지금 화면의 값을 그대로 보낸다.
+    const globals = {};
+    for (const el of globalRef.current?.querySelectorAll("[data-global]") || []) {
+      globals[el.dataset.global] = (el.textContent || "").trim();
+    }
+    makeScenario({ shots, globals });
   }
 
   // 되돌리기 — 직전 시나리오로. LLM 을 안 부르니 회차도 안 먹는다(서버가 지킨다).
@@ -192,7 +300,7 @@ export default function AdDetailPage() {
 
   // 이대로 만들기·다시 만들기 — 같은 라우트다. ★ 여기서 크레딧이 나간다.
   async function startRender() {
-    setBusy(true); setErr(""); setPollTimedOut(false);
+    setBusy(true); setErr(""); setBusyStep("rendering"); setPollTimedOut(false);
     const res = await fetch(`/api/ads/${id}/render`, { method: "POST" });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
@@ -268,21 +376,61 @@ export default function AdDetailPage() {
       {/* 배경에서 굽다 실패한 것 — 위치를 status 마다 가르지 않는다. 사장님이 못 보면 안 된다. */}
       {video_error && <p className="pgsub warn">{video_error}</p>}
 
+      {/* ①입력 — **고칠 수 있는 자리**다(2026-08-21 사장님 지적). 그전에는 "시나리오를
+          만들어 주세요" 한 줄뿐이라, 시나리오를 보고 나서 소재나 옵션을 고치려면
+          /ads/new 로 가야 했고 거기는 **새 프로젝트를 만드는 자리**라 빈 화면이 떴다.
+          ★ 트레이는 첫 화면과 **같은 컴포넌트**다(components/AdOptionTray.jsx) —
+            두 벌이면 한쪽이 낡는다.
+          ★ 저장은 PATCH 하나다(app/api/ads/[id]/route.js) — 그 라우트가 등급·해상도·
+            길이를 이미 다 판정한다. 화면이 다시 판정하지 않는다. */}
       {view === "draft" && (
         <section className="panel panel--wide">
-          <p className="pgsub">시나리오를 만들어 주세요 — 무료예요. 마음에 안 들면 몇 번이든 다시 쓸 수 있어요.</p>
-          <button className="cta" disabled={busy} onClick={makeScenario}>
-            {busy ? "쓰는 중…" : "시나리오 만들기 →"} <span className="cr">무료</span>
-          </button>
+          <h2>무엇을 만들까요</h2>
+          <textarea
+            className="composer-text"
+            value={draftText}
+            onChange={(e) => setDraftText(e.target.value)}
+            rows={6}
+            maxLength={MAX_MATERIAL_TEXT}
+            placeholder="제품·특징·하고 싶은 이야기를 적어 주세요"
+          />
+          <AdOptionTray
+            value={draftOpts}
+            onChange={(patch) => setDraftOpts((v) => ({ ...v, ...patch }))}
+            showCredits={showCredits}
+            admin={me?.isAdmin === true}
+            tier={me?.tier}
+          />
+          {(project?.material?.photos || []).length > 0 && (
+            <p className="pgsub">사진 {project.material.photos.length}장이 붙어 있어요.</p>
+          )}
+          {saved && <p className="pgsub">저장했어요.</p>}
+          <div className="step-actions">
+            <button className="mini" disabled={busy || !dirty} onClick={saveDraft}>
+              {busy ? "저장 중…" : dirty ? "저장하기" : "바뀐 것 없음"}
+            </button>
+            <div className="fwd">
+              <button className="cta" disabled={busy} onClick={saveThenScenario}>
+                {busy ? "쓰는 중…" : "시나리오 만들기 →"} <span className="cr">무료</span>
+              </button>
+            </div>
+          </div>
         </section>
       )}
 
       {view === "scenario" && (
         <section className="panel panel--wide">
           <h2>시나리오를 확인해 주세요</h2>
-          <p className="script-src">{scenario?.text}</p>
+          {/* ★ 영상 프롬프트 원문 — 이 글이 **그대로** 영상 모델에 간다(코드가 아무것도
+              안 붙인다). 사장님이 읽고 [이대로 만들기]를 누를지 정하는 자리라 읽히게
+              끊는다: prettyPrompt 가 단 머리말과 장면 시간 앞에 줄을 넣고,
+              `direction-lines`(white-space: pre-line)가 그 줄을 살린다.
+              ⚠️ 원문을 바꾸지 않는다 — 공백을 줄바꿈으로 바꿀 뿐이다. */}
+          <p className="script-src direction-lines">{prettyPrompt(scenario?.text)}</p>
 
-          {/* 장면 목록의 머리 — [수정하기]가 1번 장면보다 **위**에 있어야 손이 먼저 닿는다.
+          {/* 편집 머리 — [수정하기]는 **고칠 수 있는 것 전부보다 위**에 있어야 손이 먼저 닿는다.
+              ★ 2026-08-21 — 전역 값(인물·무대…)도 고칠 수 있게 되면서 이 자리가 장면 목록
+                앞이 아니라 **전역 값 앞**으로 올라왔다. 그 아래 두 덩어리가 다 편집 대상이다.
               편집 중에는 [취소]로 바뀐다(같은 자리에서 켜고 끈다). */}
           {/* ★ 편집은 **실제 상태(status)** 로 잠근다. view 로 판정하면 완성본을
               ?step=scenario 로 열었을 때 [수정하기]가 그대로 떠서, 고치는 순간 status 가
@@ -306,10 +454,53 @@ export default function AdDetailPage() {
           </div>
           {editing && (
             <p className="pgsub">
-              고치고 싶은 곳을 눌러 바로 고치세요 — 고친 장면은 그대로 지키고 나머지는 다시 씁니다.
+              고치고 싶은 곳을 눌러 바로 고치세요. <b>인물·무대·옷차림</b> 같은 영상 전체 값도
+              고칠 수 있어요 — 고친 것은 그대로 지키고 나머지를 거기에 맞춰 다시 씁니다.
               장면 길이(초)는 전체 길이에 맞춰져 있어 고칠 수 없어요.
             </p>
           )}
+
+          {/* ★★★ **영상 전체에 걸리는 값들** — 보여 주고(2026-08-21), 고칠 수 있게 한다.
+              그전에는 지시문(text)과 장면만 그려서, 사장님이 "이 사람이 누구고 어디서
+              찍고 무슨 옷을 입나"를 확인할 자리가 없었다 — 정작 그 값들이 굽기 지시문에
+              실려 화면을 정하는데도. 시나리오 단계는 **사람이 멈춰 서는 유일한 자리**라
+              (lib/ad/steps.js 의 waits) 여기서 못 보면 어디서도 못 본다.
+
+              ★★ 그리고 **고칠 수 있어야 한다.** AI 가 "20대 여성"으로 잡았는데 사장님이
+                40대 남성을 원하면, 그전에는 [다시 쓰기]로 통째로 새로 뽑는 수밖에 없었고
+                그러면 마음에 들던 장면·대사까지 다 바뀌었다. 영상 한 편이 $2~7 이라
+                시나리오에서 맞추는 것이 가장 싼 길이다.
+
+              ★ 읽을 때는 **값이 있는 칸만** 그린다 — 사람이 없는 영상에서 "인물 (빈칸)"이
+                뜨면 우리가 빠뜨린 것처럼 보인다.
+              ★ 고칠 때는 **일곱 칸을 다 편다** — 비어 있는 칸이야말로 사장님이 채우고 싶은
+                자리다(사람을 넣고 싶은데 AI 가 안 넣은 경우).
+              ⚠️ 이 목록은 서버(lib/ad/scenario.js 의 EDITABLE_GLOBAL_FIELDS)와 **같아야
+                한다**. 화면은 그 파일을 import 할 수 없어(서버 전용) 목록이 두 벌인데,
+                tests/ad-scenario-globals.test.js 가 둘을 대조한다. */}
+          {(() => {
+            const all = [
+              ["이야기", "angle"],
+            ];
+            const rows = editing
+              ? all
+              : all.filter(([, f]) => typeof scenario?.[f] === "string" && scenario[f].trim());
+            if (!rows.length) return null;
+            return (
+              <div className="plan-list" ref={globalRef}>
+                <div className="plan-row">
+                  <div className="plan-body">
+                    {rows.map(([label, f]) => (
+                      <div className="plan-field" key={f}>
+                        <b>{label}</b>
+                        <Field editing={editing} name={f} v={scenario?.[f]} attr="data-global" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="plan-list" ref={editRef}>
             {(scenario?.shots || []).map((shot, i) => (
@@ -319,20 +510,11 @@ export default function AdDetailPage() {
                   {/* 초 — 장면 머리에 작게. Number.isFinite 로 감싼다: 이 필드가 없는(연출
                       필드 개편 전에 만든) 옛 시나리오에서는 undefined가 그대로 안 뜨게 한다. */}
                   {Number.isFinite(shot.seconds) && <span className="badge">{shot.seconds}초</span>}
+                  {/* ★★ 2026-08-27 — 카메라·조명·음향·동작 칸을 걷었다. 그 값들은 이제
+                      **영상 프롬프트(위 script-src)** 안에 있고, 시나리오는 그것을 장면별로
+                      옮겨 적은 자막용 목록이다. 없는 값을 빈칸으로 그리면 우리가 빠뜨린
+                      것처럼 보인다. */}
                   <div className="plan-field"><b>역할</b><Field editing={editing} name="beat" v={shot.beat} /></div>
-                  <div className="plan-field"><b>카메라</b><Field editing={editing} name="camera" v={shot.camera} /></div>
-                  {/* 조명·음향 — CF 연출·촬영 감독 SYSTEM(be1cc9c)이 새로 낸다. 컨트롤러 판단:
-                      전부 보여주되 한 줄씩 작게(나중에 줄이는 게 늘리는 것보다 쉽다). 옛
-                      시나리오엔 없을 수 있어 있을 때만 그린다.
-                      ★ 편집 중에는 비어 있어도 그린다 — 안 그러면 옛 시나리오에서 그 줄을
-                      **채워 넣을 길이 없다**(고칠 수는 있는데 만들 수는 없는 상태가 된다). */}
-                  {(editing || shot.lighting) && (
-                    <div className="plan-field"><b>조명</b><Field editing={editing} name="lighting" v={shot.lighting} /></div>
-                  )}
-                  {(editing || shot.sound) && (
-                    <div className="plan-field"><b>음향</b><Field editing={editing} name="sound" v={shot.sound} /></div>
-                  )}
-                  <div className="plan-field"><b>동작</b><Field editing={editing} name="action" v={shot.action} /></div>
                   {(editing || shot.line) && (
                     <div className="plan-field"><b>대사</b><Field editing={editing} name="line" v={shot.line} /></div>
                   )}
@@ -398,8 +580,14 @@ export default function AdDetailPage() {
               걸린다, 실측 근거는 lib/ad/timing.js). 상한(분 단위 십몇 분)이 아니라
               "보통 이 정도"인 추정치를 보여준다 — 상한을 그대로 보여주면 실제보다
               훨씬 길어 보인다. */}
-          <p className="pgsub">
-            영상을 만드는 중이에요 — 길이에 따라 다르지만 보통 {adEstimatedMinutes(settings?.seconds)}분쯤 걸려요…
+          {/* ★ 깜박이는 점 + 지난 시간. 그전에는 문장 하나뿐이라 "돌고 있는지 멈췄는지"를
+              화면이 말해 주지 않았다(2026-08-21 사장님 지적) — 8분이 걸리는 자리라
+              **살아 있다는 신호**가 계속 있어야 한다. 색·모션만으로 말하지 않는다:
+              지난 시간이 글자로 함께 올라간다. */}
+          <p className="pgsub running-line">
+            <span className="running-dot" aria-hidden="true" />
+            영상을 만드는 중이에요 — 보통 {adEstimatedMinutes(settings?.seconds)}분쯤 걸려요
+            {elapsed !== null && ` · ${elapsed}분째`}
           </p>
         </section>
       )}
@@ -445,7 +633,7 @@ export default function AdDetailPage() {
             지금 상태({status || "알 수 없음"})를 이 화면이 몰라요 — 그래도 나갈 길은 있어요.
           </p>
           <div className="step-actions">
-            <button className="mini" disabled={busy} onClick={makeScenario}>
+            <button className="mini" disabled={busy} onClick={() => makeScenario()}>
               {busy ? "쓰는 중…" : scenario?.text ? "다시 쓰기 · 무료" : "시나리오 만들기 · 무료"}
             </button>
             <div className="fwd">

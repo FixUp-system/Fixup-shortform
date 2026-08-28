@@ -4,7 +4,7 @@ import { describe, it, expect } from "vitest";
 import {
   AD_MODELS, DEFAULT_AD_MODEL, DEFAULT_AD_RESOLUTION,
   adModel, adEndpoint, isAdModel, adSecondsFor, isAdSeconds,
-  adResolutionsFor, isAdResolution,
+  adResolutionsFor, isAdResolution, adDefaultResolution, isAdminOnlyResolution,
 } from "../lib/ad/models.js";
 
 describe("광고 모델 표", () => {
@@ -113,11 +113,28 @@ describe("광고 모델 표", () => {
     expect(isAdResolution("1080p", "seedance-2.5")).toBe(false);
   });
 
-  it("720p 는 모든 모델이 받는다 — 기본 해상도와 같은 값이다", () => {
+  // ★★ 2026-08-21 — "720p 는 모든 모델이 받는다"가 **깨졌다.** MiniMax H3 의 해상도는
+  //   2K·4K 뿐이라 720p 가 아예 없다. 그래서 두 축을 갈랐다:
+  //   · DEFAULT_AD_RESOLUTION — **옛 문서**를 무엇으로 볼까(값이 없던 시절 문서는 전부
+  //     Seedance 라 720p 가 맞다). 이 값은 안 바뀐다.
+  //   · adDefaultResolution(model) — **새로 만들 때** 무엇이 골라져 있을까. 모델별이다.
+  it("옛 문서 폴백은 여전히 720p 다 — 값이 없던 시절 문서는 전부 Seedance 다", () => {
     expect(DEFAULT_AD_RESOLUTION).toBe("720p");
+  });
+
+  it("새로 만들 때의 기본 해상도는 모델마다 다르고, 그 모델이 실제로 받는 값이다", () => {
     for (const m of AD_MODELS) {
-      expect(isAdResolution(DEFAULT_AD_RESOLUTION, m.id)).toBe(true);
+      expect(isAdResolution(adDefaultResolution(m.id), m.id)).toBe(true);
     }
+    expect(adDefaultResolution("seedance-2.0")).toBe("720p");
+    expect(adDefaultResolution("minimax-h3")).toBe("2K");
+  });
+
+  it("★ 관리자 전용 해상도는 기본으로 안 열린다 — 넘기는 것을 잊으면 닫히는 쪽으로 틀린다", () => {
+    expect(isAdResolution("1080p", "seedance-2.5")).toBe(false);
+    expect(isAdResolution("1080p", "seedance-2.5", { admin: true })).toBe(true);
+    expect(isAdminOnlyResolution("1080p", "seedance-2.5")).toBe(true);
+    expect(isAdminOnlyResolution("720p", "seedance-2.5")).toBe(false);
   });
 
   it("모르는 해상도는 어떤 모델도 안 받는다", () => {

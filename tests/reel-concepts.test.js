@@ -14,7 +14,7 @@ import { readFileSync } from "fs";
 import {
   REEL_CONCEPTS, DEFAULT_REEL_CONCEPT, normalizeReelConcept, reelConceptLine,
 } from "../lib/reel/concepts.js";
-import { buildScenarioMessages } from "../lib/ad/scenario.js";
+import { buildScenarioMessages } from "../lib/reel/scenario.js";
 
 const project = (settings = {}) => ({
   id: "p1",

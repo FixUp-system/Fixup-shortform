@@ -26,6 +26,10 @@ const ENDPOINT = {
   "seedance-2.0": "bytedance/seedance-2.0/image-to-video",
   "seedance-2.5": "bytedance/seedance-2.5/image-to-video",
   "kling-v3": "fal-ai/kling-video/v3/standard/image-to-video",
+  // ★ 2026-08-28 머지(feat/scenario-prompt)로 들어온 모델 — 이 표에 없으면
+  //   estimateCost(undefined) 가 TypeError 로 죽어 **가격이 아니라 테스트가** 실패한다.
+  //   값은 lib/ad/models.js 의 minimax-h3 endpoints.i2v 와 같아야 한다.
+  "minimax-h3": "minimax/h3/image-to-video",
 };
 
 // 그림 — 흐름이 둘이라 **큰 쪽**이다(lib/pricing.js 의 VIDEO_PRICE 머리말 ②).

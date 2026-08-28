@@ -9,7 +9,15 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { AD_LANGS, normalizeAdOptions } from "../lib/ad/options.js";
 
-const src = readFileSync("app/ads/new/page.js", "utf8");
+// ★ 2026-08-21 — 입력 트레이(포맷·분위기·화풍·언어·사이즈·모델·해상도·길이)가
+//   components/AdOptionTray.jsx 로 빠졌다. **입력 수정 화면(/ads/[id]?step=draft)과
+//   나눠 쓰기 위해서**다 — 두 벌이면 한쪽이 낡는다.
+//   이 시험들이 재는 계약은 그대로이므로 **읽는 자리만 넓힌다**: 화면 + 그 화면이 쓰는
+//   트레이를 한 덩어리로 본다. 트레이만 읽으면 화면 쪽 계약(사진·본문)을 놓친다.
+const src = [
+  readFileSync("app/ads/new/page.js", "utf8"),
+  readFileSync("components/AdOptionTray.jsx", "utf8"),
+].join("\n");
 // 주석은 걷어내고 판정한다 — 주석 속 낱말이 계약을 대신 통과시킨 사고가 반복됐다
 const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 

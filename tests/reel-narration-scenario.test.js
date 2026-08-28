@@ -9,8 +9,8 @@
 //   플래그 없이 부르면 광고는 글자 그대로 예전이어야 한다 — 이 저장소가 sceneCountRule·
 //   conceptLine·note 에 세 번 쓴 처방과 같다(선택 인자 하나).
 import { describe, it, expect } from "vitest";
-import { buildScenarioMessages, validateScenario } from "../lib/ad/scenario.js";
-import { SCENARIO_SCHEMA } from "../lib/ad/llm.js";
+import { buildScenarioMessages, validateScenario } from "../lib/reel/scenario.js";
+import { REEL_SCENARIO_SCHEMA as SCENARIO_SCHEMA } from "../lib/reel/scenario.js";
 
 const settings = {
   seconds: 15, aspect_ratio: "9:16", narration_lang: "ko",

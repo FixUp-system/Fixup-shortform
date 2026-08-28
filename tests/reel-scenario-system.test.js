@@ -5,7 +5,7 @@
 //   — 테스트가 주입한 경로만 지나고 진짜 배선을 안 지났기 때문이다. 그래서 여기서는
 //   buildScenarioMessages 가 실제로 내는 system 문자열을 본다.
 import { describe, it, expect } from "vitest";
-import { buildScenarioMessages, generateScenario } from "../lib/ad/scenario.js";
+import { buildScenarioMessages, generateScenario } from "../lib/reel/scenario.js";
 import { reelSceneCountRule, reelCutChoicesFor } from "../lib/reel/scenario-rules.js";
 import { readFileSync } from "fs";
 

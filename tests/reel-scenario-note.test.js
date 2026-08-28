@@ -10,7 +10,7 @@
 //   **그대로 전하고** 지켜야 할 선(언어·요청한 자리만)만 못 박는다.
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
-import { buildScenarioMessages } from "../lib/ad/scenario.js";
+import { buildScenarioMessages } from "../lib/reel/scenario.js";
 
 const project = {
   settings: { seconds: 15, aspect_ratio: "9:16", narration_lang: "ko", format: "story", mood: "warm", style: "photo" },

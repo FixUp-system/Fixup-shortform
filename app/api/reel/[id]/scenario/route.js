@@ -1,6 +1,6 @@
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { getProject, updateProject } from "../../../../../lib/projects.js";
-import { generateScenario, pickEditedShots, readPhotoVision } from "../../../../../lib/ad/scenario.js";
+import { generateScenario, pickEditedShots, readPhotoVision } from "../../../../../lib/reel/scenario.js";
 import { isNarrationSpeaker } from "../../../../../lib/cuts.js";
 import { scenarioLock, putReel } from "../../../../../lib/reel/doc.js";
 import { reelSceneCountRule } from "../../../../../lib/reel/scenario-rules.js";

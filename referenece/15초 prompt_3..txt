@@ -1,0 +1,132 @@
+Prompt
+**Create a 15-second photorealistic cinematic home-video captured on an old consumer DV camcorder. The scene should feel spontaneous, intimate, nostalgic, and genuinely recorded rather than professionally filmed.**
+
+### CAMERA
+
+Old DV camcorder aesthetic, handheld POV. The woman occasionally holds the camera herself, with natural hand shake, imperfect framing, slight motion blur, delayed autofocus, exposure pumping, awkward zooms, occasional framing mistakes, and subtle tape artifacts. The camcorder itself is never visible.
+
+### VISUAL LOOK
+
+Soft slightly blurry MiniDV/16mm-tape-like image quality, faint analog noise, subtle grain, muted contrast, realistic skin texture, naturally bloomed highlights, imperfect white balance, and low-light DV characteristics.
+
+Late-morning winter light inside the apartment transitions to cool overcast daylight outside. Keep the lighting natural and slightly imperfect.
+
+### CHARACTER
+
+A Korean woman in her 20s with long straight black hair, naturally slightly messy, realistic dewy skin, minimal makeup, large expressive eyes, and a relaxed natural appearance.
+
+She wears a comfortable oversized cream-colored sweater, loose pants, and simple socks indoors. Before going outside, she quickly puts on a dark winter coat and scarf.
+
+Maintain identical facial features, hairstyle, body proportions, and clothing continuity throughout.
+
+### STORY — 15 SECONDS
+
+**0–3 SECONDS — BEDROOM**
+
+Handheld POV.
+
+She is sitting lazily on her bed in the late morning, looking at her phone.
+
+Something catches her attention.
+
+She suddenly looks toward the window.
+
+A few tiny white snowflakes are visible outside.
+
+Her expression changes from bored to surprised.
+
+She immediately gets up.
+
+**VOICEOVER:**
+*"Wait... is it actually snowing?"*
+
+---
+
+**3–6 SECONDS — WINDOW**
+
+She quickly walks toward the window.
+
+The camera follows shakily behind her.
+
+She pulls the curtain open.
+
+Outside, snow is now clearly falling over the quiet city.
+
+She leans closer to the glass, smiling in disbelief.
+
+The autofocus briefly struggles between her face and the snowy background.
+
+**NO VOICEOVER.**
+
+Only soft room ambience and faint distant city sounds.
+
+---
+
+**6–9 SECONDS — GETTING READY**
+
+Fast but natural handheld sequence.
+
+She grabs her coat from a chair, quickly puts it on, wraps a scarf around her neck, and slips on her shoes.
+
+She briefly looks toward the camera with an excited smile before rushing toward the door.
+
+Do not make this montage overly polished — preserve the awkward, spontaneous DV-camera movement.
+
+---
+
+**9–12 SECONDS — OUTSIDE**
+
+The apartment door opens.
+
+She steps outside into the cold afternoon.
+
+The camera follows her onto the sidewalk.
+
+Snow is falling more heavily now.
+
+She stops walking and looks upward.
+
+Her hair and coat move slightly in the cold wind.
+
+She reaches one hand out and catches a few snowflakes.
+
+---
+
+**12–15 SECONDS — SNOW**
+
+Close handheld shot from slightly below.
+
+She looks directly upward as snow falls around her.
+
+A snowflake lands on her hair.
+
+She smiles softly, genuinely happy.
+
+She slowly turns toward the camera.
+
+A few snowflakes land directly on the camcorder lens, creating tiny blurry spots.
+
+**VOICEOVER:**
+*"I haven't seen the first snow in so long."*
+
+End naturally on her looking upward while the snow continues falling.
+
+### AUDIO
+
+No dramatic music.
+
+Use subtle real-world ambience: apartment room tone, distant traffic, footsteps, door opening, cold outdoor wind, soft fabric movement, and faint city ambience.
+
+The voiceover should sound intimate and casually recorded, not like professional narration.
+
+### IMPORTANT
+
+The scene must have **continuous visible action**. Do not keep her sitting or standing still for long periods.
+
+Clear progression:
+
+**phone → notices snow → gets up → opens curtain → sees snow → grabs coat → gets dressed → leaves apartment → walks outside → catches snow → looks upward → smiles.**
+
+The snow should be **realistic and physically consistent**, with individual flakes naturally falling at different depths and speeds. Avoid fantasy-like excessive snowfall.
+
+The final shot should feel like a genuine memory captured accidentally on an old camcorder.

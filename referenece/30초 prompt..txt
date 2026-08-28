@@ -1,0 +1,28 @@
+30초.
+시덴스 2.5
+
+Prompt:
+
+Ultra-realistic luxury UGC lifestyle commercial, premium skincare commercial quality, authentic TikTok/Instagram creator style, 16:9 aspect ratio, 30-second continuous cinematic sequence, warm luxury color grading, realistic lighting, natural human acting, stable facial identity, natural body mechanics, realistic cloth physics, luxury fashion aesthetic.
+
+[Reference Setup]:
+- Model Reference: Use Reference Image 1 for the female model to preserve identical facial identity, hairstyle, outfit, and jewelry across all frames. No face morphing or identity drift.
+- Product Reference: Use Reference Image 2 for the black Chanel quilted handbag with gold chain. Preserve exact leather texture, quilting pattern, gold hardware, and proportions. Never replace or change the handbag design.
+
+[Scene Progression & Action Sequence]:
+- Scene 1 (0-5s): Bright modern bedroom with large window and warm morning sunlight. The girl films herself with a front camera like a lifestyle vlogger, smiling naturally and excitedly lifting the black Chanel handbag toward the camera, rotating it so the leather and gold chain catch the sunlight. 
+  Dialogue: "Guys... I finally got my dream Chanel bag! Look how gorgeous this is!"
+- Scene 2 (5-9s): Bedroom full-length mirror. She stands in front of the mirror, places the bag over her shoulder, turns left and right, smiles proudly, and adjusts her hair. 
+  Dialogue: "I seriously can't stop looking at it."
+- Scene 3 (9-14s): Outside luxury street with beautiful afternoon sunlight and storefronts. She walks with confidence, the Chanel bag naturally swings, wind gently moves her hair. 
+  Dialogue: "It literally matches every outfit."
+- Scene 4 (14-19s): Luxury shopping mall interior with designer boutiques. She walks with shopping bags, places the handbag on a café table for a second, picks it up again, and laughs naturally. 
+  Dialogue: "I'm obsessed with it."
+- Scene 5 (19-23s): Luxury bedroom at night with a warm bedside lamp. She is asleep peacefully, holding the handbag beside her pillow. (No dialogue).
+- Scene 6 (23-27s): Dream sequence with soft dreamy lighting. The handbag suddenly disappears. She instantly wakes up in panic, looks around quickly, checks beside the bed and under the blanket with faster breathing. 
+  Dialogue: "Oh my god... where's my bag?!"
+- Scene 7 (27-30s): She suddenly notices the Chanel bag safely beside her pillow, relaxes immediately, laughs softly, places her hand on the bag, closes her eyes, and falls asleep hugging it. Fade to black. 
+  Dialogue: "Oh... it was just a dream." "Goodnight."
+
+[Audio & Technical Constraints]:
+Natural English speaking with perfect lip-sync, soft luxury lifestyle music, natural room and outdoor mall ambience, no subtitles, smooth cinematic camera movements (handheld vlog selfie, mirror POV, tracking shots, macro product close-ups, and slow cinematic push-ins), realistic hand interactions with the handbag, realistic mirror reflections, no extra fingers or object deformation.

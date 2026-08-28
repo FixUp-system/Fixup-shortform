@@ -1,14 +1,16 @@
 // 자동 배치 — 값이 나가는 판정이라 LLM 에 통째로 안 맡긴다.
 // 코드가 먼저 좁히고, 남는 결정 지점은 "사진 1장" 하나다.
 import { describe, it, expect } from "vitest";
-import { pickEndpointKind, buildScenarioMessages, validateScenario, generateScenario, pickEditedShots } from "../lib/ad/scenario.js";
-import { SCENARIO_SCHEMA } from "../lib/ad/llm.js";
+import { pickEndpointKind, buildScenarioMessages, validateScenario, generateScenario, pickEditedShots } from "../lib/film/scenario.js";
+import { SCENARIO_SCHEMA } from "../lib/film/scenario.js";
 
 const settings = {
   seconds: 15, aspect_ratio: "9:16", narration_lang: "ko",
   format: "hero", style: "photo", mood: "premium", model: "seedance-2.0-fast",
 };
 
+// ★ film 은 옛 계약 그대로다 — 사진이 정확히 1장일 때만 LLM 의 선택을 받는다.
+//   광고는 2026-08-27 에 이 분기를 걷었다(사진 수만 본다).
 describe("자동 배치", () => {
   it("사진 0장이면 t2v 로 고정 — LLM 에 안 묻는다", () => {
     expect(pickEndpointKind(0, "i2v")).toBe("t2v");
@@ -924,5 +926,27 @@ describe("장면 수 — 짧은 장면을 많이 만들지 않는다", () => {
     const s = sys();
     const at = s.indexOf("장면 수");
     expect(s.slice(at).split(/^★ /m)[0]).toMatch(/전환|이음|끊/);
+  });
+});
+
+// 보이는 것 — 영어 한 줄"이라고 분명히 요구하는데, SCENARIO_SCHEMA 의 shots.items 에
+// shows 칸이 없고 additionalProperties:false 라 모델이 낼 길 자체가 막혀 있었다.
+//
+// ⚠️ 이 결함을 **SYSTEM 문자열을 재는 기존 테스트로는 못 잡는다** — SYSTEM 은 처음부터
+//   옳았기 때문이다. 그래서 여기서 스키마를 직접 잰다. 무엇이 나가는지가 아니라
+//   무엇이 **돌아올 수 있는지**를 재는 자리다.
+describe("SCENARIO_SCHEMA — 모델이 shows 를 낼 수 있어야 한다", () => {
+  const shot = () => SCENARIO_SCHEMA.properties.shots.items;
+
+  it("shots 의 칸에 shows 가 있다", () => {
+    expect(Object.keys(shot().properties)).toContain("shows");
+  });
+
+  it("shows 는 required 다 — imagePlanFor 가 없으면 한국어 beat 로 떨어져 이미지 모델에 한국어가 나간다", () => {
+    expect(shot().required).toContain("shows");
+  });
+
+  it("additionalProperties 는 false 그대로다 — 스키마가 칸을 열거하는 성질을 깨지 않는다", () => {
+    expect(shot().additionalProperties).toBe(false);
   });
 });

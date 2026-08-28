@@ -11,7 +11,7 @@
 // ★ 광고는 lettering 만 실었다. 단계별은 what(색)·scale(크기)도 쓴다 — 셋 다 싣는다.
 //   실측 근거는 lib/scenario.js 주석에 있다("라벤더 토끼인데 크림색 토끼가 나왔다").
 import { describe, it, expect, vi } from "vitest";
-import { buildScenarioMessages, readPhotoVision } from "../lib/ad/scenario.js";
+import { buildScenarioMessages, readPhotoVision } from "../lib/film/scenario.js";
 
 const settings = { seconds: 15, aspect_ratio: "9:16", narration_lang: "ko", format: "hero", style: "photo", mood: "bright" };
 const photo = (vision) => ({ id: "p1", url: "/api/uploads/a.jpg", ...(vision ? { vision } : {}) });

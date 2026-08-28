@@ -9,7 +9,13 @@ import { resetMemoryStore, memoryStore } from "../lib/store/memory.js";
 // 이걸로 확인한다).
 // ★ Task 18 — 광고 시나리오가 lib/llm.js(OpenAI) 대신 lib/ad/llm.js(Claude Fable)를 쓰게
 // 바뀌어 mock 대상도 같이 옮긴다. lib/llm.js 자체는 기존 6단계 파이프라인용으로 안 건드렸다.
-vi.mock("../lib/ad/llm.js", () => ({
+// ★ 2026-08-21 — 이 mock 은 모듈을 **통째로** 갈아 끼운다. 그래서 lib/ad/scenario.js 가
+//   쓰는 export 를 하나라도 빠뜨리면 그 자리에서 undefined 가 되어 라우트가 500 을 낸다
+//   (scenarioSchemaFor 를 더했을 때 실제로 그렇게 다섯 테스트가 깨졌다).
+//   scenarioSchemaFor 는 진짜 것을 쓴다 — 스키마 모양은 이 파일이 재는 대상이 아니고,
+//   가짜로 두면 "지문과 스키마가 같은 kind 를 본다"는 계약이 여기서만 사라진다.
+vi.mock("../lib/ad/llm.js", async (importOriginal) => ({
+  ...(await importOriginal()),
   callJson: vi.fn(async () => ({
     text: "Vertical commercial. Slow push-in on the product, then a hand lifts it.",
     shots: [{ beat: "제품 등장", camera: "slow push-in", action: "병이 놓인다", line: "매일 아침" }],
@@ -269,10 +275,20 @@ describe("광고 라우트 — 문서", () => {
       expect(res.status).toBe(400);
     });
 
-    it("해상도를 안 주면 기본값(720p)이 명시 저장된다", async () => {
+    // ★ 2026-08-21 — 기본 해상도가 **모델별**이 됐다(adDefaultResolution). 기본 모델은
+    //   2.0 이라 여전히 720p 이지만, 값의 출처가 전역 상수에서 모델 표로 옮겨졌다.
+    it("해상도를 안 주면 그 모델의 기본값이 명시 저장된다", async () => {
       const res = await createAd(post(OK));
       const doc = await res.json();
       expect(doc.settings.resolution).toBe("720p");
+    });
+
+    it("★ H3 는 720p 가 아예 없다 — 안 주면 2K 가 저장된다", async () => {
+      const res = await createAd(
+        post({ ...OK, settings: { ...OK.settings, model: "minimax-h3" } })
+      );
+      expect(res.status).toBe(200);
+      expect((await res.json()).settings.resolution).toBe("2K");
     });
 
     it("★ standard 는 1080p 를 고를 수 있다", async () => {
