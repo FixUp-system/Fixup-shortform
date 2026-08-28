@@ -13,6 +13,7 @@ import { priceLabel, adVideoPrice } from "../../../lib/pricing";
 // 이 프로젝트가 어느 모델로 만들어지는지 — 사장님이 값을 치르기 전에 알아야 한다.
 // adModel 은 모르는/없는 id 도 기본 모델로 안전하게 떨어진다(옛 문서 보호).
 import { adModel } from "../../../lib/ad/models";
+import { prettyPrompt } from "../../../lib/ad/prompt-view";
 // 지나온 단계를 다시 볼 수 있는가 — 사이드바와 **같은 판정**을 쓴다(두 벌이면 갈린다).
 import { adViewStep } from "../../../lib/ad/steps";
 // 큐 대기 상한 — 서버(lib/ad/generate.js)와 같은 계산을 여기서도 부른다(Task 23).
@@ -420,7 +421,12 @@ export default function AdDetailPage() {
       {view === "scenario" && (
         <section className="panel panel--wide">
           <h2>시나리오를 확인해 주세요</h2>
-          <p className="script-src">{scenario?.text}</p>
+          {/* ★ 영상 프롬프트 원문 — 이 글이 **그대로** 영상 모델에 간다(코드가 아무것도
+              안 붙인다). 사장님이 읽고 [이대로 만들기]를 누를지 정하는 자리라 읽히게
+              끊는다: prettyPrompt 가 단 머리말과 장면 시간 앞에 줄을 넣고,
+              `direction-lines`(white-space: pre-line)가 그 줄을 살린다.
+              ⚠️ 원문을 바꾸지 않는다 — 공백을 줄바꿈으로 바꿀 뿐이다. */}
+          <p className="script-src direction-lines">{prettyPrompt(scenario?.text)}</p>
 
           {/* 편집 머리 — [수정하기]는 **고칠 수 있는 것 전부보다 위**에 있어야 손이 먼저 닿는다.
               ★ 2026-08-21 — 전역 값(인물·무대…)도 고칠 수 있게 되면서 이 자리가 장면 목록
