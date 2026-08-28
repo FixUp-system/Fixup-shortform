@@ -11,9 +11,14 @@ import { getStore } from "../../../lib/store/index.js";
 import { tierOf, tierAllowsModel } from "../../../lib/tiers.js";
 import { MAX_MATERIAL_TEXT } from "../../../lib/material.js";
 
-// 사진 상한. base64 는 1.33배로 부는데 fal 요청 본문에 통째로 실린다 —
-// 10MB 짜리 아홉 장이면 100MB 를 넘는다. 실측하고 올린다.
-const MAX_PHOTOS = 4;
+// ★★★ 2026-08-28 — 사진 상한을 **모델 표 하나**(lib/ad/models.js 의 adRefMax)가 정한다.
+//   그전에는 `MAX_PHOTOS = 4` 가 네 군데에 손으로 적혀 있었다(화면·생성 라우트·수정 라우트·
+//   lib/photos.js). 네 벌이면 한쪽만 고쳐도 아무도 안 잡는다 — 이 저장소가 "같은 값을 두
+//   군데 두지 않는다"로 부르는 규율을 정면으로 어긴 자리였다.
+//   fal 스키마 실측(2026-08-28): Seedance 2.0 = 9장 · Seedance 2.5 = **30장** · H3 = 9장.
+//   ⚠️ 사진 한 장은 10MB 까지 올라가고 fal 에는 base64(1.33배)로 실린다. 30장을 꽉 채우면
+//     요청이 아주 커진다 — 접수가 실패하면 크레딧은 환불되지만(failAndRefund) 그때 실측해
+//     총 바이트 상한을 따로 걸어야 한다.
 
 export const POST = withUser(async (req, _ctx, user) => {
   const body = await req.json().catch(() => null);
@@ -85,13 +90,9 @@ export const POST = withUser(async (req, _ctx, user) => {
     return Response.json({ error: "그 화면 비율은 몰라요" }, { status: 400 });
   }
 
-  // ★★ 상한이 **둘이고 좁은 쪽이 이긴다**(2026-08-21):
-  //   · MAX_PHOTOS — **우리 사정**이다(base64 가 요청 본문에 통째로 실린다).
-  //   · adRefMax(model) — **모델 사정**이다(fal 스키마의 maxItems). 세 모델 다 9 장인데,
-  //     나중에 더 좁은 모델이 들어오면 그때는 이쪽이 이겨야 한다.
-  //   둘 중 하나만 보면 "우리는 되는데 fal 이 422" 또는 그 반대가 된다.
+  //   상한은 **모델 표 하나**가 정한다(lib/ad/models.js 의 adRefMax). 화면도 같은 함수를 본다.
   const photos = Array.isArray(body.material.photos) ? body.material.photos : [];
-  const photoMax = Math.min(MAX_PHOTOS, adRefMax(model) || MAX_PHOTOS);
+  const photoMax = adRefMax(model);
   if (photos.length > photoMax) {
     return Response.json({ error: `사진은 ${photoMax}장까지 올릴 수 있어요` }, { status: 400 });
   }

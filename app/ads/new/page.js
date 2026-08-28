@@ -22,7 +22,7 @@ import { ASPECTS, DEFAULT_ASPECT_ID, aspectFor } from "../../../lib/aspects";
 //   (2.5 1080p)가 생겨 목록·검사가 admin 을 받는다.
 import {
   AD_MODELS, DEFAULT_AD_MODEL, adSecondsFor, isAdSeconds,
-  adResolutionsFor, isAdResolution, adDefaultResolution, isAdminOnlyResolution,
+  adResolutionsFor, isAdResolution, adDefaultResolution, isAdminOnlyResolution, adRefMax,
 } from "../../../lib/ad/models";
 // 길이 칩에 정가를 같이 보여준다 — 사장님이 고르기 전에 값을 알아야 한다. 숫자는 여기 안 적는다.
 import { priceLabel, adVideoPrice } from "../../../lib/pricing";
@@ -41,7 +41,6 @@ const AD_STYLES = STYLE_PRESETS.filter((s) => Object.keys(AD_STYLE_LINES).includ
 
 // 서버(app/api/ads/route.js·[id]/route.js)와 같은 값. 갈리면 화면은 통과시키는데 서버가
 // 거절한다 — 사장님이 5장을 다 올린 뒤에 거절당하지 않게 화면이 먼저 막는다.
-const MAX_PHOTOS = 4;
 
 export default function AdNewPage() {
   const router = useRouter();
@@ -63,6 +62,8 @@ export default function AdNewPage() {
   const [style, setStyle] = useState(DEFAULT_AD_OPTIONS.style);
   const [aspect, setAspect] = useState(DEFAULT_ASPECT_ID);
   const [model, setModel] = useState(DEFAULT_AD_MODEL);
+  // ★ 사진 상한은 **고른 모델**이 정한다(2026-08-28). 모델을 바꾸면 이 값도 바뀐다.
+  const maxPhotos = adRefMax(model);
   const [seconds, setSeconds] = useState(adSecondsFor(DEFAULT_AD_MODEL)[0]);
   const [resolution, setResolution] = useState(adDefaultResolution(DEFAULT_AD_MODEL));
   const [busy, setBusy] = useState(false);
@@ -88,8 +89,8 @@ export default function AdNewPage() {
 
   async function onFiles(e) {
     const files = Array.from(e.target.files);
-    const room = MAX_PHOTOS - photos.length;
-    if (files.length > room) setErr(`사진은 ${MAX_PHOTOS}장까지 올릴 수 있어요`);
+    const room = maxPhotos - photos.length;
+    if (files.length > room) setErr(`사진은 ${maxPhotos}장까지 올릴 수 있어요`);
     // ★ 켜는 자리가 첫 await 앞이어야 한다. 뒤에 두면 그 사이에 눌린 버튼이 이미 이겼다.
     setUploading(true);
     try {
@@ -183,7 +184,7 @@ export default function AdNewPage() {
           />
 
           <div className="composer-bar">
-            <button className="pill" disabled={photos.length >= MAX_PHOTOS}
+            <button className="pill" disabled={photos.length >= maxPhotos}
               onClick={() => fileRef.current?.click()}>
               ＋ 사진 {photos.length > 0 && <b>{photos.length}</b>}
             </button>

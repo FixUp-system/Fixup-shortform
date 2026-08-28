@@ -62,12 +62,20 @@ describe("/ads/new 화면", () => {
     expect(src).not.toMatch(/\.css["']/);
   });
 
-  it("사진은 서버와 같은 상한(4장)을 쓰고, 넘는 선택은 실제로 자른다", () => {
-    expect(src).toMatch(/MAX_PHOTOS\s*=\s*4/);
-    // 상수만 있고 안 쓰면 사장님이 5장을 골라도 전부 업로드된 뒤 서버 400 을 만난다.
+  // ★★★ 2026-08-28 — 상한이 **모델마다 다르다.** 그전에는 화면·생성 라우트·수정 라우트·
+  //   lib/photos.js 네 군데에 `MAX_PHOTOS = 4` 가 손으로 적혀 있었는데, fal 스키마 실측으로
+  //   실제 상한은 2.0=9 · 2.5=**30** · H3=9 였다. 우리 4는 근거 없이 좁힌 값이었다.
+  //   이제 모델 표 하나(lib/ad/models.js 의 adRefMax)가 정하고 화면·서버가 그것을 본다.
+  it("사진 상한을 고른 모델에서 읽는다 — 손으로 안 적는다", () => {
+    expect(src, "아직 4장으로 박혀 있다").not.toMatch(/MAX_PHOTOS\s*=\s*\d/);
+    expect(src).toMatch(/adRefMax\(model\)/);
+  });
+
+  it("넘는 선택은 실제로 자른다", () => {
+    // 상수만 있고 안 쓰면 사장님이 넘겨 골라도 전부 업로드된 뒤 서버 400 을 만난다.
     // slice 로 실제로 자르는지까지 구조로 확인한다.
     expect(src).toMatch(/files\.slice\(0,\s*Math\.max\(room,\s*0\)\)/);
-    expect(src).toMatch(/disabled=\{photos\.length >= MAX_PHOTOS\}/);
+    expect(src).toMatch(/disabled=\{photos\.length >= maxPhotos\}/);
   });
 
   it("사진은 기존 업로드 라우트(POST /api/uploads)로 올린다", () => {
