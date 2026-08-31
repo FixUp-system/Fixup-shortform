@@ -11,10 +11,10 @@
 |---|---|
 | 워크트리 | `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` |
 | 브랜치 | `feat/reel-cut-r2v` |
-| 테스트 | **5,314 그린** (10 skipped) — `npx vitest run` |
-| 배포 | **프로덕션 라이브** — 08-31 에 네 번(… `4136ce1` → `e02b740` → **`8c6bff0`**), 그전 08-27 `f1b3ccc`·`b97d704` |
-| 미배포 | **없다** — `8c6bff0` 이 곧 프로덕션이다(그 뒤는 이 문서 갱신뿐) |
-| 푸시 | **둘 다 올렸다**(`8c6bff0`) — `fixup`·`origin` 의 브랜치와 **`main` 모두** HEAD 와 같다. ★ `origin` 은 URL 에 계정이 안 박혀 있어 그냥 밀면 **자격증명 대기로 멈춘다**. 계정을 실어 밀면 통과한다: `git push https://jaechanyoon0519-Fixup@github.com/FixUp-system/Fixup-shortform.git <브랜치>` |
+| 테스트 | **5,324 그린** (10 skipped) — `npx vitest run` |
+| 배포 | **프로덕션 라이브** — 08-31 에 다섯 번(… `e02b740` → `8c6bff0` → **`42457a5`**), 그전 08-27 `f1b3ccc`·`b97d704` |
+| 미배포 | **없다** — `42457a5` 가 곧 프로덕션이다(그 뒤는 이 문서 갱신뿐) |
+| 푸시 | ⚠️ **`42457a5` 가 미푸시다**(배포는 됐다 — CLI 배포는 GitHub 와 무관). 그 앞(`8dab3ce`)까지는 둘 다 올렸다 — `fixup`·`origin` 의 브랜치와 **`main` 모두** HEAD 와 같다. ★ `origin` 은 URL 에 계정이 안 박혀 있어 그냥 밀면 **자격증명 대기로 멈춘다**. 계정을 실어 밀면 통과한다: `git push https://jaechanyoon0519-Fixup@github.com/FixUp-system/Fixup-shortform.git <브랜치>` |
 | main 병합 | ★ **끝났다**(2026-08-31, 사장님 지시) — 그 뒤로도 **브랜치와 main 을 함께 민다**. 지금 네 ref(`fixup`·`origin` × 브랜치·main)가 모두 `8c6bff0` 이다. 전부 fast-forward라 잃은 이력이 없다. ⚠️ **로컬 `main` 만 낡았다**(`da6bfbd`) — 다른 세션 워크트리에 체크아웃돼 있어 안 건드린다 |
 | 개발 서버 | `SHOTFORM_FAKE=fal SHOTFORM_NO_CREDITS=0 npx next dev` → 3001 |
 
@@ -57,6 +57,18 @@
   ★★ **vision 은 안 건드렸다**(사장님 결정) — 라벨이 대체하는 것은 `person` 하나뿐이고
     `lettering`·`what`·`scale` 은 사진을 봐야만 안다. 건너뛰면 제품 글자를 잃는다.
   ★ **옛 문서는 세 자리 모두 한 글자도 안 붙는다**(각인 보호).
+
+- **새로고침 직후의 잘못된 한 프레임**(`42457a5`) — `MeProvider` 가 **"읽기가 끝났는가"를
+  안 알려 줘서** 소비자가 로딩 중 `me?.x`(undefined)를 **확정된 답**으로 읽었다:
+  크레딧이 반짝 보이고(`undefined !== false` 는 참) 모델이 기본 하나만 보였다.
+  `ready` 를 더하고 **`finally` 에서** 세운다 — try 안에서만 세우면 못 읽은 계정이 **빈
+  화면으로 굳는다**. 소비자는 모르는 동안 안 그리되 **줄과 라벨은 남긴다**.
+  ★ 판단 기준: *"틀린 값→맞는 값"은 버그로, "빈자리→맞는 값"은 로딩으로 읽힌다*
+  ⚠️ **미정리로 남긴 것** — 소스 문자열 판들이 주석을 걷는 순서가 **블록 주석 먼저**라,
+    줄 주석 안의 글롭(`app/create/[id]/*/page.js`)의 `/*` 를 블록 시작으로 읽고 **다음
+    `*/` 까지 통째로** 지운다(실측 1만 3천 자). `me-ready-flicker` 판만 순서를 뒤집었고
+    `ad-sidebar-ui`·`design-system`·`resolution-ui`·`reel-model-pick` 은 그대로다 —
+    그 화면에 글롭 든 줄 주석이 하나 생기는 날 **거짓 초록**이 된다.
 
 > 🔴 **다음 세션이 첫 한 편에서 눈으로 볼 것** — H3 가 프롬프트의 따옴표 대사를 **글자
 > 그대로** 말하는가. Seedance 는 그렇게 동작하고 **자막 정렬이 그 위에 서 있다**
