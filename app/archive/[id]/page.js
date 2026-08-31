@@ -166,7 +166,7 @@ function ArchiveDetailPageBody() {
   return (
     <>
       <h1 className="pgtitle">
-        {isAd ? "광고 영상" : isFilm ? "한 번에 굽는 영상" : isReel ? "컷마다 말하는 영상" : "영상 만들기 (단계별)"}
+        {isAd ? "원클릭 영상" : isFilm ? "한 번에 굽는 영상" : isReel ? "단계별 영상" : "영상 만들기 (단계별)"}
       </h1>
       <p className="pgsub">이 영상이 어떻게 만들어졌는지 볼 수 있어요.</p>
 

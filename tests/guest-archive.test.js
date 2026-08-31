@@ -76,7 +76,7 @@ describe("★ 닫힌 자리 — 값이 나가거나 남을 건드리는 문은 �
     ["/costs", "GET"],
     ["/api/me", "GET"],
     // 만드는 화면 — 손님이 눌러도 값이 나가면 안 된다
-    ["/reel/new", "GET"],
+    ["/home", "GET"],
     [`/reel/${ID}/video`, "GET"],
     ["/create", "GET"],
   ];
@@ -163,7 +163,7 @@ describe("루트가 신원에 따라 갈린다", () => {
   const src = readFileSync("app/page.js", "utf8");
 
   it("로그인했으면 만들기 화면, 아니면 보관함", () => {
-    expect(src).toContain("/reel/new");
+    expect(src).toContain("/home");
     expect(src).toContain("/archive");
     // 신원은 middleware 가 넣어 준 헤더를 읽기만 한다 — 세션을 여기서 다시 확인하지 않는다.
     expect(src).toContain("USER_HEADER");

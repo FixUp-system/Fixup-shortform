@@ -149,7 +149,7 @@ export default function ProjectCards({ projects, limit, onDeleted, selecting, se
               <span className="project-meta">
                 <span className="title">{p.title || "제목 없음"}</span>
                 {/* 종류 표시 — 광고 문서에만 붙는다. 옛 문서는 이 배지가 아예 없다 */}
-                {isAd && <span className="badge ai">광고</span>}
+                {isAd && <span className="badge ai">원클릭</span>}
                 {/* 종류 표시 — 한 번에 굽는 영상. 옛 문서는 이 배지가 아예 없다 */}
                 {isFilm && <span className="badge ai">한 번에</span>}
                 {/* ★ 어느 방식으로 구웠는지 — film 은 한 프로젝트가 두 편을 담는다.

@@ -369,7 +369,7 @@ export default function AdDetailPage() {
 
   return (
     <>
-      <h1 className="pgtitle">광고 영상</h1>
+      <h1 className="pgtitle">원클릭 영상</h1>
       {/* 이 영상이 어느 모델로 만들어지는지 — 유료 버튼([이대로 만들기])을 누르기 전에 알아야 한다 */}
       <p className="pgsub">{model.label} 모델 · {model.hint}</p>
       {err && <p className="pgsub warn">{err}</p>}

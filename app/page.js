@@ -27,5 +27,5 @@ import { USER_HEADER } from "../lib/auth/headers.js";
 //   스위치가 꺼져 있으면 middleware 가 그 앞에서 /login 으로 보내므로 예전과 같다.
 export default async function Home() {
   const id = (await headers()).get(USER_HEADER);
-  redirect(id ? "/reel/new" : "/archive");
+  redirect(id ? "/home" : "/archive");
 }

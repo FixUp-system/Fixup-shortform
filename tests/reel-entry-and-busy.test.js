@@ -17,7 +17,7 @@ describe("루트가 살아 있는 흐름으로 보낸다", () => {
   });
 
   it("reel 로 보낸다 — 사이드바에 남긴 그 흐름이다", () => {
-    expect(clean(root)).toContain("/reel/new");
+    expect(clean(root)).toContain("/home");
   });
 });
 

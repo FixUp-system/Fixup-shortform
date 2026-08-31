@@ -1,4 +1,4 @@
-// 사이드바 「광고 영상」 최상위 항목 + 하위 단계 표시 — 소스를 읽어 판정한다
+// 사이드바 「원클릭 영상」 최상위 항목 + 하위 단계 표시 — 소스를 읽어 판정한다
 // (tests/ad-ui.test.js · tests/staleness-ui.test.js 와 같은 방식. 이 저장소에는
 // 렌더링 하네스가 없다).
 import { describe, it, expect } from "vitest";
@@ -7,19 +7,19 @@ import { readFileSync } from "node:fs";
 const src = readFileSync("components/Sidebar.jsx", "utf8");
 
 // 주석을 걷어낸 본문 — 위치(순서·근접) 기반 단정은 이걸로 한다. 이 파일 자체가 주석에서
-// "광고 영상"·"fetch" 같은 낱말을 설명용으로 쓰기 때문에, 걷어내지 않으면 실제 렌더
+// "원클릭 영상"·"fetch" 같은 낱말을 설명용으로 쓰기 때문에, 걷어내지 않으면 실제 렌더
 // 자리가 아니라 위쪽 설명 주석을 잘못 짚어 거짓으로 빨개진다(design-system.test.js의
 // stripComments와 같은 방식).
 const stripComments = (text) =>
   text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 const clean = stripComments(src);
 
-describe("사이드바 — 「광고 영상」 최상위 항목", () => {
+describe("사이드바 — 「원클릭 영상」 최상위 항목", () => {
   it("광고 영상이 홈·영상 만들기·보관함과 같은 side-item 형제로 있다", () => {
-    // "광고 영상"이라는 낱말만으로는 증거가 안 된다(주석에도 나올 수 있다) — 실제로
+    // "원클릭 영상"이라는 낱말만으로는 증거가 안 된다(주석에도 나올 수 있다) — 실제로
     // side-item 클래스가 붙은 Link 안에 있는지까지 본다.
-    const idx = clean.indexOf("광고 영상");
-    expect(idx, "'광고 영상' 문구가 없다").toBeGreaterThan(-1);
+    const idx = clean.indexOf("원클릭 영상");
+    expect(idx, "'원클릭 영상' 문구가 없다").toBeGreaterThan(-1);
     const linkStart = clean.lastIndexOf("<Link", idx);
     const block = clean.slice(linkStart, idx + 20);
     expect(block, "'광고 영상'이 side-item Link 안에 없다").toMatch(/side-item/);
@@ -27,9 +27,9 @@ describe("사이드바 — 「광고 영상」 최상위 항목", () => {
 
   // ★ 병합(2026-08-13): "홈 — 빠른 생성"이 사라졌다(빠른 생성을 화면에서 내렸다).
   // 순서 계약은 그 자리를 「영상 만들기」로 옮겨 그대로 지킨다 — 광고는 그 다음, 보관함 앞이다.
-  it("최상위 항목은 영상 만들기 다음·보관함 앞에 있다 — 형제 순서가 그대로다", () => {
+  it("최상위 항목은 단계별 영상 다음·보관함 앞에 있다 — 형제 순서가 그대로다", () => {
     const makeIdx = clean.indexOf("영상 만들기 (단계별)");
-    const adIdx = clean.indexOf("광고 영상");
+    const adIdx = clean.indexOf("원클릭 영상");
     const archiveIdx = clean.indexOf('href="/archive"');
     expect(makeIdx).toBeGreaterThan(-1);
     expect(adIdx).toBeGreaterThan(makeIdx);
@@ -44,7 +44,7 @@ describe("사이드바 — 「광고 영상」 최상위 항목", () => {
   });
 
   it("아이콘이 sparkle(영상 만들기)과 다르다 — 두 최상위 항목이 시각적으로 구별된다", () => {
-    const adIdx = clean.indexOf("광고 영상");
+    const adIdx = clean.indexOf("원클릭 영상");
     const before = clean.slice(Math.max(0, adIdx - 200), adIdx);
     expect(before).toMatch(/Icon name="ad"/);
   });

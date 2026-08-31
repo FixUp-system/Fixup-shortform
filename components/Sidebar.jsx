@@ -307,9 +307,11 @@ export default function Sidebar() {
   const reelHref = makeReelHref(reelProject);
   return (
     <aside className="side">
-      <div className="logo">
+      {/* ★ 로고는 **홈으로** 간다(2026-08-28 사장님 지시). 만드는 방식을 고르는 자리라
+          어느 화면에서 눌러도 같은 곳으로 돌아온다. */}
+      <Link href="/home" className="logo">
         <i><Icon name="play" size={16} /></i>shortform
-      </div>
+      </Link>
       {SIDEBAR_FLOWS.create && (
         <>
           <Link href={makeVideoHref} className={`side-item${inCreate ? " on" : ""}`}>
@@ -322,11 +324,11 @@ export default function Sidebar() {
         </>
       )}
       <Link href={makeVideoAdHref} className={`side-item${inAds ? " on" : ""}`}>
-        <span className="ic"><Icon name="ad" /></span>광고 영상
+        <span className="ic"><Icon name="ad" /></span>원클릭 영상
       </Link>
       {inAds && <AdStepList adProject={adProject} view={adView} busyStep={adBusyStep} />}
       {inAds && adProject?.id && (
-        <Link href="/ads/new" className="side-new">+ 새 광고 만들기</Link>
+        <Link href="/ads/new" className="side-new">+ 새 원클릭 영상</Link>
       )}
       {/* ★★ 방식이 **하나로 좁혀졌다**(2026-08-20). 그전에는 두 방식을 나란히 두어 라벨
           자체가 실험 조건을 말하게 했는데, 재고 나서 참고 그림이 남았다. 이제 메뉴는
@@ -351,7 +353,7 @@ export default function Sidebar() {
       {SIDEBAR_FLOWS.reel && (
         <>
           <Link href={reelHref} className={`side-item${inReel ? " on" : ""}`}>
-            <span className="ic"><Icon name="home" /></span>영상 만들기
+            <span className="ic"><Icon name="home" /></span>단계별 영상
           </Link>
           {inReel && <ReelStepList pathname={pathname} />}
           {/* ★★ 2026-08-25 사장님 지적: "새로 만들 수가 없어."

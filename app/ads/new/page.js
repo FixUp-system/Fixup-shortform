@@ -140,14 +140,14 @@ export default function AdNewPage() {
 
   return (
     <>
-      <h1 className="pgtitle">광고 영상 만들기</h1>
-      <p className="pgsub">무엇을 광고할지 적어 주시면 15초 시나리오를 무료로 만들어 드려요 — 확인하고 그대로 만들면 끝나요</p>
+      <h1 className="pgtitle">원클릭 영상 만들기</h1>
+      <p className="pgsub">무엇을 만들지 적어 주시면 15초 시나리오를 무료로 만들어 드려요 — 확인하고 그대로 만들면 끝나요</p>
 
       <section className="panel--wide">
         <div className="composer">
           <textarea ref={textRef} className="field composer-text" value={text} maxLength={MAX_MATERIAL_TEXT}
             onChange={(e) => setText(e.target.value)}
-            placeholder="무엇을 광고하고 싶으세요? 제품·강조하고 싶은 점·타깃을 자유롭게 적어 주세요" />
+            placeholder="무엇을 만들고 싶으세요? 제품·강조하고 싶은 점·타깃을 자유롭게 적어 주세요" />
 
           {/* 붙인 사진이 먼저 보인다 — 무엇을 이미 넣었는지가 조작보다 앞이다 */}
           {photos.length > 0 && (

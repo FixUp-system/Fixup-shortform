@@ -182,7 +182,7 @@ export default function ReelNewPage() {
     <>
       {/* ★ 2026-08-25 사장님 지시 — "컷마다 말하는 영상"은 **안쪽 사정**(클립이 직접
           말한다는 구현 방식)을 제목으로 쓴 것이었다. 사이드바 메뉴 이름과 맞춘다. */}
-      <h1 className="pgtitle">영상 만들기</h1>
+      <h1 className="pgtitle">단계별 영상 만들기</h1>
       <p className="pgsub">소재와 사진을 주시면 시나리오부터 함께 만들어요 — 컷 안에서 직접 말해요.</p>
       {err && <p className="pgsub warn">{err}</p>}
 
