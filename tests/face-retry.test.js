@@ -13,7 +13,7 @@
 //   `loc:["body","image_urls"]` — 우리가 그린 **스토리보드 판**이다.
 import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
-import { buildStoryboardPrompt, softenFace } from "../lib/reel/panels.js";
+import { buildStoryboardPrompt, softenFace, facelessPanel } from "../lib/reel/panels.js";
 import { collectReelOneShot, retryOneShotWithoutFaces } from "../lib/reel/pipeline.js";
 import { reelOf } from "../lib/reel/doc.js";
 
@@ -53,10 +53,13 @@ describe("판 지시문 — 얼굴을 낮추되 사람은 남긴다", () => {
     expect(out).not.toMatch(/dominates a panel/);
   });
 
-  it("★★ face_safe 를 켜면 얼굴을 낮추라고 말한다", () => {
+  // ⚠️ 2026-08-31 **두 번째 실측 뒤 계약이 바뀌었다.** 처음에는 "얼굴이 판을 지배하지
+  //   않게"(작게)였는데, 얼굴을 작게 그려도 · 단독 인물 카드로 넘겨도 2.5 는 거절했다.
+  //   지금 계약은 **얼굴이 아예 안 보이게**다.
+  it("★★ face_safe 를 켜면 얼굴이 **안 보이게** 하라고 말한다", () => {
     const out = buildStoryboardPrompt(makeProject({ reel: { face_safe: true } }), cuts, GRID, "", []);
-    expect(out).toMatch(/no face\s+dominates a panel/);
-    expect(out).toMatch(/straight into the camera/);
+    expect(out).toMatch(/no human face appears/);
+    expect(out).toMatch(/cropped outside the frame/);
   });
 
   it("★★★ **사람을 빼라고는 안 한다** — 그것이 애초에 막으려던 결과다", () => {
@@ -104,7 +107,37 @@ describe("칸 설명에서 얼굴 요구를 걷어낸다 — 덧붙이기만으�
 
   it("★★ **크기 축**도 내린다 — 시선만 내려서는 안 걸리지 않는다", () => {
     // 실측이 정확히 그랬다: 시선은 내려갔는데 얼굴이 커서 그대로 거절됐다.
-    expect(softenFace(LINE)).toMatch(/waist-up|cropped above the mouth/);
+    expect(softenFace(LINE)).toMatch(/waist-up/);
+  });
+
+  // ★★★ 2026-08-31 **두 번째 실측** — 얼굴을 작게 그리는 것으로도 부족했다.
+  //   같은 아바타 사진을 **단일 인물 카드**(`@Image1`, 트윗과 같은 형식)로 넘겨도
+  //   2.5 는 9초 만에 거절했다(값 $0). 형식이 아니라 **사진 같은 얼굴의 존재**가 기준이다.
+  //   → 얼굴을 **프레임 밖으로** 내보낸다. 사람은 남고, 영상 속 얼굴은 지문이 만든다.
+  describe("얼굴을 프레임 밖으로 — 작게가 아니라 아예 안 보이게", () => {
+    it("★★★ 사람이 나오는 칸에는 '얼굴은 프레임 밖' 지시가 그 칸 안에 붙는다", () => {
+      const out = facelessPanel(LINE);
+      expect(out).toMatch(/face cropped outside the frame/);
+      expect(out).toMatch(/No face is visible in this panel/);
+    });
+
+    it("★★ 사람이 없는 칸은 한 글자도 안 바뀐다", () => {
+      const product = "Panel 2: golden fried rice piled in a hot skillet, wisps of steam above the grains.";
+      expect(facelessPanel(product)).toBe(product);
+    });
+
+    it("★★ 사람과 동작은 그대로 남는다 — 빼는 것은 얼굴이지 사람이 아니다", () => {
+      const out = facelessPanel(LINE);
+      expect(out).toMatch(/young woman/);
+      expect(out).toMatch(/heaped\s+spoon/);
+    });
+
+    it("★ 지시가 **그 칸 줄 안에** 있다 — 문단으로 따로 두면 칸 설명이 이긴다(1차 실패 원인)", () => {
+      const cuts = [{ idx: 0, shows: "a woman brings the spoon to her lips" }];
+      const safe = buildStoryboardPrompt(makeProject({ reel: { face_safe: true } }), cuts, GRID, "", []);
+      const panelLine = safe.split("\n").find((l) => /^Panel/.test(l));
+      expect(panelLine, "칸 줄에 지시가 없다").toMatch(/face cropped outside the frame/);
+    });
   });
 
   it("★★ 사람도 동작도 남는다 — 걷어내는 것은 카메라이지 사람이 아니다", () => {
