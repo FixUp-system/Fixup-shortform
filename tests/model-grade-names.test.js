@@ -59,6 +59,22 @@ describe("광고 — 2.0 은 숨긴다", () => {
     expect(modelsForTier("free").length).toBeGreaterThan(0);
   });
 
+  // ★★ 2026-08-31 사장님 지시 — **기본이 프로보다 앞이다.** 칩은 표 순서 그대로 그려지므로
+  //   (components/AdOptionTray.jsx 의 modelsForTier(...).map) 순서를 표에서 정한다.
+  //   싼 쪽·기본값이 먼저 오는 것이 고르는 순서와 맞다.
+  it("★ 고르는 자리에서 기본이 프로보다 앞이다", () => {
+    const ids = modelsForTier("pro").map((m) => m.id);
+    expect(ids).toContain("minimax-h3");
+    expect(ids).toContain("seedance-2.5");
+    expect(ids.indexOf("minimax-h3"), "프로가 기본보다 앞에 있다")
+      .toBeLessThan(ids.indexOf("seedance-2.5"));
+  });
+
+  it("★ 표 자체가 그 순서다 — 화면이 따로 정렬하지 않는다", () => {
+    const open = AD_MODELS.filter((m) => !m.hidden).map((m) => m.id);
+    expect(open).toEqual(["minimax-h3", "seedance-2.5"]);
+  });
+
   it("★★ 표에서는 안 지운다 — 지우면 이미 2.0 으로 만든 문서가 값 조회에서 죽는다", () => {
     expect(AD_MODELS.some((m) => m.id === "seedance-2.0")).toBe(true);
     expect(isAdModel("seedance-2.0")).toBe(true);
