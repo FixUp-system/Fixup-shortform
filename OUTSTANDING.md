@@ -12,8 +12,9 @@
 | 워크트리 | `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` |
 | 브랜치 | `feat/reel-cut-r2v` |
 | 테스트 | **5,378 그린** (10 skipped) — `npx vitest run` · `npx next build` 통과 |
-| 배포 | **프로덕션 라이브** — 08-31 에 다섯 번(… `e02b740` → `8c6bff0` → **`42457a5`**), 그전 08-27 `f1b3ccc`·`b97d704` |
-| 미배포 | 🔴 **5커밋**(`git log --oneline 42457a5..HEAD` 로 센다) — `b81b560`(문서) · `0af4ba7`(5컷 격자) · `071239d`(통짜를 큐로) · `9eb889b`(얼굴 규칙) · `16dc57e`(A+B). **다음 세션의 첫 일이 배포다** |
+| 배포 | **프로덕션 라이브** — 08-31 에 **여섯 번**(… `8c6bff0` → `42457a5` → **`e7af76d`**), 그전 08-27 `f1b3ccc`·`b97d704`. 마지막 배포에 큐 이전·5컷 격자·얼굴 A+B 가 **다 들어갔다**. 확인: `/login` **200**, 보호 화면은 **307**(로그인으로 보냄 = 정상) |
+| 미배포 | **없다** — `e7af76d` 가 곧 프로덕션이다 |
+| ⚠️ 배포 함정 | **`.vercel` 폴더가 이 워크트리에 없다.** 그래서 `--project` 를 **반드시** 준다 — 안 주면 폴더 이름으로 새 프로젝트를 만든다(팀에 `step-gate` 라는 **실수로 생긴 프로젝트**가 그 증거다). 쓴 명령: `npx vercel@latest deploy --prod --yes --scope fix-up1 --project fixup-shortform-service` |
 | 푸시 | ⚠️ **`42457a5` 가 미푸시다**(배포는 됐다 — CLI 배포는 GitHub 와 무관). 그 앞(`8dab3ce`)까지는 둘 다 올렸다 — `fixup`·`origin` 의 브랜치와 **`main` 모두** HEAD 와 같다. ★ `origin` 은 URL 에 계정이 안 박혀 있어 그냥 밀면 **자격증명 대기로 멈춘다**. 계정을 실어 밀면 통과한다: `git push https://jaechanyoon0519-Fixup@github.com/FixUp-system/Fixup-shortform.git <브랜치>` |
 | main 병합 | ★ **끝났다**(2026-08-31, 사장님 지시) — 그 뒤로도 **브랜치와 main 을 함께 민다**. 지금 네 ref(`fixup`·`origin` × 브랜치·main)가 모두 `8c6bff0` 이다. 전부 fast-forward라 잃은 이력이 없다. ⚠️ **로컬 `main` 만 낡았다**(`da6bfbd`) — 다른 세션 워크트리에 체크아웃돼 있어 안 건드린다 |
 | 개발 서버 | `SHOTFORM_FAKE=fal SHOTFORM_NO_CREDITS=0 npx next dev` → 3001 |
@@ -54,7 +55,7 @@
   라우트는 `mergeImages` 를 그대로 다시 내보낸다(옛 테스트가 거기서 부른다).
 
 **다음 세션이 먼저 볼 것**
-1. 🔴 **배포**(위 5커밋). 방법은 이 문서 아래 배포 절 — CLI + git 없는 폴더.
+1. ~~배포~~ → **끝났다**(2026-08-31, `e7af76d`). 위 표의 배포 함정을 함께 볼 것.
 2. 🔴 **A 라이브 검증** — 실제 422 를 받아 재시도가 도는 것을 아직 못 봤다.
    가장 싼 길: 사람이 정면으로 나오는 시나리오를 일부러 만들어 통짜로 굽는다.
 3. 🔴 **원클릭 거절 원인 미확정** — 거절난 첨부는 **사람 없는 포장지 제품컷**이었다.
