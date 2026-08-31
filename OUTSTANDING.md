@@ -12,8 +12,8 @@
 | 워크트리 | `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` |
 | 브랜치 | `feat/reel-cut-r2v` |
 | 테스트 | **5,203 그린** (10 skipped) — `npx vitest run` |
-| 배포 | **프로덕션 라이브** — 08-31 에 `dcf2e0a` 를 올렸다(그전 08-27 `f1b3ccc`·`b97d704`) |
-| 미배포 | **코드는 없다** — `dcf2e0a` 가 곧 프로덕션이고, 그 뒤는 이 문서 갱신뿐이다 |
+| 배포 | **프로덕션 라이브** — 08-31 에 `20abb0c` 를 올렸다(그전 08-27 `f1b3ccc`·`b97d704`) |
+| 미배포 | **코드는 없다** — `20abb0c` 가 곧 프로덕션이고, 그 뒤는 이 문서 갱신뿐이다 |
 | 푸시 | **36커밋 미푸시**(`fixup`·`origin` 둘 다) — 원격 브랜치는 08-21 에 멈춰 있다 |
 | 개발 서버 | `SHOTFORM_FAKE=fal SHOTFORM_NO_CREDITS=0 npx next dev` → 3001 |
 
