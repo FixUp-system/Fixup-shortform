@@ -3,7 +3,7 @@
 import { describe, it, expect } from "vitest";
 import { VIDEO_PRICE, REGEN_PRICE, FREE_REGEN_PER_CUT, DEFAULT_GRANT, videoPrice, regenPrice, AD_VIDEO_PRICE, adVideoPrice, MAX_SCENARIO_TRIES } from "../lib/pricing.js";
 import { TARGET_CHOICES } from "../lib/script.js";
-import { AD_MODELS, DEFAULT_AD_MODEL, DEFAULT_AD_RESOLUTION, adSecondsFor, adResolutionsFor } from "../lib/ad/models.js";
+import { AD_MODELS, DEFAULT_AD_MODEL, LEGACY_AD_MODEL, DEFAULT_AD_RESOLUTION, adSecondsFor, adResolutionsFor } from "../lib/ad/models.js";
 // ★ lib/pricing.js 는 화면이 import 하는 파일이라 lib/clip-limits.js 를 끌어올 수 없다
 //   (import 사슬 끝에 fs 가 닿으면 번들이 깨진다). 그래서 해상도 문자열을 양쪽에 따로 적고,
 //   두 목록이 갈리는 자리는 **테스트가** 대조한다 — 테스트는 화면이 아니라 import 해도 된다.
@@ -348,10 +348,14 @@ describe("광고 영상 정가", () => {
   // 값으로 청구된다. ⚠️ 지금까지 만들어진 광고는 전부 실제로 fast 모델이었다(옛 기본값) —
   // 하지만 그 문서들은 settings.model 을 **명시 저장**했으므로(app/api/ads/route.js) 여기
   // "모델 생략" 경로를 타지 않는다. 이 폴백은 "정말 아무 값도 없는" 방어적 옛 문서용이다.
-  it("★ 모델·해상도를 생략하면(옛 문서·옛 호출부) 기본 모델(standard)·720p 값으로 본다", () => {
-    expect(adVideoPrice(15)).toBe(AD_VIDEO_PRICE[DEFAULT_AD_MODEL][15][DEFAULT_AD_RESOLUTION]);
-    expect(adVideoPrice(15, undefined)).toBe(AD_VIDEO_PRICE[DEFAULT_AD_MODEL][15][DEFAULT_AD_RESOLUTION]);
-    expect(adVideoPrice(15, null)).toBe(AD_VIDEO_PRICE[DEFAULT_AD_MODEL][15][DEFAULT_AD_RESOLUTION]);
+  // ★★ 2026-08-31 — 짝이 **LEGACY_AD_MODEL** 로 바뀌었다. 그전에는 DEFAULT_AD_MODEL 이
+  //   둘(새로 만들 때의 기본 · 옛 문서의 폴백)을 겸했는데, 기본이 H3 로 옮겨 가면서 갈렸다.
+  //   여기서 재는 것은 **모델을 안 든 옛 문서**라 그쪽이 맞다 — DEFAULT 로 두면 H3 표에
+  //   720p 가 없어 undefined 와 비교하게 되고, 그 순간 이 판은 아무것도 안 지킨다.
+  it("★ 모델·해상도를 생략하면(옛 문서·옛 호출부) 옛 문서의 모델(2.0)·720p 값으로 본다", () => {
+    expect(adVideoPrice(15)).toBe(AD_VIDEO_PRICE[LEGACY_AD_MODEL][15][DEFAULT_AD_RESOLUTION]);
+    expect(adVideoPrice(15, undefined)).toBe(AD_VIDEO_PRICE[LEGACY_AD_MODEL][15][DEFAULT_AD_RESOLUTION]);
+    expect(adVideoPrice(15, null)).toBe(AD_VIDEO_PRICE[LEGACY_AD_MODEL][15][DEFAULT_AD_RESOLUTION]);
     expect(adVideoPrice(15, "seedance-2.0")).toBe(AD_VIDEO_PRICE["seedance-2.0"][15]["720p"]);
     expect(adVideoPrice(15, "seedance-2.0", undefined)).toBe(AD_VIDEO_PRICE["seedance-2.0"][15]["720p"]);
     expect(adVideoPrice(15, "seedance-2.0", null)).toBe(AD_VIDEO_PRICE["seedance-2.0"][15]["720p"]);

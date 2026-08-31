@@ -50,10 +50,14 @@ describe("모르는 값은 좁은 쪽으로 떨어진다", () => {
 });
 
 describe("등급이 쓸 수 있는 모델", () => {
-  it("★ 기본 등급은 2.0 만 쓴다", () => {
+  it("★ 기본 등급은 기본(H3) 하나다", () => {
     // ★ 2026-08-21 — H3 가 기본 등급에 들어왔다. 등급의 근거는 원가이고 H3 는 그 축에서
     //   가장 싸다(15초 2K $1.95 < 2.0 720p $4.55) — 좁힐 이유가 없다.
-    expect(modelsForTier("basic").map((m) => m.id)).toEqual(["seedance-2.0", "minimax-h3"]);
+    // ★★ 2026-08-31 — **2.0 이 숨겨져 빠졌다.** 등급표(TIERS)에는 여전히 적혀 있지만
+    //   hidden 이 등급보다 강해서 걸러진다(modelsForTier 의 첫 줄). 등급표에서 지우지
+    //   않는 이유는 그 목록이 "누가 쓸 수 있나"의 기록이라, 2.0 을 다시 열면 그대로
+    //   살아나야 하기 때문이다.
+    expect(modelsForTier("basic").map((m) => m.id)).toEqual(["minimax-h3"]);
   });
 
   it("★ 프로 등급은 2.5 도 쓴다", () => {
@@ -61,7 +65,7 @@ describe("등급이 쓸 수 있는 모델", () => {
   });
 
   it("★ 모르는 등급은 기본 등급과 같다 — 조용히 열어 주지 않는다", () => {
-    expect(modelsForTier("nope").map((m) => m.id)).toEqual(["seedance-2.0", "minimax-h3"]);
+    expect(modelsForTier("nope").map((m) => m.id)).toEqual(["minimax-h3"]);
   });
 
   it("★ 돌려주는 것은 모델 표의 원소다 — 화면이 label·hint 를 그대로 쓴다", () => {
@@ -81,9 +85,17 @@ describe("이 등급이 이 모델을 써도 되는가 — 서버가 보는 판�
     expect(tierAllowsModel("pro", "seedance-2.5")).toBe(true);
   });
 
-  it("둘 다 2.0 은 쓴다", () => {
-    expect(tierAllowsModel("basic", "seedance-2.0")).toBe(true);
-    expect(tierAllowsModel("pro", "seedance-2.0")).toBe(true);
+  it("둘 다 기본(H3)은 쓴다", () => {
+    expect(tierAllowsModel("basic", "minimax-h3")).toBe(true);
+    expect(tierAllowsModel("pro", "minimax-h3")).toBe(true);
+  });
+
+  // ★★ 2026-08-31 — **숨긴 모델은 어느 등급도 못 쓴다.** 이것이 "숨김"과 "등급"이 다른
+  //   축이라는 말의 실제 내용이다(lib/tiers.js 머리말): 등급표에 2.0 이 적혀 있어도
+  //   hidden 이 먼저 걸러 서버가 거절한다 — 화면만 거르는 가림막이 아니다.
+  it("★ 숨긴 2.0 은 어느 등급도 못 쓴다 — 등급표에 적혀 있어도", () => {
+    expect(tierAllowsModel("basic", "seedance-2.0")).toBe(false);
+    expect(tierAllowsModel("pro", "seedance-2.0")).toBe(false);
   });
 
   it("★ 모르는 모델은 어느 등급도 못 쓴다 — 판정이 통과시키면 값이 나간 뒤에 404 다", () => {

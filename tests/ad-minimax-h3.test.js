@@ -24,7 +24,9 @@ const settingsFor = (model, over = {}) => ({
 describe("H3 모델 표", () => {
   it("표에 있고 라우트가 닫힌 목록으로 받는다", () => {
     expect(isAdModel(H3)).toBe(true);
-    expect(adModel(H3).name).toBe("MiniMax H3");
+    // ★ 2026-08-31 — 화면 이름이 **등급**으로 바뀌었다("기본"). 모델을 가리키는 것은
+    //   여전히 id(minimax-h3)와 엔드포인트다 — 아래 판이 그 둘을 글자 그대로 지킨다.
+    expect(adModel(H3).name).toBe("기본");
   });
 
   // ★ **`/lora` 가 아니다.** 그쪽은 required 가 ["prompt","loras"] 라 학습된 어댑터 없이는
@@ -39,9 +41,12 @@ describe("H3 모델 표", () => {
     }
   });
 
-  it("사장님이 정한 대로 2K 가 기본이고 4K 를 고를 수 있다", () => {
+  // ★★ 2026-08-31 사장님 지시("768이랑 2k만 제공") — 4K 를 닫고 768P 를 열었다.
+  //   fal 스키마는 넷을 준다(480P·768P·2K·4K)이고 설명이 말한다: 2K·4K 는 768P 결과를
+  //   **확대한 것**이다. 그전에는 확대본만 팔고 네이티브는 안 팔던 상태였다.
+  it("사장님이 정한 대로 768P·2K 를 고를 수 있고 2K 가 기본이다", () => {
     expect(adDefaultResolution(H3)).toBe("2K");
-    expect(adResolutionsFor(H3)).toEqual(["2K", "4K"]);
+    expect(adResolutionsFor(H3)).toEqual(["768P", "2K"]);
   });
 
   it("15초 하나다 — 스키마 상한이 15초라 30초를 못 만든다", () => {

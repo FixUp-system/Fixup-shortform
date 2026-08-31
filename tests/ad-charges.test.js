@@ -5,15 +5,17 @@ import { getStore } from "../lib/store/index.js";
 import { chargeAd, refundAd, alreadyChargedAd, adKey } from "../lib/charges.js";
 import { balanceFor, chargeVideo, NoCredits, assertCanAfford } from "../lib/charges.js";
 import { AD_VIDEO_PRICE, adVideoPrice } from "../lib/pricing.js";
-import { DEFAULT_AD_MODEL, DEFAULT_AD_RESOLUTION } from "../lib/ad/models.js";
+import { LEGACY_AD_MODEL, DEFAULT_AD_RESOLUTION } from "../lib/ad/models.js";
 
 const U = "00000000-0000-4000-8000-00000000000a";
 const P = "00000000-0000-4000-8000-0000000000f1";
 
 // ★ Task 24 — 기본 모델이 standard 다(2.0-fast 가 아니다). model 을 안 넘기면 이 값으로
-// 청구된다 — AD_VIDEO_PRICE[DEFAULT_AD_MODEL][15] 는 해상도별 객체라 720p(기본 해상도)로
+// 청구된다 — AD_VIDEO_PRICE[LEGACY_AD_MODEL][15] 는 해상도별 객체라 720p(기본 해상도)로
+// ★ 2026-08-31 — 짝이 LEGACY 로 갈렸다. 모델을 안 넘기는 이 판들이 재는 것은 **옛 문서**이고,
+//   그 폴백은 새로 만들 때의 기본(H3)이 아니라 그때 그 모델(2.0)이다.
 // 뽑는다.
-const DEFAULT_PRICE_15 = AD_VIDEO_PRICE[DEFAULT_AD_MODEL][15][DEFAULT_AD_RESOLUTION];
+const DEFAULT_PRICE_15 = AD_VIDEO_PRICE[LEGACY_AD_MODEL][15][DEFAULT_AD_RESOLUTION];
 
 async function grant(n) {
   await getStore().insertGrant({ user_id: U, amount_credits: n, reason: "test" });

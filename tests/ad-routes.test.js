@@ -28,7 +28,7 @@ import { GET as getAd, PATCH as patchAd } from "../app/api/ads/[id]/route.js";
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
 import { createProject } from "../lib/projects.js";
 import { runWithActor } from "../lib/actor.js";
-import { DEFAULT_AD_MODEL } from "../lib/ad/models.js";
+import { DEFAULT_AD_MODEL, LEGACY_AD_MODEL } from "../lib/ad/models.js";
 import { AD_VIDEO_PRICE, adVideoPrice } from "../lib/pricing.js";
 
 const U = "00000000-0000-4000-8000-00000000000a";
@@ -88,10 +88,20 @@ describe("광고 라우트 — 문서", () => {
       expect(res.status).toBe(403);
     });
 
-    it("기본 등급도 2.0 은 만든다 — 문을 너무 좁히지 않았는지 함께 본다", async () => {
+    it("기본 등급도 기본(H3)은 만든다 — 문을 너무 좁히지 않았는지 함께 본다", async () => {
       await memoryStore.insertProfile({ id: U, email: "basic@fix-up.kr", status: "approved", role: "user", tier: "basic" });
-      const res = await createAd(post({ ...OK, settings: { ...OK.settings, model: "seedance-2.0", seconds: 15 } }));
+      const res = await createAd(post({ ...OK, settings: { ...OK.settings, model: "minimax-h3", seconds: 15 } }));
       expect(res.status).toBe(200);
+    });
+
+    // ★★ 2026-08-31 — **숨긴 모델은 등급표에 적혀 있어도 못 만든다.** 2.0 은 basic·pro
+    //   둘 다의 models 에 남아 있지만 hidden 이 먼저 걸러 서버가 403 을 준다.
+    //   이것이 "숨김"과 "등급"이 다른 축이라는 말의 실제 내용이다 — 화면만 거르는
+    //   가림막이었으면 여기가 200 이었을 것이고, 그 구멍으로 2.5 가 실제로 뚫렸었다.
+    it("★ 숨긴 2.0 은 403 — 등급표에 적혀 있어도 아무도 못 쓴다", async () => {
+      await memoryStore.insertProfile({ id: U, email: "pro@fix-up.kr", status: "approved", role: "user", tier: "pro" });
+      const res = await createAd(post({ ...OK, settings: { ...OK.settings, model: "seedance-2.0", seconds: 15 } }));
+      expect(res.status).toBe(403);
     });
   });
 
@@ -115,9 +125,9 @@ describe("광고 라우트 — 문서", () => {
       expect(doc.settings.seconds).toBe(30);
     });
 
-    it("★ 2.0 모델(기본)에 30초를 주면 400 — 길이가 모델에 딸린다", async () => {
+    it("★ 기본(H3)에 30초를 주면 400 — 길이가 모델에 딸린다", async () => {
       const res = await createAd(
-        post({ ...OK, settings: { ...OK.settings, model: "seedance-2.0", seconds: 30 } })
+        post({ ...OK, settings: { ...OK.settings, model: "minimax-h3", seconds: 30 } })
       );
       expect(res.status).toBe(400);
     });
@@ -146,8 +156,12 @@ describe("광고 라우트 — 문서", () => {
     // PATCH — 모델을 바꿀 수 있고, 바꾸면 길이도 그 모델 기준으로 다시 본다.
     it("★ PATCH 로 모델을 2.5 로 바꿀 수 있다(길이가 그대로 15초라 유효하다)", async () => {
       const made = await (await createAd(post(OK))).json();
+      // ★ 2026-08-31 — 화질도 함께 보낸다. 기본(H3)과 프로(2.5)는 **겹치는 화질이 없어서**
+      //   (768P·2K ↔ 480p·720p) 모델만 바꾸면 서버가 400 을 낸다. 화면도 같은 처방이다 —
+      //   components/AdOptionTray.jsx 의 onModelChange 가 길이·화질을 그 모델의 기본으로
+      //   되돌린 뒤 함께 보낸다.
       const res = await patchAd(
-        patch({ settings: { model: "seedance-2.5" } }),
+        patch({ settings: { model: "seedance-2.5", resolution: "720p" } }),
         { params: Promise.resolve({ id: made.id }) }
       );
       expect(res.status).toBe(200);
@@ -159,7 +173,7 @@ describe("광고 라우트 — 문서", () => {
     it("★ PATCH 로 2.5 → 30초까지 함께 바꿀 수 있다", async () => {
       const made = await (await createAd(post(OK))).json();
       const res = await patchAd(
-        patch({ settings: { model: "seedance-2.5", seconds: 30 } }),
+        patch({ settings: { model: "seedance-2.5", seconds: 30, resolution: "720p" } }),
         { params: Promise.resolve({ id: made.id }) }
       );
       expect(res.status).toBe(200);
@@ -168,12 +182,12 @@ describe("광고 라우트 — 문서", () => {
       expect(doc.settings.seconds).toBe(30);
     });
 
-    it("★ 2.5·30초로 만든 뒤 모델만 2.0 으로 되돌리면 400 — 길이를 그대로 두면 2.0 이 못 받는다", async () => {
+    it("★ 2.5·30초로 만든 뒤 모델만 기본(H3)으로 되돌리면 400 — 길이를 그대로 두면 H3 가 못 받는다", async () => {
       const made = await (
         await createAd(post({ ...OK, settings: { ...OK.settings, model: "seedance-2.5", seconds: 30 } }))
       ).json();
       const res = await patchAd(
-        patch({ settings: { model: "seedance-2.0" } }),
+        patch({ settings: { model: "minimax-h3" } }),
         { params: Promise.resolve({ id: made.id }) }
       );
       expect(res.status).toBe(400);
@@ -200,14 +214,17 @@ describe("광고 라우트 — 문서", () => {
       expect(doc.settings.model).toBe("seedance-2.5");
     });
 
-    // ③ 옛 문서 보호 — settings.model 이 없는 옛 광고 문서를 PATCH 하면 기본 모델
-    // (standard) 값 그대로다. 실제 store 에 model 필드가 아예 없는 문서를 직접 심어
-    // (라우트를 안 거쳐) 재현한다.
-    it("★ settings.model 이 없는 옛 문서를 PATCH 해도 기본 모델(standard) 값으로 본다(30초는 400)", async () => {
+    // ③ 옛 문서 보호 — settings.model 이 없는 옛 광고 문서를 PATCH 하면 **그 문서가
+    // 만들어진 모델**(2.0 standard) 값 그대로다. 실제 store 에 model 필드가 아예 없는
+    // 문서를 직접 심어(라우트를 안 거쳐) 재현한다.
+    // ★ 2026-08-31 — **화질도 함께 걷는다.** 모델 칸이 생기기 전 문서라 둘 다 없다.
+    //   화질만 남기면 새 기본(H3)의 2K 가 남아, 2.0 으로 읽히는 순간 그 문서가 400 이 된다
+    //   — 옛 문서가 아니라 "H3 로 만들었는데 모델만 지운 문서"를 재는 셈이다.
+    it("★ settings.model 이 없는 옛 문서를 PATCH 해도 옛 모델(2.0 standard) 값으로 본다(30초는 400)", async () => {
       const made = await (await createAd(post(OK))).json();
       const { getStore } = await import("../lib/store/index.js");
       const row = await getStore().selectProject(made.id, U);
-      const { model, ...settingsWithoutModel } = row.doc.settings;
+      const { model, resolution: _r, ...settingsWithoutModel } = row.doc.settings;
       await getStore().updateProjectRow(made.id, U, row.version, {
         ...row.doc, settings: settingsWithoutModel,
       });
@@ -217,7 +234,8 @@ describe("광고 라우트 — 문서", () => {
         { params: Promise.resolve({ id: made.id }) }
       );
       expect(ok15.status).toBe(200);
-      expect((await ok15.json()).settings.model).toBe(DEFAULT_AD_MODEL);
+      // ★ 2026-08-31 — 옛 문서의 폴백은 **LEGACY**(2.0)다. 새로 만들 때의 기본(H3)이 아니다.
+      expect((await ok15.json()).settings.model).toBe(LEGACY_AD_MODEL);
 
       // 다시 모델 없는 상태로 되돌리고, 30초를 요구하면 기본 모델 값으로 판정돼 400 이어야 한다
       const row2 = await getStore().selectProject(made.id, U);
@@ -236,7 +254,10 @@ describe("광고 라우트 — 문서", () => {
       const made = await (await createAd(post(OK))).json();
       const { getStore } = await import("../lib/store/index.js");
       const row = await getStore().selectProject(made.id, U);
-      const { resolution, ...settingsWithoutResolution } = row.doc.settings;
+      // ★ 2026-08-31 — **모델도 함께 걷는다.** 옛 문서는 모델 칸이 생기기 전 것이라 둘 다
+      //   없다. 모델만 남겨 두면 그 문서는 H3(새 기본)로 만들어진 문서이고, H3 의 기본
+      //   화질은 2K 라 720p 가 나올 이유가 없다.
+      const { resolution, model: _m, ...settingsWithoutResolution } = row.doc.settings;
       await getStore().updateProjectRow(made.id, U, row.version, {
         ...row.doc, settings: settingsWithoutResolution,
       });
@@ -250,9 +271,9 @@ describe("광고 라우트 — 문서", () => {
 
     // ★ Task 24 — 모델을 바꾸면 해상도도 그 모델 기준으로 다시 본다(길이와 같은 규칙).
     // fast 티어가 사라진 뒤에도 같은 규칙을 재는 자리다 — 1080p 는 **2.0 만** 연다.
-    it("★ 2.0·1080p 로 만든 뒤 모델만 2.5 로 바꾸면 400 — 2.5 는 1080p 가 없다", async () => {
+    it("★ 기본(H3)·2K 로 만든 뒤 모델만 2.5 로 바꾸면 400 — 2.5 에는 2K 가 없다", async () => {
       const made = await (
-        await createAd(post({ ...OK, settings: { ...OK.settings, model: "seedance-2.0", resolution: "1080p" } }))
+        await createAd(post({ ...OK, settings: { ...OK.settings, model: "minimax-h3", resolution: "2K" } }))
       ).json();
       const res = await patchAd(
         patch({ settings: { model: "seedance-2.5" } }),
@@ -277,8 +298,11 @@ describe("광고 라우트 — 문서", () => {
 
     // ★ 2026-08-21 — 기본 해상도가 **모델별**이 됐다(adDefaultResolution). 기본 모델은
     //   2.0 이라 여전히 720p 이지만, 값의 출처가 전역 상수에서 모델 표로 옮겨졌다.
+    // ★ 2026-08-31 — 기본 모델이 H3 로 옮겨 가면서, "안 주면 720p" 를 재려면 모델을
+    //   명시해야 한다(H3 에는 720p 가 아예 없다). 재는 것은 그대로다 —
+    //   **그 모델의 기본값**이 저장되는가.
     it("해상도를 안 주면 그 모델의 기본값이 명시 저장된다", async () => {
-      const res = await createAd(post(OK));
+      const res = await createAd(post({ ...OK, settings: { ...OK.settings, model: "seedance-2.5" } }));
       const doc = await res.json();
       expect(doc.settings.resolution).toBe("720p");
     });
@@ -291,13 +315,14 @@ describe("광고 라우트 — 문서", () => {
       expect((await res.json()).settings.resolution).toBe("2K");
     });
 
-    it("★ standard 는 1080p 를 고를 수 있다", async () => {
+    // ★★ 2026-08-31 — 그전에는 "standard 는 1080p 를 고를 수 있다" 였다. 2.0 을 숨기면서
+    //   그 길이 닫혔고, **일반 사장님이 고를 수 있는 1080p 는 이제 없다**(2.5 의 1080p 는
+    //   관리자 전용, H3 는 768P·2K). 화질이 내려간 것은 아니다 — 2K 가 1080p 보다 넓다.
+    it("★ 숨긴 2.0 은 1080p 라도 못 만든다 — 403", async () => {
       const res = await createAd(
         post({ ...OK, settings: { ...OK.settings, model: "seedance-2.0", resolution: "1080p" } })
       );
-      expect(res.status).toBe(200);
-      const doc = await res.json();
-      expect(doc.settings.resolution).toBe("1080p");
+      expect(res.status).toBe(403);
     });
   });
 
@@ -501,11 +526,13 @@ describe("광고 라우트 — 굽기", () => {
     return made;
   }
 
-  // ★ Task 24 — standard·1080p 로 만든 프로젝트. 같은 모델·길이라도 해상도가 잔액
-  // 검사에 실제로 반영되는지를 재는 자리다(withScenario25 와 같은 목적, 축만 해상도다).
-  async function withScenario1080p() {
+  // ★ Task 24 — 해상도만 다른 프로젝트. 같은 모델·길이라도 해상도가 잔액 검사에 실제로
+  // 반영되는지를 재는 자리다(withScenario25 와 같은 목적, 축만 해상도다).
+  // ★★ 2026-08-31 — 축을 2.0 의 720p↔1080p 에서 **기본(H3)의 768P↔2K** 로 옮겼다.
+  //   2.0 을 숨기면서 그 모델로는 만들 수 없게 됐다. 재는 것은 그대로다.
+  async function withScenario2K() {
     const made = await (
-      await createAd(post({ ...OK, settings: { ...OK.settings, model: "seedance-2.0", resolution: "1080p" } }))
+      await createAd(post({ ...OK, settings: { ...OK.settings, model: "minimax-h3", resolution: "2K" } }))
     ).json();
     const { getStore } = await import("../lib/store/index.js");
     const row = await getStore().selectProject(made.id, U);
@@ -578,28 +605,28 @@ describe("광고 라우트 — 굽기", () => {
   });
 
   // ── Task 24 — 정가 계산에 해상도가 반영된다(모델·길이가 같아도 해상도가 축이다) ──
-  it("★ 1080p 는 정가가 더 높다 — 720p 면 통과할 잔액도 1080p 면 402", async () => {
+  it("★ 2K 는 정가가 더 높다 — 768P 면 통과할 잔액도 2K 면 402", async () => {
     const { getStore } = await import("../lib/store/index.js");
     const { AD_VIDEO_PRICE } = await import("../lib/pricing.js");
-    // standard·15초·720p(80) 는 넉넉히 내는 잔액이지만 1080p(175) 에는 못 미친다
-    await getStore().insertGrant({ user_id: U, amount_credits: 100, reason: "t" });
+    // 기본(H3)·15초·768P(20) 는 넉넉히 내는 잔액이지만 2K(40) 에는 못 미친다
+    await getStore().insertGrant({ user_id: U, amount_credits: 30, reason: "t" });
     const { POST: render } = await import("../app/api/ads/[id]/render/route.js");
-    const made = await withScenario1080p();
+    const made = await withScenario2K();
     const res = await render(new Request("http://x", { method: "POST", headers: H }), {
       params: Promise.resolve({ id: made.id }),
     });
     expect(res.status).toBe(402);
-    expect(100).toBeGreaterThan(AD_VIDEO_PRICE["seedance-2.0"][15]["720p"]);
-    expect(100).toBeLessThan(AD_VIDEO_PRICE["seedance-2.0"][15]["1080p"]);
+    expect(30).toBeGreaterThan(AD_VIDEO_PRICE["minimax-h3"][15]["768P"]);
+    expect(30).toBeLessThan(AD_VIDEO_PRICE["minimax-h3"][15]["2K"]);
   });
 
-  it("1080p 도 정가만큼 잔액이 있으면 202 로 시작한다", async () => {
+  it("2K 도 정가만큼 잔액이 있으면 202 로 시작한다", async () => {
     process.env.SHOTFORM_FAKE = "fal";
     const { getStore } = await import("../lib/store/index.js");
     const { AD_VIDEO_PRICE } = await import("../lib/pricing.js");
-    await getStore().insertGrant({ user_id: U, amount_credits: AD_VIDEO_PRICE["seedance-2.0"][15]["1080p"], reason: "t" });
+    await getStore().insertGrant({ user_id: U, amount_credits: AD_VIDEO_PRICE["minimax-h3"][15]["2K"], reason: "t" });
     const { POST: render } = await import("../app/api/ads/[id]/render/route.js");
-    const made = await withScenario1080p();
+    const made = await withScenario2K();
     const res = await render(new Request("http://x", { method: "POST", headers: H }), {
       params: Promise.resolve({ id: made.id }),
     });

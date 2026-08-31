@@ -1,14 +1,17 @@
 // ★ 이 파일의 첫 단정 하나가 "SHOTFORM_FAKE=fal 에서 $3.63 이 안 나간다"의 증거다.
 import { describe, it, expect, afterEach } from "vitest";
 import { isFakeFor, estimateCost } from "../lib/costs.js";
-import { adEndpoint, DEFAULT_AD_MODEL, adModel, AD_MODELS, adResolutionsFor } from "../lib/ad/models.js";
+import { adEndpoint, LEGACY_AD_MODEL, adModel, AD_MODELS, adResolutionsFor } from "../lib/ad/models.js";
 
 // AD_MODELS[].perSecUsd 가 숫자(해상도 무관)일 수도, 객체(해상도별)일 수도 있다
 // (lib/ad/models.js 상단 주석 참고) — "이 모델·해상도의 실제 초당 단가"를 뽑는 헬퍼.
 const perSecOf = (m, resolution) =>
   typeof m.perSecUsd === "number" ? m.perSecUsd : m.perSecUsd[resolution];
 
-const T2V = adEndpoint(DEFAULT_AD_MODEL, "t2v");
+// ★ 2026-08-31 — 여기서 재는 것은 **2.0(standard)의 원가 행**이다. 그전에는 그 모델이
+//   기본이라 DEFAULT_AD_MODEL 로 가리켰는데, 기본이 H3 로 옮겨 가면서 이름이 갈렸다.
+//   이 파일의 관심사는 "2.0 이 제 단가로 잡히는가"이지 "기본이 무엇인가"가 아니다.
+const T2V = adEndpoint(LEGACY_AD_MODEL, "t2v");
 // ★ Task 21 — 2.5 추가. 2.0 과 다른 원가표 행에 걸리는지가 이 파일의 핵심 관심사다.
 const T2V_25 = adEndpoint("seedance-2.5", "t2v");
 // ★ Task 24 — fast 티어(옛 기본 모델)도 별도 행에 걸리는지 계속 지킨다.
@@ -42,17 +45,17 @@ describe("광고 모델과 비용 축", () => {
 
   // ★ Task 24 — 기본 모델이 standard 다. resolution 을 안 넘기면(옛 호출부) 720p 로 잡힌다
   // (DEFAULT_AD_RESOLUTION 과 같은 값 — lib/costs.js 의 perSecFor 주석 참고).
-  it("원가표가 seedance(기본=standard, 720p)를 기본 단가가 아니라 제 단가로 센다", () => {
-    const perSec = perSecOf(adModel(DEFAULT_AD_MODEL), "720p");
+  it("원가표가 seedance(2.0 standard, 720p)를 기본 단가가 아니라 제 단가로 센다", () => {
+    const perSec = perSecOf(adModel(LEGACY_AD_MODEL), "720p");
     expect(estimateCost(T2V, 15)).toBeCloseTo(perSec * 15, 6);
     // 기본 단가($0.1/s)로 떨어지면 15초가 $1.5 로 기록돼 원장과 전역 상한이 함께 무력해진다
     expect(estimateCost(T2V, 15)).not.toBeCloseTo(0.1 * 15, 6);
   });
 
-  it("엔드포인트 셋 다 같은 단가로 잡힌다 — 기본(standard, 720p)", () => {
-    const perSec = perSecOf(adModel(DEFAULT_AD_MODEL), "720p");
+  it("엔드포인트 셋 다 같은 단가로 잡힌다 — 2.0(standard, 720p)", () => {
+    const perSec = perSecOf(adModel(LEGACY_AD_MODEL), "720p");
     for (const kind of ["t2v", "i2v", "r2v"]) {
-      expect(estimateCost(adEndpoint(DEFAULT_AD_MODEL, kind), 1)).toBeCloseTo(perSec, 6);
+      expect(estimateCost(adEndpoint(LEGACY_AD_MODEL, kind), 1)).toBeCloseTo(perSec, 6);
     }
   });
 
@@ -88,7 +91,7 @@ describe("광고 모델과 비용 축", () => {
   // "bytedance/seedance-2.0"(더 짧은 접두사)에 걸려 조용히 2.0 단가로 샐 수 있다.
   it("★ 원가표가 2.5 를 2.0 단가가 아니라 제 단가로 센다(720p 기준)", () => {
     const perSec25 = perSecOf(adModel("seedance-2.5"), "720p");
-    const perSecStandard720 = perSecOf(adModel(DEFAULT_AD_MODEL), "720p");
+    const perSecStandard720 = perSecOf(adModel(LEGACY_AD_MODEL), "720p");
     expect(estimateCost(T2V_25, 15)).toBeCloseTo(perSec25 * 15, 6);
     // 2.0 fast 단가로 떨어지면 15초가 $3.63 으로 기록돼 실제 원가($6.93)의 절반만 잡힌다
     expect(estimateCost(T2V_25, 15)).not.toBeCloseTo(0.2419 * 15, 6);

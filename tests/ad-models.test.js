@@ -2,7 +2,7 @@
 // 값보다 "표 밖에 문자열이 없다"와 "모르는 값이 어디로 떨어지나"를 못 박는다.
 import { describe, it, expect } from "vitest";
 import {
-  AD_MODELS, DEFAULT_AD_MODEL, DEFAULT_AD_RESOLUTION,
+  AD_MODELS, DEFAULT_AD_MODEL, LEGACY_AD_MODEL, DEFAULT_AD_RESOLUTION,
   adModel, adEndpoint, isAdModel, adSecondsFor, isAdSeconds,
   adResolutionsFor, isAdResolution, adDefaultResolution, isAdminOnlyResolution,
 } from "../lib/ad/models.js";
@@ -13,9 +13,13 @@ describe("광고 모델 표", () => {
   });
 
   // ★ Task 24 — 기본이 fast 에서 standard 로 바뀐다. standard 라야 1080p 가 열린다.
-  it("★ 기본 모델이 standard 다 — 엔드포인트에 /fast/ 가 없다", () => {
-    expect(DEFAULT_AD_MODEL).toBe("seedance-2.0");
+  // ★★ 2026-08-31 — 기본이 다시 옮겨 갔다(2.0 → 기본/H3, 2.0 을 숨기면서). 이 판이 지키는
+  //   것은 "무엇이 기본인가"가 아니라 **기본에 등급 세그먼트가 안 낀다**는 것이다.
+  it("★ 기본 모델 엔드포인트에 /fast/ 가 없다", () => {
+    expect(DEFAULT_AD_MODEL).toBe("minimax-h3");
     expect(adEndpoint(DEFAULT_AD_MODEL, "t2v")).not.toMatch(/\/fast\//);
+    // 옛 문서의 모델(2.0)도 여전히 standard 다 — 그래야 1080p 가 열린다.
+    expect(adEndpoint(LEGACY_AD_MODEL, "t2v")).not.toMatch(/\/fast\//);
   });
 
   it("모델마다 엔드포인트 셋을 다 든다", () => {
@@ -26,15 +30,17 @@ describe("광고 모델 표", () => {
     }
   });
 
-  it("adModel 은 모르는 id 를 기본 모델로 받는다", () => {
-    expect(adModel("없는모델").id).toBe(DEFAULT_AD_MODEL);
-    expect(adModel(undefined).id).toBe(DEFAULT_AD_MODEL);
+  // ★★ 2026-08-31 — 폴백이 **옛 문서의 모델**로 갈렸다. 모델을 안 든 문서는 그때 유일하던
+  //   2.0 으로 만들어졌으므로, 기본이 옮겨 가도 그 해석은 안 바뀌어야 한다.
+  it("adModel 은 모르는 id 를 옛 문서의 모델(2.0)로 받는다", () => {
+    expect(adModel("없는모델").id).toBe(LEGACY_AD_MODEL);
+    expect(adModel(undefined).id).toBe(LEGACY_AD_MODEL);
   });
 
-  it("adEndpoint 가 세 갈래를 돌려준다 — 기본 모델(2.0 standard)", () => {
-    expect(adEndpoint(DEFAULT_AD_MODEL, "t2v")).toBe("bytedance/seedance-2.0/text-to-video");
-    expect(adEndpoint(DEFAULT_AD_MODEL, "i2v")).toBe("bytedance/seedance-2.0/image-to-video");
-    expect(adEndpoint(DEFAULT_AD_MODEL, "r2v")).toBe("bytedance/seedance-2.0/reference-to-video");
+  it("adEndpoint 가 세 갈래를 돌려준다 — 2.0(standard)", () => {
+    expect(adEndpoint(LEGACY_AD_MODEL, "t2v")).toBe("bytedance/seedance-2.0/text-to-video");
+    expect(adEndpoint(LEGACY_AD_MODEL, "i2v")).toBe("bytedance/seedance-2.0/image-to-video");
+    expect(adEndpoint(LEGACY_AD_MODEL, "r2v")).toBe("bytedance/seedance-2.0/reference-to-video");
   });
 
 
@@ -141,8 +147,8 @@ describe("광고 모델 표", () => {
     expect(isAdResolution("4k", "seedance-2.0")).toBe(false);
   });
 
-  it("모르는 모델의 해상도를 물어도 기본 모델 기준으로 관대하게 떨어진다(돈이 안 걸린 검사)", () => {
-    expect(adResolutionsFor("없는모델")).toEqual(adResolutionsFor(DEFAULT_AD_MODEL));
+  it("모르는 모델의 해상도를 물어도 옛 문서의 모델 기준으로 관대하게 떨어진다(돈이 안 걸린 검사)", () => {
+    expect(adResolutionsFor("없는모델")).toEqual(adResolutionsFor(LEGACY_AD_MODEL));
   });
 
   it("import 문이 없다 — 화면이 읽어도 fs 가 안 딸려온다", async () => {

@@ -2,7 +2,7 @@ import { getProject, getProjectForViewing, updateProject } from "../../../../lib
 import { isAspect } from "../../../../lib/aspects.js";
 import { normalizeAdOptions } from "../../../../lib/ad/options.js";
 import {
-  isAdSeconds, isAdModel, adSecondsFor, DEFAULT_AD_MODEL,
+  isAdSeconds, isAdModel, adSecondsFor, LEGACY_AD_MODEL,
   isAdResolution, adResolutionsFor, DEFAULT_AD_RESOLUTION, adRefMax,
 } from "../../../../lib/ad/models.js";
 import { ownedPhotoKeys } from "../../../../lib/refs-io.js";
@@ -55,9 +55,14 @@ export const PATCH = withUser(async (req, { params }, user) => {
   } catch (e) {
     return Response.json({ error: e.message }, { status: 400 });
   }
-  // ★ 모델을 바꿀 수 있다. 옛 문서(모델 없음)는 기본 모델로 본다 — lib/ad/models.js 의
-  // adModel() 과 같은 폴백이지만, "모르는지"는 못 가리는 그 함수 대신 isAdModel 로 가른다.
-  const model = body?.settings?.model ?? project.settings.model ?? DEFAULT_AD_MODEL;
+  // ★ 모델을 바꿀 수 있다. 옛 문서(모델 없음)는 **그 문서가 만들어진 모델**로 본다 —
+  // lib/ad/models.js 의 adModel() 과 같은 폴백이지만, "모르는지"는 못 가리는 그 함수 대신
+  // isAdModel 로 가른다.
+  // ★★ 2026-08-31 — 여기는 **LEGACY_AD_MODEL** 이다(DEFAULT 가 아니다). 기본이 H3 로
+  //   옮겨 가면서 갈렸는데, 이 자리는 새로 만드는 곳이 아니라 **이미 있는 문서를 고치는**
+  //   곳이다. DEFAULT 로 두면 모델을 안 든 옛 문서가 H3 로 읽혀, 그 문서의 720p·15초가
+  //   H3 목록에 없다는 이유로 **손도 못 대고 400** 이 된다.
+  const model = body?.settings?.model ?? project.settings.model ?? LEGACY_AD_MODEL;
   if (!isAdModel(model)) return Response.json({ error: "그 영상 모델은 몰라요" }, { status: 400 });
 
   // ★★ 등급 문 — **세 번째 자리**다(2026-08-20). 만들기·굽기에 이미 달았지만, 여기가
