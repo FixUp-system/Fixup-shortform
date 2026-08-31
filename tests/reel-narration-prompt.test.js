@@ -143,7 +143,7 @@ describe("runReelOneShot — 한 벌", () => {
     const f = withOne();
     const seen = [];
     await runReelOneShot("pid", "uid", {
-      ...f, makeClip: async (a) => { seen.push(a); return { url: "https://x/v.mp4", seconds: 15 }; },
+      ...f, submitClip: async (a) => { seen.push(a); return { requestId: "req-1", statusUrl: "s", responseUrl: "r", endpoint: "e", seconds: 15 }; },
     });
     expect(seen[0].prompt).toContain(`Says exactly, in Korean: "${TEXT}"`);
     expect(seen[0].prompt).toMatch(/do not pause between shots/);
@@ -156,25 +156,25 @@ describe("runReelOneShot — 한 벌", () => {
     f.doc.settings.speech_lang = "ja";
     const seen = [];
     await runReelOneShot("pid", "uid", {
-      ...f, makeClip: async (a) => { seen.push(a); return { url: "https://x/v.mp4", seconds: 15 }; },
+      ...f, submitClip: async (a) => { seen.push(a); return { requestId: "req-1", statusUrl: "s", responseUrl: "r", endpoint: "e", seconds: 15 }; },
     });
     expect(seen[0].prompt).toMatch(/Says exactly, in Japanese/);
   });
 
   it("★각인은 여전히 본문 그대로다 — 한 벌이 각인에 안 섞인다", async () => {
     const f = withOne();
-    await runReelOneShot("pid", "uid", {
-      ...f, makeClip: async () => ({ url: "https://x/v.mp4", seconds: 15 }),
-    });
-    expect(f.doc.cuts[0].video.of).toBe("A quiet workshop bench.");
-    expect(f.doc.cuts[0].video.of).not.toMatch(/Says exactly/);
+    // ★ 2026-08-31 — 각인이 정해지는 자리가 **접수증**으로 옮겨 갔다(큐 이전). 수거가
+    //   그 값을 그대로 video.of 에 옮기므로, 여기서는 접수증을 재는 것이 더 곧다.
+    await runReelOneShot("pid", "uid", { ...f, submitClip: async () => ({ requestId: "req-1", statusUrl: "s", responseUrl: "r", endpoint: "e", seconds: 15 }), });
+    expect(f.doc.reel.job.of).toBe("A quiet workshop bench.");
+    expect(f.doc.reel.job.of).not.toMatch(/Says exactly/);
   });
 
   it("★옛 문서는 그 절이 통째로 없다", async () => {
     const f = fixture();
     const seen = [];
     await runReelOneShot("pid", "uid", {
-      ...f, makeClip: async (a) => { seen.push(a); return { url: "https://x/v.mp4", seconds: 15 }; },
+      ...f, submitClip: async (a) => { seen.push(a); return { requestId: "req-1", statusUrl: "s", responseUrl: "r", endpoint: "e", seconds: 15 }; },
     });
     expect(seen[0].prompt).not.toMatch(/Says exactly|do not pause between shots/);
   });

@@ -133,8 +133,8 @@ describe("굽기가 도는 동안 박동한다", () => {
     expect(typeof doc.progress.at).toBe("number");
   });
 
-  it("통짜 갈래 — 한 번 굽고 나면 1/1 이다", async () => {
-    const { runReelOneShot } = await import("../lib/reel/pipeline.js");
+  it("통짜 갈래 — **수거까지** 끝나면 1/1 이다", async () => {
+    const { runReelOneShot, collectReelOneShot } = await import("../lib/reel/pipeline.js");
     const doc = {
       id: "pid",
       settings: { target_seconds: 15, i2v_model: "seedance-2.0", aspect_ratio: "9:16" },
@@ -145,41 +145,47 @@ describe("굽기가 도는 동안 박동한다", () => {
       getProject: async () => doc,
       updateProject: async (_id, _owner, fn) => { Object.assign(doc, fn(doc)); return doc; },
       toFalUrl: async (u) => u,
-      makeClip: async () => ({ url: "https://x/whole.mp4", seconds: 15 }),
+      // ★ 2026-08-31 — 굽기가 **큐로** 갔다: 접수만 하고 돌아온다. 1/1 이 되는 것은
+      //   수거가 결과를 꽂은 뒤다(lib/reel/pipeline.js 의 collectReelOneShot).
+      submitClip: async () => ({ requestId: "req-1", statusUrl: "s", responseUrl: "r", endpoint: "e", seconds: 15 }),
+    });
+    await collectReelOneShot("pid", "uid", {
+      getProject: async () => doc,
+      updateProject: async (_id, _owner, fn) => { Object.assign(doc, fn(doc)); return doc; },
+      collectClip: async () => ({ done: true, url: "https://x/whole.mp4", seconds: 15 }),
     });
     expect(doc.progress.phase).toBe("video");
     expect(doc.progress.total).toBe(1);
     expect(doc.progress.done).toBe(1);
   });
 
-  it("★ 굽는 동안에도 시계로 뛴다 — 컷 하나가 임계보다 오래 걸려도 살아 있음이 보인다", async () => {
-    vi.useFakeTimers();
-    try {
-      const { runReelOneShot } = await import("../lib/reel/pipeline.js");
-      const doc = {
-        id: "pid",
-        settings: { target_seconds: 15, i2v_model: "seedance-2.0", aspect_ratio: "9:16" },
-        scenario: { text: "a kettle boils" },
-        cuts: [cut(0), cut(1), cut(2)],
-      };
-      let resolveClip;
-      const run = runReelOneShot("pid", "uid", {
-        getProject: async () => doc,
-        updateProject: async (_id, _owner, fn) => { Object.assign(doc, fn(doc)); return doc; },
-        toFalUrl: async (u) => u,
-        makeClip: () => new Promise((r) => { resolveClip = r; }),
-      });
-      // 굽기가 시작되기를 기다린다(마이크로태스크 몇 개).
-      await vi.advanceTimersByTimeAsync(0);
-      expect(doc.progress, "시작할 때 한 번 찍어야 한다").toBeTruthy();
-      const first = doc.progress.at;
-      await vi.advanceTimersByTimeAsync(STALL_MS);
-      expect(doc.progress.at, "굽는 도중에 박동이 없다").toBeGreaterThan(first);
-      resolveClip({ url: "https://x/whole.mp4", seconds: 15 });
-      await run;
-    } finally {
-      vi.useRealTimers();
-    }
+  it("★ 굽는 동안 **수거 시도**가 살아 있음을 갱신한다 — 임계보다 오래 걸려도 안 죽는다", async () => {
+    // ★★ 2026-08-31 — 통짜가 큐로 가면서 **그 자리에서 기다리는 프로세스가 사라졌다.**
+    //   예전에는 굽는 동안 시계로 박동을 찍었는데, 이제 기다리는 것은 화면이다 —
+    //   상태 조회가 두드릴 때마다 수거를 시도하고, 아직이면 그 자리에서 진척을 갱신한다.
+    //   이 갱신이 없으면 정상으로 굽는 중인 편이 2분 뒤 "멈췄어요"가 된다(STALL_MS).
+    const { runReelOneShot, collectReelOneShot } = await import("../lib/reel/pipeline.js");
+    const doc = {
+      id: "pid",
+      settings: { target_seconds: 15, i2v_model: "seedance-2.0", aspect_ratio: "9:16" },
+      scenario: { text: "a kettle boils" },
+      cuts: [cut(0), cut(1), cut(2)],
+    };
+    const deps = {
+      getProject: async () => doc,
+      updateProject: async (_id, _owner, fn) => { Object.assign(doc, fn(doc)); return doc; },
+      toFalUrl: async (u) => u,
+    };
+    await runReelOneShot("pid", "uid", {
+      ...deps,
+      submitClip: async () => ({ requestId: "req-1", statusUrl: "s", responseUrl: "r", endpoint: "e", seconds: 15 }),
+    });
+    expect(doc.progress, "접수할 때 한 번 찍어야 한다").toBeTruthy();
+    const first = doc.progress.at;
+    await new Promise((r) => setTimeout(r, 5));
+    await collectReelOneShot("pid", "uid", { ...deps, collectClip: async () => ({ done: false }) });
+    expect(doc.progress.at, "수거 시도가 진척을 안 갱신했다").toBeGreaterThan(first);
+    expect(doc.reel.job, "아직인데 접수증이 지워졌다").toBeTruthy();
   });
 });
 

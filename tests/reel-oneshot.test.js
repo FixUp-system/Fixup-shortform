@@ -12,7 +12,15 @@ import {
   ONESHOT_MAX_SECONDS, planReelBake, reelSheetUrl, reelWholePrompt,
   buildOneShotPrompt, reelVoice, reelNarrates, canBakeReel, isReelOneShotStale, storyboardGridFor,
 } from "../lib/reel/oneshot.js";
-import { runReelOneShot } from "../lib/reel/pipeline.js";
+import { runReelOneShot, collectReelOneShot } from "../lib/reel/pipeline.js";
+// ★★ 2026-08-31 — 통짜가 **큐로 옮겨 갔다.** 굽기는 이제 접수만 하고 돌아오고, 결과는
+//   상태 조회가 수거한다(lib/reel/pipeline.js 의 collectReelOneShot). 그래서 주입 이름이
+//   makeClip → submitClip 이고, **결과를 재는 판은 수거까지 거쳐야** 한다.
+//   요청 모양(refs·프롬프트)을 재는 판은 접수가 같은 인자를 받으므로 그대로다.
+const JOB = { requestId: "req-1", statusUrl: "s", responseUrl: "r", endpoint: "e", seconds: 15 };
+const collectDone = (f, url = "https://x/v.mp4", seconds = 15) =>
+  collectReelOneShot("pid", "uid", { ...f, collectClip: async () => ({ done: true, url, seconds }) });
+
 
 const cut = (idx, extra = {}) => ({
   idx, shows: `panel ${idx}`, seconds: 5,
@@ -217,7 +225,7 @@ describe("runReelOneShot", () => {
     const seen = [];
     await runReelOneShot("pid", "uid", {
       ...f,
-      makeClip: async (a) => { seen.push(a); return { url: "https://x/v.mp4", seconds: 15 }; },
+      submitClip: async (a) => { seen.push(a); return JOB; },
     });
     expect(seen).toHaveLength(1);
   });
@@ -227,7 +235,7 @@ describe("runReelOneShot", () => {
     const seen = [];
     await runReelOneShot("pid", "uid", {
       ...f,
-      makeClip: async (a) => { seen.push(a); return { url: "https://x/v.mp4", seconds: 15 }; },
+      submitClip: async (a) => { seen.push(a); return JOB; },
     });
     expect(seen[0].refs).toEqual([{ url: "https://fal/sheet.png" }]);
     expect(seen[0].imageUrl).toBe(null);
@@ -238,7 +246,7 @@ describe("runReelOneShot", () => {
     const f = fixture();
     const seen = [];
     await runReelOneShot("pid", "uid", {
-      ...f, makeClip: async (a) => { seen.push(a); return { url: "https://x/v.mp4", seconds: 15 }; },
+      ...f, submitClip: async (a) => { seen.push(a); return JOB; },
     });
     expect(seen[0].prompt).toContain("3-panel storyboard");
     expect(seen[0].prompt).toContain("A quiet workshop bench");
@@ -246,9 +254,8 @@ describe("runReelOneShot", () => {
 
   it("결과는 첫 컷에 담고 각인을 남긴다 — ⑥완성이 그 컷을 재료로 읽는다", async () => {
     const f = fixture();
-    await runReelOneShot("pid", "uid", {
-      ...f, makeClip: async () => ({ url: "https://x/v.mp4", seconds: 15 }),
-    });
+    await runReelOneShot("pid", "uid", { ...f, submitClip: async () => JOB });
+    await collectDone(f);
     expect(f.doc.cuts[0].video).toEqual({
       url: "https://x/v.mp4", seconds: 15, whole: true,
       of: "A quiet workshop bench; the camera drifts left.", imageOf: "https://fal/sheet.png",
@@ -263,9 +270,8 @@ describe("runReelOneShot", () => {
     const f = fixture();
     f.doc.cuts[1].video = { url: "https://x/old1.mp4", seconds: 4, of: "b1" };
     f.doc.cuts[2].video = { url: "https://x/old2.mp4", seconds: 4, of: "b2" };
-    await runReelOneShot("pid", "uid", {
-      ...f, makeClip: async () => ({ url: "https://x/v.mp4", seconds: 15 }),
-    });
+    await runReelOneShot("pid", "uid", { ...f, submitClip: async () => JOB });
+    await collectDone(f);
     expect(f.doc.cuts[0].video.url).toBe("https://x/v.mp4");
     expect(f.doc.cuts[1].video).toBeUndefined();
     expect(f.doc.cuts[2].video).toBeUndefined();
@@ -277,19 +283,21 @@ describe("runReelOneShot", () => {
   it("이미 구웠고 안 낡았으면 다시 안 굽는다 — 순수 이중지출을 닫는다", async () => {
     const f = fixture();
     let calls = 0;
-    const makeClip = async () => { calls += 1; return { url: "https://x/v.mp4", seconds: 15 }; };
-    await runReelOneShot("pid", "uid", { ...f, makeClip });
-    await runReelOneShot("pid", "uid", { ...f, makeClip });
+    const submitClip = async () => { calls += 1; return JOB; };
+    await runReelOneShot("pid", "uid", { ...f, submitClip });
+    await collectDone(f);
+    await runReelOneShot("pid", "uid", { ...f, submitClip });
     expect(calls).toBe(1);
   });
 
   it("프롬프트를 고치면 다시 굽는다", async () => {
     const f = fixture();
     let calls = 0;
-    const makeClip = async () => { calls += 1; return { url: "https://x/v.mp4", seconds: 15 }; };
-    await runReelOneShot("pid", "uid", { ...f, makeClip });
+    const submitClip = async () => { calls += 1; return JOB; };
+    await runReelOneShot("pid", "uid", { ...f, submitClip });
+    await collectDone(f);
     f.doc.reel = { ...(f.doc.reel || {}), prompt: "다르게 만들어 줘" };
-    await runReelOneShot("pid", "uid", { ...f, makeClip });
+    await runReelOneShot("pid", "uid", { ...f, submitClip });
     expect(calls).toBe(2);
   });
 
@@ -297,7 +305,7 @@ describe("runReelOneShot", () => {
     const f = fixture({ settings: { target_seconds: 45 } });
     let calls = 0;
     await expect(runReelOneShot("pid", "uid", {
-      ...f, makeClip: async () => { calls += 1; return { url: "u", seconds: 1 }; },
+      ...f, submitClip: async () => { calls += 1; return JOB; },
     })).rejects.toThrow();
     expect(calls).toBe(0);
   });
@@ -306,7 +314,7 @@ describe("runReelOneShot", () => {
     const f = fixture({ scenario: { text: "" } });
     let calls = 0;
     await expect(runReelOneShot("pid", "uid", {
-      ...f, makeClip: async () => { calls += 1; return { url: "u", seconds: 1 }; },
+      ...f, submitClip: async () => { calls += 1; return JOB; },
     })).rejects.toThrow();
     expect(calls).toBe(0);
   });
@@ -409,7 +417,7 @@ describe("runReelOneShot — 목소리", () => {
     const f = withVoice();
     const seen = [];
     await runReelOneShot("pid", "uid", {
-      ...f, makeClip: async (a) => { seen.push(a); return { url: "https://x/v.mp4", seconds: 15 }; },
+      ...f, submitClip: async (a) => { seen.push(a); return JOB; },
     });
     expect(seen[0].prompt).toContain("Voice: 차분한 20대 여성.");
     expect(seen[0].prompt).toContain("A quiet workshop bench.");
@@ -417,11 +425,11 @@ describe("runReelOneShot — 목소리", () => {
 
   it("★각인은 본문 그대로다 — 목소리가 각인에 안 섞인다", async () => {
     const f = withVoice();
-    await runReelOneShot("pid", "uid", {
-      ...f, makeClip: async () => ({ url: "https://x/v.mp4", seconds: 15 }),
-    });
-    expect(f.doc.cuts[0].video.of).toBe("A quiet workshop bench.");
-    expect(f.doc.cuts[0].video.of).not.toContain("Voice:");
+    // ★ 2026-08-31 — 각인이 정해지는 자리가 **접수증**으로 옮겨 갔다(큐 이전). 수거가
+    //   그 값을 그대로 video.of 에 옮기므로, 여기서는 접수증을 재는 것이 더 곧다.
+    await runReelOneShot("pid", "uid", { ...f, submitClip: async () => ({ requestId: "req-1", statusUrl: "s", responseUrl: "r", endpoint: "e", seconds: 15 }), });
+    expect(f.doc.reel.job.of).toBe("A quiet workshop bench.");
+    expect(f.doc.reel.job.of).not.toContain("Voice:");
   });
 
   it("★목소리가 생겨도 이미 구운 옛 편은 안 낡는다 — 다시 굽지 않는다(돈이 안 나간다)", async () => {
@@ -510,7 +518,7 @@ describe("runReelOneShot — 화면 밖 목소리", () => {
     const f = narrated();
     const seen = [];
     await runReelOneShot("pid", "uid", {
-      ...f, makeClip: async (a) => { seen.push(a); return { url: "https://x/v.mp4", seconds: 15 }; },
+      ...f, submitClip: async (a) => { seen.push(a); return JOB; },
     });
     expect(seen[0].prompt).toContain("no one in frame speaks or moves their lips");
   });
@@ -519,17 +527,17 @@ describe("runReelOneShot — 화면 밖 목소리", () => {
     const f = narrated({ shots: [{ line: "맛있어요!", speaker: "40대 남성 제빵사" }] });
     const seen = [];
     await runReelOneShot("pid", "uid", {
-      ...f, makeClip: async (a) => { seen.push(a); return { url: "https://x/v.mp4", seconds: 15 }; },
+      ...f, submitClip: async (a) => { seen.push(a); return JOB; },
     });
     expect(seen[0].prompt).not.toContain("voiceover");
   });
 
   it("★각인은 여전히 본문 그대로다 — 옛 편이 이 변경으로 안 낡는다", async () => {
     const f = narrated();
-    await runReelOneShot("pid", "uid", {
-      ...f, makeClip: async () => ({ url: "https://x/v.mp4", seconds: 15 }),
-    });
-    expect(f.doc.cuts[0].video.of).toBe("A quiet workshop bench.");
-    expect(f.doc.cuts[0].video.of).not.toContain("voiceover");
+    // ★ 2026-08-31 — 각인이 정해지는 자리가 **접수증**으로 옮겨 갔다(큐 이전). 수거가
+    //   그 값을 그대로 video.of 에 옮기므로, 여기서는 접수증을 재는 것이 더 곧다.
+    await runReelOneShot("pid", "uid", { ...f, submitClip: async () => ({ requestId: "req-1", statusUrl: "s", responseUrl: "r", endpoint: "e", seconds: 15 }), });
+    expect(f.doc.reel.job.of).toBe("A quiet workshop bench.");
+    expect(f.doc.reel.job.of).not.toContain("voiceover");
   });
 });

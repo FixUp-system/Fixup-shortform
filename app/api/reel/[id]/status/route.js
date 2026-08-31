@@ -1,5 +1,6 @@
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { getProject } from "../../../../../lib/projects.js";
+import { collectReelOneShot } from "../../../../../lib/reel/pipeline.js";
 import { reelOf } from "../../../../../lib/reel/doc.js";
 import { isReelClipStale } from "../../../../../lib/reel/steps.js";
 // ★ 멈춘 경과는 **서버가 잰다.** 브라우저가 자기 시계로 빼면 PC 시계가 빠른 사장님에게는
@@ -21,6 +22,20 @@ import { stalledFor } from "../../../../../lib/progress.js";
 //   없다. 그래서 이 라우트는 그냥 문서를 읽기만 한다(GET 인데 일을 안 한다).
 export const GET = withUser(async (_req, { params }, user) => {
   const { id } = await params;
+
+  // ★★★ 2026-08-31 — **GET 인데 일을 한다.** 통짜 굽기가 큐로 옮겨 가면서 생긴 자리다:
+  //   접수는 즉시 끝나고 결과는 여기서 이어받는다. 배포(서버리스)에는 응답 뒤에 남아서
+  //   도는 자리가 없고, 통짜 한 편은 어떤 한 요청 안에서도 못 끝난다 — 원클릭의
+  //   app/api/ads/[id]/status/route.js 가 같은 이유로 같은 모양이다.
+  // ★ 상태를 읽기 **전에** 수거한다 — 순서가 바뀌면 방금 끝난 영상을 한 박자 늦게 본다.
+  // ★ collectReelOneShot 은 던지지 않는다 — 수거가 실패해도 화면은 상태를 읽어야 한다.
+  //   실패는 문서의 reel.error 로 남고 아래에서 그대로 실어 보낸다.
+  // ⚠️ 남는 성질: 아무도 안 두드리면 수거도 안 된다. 창을 닫으면 fal 에서는 완성되지만
+  //   우리 문서는 굽는 중인 채로 있다가, 다음에 그 화면을 열면 그때 수거된다.
+  await collectReelOneShot(id, user.id).catch((e) => {
+    console.error("reel 수거 실패:", e);
+  });
+
   const project = await getProject(id, user.id);
   if (!project || project.kind !== "reel") {
     return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
