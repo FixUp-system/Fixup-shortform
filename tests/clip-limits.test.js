@@ -138,12 +138,15 @@ describe("하위호환 — 화면이 쓰는 이름은 기본 모델의 값이다
 });
 
 describe("영상 모델 표", () => {
-  it("고를 수 있는 것은 셋이고 기본은 Seedance 2.0 이다", () => {
+  it("고를 수 있는 것은 넷이고 기본은 기본(H3)이다", () => {
     // ★ 2026-08-25 — Seedance 2.5 가 들어왔다(사장님: "등급에 따라서 사용 가능하게").
+    // ★★ 2026-08-31 — MiniMax H3 가 들어오고 **기본이 그리로 옮겼다**(사장님 지시).
+    //   순서가 곧 칩 순서라 기본이 맨 앞이다.
     //   ★ 표에 있다고 아무나 고를 수 있는 것은 아니다: reel 은 REEL_MODEL_IDS 로 한 번,
     //     등급(lib/tiers.js)으로 또 한 번 좁힌다(tests/reel-model-pick.test.js).
-    expect(I2V_MODEL_IDS).toEqual(["seedance-2.0", "seedance-2.5", "kling-v3"]);
-    expect(DEFAULT_I2V_MODEL).toBe("seedance-2.0");
+    expect(I2V_MODEL_IDS).toEqual(["minimax-h3", "seedance-2.0", "seedance-2.5", "kling-v3"]);
+    expect(DEFAULT_I2V_MODEL).toBe("minimax-h3");
+    // ★ 옛 문서가 떨어질 자리는 **안 바뀐다** — 건드리면 이미 만든 영상이 갈아탄다.
     expect(LEGACY_I2V_MODEL).toBe("kling-v3");
   });
 

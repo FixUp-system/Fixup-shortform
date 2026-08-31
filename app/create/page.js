@@ -16,7 +16,7 @@ import { useMe } from "../../components/MeContext";
 import { TARGET_CHOICES } from "../../lib/script";
 import { DEFAULT_STYLE_ID } from "../../lib/styles";
 import { ASPECTS, DEFAULT_ASPECT_ID, aspectFor } from "../../lib/aspects";
-import { I2V_MODELS, DEFAULT_I2V_MODEL, DEFAULT_RESOLUTION, resolutionsForModel } from "../../lib/clip-limits";
+import { I2V_MODELS, DEFAULT_I2V_MODEL, DEFAULT_RESOLUTION, resolutionsForModel, defaultResolutionForModel } from "../../lib/clip-limits";
 import { SUBTITLE_LANGS, DEFAULT_SPEECH_LANG } from "../../lib/subtitle-langs";
 // 값은 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다)
 import { videoPrice } from "../../lib/pricing";
@@ -46,7 +46,9 @@ export default function CreatePage() {
   //   화질이 정가를 바꾸므로(Seedance 30초: 720p 160 · 1080p 360) 고르는 자리는 결제 앞이어야
   //   하고, 만들기 전이 가장 앞이다. 여기에는 잠금(project.charged)이 없다 — 아직 청구가
   //   없으니 잠글 것도 없고, 그 대신 **모델과 어긋난 값이 남지 않게** pickModel 이 맞춰 준다.
-  const [resolution, setResolution] = useState(DEFAULT_RESOLUTION);
+  // ★ 2026-08-31 — 이 화면도 DEFAULT_I2V_MODEL 을 공유한다. 기본이 H3 로 옮겨 가면서
+  //   전역 720p 가 그 모델에 없는 값이 됐다 — 그 모델의 기본으로 시작한다.
+  const [resolution, setResolution] = useState(defaultResolutionForModel(DEFAULT_I2V_MODEL));
   // 영상이 말할 언어 — 대사 원문이 이 말로 쓰이고, 그 글자가 그대로 자막이 된다
   const [speechLang, setSpeechLang] = useState(DEFAULT_SPEECH_LANG);
   const [stylePreset, setStylePreset] = useState(DEFAULT_STYLE_ID);
@@ -96,7 +98,7 @@ export default function CreatePage() {
     setModel(id);
     const list = resolutionsForModel(id);
     if (!list.length || list.includes(resolution)) return;
-    setResolution(list.includes(DEFAULT_RESOLUTION) ? DEFAULT_RESOLUTION : list[0]);
+    setResolution(list.includes(DEFAULT_RESOLUTION) ? DEFAULT_RESOLUTION : defaultResolutionForModel(id));
   }
 
   async function submit() {
@@ -173,7 +175,7 @@ export default function CreatePage() {
                       {/* ★ 칩마다의 값은 **기본 화질** 기준이다 — 모델을 고르는 순간의 화질을
                           쓰면, 그 모델이 그 화질을 열지 않을 때 없는 값의 가격을 적게 된다.
                           고른 화질의 정확한 값은 바로 아래 화질 칩이 적는다. */}
-                      {m.label}{showCredits && ` · ${videoPrice(seconds, m.id, DEFAULT_RESOLUTION)} 크레딧`}
+                      {m.label}{showCredits && ` · ${videoPrice(seconds, m.id, defaultResolutionForModel(m.id))} 크레딧`}
                     </button>
                   ))}
                 </div>

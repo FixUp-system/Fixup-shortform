@@ -80,13 +80,17 @@ describe("표시용 가격도 화질을 본다", () => {
 
   // 프로젝트가 아직 없는 자리(자료 화면·빠른 생성)는 저장된 화질이 없다.
   // 그래도 기본값을 **명시**로 넘긴다 — 인자를 비우면 다음 사람이 "해상도를 안 보는 자리"로
-  // 읽는다. 값은 중립이다(생략도 720p 열로 떨어진다).
-  it("자료 화면은 기본 화질을 명시로 넘긴다", () => {
-    expect(create).toMatch(/videoPrice\([\s\S]{0,80}?DEFAULT_RESOLUTION/);
+  // 읽는다.
+  // ★★ 2026-08-31 — 넘기는 값이 **전역 720p → 그 모델의 기본**으로 바뀌었다. 그전에는
+  //   "값은 중립이다(생략도 720p 열로 떨어진다)" 가 참이었는데, 기본 모델이 H3 로 옮겨
+  //   가면서 720p 는 **그 모델에 없는 값**이 됐다(768P·2K). 재는 것은 그대로다 —
+  //   **명시로 넘기는가**.
+  it("자료 화면은 그 모델의 기본 화질을 명시로 넘긴다", () => {
+    expect(create).toMatch(/videoPrice\([\s\S]{0,80}?defaultResolutionForModel/);
   });
-  it("빠른 생성도 기본 화질을 명시로 넘긴다", () => {
-    const calls = quick.match(/videoPrice\([\s\S]{0,120}?\)/g) || [];
+  it("빠른 생성도 그 모델의 기본 화질을 명시로 넘긴다", () => {
+    const calls = quick.match(/videoPrice\([\s\S]{0,140}?\)/g) || [];
     expect(calls.length).toBe(2);
-    for (const c of calls) expect(c).toMatch(/DEFAULT_RESOLUTION/);
+    for (const c of calls) expect(c).toMatch(/defaultResolutionForModel/);
   });
 });

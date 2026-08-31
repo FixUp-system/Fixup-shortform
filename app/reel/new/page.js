@@ -48,7 +48,7 @@ import { STYLE_PRESETS } from "../../../lib/styles";
 // 목록에서 고르므로 애초에 모르는 값이 안 생긴다 — 검증은 서버 몫).
 import {
   resolutionsForModel, secondsForModel, reelModelsForTier,
-  DEFAULT_I2V_MODEL, DEFAULT_RESOLUTION,
+  DEFAULT_I2V_MODEL, DEFAULT_RESOLUTION, defaultResolutionForModel,
 } from "../../../lib/clip-limits";
 // 등급은 서버가 판정해 /api/me 로 내려준다 — 화면이 profile 을 직접 읽지 않는다.
 import { useMe } from "../../../components/MeContext";
@@ -114,7 +114,9 @@ export default function ReelNewPage() {
   const { me } = useMe();
   const models = reelModelsForTier(me?.tier);
   const [model, setModel] = useState(DEFAULT_I2V_MODEL);
-  const [resolution, setResolution] = useState(DEFAULT_RESOLUTION);
+  // ★ 2026-08-31 — 전역 720p 가 아니라 **그 모델의 기본**이다. 기본이 H3 로 옮겨 가면서
+  //   720p 는 목록에 아예 없는 값이 됐다(768P·2K).
+  const [resolution, setResolution] = useState(defaultResolutionForModel(DEFAULT_I2V_MODEL));
   const [busy, setBusy] = useState("");
   // 사진이 아직 올라가는 중인가. ★ busy 로 겸할 수 없다(app/film/new/page.js 의 같은
   // 주석 참고 — 업로드가 짧게 져서 사진 0장으로 나간 사고가 있었다).
@@ -133,7 +135,8 @@ export default function ReelNewPage() {
   function onModelChange(next) {
     setModel(next);
     const res = resolutionsForModel(next);
-    if (res.length && !res.includes(resolution)) setResolution(res[0]);
+    // ★ 되돌릴 자리는 목록의 첫 값이 아니라 **그 모델의 기본**이다(광고 화면과 같은 처방).
+    if (res.length && !res.includes(resolution)) setResolution(defaultResolutionForModel(next));
     if (target !== null && !secondsForModel(next).includes(target)) setTarget(null);
   }
 

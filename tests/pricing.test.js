@@ -137,13 +137,15 @@ describe("모델별 정가", () => {
   });
 
   it("두 모델이 같은 길이 눈금을 덮는다 — 한쪽만 값이 빠지면 안 된다", () => {
-    for (const m of ["seedance-2.0", "seedance-2.5", "kling-v3"]) {
+    // ★ 2026-08-31 — H3 가 들어왔다. 화면에서 고를 수 있는 길이는 15초뿐이지만
+    //   (secondsForModel) 표는 네 눈금을 다 든다 — 한 칸이 비면 그 조합이 30초 값으로 샌다.
+    for (const m of ["seedance-2.0", "seedance-2.5", "minimax-h3", "kling-v3"]) {
       // 해상도 열마다 눈금이 똑같아야 한다 — 한 열만 60초가 빠지면 그 조합이 30초 값으로 샌다
       for (const table of Object.values(VIDEO_PRICE[m])) {
         expect(Object.keys(table).map(Number).sort((a, b) => a - b)).toEqual([15, 30, 45, 60]);
       }
     }
-    expect(Object.keys(REGEN_PRICE.clip).sort()).toEqual(["kling-v3", "seedance-2.0", "seedance-2.5"]);
+    expect(Object.keys(REGEN_PRICE.clip).sort()).toEqual(["kling-v3", "minimax-h3", "seedance-2.0", "seedance-2.5"]);
   });
 });
 

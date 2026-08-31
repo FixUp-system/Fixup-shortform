@@ -10,7 +10,7 @@ import { STYLE_PRESETS } from "../lib/styles";
 // 정가는 가격표 한 곳에서 온다. lib/pricing.js 는 import 0 개의 순수 모듈이라
 // 화면에서 불러도 안전하다(lib/charges.js 는 스토어를 끌고 오므로 안 된다).
 import { videoPrice } from "../lib/pricing";
-import { DEFAULT_I2V_MODEL, DEFAULT_RESOLUTION } from "../lib/clip-limits";
+import { DEFAULT_I2V_MODEL, defaultResolutionForModel } from "../lib/clip-limits";
 import { STEPS, stepHref, currentStepKey } from "../lib/steps";
 import { lastConfirmIndex, clearConfirms, restoreConfirm } from "../lib/quick-create-state";
 
@@ -59,7 +59,7 @@ export default function QuickCreate() {
   //   (레거시 폴백으로 두면 화면은 싼 값을 적고 장부는 비싼 값을 받아 간다).
   // ★ 화질도 마찬가지다 — 빠른 생성은 화질을 안 묻는다(단계별 흐름의 ②대본에서 고른다).
   //   그러니 값은 **기본 화질** 기준이고, 그것을 인자로 명시한다.
-  const price = (m) => videoPrice(m?.params?.target_seconds, DEFAULT_I2V_MODEL, DEFAULT_RESOLUTION);
+  const price = (m) => videoPrice(m?.params?.target_seconds, DEFAULT_I2V_MODEL, defaultResolutionForModel(DEFAULT_I2V_MODEL));
   const noCredits = (m) => credits && credits.gated && credits.balance < price(m);
 
   useEffect(() => {
@@ -191,7 +191,7 @@ export default function QuickCreate() {
           text:
             `정리했어요 — ${data.summary || "요청하신 내용"}\n` +
             `(${data.target_seconds}초 · ${data.aspect_ratio} · ${styleLabel(data.style)} · ${data.voice_label})\n` +
-            `이 영상은 ${videoPrice(data.target_seconds, DEFAULT_I2V_MODEL, DEFAULT_RESOLUTION)} 크레딧이에요.\n` +
+            `이 영상은 ${videoPrice(data.target_seconds, DEFAULT_I2V_MODEL, defaultResolutionForModel(DEFAULT_I2V_MODEL))} 크레딧이에요.\n` +
             `아래 버튼을 누르면 완성까지 자동으로 만들어요. 바꾸고 싶은 게 있으면 그냥 이어서 말씀해 주세요.`,
           confirm: true,
           params: data,
