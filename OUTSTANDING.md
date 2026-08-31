@@ -14,7 +14,8 @@
 | 테스트 | **5,296 그린** (10 skipped) — `npx vitest run` |
 | 배포 | **프로덕션 라이브** — 08-31 에 세 번(`20abb0c` → `4136ce1` → **`e02b740`**), 그전 08-27 `f1b3ccc`·`b97d704` |
 | 미배포 | **없다** — `e02b740` 이 곧 프로덕션이다(그 뒤는 이 문서 갱신뿐) |
-| 푸시 | **둘 다 올렸다**(`e02b740`) — `fixup`·`origin` 모두 HEAD 와 같다. ★ `origin` 은 URL 에 계정이 안 박혀 있어 그냥 밀면 **자격증명 대기로 멈춘다**. 계정을 실어 밀면 통과한다: `git push https://jaechanyoon0519-Fixup@github.com/FixUp-system/Fixup-shortform.git feat/reel-cut-r2v` |
+| 푸시 | **둘 다 올렸다**(`54cf5bd`) — `fixup`·`origin` 의 브랜치와 **`main` 모두** HEAD 와 같다. ★ `origin` 은 URL 에 계정이 안 박혀 있어 그냥 밀면 **자격증명 대기로 멈춘다**. 계정을 실어 밀면 통과한다: `git push https://jaechanyoon0519-Fixup@github.com/FixUp-system/Fixup-shortform.git <브랜치>` |
+| main 병합 | ★ **끝났다**(2026-08-31, 사장님 지시). `d1ae550` → **`54cf5bd`** 로 **fast-forward** — main 에만 있던 커밋이 0 이라 잃은 이력이 없고 병합 커밋도 안 생겼다. **174커밋**이 올라갔다. ⚠️ **로컬 `main` 은 그대로 낡았다**(`da6bfbd`) — 다른 세션의 워크트리에 체크아웃돼 있어 안 건드렸다 |
 | 개발 서버 | `SHOTFORM_FAKE=fal SHOTFORM_NO_CREDITS=0 npx next dev` → 3001 |
 
 ### 08-31(2) 에 바뀐 것 — 모델을 등급으로 부른다
@@ -49,6 +50,10 @@
 > 🔴 **다음 세션이 첫 한 편에서 눈으로 볼 것** — H3 가 프롬프트의 따옴표 대사를 **글자
 > 그대로** 말하는가. Seedance 는 그렇게 동작하고 **자막 정렬이 그 위에 서 있다**
 > (`lib/speech-timing.js`). 다르게 말하면 자막이 어긋난다. 아직 실측이 없다.
+
+> ★★ **이 브랜치는 이제 `main` 과 같은 커밋이다.** 이어서 작업할 때 둘 중 어디에 쌓을지
+>   먼저 정해라 — 브랜치에만 쌓으면 main 이 다시 뒤처진다. 저장소 규칙(CLAUDE.md)은
+>   여전히 **"main 에 직접 쓰지 않는다"** 이고, 이번 병합은 사장님이 따로 지시한 것이다.
 
 > ⚠️ **커밋·푸시·배포는 사장님이 요청할 때만.**
 > ⚠️ **`git checkout <파일>` 을 쓰지 마라.** 진행 중 작업이 사라진다.
