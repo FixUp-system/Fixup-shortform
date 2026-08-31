@@ -6,6 +6,7 @@ import {
   isAdResolution, adResolutionsFor, adDefaultResolution, adRefMax,
 } from "../../../lib/ad/models.js";
 import { ownedPhotoKeys } from "../../../lib/refs-io.js";
+import { isPhotoRole } from "../../../lib/photos.js";
 import { withUser } from "../../../lib/auth/require-user.js";
 import { getStore } from "../../../lib/store/index.js";
 import { tierOf, tierAllowsModel } from "../../../lib/tiers.js";
@@ -95,6 +96,12 @@ export const POST = withUser(async (req, _ctx, user) => {
   const photoMax = adRefMax(model);
   if (photos.length > photoMax) {
     return Response.json({ error: `사진은 ${photoMax}장까지 올릴 수 있어요` }, { status: 400 });
+  }
+  // ★ 사진의 **종류**도 닫힌 목록이다(2026-08-31). 화면에서만 거르면 가림막이지
+  //   잠금이 아니다 — 이 저장소가 2.5 를 hidden 으로 두었다가 API 로 뚫린 그 자리다.
+  // ★ **없으면 통과한다** — 옛 문서와 구버전 화면이 종류 없이 보낸다. 모르는 값만 막는다.
+  if (photos.some((ph) => ph?.role !== undefined && !isPhotoRole(ph.role))) {
+    return Response.json({ error: "그 사진 종류는 몰라요" }, { status: 400 });
   }
   if (!(await ownedPhotoKeys(photos, user.id))) {
     return Response.json({ error: "본인이 올린 사진만 쓸 수 있어요" }, { status: 400 });

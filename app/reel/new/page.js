@@ -61,7 +61,7 @@ import { useMe } from "../../../components/MeContext";
 //     서버가 settings.resolution 을 읽어 한다. 문구만 뺀 것이지 값이 바뀐 것이 아니다.
 // 사진 상한 — 서버(app/api/reel/route.js)와 **같은 파일**에서 읽는다. 손으로 두 벌 적으면
 // 화면은 통과시키는데 서버가 400 을 내고, 사장님은 다 올린 뒤에야 거절당한다.
-import { MAX_PHOTOS } from "../../../lib/photos";
+import { MAX_PHOTOS, PHOTO_ROLES } from "../../../lib/photos";
 import { MAX_MATERIAL_TEXT } from "../../../lib/material";
 
 // 화풍은 영상용 문구가 있는 것만 고를 수 있다 — 광고 화면(app/ads/new/page.js)·
@@ -140,6 +140,15 @@ export default function ReelNewPage() {
     if (target !== null && !secondsForModel(next).includes(target)) setTarget(null);
   }
 
+  // ★ 어느 버튼을 눌렀는지 기억한다(2026-08-31). 파일 input 은 **하나만** 둔다 —
+  //   셋으로 늘리면 업로드 상태(uploading)와 ref 도 셋이 되고, 그중 하나만 안 풀려도
+  //   버튼이 영영 잠긴다(이 화면이 이미 겪은 종류의 사고다).
+  const pendingRole = useRef(PHOTO_ROLES[0].id);
+  function pickRole(id) {
+    pendingRole.current = id;
+    fileRef.current?.click();
+  }
+
   async function onFiles(e) {
     const files = Array.from(e.target.files);
     const room = MAX_PHOTOS - photos.length;
@@ -151,7 +160,8 @@ export default function ReelNewPage() {
         fd.append("file", file);
         const res = await fetch("/api/uploads", { method: "POST", body: fd });
         const data = await res.json().catch(() => ({}));
-        if (res.ok) setPhotos((p) => [...p, data]);
+        // ★ 올린 사진에 **누른 버튼의 종류**를 붙인다 — 이 값이 프롬프트의 라벨이 된다.
+        if (res.ok) setPhotos((p) => [...p, { ...data, role: pendingRole.current }]);
         else setErr(data.error || "업로드 실패");
       }
     } finally {
@@ -358,13 +368,15 @@ export default function ReelNewPage() {
           </div>
 
           <div className="composer-bar">
-            <button
-              className="pill"
-              disabled={locked || photos.length >= MAX_PHOTOS}
-              onClick={() => fileRef.current?.click()}
-            >
-              ＋ 사진 {photos.length > 0 && <b>{photos.length}</b>}
-            </button>
+            {/* ★★ 2026-08-31 사장님 지시 — `＋사진` 하나를 **종류별 셋**으로 갈랐다.
+                누르는 순간 종류가 정해지므로 "안 고른 사진"이 아예 안 생긴다.
+                ★ 표를 돌려 그린다(lib/photos.js) — 손으로 세 번 적으면 종류가 늘 때 낡는다. */}
+            {PHOTO_ROLES.map((r) => (
+              <button key={r.id} className="pill" disabled={locked || photos.length >= MAX_PHOTOS}
+                onClick={() => pickRole(r.id)}>
+                ＋ {r.label}{photos.filter((p) => p.role === r.id).length > 0 && <b>{photos.filter((p) => p.role === r.id).length}</b>}
+              </button>
+            ))}
             <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={onFiles} />
             <span className="spacer" />
             <button className="cta" disabled={locked || !text.trim() || !target} onClick={create}>
