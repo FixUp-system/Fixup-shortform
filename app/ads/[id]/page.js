@@ -27,6 +27,7 @@ import { useAdProject } from "../../../components/AdProjectContext";
 import AdOptionTray from "../../../components/AdOptionTray";
 import { MAX_MATERIAL_TEXT } from "../../../lib/material";
 import { useMe } from "../../../components/MeContext";
+import { classifyFailure } from "../../../lib/failure";
 
 // 폴링 주기 — 기존 단계 화면들(app/create/[id]/*/page.js)과 같다. ★ 이건 "화면이 서버
 // 상태를 몇 초마다 묻는가"고, fal 큐 폴링 간격(서버 쪽, lib/ad/generate.js 의 4초)과는
@@ -374,7 +375,12 @@ export default function AdDetailPage() {
       <p className="pgsub">{model.label} 모델 · {model.hint}</p>
       {err && <p className="pgsub warn">{err}</p>}
       {/* 배경에서 굽다 실패한 것 — 위치를 status 마다 가르지 않는다. 사장님이 못 보면 안 된다. */}
-      {video_error && <p className="pgsub warn">{video_error}</p>}
+      {/* ★★ 2026-08-31 — **사장님 말로 옮겨서** 보인다. 그전에는 fal 원문 영어가 그대로
+          떴다("영상 생성 실패 (422) {\"detail\":[{\"loc\":[\"body\",\"image_urls\"]…").
+          단계별 흐름은 처음부터 이 함수를 쓰고 있었다(lib/failure.js 의 classifyFailure) —
+          광고 화면만 그 자리가 비어 있었다.
+          ★ 모르는 오류는 **원문 그대로** 나온다 — 정보를 줄이지 않는 그 함수의 규율이다. */}
+      {video_error && <p className="pgsub warn">{classifyFailure(video_error).message}</p>}
 
       {/* ①입력 — **고칠 수 있는 자리**다(2026-08-21 사장님 지적). 그전에는 "시나리오를
           만들어 주세요" 한 줄뿐이라, 시나리오를 보고 나서 소재나 옵션을 고치려면
