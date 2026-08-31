@@ -46,8 +46,26 @@ export const POST = withUser(async (req, { params }, user) => {
   //   whisper 는 시각만 답하고 글자는 시나리오가 답한다(lib/speech-timing.js).
   // ★ 못 재도 그대로 간다 — 자막 하나 때문에 이미 값을 다 치른 한 편을 잃을 수 없다.
   // ★ 재고 난 것은 문서에 남긴다 — 다시 합성할 때 또 재면 값이 두 번 나간다.
+  // ★★ 2026-08-27 — 자막 원천이 **한 벌**이면 그것을 넘긴다. 새 길에서는 말이 컷이 아니라
+  //   `scenario.narration` 에 살아 컷의 sentence 가 비므로, 안 넘기면 완성본에 자막이
+  //   통째로 없다(lib/reel/narration.js 의 narrationUnits · lib/compose.js 의 subtitleCutsOf).
+  // ★ 길이는 **구운 클립의 합**이다 — 계획 초가 아니라 실제로 화면에 있는 시간이라야
+  //   마지막 자막이 영상 밖으로 안 나간다.
+  // ★ 옛 문서는 null 이라 그 자리가 통째로 없다 — 예전 길 그대로다.
+  const units = narrationUnits(
+    project,
+    cuts.reduce((a, c) => a + (Number(c?.video?.seconds) || 0), 0)
+  );
+
   let timed = cuts;
-  if (needsSpeechProbe(cuts) && !cuts.some((c) => Number(c?.spoken_start) > 0)) {
+  // ★★ 2026-08-28 — **한 벌이 있으면 재지 않는다.** whisper 가 잰 시각은 컷에 박히는데
+  //   (spoken_start) 자막은 한 벌 단위에서 나오므로(위 units) **잰 값을 읽는 자리가 없다.**
+  //   그런데도 불렸다: needsSpeechProbe 는 "대사가 있는 컷이 둘 이상인가"를 보는데,
+  //   시나리오가 한 벌을 컷 line 에 조각내 적어 두면 참이 된다(에너지 음료 실측: 컷 다섯).
+  //   값은 작지만($0.0006/초) 쓰지 않을 값을 재려고 fal 을 부르고 몇 초를 기다린다.
+  // ★ 컷 line 은 **지우지 않는다** — 한 벌이 빠졌을 때 옛 길(컷 자막)로 떨어지는 안전망이다.
+  // ★ 옛 문서는 units 가 null 이라 이 조건이 참이 되어 **예전 그대로** 잰다(회귀 0).
+  if (!units && needsSpeechProbe(cuts) && !cuts.some((c) => Number(c?.spoken_start) > 0)) {
     const clipUrl = cuts.find((c) => c?.video?.url)?.video?.url;
     const seconds = cuts.reduce((a, c) => a + (Number(c?.video?.seconds) || 0), 0);
     const chunks = await probeSpeech(clipUrl, { projectId: id, seconds });
@@ -60,16 +78,6 @@ export const POST = withUser(async (req, { params }, user) => {
     }
   }
 
-  // ★★ 2026-08-27 — 자막 원천이 **한 벌**이면 그것을 넘긴다. 새 길에서는 말이 컷이 아니라
-  //   `scenario.narration` 에 살아 컷의 sentence 가 비므로, 안 넘기면 완성본에 자막이
-  //   통째로 없다(lib/reel/narration.js 의 narrationUnits · lib/compose.js 의 subtitleCutsOf).
-  // ★ 길이는 **구운 클립의 합**이다 — 계획 초가 아니라 실제로 화면에 있는 시간이라야
-  //   마지막 자막이 영상 밖으로 안 나간다(whisper 블록이 쓰는 그 값과 같은 자다).
-  // ★ 옛 문서는 null 이라 그 자리가 통째로 없다 — 예전 길 그대로다.
-  const units = narrationUnits(
-    project,
-    cuts.reduce((a, c) => a + (Number(c?.video?.seconds) || 0), 0)
-  );
 
   runInBackground(
     composeVideo({
