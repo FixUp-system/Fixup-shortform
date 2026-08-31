@@ -11,11 +11,11 @@
 |---|---|
 | 워크트리 | `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` |
 | 브랜치 | `feat/reel-cut-r2v` |
-| 테스트 | **5,296 그린** (10 skipped) — `npx vitest run` |
-| 배포 | **프로덕션 라이브** — 08-31 에 세 번(`20abb0c` → `4136ce1` → **`e02b740`**), 그전 08-27 `f1b3ccc`·`b97d704` |
-| 미배포 | **없다** — `e02b740` 이 곧 프로덕션이다(그 뒤는 이 문서 갱신뿐) |
-| 푸시 | **둘 다 올렸다**(`54cf5bd`) — `fixup`·`origin` 의 브랜치와 **`main` 모두** HEAD 와 같다. ★ `origin` 은 URL 에 계정이 안 박혀 있어 그냥 밀면 **자격증명 대기로 멈춘다**. 계정을 실어 밀면 통과한다: `git push https://jaechanyoon0519-Fixup@github.com/FixUp-system/Fixup-shortform.git <브랜치>` |
-| main 병합 | ★ **끝났다**(2026-08-31, 사장님 지시). `d1ae550` → **`54cf5bd`** 로 **fast-forward** — main 에만 있던 커밋이 0 이라 잃은 이력이 없고 병합 커밋도 안 생겼다. **174커밋**이 올라갔다. ⚠️ **로컬 `main` 은 그대로 낡았다**(`da6bfbd`) — 다른 세션의 워크트리에 체크아웃돼 있어 안 건드렸다 |
+| 테스트 | **5,314 그린** (10 skipped) — `npx vitest run` |
+| 배포 | **프로덕션 라이브** — 08-31 에 네 번(… `4136ce1` → `e02b740` → **`8c6bff0`**), 그전 08-27 `f1b3ccc`·`b97d704` |
+| 미배포 | **없다** — `8c6bff0` 이 곧 프로덕션이다(그 뒤는 이 문서 갱신뿐) |
+| 푸시 | **둘 다 올렸다**(`8c6bff0`) — `fixup`·`origin` 의 브랜치와 **`main` 모두** HEAD 와 같다. ★ `origin` 은 URL 에 계정이 안 박혀 있어 그냥 밀면 **자격증명 대기로 멈춘다**. 계정을 실어 밀면 통과한다: `git push https://jaechanyoon0519-Fixup@github.com/FixUp-system/Fixup-shortform.git <브랜치>` |
+| main 병합 | ★ **끝났다**(2026-08-31, 사장님 지시) — 그 뒤로도 **브랜치와 main 을 함께 민다**. 지금 네 ref(`fixup`·`origin` × 브랜치·main)가 모두 `8c6bff0` 이다. 전부 fast-forward라 잃은 이력이 없다. ⚠️ **로컬 `main` 만 낡았다**(`da6bfbd`) — 다른 세션 워크트리에 체크아웃돼 있어 안 건드린다 |
 | 개발 서버 | `SHOTFORM_FAKE=fal SHOTFORM_NO_CREDITS=0 npx next dev` → 3001 |
 
 ### 08-31(2) 에 바뀐 것 — 모델을 등급으로 부른다
@@ -46,6 +46,17 @@
   ★★ **스키마에 없는 런타임 제약이었다** — H3 를 배선하면서 OpenAPI 만 읽어서 못 봤다.
   오류 문구도 제 갈래로 팠다(`rejected_aspect`) — 그전에는 "문장을 조금 바꿔"라는 **틀린
   안내**였다.
+
+- **사진을 로고·제품·인물로 받는다**(`8c6bff0`) — `＋사진` 하나가 버튼 셋이 됐다.
+  표는 `lib/photos.js` 의 `PHOTO_ROLES` 하나(`{id, label, ko, en}`)이고, 프롬프트 **세
+  자리**에 "이건 로고다 · 절대 바꾸지 마라"가 실린다: ①원클릭 시나리오 지시문
+  ②단계별 그림(`Attached image [n] …`) ③단계별 클립(번호 없이 — 클립의 첨부 순서는
+  갈래마다 다르다). 서버도 닫힌 목록으로 판정한다(`isPhotoRole`).
+  ★ 필드 이름이 `kind` 가 아니라 **`role`** 인 이유는 `resolveCutRefs` 의 `ref.kind`
+    (thing·person)와 뜻이 겹쳐서다.
+  ★★ **vision 은 안 건드렸다**(사장님 결정) — 라벨이 대체하는 것은 `person` 하나뿐이고
+    `lettering`·`what`·`scale` 은 사진을 봐야만 안다. 건너뛰면 제품 글자를 잃는다.
+  ★ **옛 문서는 세 자리 모두 한 글자도 안 붙는다**(각인 보호).
 
 > 🔴 **다음 세션이 첫 한 편에서 눈으로 볼 것** — H3 가 프롬프트의 따옴표 대사를 **글자
 > 그대로** 말하는가. Seedance 는 그렇게 동작하고 **자막 정렬이 그 위에 서 있다**
