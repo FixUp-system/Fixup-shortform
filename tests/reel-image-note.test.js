@@ -38,7 +38,13 @@ describe("라우트가 요청을 나른다", () => {
     expect(line).toContain("note");
   });
   it("스토리보드 지문에 넘긴다", () => {
-    expect(route).toMatch(/buildStoryboardPrompt\([^)]*note/);
+    // ★ 2026-08-31 — 판 그리기의 **몸통이 lib/reel/storyboard.js 의 drawStoryboardSheet 로
+    //   옮겨 갔다**(초상 거절 자동 재시도가 같은 길로 다시 그린다). 재는 것은 그대로 두되
+    //   **두 마디**로 나눈다: 라우트가 note 를 넘기는가 · 그 함수가 지문에 싣는가.
+    //   한 마디만 재면 중간에서 끊겨도 그린이다.
+    expect(route, "라우트가 note 를 안 넘긴다").toMatch(/drawStoryboardSheet\(\{[\s\S]{0,300}note/);
+    const lib = readFileSync("lib/reel/storyboard.js", "utf8");
+    expect(lib, "그 함수가 지문에 note 를 안 싣는다").toMatch(/buildStoryboardPromptImpl\([^)]*note/);
   });
 });
 

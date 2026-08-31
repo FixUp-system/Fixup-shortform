@@ -64,19 +64,21 @@ describe("지문이 사진을 가리킨다", () => {
 
 describe("배선 — 라우트가 실제로 실어 보낸다", () => {
   const route = strip(readFileSync("app/api/reel/[id]/images/route.js", "utf8"));
+  // ★ 2026-08-31 — 스토리보드 갈래의 **몸통이 여기로 옮겨 갔다**(drawStoryboardSheet).
+  //   라우트가 아니라 이 파일을 재야 실제로 나가는 것을 잰다.
+  const lib = strip(readFileSync("lib/reel/storyboard.js", "utf8"));
 
   it("★★ 스토리보드 호출에 refs 가 실린다 — 지문만 고치면 사진은 여전히 안 간다", () => {
-    expect(route).toContain("loadStoryboardRefs");
-    const at = route.indexOf("loadStoryboardRefs(project)");
-    expect(at, "스토리보드 갈래에서 안 부른다").toBeGreaterThan(-1);
-    // generateImage 호출이 그 아래에 있고 refs 를 받는다.
-    const call = route.indexOf("generateImage({", at);
+    const at = lib.indexOf("loadRefs(project)");
+    expect(at, "스토리보드 갈래에서 참조를 안 읽는다").toBeGreaterThan(-1);
+    // 생성 호출이 그 아래에 있고 refs 를 받는다.
+    const call = lib.indexOf("gen({", at);
     expect(call).toBeGreaterThan(at);
-    expect(route.slice(call, call + 300)).toMatch(/^\s*refs,\s*$/m);
+    expect(lib.slice(call, call + 300)).toMatch(/^\s*refs,\s*$/m);
   });
 
   it("지문도 같은 refs 를 받는다 — 사진은 갔는데 말은 안 하는 상태를 막는다", () => {
-    expect(route).toMatch(/buildStoryboardPrompt\([^)]*refs\)/);
+    expect(lib).toMatch(/buildStoryboardPromptImpl\([^)]*refs\)/);
   });
 
   it("컷별 갈래는 예전 그대로다 — loadCutRefs 를 계속 쓴다", () => {

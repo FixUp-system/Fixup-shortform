@@ -2,7 +2,7 @@ import { withUser } from "../../../../../lib/auth/require-user.js";
 import { getProject, updateProject } from "../../../../../lib/projects.js";
 import { generateImage, imageResolutionFor } from "../../../../../lib/imagegen.js";
 import { buildImagePrompt } from "../../../../../lib/cuts.js";
-import { loadCutRefs, loadStoryboardRefs } from "../../../../../lib/cut-refs.js";
+import { loadCutRefs } from "../../../../../lib/cut-refs.js";
 import { requireVideoCharge, NoCredits } from "../../../../../lib/charges.js";
 import { modelIdForProject, resolutionForProject } from "../../../../../lib/clip-limits.js";
 import { fakeFal } from "../../../../../lib/fake.js";
@@ -10,16 +10,14 @@ import {
   reelOf, putReel, isImagesLocked, imageTriesLeft, imageTriesLeftLifetime, isReelRendering,
 } from "../../../../../lib/reel/doc.js";
 import {
-  planReelImages, buildStoryboardPrompt, storyboardImageSize,
-  cropStoryboardCells, saveStoryboardCells, fetchImageBytes,
+  planReelImages, drawStoryboardSheet, mergeImages,
 } from "../../../../../lib/reel/storyboard.js";
 
-// 만든 그림만 컷에 얹는다 — **컷 목록을 대체하지 않는다.** export 하는 이유: 이것이
+// 만든 그림만 컷에 얹는다 — **컷 목록을 대체하지 않는다.** 다시 내보내는 이유: 이것이
 // N1 의 수정 전부다("실패해도 뒤 컷이 살아남는가"), 테스트가 이것을 직접 부른다
 // (tests/reel-routes.test.js).
-export function mergeImages(cuts, made) {
-  return (cuts || []).map((c) => (made.has(c.idx) ? { ...c, image: made.get(c.idx) } : c));
-}
+// ★ 2026-08-31 — 몸통은 lib/reel/storyboard.js 로 옮겼다(초상 재시도도 같은 병합을 쓴다).
+export { mergeImages };
 
 // 그림 만들기 — **스토리보드 한 장을 사서 칸을 자른다**(2026-08-25). film 의 images
 // 라우트와 같은 결이다: 동기로 기다린다(호출이 한 번이라 서버리스 상한 안에서 끝나고,
@@ -143,25 +141,14 @@ export const POST = withUser(async (req, { params }, user) => {
     //   격자에서는 그 성질이 부작용이 아니라 목적이다 — 지문도 그렇게 말한다(refLine).
     // ★ 참조는 **프로젝트 전체의 합집합**이다(컷마다가 아니다) — 한 장에 다 그리기 때문이고,
     //   바이트는 키마다 한 번만 읽는다(loadStoryboardRefs).
+    // ★ 몸통은 lib/reel/storyboard.js 의 drawStoryboardSheet 하나다(2026-08-31 에 옮겼다) —
+    //   초상 거절 자동 재시도가 같은 길로 판을 다시 그린다. 두 벌이면 한쪽만 고쳐진다.
     try {
-      const { refs } = await loadStoryboardRefs(project);
-      const prompt = buildStoryboardPrompt(project, cuts, plan.grid, note, refs);
-      const out = await generateImage({
-        prompt,
-        aspect_ratio: plan.grid.canvas,
-        projectId: id,
-        resolution,
-        refs,
-        imageSize: storyboardImageSize(plan.grid, aspect_ratio, resolutionForProject(project)),
+      const drawn = await drawStoryboardSheet({
+        project, cuts, grid: plan.grid, note,
+        projectId: id, ownerId: user.id, aspect: aspect_ratio, resolution,
       });
-      // 여기서부터는 **우리 바이트**다 — 내려받아 자르고 우리 버킷에 둔다.
-      // 어디에 왜 두는지는 lib/reel/storyboard.js 의 saveStoryboardCells 머리말에 있다.
-      const cells = await cropStoryboardCells(await fetchImageBytes(out.url), plan.grid, { aspect: aspect_ratio });
-      const urls = await saveStoryboardCells(cells, user.id);
-      cuts.forEach((cut, i) => {
-        if (!urls[i]) return;
-        made.set(cut.idx, { url: urls[i], of: prompt, sheet: out.url, cell: i });
-      });
+      for (const [idx, image] of drawn) made.set(idx, image);
     } catch (e) {
       failure = e;
     }

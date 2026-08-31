@@ -303,15 +303,25 @@ describe("③그림 라우트", () => {
     expect(src).not.toContain("REEL_GRIDS");
   });
 
+  // ★ 2026-08-31 — 스토리보드 갈래의 **몸통이 lib/reel/storyboard.js 의 drawStoryboardSheet
+  //   로 옮겨 갔다.** 초상 거절 자동 재시도(lib/reel/pipeline.js)가 같은 길로 판을 다시
+  //   그려야 해서다 — 라우트에 두면 라우트가 라우트를 import 하게 된다.
+  //   재는 것은 그대로다. 다만 **두 자리로 나눠** 잰다: 라우트는 "한 번 부른다",
+  //   라이브러리는 "그 안에서도 생성 호출이 한 번이다".
+  const lib = readFileSync("lib/reel/storyboard.js", "utf8");
+
   it("스토리보드 갈래는 생성 호출이 **한 번**이다 — 컷 수만큼 부르지 않는다", () => {
     const storyboard = src.slice(src.indexOf('=== "storyboard"'), src.indexOf("// ── 컷별"));
-    expect(storyboard).toContain("generateImage(");
-    expect(storyboard.match(/generateImage\(/g)).toHaveLength(1);
+    expect(storyboard).toContain("drawStoryboardSheet(");
+    expect(storyboard.match(/drawStoryboardSheet\(/g)).toHaveLength(1);
     expect(storyboard).not.toMatch(/for \(const cut of/);
+
+    const body = lib.slice(lib.indexOf("export async function drawStoryboardSheet"));
+    expect(body.match(/await gen\(/g), "판 한 장에 생성 호출이 하나가 아니다").toHaveLength(1);
   });
 
   it("잘라서 저장하고 그 주소를 컷에 꽂는다", () => {
-    expect(src).toContain("cropStoryboardCells(");
-    expect(src).toContain("saveStoryboardCells(");
+    expect(lib).toContain("cropStoryboardCells(");
+    expect(lib).toContain("saveStoryboardCells(");
   });
 });
