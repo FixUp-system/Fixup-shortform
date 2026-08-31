@@ -211,3 +211,26 @@ cd <빈폴더> && npx vercel deploy --prod --yes --project fixup-shortform-servi
 `C:\Users\fixup\shotform-saas\CLAUDE.md` 의 규칙대로 **wiki 에 반영한다**
 (`C:\Users\fixup\obsidian_jaechan`). 사장님이 따로 요청하지 않아도 한다.
 wiki 파일은 **Write/Edit 도구로만** 쓴다 — PowerShell 로 쓰면 한글이 깨진다.
+
+---
+
+## ⑤영상 — 스토리보드가 86px 칸에 들어간다 (2026-08-28 사장님 지적)
+
+**증상:** ⑤영상 화면에서 스토리보드 한 장(6칸 격자)이 `.up`(86×86px) 안에 그려진다.
+칸 하나가 ~28px 이라 무엇이 그려졌는지 알 수 없고, `object-fit: cover` 라 가장자리가
+잘린다. 사장님이 "6컷 이미지가 작은 네모 안에 보인다"고 하신 그 자리다.
+
+**어디:** `app/reel/[id]/video/page.js` 의 `oneShot` 갈래 — `<div className="up photo-mark">`
+안에 `<img className="thumb-media" src={sheetUrl} />`.
+
+**같은 문제를 ③그림은 이미 고쳤다**(2026-08-25). 그 근거가 CSS 에 남아 있다:
+> `.up(86×86)`은 사장님이 **올린 사진**을 늘어놓는 칸이라 그 크기가 맞지만, 이쪽은
+> 값을 치르고 만든 그림을 **검토**하는 자리다 — 작으면 무엇이 그려졌는지 모른다.
+
+그때 만든 것이 `.cut-shots` / `.cut-shot`(칸당 200px · 비율 고정)이다. **⑤에는 안 왔다.**
+
+**왜 값진가:** 이번 회차에 사장님이 컷3·4의 제품 로고 누락을 그 86px 썸네일로 겨우
+알아채셨다. 제대로 보였으면 굽기 전에 더 일찍 판단할 수 있었다.
+
+**하는 일:** 통짜 갈래의 스토리보드를 격자 비율 그대로 크게 보여준다(③의 방식을 빌린다).
+0원 · 굽기와 무관.
