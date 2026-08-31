@@ -27,6 +27,12 @@ export function MeProvider({ children }) {
   //   아니라 "아직 로그인 안 했다"이고, 상단바가 그 자리에 [로그인]을 그려야 한다.
   //   failed 하나로 뭉치면 일시적인 오류에도 로그인 버튼이 뜬다.
   const [guest, setGuest] = useState(false);
+  // ★★★ **읽기가 끝났는가**(2026-08-31). `me` 가 null 인 것은 두 가지 뜻이다 —
+  //   "아직 읽는 중"과 "읽어 봤더니 없다". 소비자들이 그 둘을 구분 못 해서 새로고침 직후
+  //   **잘못된 한 프레임**이 그려졌다: 크레딧이 반짝 보이고(`me?.gated !== false` 가
+  //   undefined 에서 참), 모델 칩이 기본 하나만 보였다(tier 를 모르니 좁은 쪽으로 떨어진다).
+  // ★ `guest` 를 `failed` 와 다른 축으로 가른 것과 **같은 판단**이다 — 뭉치면 뜻이 섞인다.
+  const [ready, setReady] = useState(false);
 
   // ★ ProjectContext.load 와 달리 **던지지 않는다.** 소비자가 셋인데 그중 둘(상단바·
   // 사이드바)은 실패를 조용히 넘기면 되고, 마이페이지는 `failed` 로 화면에 드러낸다.
@@ -48,12 +54,16 @@ export function MeProvider({ children }) {
     } catch {
       setFailed(true);
       return null;
+    } finally {
+      // ★★ **어느 갈래로 끝나도** 세운다(성공·401·실패). try 안에서만 세우면 못 읽은
+      //   계정의 화면이 빈 채로 굳는다 — 잘못된 한 프레임을 고치려다 영영 빈 화면이 된다.
+      setReady(true);
     }
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  const value = useMemo(() => ({ me, failed, guest, load }), [me, failed, guest, load]);
+  const value = useMemo(() => ({ me, failed, guest, ready, load }), [me, failed, guest, ready, load]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

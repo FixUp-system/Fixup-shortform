@@ -25,7 +25,10 @@ import { modelsForTier } from "../lib/tiers";
 // (두 화면이 같은 목록을 봐야 한다).
 const AD_STYLES = STYLE_PRESETS.filter((s) => Object.keys(AD_STYLE_LINES).includes(s.id));
 
-export default function AdOptionTray({ value, onChange, showCredits = true, admin = false, tier }) {
+// ★★ `tierReady` 는 **등급을 알아냈는가**다(2026-08-31). 기본값이 `true` 인 이유는 이 값을
+//   안 넘기는 옛 호출부의 동작을 한 글자도 안 바꾸기 위해서다 — 새로 그 값을 넘기는
+//   화면만 로딩 중 칩을 비운다.
+export default function AdOptionTray({ value, onChange, showCredits = true, admin = false, tier, tierReady = true }) {
   const { format, mood, style, lang, aspect, model, seconds, resolution } = value;
   const set = (k, v) => onChange({ [k]: v });
 
@@ -127,7 +130,10 @@ export default function AdOptionTray({ value, onChange, showCredits = true, admi
                           (app/api/ads/route.js · app/api/ads/[id]/render/route.js). 2.5 가
                           지금까지 열려 있던 이유가 정확히 이것이다 — 화면에서만 거르고
                           서버는 그대로 받았다. */}
-                      {modelsForTier(tier, { admin }).map((m) => (
+                      {/* ★★ 등급을 **모르는 동안에는 안 그린다**(2026-08-31). 그전에는
+                          tier 가 undefined 라 모르는 등급 = 기본 등급으로 떨어져 **모델이
+                          기본 하나만** 보였다가 로딩 뒤 늘어났다. 줄과 라벨은 남는다. */}
+                      {tierReady && modelsForTier(tier, { admin }).map((m) => (
                         <button key={m.id} className={`chip${model === m.id ? " on" : ""}`}
                           onClick={() => onModelChange(m.id)}>
                           {m.label}

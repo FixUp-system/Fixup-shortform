@@ -26,8 +26,11 @@ describe("내 정보 공유본", () => {
 
   // ★ 2026-08-27 — **손님 축이 하나 늘었다**(guest). 401 은 "못 읽었다"가 아니라
   //   "아직 로그인 안 했다"라서, 상단바가 그 자리에 [로그인]을 그린다(UserMenu).
-  it("읽은 값·실패 여부·손님 여부·다시 읽는 함수를 내준다", () => {
-    expect(ctx).toMatch(/\{\s*me,\s*failed,\s*guest,\s*load\s*\}/);
+  // ★★ 2026-08-31 — **축이 하나 더 늘었다**(ready). `me` 가 null 인 것이 "아직 읽는 중"인지
+  //   "읽어 봤더니 없다"인지 소비자가 못 갈라서, 새로고침 직후 **잘못된 한 프레임**이
+  //   그려졌다(크레딧이 반짝 · 모델이 기본 하나만). guest 를 failed 와 가른 것과 같은 판단이다.
+  it("읽은 값·실패 여부·손님 여부·읽기 완료·다시 읽는 함수를 내준다", () => {
+    expect(ctx).toMatch(/\{\s*me,\s*failed,\s*guest,\s*ready,\s*load\s*\}/);
     expect(ctx).toMatch(/const load = useCallback/);
   });
 

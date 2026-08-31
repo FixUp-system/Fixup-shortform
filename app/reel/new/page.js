@@ -111,8 +111,11 @@ export default function ReelNewPage() {
   //   ★★ 다만 지금은 어느 등급이든 2.0 하나다. 2.5 는 reel 이 아직 안 연다
   //     (lib/clip-limits.js 의 REEL_MODEL_IDS 주석 — 프로필·통짜 상한·컷 최소·정가 넷이
   //      먼저다). 배선만 깔아 두고 그 한 줄이 늘면 열린다.
-  const { me } = useMe();
-  const models = reelModelsForTier(me?.tier);
+  const { me, ready } = useMe();
+  // ★★ 등급을 **모르는 동안에는 비운다**(2026-08-31). 그전에는 tier 가 undefined 라
+  //   모르는 등급 = 기본 등급으로 떨어져 **모델이 기본 하나만** 보였다가, 프로 등급이면
+  //   로딩 뒤 늘어났다. 줄과 라벨은 남으므로 레이아웃은 안 흔들린다.
+  const models = ready ? reelModelsForTier(me?.tier) : [];
   const [model, setModel] = useState(DEFAULT_I2V_MODEL);
   // ★ 2026-08-31 — 전역 720p 가 아니라 **그 모델의 기본**이다. 기본이 H3 로 옮겨 가면서
   //   720p 는 목록에 아예 없는 값이 됐다(768P·2K).

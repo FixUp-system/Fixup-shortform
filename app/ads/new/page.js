@@ -50,8 +50,10 @@ export default function AdNewPage() {
   //     소재를 적고 [시나리오 만들기]를 누르면 **30~50초** 동안 아무 신호가 없었다.
   const { setProject, setBusyStep } = useAdProject();
   // 크레딧을 끈 동안(내부 QA)에는 값 이야기를 안 한다 — 판정은 서버가 내려 준 gated 하나다.
-  const { me } = useMe();
-  const showCredits = me?.gated !== false;
+  const { me, ready } = useMe();
+  // ★ ready 를 함께 본다(2026-08-31) — 모르는 동안 `me?.gated !== false` 는 **참**이라
+  //   크레딧이 반짝 보였다가 사라졌다. 모르는 동안에는 값 이야기를 아예 안 한다.
+  const showCredits = ready && me?.gated !== false;
   // ★ 관리자 전용 해상도(2.5 1080p)를 여는 열쇠. **화면은 보여 줄 뿐이고 판정은 서버가
   //   한다**(app/api/ads/route.js) — 여기만 믿으면 가림막이지 잠금이 아니다.
   const admin = me?.isAdmin === true;
@@ -192,6 +194,7 @@ export default function AdNewPage() {
             showCredits={showCredits}
             admin={admin}
             tier={me?.tier}
+            tierReady={ready}
           />
 
           <div className="composer-bar">

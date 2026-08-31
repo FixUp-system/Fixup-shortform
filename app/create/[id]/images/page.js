@@ -51,9 +51,11 @@ export default function ImagesStepPage() {
   // ★ 잔액이 여기서 움직인다(정가·재생성). 상단바는 공유본을 보므로 다시 읽어 줘야
   // 옛 숫자가 안 남는다 — 안 읽으면 크레딧이 나갔는데 화면은 그대로다.
   // 실패해도 넘어간다: 만들기는 이미 시작됐고, 잔액 표시 하나 때문에 막을 일이 아니다.
-  const { me, load: reloadMe } = useMe();
+  const { me, ready, load: reloadMe } = useMe();
   // 크레딧을 끈 동안에는 값 이야기를 안 한다(gated).
-  const showCredits = me?.gated !== false;
+  // ★ ready 를 함께 본다(2026-08-31) — 모르는 동안 `me?.gated !== false` 는 **참**이라
+  //   크레딧이 반짝 보였다가 사라졌다. 모르는 동안에는 값 이야기를 아예 안 한다.
+  const showCredits = ready && me?.gated !== false;
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [pollTimedOut, setPollTimedOut] = useState(false);

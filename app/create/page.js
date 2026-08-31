@@ -29,8 +29,10 @@ export default function CreatePage() {
   // 크레딧을 끈 동안(내부 QA)에는 값 이야기를 안 한다 — 판정은 서버가 내려 준 gated 하나다.
   // ★ `!== false` 로 본다: me 를 아직 못 읽은 동안(null)에는 지금까지처럼 값을 보여준다.
   //   반대로 두면 크레딧이 켜진 정상 배포에서 값이 잠깐 사라졌다 나타난다.
-  const { me } = useMe();
-  const showCredits = me?.gated !== false;
+  const { me, ready } = useMe();
+  // ★ ready 를 함께 본다(2026-08-31) — 모르는 동안 `me?.gated !== false` 는 **참**이라
+  //   크레딧이 반짝 보였다가 사라졌다. 모르는 동안에는 값 이야기를 아예 안 한다.
+  const showCredits = ready && me?.gated !== false;
   const [text, setText] = useState("");
   const [photos, setPhotos] = useState([]); // {id, filename, url}
   // ★ 기본 30초. 예전에는 null(자동 · 자료가 정함)이 기본이었는데, 길이가 **정가를 정하는

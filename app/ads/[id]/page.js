@@ -72,8 +72,10 @@ export default function AdDetailPage() {
   //     굽기가 시작조차 안 됐다. 화면은 아무 말도 안 했다(콘솔에만 났다).
   const { project, setProject, load, setView, setBusyStep } = useAdProject();
   // 크레딧을 끈 동안(내부 QA)에는 값 이야기를 안 한다 — 판정은 서버가 내려 준 gated 하나다.
-  const { me } = useMe();
-  const showCredits = me?.gated !== false;
+  const { me, ready } = useMe();
+  // ★ ready 를 함께 본다(2026-08-31) — 모르는 동안 `me?.gated !== false` 는 **참**이라
+  //   크레딧이 반짝 보였다가 사라졌다. 모르는 동안에는 값 이야기를 아예 안 한다.
+  const showCredits = ready && me?.gated !== false;
   const [loadErr, setLoadErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -406,6 +408,7 @@ export default function AdDetailPage() {
             showCredits={showCredits}
             admin={me?.isAdmin === true}
             tier={me?.tier}
+            tierReady={ready}
           />
           {(project?.material?.photos || []).length > 0 && (
             <p className="pgsub">사진 {project.material.photos.length}장이 붙어 있어요.</p>
