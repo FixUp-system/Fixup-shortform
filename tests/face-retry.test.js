@@ -13,7 +13,7 @@
 //   `loc:["body","image_urls"]` — 우리가 그린 **스토리보드 판**이다.
 import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
-import { buildStoryboardPrompt } from "../lib/reel/panels.js";
+import { buildStoryboardPrompt, softenFace } from "../lib/reel/panels.js";
 import { collectReelOneShot, retryOneShotWithoutFaces } from "../lib/reel/pipeline.js";
 import { reelOf } from "../lib/reel/doc.js";
 
@@ -65,10 +65,14 @@ describe("판 지시문 — 얼굴을 낮추되 사람은 남긴다", () => {
     expect(out).toMatch(/product-only/);
   });
 
-  it("★ 장면 설명은 한 글자도 안 바뀐다 — 카메라만 내린다", () => {
+  // ⚠️ 2026-08-31 라이브 뒤 **이름을 고쳤다.** 처음에는 *"장면 설명은 한 글자도 안 바뀐다"*
+  //   였는데, 그것이 바로 실패한 설계였다 — 칸 설명이 얼굴을 요구하니 지시가 졌다.
+  //   지금은 **얼굴을 부르는 낱말만** 갈아 끼운다(아래 softenFace 절). 여기서 재는 것은
+  //   **그 밖의 서술은 그대로 간다**는 것이다.
+  it("★ 얼굴을 안 부르는 서술은 그대로 간다 — 걷어내는 것은 카메라뿐이다", () => {
     const plain = buildStoryboardPrompt(makeProject(), cuts, GRID, "", []);
     const safe = buildStoryboardPrompt(makeProject({ reel: { face_safe: true } }), cuts, GRID, "", []);
-    for (const c of cuts) expect(safe).toContain(c.shows);
+    for (const c of cuts) expect(safe).toContain(c.shows); // 이 소재엔 얼굴 낱말이 없다
     // 늘어난 것은 그 한 단락뿐이다.
     expect(safe.length).toBeGreaterThan(plain.length);
   });
@@ -79,6 +83,57 @@ describe("판 지시문 — 얼굴을 낮추되 사람은 남긴다", () => {
     expect(safe).toMatch(/숟가락을 은색으로/);
     // 시스템 지시가 사장님 말인 척 나가면 안 된다.
     expect(safe).not.toMatch(/The client asked for this change[^\n]*dominates/);
+  });
+});
+
+// ★★★ **라이브가 이 판을 만들었다**(2026-08-31). 처음 A 는 지시를 덧붙이기만 했고,
+//   다시 그린 판에서 인물은 **카메라를 안 보게 바뀌었는데도**(지시는 먹었다) **얼굴이
+//   여전히 커서 또 거절됐다.** 칸 설명이 `"facing camera … vertical chest-up shot"` 을
+//   그대로 **요구하고 있었다.** 이 저장소의 법 그대로다 — *금지 문구를 더 붙이는 것은
+//   소용없다. 못 그리는 것은 애초에 요구하지 않는다.*
+describe("칸 설명에서 얼굴 요구를 걷어낸다 — 덧붙이기만으로는 안 됐다", () => {
+  const LINE = "Panel 5: a cheerful young woman facing camera, eyes bright, holding the heaped "
+    + "spoon just at her lips, mid-bite smile, vertical chest-up shot, slight low angle.";
+
+  it("★★★ 실측에서 거절을 부른 그 문장의 낱말이 전부 사라진다", () => {
+    const out = softenFace(LINE);
+    for (const bad of [/facing camera/i, /eyes bright/i, /mid-bite smile/i, /chest-up shot/i]) {
+      expect(out, `아직 남아 있다: ${bad}`).not.toMatch(bad);
+    }
+  });
+
+  it("★★ **크기 축**도 내린다 — 시선만 내려서는 안 걸리지 않는다", () => {
+    // 실측이 정확히 그랬다: 시선은 내려갔는데 얼굴이 커서 그대로 거절됐다.
+    expect(softenFace(LINE)).toMatch(/waist-up|cropped above the mouth/);
+  });
+
+  it("★★ 사람도 동작도 남는다 — 걷어내는 것은 카메라이지 사람이 아니다", () => {
+    const out = softenFace(LINE);
+    expect(out).toMatch(/young woman/);
+    expect(out).toMatch(/heaped\s+spoon/);
+  });
+
+  it("★ 목적어를 안 잃는다 — 낱말만 지우면 문장이 부서진다(2026-08-18 함정)", () => {
+    expect(softenFace("a man facing camera, holding the can")).toMatch(/turned toward the food, holding the can/);
+    expect(softenFace(LINE)).not.toMatch(/,\s*,/);
+  });
+
+  it("★ 좁은 짝을 먼저 본다 — 손 클로즈업이 얼굴 클로즈업으로 남으면 안 된다", () => {
+    expect(softenFace("extreme close-up of her face")).toMatch(/close-up of their hands/);
+  });
+
+  it("★★ 평소에는 한 글자도 안 바꾼다 — face_safe 가 아닐 때 회귀 0", () => {
+    const cuts = [{ idx: 0, shows: "a woman facing camera, eyes bright" }];
+    const plain = buildStoryboardPrompt(makeProject(), cuts, GRID, "", []);
+    expect(plain).toMatch(/facing camera/);
+  });
+
+  it("★★★ face_safe 를 켜면 **칸 설명에서** 사라진다(덧붙인 문단이 아니라)", () => {
+    const cuts = [{ idx: 0, shows: "a woman facing camera, eyes bright" }];
+    const safe = buildStoryboardPrompt(makeProject({ reel: { face_safe: true } }), cuts, GRID, "", []);
+    const panelLines = safe.split("\n").filter((l) => /^Panel/.test(l));
+    expect(panelLines.length).toBeGreaterThan(0);
+    for (const l of panelLines) expect(l, "칸 설명이 아직 얼굴을 요구한다").not.toMatch(/facing camera/);
   });
 });
 
