@@ -46,6 +46,7 @@ dev-fal.log
 /*.mp3
 /*.zip
 /reel-*.json
+/h3-*.json
 /reel-*.txt
 /storyboard-*.txt
 # 세션 중 급조한 로더·조각 — 정식판은 scripts/measure/ext-loader*.mjs 다
