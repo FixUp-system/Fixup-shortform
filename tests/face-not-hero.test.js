@@ -1,0 +1,70 @@
+// **얼굴이 주인공이 되지 않게 쓴다** — 초상 거절을 애초에 안 부른다(2026-08-31 사장님 결정).
+//
+// ★★★ 실측으로 터졌다. 볶음밥 소재인데 시나리오가 5번 장면에 사람을 넣었다:
+//   *"a cheerful young woman **facing camera, eyes bright**, holding the heaped spoon
+//   just at her lips, **mid-bite smile**"* → 통짜가 그 판을 참조로 넘기자 **422**:
+//   `loc:["body","image_urls"]` — *"likenesses of real people…"*
+//
+// ★★ 왜 웹의 영상에는 얼굴이 나오는데 우리는 막히나 — **검사 대상이 출력이 아니라 입력**이다.
+//   텍스트로만 만들면(t2v) 참조 이미지가 없어 이 검사가 안 걸린다. 우리는 참조를 넘기므로
+//   (i2v·r2v) 훨씬 빡빡하다: 참조로 실제 사람 사진을 주면 딥페이크가 되기 때문이다.
+//   **분류기는 그 얼굴이 AI 가 그린 것인지 구별하지 않는다** — 프롬프트로 "AI 인물"이라고
+//   적어도 안 닿는다(2026-08-25 실측).
+//
+// ★ **완전 금지가 아니다.** 같은 날 실측에 *실사인데 통과한* 표본이 있었다 — 눈을 감고
+//   측면광이었다. 기준은 **식별 가능성**(크기 × 정면성 × 응시)이다.
+//
+// ★★ 그래서 지문이 부딪히던 자리를 고친다. 그전에는 이렇게만 적혀 있었다:
+//   *"id 를 적었으면 그 장면의 shows 는 **얼굴이 보이게** 쓴다"* — 인물 사진이 쓰이게 하려는
+//   규칙인데(손만 그리면 그 사진이 안 쓰인다), 그 말만 있으니 모델이 정면 클로즈업을 썼다.
+//   **사람을 빼라는 뜻이 아니다** — 얼굴이 주인공이 되지 않게 쓰라는 뜻이다.
+import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { classifyFailure } from "../lib/failure.js";
+
+const src = readFileSync("lib/reel/scenario.js", "utf8");
+
+describe("장면 지문 — 얼굴이 주인공이 되지 않게", () => {
+  it("★★ 정면 응시를 쓰지 말라고 말한다", () => {
+    expect(src, "정면 응시를 막는 말이 없다").toMatch(/정면으로 응시|카메라를 정면/);
+  });
+
+  it("★★ 얼굴 클로즈업을 쓰지 말라고 말한다", () => {
+    expect(src, "얼굴이 화면을 채우는 것을 막는 말이 없다").toMatch(/얼굴이 화면을 채우|클로즈업/);
+  });
+
+  it("★ 모델이 실제로 쓰던 영어 표현을 집어서 금지한다 — 뭉뚱그린 말은 안 먹는다", () => {
+    // 이 저장소의 규율: *"금지 문구를 더 붙이는 것은 소용없다 — 못 그리는 것은 애초에
+    // 요구하지 않는다."* 그래서 실측에서 나온 그 낱말을 그대로 짚는다.
+    expect(src).toMatch(/facing camera/);
+  });
+
+  it("★★ **사람을 빼라고는 안 한다** — 인물이 나오는 영상은 계속 만들 수 있어야 한다", () => {
+    // 인물 사진(avatar)을 고르는 규칙이 그대로 살아 있어야 한다. 얼굴을 통째로 막으면
+    // 캐스팅이 죽고, "사람이 말한다" 컨셉이 통째로 사라진다.
+    expect(src).toMatch(/avatar_id/);
+    expect(src, "사람을 아예 넣지 말라고 시킨다").not.toMatch(/사람을 넣지 마라|인물을 넣지 마라/);
+  });
+
+  it("★ 왜 그런지도 적어 둔다 — 규칙만 있으면 다음 사람이 지운다", () => {
+    expect(src).toMatch(/초상|거절/);
+  });
+});
+
+describe("거절 문구 — 두 경우를 다 가리킨다", () => {
+  const RAW = '영상 생성 실패 (422) {"detail":[{"loc":["body","image_urls"],"msg":"The images or videos provided may contain likenesses of real people or other private information that cannot be processed.","type":"content_policy_violation"}]}';
+
+  it("★★ 우리가 그린 장면일 수도, 올린 사진일 수도 있다 — 둘 다 말해 준다", () => {
+    // 그전 문구는 *"그 사진을 빼고 다시 시도해 주세요"* 뿐이었다. 단계별 통짜에서는
+    // 걸리는 것이 **우리가 그린 스토리보드**라, 사장님이 할 수 없는 조언이었다.
+    const { message } = classifyFailure(RAW);
+    expect(message, "장면을 고치라는 길이 없다").toMatch(/장면|시나리오/);
+    expect(message, "사진을 바꾸라는 길이 없다").toMatch(/사진/);
+  });
+
+  it("갈래와 재시도 가능 여부는 그대로다", () => {
+    const c = classifyFailure(RAW);
+    expect(c.code).toBe("rejected_likeness");
+    expect(c.retryable).toBe(true);
+  });
+});
