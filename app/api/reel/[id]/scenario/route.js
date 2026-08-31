@@ -4,6 +4,8 @@ import { generateScenario, pickEditedShots, readPhotoVision } from "../../../../
 import { isNarrationSpeaker } from "../../../../../lib/cuts.js";
 import { scenarioLock, putReel } from "../../../../../lib/reel/doc.js";
 import { reelSceneCountRule } from "../../../../../lib/reel/scenario-rules.js";
+// ★ 그 프로젝트 모델이 참조 이미지로 받는 가로세로비 한계 — 컷 수 후보를 좁히는 자다.
+import { refAspectFor, clipProfileForProject } from "../../../../../lib/clip-limits.js";
 import { reelConceptLine } from "../../../../../lib/reel/concepts.js";
 import { narrationRuleLine } from "../../../../../lib/reel/narration.js";
 import { MAX_SCENARIO_TRIES } from "../../../../../lib/pricing.js";
@@ -176,10 +178,16 @@ export const POST = withUser(async (req, { params }, user) => {
       note,
       // ★ 화질이 담을 수 있는 칸 수를 정한다(2026-08-25) — 480p 32컷 · 720p 15컷 ·
       //   1080p 6컷. 안 넘기면 720p 로 재서 1080p 프로젝트에 못 담는 수를 권한다.
+      // ★★ 2026-08-31 — **모델이 못 받는 격자가 나오는 컷 수는 애초에 안 권한다**(사장님
+      //   결정 A). 5 는 소수라 격자가 1행×5열 뿐이고 그 판은 비율 2.81 이라 H3 가 참조
+      //   이미지로 안 받는다 → 그 프로젝트는 통짜로 못 가고 **컷별로 떨어졌다**(이음새를
+      //   잃고 fal 호출이 1번 → 5번). 굽기 직전에 떨어뜨리는 것보다 여기가 뿌리다.
+      // ★ 한계를 모르는 모델(Seedance)은 null 이라 목록이 **예전 그대로**다.
       sceneCountRule: reelSceneCountRule(
         seen?.settings?.seconds,
         seen?.settings?.resolution,
         seen?.settings?.aspect_ratio,
+        refAspectFor(clipProfileForProject(seen)),
       ),
       // ★★ 컨셉 — 사장님이 고른 큰 범주가 여기서 **구성 한 줄**이 된다
       //   (2026-08-25, lib/reel/concepts.js). [알아서]면 null 이라 그 줄이 아예 안 실리고,
