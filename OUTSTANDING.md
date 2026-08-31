@@ -1,4 +1,4 @@
-# 이어서 할 일 — `feat/reel-cut-r2v` (2026-08-27 기준)
+# 이어서 할 일 — `feat/reel-cut-r2v` (2026-08-31 기준)
 
 이 문서는 **다음 세션이 이 브랜치를 그대로 이어받기 위한 것**이다.
 사실은 코드가 진실의 원천이다. 여기 적힌 것과 코드가 어긋나면 코드를 믿고 이 문서를 고쳐라.
@@ -11,17 +11,17 @@
 |---|---|
 | 워크트리 | `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` |
 | 브랜치 | `feat/reel-cut-r2v` |
-| 테스트 | **4,910 그린** (10 skipped) — `npx vitest run` |
-| 배포 | **프로덕션 라이브** — 오늘 두 번 올렸다(`f1b3ccc` · `b97d704`) |
-| 미배포 | `09388ce` · `7f6c6e6` **둘이 아직 프로덕션에 없다** |
-| 푸시 | **커밋 다섯 전부 미푸시**(`fixup`·`origin` 둘 다) |
+| 테스트 | **5,203 그린** (10 skipped) — `npx vitest run` |
+| 배포 | **프로덕션 라이브** — 08-31 에 `dcf2e0a` 를 올렸다(그전 08-27 `f1b3ccc`·`b97d704`) |
+| 미배포 | **코드는 없다** — `dcf2e0a` 가 곧 프로덕션이고, 그 뒤는 이 문서 갱신뿐이다 |
+| 푸시 | **36커밋 미푸시**(`fixup`·`origin` 둘 다) — 원격 브랜치는 08-21 에 멈춰 있다 |
 | 개발 서버 | `SHOTFORM_FAKE=fal SHOTFORM_NO_CREDITS=0 npx next dev` → 3001 |
 
 > ⚠️ **커밋·푸시·배포는 사장님이 요청할 때만.**
 > ⚠️ **`git checkout <파일>` 을 쓰지 마라.** 진행 중 작업이 사라진다.
 > ⚠️ **병렬 세션이 있으면 커밋 직전에 `git branch --show-current`.**
 
-### 배포하는 법 (오늘 두 번 이 길로 했다)
+### 배포하는 법 (08-27 두 번 · 08-31 한 번, 이 길로 했다)
 
 ```bash
 # 커밋 이메일이 GitHub 계정과 안 맞아 Git 트리거가 0ms 에서 멈춘다 → git 없는 폴더에서 올린다
@@ -39,7 +39,20 @@ cd <빈폴더> && npx vercel deploy --prod --yes --project fixup-shortform-servi
 
 ---
 
-## 1. 🔴 다음 세션이 **먼저** 할 일 — 내레이션을 한 사람의 말로
+## 1. ✅ 끝났다(2026-08-28) — 내레이션을 한 사람의 말로
+
+**구현 완료**(`249f5b3`) · `lib/reel/narration.js` 에 다섯 함수가 산다 —
+`reelNarration` · `narrationSentences` · `narrationLimit` · `narrationUnits` · `narrationRuleLine`.
+그 뒤 08-28 에 한 가지를 더 막았다(`99edd57`) — **한 벌이 있으면 whisper 로 시각을 안 잰다**
+(재는 값을 읽는 자리가 없었다).
+
+⚠️ 계획 문서(`docs/superpowers/plans/2026-08-27-narration-as-one-voice.md`)의 체크박스는
+한 개도 안 채워져 있다 — **문서만 뒤처졌다.** 코드를 믿어라.
+
+★ **다음 세션의 첫 일은 이제 §2(돈 구멍 둘)다.**
+
+<details>
+<summary>설계 기록(그대로 둠)</summary>
 
 사장님 지시(2026-08-27):
 
@@ -70,7 +83,9 @@ cd <빈폴더> && npx vercel deploy --prod --yes --project fixup-shortform-servi
 
 ---
 
-## 2. 🔴 그다음 — 돈이 새는 자리 둘 (아직 안 고쳤다)
+</details>
+
+## 2. 🔴 **이제 첫 일** — 돈이 새는 자리 둘 (아직 안 고쳤다)
 
 ### ① 재생성이 전부 크레딧 0
 
