@@ -45,7 +45,10 @@ describe("순수 규율", () => {
     //   "끝났는가"의 판정(isCutDone)을 여기서 다시 적으면 파이프라인과 조용히 갈린다 —
     //   그 갈림이 images_error 버그(2026-08-14)의 뿌리였다.
     // ★ `../` 를 통째로 열지 않는다 — 이 둘만 허용한다.
-    const ALLOWED_OUTSIDE = ["../clip-limits.js", "../progress.js", "../cuts.js"];
+    // ★ 2026-08-31 — `../aspects.js` 를 더했다. **import 가 0 건인 순수 데이터 파일**이라
+    //   (실측) 이 판이 지키려는 것("사슬 끝에 fs·env 가 안 닿는다")을 안 깬다. 여기서
+    //   "9:16" 을 손으로 파싱하면 화면 비율 표와 두 벌이 된다.
+    const ALLOWED_OUTSIDE = ["../clip-limits.js", "../progress.js", "../cuts.js", "../aspects.js"];
     for (const spec of specs) {
       if (ALLOWED_OUTSIDE.includes(spec)) continue;
       expect(spec, `허용 밖의 import: ${spec}`).toMatch(/^\.\//);
