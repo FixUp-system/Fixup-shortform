@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { loadProjects } from "../../lib/projects-client";
 import ProjectCards from "../../components/ProjectCards";
 import { useDialog } from "../../components/DialogProvider";
+import Icon from "../../components/Icon";
 
 function ArchiveBody() {
   const [projects, setProjects] = useState(null); // null = 불러오는 중
@@ -24,7 +25,7 @@ function ArchiveBody() {
   const [scope, setScope] = useState(() => (params.get("scope") === "all" ? "all" : "mine"));
 
   // 정리는 몰아서 하는 일이다 — 하나씩 지우면 스무 편을 치우는 데 스무 번을 묻는다.
-  // 평소에는 카드가 프로젝트로 들어가는 문이고, [수정] 을 누른 동안에만 고르는 자리가 된다.
+  // 평소에는 카드가 프로젝트로 들어가는 문이고, [정리] 를 누른 동안에만 고르는 자리가 된다.
   const { confirm } = useDialog();
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState(() => new Set());
@@ -63,7 +64,7 @@ function ArchiveBody() {
 
   // 고른 것을 지운다.
   //
-  // ★ 한 번만 묻는다 — 스무 편을 고르고 스무 번 확인하면 [수정] 을 만든 뜻이 없다.
+  // ★ 한 번만 묻는다 — 스무 편을 고르고 스무 번 확인하면 [정리] 를 만든 뜻이 없다.
   // ★ 한 건씩 순서대로 보낸다. 한꺼번에 던지면 실패한 것이 무엇인지 흐려지고, 지우기는
   //   완성본 파일까지 함께 지우는 일이라 서버에 한 번에 몰 이유가 없다.
   // ★ 성공한 것만 목록에서 뺀다 — 실패한 카드는 남아 있어야 다시 시도할 수 있다.
@@ -132,15 +133,15 @@ function ArchiveBody() {
         ) : (
           <div className="chips">
             {/* 보는 범위 — 내부 팀이라 남이 만든 것도 볼 수 있다(읽기 전용).
-                ★ 손님에게는 이 두 칸과 [수정]을 안 그린다(2026-08-27) — 고를 것도 지울
+                ★ 손님에게는 이 두 칸과 [정리]를 안 그린다(2026-08-27) — 고를 것도 지울
                   것도 없다. 대신 무엇을 보고 있는지 한 줄로 말한다. */}
             {guest ? (
               <span className="hint">로그인 없이 전체 결과물을 보고 있어요 — 보기 전용이에요.</span>
             ) : (
               <>
             {/* ★★★ 2026-09-01 사장님 지시 — **한 상자로 묶는다.** 그전에는 셋이 똑같은
-                `.mini` 로 나란히 서서(`내 영상`·`전체`·`수정`) 어느 둘이 한 짝인지 모양으로
-                안 드러났다. 앞의 둘은 고르는 것이고 [수정]은 하는 것이다.
+                `.mini` 로 나란히 서서(`내 영상`·`전체`·`정리`) 어느 둘이 한 짝인지 모양으로
+                안 드러났다. 앞의 둘은 고르는 것이고 [정리]는 하는 것이다.
                 ★ 판정은 그대로 `aria-pressed` 다 — 보이는 상태와 스크린리더가 읽는 상태가
                   갈릴 수 없게(app/globals.css 의 그 규율을 그대로 지킨다). */}
             <div className="seg" role="group" aria-label="보는 범위">
@@ -159,13 +160,29 @@ function ArchiveBody() {
                 전체
               </button>
             </div>
-            {/* 몰아서 지우기는 **내 영상** 자리에서만 연다 — 전체 목록에는 남의 카드가
-                섞여 있어 "모두 선택"이 지울 수 없는 것까지 고른다 */}
-            {count > 0 && !isAll && (
-              <button className="mini" onClick={() => setSelecting(true)}>
-                수정
-              </button>
-            )}
+            {/* ★★★ 2026-09-01 사장님 지적 — **사라지지 않는다.** 그전에는 조건부 렌더라
+                [전체] 로 바꾸거나 영상이 0편이면 통째로 없어져 옆 토글까지 자리가 흔들렸다.
+                사라지면 "없어졌나?" 로 읽히지만 **흐리게 있으면 "지금은 못 쓴다"** 로 읽힌다.
+                ★ 이름을 `수정` → `정리` 로 바꿨다 — 이 버튼이 여는 것은 편집이 아니라
+                  **여러 편 골라 지우기**다(모두 선택 · 취소 · N편 지우기).
+                ★ 아이콘도 휴지통이다. 톱니바퀴는 "설정" 으로 읽혀 실제 동작과 어긋난다.
+                ★ [전체] 에서 못 쓰는 이유는 그대로다 — 그 목록에는 남의 카드가 섞여 있어
+                  "모두 선택" 이 지울 수 없는 것까지 고른다. 이제 그 이유를 화면이 말한다. */}
+            <button
+              className="mini"
+              aria-label="영상 정리"
+              title={
+                isAll
+                  ? "전체에서는 고를 수 없어요 — 남이 만든 영상이 섞여 있어요"
+                  : count > 0
+                    ? "여러 편을 골라 지워요"
+                    : "정리할 영상이 없어요"
+              }
+              disabled={isAll || count === 0}
+              onClick={() => setSelecting(true)}
+            >
+              <Icon name="trash" size={13} /> 정리
+            </button>
               </>
             )}
             <Link href="/create" className="cta">

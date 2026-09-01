@@ -234,8 +234,13 @@ describe("로그인 화면의 보관함 문 — 링크가 아니라 버튼으로
 
   it("★ 그 클래스에 밑줄 해제가 실제로 있다 — 클래스만 붙이고 스타일이 없으면 헛일이다", () => {
     const css = readFileSync("app/globals.css", "utf8");
-    const at = css.indexOf(".mini {");
-    expect(at).toBeGreaterThan(-1);
-    expect(css.slice(at, at + 500)).toMatch(/text-decoration:\s*none/);
+    // ⚠️ 2026-09-01 — 여기는 `css.indexOf(".mini {")` 였는데, 그 글자는 **`.home-header
+    //   .mini {`** 에도 들어 있어서 훨씬 앞줄을 잡았다. 그리고 거기서 500 자 안에 있던
+    //   `.project-card` 의 `text-decoration: none` 을 맞은 것으로 읽었다 — 즉 **엉뚱한
+    //   규칙을 보고 통과**하고 있었다(`.project-card` 에 줄이 늘자 드러났다).
+    //   맨 왼쪽에서 시작하는 `.mini` 규칙만 잡고, 창이 아니라 **규칙 끝**까지 본다.
+    const at = css.indexOf("\n.mini {");
+    expect(at, ".mini 규칙을 못 찾았다").toBeGreaterThan(-1);
+    expect(css.slice(at, css.indexOf("}", at) + 1)).toMatch(/text-decoration:\s*none/);
   });
 });

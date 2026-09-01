@@ -32,11 +32,13 @@ describe("범위 고르기 — 한 상자로 묶는다", () => {
     expect((box.match(/aria-pressed/g) || []).length, "두 칸 모두에 없다").toBe(2);
   });
 
-  it("★★ [수정]은 그 상자 밖이다 — 고르는 것과 하는 것은 다르다", () => {
+  // ★ 이름은 그 뒤 [정리] 로 바뀌었다(하는 일이 편집이 아니라 골라 지우기다) —
+  //   판정하는 것은 그대로다: **고르는 것과 하는 것이 한 상자에 있으면 안 된다.**
+  it("★★ [정리]는 그 상자 밖이다 — 고르는 것과 하는 것은 다르다", () => {
     const at = page.indexOf('className="seg"');
     const end = page.indexOf("</div>", at);
-    expect(page.slice(at, end), "수정이 상자 안에 있다").not.toContain("수정");
-    expect(page, "수정 버튼이 사라졌다").toContain("수정");
+    expect(page.slice(at, end), "정리가 상자 안에 있다").not.toContain("정리");
+    expect(page, "정리 버튼이 사라졌다").toContain("정리");
   });
 
   it("★ 손님 안내는 그대로다 — 고를 것이 없는 사람에게는 상자를 안 그린다", () => {
