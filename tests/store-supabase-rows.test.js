@@ -239,3 +239,54 @@ describe("allCosts — 행 상한", () => {
     await expect(supabaseStore.allCosts()).rejects.toThrow(/3건 중 0건/);
   });
 });
+
+// **구운 통짜가 보관함에 뜨는 길은 여기다** (2026-09-01).
+//
+// ★★★ 인메모리로는 이 구멍이 안 보인다 — 거기는 doc 을 통째로 들고 있어서 `doc.cuts[0]`
+//   을 그냥 읽으면 되지만, 프로덕션은 **셀렉트에 적힌 칸만** 온다. 칸을 안 적으면
+//   `r.reel_url` 이 영영 undefined 라 매핑이 아무리 옳아도 카드가 비어 있다.
+//   tests/archive-oneshot-video.test.js 가 규칙을, 이 파일이 **배선**을 잰다.
+describe("보관함 목록이 통짜 영상 칸을 실제로 읽어 온다", () => {
+  const ROW = {
+    id: "p1", status: "draft", created_at: "2026-09-01T00:00:00Z",
+    kind: "reel", video_url: null, ad_video_url: null,
+    reel_url: "https://fal/whole.mp4", reel_whole: "true",
+  };
+
+  it("★★★ 셀렉트에 cuts[0].video 두 칸이 있다 — 내 목록", async () => {
+    await supabaseStore.listProjects("o1");
+    expect(H.calls[0].select.cols).toContain("doc->cuts->0->video->>url");
+    expect(H.calls[0].select.cols, "whole 이 없으면 컷별 조각까지 완성본이 된다")
+      .toContain("doc->cuts->0->video->>whole");
+  });
+
+  it("★★ 전체 목록도 같은 칸을 읽는다 — 두 자리가 갈리면 탭마다 다르게 보인다", async () => {
+    await supabaseStore.listAllProjects();
+    expect(H.calls[0].select.cols).toContain("doc->cuts->0->video->>url");
+    expect(H.calls[0].select.cols).toContain("doc->cuts->0->video->>whole");
+  });
+
+  it("★★★ 통짜면 카드에 그 영상이 뜬다", async () => {
+    H.respond = () => ({ data: [ROW], error: null });
+    const [row] = await supabaseStore.listProjects("o1");
+    expect(row.video_url).toBe("https://fal/whole.mp4");
+  });
+
+  it("★★ whole 이 아니면 안 뜬다 — 컷별 첫 조각을 완성본이라 부르지 않는다", async () => {
+    H.respond = () => ({ data: [{ ...ROW, reel_whole: null }], error: null });
+    const [row] = await supabaseStore.listProjects("o1");
+    expect(row.video_url).toBeNull();
+  });
+
+  it("★★ 합성본이 있으면 그쪽이 이긴다 — 자막 태운 편이 진짜 완성본이다", async () => {
+    H.respond = () => ({ data: [{ ...ROW, video_url: "/api/renders/p1.mp4" }], error: null });
+    const [row] = await supabaseStore.listProjects("o1");
+    expect(row.video_url).toBe("/api/renders/p1.mp4");
+  });
+
+  it("★ 광고는 예전 그대로다", async () => {
+    H.respond = () => ({ data: [{ ...ROW, kind: "ad", reel_url: null, reel_whole: null, ad_video_url: "/ad.mp4" }], error: null });
+    const [row] = await supabaseStore.listProjects("o1");
+    expect(row.video_url).toBe("/ad.mp4");
+  });
+});
