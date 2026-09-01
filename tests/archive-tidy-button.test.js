@@ -93,18 +93,39 @@ describe("아이콘과 글자가 안 붙는다", () => {
 //   **고르는 줄에 함께 서는 [정리]** 하나다.
 // ★ `.home-header .mini` 자체를 안 건드린다 — 고르는 동안 뜨는 버튼 셋
 //   (모두 선택·취소·N편 지우기)은 그 줄을 통째로 쓰므로 지금 키가 맞다.
-describe("[정리] — 옆 토글과 같은 키", () => {
+describe("머리줄 — 버튼이 모두 같은 키", () => {
   const css = readFileSync("app/globals.css", "utf8");
+  // `.home-header …` 로 시작하는 규칙 전부(선택자가 여럿 묶인 것도 한 덩어리로 잡힌다).
+  const headerRules = [...css.matchAll(/\.home-header[^{]*\{[^}]*\}/g)].map((m) => m[0]);
+  const ruleFor = (sel) =>
+    headerRules.find((r) => r.includes(sel) && /height:/.test(r.split("{")[1] || "")) || "";
 
-  it("★★★ 세그먼트와 같은 사다리를 쓴다", () => {
-    const at = css.indexOf(".home-header .mini.tidy-btn");
-    expect(at, "[정리] 전용 크기 규칙이 없다").toBeGreaterThan(-1);
-    const rule = css.slice(at, css.indexOf("}", at) + 1);
-    expect(rule, "세그먼트(--ctl-sm)와 다른 사다리를 쓴다").toMatch(/height:\s*var\(--ctl-sm\)/);
+  it("★★★ [정리] 도 [새 영상 만들기] 도 세그먼트와 같은 사다리다", () => {
+    expect(ruleFor(".home-header .mini"), "[정리]·고르기 버튼이 다른 사다리다")
+      .toMatch(/height:\s*var\(--ctl-sm\)/);
+    expect(ruleFor(".home-header .cta"), "[새 영상 만들기] 가 다른 사다리다")
+      .toMatch(/height:\s*var\(--ctl-sm\)/);
   });
 
-  it("★★ 화면이 그 클래스를 단다", () => {
-    expect(tidy).toMatch(/tidy-btn/);
+  it("★★★ 그 줄에 큰 사다리가 남아 있지 않다 — 하나라도 남으면 밑선이 어긋난다", () => {
+    const big = headerRules.filter((r) => /--ctl-lg|--ctl-md/.test(r));
+    expect(big, `큰 사다리가 남았다: ${big.join(" / ")}`).toEqual([]);
+  });
+
+  // ★ `.mini.confirm-btn` 은 **다른 화면도 쓰는 공용 규칙**이라(미리보기 패널 등) 전역으로
+  //   바꾸면 안 된다. 머리줄 안에서만 덮는다 — 안 덮으면 그 버튼만 글자 14px·여백 16px 로
+  //   남아 옆 둘과 어긋난다(실측).
+  it("★★ 고르는 동안의 [N편 지우기] 도 같은 글자·여백이다", () => {
+    const at = css.indexOf(".home-header .mini.confirm-btn");
+    expect(at, "머리줄용 덮어쓰기가 없다 — 그 버튼만 크다").toBeGreaterThan(-1);
+    const rule = css.slice(at, css.indexOf("}", at) + 1);
+    expect(rule).toMatch(/font-size:\s*12px/);
+    expect(rule).toMatch(/padding:\s*0 12px/);
+  });
+
+  it("★★ 예외 규칙을 안 만든다 — 줄 전체가 한 사다리라 [정리] 만 따로 잡을 이유가 없다", () => {
+    expect(css, "tidy-btn 전용 크기 규칙이 남았다 — 한 벌로 맞췄으면 필요 없다")
+      .not.toMatch(/\.home-header \.mini\.tidy-btn\s*\{/);
   });
 
   // ★ 키를 쥔 것은 **상자**다. 칸에만 주면 상자의 테두리가 그 위에 더해져 1.3px 커지고
