@@ -48,7 +48,7 @@ import { STYLE_PRESETS } from "../../../lib/styles";
 // 목록에서 고르므로 애초에 모르는 값이 안 생긴다 — 검증은 서버 몫).
 import {
   resolutionsForModel, secondsForModel, reelModelsForTier,
-  DEFAULT_I2V_MODEL, DEFAULT_RESOLUTION, defaultResolutionForModel,
+  DEFAULT_I2V_MODEL, DEFAULT_RESOLUTION, defaultResolutionForModel, blocksFacesInRefs,
 } from "../../../lib/clip-limits";
 // 등급은 서버가 판정해 /api/me 로 내려준다 — 화면이 profile 을 직접 읽지 않는다.
 import { useMe } from "../../../components/MeContext";
@@ -61,7 +61,7 @@ import { useMe } from "../../../components/MeContext";
 //     서버가 settings.resolution 을 읽어 한다. 문구만 뺀 것이지 값이 바뀐 것이 아니다.
 // 사진 상한 — 서버(app/api/reel/route.js)와 **같은 파일**에서 읽는다. 손으로 두 벌 적으면
 // 화면은 통과시키는데 서버가 400 을 내고, 사장님은 다 올린 뒤에야 거절당한다.
-import { MAX_PHOTOS, PHOTO_ROLES } from "../../../lib/photos";
+import { MAX_PHOTOS, PHOTO_ROLES, visiblePhotoRoles, isPersonPhoto } from "../../../lib/photos";
 import { MAX_MATERIAL_TEXT } from "../../../lib/material";
 
 // 화풍은 영상용 문구가 있는 것만 고를 수 있다 — 광고 화면(app/ads/new/page.js)·
@@ -147,6 +147,18 @@ export default function ReelNewPage() {
   //   셋으로 늘리면 업로드 상태(uploading)와 ref 도 셋이 되고, 그중 하나만 안 풀려도
   //   버튼이 영영 잠긴다(이 화면이 이미 겪은 종류의 사고다).
   const pendingRole = useRef(PHOTO_ROLES[0].id);
+
+  // ★★★ **프로(2.5)에서는 `＋인물`이 아예 안 보인다**(2026-09-01 사장님 결정).
+  //   2.5 는 사진 같은 얼굴이 든 참조를 실측 9건 전부 거절했다 — 받아 놓고 못 쓰면
+  //   사장님 얼굴이 나올 거라는 기대만 만들고 판값($0.401)을 두 번 태운다.
+  //   ★ 잠긴 버튼을 남기지 않고 **숨긴다** — 못 쓰는 것은 안 보이는 편이 낫다.
+  //   ★ 화면은 가림막일 뿐이다. 실제 잠금은 lib/cut-refs.js 의 describeCutRefs 다.
+  //   ★ **나중에 푼다** — 종량제로 옮겨 가면 실패의 값이 우리 것이 아니게 된다.
+  const noFaces = blocksFacesInRefs({ settings: { i2v_model: model } });
+  const photoRoles = visiblePhotoRoles(noFaces);
+  // 이미 올려 둔 인물 사진 — 지우지 않는다(기본으로 되돌리면 그대로 살아나야 한다).
+  //   대신 안 실린다고 말한다. 조용히 버리면 "반영이 안 된다"로 읽힌다.
+  const strandedPeople = noFaces ? photos.filter(isPersonPhoto).length : 0;
   function pickRole(id) {
     pendingRole.current = id;
     fileRef.current?.click();
@@ -227,6 +239,15 @@ export default function ReelNewPage() {
                 </div>
               ))}
             </div>
+          )}
+
+          {/* ★★ 이미 올려 둔 인물 사진은 **지우지 않는다** — 기본으로 되돌리면 그대로
+              살아나야 한다. 대신 안 실린다고 말한다: 조용히 버리면 "반영이 안 된다"로
+              읽힌다(이 저장소가 사진 누락으로 이미 겪은 종류의 오해다). */}
+          {strandedPeople > 0 && (
+            <p className="warn">
+              인물 사진 {strandedPeople}장은 프로에서 안 실려요 — 얼굴 사진을 쓰시려면 기본으로 바꿔 주세요.
+            </p>
           )}
 
           <div className="composer-tray">
@@ -374,7 +395,7 @@ export default function ReelNewPage() {
             {/* ★★ 2026-08-31 사장님 지시 — `＋사진` 하나를 **종류별 셋**으로 갈랐다.
                 누르는 순간 종류가 정해지므로 "안 고른 사진"이 아예 안 생긴다.
                 ★ 표를 돌려 그린다(lib/photos.js) — 손으로 세 번 적으면 종류가 늘 때 낡는다. */}
-            {PHOTO_ROLES.map((r) => (
+            {photoRoles.map((r) => (
               <button key={r.id} className="pill" disabled={locked || photos.length >= MAX_PHOTOS}
                 onClick={() => pickRole(r.id)}>
                 ＋ {r.label}{photos.filter((p) => p.role === r.id).length > 0 && <b>{photos.filter((p) => p.role === r.id).length}</b>}
