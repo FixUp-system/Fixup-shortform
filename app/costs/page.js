@@ -126,15 +126,33 @@ export default function CostsPage() {
             </label>
             <label>
               <small>종류</small>
-              {/* ★ 모양은 이 저장소의 고르기 칸 하나다(.sub-select) — `.field` 는 input
-                  전용이라 select 에 붙이면 **브라우저 기본 흰 칸**이 된다(그 상태였다). */}
-              <span className="sub-select-wrap cost-filter-pick">
-                <select className="sub-select" value={flow} onChange={(e) => setFlow(e.target.value)}>
-                  <option value="">전체</option>
-                  {flowsInLedger.map((f) => (
-                    <option key={f.id} value={f.id}>{f.label}</option>
-                  ))}
-                </select>
+              {/* ★★★ 2026-09-01 사장님 지시 — **한눈에 갈아 끼운다.** 그전에는 드롭다운이라
+                  무엇을 고를 수 있는지 열어 봐야 알았다. 보관함에서 쓰는 그 세그먼트를
+                  그대로 쓴다(같은 일에 두 벌을 만들지 않는다).
+                  ★ 판정은 `aria-pressed` 다 — 보이는 상태와 스크린리더가 읽는 상태가
+                    갈릴 수 없다(보관함과 같은 규율).
+                  ★ 옛 흐름(한 번에 굽기·기타)도 칸으로 남긴다 — 원장에 그 지출이 실제로
+                    있고, 고르는 길을 없애면 그 돈을 들여다볼 방법이 사라진다. */}
+              <span className="seg" role="group" aria-label="종류">
+                <button
+                  type="button"
+                  className="seg-btn"
+                  aria-pressed={flow === ""}
+                  onClick={() => setFlow("")}
+                >
+                  전체
+                </button>
+                {flowsInLedger.map((f) => (
+                  <button
+                    type="button"
+                    key={f.id}
+                    className="seg-btn"
+                    aria-pressed={flow === f.id}
+                    onClick={() => setFlow(f.id)}
+                  >
+                    {f.label}
+                  </button>
+                ))}
               </span>
             </label>
             {/* 되돌리는 길을 남긴다 — 조건 넷을 손으로 되돌리게 두지 않는다. */}

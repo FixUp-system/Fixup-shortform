@@ -84,6 +84,14 @@ alter table profiles add column if not exists display_name text;
 --   모르는 값을 basic 으로 떨어뜨린다(DB 기본값과 같은 값이다).
 alter table profiles add column if not exists tier text not null default 'basic';
 
+-- 운영자가 붙이는 이름 — 사용자 본인이 고치는 display_name 과 **다른 칸**이다(2026-09-01).
+-- ★ 왜 나누나: 내부용 계정 이름이 `fixup1` 같아서 누구 것인지 운영자도 헷갈린다(사장님).
+--   그렇다고 display_name 을 운영자가 덮으면 **사용자 화면의 이름이 남의 손에 바뀐다.**
+-- ★ 이 값은 **관리자 화면에서만** 보인다 — GET /api/me 는 안 싣는다(그 라우트 주석 참고).
+--   사용자 자신이 "운영자가 나를 뭐라고 적었는지" 를 보게 되면 안 된다.
+-- ★ 백필이 필요 없다 — 안 적은 계정은 null 이고, 화면은 그때 본인 이름만 보여 준다.
+alter table profiles add column if not exists admin_name text;
+
 -- 업로드는 프로젝트가 생기기 전에 일어나서 역조회할 대상이 없다.
 -- Storage 키에 owner 를 접두어로 넣는 방법도 있으나 URL 형태가 바뀌어
 -- 문서에 박힌 material.photos[].url 이 깨진다 — 이관에서 지킨 불변조건이다.

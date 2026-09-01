@@ -310,3 +310,40 @@ describe("보관함 목록이 통짜 영상 칸을 실제로 읽어 온다", () 
     expect(row.video_url).toBe("/ad.mp4");
   });
 });
+
+// **컬럼이 없어도 사용자 관리 화면은 살아야 한다** (2026-09-01).
+//
+// ★★★ 이 저장소의 규칙은 "스키마를 먼저 올리고 배포하라" 인데, 그 순서가 어긋나면
+//   프로필 조회가 통째로 실패해 **화면이 500 으로 죽는다**(실측: 컬럼 없이 HTTP 500).
+//   멀쩡하던 화면을 배포 순서 하나로 잃는 것이, 새 값을 못 보는 것보다 나쁘다.
+// ★ 그래서 없으면 그 칸만 빼고 다시 읽는다. **다른 오류는 그대로 던진다** — 아무 오류나
+//   삼키면 진짜 사고(권한·연결)가 "빈 목록"으로 뭉개진다.
+describe("프로필 목록 — admin_name 컬럼이 없어도 읽는다", () => {
+  const ROWS = [{ id: "u1", email: "a@b.c", status: "approved", role: "user" }];
+
+  it("★★★ 없다고 하면 그 칸을 빼고 다시 읽는다", async () => {
+    let call = 0;
+    H.respond = () => {
+      call += 1;
+      if (call === 1) return { data: null, error: { message: `column profiles.admin_name does not exist` } };
+      return { data: ROWS, error: null };
+    };
+    const out = await supabaseStore.listProfiles();
+    expect(call, "다시 읽지 않았다").toBe(2);
+    expect(out).toEqual(ROWS);
+    expect(H.calls[0].select.cols, "첫 조회는 그 칸을 달고 간다").toContain("admin_name");
+    expect(H.calls[1].select.cols, "두 번째 조회에도 그 칸이 남았다").not.toContain("admin_name");
+  });
+
+  it("★★ 있으면 한 번만 읽는다 — 멀쩡할 때 왕복을 늘리지 않는다", async () => {
+    let call = 0;
+    H.respond = () => { call += 1; return { data: ROWS, error: null }; };
+    await supabaseStore.listProfiles();
+    expect(call).toBe(1);
+  });
+
+  it("★★ 다른 오류는 삼키지 않는다 — 진짜 사고가 빈 목록으로 뭉개지면 안 된다", async () => {
+    H.respond = () => ({ data: null, error: { message: "permission denied for table profiles" } });
+    await expect(supabaseStore.listProfiles()).rejects.toThrow(/프로필 목록/);
+  });
+});

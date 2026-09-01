@@ -24,6 +24,9 @@ async function grantSignupCreditsOnce(store, userId, grantedBy) {
   });
 }
 
+// 표 한 칸에 들어가야 한다 — 길면 줄이 넘쳐 다른 칸이 밀린다.
+const ADMIN_NAME_MAX = 40;
+
 const ALLOWED_STATUS = new Set(["approved", "blocked", "pending"]);
 const ALLOWED_ROLE = new Set(["user", "admin"]);
 
@@ -42,11 +45,21 @@ const ALLOWED_ROLE = new Set(["user", "admin"]);
 export const PATCH = withUser(async (req, { params }, user) => {
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
-  const { status, role, tier } = body || {};
+  const { status, role, tier, admin_name } = body || {};
 
-  if (status === undefined && role === undefined && tier === undefined) {
-    return Response.json({ error: "status·role·tier 중 하나는 있어야 해요" }, { status: 400 });
+  if (status === undefined && role === undefined && tier === undefined && admin_name === undefined) {
+    return Response.json({ error: "status·role·tier·admin_name 중 하나는 있어야 해요" }, { status: 400 });
   }
+  // ★★★ 운영자가 붙이는 이름(2026-09-01 사장님 지시) — **사용자 본인의 display_name 과
+  //   다른 칸이다.** 내부용 계정 이름이 `fixup1` 같아서 누구 것인지 운영자도 헷갈린다.
+  //   앞엣것을 운영자가 덮으면 사용자 화면의 이름이 남의 손에 바뀐다.
+  //   ★ 이 값은 관리자 화면에서만 보인다 — GET /api/me 는 안 싣는다.
+  if (admin_name !== undefined && typeof admin_name !== "string") {
+    return Response.json({ error: "이름은 글자로 보내 주세요" }, { status: 400 });
+  }
+  // 비우면 **지운다** — 빈 글자를 남기면 "이름이 있다" 로 읽혀 표에 빈 칸이 선다.
+  const nextAdminName =
+    admin_name === undefined ? undefined : (admin_name.trim().slice(0, ADMIN_NAME_MAX) || null);
   if (status !== undefined && !ALLOWED_STATUS.has(status)) {
     return Response.json({ error: "status 는 approved·blocked·pending 중 하나예요" }, { status: 400 });
   }
@@ -102,6 +115,8 @@ export const PATCH = withUser(async (req, { params }, user) => {
     //   거기 두면 이중 쓰기를 지켜야 하는 자리가 하나 더 늘고, 갈리면 "화면은 pro 인데
     //   서버는 basic"이 된다.
     ...(tier !== undefined ? { tier } : {}),
+    // ★ 원장에만 쓴다 — 게이트(app_metadata)가 읽을 값이 아니다(tier 와 같은 판단).
+    ...(nextAdminName !== undefined ? { admin_name: nextAdminName } : {}),
   });
 
   // ★ 게이트·원장이 둘 다 성공한 **뒤에** 준다. 앞에 두면 게이트 실패로 502 를 돌려주면서

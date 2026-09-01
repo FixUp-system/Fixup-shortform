@@ -145,6 +145,25 @@ export default function AdminPage() {
     setBusy("");
   }
 
+  // 운영자가 붙이는 이름 — 등급·역할과 **같은 문**(PATCH)을 쓴다.
+  // ★ 이 값은 사용자 본인의 이름(display_name)이 아니다. 본인 것은 마이페이지에서만 바뀐다.
+  // ★ 칸을 벗어날 때 저장한다(blur) — 글자마다 보내면 요청이 쏟아진다.
+  async function setAdminName(id, admin_name) {
+    setBusy(id);
+    setErr("");
+    const r = await fetch(`/api/admin/users/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ admin_name }),
+    });
+    if (!r.ok) {
+      const body = await r.json().catch(() => ({}));
+      setErr(body.error || "이름을 바꾸지 못했어요");
+    }
+    await load();
+    setBusy("");
+  }
+
   async function setStatus(id, status) {
     setBusy(id);
     setErr("");
@@ -236,6 +255,8 @@ export default function AdminPage() {
     (u) =>
       !q ||
       displayNameOf(u).toLowerCase().includes(q) ||
+      // ★ 운영자가 붙인 이름으로도 찾는다 — 누군지 적어 두고 못 찾으면 뜻이 없다.
+      u.admin_name?.toLowerCase().includes(q) ||
       u.email?.toLowerCase().includes(q) ||
       u.id?.toLowerCase().includes(q)
   );
@@ -272,6 +293,9 @@ export default function AdminPage() {
             <thead>
               <tr>
                 <th>이름</th>
+                {/* ★★★ 2026-09-01 사장님 지시 — 내부용 계정 이름이 `fixup1` 같아서 누구
+                    것인지 운영자도 헷갈린다. **여기서만** 보이는 이름을 따로 적는다. */}
+                <th>운영자 이름</th>
                 <th>이메일</th>
                 <th>상태</th>
                 <th>역할</th>
@@ -287,6 +311,23 @@ export default function AdminPage() {
                   {/* ★ 이름이 먼저다 — 사람을 부르는 말이고, 이메일은 신원이다.
                       이름을 안 적은 사람은 이메일 앞부분이 뜬다(displayNameOf). */}
                   <td>{displayNameOf(u)}</td>
+                  {/* ★ 사용자 본인 이름 옆에 나란히 둔다 — 둘을 함께 봐야 누군지 안다.
+                      ★ 비우고 나가면 지워진다(라우트가 빈 글자를 null 로 읽는다). */}
+                  <td>
+                    <input
+                      className="dlg-input admin-name"
+                      type="text"
+                      defaultValue={u.admin_name || ""}
+                      placeholder="누구 계정인지"
+                      maxLength={40}
+                      disabled={busy === u.id}
+                      onBlur={(e) => {
+                        const next = e.target.value.trim();
+                        if (next !== (u.admin_name || "")) setAdminName(u.id, next);
+                      }}
+                      aria-label={`${u.email} 운영자 이름`}
+                    />
+                  </td>
                   <td className="mono">{u.email}</td>
                   <td>
                     <span className={`st-badge st-${u.status === "approved" ? "done" : u.status === "blocked" ? "error" : "submitted"}`}>

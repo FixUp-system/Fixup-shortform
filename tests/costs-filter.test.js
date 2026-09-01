@@ -119,20 +119,28 @@ describe("흐름(광고 · 영상 만들기)을 가른다", () => {
   // ★★ 2026-08-27 — 고르는 목록은 **제품 둘만**이다(사장님 지시). 그래도 옛 흐름의
   //   지출은 합계에서 안 버린다 — 버리면 흐름별 합이 누적과 안 맞아 "어디로 샜지"가 된다.
   it("표 순서를 따르고, 옛 흐름은 그 뒤에 선다", () => {
+    // ⚠️ 2026-09-01 — 순서가 뒤집혔다. 이름을 사이드바에 맞추면서(원클릭 영상 ·
+    //   단계별 영상) **거기 순서**를 따랐다 — 사이드바에서 원클릭이 위다.
     const order = sumByFlow(rows).map((f) => f.flow);
-    expect(order.slice(0, 2)).toEqual(["reel", "ad"]);
+    expect(order.slice(0, 2)).toEqual(["ad", "reel"]);
     expect(order).toContain("step");
     expect(order).toContain("etc");
   });
 
   it("고를 수 있는 종류는 지금 파는 둘뿐이다", () => {
-    expect(FLOWS.map((f) => f.id)).toEqual(["reel", "ad"]);
-    expect(FLOWS.map((f) => f.label)).toEqual(["영상 만들기", "광고 영상"]);
+    // ⚠️ 2026-09-01 — 이름이 바뀌었다. 사이드바가 "원클릭 영상 · 단계별 영상" 으로
+    //   바뀐 뒤에도 여기만 옛 이름에 남아 있었다(같은 것을 두 화면이 다르게 불렀다).
+    //   ★ 그 어긋남을 다시 안 놓치게 tests/costs-flow-names.test.js 가 **사이드바 소스를
+    //     읽어** 대조한다 — 글자를 손으로 적는 이 판만으로는 또 같이 낡는다.
+    expect(FLOWS.map((f) => f.id)).toEqual(["ad", "reel"]);
+    expect(FLOWS.map((f) => f.label)).toEqual(["원클릭 영상", "단계별 영상"]);
   });
 
   it("옛 흐름도 표에서는 사람 말로 보인다 — 안쪽 이름을 그대로 보여 주지 않는다", () => {
     expect(flowLabel("film")).toBe("한 번에 굽기");
-    expect(flowLabel("step")).toBe("단계별");
+    // ⚠️ `reel` 이 "단계별 영상" 이 되면서 옛 이름 "단계별" 과 부딪혔다 — 옛것임이
+    //   이름에 드러나야 표에서 안 헷갈린다.
+    expect(flowLabel("step")).toBe("옛 단계별");
     expect(flowLabel("etc")).toBe("기타");
   });
 
