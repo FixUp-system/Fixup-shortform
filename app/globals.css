@@ -298,6 +298,19 @@ aside.side {
 .side-item.soon { color: var(--ink-soft); cursor: default; }
 .side-item.soon:hover { background: transparent; }
 .side-item .ic { display: inline-flex; flex: none; opacity: 0.85; }
+/* 칩 안의 [관리자] 표시 — 2026-09-01 사장님 지적으로 생겼다.
+   그전에는 `.soon-tag` 가 `.side-item .soon-tag` 로만 정의돼 있어 사이드바 밖에서는
+   규칙이 **0** 이었다. 그래서 해상도 칩이 **"1080p관리자"** 로 글자가 그대로 이어 붙었다
+   (components/AdOptionTray.jsx 가 값 뒤에 이 배지를 놓는다).
+   ★ 칩 안이라 테두리를 또 두르지 않는다 — 박스 안 박스가 된다. 간격과 옅은 색으로 가른다. */
+.chip .soon-tag {
+  margin-left: 6px;
+  /* ★ 12px 는 이 저장소의 글자 눈금이다(12·14·16·18·28) — tests/design-system.test.js
+     가 그 밖의 값을 빨갛게 잡는다. 처음에 11px 로 적었다가 거기서 걸렸다. */
+  font-size: 12px;
+  opacity: 0.65;
+}
+
 .side-item .soon-tag {
   margin-left: auto;
   font-size: 12px;
@@ -1492,6 +1505,43 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
 .brief-row .val:empty::before,
 .brief-row .val.blank { color: var(--ink-soft); }
 .brief-point { display: flex; gap: 8px; align-items: baseline; }
+
+/* ── 만든 정보 — 한눈에 (2026-09-01 사장님 지시)
+   사양 다섯(모델·길이·화질·비율·화풍)이 줄 다섯을 차지하던 자리다. 한 줄 칩으로 모으면
+   훑는 눈이 한 번에 지나간다. 라벨은 옅게, 값은 진하게 — 값이 먼저 읽혀야 한다. */
+.spec-chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 2px 0 12px; }
+.spec-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+  padding: 5px 11px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.spec-chip > b { color: var(--ink-soft); font-weight: 400; font-size: 12px; }
+
+/* 붙인 레퍼런스 — 장수가 아니라 **무엇을 붙였는지**가 보여야 한다.
+   ★ 그림은 정사각으로 자른다(object-fit: cover) — 비율이 제각각이면 줄이 울퉁불퉁해져
+     오히려 훑기 어렵다. 종류는 그림 아래에 한 마디로 적는다. */
+.brief-refs { display: flex; flex-wrap: wrap; gap: 10px; padding: 0 0 12px; }
+.ref-card { margin: 0; width: 72px; }
+.ref-card img {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: var(--r-ctl);
+  border: 1px solid var(--line);
+  display: block;
+  background: var(--surface2);
+}
+.ref-card figcaption {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--ink-soft);
+  text-align: center;
+}
 .brief-point::before { content: "•"; color: var(--ink-soft); }
 .ask { background: var(--surface); border-radius: var(--r-card); padding: 14px 16px; margin-top: 14px; }
 .ask h3 { font-size: 14px; font-weight: 600; margin: 0 0 10px; }
