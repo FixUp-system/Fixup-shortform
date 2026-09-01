@@ -63,7 +63,7 @@ describe("STYLE_PRESETS — 화풍 표", () => {
   //
   //   studio 는 realistic 이지만 여기서 뺀다: 같은 사진이어도 **찍는 대상이 다르다**
   //   (배경 없는 제품컷). 그래서 photo 와 "lighting" 을 나눠 써도 화면이 헷갈리지 않는다.
-  const LIVE_CAPTURE = ["photo", "film", "cinema"];   // 같은 장면·같은 매체 — 문구로만 갈린다
+  const LIVE_CAPTURE = ["photo", "film", "cinema", "vlog"];   // 같은 장면·같은 매체 — 문구로만 갈린다
   const NOT_LIVE_CAPTURE = ["studio"];                // 실사지만 찍는 대상이 다르다
 
   const finishWords = (s) => new Set(

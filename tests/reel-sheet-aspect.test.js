@@ -41,11 +41,22 @@ describe("모델 표 — 참조 이미지 비율 한계", () => {
       .toEqual({ min: 0.4, max: 2.5 });
   });
 
-  it("★ Seedance 는 한계가 없다 — 확인된 적이 없으니 적지 않는다", () => {
-    // 모르는 것을 좁게 적으면 멀쩡히 되던 길이 막힌다. 여기서는 **모르면 안 막는다** —
-    // 값이 걸린 자리가 아니라 갈래 판정이라, 틀려도 컷별로 떨어질 뿐이다.
+  // ⚠️ 2026-09-01 — **이 단정이 뒤집혔다.** 그전에는 *"Seedance 는 한계가 없다 — 확인된
+  //   적이 없으니 적지 않는다"* 였다. 그날 라이브가 확인해 주었다: 컷 5개짜리 프로젝트가
+  //   1행×5열(**비율 2.83**)로 나갔다가 거절됐다. **문구는 초상이었다**
+  //   ("likenesses of real people") — 같은 비율을 H3 는 "aspect ratio should be between
+  //   0.4 and 2.5" 라고 정확히 말한다. 2.5 는 **원인을 잘못 가리키는 문구**를 돌려준다.
+  //   ★ 가른 방법: 컷만 5→4 로 줄여(격자 2×2, 비율 0.56) 같은 판을 다시 넘겼더니
+  //     거절이 사라지고 5분 넘게 정상으로 구웠다. 바뀐 축이 비율 하나였다.
+  it("★★ 2.5 는 0.4~2.5 로 잡는다 — 실측이 뒤집었다", () => {
+    expect(refAspectFor(clipProfileForProject({ settings: { i2v_model: "seedance-2.5" } })))
+      .toEqual({ min: 0.4, max: 2.5 });
+  });
+
+  it("★ 2.0 은 여전히 한계가 없다 — 그쪽은 확인된 적이 없다", () => {
+    // 모르는 것을 좁게 적으면 멀쩡히 되던 길이 막힌다. **모르면 안 막는다.**
+    // 2.0 은 얼굴 넷짜리 판(비율 0.84)을 통과시킨 실적만 있고, 넓은 판은 재 본 적이 없다.
     expect(refAspectFor(clipProfileForProject({ settings: { i2v_model: "seedance-2.0" } }))).toBeNull();
-    expect(refAspectFor(clipProfileForProject({ settings: { i2v_model: "seedance-2.5" } }))).toBeNull();
   });
 });
 

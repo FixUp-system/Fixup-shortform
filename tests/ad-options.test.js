@@ -44,7 +44,7 @@ describe("광고 옵션", () => {
   //   축은 styles.js 쪽과 같다: 실사 촬영 계열 셋(photo·film·cinema)만 pairwise 로 금지한다.
   //   셋 다 "진짜 장면을 카메라로 찍은 영상"이라 구별이 문구에만 있다. studio 는 실사지만
   //   찍는 대상이 다르고(배경 없는 제품컷), 비실사는 매체부터 갈리므로 뺀다.
-  const AD_LIVE_CAPTURE = ["photo", "film", "cinema"];
+  const AD_LIVE_CAPTURE = ["photo", "film", "cinema", "vlog"];
 
   it("영상 문구도 실사 촬영 계열끼리 낱말을 안 나눈다", () => {
     const words = (s) => new Set(

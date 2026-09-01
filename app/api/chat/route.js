@@ -31,7 +31,7 @@ const SYSTEM_PROMPT = `너는 shortform의 영상 제작 도우미다. 사용자
    "material_text":"<자료 원문 — 대화에서 받은 사실·포인트를 한국어 서술형으로. 제품명·가격·기간 같은 구체 디테일은 하나도 빠뜨리지 않는다. 지어내지 않는다>",
    "target_seconds":15|30|45|60,
    "aspect_ratio":"9:16"|"1:1"|"16:9",
-   "style":"photo"|"illust"|"anime"|"studio"|"render3d"|"film"|"cinema"|"scifi",
+   "style":"photo"|"vlog"|"illust"|"anime"|"studio"|"render3d"|"film"|"cinema"|"scifi",
    "voice_label":"차분한 여성"|"밝은 여성"|"차분한 남성"|"밝은 남성",
    "summary":"<수집 내용 한국어 한 줄 요약>"}
 
