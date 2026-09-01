@@ -189,6 +189,36 @@ describe("수거 — 화면이 두드릴 때 이어받는다", () => {
     expect(f.d.reel.job ?? null, "접수증이 안 지워졌다").toBeNull();
   });
 
+  // ★★★ **되살림 경로가 단계를 안 옮겼다** (2026-09-01 사장님 지적: "이어서 작업하기로
+  //   들어간 화면이 만드는 중이라고 나온다").
+  //
+  //   같은 일이 두 경로로 끝난다:
+  //     · 정상  — /clips 가 runReelOneShot 을 끝까지 기다렸다가 `.then()` 에서 "clips" 로 옮긴다
+  //     · 되살림 — 그 요청이 죽으면(서버리스 시간 초과) 폴링이 이 함수로 주워 담는다
+  //   **그런데 옮기는 줄이 정상 쪽에만 있었다.** 되살림으로 끝난 편은 영상이 멀쩡히 꽂혔는데도
+  //   status 가 "rendering" 에 남아, ⑥완성 화면이 영영 "영상을 이어 붙이는 중이에요" 를 띄우고
+  //   [이대로 완성하기] 버튼까지 잠긴다(rendering 으로 잠그기 때문에) — **나올 문이 없다.**
+  //   ★ /clips 라우트의 주석이 이 증상을 미리 적어 두었다: *"여기서 옮기지 않으면 status 가
+  //     영원히 rendering 으로 남아 화면은 영영 만드는 중"*. 그 줄이 이쪽에는 없었다.
+  //   ★ "done" 이 아니라 **"clips"** 다 — 클립이 끝난 것이고 완성본은 /render 가 만든다.
+  it("★★★ 끝났으면 단계를 옮긴다 — 안 옮기면 영영 '만드는 중'이다", async () => {
+    const f = fixture(JOB);
+    await collectReelOneShot("pid", "uid", { ...f, collectClip: async () => ({ done: true, url: "https://fal/v.mp4", seconds: 15 }) });
+    expect(f.d.reel.status, "rendering 에 남았다 — 화면이 영영 만드는 중이고 완성 버튼이 잠긴다").toBe("clips");
+  });
+
+  it("★★ 아직이면 그대로 굽는 중이다 — 끝나기도 전에 옮기면 안 된다", async () => {
+    const f = fixture(JOB);
+    await collectReelOneShot("pid", "uid", { ...f, collectClip: async () => ({ done: false }) });
+    expect(f.d.reel.status).toBe("rendering");
+  });
+
+  it("★★ 실패는 error 로 간다 — 성공 자리만 고치고 실패를 흘리면 안 된다", async () => {
+    const f = fixture(JOB);
+    await collectReelOneShot("pid", "uid", { ...f, collectClip: async () => { throw new Error("영상 생성 실패 (500)"); } });
+    expect(f.d.reel.status).toBe("error");
+  });
+
   it("★ 나머지 컷의 옛 클립을 걷는다 — 안 걷으면 완성본이 '한 편 + 옛 컷들'이 된다", async () => {
     const f = fixture(JOB);
     await collectReelOneShot("pid", "uid", { ...f, collectClip: async () => ({ done: true, url: "https://fal/v.mp4", seconds: 15 }) });
