@@ -115,7 +115,11 @@ export default function LoginPage() {
           그때 여기서 나갈 길이 없으면 로그인이 **유일한 문**처럼 보인다.
           ★ 로그인은 그대로 위에 있다 — 이건 보는 길일 뿐 문을 대신하지 않는다. */}
       <p className="login-help">
-        <Link href="/archive">로그인 없이 보관함 보기 →</Link>
+        {/* ★★ 2026-09-01 사장님 지적 — 맨 <Link> 라 브라우저 기본 밑줄이 그어져
+            "링크"로 보였다. 이 저장소가 2026-08-25 에 같은 지적을 받고 `.mini` 에
+            밑줄 해제를 넣어 두었다(app/globals.css) — 새 스타일을 만들지 않고
+            그것을 쓴다. 테두리·높이까지 옆 화면들과 같은 모양이 된다. */}
+        <Link className="mini" href="/archive">로그인 없이 보관함 보기 →</Link>
       </p>
     </>
   );

@@ -86,3 +86,64 @@ describe("보관함 목록이 통짜를 안다", () => {
     expect((await rowOf(p.id)).video_url).toBe("/ad.mp4");
   });
 });
+
+// **상세 화면도 같은 것을 봐야 한다** (2026-09-01 사장님 지적: 카드는 뜨는데 눌러 들어가면
+// "아직 완성본이 없어요"가 떴다).
+//
+// ★★★ 실측으로 **두 자리가 정반대로 어긋나 있었다**(단계별 18편):
+//   · 합성본은 `doc.reel.video.url` 에 산다(4편) — **상세는 봤고 목록은 못 봤다**
+//     (목록 SQL 이 `doc->render->>url` 을 읽는데 그 자리는 종류 없는 옛 문서의 것이다).
+//   · 통짜 클립은 `cuts[0].video` 에 산다(10편) — **목록은 봤고(앞의 수정) 상세는 못 봤다**.
+//   한쪽만 고치면 반대쪽이 남는다. 그래서 판정을 한 벌로 만든다.
+//
+// ★ lib/archive/video.js 는 "import 가 없다"를 성질로 적어 두었다. 그 뜻은 **화면이 그대로
+//   부를 수 있어야 한다**(사슬 끝에 fs 가 닿으면 안 된다)이고, lib/reel/doc.js 도 import 0 개라
+//   그 성질이 깨지지 않는다. 규칙을 두 벌로 베끼는 쪽이 이 저장소가 더 크게 겪은 사고다.
+import { archiveVideoUrl } from "../lib/archive/video.js";
+
+const reelDoc = (extra) => ({ kind: "reel", ...extra });
+
+describe("상세 화면 판정 — archiveVideoUrl", () => {
+  it("★★★ 통짜 클립만 있어도 완성본이다 — 이것이 '아직 완성본이 없어요'의 원인이었다", () => {
+    expect(archiveVideoUrl(reelDoc({ cuts: [{ video: WHOLE }] }))).toBe("https://fal/whole.mp4");
+  });
+
+  it("★★ 합성본이 있으면 그쪽이 이긴다 — 자막 태운 편이 진짜 완성본이다", () => {
+    const doc = reelDoc({ reel: { video: { url: "/api/renders/r.mp4" } }, cuts: [{ video: WHOLE }] });
+    expect(archiveVideoUrl(doc)).toBe("/api/renders/r.mp4");
+  });
+
+  it("★★ 컷별 조각은 완성본이 아니다 — 아직 이어 붙이기 전이다", () => {
+    expect(archiveVideoUrl(reelDoc({ cuts: [{ video: PIECE }, { video: { url: "y" } }] }))).toBeNull();
+  });
+
+  it("★ 광고·film·옛 문서는 예전 그대로다", () => {
+    expect(archiveVideoUrl({ kind: "ad", videos: [{ url: "/ad.mp4" }] })).toBe("/ad.mp4");
+    expect(archiveVideoUrl({ kind: "film", films: { order: { video: { url: "/f.mp4" } } } })).toBe("/f.mp4");
+    expect(archiveVideoUrl({ render: { url: "/old.mp4" } })).toBe("/old.mp4");
+    expect(archiveVideoUrl(null)).toBeNull();
+  });
+
+  it("★★ 언제나 문자열이거나 null 이다 — 이 파일이 생긴 이유다(객체를 내면 재생이 죽는다)", () => {
+    for (const d of [reelDoc({ cuts: [{ video: WHOLE }] }), reelDoc({}), null]) {
+      const v = archiveVideoUrl(d);
+      expect(v === null || typeof v === "string").toBe(true);
+    }
+  });
+});
+
+describe("목록도 합성본 자리를 본다 — 반대쪽 어긋남", () => {
+  beforeEach(() => resetMemoryStore());
+
+  it("★★★ doc.reel.video.url 만 있어도 카드에 영상이 뜬다", async () => {
+    const p = await makeReel((d) => ({ ...d, reel: { ...d.reel, video: { url: "/api/renders/z.mp4" } } }));
+    expect((await rowOf(p.id)).video_url).toBe("/api/renders/z.mp4");
+  });
+
+  it("★★ 합성본이 통짜 클립을 이긴다 — 두 자리가 같은 순서를 쓴다", async () => {
+    const p = await makeReel((d) => ({
+      ...d, cuts: [{ idx: 0, video: WHOLE }], reel: { ...d.reel, video: { url: "/api/renders/z.mp4" } },
+    }));
+    expect((await rowOf(p.id)).video_url).toBe("/api/renders/z.mp4");
+  });
+});

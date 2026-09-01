@@ -260,6 +260,26 @@ describe("보관함 목록이 통짜 영상 칸을 실제로 읽어 온다", () 
       .toContain("doc->cuts->0->video->>whole");
   });
 
+  // ★★★ 2026-09-01 — **단계별 합성본은 doc.render 가 아니라 doc.reel.video 에 산다**
+  //   (app/api/reel/[id]/render/route.js 가 putReel 로 채운다). 목록은 그 자리를 아예
+  //   안 읽고 있었다 — 실측 18편 중 4편이 합성까지 끝났는데 카드가 몰랐다.
+  //   판정 순서는 상세 화면(lib/archive/video.js)과 **같아야 한다**: 합성본이 먼저다.
+  it("★★★ 셀렉트에 doc.reel.video 도 있다 — 합성한 편이 목록에서 빠지면 안 된다", async () => {
+    await supabaseStore.listProjects("o1");
+    expect(H.calls[0].select.cols).toContain("doc->reel->video->>url");
+  });
+
+  it("★★ 전체 목록도 같다", async () => {
+    await supabaseStore.listAllProjects();
+    expect(H.calls[0].select.cols).toContain("doc->reel->video->>url");
+  });
+
+  it("★★ 합성본이 통짜 클립을 이긴다", async () => {
+    H.respond = () => ({ data: [{ ...ROW, reel_video_url: "/api/renders/p1.mp4" }], error: null });
+    const [row] = await supabaseStore.listProjects("o1");
+    expect(row.video_url).toBe("/api/renders/p1.mp4");
+  });
+
   it("★★ 전체 목록도 같은 칸을 읽는다 — 두 자리가 갈리면 탭마다 다르게 보인다", async () => {
     await supabaseStore.listAllProjects();
     expect(H.calls[0].select.cols).toContain("doc->cuts->0->video->>url");

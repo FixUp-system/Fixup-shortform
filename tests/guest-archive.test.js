@@ -212,3 +212,30 @@ describe("손님에게 보이는 상단바", () => {
     expect(me).toContain("setGuest");
   });
 });
+
+// **버튼처럼 보이는 것에 밑줄이 그어지면 안 된다** (2026-09-01 사장님 지적).
+//
+// ★★ 이 저장소가 **두 번째로 겪는 자리**다. 2026-08-25 에 같은 지적을 받고 `.mini` 에
+//   `text-decoration: none` 을 넣었는데(app/globals.css 의 그 주석), 이 링크만 그 규약
+//   밖에 맨 `<Link>` 로 남아 브라우저 기본 밑줄이 그어졌다.
+// ★ 고치는 방향은 **새 스타일을 만드는 것이 아니라 있는 것을 쓰는 것**이다 — `.mini` 는
+//   밑줄 해제·테두리·높이를 이미 다 들고 있고, 옆 화면들이 쓰는 그 모양이다.
+describe("로그인 화면의 보관함 문 — 링크가 아니라 버튼으로 보인다", () => {
+  const src = readFileSync("app/login/page.js", "utf8");
+  const line = src.split("\n").find((l) => l.includes('href="/archive"')) || "";
+
+  it("★★★ 그 자리가 아직 있다 — 로그인이 유일한 문처럼 보이면 안 된다", () => {
+    expect(line, "보관함으로 가는 문이 사라졌다").toMatch(/보관함/);
+  });
+
+  it("★★★ 버튼 모양을 쓴다 — 맨 <Link> 면 브라우저가 밑줄을 긋는다", () => {
+    expect(line, "className 이 없어 기본 링크로 그려진다").toMatch(/className="[^"]*\bmini\b/);
+  });
+
+  it("★ 그 클래스에 밑줄 해제가 실제로 있다 — 클래스만 붙이고 스타일이 없으면 헛일이다", () => {
+    const css = readFileSync("app/globals.css", "utf8");
+    const at = css.indexOf(".mini {");
+    expect(at).toBeGreaterThan(-1);
+    expect(css.slice(at, at + 500)).toMatch(/text-decoration:\s*none/);
+  });
+});
