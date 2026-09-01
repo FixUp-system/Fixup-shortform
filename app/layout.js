@@ -25,7 +25,18 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="ko" className={`${GeistSans.variable} ${pretendard.variable}`}>
+    // ★★★ 2026-09-01 — **밝은 테마에서 화면이 깨졌다**(사장님 지적, 로컬 실측).
+    //   아래 <head> 스크립트가 리액트가 붙기 **전에** `data-theme="light"` 를 여기에 찍는데,
+    //   서버 HTML 에는 없던 속성이라 hydration 이 불일치로 본다 — 개발에서는 오버레이가
+    //   화면을 통째로 덮고, 운영에서는 조용히 루트부터 다시 그린다.
+    //   ★ 스크립트를 없애면 번쩍임이 돌아온다(그 스크립트가 있는 이유). 그래서 고칠 곳은
+    //     스크립트가 아니라 **단정하는 쪽**이고, 리액트가 그 자리를 위해 둔 것이 이 속성이다.
+    //   ★ 범위는 **이 요소의 속성 한 겹**뿐이다 — 아래 트리의 hydration 검사는 그대로 산다.
+    <html
+      lang="ko"
+      className={`${GeistSans.variable} ${pretendard.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         {/* ★★ 테마는 **첫 칠 전에** 정해져야 한다(2026-08-18). 리액트가 붙은 뒤에 칠하면
             밝은 화면을 고른 사장님이 새로고침마다 어두운 화면을 한 번 보고 지나간다 —

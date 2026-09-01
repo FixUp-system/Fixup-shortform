@@ -394,22 +394,38 @@ export default function AdDetailPage() {
       {view === "draft" && (
         <section className="panel panel--wide">
           <h2>무엇을 만들까요</h2>
+          {/* ★★★ 2026-09-01 — `field` 가 빠져 **브라우저 기본 상자**가 떴다(사장님 지적).
+              공용 규칙은 `textarea.field` 다(app/globals.css). `.composer-text` 는 높이만
+              얹는 보조 규칙이고 그나마 `.composer` 상자 안에서만 걸리는데(`.composer
+              textarea.composer-text`) 이 화면에는 그 상자가 없다 — 그래서 아무것도 안
+              걸렸다. 첫 화면(/ads/new)과 **같은 클래스**로 맞춘다. */}
           <textarea
-            className="composer-text"
+            className="field composer-text"
             value={draftText}
             onChange={(e) => setDraftText(e.target.value)}
             rows={6}
             maxLength={MAX_MATERIAL_TEXT}
             placeholder="제품·특징·하고 싶은 이야기를 적어 주세요"
           />
-          <AdOptionTray
-            value={draftOpts}
-            onChange={(patch) => setDraftOpts((v) => ({ ...v, ...patch }))}
-            showCredits={showCredits}
-            admin={me?.isAdmin === true}
-            tier={me?.tier}
-            tierReady={ready}
-          />
+          {/* ★★★ 2026-09-01 — **값이 있을 때만 그린다.** `draftOpts` 는 useState(null) 로
+              시작하는데 트레이가 그 값을 바로 구조분해해서, 주소로 바로 들어오거나
+              새로고침하면 첫 렌더에서 화면이 통째로 죽었다(TypeError: Cannot destructure
+              property 'format' of 'value' as it is null). 화면 안에서 [입력] 을 눌러
+              들어갈 때만 멀쩡했다 — 그때는 프로젝트가 이미 읽혀 있어서다.
+              ★ 같은 파일의 dirty 판정·저장은 이미 `!!draftOpts` 로 지키고 있었다. 그리는
+                자리만 빠져 있었다.
+              ★ `value || {}` 로 막지 않는다 — 크래시는 사라지지만 아직 못 읽은 상태가
+                "아무것도 안 골랐음"으로 보이고, 그대로 저장될 수 있다. */}
+          {draftOpts && (
+            <AdOptionTray
+              value={draftOpts}
+              onChange={(patch) => setDraftOpts((v) => ({ ...v, ...patch }))}
+              showCredits={showCredits}
+              admin={me?.isAdmin === true}
+              tier={me?.tier}
+              tierReady={ready}
+            />
+          )}
           {(project?.material?.photos || []).length > 0 && (
             <p className="pgsub">사진 {project.material.photos.length}장이 붙어 있어요.</p>
           )}
