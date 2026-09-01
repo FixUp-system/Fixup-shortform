@@ -38,10 +38,8 @@ const post = (role, settings) =>
   });
 
 describe("판정 함수 — 관리자는 등급을 안 탄다", () => {
-  it("관리자에게는 숨기지도 은퇴하지도 않은 모델이 전부 열린다", () => {
-    // ★ 2026-09-01 — 거르는 축이 둘이다: `hidden`(아무도) · `retired`(새로는 못 고름).
-    //   관리자도 **목록**에는 은퇴 모델이 안 나온다 — 다만 게이트는 지난다(아래 시험).
-    const all = AD_MODELS.filter((m) => !m.hidden && !m.retired).map((m) => m.id);
+  it("관리자에게는 숨기지 않은 모델이 전부 열린다", () => {
+    const all = AD_MODELS.filter((m) => !m.hidden).map((m) => m.id);
     expect(modelsForTier("basic", { admin: true }).map((m) => m.id)).toEqual(all);
     // 등급이 아예 없어도 마찬가지다 — 관리자면 등급을 안 본다.
     expect(modelsForTier(undefined, { admin: true }).map((m) => m.id)).toEqual(all);
@@ -67,7 +65,6 @@ describe("판정 함수 — 관리자는 등급을 안 탄다", () => {
   // ★★ 이것이 이 파일의 핵심이다: 두 게이트가 **같은 축**을 봐야 관리자 전용 해상도에
   //    도달할 수 있다. 하나라도 tier 로 돌아가면 그 자리는 다시 죽은 코드가 된다.
   it("★ 관리자는 2.5 를 고를 수 있고, 그래야 1080p 에 도달한다", () => {
-    // ★ 2026-09-01 — 2.5 는 **은퇴**라 목록엔 없지만 게이트는 관리자에게 통과시킨다.
     expect(tierAllowsModel("basic", "seedance-2.5", { admin: true })).toBe(true);
     expect(isAdResolution("1080p", "seedance-2.5", { admin: true })).toBe(true);
     expect(adResolutionsFor("seedance-2.5", { admin: true })).toContain("1080p");
@@ -98,14 +95,12 @@ describe("라우트가 실제로 그렇게 동작한다 — HTTP 로 잰다", ()
     expect(res.status).toBe(403);
   });
 
-  // ⚠️ 2026-09-01 — **막히는 자리가 앞당겨졌다.** 그전에는 모델은 통과하고 해상도에서
-  //   400 이었는데, 이제 2.5 가 **은퇴**라 손님은 모델 단계에서 403 이다.
-  it("손님은 은퇴한 2.5 를 아예 못 만든다 — 해상도까지 가지도 않는다", async () => {
+  it("손님은 2.5 의 1080p 에서도 막힌다 — 모델을 뚫어도 해상도가 남는다", async () => {
     await memoryStore.insertProfile({
       id: U, email: "pro@fix-up.kr", status: "approved", role: "user", tier: "pro",
     });
     const res = await createAd(post("user", { model: "seedance-2.5", seconds: 15, resolution: "1080p" }));
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(400);
   });
 
   it("관리자도 모르는 모델은 400 — 값이 나간 뒤에 fal 이 404 를 내는 것보다 낫다", async () => {

@@ -1,3 +1,9 @@
+// ⚠️⚠️ 2026-09-01 — **단계별의 기본이 H3 → 2.0 으로 바뀌었다**(사장님 지시).
+//   08-31 에는 H3 가 기본이었다. 그날 실측이 뒤집었다: 2.5 는 참조 이미지에 얼굴이
+//   있으면 **아홉 번 전부 거절**했고, 2.0 은 **같은 판을 첫 시도에 통과**시켰다.
+//   브이로그처럼 인물이 주인공인 영상은 판에 얼굴이 있어야 하는데 그 조건을
+//   만족하는 모델이 2.0 뿐이었다.
+//   ★ **원클릭은 안 바뀐다** — 그쪽 기본은 여전히 H3 다(표가 다르다).
 // **단계별(reel)에도 기본(H3)을 배선한다** — 원클릭과 같은 이름·같은 화질(2026-08-31 사장님 지시).
 //
 // ★★ 전제가 바뀌었다 — **H3 는 소리를 낸다**(사장님 실측 확인, 2026-08-31).
@@ -26,37 +32,36 @@ import { VIDEO_PRICE, REGEN_PRICE, videoPrice, regenPrice } from "../lib/pricing
 
 const P = (id, extra = {}) => ({ settings: { i2v_model: id, ...extra } });
 
-describe("단계별 — 기본은 H3 다", () => {
-  it("표에 있고 이름이 '기본' 이다", () => {
-    const m = I2V_MODELS.find((x) => x.id === "minimax-h3");
+describe("단계별 — 기본은 2.0 이다", () => {
+  it("표에 있고 이름이 '기본' 이다 — 2.0", () => {
+    const m = I2V_MODELS.find((x) => x.id === "seedance-2.0");
     expect(m, "reel 표에 H3 가 없다").toBeTruthy();
     expect(m.label).toBe("기본");
   });
 
-  it("★ 새로 만들면 기본(H3)으로 만든다", () => {
-    expect(DEFAULT_I2V_MODEL).toBe("minimax-h3");
+  it("★ 새로 만들면 기본(2.0)으로 만든다", () => {
+    expect(DEFAULT_I2V_MODEL).toBe("seedance-2.0");
   });
 
   it("★★ 옛 문서의 폴백은 그대로 Kling 이다 — 건드리면 이미 만든 영상이 갈아탄다", () => {
     expect(LEGACY_I2V_MODEL).toBe("kling-v3");
   });
 
-  it("★ 고를 수 있고, 2.0 은 빠졌다(숨김)", () => {
-    expect(REEL_MODEL_IDS).toContain("minimax-h3");
-    // ⚠️ 2026-09-01 뒤집힘 — 프로가 2.0 이고 2.5 가 내려갔다.
+  it("★ 고를 수 있고, H3 는 빠졌다", () => {
     expect(REEL_MODEL_IDS).toContain("seedance-2.0");
-    expect(REEL_MODEL_IDS, "2.5 가 아직 고를 수 있다").not.toContain("seedance-2.5");
-    expect(isReelModel("minimax-h3")).toBe(true);
-    expect(isReelModel("seedance-2.5")).toBe(false);
+    expect(REEL_MODEL_IDS).toContain("seedance-2.0");
+    expect(REEL_MODEL_IDS, "H3 가 아직 고를 수 있다").not.toContain("minimax-h3");
+    expect(isReelModel("seedance-2.0")).toBe(true);
+    expect(isReelModel("minimax-h3")).toBe(false);
   });
 
   it("★ 기본이 프로보다 앞이다 — 원클릭과 같은 순서", () => {
     const ids = reelModelsForTier("pro").map((m) => m.id);
-    expect(ids.indexOf("minimax-h3")).toBeLessThan(ids.indexOf("seedance-2.0"));
+    expect(ids.indexOf("seedance-2.0")).toBeLessThan(ids.indexOf("seedance-2.5"));
   });
 
-  it("기본 등급도 기본(H3)은 쓴다 — 숨겼더니 빈 목록이 되면 안 된다", () => {
-    expect(reelModelsForTier("basic").map((m) => m.id)).toEqual(["minimax-h3"]);
+  it("기본 등급도 기본(2.0)은 쓴다 — 빈 목록이 되면 안 된다", () => {
+    expect(reelModelsForTier("basic").map((m) => m.id)).toEqual(["seedance-2.0"]);
   });
 });
 

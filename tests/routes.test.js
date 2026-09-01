@@ -1025,8 +1025,8 @@ describe("POST /api/projects — 영상 모델", () => {
   it("새로 만드는 프로젝트는 기본 모델을 명시 저장한다", async () => {
     const res = await projectsPOST(patchReq({ material: { text: "가" }, settings: { aspect_ratio: "9:16", target_seconds: 30 } }));
     expect(res.status ?? 200).toBe(200);
-    // ★ 2026-08-31 — 기본이 기본(H3)으로 옮겼다(사장님 지시).
-    expect((await res.json()).settings.i2v_model).toBe("minimax-h3");
+    // ⚠️ 2026-09-01 — 기본이 다시 **2.0** 이다(사장님 지시 — 얼굴 든 참조를 받는 유일한 모델).
+    expect((await res.json()).settings.i2v_model).toBe("seedance-2.0");
   });
 
   it("고른 모델이 있으면 그것을 저장한다", async () => {
@@ -1043,7 +1043,7 @@ describe("POST /api/projects — 영상 모델", () => {
     expect(res0.status).toBe(400);
     // 값을 아예 안 보내는 것은 정상이다 — 그때만 기본값으로 채운다
     const res = await projectsPOST(patchReq({ material: { text: "가" } }));
-    expect((await res.json()).settings.i2v_model).toBe("minimax-h3");
+    expect((await res.json()).settings.i2v_model).toBe("seedance-2.0");
   });
 });
 
@@ -1090,10 +1090,11 @@ describe("POST /api/projects — 공통 지시", () => {
 describe("POST /api/projects — 화질", () => {
   // ★ 2026-08-31 — 기본 모델이 H3 로 옮겨 가면서 1080p 는 **그 모델에 없는 값**이 됐다
   //   (768P·2K). 재는 것은 그대로다 — 고른 화질이 그대로 담기는가.
+  // ⚠️ 2026-09-01 — 기본이 2.0 이 되면서 화질 목록이 바뀌었다(768P·2K → 480p·720p·1080p).
   it("고른 화질을 settings 에 담아 만든다", async () => {
-    const res = await projectsPOST(patchReq({ material: { text: "가" }, settings: { resolution: "2K" } }));
+    const res = await projectsPOST(patchReq({ material: { text: "가" }, settings: { resolution: "720p" } }));
     expect(res.status ?? 200).toBe(200);
-    expect((await res.json()).settings.resolution).toBe("2K");
+    expect((await res.json()).settings.resolution).toBe("720p");
   });
 
   // 검증 없이 통과시키면 모델에 없는 값이 저장되고, 그 값이 그대로 fal 유료 호출로 나가

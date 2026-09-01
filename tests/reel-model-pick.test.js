@@ -1,3 +1,9 @@
+// ⚠️⚠️ 2026-09-01 — **단계별의 기본이 H3 → 2.0 으로 바뀌었다**(사장님 지시).
+//   08-31 에는 H3 가 기본이었다. 그날 실측이 뒤집었다: 2.5 는 참조 이미지에 얼굴이
+//   있으면 **아홉 번 전부 거절**했고, 2.0 은 **같은 판을 첫 시도에 통과**시켰다.
+//   브이로그처럼 인물이 주인공인 영상은 판에 얼굴이 있어야 하는데 그 조건을
+//   만족하는 모델이 2.0 뿐이었다.
+//   ★ **원클릭은 안 바뀐다** — 그쪽 기본은 여전히 H3 다(표가 다르다).
 // reel 도 **모델을 고른다** — 광고 화면과 같은 모양으로(2026-08-25 사장님 지시:
 // "광고 영상에 맞추서 사이즈 칩이랑 모델 선택 칩 구성해줘. 모델선택은 똑같이 2.5는
 // 프로 이상만 접근가능하도록").
@@ -31,10 +37,8 @@ describe("reel 이 여는 모델", () => {
   // ★★ 2026-08-31 — **기본(H3)이 들어오고 2.0 이 빠졌다**(사장님 지시). 위 머리말의 조건
   //   넷을 H3 에 대해 이번에 다 채웠다(프로필·통짜 상한·컷 최소·정가).
   //   2.0 을 뺀 것은 **고르는 자리에서만**이다 — 이미 2.0 으로 만든 문서는 그대로 돈다.
-  it("★ 기본(H3)과 프로(2.0) 둘이다 — 기본이 앞이다", () => {
-    // ⚠️ 2026-09-01 — 프로가 2.5 → **2.0** 으로 뒤집혔다(2.5 는 얼굴 든 참조를 아홉 번
-    //   전부 거절했고 2.0 은 같은 판을 첫 시도에 통과시켰다).
-    expect(REEL_MODEL_IDS).toEqual(["minimax-h3", "seedance-2.0"]);
+  it("★ 기본(2.0)과 프로(2.5) 둘이다 — 기본이 앞이다", () => {
+    expect(REEL_MODEL_IDS).toEqual(["seedance-2.0", "seedance-2.5"]);
   });
 
   it("★★ Kling v3 는 안 연다 — speaks:false 라 대사가 통째로 사라진다", () => {
@@ -42,17 +46,17 @@ describe("reel 이 여는 모델", () => {
     expect(isReelModel("kling-v3")).toBe(false);
   });
 
-  it("★ 기본 등급은 기본(H3)만 — 프로(2.0)는 프로 등급부터다", () => {
-    expect(reelModelsForTier("basic").map((m) => m.id)).toEqual(["minimax-h3"]);
+  it("★ 기본 등급은 기본(2.0)만 — 프로(2.5)는 프로 등급부터다", () => {
+    expect(reelModelsForTier("basic").map((m) => m.id)).toEqual(["seedance-2.0"]);
   });
 
   it("★ 프로는 둘 다 고른다", () => {
-    expect(reelModelsForTier("pro").map((m) => m.id)).toEqual(["minimax-h3", "seedance-2.0"]);
+    expect(reelModelsForTier("pro").map((m) => m.id)).toEqual(["seedance-2.0", "seedance-2.5"]);
   });
 
   it("등급이 모르는 값이면 기본 등급으로 본다 — 던지지 않는다(화면이 부르는 자리다)", () => {
-    expect(reelModelsForTier(undefined).map((m) => m.id)).toEqual(["minimax-h3"]);
-    expect(reelModelsForTier("없는등급").map((m) => m.id)).toEqual(["minimax-h3"]);
+    expect(reelModelsForTier(undefined).map((m) => m.id)).toEqual(["seedance-2.0"]);
+    expect(reelModelsForTier("없는등급").map((m) => m.id)).toEqual(["seedance-2.0"]);
   });
 
   it("★ 등급 표와 갈리지 않는다 — 프로가 여는 것 중 reel 이 여는 것만 나온다", () => {

@@ -60,9 +60,8 @@ describe("등급이 쓸 수 있는 모델", () => {
     expect(modelsForTier("basic").map((m) => m.id)).toEqual(["minimax-h3"]);
   });
 
-  it("★ 프로 등급은 2.0(프로)을 쓴다 — 은퇴한 2.5 는 목록에 없다", () => {
-    expect(modelsForTier("pro").map((m) => m.id)).toContain("seedance-2.0");
-    expect(modelsForTier("pro").map((m) => m.id), "은퇴 모델이 목록에 있다").not.toContain("seedance-2.5");
+  it("★ 프로 등급은 2.5 도 쓴다", () => {
+    expect(modelsForTier("pro").map((m) => m.id)).toContain("seedance-2.5");
   });
 
   it("★ 모르는 등급은 기본 등급과 같다 — 조용히 열어 주지 않는다", () => {
@@ -79,7 +78,7 @@ describe("등급이 쓸 수 있는 모델", () => {
 
 describe("이 등급이 이 모델을 써도 되는가 — 서버가 보는 판정", () => {
   it("★ 기본 등급은 2.5 를 못 쓴다", () => {
-    expect(tierAllowsModel("basic", "seedance-2.5")).toBe(false);  // 기본 등급엔 2.5 가 없다
+    expect(tierAllowsModel("basic", "seedance-2.5")).toBe(false);
   });
 
   it("★ 프로 등급은 쓴다", () => {
@@ -94,11 +93,9 @@ describe("이 등급이 이 모델을 써도 되는가 — 서버가 보는 판�
   // ★★ 2026-08-31 — **숨긴 모델은 어느 등급도 못 쓴다.** 이것이 "숨김"과 "등급"이 다른
   //   축이라는 말의 실제 내용이다(lib/tiers.js 머리말): 등급표에 2.0 이 적혀 있어도
   //   hidden 이 먼저 걸러 서버가 거절한다 — 화면만 거르는 가림막이 아니다.
-  it("★★ 은퇴한 2.5 는 **고르는 목록엔 없고 게이트는 통과한다** — 옛 문서 재굽기", () => {
-    // ★★ 2026-09-01 — **은퇴 축이 생겼다.** 2.5 는 고르는 목록엔 없지만 게이트는 통과한다
-    //   (이미 2.5 로 만든 문서를 다시 굽기 위해서다). `hidden` 과 다른 축이다.
-    expect(tierAllowsModel("basic", "seedance-2.5")).toBe(false);   // 등급에 없다
-    expect(tierAllowsModel("pro", "seedance-2.5")).toBe(true);      // 등급에 있으면 통과
+  it("★ 숨긴 2.0 은 어느 등급도 못 쓴다 — 등급표에 적혀 있어도", () => {
+    expect(tierAllowsModel("basic", "seedance-2.0")).toBe(false);
+    expect(tierAllowsModel("pro", "seedance-2.0")).toBe(false);
   });
 
   it("★ 모르는 모델은 어느 등급도 못 쓴다 — 판정이 통과시키면 값이 나간 뒤에 404 다", () => {
