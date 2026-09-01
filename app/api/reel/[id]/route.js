@@ -35,7 +35,7 @@ export const GET = withUser(async (_req, { params }, user) => {
   if (!project || project.kind !== "reel") {
     return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
   }
-  return Response.json({ ...project, mine: viewed.mine });
+  return Response.json({ ...project, mine: viewed.mine, editable: viewed.editable });
 }, { guest: true });
 
 // reel 문서에 **자막 설정을 저장하는 문**(2026-08-25).

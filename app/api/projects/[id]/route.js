@@ -58,6 +58,8 @@ export const GET = withUser(async (req, { params }, user) => {
     charged: await alreadyChargedVideo(id),
     // 내가 만든 것인가 — 화면이 쓰기 버튼([이어서 작업하기])을 그릴지 정하는 근거다.
     mine: viewed.mine,
+    // ★ 제작 화면 문은 이 값이 연다 — 운영자는 남의 것도 고칠 수 있다(lib/projects.js).
+    editable: viewed.editable,
   });
 }, { guest: true });
 

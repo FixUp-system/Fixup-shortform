@@ -27,7 +27,7 @@ export async function loadAd(id, ownerId) {
 async function loadAdForViewing(id, viewerId) {
   const viewed = await getProjectForViewing(id, viewerId);
   if (!viewed || viewed.doc.kind !== "ad") return null;
-  return { project: viewed.doc, mine: viewed.mine };
+  return { project: viewed.doc, mine: viewed.mine, editable: viewed.editable };
 }
 
 // ★ 손님(비로그인)도 읽는다(lib/auth/guest.js) — mine 은 늘 false 다.
@@ -36,7 +36,7 @@ export const GET = withUser(async (_req, { params }, user) => {
   const viewed = await loadAdForViewing(id, user?.id ?? null);
   if (!viewed) return Response.json({ error: "찾을 수 없어요" }, { status: 404 });
   // mine — 화면이 쓰기 버튼을 그릴지 정하는 근거다(만든 사람이 누구인지는 안 준다).
-  return Response.json({ ...viewed.project, mine: viewed.mine });
+  return Response.json({ ...viewed.project, mine: viewed.mine, editable: viewed.editable });
 }, { guest: true });
 
 export const PATCH = withUser(async (req, { params }, user) => {

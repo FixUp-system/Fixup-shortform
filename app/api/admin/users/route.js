@@ -4,7 +4,7 @@ import { getStore } from "../../../../lib/store/index.js";
 // 잔액을 보이는 값으로 만드는 규칙은 한 곳이다 — 사장님 화면과 같은 값이어야 한다
 import { floorBalance } from "../../../../lib/charges.js";
 
-export const GET = withUser(async () => {
+export const GET = withUser(async (_req, _ctx, user) => {
   const store = getStore();
   const users = await store.listProfiles();
   const ids = users.map((u) => u.id);
@@ -25,8 +25,12 @@ export const GET = withUser(async () => {
   ]);
 
   // ★ 칸이 없는 사람은 0 이다 — 두 장부 모두 "없으면 안 담는다"가 규약이다.
+  // ★ `self` — **내 줄인가.** 역할 고르는 자리를 내 줄에서만 잠그는 데 쓴다(자기를
+  //   강등하면 아무도 못 들어온다 — lib/admin/self-guard.js). 화면이 자기 id 를 알려면
+  //   왕복이 하나 더 늘고, 그 값은 이미 여기 있다.
   const withCredits = users.map((u) => ({
     ...u,
+    self: u.id === user.id,
     balance: floorBalance((grants.get(u.id) || 0) - (charges.get(u.id) || 0)),
   }));
   return Response.json({ users: withCredits });

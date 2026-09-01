@@ -23,5 +23,5 @@ export const GET = withUser(async (_req, { params }, user) => {
   const viewed = await loadFilmForViewing(id, user?.id ?? null);
   if (!viewed) return Response.json({ error: "찾을 수 없어요" }, { status: 404 });
   // mine — 화면이 쓰기 버튼을 그릴지 정하는 근거다(만든 사람이 누구인지는 안 준다).
-  return Response.json({ ...viewed.project, mine: viewed.mine });
+  return Response.json({ ...viewed.project, mine: viewed.mine, editable: viewed.editable });
 }, { guest: true });

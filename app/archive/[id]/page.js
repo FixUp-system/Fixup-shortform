@@ -330,10 +330,14 @@ function ArchiveDetailPageBody() {
               <a className="mini" href={`${video}?dl=1`} download>내려받기</a>
             )}
             {/* ★ 값이 나가는 버튼은 이 화면에 없다 — 만드는 일은 제작 화면에서 한다.
-                ★ 남이 만든 영상이면(mine === false) 이 길도 안 그린다: 제작 화면은
-                  소유자만 열 수 있어(getProject 가 소유자를 요구한다) 눌러도 404 다.
-                  옛 응답에 mine 이 없을 수 있으므로 **false 일 때만** 감춘다. */}
-            {doc.mine !== false && (
+                ★ 고칠 수 없는 영상이면 이 길도 안 그린다 — 눌러도 404 이기 때문이다.
+                ★★ 2026-09-01 — 판정이 `mine` 에서 **`editable`** 로 바뀌었다.
+                  옛 주석은 "제작 화면은 소유자만 열 수 있다"였는데 **그 전제가 낡았다**:
+                  2026-08-27 부터 운영자는 남의 것도 고칠 수 있다(lib/projects.js 의
+                  ownerScope). 즉 뒷문은 이미 열려 있었고 이 문만 옛 전제로 닫혀 있었다.
+                  ★ 지우기는 그대로 `mine` 이다(components/ProjectCards.jsx).
+                  옛 응답에 editable 이 없을 수 있으므로 **false 일 때만** 감춘다. */}
+            {doc.editable !== false && (
               <Link href={workHref} className="cta">이어서 작업하기 →</Link>
             )}
           </div>

@@ -3,6 +3,7 @@ import { withUser } from "../../../../../lib/auth/require-user.js";
 import { getStore } from "../../../../../lib/store/index.js";
 import { SIGNUP_GRANT, SIGNUP_GRANT_REASON } from "../../../../../lib/pricing.js";
 import { isTier, TIERS } from "../../../../../lib/tiers.js";
+import { blocksSelfRoleChange } from "../../../../../lib/admin/self-guard.js";
 
 // 가입 기본 지급 — **처음 승인될 때 한 번**만 들어간다.
 //
@@ -51,6 +52,14 @@ export const PATCH = withUser(async (req, { params }, user) => {
   }
   if (role !== undefined && !ALLOWED_ROLE.has(role)) {
     return Response.json({ error: "role 은 user·admin 중 하나예요" }, { status: 400 });
+  }
+  // ★★★ 자기 역할은 못 바꾼다 — 마지막 운영자가 자기를 내리면 **아무도 못 들어온다**
+  //   (되돌릴 문이 앱 안에 없고 DB 를 직접 고쳐야 한다). 판정은 순수 함수 한 벌이다.
+  //   ★ 승인·차단·등급에는 이 성질이 없다 — 자기를 차단해도 다른 운영자가 푼다.
+  if (role !== undefined && blocksSelfRoleChange(user.id, id)) {
+    return Response.json(
+      { error: "자기 역할은 바꿀 수 없어요 — 다른 운영자에게 부탁해 주세요" }, { status: 400 }
+    );
   }
   // ★ 판정은 lib/tiers.js 하나다 — 여기에 등급 이름을 손으로 적으면 표와 갈린다.
   //   조용히 받으면 아무 문자열이나 컬럼에 들어가고, 그 계정은 tierOf 가 basic 으로

@@ -125,6 +125,26 @@ export default function AdminPage() {
     setBusy("");
   }
 
+  // 역할 — 등급과 **같은 문**(PATCH)을 쓴다. 문을 새로 내면 승인·차단과 갈린다.
+  // ★★ 내 줄은 화면에서 잠근다(아래 `u.self`). 다만 그것은 가림막이라 **서버도 막는다**
+  //   (app/api/admin/users/[id]/route.js 의 blocksSelfRoleChange) — 이 저장소가 2.5 에서
+  //   "화면에서만 거른 것은 잠금이 아니다"를 이미 겪었다.
+  async function setRole(id, role) {
+    setBusy(id);
+    setErr("");
+    const r = await fetch(`/api/admin/users/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role }),
+    });
+    if (!r.ok) {
+      const body = await r.json().catch(() => ({}));
+      setErr(body.error || "역할을 바꾸지 못했어요");
+    }
+    await load();
+    setBusy("");
+  }
+
   async function setStatus(id, status) {
     setBusy(id);
     setErr("");
@@ -273,7 +293,23 @@ export default function AdminPage() {
                       {STATUS_LABEL[u.status] || u.status}
                     </span>
                   </td>
-                  <td>{u.role}</td>
+                  {/* 역할 — 2026-09-01 사장님 지시로 **읽기 전용 글자에서 고르는 자리로**
+                      바뀌었다. 등급과 같은 모양(드롭다운)이라 줄이 안 넘친다.
+                      ★ 내 줄은 잠근다 — 마지막 운영자가 자기를 내리면 아무도 못 들어온다.
+                        서버도 같은 것을 막는다(가림막이 아니라 잠금이다). */}
+                  <td>
+                    <select
+                      className="dlg-input tier-pick"
+                      value={u.role === "admin" ? "admin" : "user"}
+                      disabled={busy === u.id || u.self === true}
+                      onChange={(e) => setRole(u.id, e.target.value)}
+                      aria-label={`${u.email} 역할`}
+                      title={u.self ? "자기 역할은 바꿀 수 없어요" : undefined}
+                    >
+                      <option value="user">사용자</option>
+                      <option value="admin">운영자</option>
+                    </select>
+                  </td>
                   {/* 등급 — 드롭다운으로 고른다(2026-08-20 사장님 지시). 칩을 나열하면
                       등급이 늘 때 줄이 넘치고, 지금 무엇인지도 한눈에 안 들어온다.
                       ★ 보기는 표(TIERS)에서 나온다 — 화면에 이름을 복사하면 표와 갈린다.

@@ -319,8 +319,14 @@ describe("보관함 화면 — 전체/내 영상", () => {
     expect(cards).toContain("card-del");
   });
 
-  it("남의 것에는 [이어서 작업하기]를 안 그린다 — 눌러도 404 인 유료 문이다", () => {
-    expect(detail).toMatch(/mine/);
+  // ⚠️ 2026-09-01 — **판정 이름이 `mine` 에서 `editable` 로 바뀌었다.** 지키는 것은 그대로다:
+  //   남의 것에는 이 문이 없다. 다만 "남의 것 = 못 고치는 것"이 더 이상 같은 말이 아니다 —
+  //   운영자는 남의 것도 고칠 수 있다(2026-08-27, lib/projects.js 의 ownerScope). 옛 단정은
+  //   *"눌러도 404 다"* 를 근거로 삼았는데 운영자에게는 404 가 아니었고, 그래서 운영자에게만
+  //   **뒷문은 열려 있는데 앞문이 없는** 상태였다(tests/admin-view-and-role.test.js).
+  it("남의 것에는 [이어서 작업하기]를 안 그린다 — 못 고치는 사람에게는 눌러도 404 인 유료 문이다", () => {
+    expect(detail).toMatch(/editable/);
+    expect(detail, "무조건 그리면 보통 사용자에게도 404 문이 열린다").toMatch(/editable !== false/);
   });
 });
 
