@@ -2,6 +2,9 @@ import { withUser } from "../../../../../lib/auth/require-user.js";
 import { runInBackground } from "../../../../../lib/background.js";
 import { getProject, updateProject } from "../../../../../lib/projects.js";
 import { putReel } from "../../../../../lib/reel/doc.js";
+// ★ 진행 표식 — 사이드바가 ⑤영상과 ⑥완성을 가르는 유일한 근거다(둘 다 status 가
+//   "rendering" 이다). lib/reel/steps.js 의 runningReelStepKey 가 이 값을 읽는다.
+import { reelProgress } from "../../../../../lib/reel/pipeline.js";
 import { composeVideo } from "../../../../../lib/compose.js";
 import { speechLangOf } from "../../../../../lib/subtitle-langs.js";
 // 자막 시각 — 모델이 **언제** 말했는지를 재서 붙인다(2026-08-25 실측).
@@ -33,7 +36,13 @@ export const POST = withUser(async (req, { params }, user) => {
     return Response.json({ error: "영상을 먼저 만들어 주세요" }, { status: 400 });
   }
 
-  await updateProject(id, user.id, (p) => putReel(p, { status: "rendering", error: null }));
+  // ★★★ 2026-09-01 — **표식을 함께 찍는다.** status 는 /clips 와 똑같이 "rendering"
+  //   이라 그것만으로는 굽는 중인지 합성 중인지 알 수 없었다. phase 를 "render" 로
+  //   남기면 사이드바가 ⑥완성 줄에 표시를 붙인다.
+  //   ⚠️ 덤으로 STALL_EXEMPT_PHASES(["render"]) 가 비로소 뜻을 갖는다 — 그전에는
+  //     reel 에서 이 phase 가 한 번도 안 쓰여 그 면제가 죽은 코드였다.
+  await updateProject(id, user.id, (p) =>
+    reelProgress(putReel(p, { status: "rendering", error: null }), "render", Date.now()));
 
   // ★★ **말한 때를 재서 자막에 반영한다**(2026-08-25 사장님 지시).
   //

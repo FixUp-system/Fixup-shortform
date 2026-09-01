@@ -138,20 +138,27 @@ function ArchiveBody() {
               <span className="hint">로그인 없이 전체 결과물을 보고 있어요 — 보기 전용이에요.</span>
             ) : (
               <>
-            <button
-              className="mini"
-              aria-pressed={!isAll}
-              onClick={() => changeScope("mine")}
-            >
-              내 영상
-            </button>
-            <button
-              className="mini"
-              aria-pressed={isAll}
-              onClick={() => changeScope("all")}
-            >
-              전체
-            </button>
+            {/* ★★★ 2026-09-01 사장님 지시 — **한 상자로 묶는다.** 그전에는 셋이 똑같은
+                `.mini` 로 나란히 서서(`내 영상`·`전체`·`수정`) 어느 둘이 한 짝인지 모양으로
+                안 드러났다. 앞의 둘은 고르는 것이고 [수정]은 하는 것이다.
+                ★ 판정은 그대로 `aria-pressed` 다 — 보이는 상태와 스크린리더가 읽는 상태가
+                  갈릴 수 없게(app/globals.css 의 그 규율을 그대로 지킨다). */}
+            <div className="seg" role="group" aria-label="보는 범위">
+              <button
+                className="seg-btn"
+                aria-pressed={!isAll}
+                onClick={() => changeScope("mine")}
+              >
+                내 영상
+              </button>
+              <button
+                className="seg-btn"
+                aria-pressed={isAll}
+                onClick={() => changeScope("all")}
+              >
+                전체
+              </button>
+            </div>
             {/* 몰아서 지우기는 **내 영상** 자리에서만 연다 — 전체 목록에는 남의 카드가
                 섞여 있어 "모두 선택"이 지울 수 없는 것까지 고른다 */}
             {count > 0 && !isAll && (

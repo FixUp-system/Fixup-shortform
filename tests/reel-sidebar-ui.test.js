@@ -42,7 +42,11 @@ describe("reel 스테퍼는 사이드바가 그린다", () => {
   it("★ film 과 같은 클래스를 쓴다 — 모양이 갈리면 한 화면만 다르게 보인다", () => {
     const code = strip(sidebar());
     const at = code.indexOf("function ReelStepList");
-    const body = code.slice(at, at + 1400);
+    // ⚠️ 2026-09-01 — 여기는 `at + 1400` 이라는 **고정 창**이었다. 그 함수에 줄이 늘자
+    //   `locked` 가 창 밖으로 밀려 빨개졌다 — 코드는 멀쩡한데 판이 틀린 경우다.
+    //   창이 아니라 **함수 끝**까지 본다(맨 왼쪽 `}` 가 그 자리다).
+    const end = code.indexOf("\n}", at);
+    const body = code.slice(at, end > at ? end : code.length);
     expect(body).toContain("side-steps");
     expect(body).toContain("side-step");
     expect(body).toContain("locked");

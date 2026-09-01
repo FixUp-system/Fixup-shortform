@@ -22,6 +22,7 @@ import { useFilmProject } from "./FilmProjectContext";
 // reel — 표·주소·열림 판정은 lib/reel/steps.js 하나가 쥔다(레이아웃 가드와 같은 표다).
 import {
   REEL_STEPS, reelStepHref, reelStepFromPathname, currentReelStepKey, isReelStepReachable,
+  runningReelStepKey,
 } from "../lib/reel/steps";
 // reel 공유본도 루트에서 온다(components/ReelProjectContext) — film 과 같은 자리다.
 import { useReelProject } from "./ReelProjectContext";
@@ -204,20 +205,39 @@ function ReelStepList({ pathname }) {
   const { project } = useReelProject();
   const parts = (pathname || "").split("/").filter(Boolean);
   const id = parts[1];
-  // 아직 못 읽었으면(또는 /reel/new 처럼 프로젝트가 없으면) 그리지 않는다 —
-  // 빈 목록이 깜빡이는 것보다 없는 편이 낫다(FilmStepList 와 같은 규칙).
-  if (!project || project.id !== id) return null;
+  // ★★★ 2026-09-01 사장님 지시 — **새로 만드는 자리에서도 단계를 보여 준다.**
+  //   그전에는 프로젝트가 없으면 통째로 안 그려서, 사이드바에서 [단계별 영상] 을 눌러
+  //   들어온 사람은 이 흐름이 몇 단계인지조차 볼 수 없었다(원클릭은 보였다).
+  //   ★ 옛 주석의 걱정("빈 목록이 깜빡이는 것보다 없는 편이 낫다")은 `/reel/<id>` 를
+  //     **읽는 동안**의 이야기다. `/reel/new` 는 영영 프로젝트가 없는 자리라 깜빡일 것이
+  //     없다 — 그래서 그 자리에서만 잠긴 목록을 보여 주고, 읽는 중에는 예전처럼 안 그린다.
+  const fresh = id === "new";
+  const ready = !!project && project.id === id;
+  if (!ready && !fresh) return null;
 
-  const here = currentReelStepKey(project);
+  const here = ready ? currentReelStepKey(project) : null;
   const step = reelStepFromPathname(pathname);
+  // ★★ 지금 도는 단계 — 판정은 lib/reel/steps.js 하나다(원클릭이 busyStep·status 를
+  //   합치는 것과 같은 자리). 문서에서 읽으므로 새로고침하거나 다른 탭에서 들어와도 보인다.
+  const running = ready ? runningReelStepKey(project) : null;
   return (
     <div className="side-steps">
-      {REEL_STEPS.map((s) => {
-        const open = isReelStepReachable(s.key, project);
-        const active = step?.key === s.key;
+      {REEL_STEPS.map((s, i) => {
+        const open = ready && isReelStepReachable(s.key, project);
+        // 새로 만드는 자리에서는 ①입력에 불이 켜진다 — 지금 하고 있는 일이 그것이다.
+        const active = fresh ? i === 0 : step?.key === s.key;
         // ★ 지나옴은 **지금 단계가 아니면서 열려 있는** 것이다 — 옮기기 전 판정 그대로다.
         const passed = !active && open && s.key !== here;
-        const cls = `side-step${active ? " on" : ""}${passed ? " passed" : ""}`;
+        const isRunning = running === s.key;
+        const cls = `side-step${active ? " on" : ""}${passed ? " passed" : ""}${isRunning ? " running" : ""}`;
+        const inner = (
+          <>
+            <i>{passed ? <><Icon name="check" size={12} /><span className="sr-only">완료</span></> : s.no}</i>
+            {s.label}
+            {/* 글자도 함께 둔다 — 색·모션만으로는 못 읽는 사람이 있다(AdStepList 와 같은 규율). */}
+            {isRunning && <em className="running-tag">만드는 중…</em>}
+          </>
+        );
         return open ? (
           <Link
             key={s.key}
@@ -225,13 +245,10 @@ function ReelStepList({ pathname }) {
             className={cls}
             aria-current={active ? "step" : undefined}
           >
-            <i>{passed ? <><Icon name="check" size={12} /><span className="sr-only">완료</span></> : s.no}</i>
-            {s.label}
+            {inner}
           </Link>
         ) : (
-          <span key={s.key} className={`${cls} locked`} aria-disabled="true">
-            <i>{s.no}</i>{s.label}
-          </span>
+          <span key={s.key} className={`${cls} locked`} aria-disabled="true">{inner}</span>
         );
       })}
     </div>

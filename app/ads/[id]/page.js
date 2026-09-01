@@ -436,7 +436,8 @@ export default function AdDetailPage() {
             </button>
             <div className="fwd">
               <button className="cta" disabled={busy} onClick={saveThenScenario}>
-                {busy ? "쓰는 중…" : "시나리오 만들기 →"} <span className="cr">무료</span>
+                {/* ★ 2026-09-01 — 값 문구를 뗐다(사장님 지시). [다시 쓰기] 는 그대로다. */}
+                {busy ? "쓰는 중…" : "시나리오 만들기 →"}
               </button>
             </div>
           </div>
@@ -659,7 +660,7 @@ export default function AdDetailPage() {
           </p>
           <div className="step-actions">
             <button className="mini" disabled={busy} onClick={() => makeScenario()}>
-              {busy ? "쓰는 중…" : scenario?.text ? "다시 쓰기 · 무료" : "시나리오 만들기 · 무료"}
+              {busy ? "쓰는 중…" : scenario?.text ? "다시 쓰기 · 무료" : "시나리오 만들기"}
             </button>
             <div className="fwd">
               <Link href="/archive" className="cta">보관함으로</Link>

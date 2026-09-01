@@ -211,7 +211,9 @@ export default function AdNewPage() {
 
             <span className="spacer" />
             <button className="cta" onClick={submit} disabled={busy || uploading || !text.trim()}>
-              {busy ? "만드는 중…" : uploading ? "사진 올리는 중…" : "시나리오 만들기 →"} <span className="cr">무료</span>
+              {/* ★ 2026-09-01 — 값 문구를 뗐다(사장님 지시). 무료라는 사실은 누르기 전에
+                  알아야 할 것이 아니라, 값이 나가는 자리에서만 말하면 된다. */}
+              {busy ? "만드는 중…" : uploading ? "사진 올리는 중…" : "시나리오 만들기 →"}
             </button>
           </div>
         </div>
