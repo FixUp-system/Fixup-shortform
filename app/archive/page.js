@@ -169,7 +169,7 @@ function ArchiveBody() {
                 ★ [전체] 에서 못 쓰는 이유는 그대로다 — 그 목록에는 남의 카드가 섞여 있어
                   "모두 선택" 이 지울 수 없는 것까지 고른다. 이제 그 이유를 화면이 말한다. */}
             <button
-              className="mini"
+              className="mini tidy-btn"
               aria-label="영상 정리"
               title={
                 isAll

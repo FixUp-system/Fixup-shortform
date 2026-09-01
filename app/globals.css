@@ -453,6 +453,17 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
 .home-header .chips { align-items: center; }
 .home-header .cta { margin-top: 0; }
 .home-header .mini { height: var(--ctl-lg); padding: 0 18px; font-size: 14px; }
+/* ★★★ [정리] 만 예외다(2026-09-01 사장님 지시: "옆에 토글이랑 같은 사이즈로").
+   위 규칙이 그 줄의 버튼을 --ctl-lg 로 키우는데, 옆에 선 세그먼트는 --ctl-sm 이라
+   나란히 두면 키가 눈에 띄게 어긋난다(실측 48px vs 33px).
+   ★ 위 규칙 자체는 안 건드린다 — 고르는 동안 뜨는 버튼 셋(모두 선택·취소·N편 지우기)은
+     그 줄을 통째로 쓰므로 지금 키가 맞다.
+   ★ [새 영상 만들기] 도 그대로 크다 — 주 버튼이라 커야 하는 것이 맞다. */
+.home-header .mini.tidy-btn {
+  height: var(--ctl-sm);
+  padding: 0 12px;
+  font-size: 12px;
+}
 
 /* 만든 것을 눈으로 찾게 한다 — 제목 한 줄로는 무엇을 만들었는지 기억나지 않는다.
    auto-fill 이라 폭이 좁아지면 열 수가 알아서 준다(별도 미디어쿼리가 필요 없다). */
@@ -788,6 +799,10 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
      보이는 상태와 스크린리더가 읽는 상태가 갈릴 수 없다. */
 .seg {
   display: inline-flex;
+  /* ★ 키를 **상자가** 정한다(2026-09-01). 칸에만 키를 주면 상자의 테두리가 그 위에
+     더해져 옆 버튼보다 1.3px 크다 — 나란히 두면 밑선이 어긋난다. 상자에 키를 주고
+     칸은 그 안을 채운다. 그러면 `.mini` 와 **같은 사다리(--ctl-sm)** 로 딱 맞는다. */
+  height: var(--ctl-sm);
   border: 1px solid var(--line);
   border-radius: var(--r-ctl);
   overflow: hidden;
@@ -796,7 +811,7 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: var(--ctl-sm);
+  height: 100%;
   padding: 0 14px;
   border: 0;
   background: transparent;

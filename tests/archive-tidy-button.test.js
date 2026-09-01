@@ -74,8 +74,47 @@ describe("[정리] — 이름과 아이콘이 하는 일과 맞는다", () => {
 describe("아이콘과 글자가 안 붙는다", () => {
   it("★★ 버튼에 간격이 있다", () => {
     const css = readFileSync("app/globals.css", "utf8");
-    const at = css.indexOf(".mini {");
-    expect(at).toBeGreaterThan(-1);
-    expect(css.slice(at, at + 500), "gap 이 없어 아이콘과 글자가 붙는다").toMatch(/gap:/);
+    // ⚠️ `.mini {` 라는 글자는 `.home-header .mini {` 에도 들어 있다 — 그냥 indexOf 로
+    //   찾으면 엉뚱한 규칙을 잡고, 고정 창으로 자르면 옆 규칙까지 넘어가 거짓으로
+    //   통과한다(이 저장소가 오늘 그 함정을 세 번 밟았다). 맨 왼쪽 규칙만, 규칙 끝까지.
+    const at = css.indexOf("\n.mini {");
+    expect(at, ".mini 규칙을 못 찾았다").toBeGreaterThan(-1);
+    expect(css.slice(at, css.indexOf("}", at) + 1), "gap 이 없어 아이콘과 글자가 붙는다")
+      .toMatch(/gap:/);
+  });
+});
+
+// **[정리] 는 옆 토글과 같은 키다** (2026-09-01 사장님 지시).
+//
+// ★★★ 그전에는 한 줄에 키가 셋이었다(브라우저 실측): 토글 33px · [정리] **48px** ·
+//   [새 영상 만들기] 40px. `.home-header .mini` 가 그 줄의 버튼을 `--ctl-lg` 로 키우는데
+//   세그먼트는 `--ctl-sm` 이라, 나란히 서면 눈에 띄게 어긋났다.
+// ★ [새 영상 만들기] 는 그대로 크다 — 주 버튼이라 커야 하는 것이 맞다. 맞추는 것은
+//   **고르는 줄에 함께 서는 [정리]** 하나다.
+// ★ `.home-header .mini` 자체를 안 건드린다 — 고르는 동안 뜨는 버튼 셋
+//   (모두 선택·취소·N편 지우기)은 그 줄을 통째로 쓰므로 지금 키가 맞다.
+describe("[정리] — 옆 토글과 같은 키", () => {
+  const css = readFileSync("app/globals.css", "utf8");
+
+  it("★★★ 세그먼트와 같은 사다리를 쓴다", () => {
+    const at = css.indexOf(".home-header .mini.tidy-btn");
+    expect(at, "[정리] 전용 크기 규칙이 없다").toBeGreaterThan(-1);
+    const rule = css.slice(at, css.indexOf("}", at) + 1);
+    expect(rule, "세그먼트(--ctl-sm)와 다른 사다리를 쓴다").toMatch(/height:\s*var\(--ctl-sm\)/);
+  });
+
+  it("★★ 화면이 그 클래스를 단다", () => {
+    expect(tidy).toMatch(/tidy-btn/);
+  });
+
+  // ★ 키를 쥔 것은 **상자**다. 칸에만 주면 상자의 테두리가 그 위에 더해져 1.3px 커지고
+  //   나란히 둔 [정리] 와 밑선이 어긋난다(실측). 상자가 --ctl-sm 을 쥐고 칸이 채운다.
+  it("★ 세그먼트 상자도 같은 사다리다 — 둘이 같은 값을 봐야 맞는다", () => {
+    const box = css.indexOf(".seg {");
+    expect(box, ".seg 규칙이 없다").toBeGreaterThan(-1);
+    expect(css.slice(box, css.indexOf("}", box) + 1)).toMatch(/height:\s*var\(--ctl-sm\)/);
+    const btn = css.indexOf(".seg-btn {");
+    expect(css.slice(btn, css.indexOf("}", btn) + 1), "칸이 상자를 안 채운다")
+      .toMatch(/height:\s*100%/);
   });
 });
