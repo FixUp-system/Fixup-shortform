@@ -2,7 +2,7 @@ import { createProject } from "../../../lib/projects.js";
 import { isAspect, DEFAULT_ASPECT_ID } from "../../../lib/aspects.js";
 import { normalizeAdOptions } from "../../../lib/ad/options.js";
 import {
-  isAdSeconds, isAdModel, adSecondsFor, DEFAULT_AD_MODEL,
+  isAdSeconds, isAdModel, isRetiredModel, adSecondsFor, DEFAULT_AD_MODEL,
   isAdResolution, adResolutionsFor, adDefaultResolution, adRefMax,
 } from "../../../lib/ad/models.js";
 import { ownedPhotoKeys } from "../../../lib/refs-io.js";
@@ -62,6 +62,15 @@ export const POST = withUser(async (req, _ctx, user) => {
   const tier = tierOf((await getStore().findProfiles([user.id])).get(user.id));
   if (!tierAllowsModel(tier, model, { admin })) {
     return Response.json({ error: "지금 등급에서는 고를 수 없는 모델이에요" }, { status: 403 });
+  }
+  // ★★★ **은퇴한 모델로는 새로 안 만든다**(2026-09-01). 위 게이트는 그것을 통과시키는데,
+  //   그 자리는 **이미 만든 문서를 다시 굽기 위한** 문이다. 여기서 안 막으면 화면에서만
+  //   사라지고 API 로는 계속 만들어진다 — 2.5 를 `hidden` 으로 가렸을 때 겪은 그
+  //   "가림막" 문제와 같은 모양이 된다.
+  // ★ **관리자는 지난다** — 등급 게이트와 같은 축이다(lib/tiers.js 머리말). 막으면
+  //   2.5 의 1080p 같은 관리자 전용 자리가 다시 죽은 코드가 된다.
+  if (!admin && isRetiredModel(model)) {
+    return Response.json({ error: "그 모델은 이제 새로 만들 수 없어요" }, { status: 403 });
   }
 
   // ★ 길이는 고른 모델 기준이다 — 모델마다 고를 수 있는 길이가 다르다(2.0=15초,

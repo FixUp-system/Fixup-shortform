@@ -36,6 +36,12 @@ const H = { [USER_HEADER]: U, [STATUS_HEADER]: "approved", [ROLE_HEADER]: "user"
 
 const post = (body) =>
   new Request("http://x/api/ads", { method: "POST", headers: H, body: JSON.stringify(body) });
+// ★ 2026-09-01 — **은퇴 모델(2.5)로 새로 만들 수 있는 것은 관리자뿐**이라, 2.5 를 쓰는
+//   시험은 이 도우미로 만든다(역할은 헤더에서 온다 — 프로필 행이 아니다).
+const postAdmin = (body) =>
+  new Request("http://x/api/ads", {
+    method: "POST", headers: { ...H, [ROLE_HEADER]: "admin" }, body: JSON.stringify(body),
+  });
 const patch = (body) =>
   new Request("http://x/api/ads/x", { method: "PATCH", headers: H, body: JSON.stringify(body) });
 const get = () => new Request("http://x/api/ads/x", { headers: H });
@@ -98,10 +104,18 @@ describe("광고 라우트 — 문서", () => {
     //   둘 다의 models 에 남아 있지만 hidden 이 먼저 걸러 서버가 403 을 준다.
     //   이것이 "숨김"과 "등급"이 다른 축이라는 말의 실제 내용이다 — 화면만 거르는
     //   가림막이었으면 여기가 200 이었을 것이고, 그 구멍으로 2.5 가 실제로 뚫렸었다.
-    it("★ 숨긴 2.0 은 403 — 등급표에 적혀 있어도 아무도 못 쓴다", async () => {
+    // ⚠️ 2026-09-01 — **뒤집혔다.** 그전에는 2.0 이 숨김이라 403 이었다. 이제 2.0 이
+    //   프로이고 **2.5 가 은퇴**다(새로는 못 만들고 옛 문서만 다시 굽는다).
+    it("★★ 은퇴한 2.5 로는 새로 못 만든다 — 403(등급이 열어 줘도)", async () => {
       await memoryStore.insertProfile({ id: U, email: "pro@fix-up.kr", status: "approved", role: "user", tier: "pro" });
-      const res = await createAd(post({ ...OK, settings: { ...OK.settings, model: "seedance-2.0", seconds: 15 } }));
+      const res = await createAd(post({ ...OK, settings: { ...OK.settings, model: "seedance-2.5", seconds: 15 } }));
       expect(res.status).toBe(403);
+    });
+
+    it("★ 프로(2.0)는 프로 등급이면 만들어진다", async () => {
+      await memoryStore.insertProfile({ id: U, email: "pro2@fix-up.kr", status: "approved", role: "user", tier: "pro" });
+      const res = await createAd(post({ ...OK, settings: { ...OK.settings, model: "seedance-2.0", seconds: 15 } }));
+      expect(res.status).toBe(200);
     });
   });
 
@@ -117,7 +131,7 @@ describe("광고 라우트 — 문서", () => {
     // ① 2.5 로 30초를 만들 수 있고 2.0 으로는 400
     it("★ 2.5 모델은 30초를 만들 수 있다", async () => {
       const res = await createAd(
-        post({ ...OK, settings: { ...OK.settings, model: "seedance-2.5", seconds: 30 } })
+        postAdmin({ ...OK, settings: { ...OK.settings, model: "seedance-2.5", seconds: 30 } })
       );
       expect(res.status).toBe(200);
       const doc = await res.json();
@@ -184,7 +198,7 @@ describe("광고 라우트 — 문서", () => {
 
     it("★ 2.5·30초로 만든 뒤 모델만 기본(H3)으로 되돌리면 400 — 길이를 그대로 두면 H3 가 못 받는다", async () => {
       const made = await (
-        await createAd(post({ ...OK, settings: { ...OK.settings, model: "seedance-2.5", seconds: 30 } }))
+        await createAd(postAdmin({ ...OK, settings: { ...OK.settings, model: "seedance-2.5", seconds: 30 } }))
       ).json();
       const res = await patchAd(
         patch({ settings: { model: "minimax-h3" } }),
@@ -204,7 +218,7 @@ describe("광고 라우트 — 문서", () => {
 
     it("PATCH 에서 모델을 안 주면 기존 모델이 보존된다", async () => {
       const made = await (
-        await createAd(post({ ...OK, settings: { ...OK.settings, model: "seedance-2.5" } }))
+        await createAd(postAdmin({ ...OK, settings: { ...OK.settings, model: "seedance-2.5" } }))
       ).json();
       const res = await patchAd(
         patch({ settings: { mood: "bright" } }),
@@ -289,9 +303,12 @@ describe("광고 라우트 — 문서", () => {
       expect(res.status).toBe(400);
     });
 
-    it("★ 모델이 안 받는 해상도는 POST 에서 400 — fast 에 1080p", async () => {
+    // ⚠️ 2026-09-01 — 2.5 의 1080p 는 **관리자에게는 열려 있다**(adminResolutions). 그래서
+    //   "모델이 안 받는 해상도"를 재려면 관리자가 아니어야 한다 — 손님에게는 그 문이 없다.
+    //   ★ 다만 손님은 이제 은퇴 게이트에 먼저 걸려 403 이다. 해상도 400 은 **기본(H3)**으로 잰다.
+    it("★ 모델이 안 받는 해상도는 POST 에서 400 — 기본(H3)에 1080p", async () => {
       const res = await createAd(
-        post({ ...OK, settings: { ...OK.settings, model: "seedance-2.5", resolution: "1080p" } })
+        post({ ...OK, settings: { ...OK.settings, model: "minimax-h3", resolution: "1080p" } })
       );
       expect(res.status).toBe(400);
     });
@@ -302,7 +319,7 @@ describe("광고 라우트 — 문서", () => {
     //   명시해야 한다(H3 에는 720p 가 아예 없다). 재는 것은 그대로다 —
     //   **그 모델의 기본값**이 저장되는가.
     it("해상도를 안 주면 그 모델의 기본값이 명시 저장된다", async () => {
-      const res = await createAd(post({ ...OK, settings: { ...OK.settings, model: "seedance-2.5" } }));
+      const res = await createAd(postAdmin({ ...OK, settings: { ...OK.settings, model: "seedance-2.5" } }));
       const doc = await res.json();
       expect(doc.settings.resolution).toBe("720p");
     });
@@ -318,11 +335,13 @@ describe("광고 라우트 — 문서", () => {
     // ★★ 2026-08-31 — 그전에는 "standard 는 1080p 를 고를 수 있다" 였다. 2.0 을 숨기면서
     //   그 길이 닫혔고, **일반 사장님이 고를 수 있는 1080p 는 이제 없다**(2.5 의 1080p 는
     //   관리자 전용, H3 는 768P·2K). 화질이 내려간 것은 아니다 — 2K 가 1080p 보다 넓다.
-    it("★ 숨긴 2.0 은 1080p 라도 못 만든다 — 403", async () => {
+    // ⚠️ 2026-09-01 뒤집힘 — 2.0 이 프로가 되면서 **일반 사장님의 1080p 가 돌아왔다**
+    //   (2.0 은 480p·720p·1080p 를 연다). 위 주석의 "1080p 는 이제 없다"는 그날까지의 사실이다.
+    it("★ 프로(2.0)는 1080p 로 만들 수 있다", async () => {
       const res = await createAd(
         post({ ...OK, settings: { ...OK.settings, model: "seedance-2.0", resolution: "1080p" } })
       );
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(200);
     });
   });
 
@@ -516,7 +535,7 @@ describe("광고 라우트 — 굽기", () => {
   // 잔액 검사에 실제로 반영되는지를 재는 자리다.
   async function withScenario25() {
     const made = await (
-      await createAd(post({ ...OK, settings: { ...OK.settings, model: "seedance-2.5", seconds: 30 } }))
+      await createAd(postAdmin({ ...OK, settings: { ...OK.settings, model: "seedance-2.5", seconds: 30 } }))
     ).json();
     const { getStore } = await import("../lib/store/index.js");
     const row = await getStore().selectProject(made.id, U);

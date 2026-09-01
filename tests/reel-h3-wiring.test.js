@@ -43,15 +43,16 @@ describe("단계별 — 기본은 H3 다", () => {
 
   it("★ 고를 수 있고, 2.0 은 빠졌다(숨김)", () => {
     expect(REEL_MODEL_IDS).toContain("minimax-h3");
-    expect(REEL_MODEL_IDS).toContain("seedance-2.5");
-    expect(REEL_MODEL_IDS, "2.0 이 아직 고를 수 있다").not.toContain("seedance-2.0");
+    // ⚠️ 2026-09-01 뒤집힘 — 프로가 2.0 이고 2.5 가 내려갔다.
+    expect(REEL_MODEL_IDS).toContain("seedance-2.0");
+    expect(REEL_MODEL_IDS, "2.5 가 아직 고를 수 있다").not.toContain("seedance-2.5");
     expect(isReelModel("minimax-h3")).toBe(true);
-    expect(isReelModel("seedance-2.0")).toBe(false);
+    expect(isReelModel("seedance-2.5")).toBe(false);
   });
 
   it("★ 기본이 프로보다 앞이다 — 원클릭과 같은 순서", () => {
     const ids = reelModelsForTier("pro").map((m) => m.id);
-    expect(ids.indexOf("minimax-h3")).toBeLessThan(ids.indexOf("seedance-2.5"));
+    expect(ids.indexOf("minimax-h3")).toBeLessThan(ids.indexOf("seedance-2.0"));
   });
 
   it("기본 등급도 기본(H3)은 쓴다 — 숨겼더니 빈 목록이 되면 안 된다", () => {

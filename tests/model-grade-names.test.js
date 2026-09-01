@@ -29,8 +29,8 @@ describe("광고 — 이름이 등급이다", () => {
     expect(m.name).toBe("기본");
   });
 
-  it("2.5 는 '프로' 다", () => {
-    const m = adModel("seedance-2.5");
+  it("2.0 이 '프로' 다", () => {
+    const m = adModel("seedance-2.0");
     expect(m.label).toBe("프로");
     expect(m.name).toBe("프로");
   });
@@ -42,17 +42,26 @@ describe("광고 — 이름이 등급이다", () => {
   });
 });
 
-describe("광고 — 2.0 은 숨긴다", () => {
-  it("★ 고르는 자리에 안 나온다 — 어느 등급에서도", () => {
+// ⚠️⚠️ 2026-09-01 — **등급이 뒤집혔다**(사장님 지시). 08-31 에는 2.5 가 프로였고
+//   2.0 이 숨김이었다. 그날 하루의 실측이 그 판단을 뒤집었다:
+//     · 2.5 는 참조 이미지에 **사람 얼굴이 있으면 아홉 번 전부 거절**했다
+//       (크기·각도·장수·스타일·그리드 다섯 축을 다 재봤다. `partner_validation_failed`)
+//     · 2.0 은 **같은 판을 첫 시도에 통과**시켰다(얼굴 넷짜리 브이로그 판, 재시도 0)
+//     · 값도 싸고($4.55 대 $6.93) 빠르다(217초 대 396초)
+//   ⚠️ 대가: 2.0 의 통짜 상한이 15초라 **30초가 사라졌다**.
+//   ★ 2.5 는 `hidden` 이 아니라 **`retired`** 다 — 새로는 못 고르되
+//     이미 그것으로 만든 문서는 다시 구워진다(08-31 에 2.0 을 숨겨 겪은 그 문제).
+describe("광고 — 2.0 이 프로다", () => {
+  it("★ 은퇴한 2.5 는 고르는 자리에 안 나온다 — 어느 등급에서도", () => {
     for (const tier of ["free", "pro"]) {
       const ids = modelsForTier(tier).map((m) => m.id);
-      expect(ids, `${tier} 등급에 2.0 이 보인다`).not.toContain("seedance-2.0");
+      expect(ids, `${tier} 등급에 은퇴한 2.5 가 보인다`).not.toContain("seedance-2.5");
     }
   });
 
-  it("★ 관리자에게도 안 나온다 — hidden 은 등급·역할보다 강하다", () => {
+  it("★ 은퇴 모델은 관리자에게도 목록에 안 나온다", () => {
     const ids = modelsForTier("pro", { admin: true }).map((m) => m.id);
-    expect(ids).not.toContain("seedance-2.0");
+    expect(ids).not.toContain("seedance-2.5");
   });
 
   it("그래도 고를 것이 남는다 — 숨겼더니 빈 목록이 되면 안 된다", () => {
@@ -65,21 +74,22 @@ describe("광고 — 2.0 은 숨긴다", () => {
   it("★ 고르는 자리에서 기본이 프로보다 앞이다", () => {
     const ids = modelsForTier("pro").map((m) => m.id);
     expect(ids).toContain("minimax-h3");
-    expect(ids).toContain("seedance-2.5");
+    expect(ids).toContain("seedance-2.0");
     expect(ids.indexOf("minimax-h3"), "프로가 기본보다 앞에 있다")
-      .toBeLessThan(ids.indexOf("seedance-2.5"));
+      .toBeLessThan(ids.indexOf("seedance-2.0"));
   });
 
   it("★ 표 자체가 그 순서다 — 화면이 따로 정렬하지 않는다", () => {
-    const open = AD_MODELS.filter((m) => !m.hidden).map((m) => m.id);
-    expect(open).toEqual(["minimax-h3", "seedance-2.5"]);
+    // ★ 2026-09-01 — 거르는 축이 둘이 됐다: `hidden`(아무도) · `retired`(새로는 못 고름).
+    const open = AD_MODELS.filter((m) => !m.hidden && !m.retired).map((m) => m.id);
+    expect(open).toEqual(["minimax-h3", "seedance-2.0"]);
   });
 
   it("★★ 표에서는 안 지운다 — 지우면 이미 2.0 으로 만든 문서가 값 조회에서 죽는다", () => {
-    expect(AD_MODELS.some((m) => m.id === "seedance-2.0")).toBe(true);
-    expect(isAdModel("seedance-2.0")).toBe(true);
-    expect(adModel("seedance-2.0").id).toBe("seedance-2.0");
-    expect(() => adVideoPrice(15, "seedance-2.0", "720p")).not.toThrow();
+    expect(AD_MODELS.some((m) => m.id === "seedance-2.5")).toBe(true);
+    expect(isAdModel("seedance-2.5")).toBe(true);
+    expect(adModel("seedance-2.5").id).toBe("seedance-2.5");
+    expect(() => adVideoPrice(15, "seedance-2.5", "720p")).not.toThrow();
   });
 });
 
@@ -143,15 +153,15 @@ describe("단계별(reel) — 같은 등급 이름을 쓴다", () => {
     expect(byId("minimax-h3").label).toBe("기본");
   });
 
-  it("2.5 가 '프로' 다", () => {
-    expect(byId("seedance-2.5").label).toBe("프로");
+  it("2.0 이 '프로' 다", () => {
+    expect(byId("seedance-2.0").label).toBe("프로");
   });
 
   // ★★ 2026-08-31 — 2.0 은 **숨긴 모델이 됐다**(REEL_MODEL_IDS 에서 빠졌다). 그래서
   //   등급 이름을 도로 뺐다 — 광고 표의 2.0 과 같은 규율이다: 이 이름이 보이는 곳은
   //   이미 그것으로 만든 옛 문서뿐이라 모델 이름이 맞다.
-  it("★ 숨긴 2.0 은 등급 이름을 안 받는다", () => {
-    expect(byId("seedance-2.0").label).toBe("Seedance 2.0");
+  it("★ 은퇴한 2.5 는 등급 이름을 안 받는다", () => {
+    expect(byId("seedance-2.5").label).toBe("Seedance 2.5");
   });
 
   it("★ Kling 은 등급 이름을 안 받는다 — reel 이 안 여는 모델이라 두 등급 밖이다", () => {

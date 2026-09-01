@@ -31,8 +31,10 @@ describe("reel 이 여는 모델", () => {
   // ★★ 2026-08-31 — **기본(H3)이 들어오고 2.0 이 빠졌다**(사장님 지시). 위 머리말의 조건
   //   넷을 H3 에 대해 이번에 다 채웠다(프로필·통짜 상한·컷 최소·정가).
   //   2.0 을 뺀 것은 **고르는 자리에서만**이다 — 이미 2.0 으로 만든 문서는 그대로 돈다.
-  it("★ 기본(H3)과 프로(2.5) 둘이다 — 기본이 앞이다", () => {
-    expect(REEL_MODEL_IDS).toEqual(["minimax-h3", "seedance-2.5"]);
+  it("★ 기본(H3)과 프로(2.0) 둘이다 — 기본이 앞이다", () => {
+    // ⚠️ 2026-09-01 — 프로가 2.5 → **2.0** 으로 뒤집혔다(2.5 는 얼굴 든 참조를 아홉 번
+    //   전부 거절했고 2.0 은 같은 판을 첫 시도에 통과시켰다).
+    expect(REEL_MODEL_IDS).toEqual(["minimax-h3", "seedance-2.0"]);
   });
 
   it("★★ Kling v3 는 안 연다 — speaks:false 라 대사가 통째로 사라진다", () => {
@@ -40,12 +42,12 @@ describe("reel 이 여는 모델", () => {
     expect(isReelModel("kling-v3")).toBe(false);
   });
 
-  it("★ 기본 등급은 기본(H3)만 — 프로(2.5)는 프로 등급부터다", () => {
+  it("★ 기본 등급은 기본(H3)만 — 프로(2.0)는 프로 등급부터다", () => {
     expect(reelModelsForTier("basic").map((m) => m.id)).toEqual(["minimax-h3"]);
   });
 
   it("★ 프로는 둘 다 고른다", () => {
-    expect(reelModelsForTier("pro").map((m) => m.id)).toEqual(["minimax-h3", "seedance-2.5"]);
+    expect(reelModelsForTier("pro").map((m) => m.id)).toEqual(["minimax-h3", "seedance-2.0"]);
   });
 
   it("등급이 모르는 값이면 기본 등급으로 본다 — 던지지 않는다(화면이 부르는 자리다)", () => {

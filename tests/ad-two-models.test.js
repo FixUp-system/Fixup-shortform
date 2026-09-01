@@ -29,8 +29,9 @@ describe("광고 모델은 2.0 과 2.5 둘뿐이다", () => {
   //   고르는 자리에 필요한 것은 그 답이다 — 그래서 등급으로 부른다.
   // ★ 그때의 걱정(화면 이름과 fal 이 갈린다)은 **id 로 막는다** — 값·원장·fal 호출은
   //   전부 id 로만 가고, 아래 "엔드포인트가 모델 id 를 그대로 담는다" 가 그것을 지킨다.
+  // ⚠️ 2026-09-01 — 프로가 2.5 → 2.0 으로 뒤집혔고, 거르는 축에 `retired` 가 생겼다.
   it("고를 수 있는 모델의 이름은 등급이다 — 기본 · 프로", () => {
-    const open = AD_MODELS.filter((m) => !m.hidden);
+    const open = AD_MODELS.filter((m) => !m.hidden && !m.retired);
     expect(open.map((m) => m.label).sort()).toEqual(["기본", "프로"]);
     for (const m of open) {
       expect(m.name, `${m.id} 의 name 이 등급이 아니다`).toBe(m.label);
