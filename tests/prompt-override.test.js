@@ -116,6 +116,7 @@ describe("영상 프롬프트 — 본문과 꼬리", () => {
     expect(buildClipPrompt(c, p)).toBe(
       "slow push-in. A narrator speaks in voiceover, off-screen — no one in frame speaks or moves their lips. " +
       "Voice: calm low male voice. Says exactly, in Korean: \"핑계 대지 마세요\". " +
+      "The narration is delivered by a native Korean speaker with natural, fluent Korean pronunciation and everyday intonation — never a foreign accent, never spelled out letter by letter. " +
       "The attached image is the first frame — continue naturally from it. " +
       "Keep the subject and style unchanged. No text or letters."
     );
@@ -131,6 +132,7 @@ describe("영상 프롬프트 — 본문과 꼬리", () => {
     expect(buildClipPrompt(c, p)).toBe(
       "slow push-in. 코치 speaks to the camera with natural lip sync. " +
       "Voice: gravelly veteran voice. Says exactly, in Korean: \"핑계 대지 마세요\". " +
+      "The narration is delivered by a native Korean speaker with natural, fluent Korean pronunciation and everyday intonation — never a foreign accent, never spelled out letter by letter. " +
       "Characters in this frame: 코치: wiry coach in a grey tracksuit. " +
       "The attached image is the first frame — continue naturally from it. " +
       "Keep the subject and style unchanged. No text or letters."
@@ -164,6 +166,7 @@ describe("영상 프롬프트 — 본문과 꼬리", () => {
       "천천히 뒤로 물러난다. 컵을 들어 입으로 가져간다. 김이 천천히 피어오른다. " +
       "fast, explosive motion. barista speaks to the camera with natural lip sync. " +
       "Voice: warm alto voice. Says exactly, in Korean: \"한 모금이면 충분해요\". " +
+      "The narration is delivered by a native Korean speaker with natural, fluent Korean pronunciation and everyday intonation — never a foreign accent, never spelled out letter by letter. " +
       "Setting: a narrow morning cafe counter. " +
       "Characters in this frame: barista: short-haired barista in a linen apron. " +
       // ★ 여기 있던 `The subject is: … Its appearance: …` 는 2026-08-18 에 빠졌다.
@@ -220,6 +223,7 @@ describe("영상 프롬프트 — 본문과 꼬리", () => {
       "천천히 뒤로 물러난다. 컵을 들어 입으로 가져간다. 김이 천천히 피어오른다. " +
       "fast, explosive motion. A narrator speaks in voiceover, off-screen — no one in frame speaks or moves their lips. " +
       "Voice: calm low male voice. Says exactly, in Korean: \"한 모금이면 충분해요\". " +
+      "The narration is delivered by a native Korean speaker with natural, fluent Korean pronunciation and everyday intonation — never a foreign accent, never spelled out letter by letter. " +
       "Setting: a narrow morning cafe counter. " +
       "Characters in this frame: barista: short-haired barista in a linen apron. " +
       // ★ 제품 절은 여기서도 빠졌다 — 위 화면 안 대사 갈래와 같은 이유다.
