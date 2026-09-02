@@ -230,10 +230,15 @@ describe("재시도 — 판을 다시 그리고 다시 굽는다", () => {
   });
 });
 
-describe("수거가 초상 거절을 재시도로 넘긴다", () => {
+// ★★★ 2026-09-02 — **이 묶음은 뒤집힌 것이다.** 그전에는 "수거가 초상 거절을 재시도로
+//   넘긴다"(08-31 결정 A)를 못 박았는데, 사장님이 뒤집었다: "자동으로 재시도가 돌면 안 돼 —
+//   우리 비용과 관련된 문제라서." 판 재작화 $0.401 + 재굽기 ~$2 가 사용자 행동 없이
+//   나가고, 보관함 줍기(GET)가 생기면서 **열기만 해도** 나갈 뻔했다.
+//   retryOneShotWithoutFaces 는 수동 버튼용으로만 남는다(위 단위 판들이 그 함수 자체를 잰다).
+describe("수거가 초상 거절을 자동으로 재시도하지 않는다", () => {
   const withJob = () => makeProject({ reel: { job: { requestId: "r1", of: "body", imageOf: "sheet" } } });
 
-  it("★★★ 초상 거절이면 실패로 적지 않고 재시도로 넘긴다", async () => {
+  it("★★★ 초상 거절도 **자동 재시도 없이** 확정 실패로 적힌다 — 돈은 사용자 행동으로만", async () => {
     const store = makeStore(withJob());
     const retry = vi.fn(async () => ({ retried: true }));
     const r = await collectReelOneShot("p1", "u1", {
@@ -241,9 +246,9 @@ describe("수거가 초상 거절을 재시도로 넘긴다", () => {
       collectClip: async () => { throw new Error(RAW422); },
       retryOneShotWithoutFaces: retry,
     });
-    expect(retry).toHaveBeenCalledTimes(1);
-    expect(r.retried).toBe(true);
-    expect(reelOf(store.box.doc).status, "실패로 적어 버렸다").not.toBe("error");
+    expect(retry, "자동 재시도가 돌았다 — 사장님이 금지한 지출이다").not.toHaveBeenCalled();
+    expect(reelOf(store.box.doc).status).toBe("error");
+    expect(reelOf(store.box.doc).error).toContain("likenesses");
   });
 
   // ★ 2026-09-02 — 표본을 (500)→(422)로 바꿨다. 5xx 는 이제 **일시 오류**라 접수증을

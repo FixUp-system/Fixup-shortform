@@ -1,7 +1,6 @@
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { runInBackground } from "../../../../../lib/background.js";
-import { runReelClips, runReelOneShot, retryOneShotWithoutFaces } from "../../../../../lib/reel/pipeline.js";
-import { classifyFailure } from "../../../../../lib/failure.js";
+import { runReelClips, runReelOneShot } from "../../../../../lib/reel/pipeline.js";
 import { planReelBake, canBakeReel } from "../../../../../lib/reel/oneshot.js";
 import { putReel, reelOf } from "../../../../../lib/reel/doc.js";
 import { getProject, updateProject } from "../../../../../lib/projects.js";
@@ -106,14 +105,9 @@ export const POST = withUser(async (req, { params }, user) => {
         await updateProject(id, user.id, (p) => putReel(p, { status: "clips", error: null })).catch(() => {});
       })
       .catch(async (e) => {
-        // ★★★ 초상 거절이면 **한 번은 받아낸다**(2026-08-31) — 판을 얼굴 낮춰 다시 그리고
-        //   다시 굽는다. 거절은 0원이라 이 순서가 값이 안 든다(retryOneShotWithoutFaces
-        //   머리말 참고). ★ 거절이 **접수 때** 올지 **수거 때** 올지 몰라 두 자리 다 받는다 —
-        //   같은 함수를 부르고, `reel.face_safe` 하나가 "한 번뿐"을 지킨다.
-        if (classifyFailure(e?.message || "").code === "rejected_likeness") {
-          const again = await retryOneShotWithoutFaces(id, user.id).catch(() => null);
-          if (again?.retried) return;
-        }
+        // ★★★ 초상 거절 자동 재시도는 **걷어냈다**(2026-09-02 사장님 지시 — 비용이 사용자
+        //   행동 없이 나간다). 확정 실패로 적히고 화면이 사장님 말로 옮긴다
+        //   (rejected_likeness). retryOneShotWithoutFaces 는 수동 버튼용으로만 남는다.
         await updateProject(id, user.id, (p) =>
           // ★ 어느 단계의 실패인지 적는다(2026-08-25) — 안 적으면 ③이미지 화면이 이 문구를
           //   자기 오류처럼 보여 준다(lib/reel/doc.js 의 reelErrorFor).
