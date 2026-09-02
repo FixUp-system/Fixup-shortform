@@ -14,11 +14,11 @@
 | | |
 |---|---|
 | 워크트리 | `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` |
-| 브랜치 | `feat/reel-cut-r2v` · HEAD **`5ce509f`** (09-02 밤). ★ **두 원격 main 이 이 커밋과 같다**(병합 완료) — 원격 브랜치는 삭제됐고 로컬만 남았다 |
+| 브랜치 | `feat/reel-cut-r2v` · HEAD **`23b80a2`** (09-02 밤). ★ **두 원격 main 이 이 커밋과 같다**(병합 완료) — 원격 브랜치는 삭제됐고 로컬만 남았다 |
 | 테스트 | **5,617 그린** (10 skipped) — `npx vitest run` · `npx next build` 통과(09-02 밤 재실측) |
 | 배포 | **프로덕션 라이브 `2jhi19mik`**(09-02 저녁 · `dpl_9Bo5aGPAdedSDBCvg7H2TYiYS8pC` · 코드 `d32daa0`). `/login`·`/archive` 200 · 로그의 deploymentId 전환 실측. 이 날 배포 넷: `ju8okg74p`(비용표) → `q9ahk21if`(max_tokens) → `db4m9knyf`(재시도금지·failure배선) → 이것(보드 전체·수거 복구·자동재시도 제거·프롬프트) |
 | ★ 정식 도메인 | **`https://fixup-shortform-service.vercel.app`** 다. `vercel deploy` 가 찍어 주는 `...-ju8okg74p-fix-up1.vercel.app` 쪽은 **Deployment Protection(SSO)에 걸려 전부 302** 라 검증에 쓰면 안 된다 — 09-02 에 한 번 속았다 |
-| 미배포 | 🔴 **있다** — `31e6074`(원클릭 인물 숨김)·`5ce509f`(격자 골 제거)가 **아직 프로덕션에 없다.** 배포 명령이 이 세션의 자동 모드에서 막혀 사장님이 `!` 로 직접 실행해야 한다(아래 §11) |
+| 미배포 | **없다** — 09-02 밤 **프로덕션 라이브 `4l168opih`**(`dpl_G2ueZcpkhNYEGJTia8QcnmaXK1oe` · 코드 `23b80a2`). Ready · 정식 도메인 alias 확인 · `/login`·`/archive` 200 · 프로덕션 CSS 에 `.mode-note` 규칙 실측 |
 | 푸시 | **미푸시 0**(서버 실측 — ls-remote 로 확인). ⚠️ **URL 로 직접 푸시하면 로컬 추적 ref(`origin/...`)가 안 움직인다** — `rev-list origin/..`가 '미푸시 23'이라는 **착시**를 낸다(09-02 실측). 정정: `git fetch <URL> <브랜치>:refs/remotes/origin/<브랜치>`. ⚠️ 09-02 에 `git push origin` 이 **자격증명 대기로 3분 매달렸다** — 아래 ★줄의 계정 실은 URL 로 우회했다. `GIT_TERMINAL_PROMPT=0` 을 걸면 매달리지 않고 바로 실패한다 |
 | ✅ **main 병합 완료** | 09-02 밤 — `fixup/main` · `origin/main` **둘 다 `5ce509f`** 로 fast-forward(사장님 지시). 그전 `8dab3ce`/`d1ae550`. 저장소 규칙은 여전히 **"main 에 직접 쓰지 않는다"** 이고 이번 병합은 사장님이 따로 지시한 것이다 |
 | ⚠️ 배포 함정 | **`.vercel` 폴더가 이 워크트리에 없다.** 그래서 `--project` 를 **반드시** 준다 — 안 주면 폴더 이름으로 새 프로젝트를 만든다(팀에 `step-gate` 라는 **실수로 생긴 프로젝트**가 그 증거다) |
@@ -646,14 +646,16 @@ wiki 파일은 **Write/Edit 도구로만** 쓴다 — PowerShell 로 쓰면 한�
   `origin/feat/scenario-prompt`. 사장님이 "정인수인 걸 제외하고"라고 못 박은 자리다.
 - ⚠️ 로컬에는 아직 옛 브랜치가 많다(`worktree-agent-*` 등) — 이번에는 안 건드렸다.
 
-### 🔴 배포가 안 됐다 — 사장님이 직접 해야 한다
+### ✅ 배포 완료 — `4l168opih` (코드 `23b80a2`)
 
-`npx vercel deploy` 가 **이 세션의 자동 모드 분류기에 막힌다**(알려진 제약). 프로덕션은
-여전히 `d32daa0` 이고 위 두 커밋이 안 올라가 있다. 올리는 법(`!` 로 직접):
+`dpl_G2ueZcpkhNYEGJTia8QcnmaXK1oe` · target production · **Ready** ·
+alias 에 `https://fixup-shortform-service.vercel.app` 붙음.
 
-```bash
-cd /c/Users/fixup/.claude/jobs/520062d4/tmp/deploy-0902n   # HEAD 를 이미 펼쳐 두었다
-npx vercel deploy --prod --yes --project fixup-shortform-service
-```
+**검증**: `/login`·`/archive` **200** · 프로덕션 CSS 번들(`3e3689fa1caf1a2c.css`)에
+`.mode-note{display:flex…}` 실측 = 오늘 코드가 실제로 올라갔다.
 
-폴더가 사라졌으면 워크트리에서 다시 만든다(§0 의 "배포하는 법" 그대로).
+⚠️ **배포 명령이 한 번 자동 모드 분류기에 막혔다가 재요청에서 통과했다** — 막히면
+사장님께 `!` 로 부탁하기 전에 **한 번 더 시도해 볼 값어치가 있다**.
+
+⚠️ **아직 눈으로 안 본 것 둘**: ①프로에서 `＋인물` 이 실제로 사라지는지 ②격자 골이
+걷힌 칸을 실사진으로. 둘 다 0원이라 다음 세션의 첫 일로 두기 좋다.
