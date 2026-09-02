@@ -14,13 +14,13 @@
 | | |
 |---|---|
 | 워크트리 | `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` |
-| 브랜치 | `feat/reel-cut-r2v` · HEAD **`d32daa0`** (09-02 저녁, 이 문서 커밋이 하나 더 얹힌다) |
-| 테스트 | **5,606 그린** (10 skipped) — `npx vitest run` · `npx next build` 통과 |
+| 브랜치 | `feat/reel-cut-r2v` · HEAD **`5ce509f`** (09-02 밤). ★ **두 원격 main 이 이 커밋과 같다**(병합 완료) — 원격 브랜치는 삭제됐고 로컬만 남았다 |
+| 테스트 | **5,617 그린** (10 skipped) — `npx vitest run` · `npx next build` 통과(09-02 밤 재실측) |
 | 배포 | **프로덕션 라이브 `2jhi19mik`**(09-02 저녁 · `dpl_9Bo5aGPAdedSDBCvg7H2TYiYS8pC` · 코드 `d32daa0`). `/login`·`/archive` 200 · 로그의 deploymentId 전환 실측. 이 날 배포 넷: `ju8okg74p`(비용표) → `q9ahk21if`(max_tokens) → `db4m9knyf`(재시도금지·failure배선) → 이것(보드 전체·수거 복구·자동재시도 제거·프롬프트) |
 | ★ 정식 도메인 | **`https://fixup-shortform-service.vercel.app`** 다. `vercel deploy` 가 찍어 주는 `...-ju8okg74p-fix-up1.vercel.app` 쪽은 **Deployment Protection(SSO)에 걸려 전부 302** 라 검증에 쓰면 안 된다 — 09-02 에 한 번 속았다 |
-| 미배포 | **없다** — HEAD 가 곧 프로덕션이다(이 문서 커밋만 그 뒤) |
+| 미배포 | 🔴 **있다** — `31e6074`(원클릭 인물 숨김)·`5ce509f`(격자 골 제거)가 **아직 프로덕션에 없다.** 배포 명령이 이 세션의 자동 모드에서 막혀 사장님이 `!` 로 직접 실행해야 한다(아래 §11) |
 | 푸시 | **미푸시 0**(서버 실측 — ls-remote 로 확인). ⚠️ **URL 로 직접 푸시하면 로컬 추적 ref(`origin/...`)가 안 움직인다** — `rev-list origin/..`가 '미푸시 23'이라는 **착시**를 낸다(09-02 실측). 정정: `git fetch <URL> <브랜치>:refs/remotes/origin/<브랜치>`. ⚠️ 09-02 에 `git push origin` 이 **자격증명 대기로 3분 매달렸다** — 아래 ★줄의 계정 실은 URL 로 우회했다. `GIT_TERMINAL_PROMPT=0` 을 걸면 매달리지 않고 바로 실패한다 |
-| ⚠️ **main 이 뒤에 있다** | `fixup/main` = `8dab3ce`(HEAD 가 **52커밋 앞** — 09-02 밤 재실측) · `origin/main` = `d1ae550`(HEAD 가 **229커밋 앞** — 09-02 밤 재실측). 즉 **두 원격의 main 도 서로 다르다** — `origin/main` 은 `fixup/main` 의 조상이라 갈라진 것은 아니고 **177커밋 뒤처진 것**이다. 이 회차에는 브랜치만 밀었다. **main 병합·푸시는 사장님이 지시할 때만** 한다 |
+| ✅ **main 병합 완료** | 09-02 밤 — `fixup/main` · `origin/main` **둘 다 `5ce509f`** 로 fast-forward(사장님 지시). 그전 `8dab3ce`/`d1ae550`. 저장소 규칙은 여전히 **"main 에 직접 쓰지 않는다"** 이고 이번 병합은 사장님이 따로 지시한 것이다 |
 | ⚠️ 배포 함정 | **`.vercel` 폴더가 이 워크트리에 없다.** 그래서 `--project` 를 **반드시** 준다 — 안 주면 폴더 이름으로 새 프로젝트를 만든다(팀에 `step-gate` 라는 **실수로 생긴 프로젝트**가 그 증거다) |
 | ★ origin 푸시 | `origin` 은 URL 에 계정이 안 박혀 있다. 이 회차에는 `git push origin <브랜치>` 가 그냥 통과했지만, 자격증명 대기로 멈추면 계정을 실어라: `git push https://jaechanyoon0519-Fixup@github.com/FixUp-system/Fixup-shortform.git <브랜치>` |
 | 개발 서버 | `npx next dev -p 3111` (이 회차에 쓴 포트). `.env.local` 의 `SHOTFORM_DEV_USER` 가 **로그인을 건너뛰고 운영자 신원**을 준다 — 관리자·비용 화면을 그대로 볼 수 있다 |
@@ -614,3 +614,46 @@ wiki 파일은 **Write/Edit 도구로만** 쓴다 — PowerShell 로 쓰면 한�
 **같은 저녁에 중단된 것:** "인물 사진을 그리드에 합성해 2.0 r2v 에 넣으면 422 를 피하나"
 실험 — 스크립트까지 만들고 **fal 호출 전에** 사장님이 착각이었다며 중단 지시. $0.
 (설계는 남긴다: A=원본 접수→422 확인 0원 · B=2×2 그리드 접수, 접수 통과가 곧 답.)
+
+---
+
+## 11. 09-02 밤 (2) — 격자 골 제거 · main 병합 · 브랜치 정리
+
+### 잘라낸 칸에 격자 골이 남지 않는다 (`5ce509f`)
+
+사장님 지시: *"개별 이미지 다운로드할 때 격자가 포함되는데 격자 없이 사용자가 다운 받을 수
+있게 해줘."*
+
+**뿌리**: 판 지문이 *"Thin clean even gaps separate the panels"* 라 모델이 칸 사이에 띠를
+그린다. `cropStoryboardCells` 가 **격자 수학 그대로**(`width/cols`) 자르니 그 띠 절반씩이
+칸 가장자리에 남았다 — 실측(프로젝트 1990a4da 의 칸)으로 **720px 칸에 흰 띠 ~14px**.
+
+**고친 방법**: 자르기 전에 칸 안쪽에서 **균일한(분산 작은) 흰/검 띠만** 걷는다
+(`flatMargins`, `lib/reel/storyboard.js`). 한 변에서 **최대 5%** 까지만 — 하늘·흰 벽 같은
+실제 내용은 분산이 있어 안 걸린다(그 성질을 판으로 못 박았다). 걷은 뒤 **원래 칸 크기로
+되돌린다** — 컷별 굽기의 첫 프레임 크기(720×1280)가 흔들리면 안 되기 때문이다.
+
+⚠️ **실사진으로는 아직 안 봤다** — 합성 판으로만 쟀다(테스트 2개). 다음에 실제로 한 장
+그리면 칸 가장자리를 눈으로 확인할 것.
+
+### main 병합 · 브랜치 정리 (사장님 지시)
+
+- **두 원격 main 을 `5ce509f` 로 fast-forward** — `fixup/main`(8dab3ce→) ·
+  `origin/main`(d1ae550→). 충돌 없음(둘 다 조상이었다).
+- **삭제한 원격 브랜치**(전부 main 에 포함된 것만): `feat/reel-cut-r2v`(두 원격) ·
+  `origin/feat/theme-light`. 로컬 `feat/theme-light` 도 지웠다.
+- **남긴 것 — 정인수(`9843ohs@gmail.com`) 작성분**: `origin/feat/ad-video` ·
+  `origin/feat/scenario-prompt`. 사장님이 "정인수인 걸 제외하고"라고 못 박은 자리다.
+- ⚠️ 로컬에는 아직 옛 브랜치가 많다(`worktree-agent-*` 등) — 이번에는 안 건드렸다.
+
+### 🔴 배포가 안 됐다 — 사장님이 직접 해야 한다
+
+`npx vercel deploy` 가 **이 세션의 자동 모드 분류기에 막힌다**(알려진 제약). 프로덕션은
+여전히 `d32daa0` 이고 위 두 커밋이 안 올라가 있다. 올리는 법(`!` 로 직접):
+
+```bash
+cd /c/Users/fixup/.claude/jobs/520062d4/tmp/deploy-0902n   # HEAD 를 이미 펼쳐 두었다
+npx vercel deploy --prod --yes --project fixup-shortform-service
+```
+
+폴더가 사라졌으면 워크트리에서 다시 만든다(§0 의 "배포하는 법" 그대로).
