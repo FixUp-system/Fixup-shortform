@@ -34,6 +34,11 @@ export default function ReelImagesPage() {
   // ★ 사장님이 한국어로 적는 수정 요청. 보낸 뒤에는 비운다 — 남아 있으면 다음에
   //   또 누를 때 같은 요청이 두 번 실린다(②시나리오와 같은 처방).
   const [note, setNote] = useState("");
+  // ★★ 보드는 **펼쳤을 때만** 그린다. loading="lazy" 로 미루려 했더니 접힌 <details>
+  //   안에서는 브라우저가 요청조차 안 해(currentSrc null) 펼쳐도 빈 칸이었다
+  //   (2026-09-02, 화면을 실제로 열어 보고 알았다). 붙였다 뗐다 하는 편이 확실하다 —
+  //   접힌 채로는 굽는 값을 안 치르고, 펼치면 반드시 뜬다.
+  const [boardOpen, setBoardOpen] = useState(false);
 
   const reel = reelOf(project);
   const cuts = project?.cuts || [];
@@ -182,17 +187,24 @@ export default function ReelImagesPage() {
           ★ 없애는 것이 아니다 — 전체 흐름은 **가끔** 보는 것이라 필요할 때 펴는 자리로
             내린다(같은 날 통째로 뺐다가 되돌린 적이 있어 이번에는 접기다).
           ★ [전체 내려받기]는 **접힘 밖**이다 — 펴지 않고도 받을 수 있어야 한다. */}
+      {/* ★★★ 2026-09-02 — 이 자리가 보여 주는 것이 **모델용 격자에서 사람용 보드로** 바뀌었다
+          (사장님 요청: "사용자는 좀 더 보기 편하게 이미지보드처럼 보고 다운 받을 수 있게").
+          번호·타임코드·카메라·연기·대사가 붙은 한 장이고, 비율은 프로젝트 비율을 따른다.
+          ★★ **모델에 가는 r2v 격자는 그대로다** — 만드는 방식도 각인도 안 바뀌었다.
+            그 원본은 ④프롬프트·⑤영상에서 여전히 그대로 보인다(거기서는 그것이 본문이다).
+          ★ 보드는 그 자리에서 그린다(저장하지 않는다) — 컷을 고치면 다음에 열 때 최신이다.
+          ★ 그림은 **펼쳤을 때만** 붙인다(boardOpen) — 접힌 채로는 굽는 값을 안 치른다. */}
       {sheetUrl && (
         <div className="sheet-block">
-          <details className="lib-fold sheet-foldable">
+          <details className="lib-fold sheet-foldable" onToggle={(e) => setBoardOpen(e.currentTarget.open)}>
             <summary>스토리보드 한 장 보기</summary>
             <div className="sheet-view sheet-view--sm">
-              <img src={sheetUrl} alt="스토리보드" />
+              {boardOpen && <img src={`/api/reel/${id}/board`} alt="스토리보드" />}
               {drawingNow && <div className="frame-busy"><span className="spinner" aria-hidden="true" /></div>}
             </div>
           </details>
           <div className="panel-act">
-            <a className="mini" href={`/api/reel/${id}/sheet`} download>전체 내려받기</a>
+            <a className="mini" href={`/api/reel/${id}/board?download=1`} download>전체 내려받기</a>
           </div>
         </div>
       )}

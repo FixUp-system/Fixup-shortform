@@ -69,13 +69,18 @@ describe("보여 주는 것은 컷별 [그림 · 지문] 이다", () => {
     expect(sheet, "통합본이 컷별 목록보다 아래에 있다").toBeLessThan(lines);
   });
 
-  it("★ 통합본도 내려받을 수 있다 — 그 한 장은 fal 에 있어 링크만으로는 저장이 안 된다", () => {
+  // ★★★ 2026-09-02 — **이 판은 뒤집힌 것이다.** 그전에는 이 자리가 모델용 r2v 격자
+  //   (/sheet)를 보여 주고 내려주는 것을 못 박았다. 사장님 지시로 그 자리가 **사람용
+  //   보드**(/board — 번호·타임코드·카메라·연기·대사가 붙은 한 장)로 바뀌었다.
+  //   ★ 모델에 가는 격자는 그대로다 — 만드는 방식도 각인도 안 바뀌었고, 그 원본은
+  //     ④프롬프트·⑤영상에서 여전히 보인다. 바뀐 것은 **이 화면이 보여 주는 것**뿐이다.
+  it("★ 보드를 내려받을 수 있다 — 그려서 흘려주므로 링크만으로는 저장이 안 된다", () => {
     expect(src).toContain("전체 내려받기");
-    expect(src).toMatch(/\/sheet`/);
-    const route = readFileSync("app/api/reel/[id]/sheet/route.js", "utf8");
+    expect(src).toMatch(/\/board`/);
+    const route = readFileSync("app/api/reel/[id]/board/route.js", "utf8");
     expect(route, "내려받기 헤더가 없다").toContain("Content-Disposition");
     // ★ 화면이 준 주소를 그대로 열면 아무 URL 이나 받아 오는 문이 된다(SSRF).
-    expect(route, "주소를 문서에서 안 판다").toContain("reelSheetUrl");
+    expect(route, "우리 버킷이 아닌 곳을 읽는다").toMatch(/getObject\(\s*"uploads"/);
   });
 
   // ★★ 2026-08-27 (넷째) — **줄에서 카드로.** 줄로 늘어놓으니 9:16 그림이 손톱만 해져서
@@ -101,8 +106,13 @@ describe("보여 주는 것은 컷별 [그림 · 지문] 이다", () => {
   it("(1) 스토리보드가 접혀 있다 — 펴기 전에는 한 줄이다", () => {
     expect(src, "접는 자리가 없다").toContain("sheet-foldable");
     expect(src).toContain("스토리보드 한 장 보기");
-    const at = src.indexOf("sheet-foldable");
-    expect(src.slice(at, at + 120), "펼친 채로 열린다").not.toContain("open");
+    // ★★ 2026-09-02 — 판정을 **정확하게** 고쳤다. 그전에는 "뒤 120자에 open 이라는 글자가
+    //   없다" 였는데, 그 자리에 `onToggle`·`setBoardOpen` 이 붙자 **거짓으로 깨졌다**.
+    //   재려는 것은 낱말이 아니라 **`open` 속성**이다(details 가 기본으로 펴져 있는가).
+    //   이 저장소가 여러 번 밟은 함정이라(소스 문자열 그물이 주장보다 넓게 잰다) 여기서는
+    //   여는 태그만 잘라 속성 모양으로 본다.
+    const tag = src.slice(src.indexOf("<details"), src.indexOf(">", src.indexOf("sheet-foldable")) + 1);
+    expect(tag, "펼친 채로 열린다").not.toMatch(/\sopen(\s|=\{true\}|>)/);
   });
 
   it("★ [전체 내려받기]는 접힘 **밖**이다 — 펴지 않고도 받을 수 있어야 한다", () => {

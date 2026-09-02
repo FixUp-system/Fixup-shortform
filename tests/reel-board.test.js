@@ -1,0 +1,185 @@
+// 스토리보드 **보드** — 사람이 보고 내려받는 한 장(2026-09-02 사장님 요청).
+//
+// ★★ 출력이 둘이고 원천은 하나다. 같은 cuts 에서
+//   · **모델용** = r2v 시트(lib/reel/storyboard.js) — 격자 그림 한 장, 글자 없음
+//   · **사람용** = 이 보드 — 번호·타임코드·카메라·연기·대사가 붙은 카드 격자
+//   이 판이 지키는 것은 **둘이 안 섞이는 것**이다. r2v 경로를 한 줄도 안 건드린다.
+//
+// ★ 비율이 배치를 정한다(사장님 지시: "16:9로 생성을 했으면 스토리보드 자체도 16:9 안에서").
+//   열 수를 표로 박지 않고 **기하로 고른다** — 목표 비율에 가장 가까워지는 열 수를 고르면
+//   9:16 은 자연히 적은 열, 16:9 는 많은 열이 된다. 표로 박으면 컷 수가 바뀔 때 어긋난다.
+import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { boardLayout, boardSvg, MIN_CARD_W } from "../lib/reel/board.js";
+
+const cut = (idx, over = {}) => ({
+  idx,
+  seconds: 3,
+  camera: `camera-${idx}`,
+  action: `action-${idx}`,
+  lighting: `lighting-${idx}`,
+  sentence: "",
+  image: { url: `/api/uploads/cut-${idx}.jpg` },
+  ...over,
+});
+const cuts = (n, over) => Array.from({ length: n }, (_, i) => cut(i, over));
+
+const project = (aspect = "9:16") => ({
+  settings: { aspect_ratio: aspect, target_seconds: 15, style: "photo", mood: "premium" },
+  scenario: { narration: { text: "해 질 무렵 한강 위로 서울이 깨어납니다." } },
+});
+
+describe("보드 배치 — 비율이 정한다", () => {
+  it("★★ 캔버스 비율이 **프로젝트 비율과 같다** — 세 비율 모두", () => {
+    for (const [aspect, want] of [["9:16", 9 / 16], ["1:1", 1], ["16:9", 16 / 9]]) {
+      const L = boardLayout(8, aspect);
+      expect(L.width / L.height, `${aspect} 의 캔버스가 그 비율이 아니다`).toBeCloseTo(want, 2);
+    }
+  });
+
+  it("★ 가로 보드가 세로 보드보다 열이 많다 — 표가 아니라 기하에서 나온다", () => {
+    expect(boardLayout(8, "16:9").cols).toBeGreaterThan(boardLayout(8, "9:16").cols);
+  });
+
+  it("★ 컷이 모두 격자에 들어간다 — 빠지는 컷이 없다", () => {
+    for (const n of [1, 3, 4, 5, 6, 8, 9, 10, 12, 16]) {
+      for (const a of ["9:16", "1:1", "16:9"]) {
+        const L = boardLayout(n, a);
+        expect(L.cols * L.rows, `${a} ${n}컷이 격자를 넘친다`).toBeGreaterThanOrEqual(n);
+      }
+    }
+  });
+
+  it("★★ 카드가 최소 크기 아래로 절대 안 내려간다 — 실제 쓰는 컷 수 전부", () => {
+    // 고를 수 있는 칸 수(reelCutChoicesFor)와 그 언저리를 훑는다.
+    for (const n of [3, 4, 5, 6, 8, 9, 10, 12, 15, 16]) {
+      for (const a of ["9:16", "1:1", "16:9"]) {
+        expect(boardLayout(n, a).card.w, `${a} ${n}컷의 카드가 너무 작다`).toBeGreaterThanOrEqual(MIN_CARD_W);
+      }
+    }
+  });
+
+  it("★★ 그래도 못 지킬 만큼 많으면 **캔버스가 커진다** — 비율은 그대로", () => {
+    // ★ 실측으로 배운 것: 16컷까지는 열이 늘며 흡수돼 기본 폭(1600)이 그대로다. 이 가드가
+    //   실제로 도는 것은 그보다 훨씬 많을 때다 — 그래도 규칙은 규칙이라 판으로 잡아 둔다.
+    const few = boardLayout(4, "9:16");
+    const many = boardLayout(36, "9:16");
+    expect(many.card.w).toBeGreaterThanOrEqual(MIN_CARD_W);
+    expect(many.width).toBeGreaterThan(few.width);
+    expect(many.width / many.height).toBeCloseTo(few.width / few.height, 2);
+  });
+
+  it("컷이 0이어도 안 던진다", () => {
+    const L = boardLayout(0, "9:16");
+    expect(L.width).toBeGreaterThan(0);
+    expect(L.height).toBeGreaterThan(0);
+  });
+
+  it("모르는 비율은 기본(9:16)으로 떨어진다 — 여기서 멈추면 보드를 못 만든다", () => {
+    expect(boardLayout(6, "3:7").width / boardLayout(6, "3:7").height).toBeCloseTo(9 / 16, 2);
+  });
+});
+
+describe("보드 SVG — 무엇이 실리나", () => {
+  const svg = (n = 4, over, aspect = "9:16") =>
+    boardSvg({ project: project(aspect), cuts: cuts(n, over), layout: boardLayout(n, aspect) });
+
+  it("★ 컷의 카메라·연기가 실제로 들어간다", () => {
+    const s = svg(3);
+    for (const i of [0, 1, 2]) {
+      expect(s).toContain(`camera-${i}`);
+      expect(s).toContain(`action-${i}`);
+    }
+  });
+
+  it("★★ 타임코드가 **누적**이다 — 3초짜리 셋이면 0:00·0:03·0:06 에서 시작한다", () => {
+    const s = svg(3);
+    expect(s).toContain("0:00");
+    expect(s).toContain("0:03");
+    expect(s).toContain("0:06");
+  });
+
+  it("★★ 셋째 칸 — 대사가 있으면 대사다", () => {
+    // ★ 글자는 칸 폭에 맞춰 **접힌다** — 한 문장을 통째로 찾으면 접히는 순간 판이 거짓으로
+    //   깨진다(2026-09-02 에 실제로 그랬다). 낱말이 실렸는지를 본다.
+    const s = svg(2, { sentence: "오늘도 수고했어" });
+    expect(s).toContain("오늘도");
+    expect(s).toContain("수고했어");
+    expect(s).toContain("대사");
+  });
+
+  it("★★ 셋째 칸 — 대사가 없으면 조명으로 채운다(빈 칸을 두지 않는다)", () => {
+    // 지금 흐름은 내레이션을 **영상 전체 한 벌**로 뽑아서(2026-08-27) 컷별 sentence 가
+    // 비어 있다. 대사 칸을 그대로 두면 모든 카드에서 빈 칸이 된다 — 실데이터로 확인했다.
+    const s = svg(2);
+    expect(s).toContain("lighting-0");
+    expect(s).toContain("lighting-1");
+  });
+
+  it("★ 내레이션 한 벌은 **머리글**에 실린다 — 컷에 나눠 붙이지 않는다", () => {
+    expect(svg(3)).toContain("해 질 무렵 한강 위로");
+  });
+
+  it("★ 글자를 폰트와 함께 심는다 — 심지 않으면 배포(리눅스)에서 두부가 된다", () => {
+    expect(svg(2)).toContain("@font-face");
+    expect(svg(2)).toMatch(/base64/);
+  });
+
+  it("★ 꺾쇠·앰퍼샌드가 SVG 를 깨뜨리지 않는다", () => {
+    const s = svg(1, { camera: 'wide <shot> & "close"', sentence: "a < b & c" });
+    expect(s).not.toContain("<shot>");
+    expect(s).toContain("&lt;");
+    expect(s).toContain("&amp;");
+  });
+
+  it("컷이 없어도 SVG 를 낸다", () => {
+    expect(boardSvg({ project: project(), cuts: [], layout: boardLayout(0, "9:16") })).toContain("<svg");
+  });
+});
+
+describe("화면·라우트 배선", () => {
+  const page = readFileSync("app/reel/[id]/images/page.js", "utf8");
+  const route = readFileSync("app/api/reel/[id]/board/route.js", "utf8");
+
+  it("★ ③이미지의 [스토리보드 한 장 보기]가 **보드**를 보여 준다", () => {
+    expect(page).toContain("/board");
+    // 그 자리에서 옛 격자(sheet)를 그대로 보여 주던 배선은 사라졌다.
+    expect(page, "아직 시트를 그 자리에 그린다").not.toContain('<img src={sheetUrl}');
+  });
+
+  it("★★ 미리보기와 내려받기가 **다른 주소**다", () => {
+    // 한 주소로 겸할 수 없다 — `attachment` 를 늘 붙이면 <img> 가 아무것도 못 그린다
+    // (2026-09-02, 화면을 실제로 열어 보고 알았다. 판도 빌드도 그때 그린이었다).
+    expect(page, "미리보기가 내려받기 주소를 쓴다").toMatch(/<img src=\{`\/api\/reel\/\$\{id\}\/board`\}/);
+    // ★ 펼쳤을 때만 붙인다 — lazy 로는 접힌 details 안에서 요청조차 안 갔다.
+    expect(page, "접힌 채로도 그린다").toContain("boardOpen && <img");
+    expect(page, "내려받기가 download 인자를 안 준다").toMatch(/\/board\?download=1`\}[^>]*download/);
+    expect(route, "라우트가 그 인자를 안 본다").toContain('searchParams.has("download")');
+  });
+
+  it("★★ 라우트가 **우리 버킷의 그림만** 읽는다 — 아무 URL 이나 열면 SSRF 다", () => {
+    // 주소에서 키만 떼어 uploads 버킷을 본다. 주소를 그대로 fetch 하면 안 된다.
+    expect(route, "uploads 버킷을 안 읽는다").toMatch(/getObject\(\s*"uploads"/);
+    expect(route, "주소를 그대로 여는 자리가 있다").not.toMatch(/fetch\(\s*url/);
+  });
+
+  it("★ 굽는 시간이 배포 기본값에 안 잘린다", () => {
+    expect(route).toMatch(/maxDuration\s*=\s*\d+/);
+  });
+});
+
+// ★★ 모델이 보는 것과 사람이 보는 것을 **섞지 않는다**. 이 판이 그 경계다.
+describe("r2v 경로를 안 건드린다", () => {
+  const storyboard = readFileSync("lib/reel/storyboard.js", "utf8");
+  const board = readFileSync("lib/reel/board.js", "utf8");
+
+  it("★ 보드는 시트를 만드는 함수를 부르지 않는다 — 값(그림)이 나가는 자리다", () => {
+    expect(board).not.toContain("drawStoryboardSheet");
+    expect(board, "보드가 이미지 모델을 부른다").not.toContain("generateImage");
+  });
+
+  it("★ 시트 쪽은 보드를 모른다 — 의존이 한 방향이다", () => {
+    expect(storyboard).not.toContain("board.js");
+    expect(storyboard).not.toContain("drawBoard");
+  });
+});
