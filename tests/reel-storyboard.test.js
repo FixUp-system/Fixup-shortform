@@ -177,6 +177,50 @@ describe("cropStoryboardCells — 칸을 잘라낸다", () => {
     }
   });
 
+  // ★★ 2026-09-02 사장님 지시 — "개별 이미지 다운로드할 때 격자가 포함되는데 격자 없이".
+  //   판 지문의 "Thin clean even gaps" 가 칸 사이에 흰 띠를 그리고, 격자 수학 그대로
+  //   자르면 그 띠 절반씩이 칸 가장자리에 남았다(실측 720px 칸에 ~14px).
+  it("★★★ 칸 사이 흰 골이 잘린 칸에 안 남는다 — 걷은 뒤 크기는 그대로다", async () => {
+    const grid = storyboardGridFor(4); // 2행 2열
+    const cellW = 180, cellH = 320, gap = 8; // 칸은 9:16 정확 · 골 8px = 폭의 4.4%(실측 ~2%와 같은 자리, 상한 5% 안)
+    const panels = [];
+    for (let r = 0; r < 2; r++) for (let c = 0; c < 2; c++) {
+      panels.push({
+        input: await sharp({ create: { width: cellW - gap * 2, height: cellH - gap * 2, channels: 3, background: { r: 120, g: 120, b: 120 } } }).png().toBuffer(),
+        left: c * cellW + gap, top: r * cellH + gap,
+      });
+    }
+    // 바탕이 흰 판 = 칸 둘레의 골이 전부 흰 띠다
+    const sheet = await sharp({ create: { width: cellW * 2, height: cellH * 2, channels: 3, background: { r: 255, g: 255, b: 255 } } })
+      .composite(panels).png().toBuffer();
+    const cells = await cropStoryboardCells(sheet, grid);
+    for (const cell of cells) {
+      const { data, info } = await sharp(cell).greyscale().raw().toBuffer({ resolveWithObject: true });
+      const W = info.width, H = info.height;
+      expect([W, H], "골을 걷어도 칸 크기는 격자 수학 그대로여야 한다").toEqual([cellW, cellH]);
+      const colAvg = (x) => { let s = 0; for (let y = 0; y < H; y++) s += data[y * W + x]; return s / H; };
+      const rowAvg = (y) => { let s = 0; for (let x = 0; x < W; x++) s += data[y * W + x]; return s / W; };
+      for (const v of [colAvg(0), colAvg(W - 1), rowAvg(0), rowAvg(H - 1)]) {
+        expect(v, "가장자리에 흰 골이 남아 있다").toBeLessThan(235);
+      }
+    }
+  });
+
+  it("★ 진짜 내용은 안 걷는다 — 균일하지 않은 밝은 가장자리(하늘·흰 벽)는 남는다", async () => {
+    const grid = storyboardGridFor(4);
+    const cellW = 180, cellH = 320;
+    // 골 없는 판: 칸 전체가 노이즈 있는 밝은 회색(평균 ~240, 분산 큼)
+    const px = Buffer.alloc(cellW * 2 * cellH * 2 * 3);
+    for (let i = 0; i < px.length; i += 3) {
+      const v = 210 + ((i / 3) % 60); // 210~269 를 오르내린다 → 분산이 크다
+      px[i] = px[i + 1] = px[i + 2] = Math.min(255, v);
+    }
+    const sheet = await sharp(px, { raw: { width: cellW * 2, height: cellH * 2, channels: 3 } }).png().toBuffer();
+    const cells = await cropStoryboardCells(sheet, grid);
+    const m = await sharp(cells[0]).metadata();
+    expect([m.width, m.height]).toEqual([cellW, cellH]);
+  });
+
   it("3×3 격자를 실제 크기로 자르면 칸이 굽기 해상도(720×1280)다", async () => {
     const grid = storyboardGridFor(9);
     const { width, height } = storyboardImageSize(grid);
