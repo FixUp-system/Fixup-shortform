@@ -33,6 +33,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 // 프로젝트 공유본 — 루트가 들고 사이드바가 읽는다. 여기서는 **놓는다**(아래 useEffect).
 import { useReelProject } from "../../../components/ReelProjectContext";
+import Icon from "../../../components/Icon";
 // 주소는 단계 표 한 벌이 만든다 — 화면이 `/reel/<id>/scenario` 를 손으로 적으면 두 벌이 된다.
 import { REEL_STEPS, reelStepHref } from "../../../lib/reel/steps";
 import { ASPECTS, DEFAULT_ASPECT_ID, aspectFor } from "../../../lib/aspects";
@@ -412,6 +413,13 @@ export default function ReelNewPage() {
             </button>
           </div>
         </div>
+
+        {/* ★ 2026-09-02 사장님 지시 — 모드 하단 상시 안내: 프로에서 ＋인물이 왜 없는지를
+            만들기 전에 말해 둔다(원클릭 app/ads/new 와 같은 줄). */}
+        <p className="mode-note">
+          <Icon name="bang" size={14} />
+          프로 버전에서는 인물 사진 참조가 지원되지 않아요.
+        </p>
       </section>
     </>
   );

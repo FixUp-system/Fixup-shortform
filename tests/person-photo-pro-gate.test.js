@@ -76,9 +76,10 @@ describe("올리는 자리 — 프로면 ＋인물 이 사라진다", () => {
   });
 });
 
-// ★ 원클릭(ad)은 이 잠금 밖이다 — 참조를 자기 길로 모은다(lib/ad/pipeline.js 의
-//   readRefBytes). 사장님이 "원클릭은 기존 그대로"라고 못 박은 자리라 함께 잰다.
-describe("원클릭은 안 건드린다", () => {
+// ★ 원클릭(ad)은 이 **적재 잠금** 밖이다 — 참조를 자기 길로 모은다(lib/ad/pipeline.js 의
+//   readRefBytes). ⚠️ 2026-09-02 부터 **화면 숨김은 원클릭에도 걸렸다**("일단 숨김처리" —
+//   tests/ad-person-photo-hide.test.js 가 잰다). 서버 적재는 여전히 제 갈래 그대로다.
+describe("원클릭 적재는 안 건드린다", () => {
   it("★★ 광고 갈래는 describeCutRefs 를 안 쓴다", () => {
     const src = readFileSync("lib/ad/pipeline.js", "utf8");
     expect(src).not.toMatch(/describeCutRefs|loadCutRefs|loadStoryboardRefs/);

@@ -23,7 +23,11 @@ import { ASPECTS, DEFAULT_ASPECT_ID, aspectFor } from "../../../lib/aspects";
 import {
   AD_MODELS, DEFAULT_AD_MODEL, adSecondsFor, isAdSeconds,
   adResolutionsFor, isAdResolution, adDefaultResolution, isAdminOnlyResolution, adRefMax,
+  adEndpoint,
 } from "../../../lib/ad/models";
+// 프로(2.5)가 얼굴 든 참조를 거절하는가 — 표는 clip-limits 의 프로필 하나다(단계별과 같은 판).
+import { blocksFacesForEndpoint } from "../../../lib/clip-limits";
+import Icon from "../../../components/Icon";
 // 길이 칩에 정가를 같이 보여준다 — 사장님이 고르기 전에 값을 알아야 한다. 숫자는 여기 안 적는다.
 import { priceLabel, adVideoPrice } from "../../../lib/pricing";
 // app/create/page.js 와 같은 이유로 쓴다 — 새 광고를 시작하는 자리에서 이전 광고의
@@ -34,7 +38,7 @@ import { useMe } from "../../../components/MeContext";
 // 등급이 고를 수 있는 모델 — 표와 판정은 lib/tiers.js 한 벌이다.
 import { modelsForTier } from "../../../lib/tiers";
 import { MAX_MATERIAL_TEXT } from "../../../lib/material";
-import { PHOTO_ROLES } from "../../../lib/photos";
+import { PHOTO_ROLES, visiblePhotoRoles, isPersonPhoto } from "../../../lib/photos";
 
 // 화풍 라벨은 styles.js 에 있지만, 고를 수 있는 것은 AD_STYLE_LINES 에 영상용 문구가 있는
 // id 뿐이어야 한다 — 둘이 어긋나면 화면에는 있는데 서버(normalizeAdOptions)가 400 을 낸다.
@@ -94,6 +98,15 @@ export default function AdNewPage() {
   //   셋으로 늘리면 업로드 상태(uploading)와 ref 도 셋이 되고, 그중 하나만 안 풀려도
   //   버튼이 영영 잠긴다(이 화면이 이미 겪은 종류의 사고다).
   const pendingRole = useRef(PHOTO_ROLES[0].id);
+  // ★★ 2026-09-02 사장님 지시 — **원클릭도 프로(2.5)에서는 `＋인물`을 숨긴다**
+  //   (단계별 app/reel/new 와 같은 규율: 잠긴 버튼을 남기지 않고 숨긴다).
+  //   ⚠️ 일단 **화면 숨김만**이다("일단 숨김처리" — 같은 날 지시). 서버 잠금은 아직 없다 —
+  //   옛 문서나 API 직접 호출로는 여전히 인물 사진이 실려 나갈 수 있다.
+  const noFaces = blocksFacesForEndpoint(adEndpoint(model, "r2v"));
+  const photoRoles = visiblePhotoRoles(noFaces);
+  // 이미 올려 둔 인물 사진은 지우지 않는다 — 기본으로 되돌리면 그대로 살아나야 한다.
+  // 대신 안 실린다고 말한다(조용히 버리면 "반영이 안 된다"로 읽힌다 — 단계별과 같은 이유).
+  const strandedPeople = noFaces ? photos.filter(isPersonPhoto).length : 0;
   function pickRole(id) {
     pendingRole.current = id;
     fileRef.current?.click();
@@ -176,6 +189,14 @@ export default function AdNewPage() {
             </div>
           )}
 
+          {/* ★★ 이미 올려 둔 인물 사진은 **지우지 않는다** — 기본으로 되돌리면 그대로
+              살아나야 한다. 대신 안 실린다고 말한다(단계별 app/reel/new 와 같은 문구). */}
+          {strandedPeople > 0 && (
+            <p className="warn">
+              인물 사진 {strandedPeople}장은 프로에서 안 실려요 — 얼굴 사진을 쓰시려면 기본으로 바꿔 주세요.
+            </p>
+          )}
+
           {/* 고른 것들은 늘 펼쳐 둔다 — 접으면 무엇이 골라져 있는지 보려고 한 번 더 눌러야 한다 */}
           {/* ★ 트레이는 **입력 수정 화면과 나눠 쓴다**(components/AdOptionTray.jsx) —
               두 벌이면 한쪽이 낡는다. 판정은 그 안에서도 lib 이 쥔다. */}
@@ -201,7 +222,7 @@ export default function AdNewPage() {
             {/* ★★ 2026-08-31 사장님 지시 — `＋사진` 하나를 **종류별 셋**으로 갈랐다.
                 누르는 순간 종류가 정해지므로 "안 고른 사진"이 아예 안 생긴다.
                 ★ 표를 돌려 그린다(lib/photos.js) — 손으로 세 번 적으면 종류가 늘 때 낡는다. */}
-            {PHOTO_ROLES.map((r) => (
+            {photoRoles.map((r) => (
               <button key={r.id} className="pill" disabled={photos.length >= maxPhotos}
                 onClick={() => pickRole(r.id)}>
                 ＋ {r.label}{photos.filter((p) => p.role === r.id).length > 0 && <b>{photos.filter((p) => p.role === r.id).length}</b>}
@@ -219,6 +240,13 @@ export default function AdNewPage() {
         </div>
 
         {err && <p className="pgsub warn">{err}</p>}
+
+        {/* ★ 2026-09-02 사장님 지시 — 모드 하단 상시 안내: 프로에서 ＋인물이 왜 없는지를
+            만들기 전에 말해 둔다(버튼이 조용히 사라지면 "버그"로 읽힌다). */}
+        <p className="mode-note">
+          <Icon name="bang" size={14} />
+          프로 버전에서는 인물 사진 참조가 지원되지 않아요.
+        </p>
       </section>
     </>
   );

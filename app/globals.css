@@ -1993,6 +1993,18 @@ textarea.field::placeholder { color: var(--ink-soft); }
 }
 .composer-tray .tray-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .composer-tray .tray-note { color: var(--ink-soft); font-size: 12px; }
+
+/* 모드 하단 안내 — "프로에서는 인물 참조가 안 된다"를 만들기 화면(원클릭·단계별) 맨 아래에
+   상시로 둔다(2026-09-02 사장님 지시). ! 아이콘과 글이 한 줄이다. */
+.mode-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+.mode-note svg { flex: none; }
 /* 보정 칸 — 공용 규칙(textarea.field) 위에서 크기만 줄인다.
    이 칸은 바로 위의 컨셉 설명과 나란히 앉아 있어서, 검정 표시가 없으면 둘 다 회색 글줄로
    보이고 어느 쪽이 쓸 수 있는 자리인지 알 수 없다. */

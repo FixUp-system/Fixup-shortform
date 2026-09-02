@@ -73,6 +73,13 @@ const PATHS = {
       <path d="M4.5 20a7.5 7.5 0 0 1 15 0" />
     </>
   ),
+  // 느낌표(원 안의 !) — 만들기 화면 하단의 "프로에서는 인물 참조가 안 된다" 안내가 쓴다.
+  bang: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 8v4.5M12 16v.01" />
+    </>
+  ),
 };
 
 export default function Icon({ name, size = 18 }) {
