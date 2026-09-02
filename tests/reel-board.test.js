@@ -50,14 +50,15 @@ describe("보드 배치 — 비율이 정한다", () => {
     expect(L.card.w).toBeGreaterThan(500);
   });
 
-  it("★★ 남는 공백은 위·줄 사이·아래에 **똑같이** 나뉜다 — 한 덩어리로 몰리면 빈 자리로 보인다", () => {
+  it("★★ 줄 사이는 붙고, 남는 공백은 위아래로 **똑같이** 나뉜다 (사장님 최종)", () => {
     for (const [n, aspect] of [[5, "9:16"], [8, "9:16"], [6, "1:1"], [5, "16:9"]]) {
       const L = boardLayout(n, aspect);
       const top = L.origin.y - L.pad - L.header.h;
       const gridBottom = L.origin.y + L.rows * L.card.h + (L.rows - 1) * L.gapY;
       const bottom = L.height - gridBottom - L.pad;
       expect(Math.abs(top - bottom), `${aspect} ${n}컷 위아래가 안 맞다`).toBeLessThanOrEqual(2);
-      expect(L.gapY - L.gap - top, `${aspect} ${n}컷 줄 사이 분배가 다르다`).toBeLessThanOrEqual(2);
+      // 줄 사이는 기본 간격 그대로 — 잉여를 줄 사이에 끼우지 않는다.
+      expect(Math.abs(L.gapY - L.gap), `${aspect} ${n}컷 줄 사이가 벌어졌다`).toBeLessThanOrEqual(0.01);
     }
   });
 
