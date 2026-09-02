@@ -120,9 +120,15 @@ describe("보드 SVG — 무엇이 실리나", () => {
     expect(svg(3)).toContain("해 질 무렵 한강 위로");
   });
 
-  it("★ 글자를 폰트와 함께 심는다 — 심지 않으면 배포(리눅스)에서 두부가 된다", () => {
-    expect(svg(2)).toContain("@font-face");
-    expect(svg(2)).toMatch(/base64/);
+  // ★★★ 2026-09-02 — **@font-face 심기는 안 먹힌다는 것을 실측으로 확인했다.**
+  //   서로 다른 폰트 6종을 base64 로 심어 렌더했더니 전부 같은 모양이 나왔다 — sharp 의
+  //   SVG 렌더러가 심은 폰트를 무시하고 시스템 폰트로 그린다(Windows 는 한글 폰트가 가려
+  //   줬지만 배포 리눅스에는 없어 두부가 된다). 그래서 글자를 **윤곽선(path)** 으로 굽는다.
+  it("★★ 글자가 윤곽선이다 — <text> 없이 path + data-text 만 있다", () => {
+    const s = svg(2);
+    expect(s, "폰트 시스템에 기대는 <text> 가 남았다").not.toMatch(/<text[\s>]/);
+    expect(s).toContain("data-text=");
+    expect(s, "죽은 처방(@font-face)이 돌아왔다").not.toContain("@font-face");
   });
 
   it("★ 꺾쇠·앰퍼샌드가 SVG 를 깨뜨리지 않는다", () => {
