@@ -1,4 +1,4 @@
-# 이어서 할 일 — `feat/reel-cut-r2v` (2026-09-01 기준 · **네 번째 갱신**)
+# 이어서 할 일 — `feat/reel-cut-r2v` (2026-09-02 저녁 기준 · **다섯째 갱신**)
 
 이 문서는 **다음 세션이 이 브랜치를 그대로 이어받기 위한 것**이다.
 사실은 코드가 진실의 원천이다. 여기 적힌 것과 코드가 어긋나면 코드를 믿고 이 문서를 고쳐라.
@@ -19,7 +19,7 @@
 | 배포 | **프로덕션 라이브 `2jhi19mik`**(09-02 저녁 · `dpl_9Bo5aGPAdedSDBCvg7H2TYiYS8pC` · 코드 `d32daa0`). `/login`·`/archive` 200 · 로그의 deploymentId 전환 실측. 이 날 배포 넷: `ju8okg74p`(비용표) → `q9ahk21if`(max_tokens) → `db4m9knyf`(재시도금지·failure배선) → 이것(보드 전체·수거 복구·자동재시도 제거·프롬프트) |
 | ★ 정식 도메인 | **`https://fixup-shortform-service.vercel.app`** 다. `vercel deploy` 가 찍어 주는 `...-ju8okg74p-fix-up1.vercel.app` 쪽은 **Deployment Protection(SSO)에 걸려 전부 302** 라 검증에 쓰면 안 된다 — 09-02 에 한 번 속았다 |
 | 미배포 | **없다** — HEAD 가 곧 프로덕션이다(이 문서 커밋만 그 뒤) |
-| 푸시 | **미푸시 0** — `fixup`·`origin` 브랜치가 둘 다 HEAD 와 같다. ⚠️ 09-02 에 `git push origin` 이 **자격증명 대기로 3분 매달렸다** — 아래 ★줄의 계정 실은 URL 로 우회했다. `GIT_TERMINAL_PROMPT=0` 을 걸면 매달리지 않고 바로 실패한다 |
+| 푸시 | **미푸시 0**(서버 실측 — ls-remote 로 확인). ⚠️ **URL 로 직접 푸시하면 로컬 추적 ref(`origin/...`)가 안 움직인다** — `rev-list origin/..`가 '미푸시 23'이라는 **착시**를 낸다(09-02 실측). 정정: `git fetch <URL> <브랜치>:refs/remotes/origin/<브랜치>`. ⚠️ 09-02 에 `git push origin` 이 **자격증명 대기로 3분 매달렸다** — 아래 ★줄의 계정 실은 URL 로 우회했다. `GIT_TERMINAL_PROMPT=0` 을 걸면 매달리지 않고 바로 실패한다 |
 | ⚠️ **main 이 뒤에 있다** | `fixup/main` = `8dab3ce`(HEAD 가 **27커밋 앞**) · `origin/main` = `d1ae550`(HEAD 가 **204커밋 앞**). 즉 **두 원격의 main 도 서로 다르다** — `origin/main` 은 `fixup/main` 의 조상이라 갈라진 것은 아니고 **177커밋 뒤처진 것**이다. 이 회차에는 브랜치만 밀었다. **main 병합·푸시는 사장님이 지시할 때만** 한다 |
 | ⚠️ 배포 함정 | **`.vercel` 폴더가 이 워크트리에 없다.** 그래서 `--project` 를 **반드시** 준다 — 안 주면 폴더 이름으로 새 프로젝트를 만든다(팀에 `step-gate` 라는 **실수로 생긴 프로젝트**가 그 증거다) |
 | ★ origin 푸시 | `origin` 은 URL 에 계정이 안 박혀 있다. 이 회차에는 `git push origin <브랜치>` 가 그냥 통과했지만, 자격증명 대기로 멈추면 계정을 실어라: `git push https://jaechanyoon0519-Fixup@github.com/FixUp-system/Fixup-shortform.git <브랜치>` |
@@ -518,6 +518,27 @@ Anthropic 이 비스트리밍에 권고하는 기본값이고 `lib/llm.js` 가 �
 실사(photo)에 `hyper-realistic detail, lifelike movement`(natural 은 film 과 겹쳐 회피).
 효과 미측정(유료 생성이라 다음 실편에서).
 
+### 저녁 마무리분 (7d4db0f · d32daa0)
+
+- **우측 하단 FixUp 로고**(`public/board-logo.png`, 폭 7%). ⚠️ **원본(dnc.png)이 150×91px
+  뿐이라 화질 한계** — 사장님이 고해상도(SVG/500px+)를 주면 파일만 갈아끼우면 된다.
+- **③이미지의 보드가 고정 배치**가 됐다(토글 제거 — "그냥 고정 이미지로"). 라우트 60초
+  캐시가 반복 로드를 던다. "접혀 있다"·"내려받기는 접힘 밖" 옛 판은 뒤집거나 걷었다.
+- 보드 배치 최종: **카드 최대화**(5컷 9:16 = 3+2 두 줄 505px) · 줄 사이는 기본 간격 ·
+  잉여는 위아래 반씩 · 보드·그림 모두 정확히 영상 비율. (하루에 지시가 다섯 번 진동했다 —
+  다시 바꿀 때는 어느 지시를 뒤집는지 커밋에 적을 것.)
+
+### 다음 세션이 먼저 볼 것 (09-02 저녁 기준)
+
+1. **max_tokens 16000 라이브 확인(0원)** — 시나리오 성공 한 번 뒤 원장 `meta.duration` 의
+   출력 토큰을 읽어 여유를 잰다(§10). 아직 성공 실측이 없다.
+2. **수거 복구 라이브 확인** — 보관함 열기만으로 걷히는지(§12). 화장품 편(1990a4da)이
+   첫 표본이 된다: 열면 초상 거절 안내가 떠야 정상.
+3. **"얼굴 낮춰 다시 굽기" 수동 버튼** — 미결. retryOneShotWithoutFaces 가 대기 중
+   (자동 호출 금지). 사장님 결정 필요.
+4. **로고 고해상도 교체** — 사장님이 파일 주기로 함.
+5. failureFromResponse 나머지 화면 6개(§11) · effort 측정(§10) · 옛 잃은 편 수동 복구
+   (fal requestId 필요, §12).
 ### 초상 거절 — **자동 재시도를 걷어냈다** (사장님 지시 뒤집힘)
 
 화장품 편(1990a4da)에서 fal 응답을 직접 열어 **422 초상 거절 확정**(person 사진 → 판의
