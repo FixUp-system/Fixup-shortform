@@ -40,12 +40,24 @@ describe("보드 배치 — 비율이 정한다", () => {
     }
   });
 
-  it("★★ 위아래 여백이 없다 — 격자가 세로를 꽉 채운다(자투리는 좌우로)", () => {
+  // ★ 2026-09-02 후속 지시("비율 유지하고 이미지 컷 자체 크기를 키우면 안 돼?") — 계약이
+  //   "세로 꽉 채움"에서 **카드 최대화 + 공백 균등 분배**로 바뀌었다. 9:16 5컷이 2열
+  //   445px(꽉 참)에서 3열 505px(위·아래 221px 균등)로 커진 것이 그 값이다.
+  it("★★ 카드가 최대다 — 5컷 9:16 이 두 줄(3+2)에 500px 를 넘는다", () => {
+    const L = boardLayout(5, "9:16");
+    expect(L.cols).toBe(3);
+    expect(L.rows).toBe(2);
+    expect(L.card.w).toBeGreaterThan(500);
+  });
+
+  it("★★ 남는 공백은 위·줄 사이·아래에 **똑같이** 나뉜다 — 한 덩어리로 몰리면 빈 자리로 보인다", () => {
     for (const [n, aspect] of [[5, "9:16"], [8, "9:16"], [6, "1:1"], [5, "16:9"]]) {
       const L = boardLayout(n, aspect);
-      const gridBottom = L.origin.y + L.rows * L.card.h + (L.rows - 1) * L.gap;
-      expect(L.height - gridBottom, `${aspect} ${n}컷 아래가 빈다`).toBeLessThanOrEqual(L.pad + 2);
-      expect(L.origin.y, `${aspect} ${n}컷 위가 빈다`).toBeLessThanOrEqual(L.pad + L.header.h + 2);
+      const top = L.origin.y - L.pad - L.header.h;
+      const gridBottom = L.origin.y + L.rows * L.card.h + (L.rows - 1) * L.gapY;
+      const bottom = L.height - gridBottom - L.pad;
+      expect(Math.abs(top - bottom), `${aspect} ${n}컷 위아래가 안 맞다`).toBeLessThanOrEqual(2);
+      expect(L.gapY - L.gap - top, `${aspect} ${n}컷 줄 사이 분배가 다르다`).toBeLessThanOrEqual(2);
     }
   });
 
