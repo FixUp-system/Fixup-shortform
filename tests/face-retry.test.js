@@ -246,12 +246,15 @@ describe("수거가 초상 거절을 재시도로 넘긴다", () => {
     expect(reelOf(store.box.doc).status, "실패로 적어 버렸다").not.toBe("error");
   });
 
-  it("★★ 다른 실패는 예전 그대로다 — 재시도를 안 부른다", async () => {
+  // ★ 2026-09-02 — 표본을 (500)→(422)로 바꿨다. 5xx 는 이제 **일시 오류**라 접수증을
+  //   지키고 물러난다(tests/reel-collect-recovery.test.js 가 그 계약을 잰다) — 이 판이
+  //   재는 것은 "초상이 아닌 **확정** 실패는 재시도 없이 error 로 간다"이므로 확정 표본을 쓴다.
+  it("★★ 초상이 아닌 확정 실패는 예전 그대로다 — 재시도를 안 부른다", async () => {
     const store = makeStore(withJob());
     const retry = vi.fn(async () => ({ retried: true }));
     await collectReelOneShot("p1", "u1", {
       ...store,
-      collectClip: async () => { throw new Error("영상 생성 실패 (500) upstream"); },
+      collectClip: async () => { throw new Error('영상 생성 실패 (422) {"detail":[{"msg":"invalid input"}]}'); },
       retryOneShotWithoutFaces: retry,
     });
     expect(retry).not.toHaveBeenCalled();

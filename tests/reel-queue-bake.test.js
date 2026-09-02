@@ -213,9 +213,12 @@ describe("수거 — 화면이 두드릴 때 이어받는다", () => {
     expect(f.d.reel.status).toBe("rendering");
   });
 
-  it("★★ 실패는 error 로 간다 — 성공 자리만 고치고 실패를 흘리면 안 된다", async () => {
+  // ★ 2026-09-02 — 표본을 (500)→(422)로 바꿨다. 5xx·네트워크·429·504 는 이제 **일시
+  //   오류**라 접수증을 지키고 물러난다(fal 에 결과가 살아 있을 수 있다 — 사장님이 실제로
+  //   겪었다). 확정 실패만 error 로 간다. 일시 쪽 계약은 reel-collect-recovery 가 잰다.
+  it("★★ 확정 실패는 error 로 간다 — 성공 자리만 고치고 실패를 흘리면 안 된다", async () => {
     const f = fixture(JOB);
-    await collectReelOneShot("pid", "uid", { ...f, collectClip: async () => { throw new Error("영상 생성 실패 (500)"); } });
+    await collectReelOneShot("pid", "uid", { ...f, collectClip: async () => { throw new Error('영상 생성 실패 (422) {"msg":"invalid"}'); } });
     expect(f.d.reel.status).toBe("error");
   });
 

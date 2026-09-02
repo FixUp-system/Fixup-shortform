@@ -1,5 +1,7 @@
 import { withUser } from "../../../../lib/auth/require-user.js";
 import { getProject, getProjectForViewing, updateProject } from "../../../../lib/projects.js";
+// ★ 줍기(아래 GET 머리말) — 접수증이 남아 있으면 fal 에서 끝난 결과를 걷어 문서에 꽂는다.
+import { collectReelOneShot } from "../../../../lib/reel/pipeline.js";
 // 자막 설정의 되돌리기 규칙은 lib 하나가 쥔다 — 라우트가 다시 적으면 갈린다.
 import { normalizeSubtitle } from "../../../../lib/subtitles.js";
 
@@ -30,10 +32,23 @@ import { normalizeSubtitle } from "../../../../lib/subtitles.js";
 //   ★ 고치는 문(PATCH, 아래)은 **그대로 소유자 전용**이다. 열린 것은 읽기뿐이다.
 export const GET = withUser(async (_req, { params }, user) => {
   const { id } = await params;
-  const viewed = await getProjectForViewing(id, user?.id ?? null);
-  const project = viewed?.doc || null;
+  let viewed = await getProjectForViewing(id, user?.id ?? null);
+  let project = viewed?.doc || null;
   if (!project || project.kind !== "reel") {
     return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
+  }
+  // ★★★ 줍기 — "읽는 문은 안 쓴다"의 **명시적 예외**다(2026-09-02 사장님 신고: 오류로
+  //   멈췄다 이어서 하면 fal 에는 결과물이 있는데 보관함에서는 안 보인다).
+  //   수거가 ⑤영상 상태 라우트에만 걸려 있어서, 보관함으로 바로 가면 아무도 안 걷었다.
+  //   보관함 상세도 이 문을 부르므로(app/archive/[id]/page.js) 여기서 걷으면 양쪽이 산다.
+  //   ★ 새로 만드는 것이 아니다 — 이미 값을 치른 결과를 **줍는** 것이다(fal 호출 0원,
+  //     접수증 없으면 그대로 지나간다). ★ 소유자일 때만 — 남의 편을 손대지 않는다.
+  if (viewed.mine && project.reel?.job?.requestId) {
+    const got = await collectReelOneShot(id, user.id).catch(() => null);
+    if (got?.changed) {
+      viewed = (await getProjectForViewing(id, user.id).catch(() => null)) || viewed;
+      project = viewed?.doc || project;
+    }
   }
   return Response.json({ ...project, mine: viewed.mine, editable: viewed.editable });
 }, { guest: true });
