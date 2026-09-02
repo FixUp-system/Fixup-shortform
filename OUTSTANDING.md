@@ -20,7 +20,7 @@
 | ★ 정식 도메인 | **`https://fixup-shortform-service.vercel.app`** 다. `vercel deploy` 가 찍어 주는 `...-ju8okg74p-fix-up1.vercel.app` 쪽은 **Deployment Protection(SSO)에 걸려 전부 302** 라 검증에 쓰면 안 된다 — 09-02 에 한 번 속았다 |
 | 미배포 | **없다** — HEAD 가 곧 프로덕션이다(이 문서 커밋만 그 뒤) |
 | 푸시 | **미푸시 0**(서버 실측 — ls-remote 로 확인). ⚠️ **URL 로 직접 푸시하면 로컬 추적 ref(`origin/...`)가 안 움직인다** — `rev-list origin/..`가 '미푸시 23'이라는 **착시**를 낸다(09-02 실측). 정정: `git fetch <URL> <브랜치>:refs/remotes/origin/<브랜치>`. ⚠️ 09-02 에 `git push origin` 이 **자격증명 대기로 3분 매달렸다** — 아래 ★줄의 계정 실은 URL 로 우회했다. `GIT_TERMINAL_PROMPT=0` 을 걸면 매달리지 않고 바로 실패한다 |
-| ⚠️ **main 이 뒤에 있다** | `fixup/main` = `8dab3ce`(HEAD 가 **27커밋 앞**) · `origin/main` = `d1ae550`(HEAD 가 **204커밋 앞**). 즉 **두 원격의 main 도 서로 다르다** — `origin/main` 은 `fixup/main` 의 조상이라 갈라진 것은 아니고 **177커밋 뒤처진 것**이다. 이 회차에는 브랜치만 밀었다. **main 병합·푸시는 사장님이 지시할 때만** 한다 |
+| ⚠️ **main 이 뒤에 있다** | `fixup/main` = `8dab3ce`(HEAD 가 **52커밋 앞** — 09-02 밤 재실측) · `origin/main` = `d1ae550`(HEAD 가 **229커밋 앞** — 09-02 밤 재실측). 즉 **두 원격의 main 도 서로 다르다** — `origin/main` 은 `fixup/main` 의 조상이라 갈라진 것은 아니고 **177커밋 뒤처진 것**이다. 이 회차에는 브랜치만 밀었다. **main 병합·푸시는 사장님이 지시할 때만** 한다 |
 | ⚠️ 배포 함정 | **`.vercel` 폴더가 이 워크트리에 없다.** 그래서 `--project` 를 **반드시** 준다 — 안 주면 폴더 이름으로 새 프로젝트를 만든다(팀에 `step-gate` 라는 **실수로 생긴 프로젝트**가 그 증거다) |
 | ★ origin 푸시 | `origin` 은 URL 에 계정이 안 박혀 있다. 이 회차에는 `git push origin <브랜치>` 가 그냥 통과했지만, 자격증명 대기로 멈추면 계정을 실어라: `git push https://jaechanyoon0519-Fixup@github.com/FixUp-system/Fixup-shortform.git <브랜치>` |
 | 개발 서버 | `npx next dev -p 3111` (이 회차에 쓴 포트). `.env.local` 의 `SHOTFORM_DEV_USER` 가 **로그인을 건너뛰고 운영자 신원**을 준다 — 관리자·비용 화면을 그대로 볼 수 있다 |
