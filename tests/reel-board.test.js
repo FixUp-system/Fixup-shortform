@@ -246,8 +246,8 @@ describe("화면·라우트 배선", () => {
     // 한 주소로 겸할 수 없다 — `attachment` 를 늘 붙이면 <img> 가 아무것도 못 그린다
     // (2026-09-02, 화면을 실제로 열어 보고 알았다. 판도 빌드도 그때 그린이었다).
     expect(page, "미리보기가 내려받기 주소를 쓴다").toMatch(/<img src=\{`\/api\/reel\/\$\{id\}\/board`\}/);
-    // ★ 펼쳤을 때만 붙인다 — lazy 로는 접힌 details 안에서 요청조차 안 갔다.
-    expect(page, "접힌 채로도 그린다").toContain("boardOpen && <img");
+    // ★ 2026-09-02 — 토글을 걷어냈다(사장님: "그냥 고정 이미지로"). 항상 붙는다.
+    expect(page, "토글이 남아 있다").not.toContain("boardOpen");
     expect(page, "내려받기가 download 인자를 안 준다").toMatch(/\/board\?download=1`\}[^>]*download/);
     expect(route, "라우트가 그 인자를 안 본다").toContain('searchParams.has("download")');
   });

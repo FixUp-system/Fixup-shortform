@@ -34,11 +34,6 @@ export default function ReelImagesPage() {
   // ★ 사장님이 한국어로 적는 수정 요청. 보낸 뒤에는 비운다 — 남아 있으면 다음에
   //   또 누를 때 같은 요청이 두 번 실린다(②시나리오와 같은 처방).
   const [note, setNote] = useState("");
-  // ★★ 보드는 **펼쳤을 때만** 그린다. loading="lazy" 로 미루려 했더니 접힌 <details>
-  //   안에서는 브라우저가 요청조차 안 해(currentSrc null) 펼쳐도 빈 칸이었다
-  //   (2026-09-02, 화면을 실제로 열어 보고 알았다). 붙였다 뗐다 하는 편이 확실하다 —
-  //   접힌 채로는 굽는 값을 안 치르고, 펼치면 반드시 뜬다.
-  const [boardOpen, setBoardOpen] = useState(false);
 
   const reel = reelOf(project);
   const cuts = project?.cuts || [];
@@ -193,16 +188,17 @@ export default function ReelImagesPage() {
           ★★ **모델에 가는 r2v 격자는 그대로다** — 만드는 방식도 각인도 안 바뀌었다.
             그 원본은 ④프롬프트·⑤영상에서 여전히 그대로 보인다(거기서는 그것이 본문이다).
           ★ 보드는 그 자리에서 그린다(저장하지 않는다) — 컷을 고치면 다음에 열 때 최신이다.
-          ★ 그림은 **펼쳤을 때만** 붙인다(boardOpen) — 접힌 채로는 굽는 값을 안 치른다. */}
+          ★ 항상 그린다(2026-09-02 사장님: 고정 이미지) — 라우트가 60초 캐시로 반복 로드를 던다. */}
+      {/* ★★★ 2026-09-02 — 보드는 **고정 이미지**다(사장님 지시: "토글로 되어 있는데 그냥
+          고정 이미지로 배치해줘"). 접었다 펴던 details 를 걷어냈다 — 화면을 열면 바로 보인다.
+          ★ 모델에 가는 r2v 격자는 그대로다. 원본은 ④프롬프트·⑤영상에서 여전히 보인다.
+          ★ 보드는 그 자리에서 그린다(저장 안 함, 0원) — 컷을 고치면 다음 로드가 최신이다. */}
       {sheetUrl && (
         <div className="sheet-block">
-          <details className="lib-fold sheet-foldable" onToggle={(e) => setBoardOpen(e.currentTarget.open)}>
-            <summary>스토리보드 한 장 보기</summary>
-            <div className="sheet-view sheet-view--sm">
-              {boardOpen && <img src={`/api/reel/${id}/board`} alt="스토리보드" />}
-              {drawingNow && <div className="frame-busy"><span className="spinner" aria-hidden="true" /></div>}
-            </div>
-          </details>
+          <div className="sheet-view sheet-view--sm">
+            <img src={`/api/reel/${id}/board`} alt="스토리보드" />
+            {drawingNow && <div className="frame-busy"><span className="spinner" aria-hidden="true" /></div>}
+          </div>
           <div className="panel-act">
             <a className="mini" href={`/api/reel/${id}/board?download=1`} download>전체 내려받기</a>
           </div>
