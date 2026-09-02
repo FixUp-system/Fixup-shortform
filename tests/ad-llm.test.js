@@ -231,7 +231,34 @@ describe("⑥ stop_reason 거절 처리", () => {
     expect(fetch.calls.length).toBe(1);
   });
 
-  it("max_tokens 로 잘리면(파싱 실패) 재시도하지, 거절로 취급하지 않는다", async () => {
+  // ★★★ 2026-09-02 — **이 판은 뒤집힌 것이다.**
+  //
+  // 그전에는 "max_tokens 로 잘리면 재시도한다" 를 못 박고 있었다. 그런데 그 재시도는
+  // **고쳐지지 않는 것을 한 번 더 사는 일**이었다 — 입력도 상한도 그대로라 두 번째도
+  // 같은 자리에서 잘린다. 프로덕션 실측(프로젝트 5ddea7b7)에서 잘린 호출이 10회 쌓여
+  // **$3.25** 가 그렇게 나갔다. 그래서 잘린 것은 재시도하지 않고 사장님에게 말한다.
+  it("★ max_tokens 로 잘려 파싱이 깨지면 **재시도하지 않고** 사장님 말로 던진다", async () => {
+    const fetch = spyFetch(anthropicFetch({ stopReason: "max_tokens", text: '{"text":"짤린 j' }));
+    await expect(
+      runWithActor(A, () => callJson({ system: "s", messages: [], fetchImpl: fetch, apiKey: "k" }))
+    ).rejects.toThrow(/잘렸어요/);
+    // 값을 두 배로 치르지 않는다 — 이것이 이 판의 요점이다.
+    expect(fetch.calls.length).toBe(1);
+  });
+
+  // ★ 순서가 계약이다 — **파싱을 먼저** 해 본다. 상한에 닿았다는 것과 결과가 깨졌다는 것은
+  //   다른 사실이고, 우연히 JSON 이 완결됐으면 그것은 멀쩡한 결과다.
+  it("★ 상한에 닿았어도 JSON 이 완결됐으면 정상으로 돌려준다", async () => {
+    const fetch = spyFetch(anthropicFetch({ stopReason: "max_tokens" }));
+    const out = await runWithActor(A, () =>
+      callJson({ system: "s", messages: [], fetchImpl: fetch, apiKey: "k" })
+    );
+    expect(out.text).toContain("앰플");
+    expect(fetch.calls.length).toBe(1);
+  });
+
+  // ★ 잘림과 "형식을 틀림" 을 같이 다루면 안 된다 — 후자는 다시 부르면 다른 답이 나온다.
+  it("★ 잘린 것이 아닌 파싱 실패는 **그대로 재시도한다**", async () => {
     let i = 0;
     const fetchImpl = async () => {
       i++;
@@ -239,8 +266,8 @@ describe("⑥ stop_reason 거절 처리", () => {
         ok: true,
         json: async () => ({
           model: CLAUDE_MODEL,
-          content: [{ type: "text", text: i === 1 ? '{"text":"짤린 j' : '{"text":"ok","shots":[]}' }],
-          stop_reason: i === 1 ? "max_tokens" : "end_turn",
+          content: [{ type: "text", text: i === 1 ? "깨짐{" : '{"text":"ok","shots":[]}' }],
+          stop_reason: "end_turn",
           usage: { input_tokens: 1, output_tokens: 1 },
         }),
       };

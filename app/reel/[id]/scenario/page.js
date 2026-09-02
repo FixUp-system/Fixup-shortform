@@ -19,6 +19,9 @@ import { scenarioLock } from "../../../../lib/reel/doc";
 import ReelBack from "../../../../components/ReelBack";
 import { reelNarration, narrationLimit } from "../../../../lib/reel/narration";
 import { speechLangOf } from "../../../../lib/subtitle-langs";
+// ★ 실패를 사장님 말로 옮기는 자리는 lib/failure.js 하나다 — 화면이 문구를 손으로 적으면
+//   그 화면만 다른 말을 하게 된다(2026-09-02: 504 가 "시나리오를 만들지 못했어요" 로 뭉개졌다).
+import { failureFromResponse } from "../../../../lib/failure";
 
 export default function ReelScenarioPage() {
   const { id } = useParams();
@@ -53,8 +56,10 @@ export default function ReelScenarioPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(note.trim() ? { note: note.trim() } : {}),
     });
+    // ★ 본문이 JSON 이 아닐 수 있다 — 함수가 시간으로 죽으면 Vercel 이 504 에 HTML 을 준다.
+    //   그때 빈 객체가 되고, 아래 판정기가 **상태 코드로** 사유를 짓는다.
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) { setErr(data.error || "시나리오를 만들지 못했어요"); setBusy(false); return; }
+    if (!res.ok) { setErr(failureFromResponse(res.status, data).message); setBusy(false); return; }
     // ★ 응답이 전체 문서가 아니다(위 머리말) — 다시 읽어야 최신 project 가 된다.
     await reload(id).catch((e) => setErr(e.message));
     setNote("");
