@@ -9,7 +9,7 @@
 //   열 수를 표로 박지 않고 **기하로 고른다** — 목표 비율에 가장 가까워지는 열 수를 고르면
 //   9:16 은 자연히 적은 열, 16:9 는 많은 열이 된다. 표로 박으면 컷 수가 바뀔 때 어긋난다.
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { boardLayout, boardSvg, paletteFor, accentFrom, MIN_CARD_W } from "../lib/reel/board.js";
 
 const cut = (idx, over = {}) => ({
@@ -260,6 +260,15 @@ describe("화면·라우트 배선", () => {
 
   it("★ 굽는 시간이 배포 기본값에 안 잘린다", () => {
     expect(route).toMatch(/maxDuration\s*=\s*\d+/);
+  });
+});
+
+describe("로고", () => {
+  it("★ 우측 하단 로고 — 파일이 저장소에 있고 drawBoard 가 그것을 읽는다", () => {
+    // 다운로드 폴더를 읽으면 로컬에서만 돌고 배포에서 조용히 사라진다.
+    expect(existsSync("public/board-logo.png"), "로고 파일이 저장소에 없다").toBe(true);
+    const board = readFileSync("lib/reel/board.js", "utf8");
+    expect(board).toContain("public/board-logo.png");
   });
 });
 
