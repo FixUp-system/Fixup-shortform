@@ -10,7 +10,7 @@
 //   9:16 은 자연히 적은 열, 16:9 는 많은 열이 된다. 표로 박으면 컷 수가 바뀔 때 어긋난다.
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { boardLayout, boardSvg, MIN_CARD_W } from "../lib/reel/board.js";
+import { boardLayout, boardSvg, paletteFor, accentFrom, MIN_CARD_W } from "../lib/reel/board.js";
 
 const cut = (idx, over = {}) => ({
   idx,
@@ -140,6 +140,59 @@ describe("보드 SVG — 무엇이 실리나", () => {
 
   it("컷이 없어도 SVG 를 낸다", () => {
     expect(boardSvg({ project: project(), cuts: [], layout: boardLayout(0, "9:16") })).toContain("<svg");
+  });
+});
+
+
+// ★★ 포인트 색은 **영상에서 나온다**(2026-09-02 사장님 선택 — 2번안).
+//   규칙: **색상(hue)은 영상이, 명도·채도는 판이** 정한다 — 흰 글자가 항상 설 수 있는
+//   어두운 범위로 죈다. 바탕·카드는 중립을 지킨다(어떤 색이 뽑혀도 판이 안 깨지게).
+describe("포인트 색 — 영상에서 나온다", () => {
+  const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+
+  it("영상이 없으면(추출 실패) 기준 판 그대로다 — 레퍼런스의 초록", () => {
+    const p = paletteFor(null);
+    expect(p.green).toBe("#2F5D3F");
+    expect(p.bg).toBe("#F5F1E6");
+  });
+
+  it("★★ 따뜻한 영상이면 포인트가 따뜻해진다 — 색상은 영상을 따른다", () => {
+    const p = paletteFor({ r: 214, g: 138, b: 60 }); // 노을 앰버
+    expect(p.green).not.toBe("#2F5D3F");
+    const [r, g, b] = hexRgb(p.green);
+    expect(r, "앰버 색상이 안 살았다").toBeGreaterThan(g);
+    expect(g).toBeGreaterThan(b);
+  });
+
+  it("★★ 어떤 색이 뽑혀도 흰 글자가 선다 — 명도는 판이 죈다", () => {
+    for (const rgb of [{ r: 250, g: 240, b: 120 }, { r: 40, g: 60, b: 200 }, { r: 220, g: 40, b: 40 }]) {
+      const [r, g, b] = hexRgb(paletteFor(rgb).green);
+      const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+      expect(lum, `${JSON.stringify(rgb)} 의 포인트가 너무 밝다`).toBeLessThan(0.35);
+    }
+  });
+
+  it("무채색 영상은 기준 판으로 떨어진다 — 잿빛의 색상값은 소음이다", () => {
+    expect(paletteFor({ r: 128, g: 128, b: 131 }).green).toBe("#2F5D3F");
+  });
+
+  it("★ 바탕·카드·테두리는 영상과 무관하게 중립이다", () => {
+    const p = paletteFor({ r: 214, g: 138, b: 60 });
+    const base = paletteFor(null);
+    for (const k of ["bg", "card", "line", "divider", "imgSlot"]) expect(p[k]).toBe(base[k]);
+  });
+
+  it("accentFrom 은 가장 진한(채도 높은) 색을 고른다 — 평균은 진흙이 된다", () => {
+    const amber = { r: 214, g: 138, b: 60 };
+    expect(accentFrom([{ r: 120, g: 120, b: 122 }, amber, { r: 90, g: 95, b: 100 }])).toEqual(amber);
+    expect(accentFrom([{ r: 128, g: 128, b: 128 }])).toBe(null);
+    expect(accentFrom([])).toBe(null);
+  });
+
+  it("★ boardSvg 가 그 판을 실제로 쓴다 — 만들기만 하고 안 꽂으면 아무 일도 없다", () => {
+    const p = paletteFor({ r: 214, g: 138, b: 60 });
+    const s2 = boardSvg({ project: project(), cuts: cuts(2), layout: boardLayout(2, "9:16"), palette: p });
+    expect(s2).toContain(p.green);
   });
 });
 
