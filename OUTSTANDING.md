@@ -14,9 +14,9 @@
 | | |
 |---|---|
 | 워크트리 | `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` |
-| 브랜치 | `feat/reel-cut-r2v` · 코드 HEAD **`c484d91`** (09-02, 이 문서 커밋이 그 위에 하나 더 얹힌다) |
-| 테스트 | **5,557 그린** (10 skipped) — `npx vitest run` · `npx next build` 통과 |
-| 배포 | **프로덕션 라이브 `q9ahk21if`**(2026-09-02 · `dpl_BD1gxB3EizCFUmumSWZKsqsFiqTE` · 코드 `c484d91`). 확인: `/login` **200** · `/archive` **200** · 프로덕션 로그의 `deploymentId` 가 이 배포로 바뀐 것까지 **실측**. 그 앞 배포는 `ju8okg74p`(코드 `708c0db`, 모드 카드 분리 — CSS 번들에서 규칙 확인했다) |
+| 브랜치 | `feat/reel-cut-r2v` · 코드 HEAD **`bfdfdf9`** (09-02, 이 문서 커밋이 그 위에 하나 더 얹힌다) |
+| 테스트 | **5,565 그린** (10 skipped) — `npx vitest run` · `npx next build` 통과 |
+| 배포 | **프로덕션 라이브 `db4m9knyf`**(2026-09-02 · `dpl_6FJfcVVwHP2P6Zf11U9XNX2LzRMp` · 코드 `bfdfdf9`). 확인: `/login` **200** · `/archive` **200** · 프로덕션 로그의 `deploymentId` 가 이 배포로 바뀐 것까지 **실측**. 이 회차의 앞선 배포 둘: `q9ahk21if`(코드 `c484d91`, max_tokens 16000) · `ju8okg74p`(코드 `708c0db`, 모드 카드 분리) |
 | ★ 정식 도메인 | **`https://fixup-shortform-service.vercel.app`** 다. `vercel deploy` 가 찍어 주는 `...-ju8okg74p-fix-up1.vercel.app` 쪽은 **Deployment Protection(SSO)에 걸려 전부 302** 라 검증에 쓰면 안 된다 — 09-02 에 한 번 속았다 |
 | 미배포 | **없다** — 코드 HEAD 가 곧 프로덕션이다(이 문서 커밋만 그 뒤에 있다) |
 | 푸시 | **미푸시 0** — `fixup`·`origin` 브랜치가 둘 다 `708c0db` 다. ⚠️ 09-02 에 `git push origin` 이 **자격증명 대기로 3분 매달렸다** — 아래 ★줄의 계정 실은 URL 로 우회했다. `GIT_TERMINAL_PROMPT=0` 을 걸면 매달리지 않고 바로 실패한다 |
@@ -432,17 +432,55 @@ cd <빈폴더> && npx vercel deploy --prod --yes --project fixup-shortform-servi
 Anthropic 이 비스트리밍에 권고하는 기본값이고 `lib/llm.js` 가 이미 쓰던 값이다 —
 **같은 성격의 값이 두 벌이었고 낮은 쪽이 터졌다.**
 
-> ⚠️ **급한 불만 껐다**(사장님 지시 — 사용자가 기다리는 중). 남은 숙제 둘:
-> ① **사고 깊이(`output_config.effort`)로 조절**하는 쪽이 근본일 수 있다 — 시나리오처럼
->    정형 JSON 을 뽑는 일은 `medium` 이면 사고가 짧아져 값도 내려간다. **사장님이 검토 예정.**
-> ② **`max_tokens` 로 잘렸으면 재시도하지 마라** — `RETRYABLE_STOP` 이 `max_tokens` 를
->    담고 있어 같은 실패를 두 번 산다(회당 **$0.65**). 사장님에게 "소재가 길어 잘렸어요" 로
->    말하는 편이 맞다.
+> ✅ **②는 그 뒤 고쳤다**(`bfdfdf9` · 아래 §11).
+> ⚠️ **남은 숙제 — 사고 깊이(`output_config.effort`)**. 시나리오처럼 정형 JSON 을 뽑는 일은
+>    `medium` 이면 사고가 짧아져 값도 내려간다. **다만 effort 는 Anthropic 이 "품질을
+>    맞바꾸는 레버" 라고 명시한 값이라 재고 정해야 한다** — 재는 도구가 이미 있다:
+>    `node scripts/measure/scenario.mjs 3 15`(규칙 위반율·장면 분포, **fal 미호출**).
+>    `high`(지금, 기본값) 와 `medium` 의 위반율을 대조한다. **사장님이 검토 예정.**
 > ⚠️ **아직 라이브로 한 번도 성공을 못 봤다** — 배포는 됐고 테스트·빌드는 그린이지만,
 >    실제 생성이 16000 안에서 끝나는 것은 **다음 회차에 눈으로 확인**해야 한다.
+>    ★ 확인은 **0원**이다 — 성공 한 번 뒤 원장(`cost_records.meta.duration`)의 출력 토큰을
+>      읽으면 여유가 얼마나 되는지 그대로 보인다(4096 에 붙어 있던 자리다).
 
 **검증**: `npx vitest run` **5,557 그린** · `npx next build` 통과 · 프로덕션 로그의
 `deploymentId` 가 `dpl_BD1gxB3E…` 로 바뀐 것 확인.
+
+## 11. 09-02 — 잘린 응답은 재시도하지 않고, 실패를 사장님 말로 옮긴다 (`bfdfdf9` · **배포됨**)
+
+§10 이 남긴 숙제 ②를 닫았다. 두 가지를 같이 고쳤다.
+
+### ① `max_tokens` 로 잘렸으면 재시도하지 않는다 (`lib/ad/llm.js`)
+
+입력도 상한도 그대로라 **두 번째도 같은 자리에서 잘린다** — 고쳐지지 않는 것을 한 번 더
+사는 일이었다(실측: 잘린 호출 10회 $3.25). 이제 *"소재가 길어 시나리오가 중간에 잘렸어요"*
+로 바로 말한다.
+
+**지킨 순서 둘** — 다음에 이 자리를 고칠 때 깨지 말 것:
+- **파싱을 먼저 해 본다.** 상한에 닿았어도 JSON 이 완결됐으면 그것은 멀쩡한 결과다.
+- **잘린 것과 "형식을 틀린 것" 을 가른다.** 후자는 다시 부르면 다른 답이 나오므로 **그대로
+  재시도한다.** 둘을 같이 다루면 고칠 수 있는 실패까지 포기하게 된다.
+
+★ `RETRYABLE_STOP` → **`NOT_REFUSAL_STOP`** 으로 이름을 고쳤다. 그 집합이 가르는 것은 이제
+"거절인가 아닌가" 하나뿐이고 재시도 여부는 파싱 자리가 정한다 — 이름이 거짓말을 하지 않게 했다.
+
+### ② 실패를 사장님 말로 옮긴다 (`lib/failure.js` · ②시나리오 화면)
+
+화면들이 `data.error || "고정 문구"` 를 손으로 적고 있어서 **본문이 JSON 이 아닐 때 아무
+정보도 안 남았다.** 함수가 시간으로 죽으면 Vercel 이 **504 에 HTML** 을 주고 `res.json()` 이
+실패해 빈 객체가 되고, 화면에는 "시나리오를 만들지 못했어요" 만 떴다 — 정작
+`classifyFailure` 에 **`504 → "만드는 데 너무 오래 걸렸어요"` 갈래가 이미 있었는데** 거기까지
+못 갔다.
+
+**`failureFromResponse(status, body)`** 를 더했다. 서버가 준 말이 있으면 **그 말이 이기고**,
+없을 때만 상태 코드로 짓는다(`(NNN)` 꼴 — 아래 판정기가 읽는 규약을 두 벌로 안 만든다).
+
+> ⚠️ **배선한 것은 ②시나리오 화면 하나다.** 같은 모양(`data.error || "…"`)이 남은 화면들:
+> `app/ads/new` · `app/ads/[id]` · `app/create` · `app/create/[id]/images` · `app/film/new` ·
+> `app/film/one/[mode]`. 사고가 난 자리부터 옮겼다 — **나머지는 남은 일이다.**
+
+**검증**: `npx vitest run` **5,565 그린**(+8) · `npx next build` 통과 · 프로덕션 로그의
+`deploymentId` 가 `dpl_6FJfcVVwHP2P6Zf…` 로 바뀐 것 확인.
 
 ## 8. 세션을 마칠 때
 
