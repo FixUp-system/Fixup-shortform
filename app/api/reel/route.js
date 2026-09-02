@@ -4,8 +4,8 @@ import { ownedPhotoKeys } from "../../../lib/refs-io.js";
 import { withUser } from "../../../lib/auth/require-user.js";
 import { MAX_PHOTOS, isPhotoRole } from "../../../lib/photos.js";
 import { MAX_MATERIAL_TEXT } from "../../../lib/material.js";
-import { DEFAULT_I2V_MODEL, isResolutionFor, secondsForModel, isReelModel } from "../../../lib/clip-limits.js";
-import { tierOf, tierAllowsModel } from "../../../lib/tiers.js";
+import { DEFAULT_I2V_MODEL, isResolutionFor, secondsForModel, isReelModel, reelAllowsModel } from "../../../lib/clip-limits.js";
+import { tierOf } from "../../../lib/tiers.js";
 import { getStore } from "../../../lib/store/index.js";
 import { normalizeAdOptions } from "../../../lib/ad/options.js";
 import { normalizeReelConcept } from "../../../lib/reel/concepts.js";
@@ -46,8 +46,16 @@ export const POST = withUser(async (req, _ctx, user) => {
   if (!isReelModel(model)) {
     return Response.json({ error: "그 모델은 아직 쓸 수 없어요" }, { status: 400 });
   }
+  // ★★★ 2026-09-02 — **단계별 표로 판정한다**(reelAllowsModel). 그전에는 원클릭의
+  //   tierAllowsModel 을 썼는데 그것은 AD_MODELS 를 거른다 — 08-31 에 2.0 을 원클릭에서
+  //   은퇴시키자(`hidden: true`) 그 표시가 단계별까지 막았고, 은퇴 표시는 등급·역할보다
+  //   강해서 관리자도 못 뚫었다. 09-01 에 단계별 기본이 2.0 이 되면서 **아무도 단계별
+  //   영상을 못 만들었다**(기본값 그대로 두면 곧바로 403).
+  // ★ 관리자는 등급을 안 탄다 — 원클릭 세 라우트(ads/route·ads/[id]/route·render)와 같은 축.
+  //   선언이 게이트보다 **위**에 있어야 한다(const 의 사각지대 — ads/route.js 의 그 주석).
+  const admin = user.role === "admin";
   const tier = tierOf((await getStore().findProfiles([user.id])).get(user.id));
-  if (!tierAllowsModel(tier, model)) {
+  if (!reelAllowsModel(tier, model, { admin })) {
     return Response.json({ error: "이 모델은 프로 등급부터 쓸 수 있어요" }, { status: 403 });
   }
 

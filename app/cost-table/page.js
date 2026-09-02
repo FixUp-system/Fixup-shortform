@@ -4,6 +4,10 @@
 //   두 장부가 단위부터 다르다(CLAUDE.md 의 "장부가 둘이고 단위가 다르다") — 여기서
 //   크레딧을 함께 보여 주면 그 둘이 섞여 읽힌다. 그래서 이 화면은 **달러와 원화만** 말한다.
 //
+// ★★★ 2026-09-02 — **모드별로 가른다**(사장님 지시: "비용테이블도 갱신해줘 각 모드별로").
+//   그전에는 조합이 이 파일 안에 손으로 적힌 세 줄(ROWS)이었고 **단계별만** 담고 있었다.
+//   이제 조합은 lib/cost-table.js 가 각 모드의 원천 표에서 뽑고, 이 화면은 **그리기만** 한다.
+//
 // ★★ **서버 컴포넌트다**("use client" 가 없다). 값을 lib/costs.js 의 estimateCost 한
 //   자리에서 뽑기 때문이다 — 그 파일은 store·actor 를 끌어 화면이 import 할 수 없다.
 //   표를 여기 손으로 적으면 단가가 바뀌는 날 이 화면만 낡는다(이 저장소가 "값이 두 벌이면
@@ -14,6 +18,7 @@
 export const dynamic = "force-dynamic";
 
 import { estimateCost } from "../../lib/costs.js";
+import { costTableSections } from "../../lib/cost-table.js";
 
 // ★★ 환율은 **상수 + 기준일**이다(2026-08-25 00:02 UTC · open.er-api.com).
 //   런타임에 외부 환율 API 를 부르지 않는 이유: 이 화면 하나 때문에 바깥 서비스에
@@ -22,31 +27,25 @@ import { estimateCost } from "../../lib/costs.js";
 const USD_KRW = 1383.12;
 const RATE_AT = "2026-08-25";
 
-// 보여 줄 조합 — 각 모델이 실제로 여는 길이·화질만 적는다(lib/clip-limits.js 의
-// secondsForModel · resolutionsForModel 이 화면에서 여는 것과 같은 조합이다).
-const ROWS = [
-  { model: "Seedance 2.0", tier: "기본", ep: "bytedance/seedance-2.0/reference-to-video", seconds: 15, resolutions: ["480p", "720p", "1080p"] },
-  { model: "Seedance 2.5", tier: "프로", ep: "bytedance/seedance-2.5/reference-to-video", seconds: 15, resolutions: ["480p", "720p"] },
-  { model: "Seedance 2.5", tier: "프로", ep: "bytedance/seedance-2.5/reference-to-video", seconds: 30, resolutions: ["480p", "720p"] },
-];
-
-// 스토리보드는 **한 장**이다 — 컷이 몇 개든 격자 한 장에 다 그린다(lib/reel/storyboard.js).
-// 그래서 이미지값은 길이·컷 수와 무관하게 편당 한 번이다.
-const IMAGE_ENDPOINT = "openai/gpt-image";
-const IMAGE_QUALITY = "high";
-
 const usd = (n) => `$${n.toFixed(2)}`;
 const krw = (n) => `${Math.round(n * USD_KRW).toLocaleString("ko-KR")}원`;
 
+// 모드마다 무엇이 드는지 한 줄로 설명한다 — 합계가 왜 다른 규칙으로 읽히는지가 여기 있다.
+const NOTE = {
+  ad: (
+    <>
+      올려 주신 사진을 그대로 넘겨서 만들어요. 그림을 따로 만들지 않으니 <b>영상값만</b> 들어요.
+    </>
+  ),
+  reel: (
+    <>
+      스토리보드는 컷이 몇 개든 <b>한 장</b>이라 값이 편당 한 번만 들어요. 영상은 길이와 화질이 값을 정해요.
+    </>
+  ),
+};
+
 export default function CostTablePage() {
-  const image = estimateCost(IMAGE_ENDPOINT, 1, IMAGE_QUALITY);
-  const rows = [];
-  for (const r of ROWS) {
-    for (const res of r.resolutions) {
-      const video = estimateCost(r.ep, r.seconds, res);
-      rows.push({ ...r, res, video, total: image + video });
-    }
-  }
+  const sections = costTableSections(estimateCost);
 
   return (
     <>
@@ -56,47 +55,45 @@ export default function CostTablePage() {
         지금은 내부 테스트 단계라 모두가 볼 수 있게 열어 두었어요.
       </p>
 
-      <section className="panel panel--wide">
-        <h2>한 편 만들 때</h2>
-        <p className="pgsub">
-          스토리보드는 컷이 몇 개든 <b>한 장</b>이라 값이 한 번만 들어요. 영상은 길이와 화질이 값을 정해요.
-        </p>
+      {sections.map((s) => (
+        <section className="panel panel--wide" key={s.id}>
+          <h2>{s.label}</h2>
+          <p className="pgsub">{NOTE[s.id]}</p>
 
-        <div className="tablewrap">
-          <table className="costtable">
-            <thead>
-              <tr>
-                <th>모델</th>
-                <th>등급</th>
-                <th>길이</th>
-                <th>화질</th>
-                <th className="num">이미지</th>
-                <th className="num">영상</th>
-                <th className="num">합계</th>
-                <th className="num">원화</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={`${r.model}-${r.seconds}-${r.res}`}>
-                  <td>{r.model}</td>
-                  <td>{r.tier}</td>
-                  <td>{r.seconds}초</td>
-                  <td>{r.res}</td>
-                  <td className="num">{usd(image)}</td>
-                  <td className="num">{usd(r.video)}</td>
-                  <td className="num"><b>{usd(r.total)}</b></td>
-                  <td className="num">{krw(r.total)}</td>
+          <div className="tablewrap">
+            <table className="costtable">
+              <thead>
+                <tr>
+                  <th>모델</th>
+                  <th>길이</th>
+                  <th>화질</th>
+                  {s.hasImage && <th className="num">스토리보드</th>}
+                  <th className="num">영상</th>
+                  <th className="num">합계</th>
+                  <th className="num">원화</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {s.rows.map((r) => (
+                  <tr key={`${r.modelId}-${r.seconds}-${r.resolution}`}>
+                    <td>{r.label}</td>
+                    <td>{r.seconds}초</td>
+                    <td>{r.resolution}</td>
+                    {s.hasImage && <td className="num">{usd(r.image)}</td>}
+                    <td className="num">{usd(r.video)}</td>
+                    <td className="num"><b>{usd(r.total)}</b></td>
+                    <td className="num">{krw(r.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ))}
 
-        <p className="pgsub">
-          환율 1달러 = {USD_KRW.toLocaleString("ko-KR")}원 ({RATE_AT} 기준). 참고용이라 실제 청구 시점의 환율과 달라요.
-        </p>
-      </section>
+      <p className="pgsub">
+        환율 1달러 = {USD_KRW.toLocaleString("ko-KR")}원 ({RATE_AT} 기준). 참고용이라 실제 청구 시점의 환율과 달라요.
+      </p>
     </>
   );
 }

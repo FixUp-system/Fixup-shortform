@@ -115,7 +115,11 @@ export default function ReelNewPage() {
   // ★★ 등급을 **모르는 동안에는 비운다**(2026-08-31). 그전에는 tier 가 undefined 라
   //   모르는 등급 = 기본 등급으로 떨어져 **모델이 기본 하나만** 보였다가, 프로 등급이면
   //   로딩 뒤 늘어났다. 줄과 라벨은 남으므로 레이아웃은 안 흔들린다.
-  const models = ready ? reelModelsForTier(me?.tier) : [];
+  // ★★ 2026-09-02 — **관리자는 등급을 안 타므로 화면도 그 축을 본다**(원클릭의
+  //   AdOptionTray 가 이미 `modelsForTier(tier, { admin })` 으로 넘긴다). 서버만 열어 주면
+  //   운영자가 자기 화면에서 그 모델을 못 고른다.
+  const admin = me?.isAdmin === true;
+  const models = ready ? reelModelsForTier(me?.tier, { admin }) : [];
   const [model, setModel] = useState(DEFAULT_I2V_MODEL);
   // ★ 2026-08-31 — 전역 720p 가 아니라 **그 모델의 기본**이다. 기본이 H3 로 옮겨 가면서
   //   720p 는 목록에 아예 없는 값이 됐다(768P·2K).
