@@ -30,22 +30,18 @@ const project = (aspect = "9:16") => ({
 });
 
 describe("보드 배치 — 비율이 정한다", () => {
-  // ★★ 2026-09-02 — **계약이 바뀌었다**(사장님: "위아래 여백 최소화"). 그전에는 캔버스가
-  //   정확히 영상 비율이었는데, 고정 비율 그림을 앉히면 자투리가 수학적으로 남아 위아래가
-  //   빈다. 이제 세로는 **내용에 맞춰 줄어들 수 있다** — 대신 폭 기준 비율보다 납작해지지
-  //   않고(내용이 짧을 때만 줄어든다), 내용이 더 길면 비율 높이를 그대로 지킨다.
-  it("★★ 캔버스 — 세로는 내용에 맞고, 영상 비율보다 길어지지 않는다", () => {
+  // ★★★ 2026-09-02 최종(사장님 강조 지시) — **보드도 이미지도 정확히 영상 비율**이다.
+  //   같은 날 세로를 내용에 맞춰 줄였다가(위아래 여백 제거) 보드 비율이 깨져 되돌렸다.
+  //   위아래 여백 제거는 유지된다 — 격자가 세로를 꽉 채우고 자투리는 좌우로 간다.
+  it("★★ 캔버스 비율이 **정확히 영상 비율**이다 — 세 비율 모두", () => {
     for (const [aspect, want] of [["9:16", 9 / 16], ["1:1", 1], ["16:9", 16 / 9]]) {
       const L = boardLayout(8, aspect);
-      // 비율 높이를 넘지 않는다(= w/h 가 영상 비율 밑으로 안 내려간다)
-      expect(L.width / L.height, `${aspect} 보드가 영상 비율보다 길다`).toBeGreaterThanOrEqual(want - 0.01);
+      expect(L.width / L.height, `${aspect} 보드가 그 비율이 아니다`).toBeCloseTo(want, 2);
     }
-    // ★ 가로 영상도 내용이 짧으면 줄어든다(8컷 4열이 실제로 그렇다) — 여백 제거가
-    //   비율 보존보다 우선이라는 것이 이 계약의 요점이다. 늘어나는 방향만 막는다.
   });
 
-  it("★★ 위아래 여백이 없다 — 격자가 여백만 남기고 바닥에 닿는다", () => {
-    for (const [n, aspect] of [[5, "9:16"], [8, "9:16"], [6, "1:1"]]) {
+  it("★★ 위아래 여백이 없다 — 격자가 세로를 꽉 채운다(자투리는 좌우로)", () => {
+    for (const [n, aspect] of [[5, "9:16"], [8, "9:16"], [6, "1:1"], [5, "16:9"]]) {
       const L = boardLayout(n, aspect);
       const gridBottom = L.origin.y + L.rows * L.card.h + (L.rows - 1) * L.gap;
       expect(L.height - gridBottom, `${aspect} ${n}컷 아래가 빈다`).toBeLessThanOrEqual(L.pad + 2);
@@ -53,8 +49,10 @@ describe("보드 배치 — 비율이 정한다", () => {
     }
   });
 
-  it("★ 가로 보드가 세로 보드보다 열이 많다 — 표가 아니라 기하에서 나온다", () => {
-    expect(boardLayout(8, "16:9").cols).toBeGreaterThan(boardLayout(8, "9:16").cols);
+  it("★ 가로 보드의 열이 세로 보드보다 적지 않다 — 표가 아니라 기하에서 나온다", () => {
+    // 세로 채움 규칙에서는 두 비율이 같은 열 수에 이를 수 있다(8컷이 실제로 3x3 동률).
+    expect(boardLayout(8, "16:9").cols).toBeGreaterThanOrEqual(boardLayout(8, "9:16").cols);
+    expect(boardLayout(4, "16:9").cols).toBeGreaterThanOrEqual(boardLayout(4, "9:16").cols);
   });
 
   it("★ 컷이 모두 격자에 들어간다 — 빠지는 컷이 없다", () => {
@@ -84,7 +82,7 @@ describe("보드 배치 — 비율이 정한다", () => {
     const many = boardLayout(36, "9:16");
     expect(many.card.w).toBeGreaterThanOrEqual(MIN_CARD_W);
     expect(many.width).toBeGreaterThan(few.width);
-    expect(many.width / many.height).toBeGreaterThanOrEqual(9 / 16 - 0.01);
+    expect(many.width / many.height).toBeCloseTo(9 / 16, 2); // 커져도 비율은 정확히 그대로
   });
 
   it("컷이 0이어도 안 던진다", () => {
