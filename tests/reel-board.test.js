@@ -116,8 +116,15 @@ describe("보드 SVG — 무엇이 실리나", () => {
     expect(s).toContain("lighting-1");
   });
 
-  it("★ 내레이션 한 벌은 **머리글**에 실린다 — 컷에 나눠 붙이지 않는다", () => {
-    expect(svg(3)).toContain("해 질 무렵 한강 위로");
+  // ★★ 2026-09-02 — **이 판은 뒤집힌 것이다.** 내레이션을 머리글에 싣던 판이었는데,
+  //   사장님 지시("초·사이즈·컷수·내레이션 전부 제거, 이미지컷들로 가득")로 머리글이
+  //   제목 한 줄이 됐다. 내레이션·메타가 보드에 **안 실리는 것**이 이제 계약이다.
+  it("★ 머리글은 제목뿐이다 — 내레이션·메타 상자가 안 실린다", () => {
+    const s = svg(3);
+    expect(s).not.toContain("해 질 무렵 한강 위로");
+    expect(s).not.toContain("DURATION");
+    expect(s).not.toContain("내레이션");
+    expect(s).toContain("STORYBOARD");
   });
 
   // ★★★ 2026-09-02 — **@font-face 심기는 안 먹힌다는 것을 실측으로 확인했다.**
