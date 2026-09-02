@@ -482,6 +482,48 @@ Anthropic 이 비스트리밍에 권고하는 기본값이고 `lib/llm.js` 가 �
 **검증**: `npx vitest run` **5,565 그린**(+8) · `npx next build` 통과 · 프로덕션 로그의
 `deploymentId` 가 `dpl_6FJfcVVwHP2P6Zf…` 로 바뀐 것 확인.
 
+## 12. 09-02 — 스토리보드 보드(사람용) · 수거 복구 (**미배포**)
+
+### 사람용 스토리보드 보드 — 346fa11 → ebb30ee (9커밋, 사장님과 왕복 조정)
+
+③이미지의 [스토리보드 한 장 보기]가 **사람용 보드**를 그린다(`lib/reel/board.js` ·
+`GET /api/reel/[id]/board`). r2v 시트·각인은 한 줄도 안 건드렸다. 최종 계약:
+- **보드도 안의 그림도 정확히 영상 비율** · 열 수는 **카드 최대화**(9:16 5컷 = 3+2 두 줄
+  505px) · 줄 사이는 기본 간격, 남는 공백은 **위아래 반씩** · 머리글은 제목 한 줄뿐
+- 포인트 색은 컷 지배색에서 **색상만** 받는다(명도는 "흰 글자가 선다" 계약이 정함,
+  무채색은 기준 초록) — `paletteFor`·`accentFrom`
+- ★★★ **글자는 opentype.js 로 윤곽선(path)** — sharp 의 SVG 렌더러는 @font-face 를
+  무시한다(6종 심어 렌더해 전부 같은 모양 — Windows 시스템 폰트가 가려 준 것,
+  배포 리눅스면 두부였다). 폭도 실측(getAdvanceWidth)으로 접는다
+- ★ opentype.js 는 `dist/opentype.mjs` 를 경로로 직접 import(이중 빌드 함정)
+- 그리는 순서 = 바탕(카드) → 컷 그림(둥근 마스크) → 글자층(배경 없는 SVG)
+- 미리보기(inline)와 내려받기(?download=1 → attachment)는 **다른 주소**다 — attachment
+  를 늘 붙이면 <img> 가 안 그려진다(실측). 접힌 details 안 lazy 는 요청조차 안 간다
+  → 펼칠 때만 <img> 를 붙인다(boardOpen)
+
+### 수거 복구 — c000cbf (사장님 신고: fal 엔 있는데 보관함엔 없다)
+
+§7.7 의 🔴 를 닫았다. ① `collectReelOneShot` — 일시 오류(network·busy·timeout·provider)는
+**접수증을 지키고 아무것도 안 적는다**(그전엔 어떤 오류든 job:null — 돈 낸 편을 버렸다).
+확정 실패만 error. ② `GET /api/reel/[id]` 에 **줍기**를 달았다(소유자·접수증 있을 때만) —
+보관함 상세가 이 문을 불러서, 이제 보관함만 열어도 fal 에서 끝난 결과가 걷힌다.
+★ 판 계약: `tests/reel-collect-recovery.test.js`. (500) 표본으로 "실패→error" 를 못 박던
+옛 판 둘은 확정 표본(422)으로 바꿨다.
+⚠️ **접수증이 이미 지워진 옛 편(4698cf3c "fetch failed")은 복구 불가** — requestId 를
+어디에도 안 남겼다. fal 대시보드에서 수동으로 찾는 길뿐.
+
+### 프롬프트 — 819365c
+
+과잉 연출 자제(닫힌 용기·음식 김·실내 흙먼지, 원리+예시) 원클릭·단계별 공통 +
+실사(photo)에 `hyper-realistic detail, lifelike movement`(natural 은 film 과 겹쳐 회피).
+효과 미측정(유료 생성이라 다음 실편에서).
+
+### 🔴 화장품 초상 거절 라이브 (1990a4da)
+
+fal 응답을 직접 열어 **422 초상 거절 확정**(person 사진 → 판의 인물). 접수증 살아 있고
+아직 미수거 — **⑤영상(또는 이제 보관함)을 열면 자동 재시도(얼굴 낮춘 판 재작화)가
+발동**한다. §0 의 🔴 "A 라이브 검증"이 이번에 처음 돈다 — 실제로 도는지 볼 것.
+
 ## 8. 세션을 마칠 때
 
 `C:\Users\fixup\shotform-saas\CLAUDE.md` 의 규칙대로 **wiki 에 반영한다**
