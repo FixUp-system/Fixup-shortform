@@ -14,11 +14,11 @@
 | | |
 |---|---|
 | 워크트리 | `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` |
-| 브랜치 | `feat/reel-cut-r2v` · HEAD **`97b2702`** (09-02 저녁, 세어서 고침) |
+| 브랜치 | `feat/reel-cut-r2v` · HEAD **`d32daa0`** (09-02 저녁, 이 문서 커밋이 하나 더 얹힌다) |
 | 테스트 | **5,606 그린** (10 skipped) — `npx vitest run` · `npx next build` 통과 |
-| 배포 | **프로덕션 라이브 `db4m9knyf`**(2026-09-02 · `dpl_6FJfcVVwHP2P6Zf11U9XNX2LzRMp` · 코드 `bfdfdf9`). 확인: `/login` **200** · `/archive` **200** · 프로덕션 로그의 `deploymentId` 가 이 배포로 바뀐 것까지 **실측**. 이 회차의 앞선 배포 둘: `q9ahk21if`(코드 `c484d91`, max_tokens 16000) · `ju8okg74p`(코드 `708c0db`, 모드 카드 분리) |
+| 배포 | **프로덕션 라이브 `2jhi19mik`**(09-02 저녁 · `dpl_9Bo5aGPAdedSDBCvg7H2TYiYS8pC` · 코드 `d32daa0`). `/login`·`/archive` 200 · 로그의 deploymentId 전환 실측. 이 날 배포 넷: `ju8okg74p`(비용표) → `q9ahk21if`(max_tokens) → `db4m9knyf`(재시도금지·failure배선) → 이것(보드 전체·수거 복구·자동재시도 제거·프롬프트) |
 | ★ 정식 도메인 | **`https://fixup-shortform-service.vercel.app`** 다. `vercel deploy` 가 찍어 주는 `...-ju8okg74p-fix-up1.vercel.app` 쪽은 **Deployment Protection(SSO)에 걸려 전부 302** 라 검증에 쓰면 안 된다 — 09-02 에 한 번 속았다 |
-| 미배포 | **있다 — `bfdfdf9`(프로덕션) 이후 12커밋**: 스토리보드 보드 전체·프롬프트 과잉연출·수거 복구(§12). 사장님 지시로만 배포 |
+| 미배포 | **없다** — HEAD 가 곧 프로덕션이다(이 문서 커밋만 그 뒤) |
 | 푸시 | **미푸시 0** — `fixup`·`origin` 브랜치가 둘 다 HEAD 와 같다. ⚠️ 09-02 에 `git push origin` 이 **자격증명 대기로 3분 매달렸다** — 아래 ★줄의 계정 실은 URL 로 우회했다. `GIT_TERMINAL_PROMPT=0` 을 걸면 매달리지 않고 바로 실패한다 |
 | ⚠️ **main 이 뒤에 있다** | `fixup/main` = `8dab3ce`(HEAD 가 **27커밋 앞**) · `origin/main` = `d1ae550`(HEAD 가 **204커밋 앞**). 즉 **두 원격의 main 도 서로 다르다** — `origin/main` 은 `fixup/main` 의 조상이라 갈라진 것은 아니고 **177커밋 뒤처진 것**이다. 이 회차에는 브랜치만 밀었다. **main 병합·푸시는 사장님이 지시할 때만** 한다 |
 | ⚠️ 배포 함정 | **`.vercel` 폴더가 이 워크트리에 없다.** 그래서 `--project` 를 **반드시** 준다 — 안 주면 폴더 이름으로 새 프로젝트를 만든다(팀에 `step-gate` 라는 **실수로 생긴 프로젝트**가 그 증거다) |
