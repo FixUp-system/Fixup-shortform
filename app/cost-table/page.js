@@ -55,8 +55,11 @@ export default function CostTablePage() {
         지금은 내부 테스트 단계라 모두가 볼 수 있게 열어 두었어요.
       </p>
 
+      {/* ★ 모드 하나가 카드 하나다. cost-mode 는 그 카드들을 **떼어 놓는** 표시다
+          (app/globals.css) — .panel 에는 margin 이 없어, 그냥 쌓으면 간격 0 으로 맞붙어
+          두 모드가 한 덩어리로 읽힌다(2026-09-02 사장님 지적). */}
       {sections.map((s) => (
-        <section className="panel panel--wide" key={s.id}>
+        <section className="panel panel--wide cost-mode" key={s.id}>
           <h2>{s.label}</h2>
           <p className="pgsub">{NOTE[s.id]}</p>
 

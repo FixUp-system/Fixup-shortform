@@ -170,3 +170,39 @@ describe("좁은 화면", () => {
     expect(css.slice(at, at + 120)).toContain("overflow-x: auto");
   });
 });
+
+// ★★★ 2026-09-02 사장님 지적 — "원클릭과 단계별 영상의 ui 영역이 겹친다".
+//
+// 실측(개발 서버 · getBoundingClientRect): 원클릭 카드의 bottom 과 단계별 카드의 top 이
+// **둘 다 619** 였다. 간격이 0 인 데다 배경이 둘 다 var(--surface) 라 두 모드가 한 덩어리로
+// 읽혔고, 원클릭 표의 마지막 줄은 아래 선까지 없어서(costtable tbody tr:last-child)
+// 단계별 제목이 그 표에 딸린 줄처럼 붙었다.
+//
+// 뿌리는 `.panel` 에 margin 이 아예 없다는 것이다 — 카드를 하나만 쓰는 화면이 대부분이라
+// 그동안 안 드러났고, 이 화면이 카드 둘을 세로로 쌓는 첫 자리다.
+//
+// ★ 여기서 못 박는 것은 **떼어 놓는다는 사실**이지 픽셀이 아니다. 값은 사다리(--sp-*)가
+//   정하고, 그 사다리를 쓰는지는 tests/control-scale.test.js 가 따로 잰다.
+describe("두 모드는 떨어져 있다", () => {
+  // ★ 선택자는 **줄 맨 왼쪽부터** 잡는다 — 주석 안에 같은 글자가 있어도 규칙으로 오인하지
+  //   않는다(2026-09-01 에 소스 문자열 판이 하루 다섯 번 틀린 그 함정).
+  const rule = (sel) => {
+    const at = css.indexOf(`\n${sel} {`);
+    return at === -1 ? "" : css.slice(at, css.indexOf("}", at));
+  };
+
+  it("★★ 모드 카드가 서로 붙지 않는다 — 간격 0 이면 한 덩어리로 읽힌다", () => {
+    const r = rule(".cost-mode + .cost-mode");
+    expect(r, "모드 카드를 떼어 놓는 규칙이 사라졌다").toBeTruthy();
+    expect(r, "간격이 사다리(--sp-*)를 안 쓴다").toMatch(/margin-top:\s*var\(--sp-/);
+  });
+
+  it("★ 화면이 그 표시를 실제로 붙인다 — 규칙만 있고 안 붙이면 아무 일도 안 일어난다", () => {
+    expect(page, "section 에 cost-mode 가 없다").toMatch(/className="panel panel--wide cost-mode"/);
+  });
+
+  it("★★ 전역 패널 간격을 건드려 푼 것이 아니다 — 다른 화면까지 함께 벌어진다", () => {
+    // 패널을 여러 개 쌓는 화면이 여럿이다(app/reel/[id]/images 만 해도 10개).
+    expect(rule(".panel + .panel"), "전역 패널 형제 규칙이 생겼다 — 다른 화면이 함께 바뀐다").toBe("");
+  });
+});
