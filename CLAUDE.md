@@ -36,8 +36,11 @@
 > 옛 문장은 "의도적 미커밋이다(주석에 '커밋하지 않는다')" 였는데 **둘 다 사실이 아니다**:
 > 파일은 추적되고 있고 그런 주석도 없다. 이 두 벌 상태가 위 함정의 원인이었다.
 >
-> ★ **이어서 하는 세션은 wiki 부터 읽어라** — 지금 상태와 남은 일이 한 장에 있다:
-> `C:\Users\fixup\obsidian_jaechan\sources\shotform-deploy-and-qa-2026-08-14.md`
+> ★ **이어서 하는 세션이 읽을 두 장**(2026-09-02 갱신 — 그전에는 08-14 페이지를 가리키고
+> 있어 2주 낡아 있었다):
+> · **상태와 남은 일** → 이 저장소의 `OUTSTANDING.md` (브랜치 `feat/reel-cut-r2v`)
+> · **왜 그렇게 했나(회차 서사)** → `C:\Users\fixup\obsidian_jaechan\sources\shotform-archive-admin-and-ui-2026-09-01.md`
+>   그리고 그 wiki 의 `index.md` → `products/shotform-saas.md` 순으로 내려가면 전체가 보인다.
 
 > ## ★★ 화면 파일을 손댔으면 **한 번 굽는다**
 >

@@ -1,7 +1,11 @@
-# 이어서 할 일 — `feat/reel-cut-r2v` (2026-08-31 기준 · **세 번째 갱신**)
+# 이어서 할 일 — `feat/reel-cut-r2v` (2026-09-01 기준 · **네 번째 갱신**)
 
 이 문서는 **다음 세션이 이 브랜치를 그대로 이어받기 위한 것**이다.
 사실은 코드가 진실의 원천이다. 여기 적힌 것과 코드가 어긋나면 코드를 믿고 이 문서를 고쳐라.
+
+> 회차 서사(무엇을 왜 고쳤나)는 wiki 에 있다 —
+> `C:\Users\fixup\obsidian_jaechan\sources\shotform-archive-admin-and-ui-2026-09-01.md`.
+> 이 문서는 **상태와 남은 일**만 적는다.
 
 ---
 
@@ -10,14 +14,37 @@
 | | |
 |---|---|
 | 워크트리 | `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` |
-| 브랜치 | `feat/reel-cut-r2v` |
-| 테스트 | **5,378 그린** (10 skipped) — `npx vitest run` · `npx next build` 통과 |
-| 배포 | **프로덕션 라이브** — 08-31 에 **여섯 번**(… `8c6bff0` → `42457a5` → **`e7af76d`**), 그전 08-27 `f1b3ccc`·`b97d704`. 마지막 배포에 큐 이전·5컷 격자·얼굴 A+B 가 **다 들어갔다**. 확인: `/login` **200**, 보호 화면은 **307**(로그인으로 보냄 = 정상) |
-| 미배포 | **없다** — `e7af76d` 가 곧 프로덕션이다 |
-| ⚠️ 배포 함정 | **`.vercel` 폴더가 이 워크트리에 없다.** 그래서 `--project` 를 **반드시** 준다 — 안 주면 폴더 이름으로 새 프로젝트를 만든다(팀에 `step-gate` 라는 **실수로 생긴 프로젝트**가 그 증거다). 쓴 명령: `npx vercel@latest deploy --prod --yes --scope fix-up1 --project fixup-shortform-service` |
-| 푸시 | ⚠️ **`42457a5` 가 미푸시다**(배포는 됐다 — CLI 배포는 GitHub 와 무관). 그 앞(`8dab3ce`)까지는 둘 다 올렸다 — `fixup`·`origin` 의 브랜치와 **`main` 모두** HEAD 와 같다. ★ `origin` 은 URL 에 계정이 안 박혀 있어 그냥 밀면 **자격증명 대기로 멈춘다**. 계정을 실어 밀면 통과한다: `git push https://jaechanyoon0519-Fixup@github.com/FixUp-system/Fixup-shortform.git <브랜치>` |
-| main 병합 | ★ **끝났다**(2026-08-31, 사장님 지시) — 그 뒤로도 **브랜치와 main 을 함께 민다**. 지금 네 ref(`fixup`·`origin` × 브랜치·main)가 모두 `8c6bff0` 이다. 전부 fast-forward라 잃은 이력이 없다. ⚠️ **로컬 `main` 만 낡았다**(`da6bfbd`) — 다른 세션 워크트리에 체크아웃돼 있어 안 건드린다 |
-| 개발 서버 | `SHOTFORM_FAKE=fal SHOTFORM_NO_CREDITS=0 npx next dev` → 3001 |
+| 브랜치 | `feat/reel-cut-r2v` · HEAD **`9159e1c`** |
+| 테스트 | **5,538 그린** (10 skipped) — `npx vitest run` · `npx next build` 통과 |
+| 배포 | **프로덕션 라이브 `boa27t957`**(2026-09-01, 이 회차에 네 번 올렸다). 확인: `/archive` **200** · `/login` **200** |
+| 미배포 | **없다** — HEAD 가 곧 프로덕션이다 |
+| 푸시 | **미푸시 0** — `fixup`·`origin` 의 브랜치가 둘 다 HEAD(`9159e1c`)와 같다 |
+| ⚠️ **main 이 뒤에 있다** | `fixup/main` = `8dab3ce`(HEAD 가 **27커밋 앞**) · `origin/main` = `d1ae550`(HEAD 가 **204커밋 앞**). 즉 **두 원격의 main 도 서로 다르다** — `origin/main` 은 `fixup/main` 의 조상이라 갈라진 것은 아니고 **177커밋 뒤처진 것**이다. 이 회차에는 브랜치만 밀었다. **main 병합·푸시는 사장님이 지시할 때만** 한다 |
+| ⚠️ 배포 함정 | **`.vercel` 폴더가 이 워크트리에 없다.** 그래서 `--project` 를 **반드시** 준다 — 안 주면 폴더 이름으로 새 프로젝트를 만든다(팀에 `step-gate` 라는 **실수로 생긴 프로젝트**가 그 증거다) |
+| ★ origin 푸시 | `origin` 은 URL 에 계정이 안 박혀 있다. 이 회차에는 `git push origin <브랜치>` 가 그냥 통과했지만, 자격증명 대기로 멈추면 계정을 실어라: `git push https://jaechanyoon0519-Fixup@github.com/FixUp-system/Fixup-shortform.git <브랜치>` |
+| 개발 서버 | `npx next dev -p 3111` (이 회차에 쓴 포트). `.env.local` 의 `SHOTFORM_DEV_USER` 가 **로그인을 건너뛰고 운영자 신원**을 준다 — 관리자·비용 화면을 그대로 볼 수 있다 |
+
+### 09-01 에 바뀐 것 — 만든 것이 보이지 않던 자리들
+
+10커밋. 서사는 위 wiki 페이지에, 여기는 **다음 세션이 알아야 할 사실**만.
+
+- **보관함이 이제 단계별 영상을 보여 준다.** 완성본 자리가 **셋**이라는 것을 알아 둘 것 —
+  `doc.reel.video.url`(합성본) · `cuts[0].video`(`whole:true`, 통짜) · `doc.render.url`(옛 문서).
+  판정은 `lib/archive/video.js` 하나이고 **목록(SQL)과 상세가 같은 순서**를 봐야 한다.
+- **`collectReelOneShot` 이 단계를 옮긴다**(`status:"clips"`). 그전에는 되살림 경로에만
+  그 줄이 없어 영영 "만드는 중"이었다.
+- **⑥완성이 진행 표식을 남긴다**(`phase: "render"`). 이게 있어야 사이드바가 ⑤와 ⑥을 가른다.
+  ⚠️ 그전에는 이 phase 가 한 번도 안 쓰여 `STALL_EXEMPT_PHASES` 가 **죽은 코드**였다.
+- **운영자 권한 둘** — `getProjectForViewing` 이 `editable`(= mine ‖ 운영자)을 함께 준다.
+  **지우기는 그대로 `mine`.** 역할 지정은 `PATCH /api/admin/users/[id]`, 자기 강등은
+  `lib/admin/self-guard.js` 가 막는다.
+- **프로(2.5)에서 인물 사진을 안 받는다** — 화면(`visiblePhotoRoles`) + 서버(`describeCutRefs`).
+  ★ **종량제로 옮겨 가면 완화한다**(코드 네 자리에 그 이유가 적혀 있다).
+- **비용 화면 흐름 이름이 사이드바와 같아졌다**(원클릭 영상 · 단계별 영상).
+  ⚠️ 그 판은 **사이드바 소스를 읽어 대조**한다 — 사이드바 이름을 바꾸면 여기도 같이 바꿔야 한다.
+- **`.home-header` 줄은 한 사다리**(`--ctl-sm` 32px · 12px). 보관함 머리줄 전용이다.
+- ⚠️ **운영자 이름(`admin_name`)은 만들었다가 사장님 요청으로 전부 되돌렸다.** 코드 흔적 0.
+  **DB 에 컬럼이 남아 있을 수 있다**(사장님이 SQL 을 실행했다면) — 아무도 안 읽고 안 쓴다.
 
 ### 08-31(3) 에 바뀐 것 — 통짜를 큐로 · 얼굴을 예방에서 재시도로
 
@@ -325,6 +352,27 @@ cd <빈폴더> && npx vercel deploy --prod --yes --project fixup-shortform-servi
 4. 반올림이 컷 초 합을 부풀린다(15초 목표에 합 17초) — 화면은 맞지만 근본은 시나리오 단계
 5. `app/api/reel/[id]/render/route.js` 가 `composeVideo` 의 `rawUrl` 을 버린다
 6. reel 자막 언어를 고르는 화면이 없다(음성 언어를 따라간다)
+
+### 09-01 에 보태진 것
+
+7. 🔴 **`fetch failed` 가 접수증을 지운다** — `collectReelOneShot` 의 catch 가 **어떤 오류에도**
+   `job: null` 을 찍는다. 네트워크가 한 번 흔들리면 **이미 구워진(돈 낸) 편을 잃는다.**
+   이 회차에 실제로 겪어서 스크립트에서는 fal 을 직접 폴링해 피해 갔다 — **코드는 안 고쳤다.**
+   고칠 방향: 수거가 **끝났다고 확인됐을 때만** 접수증을 지운다.
+8. **원클릭 초상 거절 하나가 미확정**(`eaa6fb4a`) — 첨부가 **사람 없는 포장지 제품컷**이었고
+   비율도 1.36 이라 정상이었다. 8-31(2) 의 "얼굴 때문" 함의를 이 표본이 반증한다.
+9. **H3 에 얼굴 참조를 한 번도 안 재 봤다** — `blocksFacesInRefs` 가 H3 를 **안 막는다**
+   (모르면 안 막는다는 규율). 재 보는 값은 $0.30 정도.
+10. ⚠️ **소스 문자열로 재는 판이 하루에 다섯 번 틀렸다**(이 회차). 셋은 고쳤지만
+    **같은 종류가 다른 판에 남아 있을 수 있다.** 새 판을 쓸 때 지킬 것:
+    주석을 먼저 걷는다 · 고정 창이 아니라 **규칙/함수 끝까지** 자른다 ·
+    선택자는 **맨 왼쪽부터**(`"\n.mini {"` — `.a .mini {` 에도 같은 글자가 있다) ·
+    **주석에 그 모양을 예시로 적지 않는다**(판이 주석을 규칙으로 잡는다) ·
+    그물이 재는 범위를 **주장보다 넓게 적지 않는다**.
+11. **veo3.1 은 재 보기만 했다** — reference-to-video 는 **8초 고정**(런타임 검증기가 `'8s'`
+    하나만 받는다. 공개 스키마는 `string` 이라 안 보인다), 15초는 `extend-video` 로 이어
+    붙인다(**뒤 7초는 판을 안 본다**), 720p 최저, $2.25. 사장님 판정 **seedance 가 낫다** —
+    쓸 계획은 없다.
 
 ---
 
