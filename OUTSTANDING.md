@@ -14,11 +14,12 @@
 | | |
 |---|---|
 | 워크트리 | `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` |
-| 브랜치 | `feat/reel-cut-r2v` · HEAD **`9159e1c`** |
-| 테스트 | **5,538 그린** (10 skipped) — `npx vitest run` · `npx next build` 통과 |
-| 배포 | **프로덕션 라이브 `boa27t957`**(2026-09-01, 이 회차에 네 번 올렸다). 확인: `/archive` **200** · `/login` **200** |
-| 미배포 | **없다** — HEAD 가 곧 프로덕션이다 |
-| 푸시 | **미푸시 0** — `fixup`·`origin` 의 브랜치가 둘 다 HEAD(`9159e1c`)와 같다 |
+| 브랜치 | `feat/reel-cut-r2v` · 코드 HEAD **`708c0db`** (09-02, 이 문서 커밋이 그 위에 하나 더 얹힌다) |
+| 테스트 | **5,557 그린** (10 skipped) — `npx vitest run` · `npx next build` 통과 |
+| 배포 | **프로덕션 라이브 `ju8okg74p`**(2026-09-02 · `dpl_7RVu7grfAwB846mZs3sAK5s9oaU6` · 코드 `708c0db`). 확인: `/login` **200** · `/archive` **200** · 배포된 CSS 번들에 `.cost-mode+.cost-mode{margin-top:var(--sp-5)}` **실측 확인** |
+| ★ 정식 도메인 | **`https://fixup-shortform-service.vercel.app`** 다. `vercel deploy` 가 찍어 주는 `...-ju8okg74p-fix-up1.vercel.app` 쪽은 **Deployment Protection(SSO)에 걸려 전부 302** 라 검증에 쓰면 안 된다 — 09-02 에 한 번 속았다 |
+| 미배포 | **없다** — 코드 HEAD 가 곧 프로덕션이다(이 문서 커밋만 그 뒤에 있다) |
+| 푸시 | **미푸시 0** — `fixup`·`origin` 브랜치가 둘 다 `708c0db` 다. ⚠️ 09-02 에 `git push origin` 이 **자격증명 대기로 3분 매달렸다** — 아래 ★줄의 계정 실은 URL 로 우회했다. `GIT_TERMINAL_PROMPT=0` 을 걸면 매달리지 않고 바로 실패한다 |
 | ⚠️ **main 이 뒤에 있다** | `fixup/main` = `8dab3ce`(HEAD 가 **27커밋 앞**) · `origin/main` = `d1ae550`(HEAD 가 **204커밋 앞**). 즉 **두 원격의 main 도 서로 다르다** — `origin/main` 은 `fixup/main` 의 조상이라 갈라진 것은 아니고 **177커밋 뒤처진 것**이다. 이 회차에는 브랜치만 밀었다. **main 병합·푸시는 사장님이 지시할 때만** 한다 |
 | ⚠️ 배포 함정 | **`.vercel` 폴더가 이 워크트리에 없다.** 그래서 `--project` 를 **반드시** 준다 — 안 주면 폴더 이름으로 새 프로젝트를 만든다(팀에 `step-gate` 라는 **실수로 생긴 프로젝트**가 그 증거다) |
 | ★ origin 푸시 | `origin` 은 URL 에 계정이 안 박혀 있다. 이 회차에는 `git push origin <브랜치>` 가 그냥 통과했지만, 자격증명 대기로 멈추면 계정을 실어라: `git push https://jaechanyoon0519-Fixup@github.com/FixUp-system/Fixup-shortform.git <브랜치>` |
@@ -375,6 +376,35 @@ cd <빈폴더> && npx vercel deploy --prod --yes --project fixup-shortform-servi
     쓸 계획은 없다.
 
 ---
+
+## 9. 09-02 — 실제 비용 화면의 두 모드를 뗐다 (**커밋 `708c0db` · 프로덕션 반영 완료**)
+
+사장님 지적: *"실제 비용 탭에서 원클릭과 단계별 영상의 ui 영역이 겹치는 부분이 있어서
+분리해줘."*
+
+**실측으로 확인한 것**(dev 3311 · `getBoundingClientRect`): 원클릭 카드의 `bottom` 과
+단계별 카드의 `top` 이 **둘 다 619** 였다 — 간격이 **정확히 0**. 배경이 둘 다
+`var(--surface)` 라 두 카드가 한 덩어리로 이어져 보였고, 원클릭 표의 마지막 줄은 아래
+선까지 없어서(`costtable tbody tr:last-child`) **단계별 제목이 그 표에 딸린 줄처럼** 붙었다.
+
+**뿌리**: `.panel` 에 margin 이 **아예 없다**. 카드를 하나만 쓰는 화면이 대부분이라
+그동안 안 드러났고, `app/cost-table` 이 **카드 둘을 세로로 쌓는 첫 자리**다.
+
+**고친 방법**: 화면 전용 표시 `cost-mode` 하나 + `margin-top: var(--sp-5)`.
+★ 전역 패널 형제 규칙으로 풀지 **않았다** — 패널을 여러 개 쓰는 화면이 여럿이라
+(`app/reel/[id]/images` 만 해도 10개) 그쪽 간격까지 말없이 바뀐다. 그 사실 자체를
+판으로 못 박아 두었다(`tests/cost-table-ui.test.js` 의 "두 모드는 떨어져 있다").
+
+**검증**: 간격 **0 → 24px** 실측 · `npx vitest run` **5,557 그린** · `npx next build` 통과 ·
+프로덕션 CSS 번들에서 `.cost-mode+.cost-mode{margin-top:var(--sp-5)}` 확인, 전역
+`.panel+.panel` 은 **0건**(의도대로 안 생겼다).
+
+> ⚠️ **안 건드린 것 — 값과 내용**. 두 표에 **`프로` 행이 값까지 그대로 중복**된다
+> (15초 480p `$3.08` · 15초 720p `$6.93` · 30초 480p `$6.17` · 30초 720p `$13.87` —
+> 단계별은 여기에 스토리보드 `$0.40` 만 더 붙는다). 게다가 **등급 이름이 두 모드에서 다른
+> 엔진을 가리킨다**: 원클릭의 `기본`은 MiniMax H3(768P·2K)이고 단계별의 `기본`은
+> Seedance 2.0(480p·720p·1080p)이다. 사장님 지적이 "UI 영역"이었고 정가·원가 재산정은
+> **요청 시에만** 하는 규칙이라 **손대지 않았다.** 표를 합치거나 이름을 가를지는 미결.
 
 ## 8. 세션을 마칠 때
 
