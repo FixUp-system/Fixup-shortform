@@ -1014,6 +1014,20 @@ a.side-item { text-decoration: none; }
 .panel--library { width: 100%; max-width: 1160px; }
 /* 접었다 펴는 자리 — 긴 글(시나리오·원고·컷 목록)이 여기 들어간다 */
 .lib-fold { border-top: 1px solid var(--line); padding: 12px 0; }
+
+/* ★★ 2026-09-03 사장님 지시 — ③이미지의 지문 절 머리줄.
+   순서가 **라인 → [전체 내려받기] → 지문 전체**다. 그래서 라인을 이 줄이 갖고,
+   바로 아래 <details> 는 제 라인을 내려놓는다(--tight) — 안 그러면 줄이 둘이 된다.
+   ★ 위쪽 여백이 넉넉하다 — 사장님 지적("개별 이미지와 라인이 겹쳐"): 컷 카드가 이 줄에
+     바싹 붙어 카드 테두리와 라인이 한 겹처럼 보였다. */
+.prompt-head {
+  display: flex;
+  justify-content: flex-end;
+  /* ★ 2026-09-03(3차) — 버튼이 **라인 위**다(사장님 지시). 라인은 아래 지문 절이 갖는다.
+     그래서 여기는 라인을 안 그리고, 컷 카드와의 여백만 갖는다. */
+  margin-top: var(--sp-5);
+  margin-bottom: 12px;
+}
 .lib-fold > summary {
   cursor: pointer;
   /* 눈금은 12·14·16·18·28 뿐이다(tests/design-system.test.js). 누르는 자리라 14 를 쓴다 */

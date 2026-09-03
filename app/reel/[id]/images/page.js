@@ -346,6 +346,24 @@ export default function ReelImagesPage() {
           지문을 **늘 보면서** 고치는 자리라 접힌 채로 두면 매번 한 번 더 눌러야 했다.
           <details> 는 그대로 쓴다 — 접는 길은 남기고 **첫 상태만** 뒤집었다.
           ★ 키보드·스크린리더 동작이 이미 붙어 있어 <details> 를 계속 쓴다. */}
+      {/* ★★ 2026-09-03 사장님 지시 — **[전체 내려받기]는 이 라인 아래, 지문 위**다.
+          같은 날 한 번 뺐다가 되돌렸다(사장님이 "필요하다"고 짚었다): 보드 아래 버튼은
+          **보고 있는 그 한 장**을 받는 자리이고, 이 버튼은 **이 단계의 결과물 전체**를
+          받는 자리라 뜻이 다르다. 자리도 그래서 다르다 — 지문 절의 머리에 선다.
+          ★ 받는 것은 같은 보드 한 장이다(컷 그림을 모아 그린다) — "스토리보드 포함".
+          ★ 자리: **컷 카드 아래 · 라인 위**(사장님 지시 3차). 라인은 지문 절이 갖는다. */}
+      {fullPrompt && (
+        <div className="prompt-head">
+          <a
+            className="mini"
+            href={`${boardHref}${boardHref.includes("?") ? "&" : "?"}download=1`}
+            download
+          >
+            전체 내려받기
+          </a>
+        </div>
+      )}
+
       {fullPrompt && (
         <details className="lib-fold" open>
           <summary>
