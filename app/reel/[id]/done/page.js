@@ -17,6 +17,7 @@ import { startPolling } from "../../../../lib/poll";
 import { REEL_STEPS, reelStepHref } from "../../../../lib/reel/steps";
 import ReelBack from "../../../../components/ReelBack";
 import { speechLangOf } from "../../../../lib/subtitle-langs";
+import { narrationChanged } from "../../../../lib/reel/narration";
 import SubtitleEditor, { seedSubtitle } from "../../../../components/SubtitleEditor";
 
 const DONE_TIMEOUT_MS = 10 * 60 * 1000;
@@ -136,6 +137,20 @@ export default function ReelDonePage() {
       {err && <p className="pgsub warn">{err}</p>}
       {/* ★ 이 단계(합성)의 오류만 읽는다 — ⑤영상의 실패가 여기 뜨면 안 된다. */}
       {reelErrorFor(reel, "done") && <p className="pgsub warn">{reelErrorFor(reel, "done")}</p>}
+      {/* ★★ 2026-09-03 — 자막은 **파일 속 소리**를 따른다(lib/reel/narration.js 의
+          bakedNarration). 그래서 내레이션 글자를 고쳐도 이미 구운 이 영상의 자막은 안
+          바뀐다 — 그것이 맞다. 바꾸면 소리는 옛 문장인데 자막만 새 문장이 되어, 사장님이
+          신고한 "아예 다른 자막"이 된다.
+          ★ 대신 **바뀐 사실을 말해 준다.** 조용히 두면 "고쳤는데 반영이 안 된다"로 읽힌다 —
+            이 저장소가 사진 누락에서 이미 겪은 종류의 오해다.
+          ★ 다시 굽는 것은 돈이 드는 일이라(한 편 $4.5) **여기서 버튼을 열지 않는다.**
+            돈 나가는 자리는 영상 화면 하나다. */}
+      {narrationChanged(project) && (
+        <p className="pgsub warn">
+          내레이션을 고치셨어요 — 이 영상의 자막은 영상이 말하는 문장 그대로예요.
+          고친 문장으로 바꾸려면 영상 화면에서 다시 만들어 주세요.
+        </p>
+      )}
       {/* ★★ 2026-08-25 — 도는 표시를 붙이고 **busy 도 함께 본다**(사장님: "이대로 완성하기
           누르면 지금 진행되고 있는지 잘 모르겠어").
           ★ 왜 busy 인가: 누른 직후에는 busy 만 참이다. reel.status 가 "rendering" 이 되고

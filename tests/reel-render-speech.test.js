@@ -48,7 +48,13 @@ describe("합성 전에 시각을 잰다", () => {
 //   값을 재려고 fal 을 부르고 몇 초를 기다린다.
 // ★ 컷 line 자체는 **지우지 않는다** — 한 벌이 어떤 이유로 빠졌을 때 옛 길(컷 자막)로
 //   떨어지는 안전망이다.
-describe("한 벌이 있으면 시각을 안 잰다", () => {
+// ★★★ 2026-09-03 뒤집힘 — **한 벌도 잰다.** 위 서사는 기록으로 둔다.
+//   그때 판단("잰 값을 읽는 자리가 없으니 재지 마라")은 맞았고, 달라진 것은 **자리를
+//   만들었다**는 것이다: `reel.narration_timing` 이 문장 단위로 시각을 든다
+//   (lib/reel/narration.js 의 narrationUnits 가 그것을 units 에 얹는다).
+//   그 자리를 만드는 것은 *"실측으로 어긋남이 확인되기 전에는 만들지 않는다"* 로 미뤄
+//   두었는데, 2026-09-03 에 사장님이 *"자막 싱크가 살짝 안 맞아"* 로 그 실측을 주었다.
+describe("한 벌도 시각을 잰다", () => {
   it("★한 벌 판정이 재기 판정보다 **앞**에 있다", () => {
     const body = clean.slice(clean.lastIndexOf("import "));
     const units = body.indexOf("narrationUnits(");
@@ -58,12 +64,17 @@ describe("한 벌이 있으면 시각을 안 잰다", () => {
     expect(units, "한 벌 계산이 재기 판정보다 뒤에 있다").toBeLessThan(probe);
   });
 
-  it("★재기 조건이 한 벌 유무를 본다", () => {
-    expect(clean).toMatch(/!\s*units\s*&&\s*needsSpeechProbe/);
+  it("★★ 한 벌이면 **한 벌 단위로** 재고, 그 값을 문서에 남긴다", () => {
+    expect(clean, "한 벌을 정렬하지 않는다").toMatch(/alignSpeech\(units,/);
+    expect(clean, "잰 값을 남기는 자리가 없다").toMatch(/narration_timing/);
   });
 
-  it("옛 문서는 예전 그대로다 — 한 벌이 없으면 그 조건이 참이 되어 지나간다", () => {
-    // units 가 null 이면 !units 가 참이라 needsSpeechProbe 판정이 그대로 산다.
+  it("★★ 옛 문서·컷별 갈래는 **예전 그대로** 컷에 박는다 — 회귀 0", () => {
     expect(clean).toContain("needsSpeechProbe(cuts)");
+    expect(clean, "컷 정렬이 사라졌다").toMatch(/alignSpeech\(cuts,/);
+  });
+
+  it("★ 문장이 하나면 안 잰다 — 시작이 곧 영상 시작이라 어긋날 자리가 없다", () => {
+    expect(clean).toMatch(/units\.length\s*>\s*1/);
   });
 });

@@ -61,22 +61,46 @@ export const POST = withUser(async (req, { params }, user) => {
   // ★ 길이는 **구운 클립의 합**이다 — 계획 초가 아니라 실제로 화면에 있는 시간이라야
   //   마지막 자막이 영상 밖으로 안 나간다.
   // ★ 옛 문서는 null 이라 그 자리가 통째로 없다 — 예전 길 그대로다.
-  const units = narrationUnits(
-    project,
-    cuts.reduce((a, c) => a + (Number(c?.video?.seconds) || 0), 0)
-  );
+  const seconds = cuts.reduce((a, c) => a + (Number(c?.video?.seconds) || 0), 0);
+  const units = narrationUnits(project, seconds);
 
   let timed = cuts;
-  // ★★ 2026-08-28 — **한 벌이 있으면 재지 않는다.** whisper 가 잰 시각은 컷에 박히는데
-  //   (spoken_start) 자막은 한 벌 단위에서 나오므로(위 units) **잰 값을 읽는 자리가 없다.**
-  //   그런데도 불렸다: needsSpeechProbe 는 "대사가 있는 컷이 둘 이상인가"를 보는데,
-  //   시나리오가 한 벌을 컷 line 에 조각내 적어 두면 참이 된다(에너지 음료 실측: 컷 다섯).
-  //   값은 작지만($0.0006/초) 쓰지 않을 값을 재려고 fal 을 부르고 몇 초를 기다린다.
-  // ★ 컷 line 은 **지우지 않는다** — 한 벌이 빠졌을 때 옛 길(컷 자막)로 떨어지는 안전망이다.
-  // ★ 옛 문서는 units 가 null 이라 이 조건이 참이 되어 **예전 그대로** 잰다(회귀 0).
-  if (!units && needsSpeechProbe(cuts) && !cuts.some((c) => Number(c?.spoken_start) > 0)) {
+  let timedUnits = units;
+  // ★★★ 2026-09-03 사장님 신고 — *"자막 싱크가 살짝 안 맞아."* **한 벌도 잰다.**
+  //
+  //   그전에는 한 벌이면 **아예 건너뛰었다**(2026-08-28). 이유가 맞았다: whisper 가 잰 시각은
+  //   컷에 박히는데 자막은 한 벌 단위에서 나오므로 **잰 값을 읽는 자리가 없었다.** 그래서
+  //   쓰지 않을 값을 재려고 fal 을 부르는 것이 낭비였다.
+  //   → 이제 **읽는 자리를 만들었다**: `reel.narration_timing` 이 문장 단위로 시각을 든다
+  //     (lib/reel/narration.js 의 narrationUnits 가 그것을 units 에 얹는다). 저장 자리를
+  //     만드는 것은 *"실측으로 어긋남이 확인되기 전에는 만들지 않는다"* 로 미뤄 두었는데
+  //     (tests/reel-narration-subtitles.test.js 머리말) **오늘 그 실측이 나왔다.**
+  //
+  // ★ 문장이 하나면 안 잰다 — 시작이 곧 영상 시작이라 어긋날 자리가 없다(컷 갈래의
+  //   needsSpeechProbe 와 같은 판정이다: 한 클립에 말이 둘 이상일 때만 잰다).
+  // ★ 이미 잰 것이 있으면 다시 안 잰다 — 다시 합성할 때 또 재면 값이 두 번 나간다.
+  // ★ 못 재도 그대로 간다 — 자막 하나 때문에 이미 값을 다 치른 한 편을 잃을 수 없다.
+  //   그때는 글자 수 비례라는 **바닥**으로 흐른다(예전 그대로다).
+  // ★ 컷 line 은 지우지 않는다 — 한 벌이 빠졌을 때 옛 길(컷 자막)로 떨어지는 안전망이다.
+  if (units) {
+    if (units.length > 1 && !units.some((u) => Number(u.spoken_start) > 0)) {
+      const clipUrl = cuts.find((c) => c?.video?.url)?.video?.url;
+      const chunks = await probeSpeech(clipUrl, { projectId: id, seconds });
+      if (chunks.length) {
+        timedUnits = alignSpeech(units, chunks);
+        // ★ 문장과 **같은 순서**로 담는다 — 개수가 어긋나면 남는 자리는 null 이고,
+        //   narrationUnits 가 그 자리를 건드리지 않아 바닥으로 흐른다.
+        await updateProject(id, user.id, (p) => putReel(p, {
+          narration_timing: timedUnits.map((u) => ({
+            start: Number.isFinite(u.spoken_start) ? u.spoken_start : null,
+            seconds: Number.isFinite(u.spoken_seconds) ? u.spoken_seconds : null,
+          })),
+        })).catch(() => {});
+      }
+    }
+  } else if (needsSpeechProbe(cuts) && !cuts.some((c) => Number(c?.spoken_start) > 0)) {
+    // 옛 문서·컷별 갈래 — **예전 그대로** 컷에 박는다(회귀 0).
     const clipUrl = cuts.find((c) => c?.video?.url)?.video?.url;
-    const seconds = cuts.reduce((a, c) => a + (Number(c?.video?.seconds) || 0), 0);
     const chunks = await probeSpeech(clipUrl, { projectId: id, seconds });
     if (chunks.length) {
       timed = alignSpeech(cuts, chunks);
@@ -92,7 +116,7 @@ export const POST = withUser(async (req, { params }, user) => {
     composeVideo({
       projectId: id,
       cuts: timed,
-      narrationUnits: units,
+      narrationUnits: timedUnits,
       aspect_ratio: project.settings?.aspect_ratio || "9:16",
       subtitle: project.settings?.subtitle,
       lang: project.settings?.subtitle_lang || speechLangOf(project),

@@ -256,8 +256,10 @@ describe("runReelOneShot", () => {
     const f = fixture();
     await runReelOneShot("pid", "uid", { ...f, submitClip: async () => JOB });
     await collectDone(f);
+    // ★ 2026-09-03 — `said` 가 늘었다. **각인이 아니다**(낡음 판정에 안 쓴다) — 자막이
+    //   무엇을 태울지를 정하는 값이다. 이 fixture 에는 한 벌이 없어 빈 문자열이다.
     expect(f.doc.cuts[0].video).toEqual({
-      url: "https://x/v.mp4", seconds: 15, whole: true,
+      url: "https://x/v.mp4", seconds: 15, whole: true, said: "",
       of: "A quiet workshop bench; the camera drifts left.", imageOf: "https://fal/sheet.png",
     });
     // 나머지 컷은 온전하다 — 같은 클립을 여러 번 담으면 합성이 그만큼 이어 붙인다.
