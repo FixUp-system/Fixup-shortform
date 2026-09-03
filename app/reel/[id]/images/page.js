@@ -15,6 +15,7 @@ import { useParams } from "next/navigation";
 import { useReelProject } from "../layout";
 import { REEL_STEPS, reelStepHref } from "../../../../lib/reel/steps";
 import ReelBack from "../../../../components/ReelBack";
+import AutoTextarea from "../../../../components/AutoTextarea";
 import {
   reelOf, reelErrorFor, canDrawReelImages, isReelRendering, isImagesLocked, imageTriesLeft, imageTriesLeftLifetime,
 } from "../../../../lib/reel/doc";
@@ -388,7 +389,7 @@ export default function ReelImagesPage() {
           ★ 그림이 있을 때만 보인다 — 없으면 고칠 것이 없다. */}
       {(sheetUrl || hasImages) && (
         <div className="note-form">
-          <textarea
+          <AutoTextarea
             className="field"
             rows={3}
             value={note}

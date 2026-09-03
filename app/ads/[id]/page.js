@@ -25,6 +25,7 @@ import { adPollTimeoutMs, adEstimatedMinutes } from "../../../lib/ad/timing";
 // 표시가 여기서 읽어들인 값을 그대로 본다. 사이드바가 따로 fetch·폴링하지 않아도 되는 이유.
 import { useAdProject } from "../../../components/AdProjectContext";
 import AdOptionTray from "../../../components/AdOptionTray";
+import AutoTextarea from "../../../components/AutoTextarea";
 import { MAX_MATERIAL_TEXT } from "../../../lib/material";
 import { useMe } from "../../../components/MeContext";
 import { classifyFailure } from "../../../lib/failure";
@@ -399,7 +400,7 @@ export default function AdDetailPage() {
               얹는 보조 규칙이고 그나마 `.composer` 상자 안에서만 걸리는데(`.composer
               textarea.composer-text`) 이 화면에는 그 상자가 없다 — 그래서 아무것도 안
               걸렸다. 첫 화면(/ads/new)과 **같은 클래스**로 맞춘다. */}
-          <textarea
+          <AutoTextarea
             className="field composer-text"
             value={draftText}
             onChange={(e) => setDraftText(e.target.value)}

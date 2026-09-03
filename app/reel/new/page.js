@@ -33,8 +33,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 // 프로젝트 공유본 — 루트가 들고 사이드바가 읽는다. 여기서는 **놓는다**(아래 useEffect).
 import { useReelProject } from "../../../components/ReelProjectContext";
-import Icon from "../../../components/Icon";
-import { useAutoGrow } from "../../../components/useAutoGrow";
+import AutoTextarea from "../../../components/AutoTextarea";
 // 주소는 단계 표 한 벌이 만든다 — 화면이 `/reel/<id>/scenario` 를 손으로 적으면 두 벌이 된다.
 import { REEL_STEPS, reelStepHref } from "../../../lib/reel/steps";
 import { ASPECTS, DEFAULT_ASPECT_ID, aspectFor } from "../../../lib/aspects";
@@ -132,13 +131,6 @@ export default function ReelNewPage() {
   const [uploading, setUploading] = useState(false);
   const [err, setErr] = useState("");
   const fileRef = useRef(null);
-  const textRef = useRef(null);
-  // ★★★ 2026-09-03 사장님 지시 — **이 화면에는 이것이 없었다.** 공용 규칙(textarea.field)이
-  //   `overflow-y: hidden` 을 걸어 두는데(칸이 자라는 것을 전제한 설정이다) 자라지 않으니,
-  //   132px 를 넘긴 글이 스크롤바도 없이 잘렸다 — 방향키로는 움직이는데 얼마나 더 있는지
-  //   알 수 없고 드래그가 어디까지 잡혔는지도 안 보였다. 원클릭·①자료와 같은 훅을 쓴다.
-  useAutoGrow(textRef, text);
-
   const locked = !!busy || uploading;
 
   // ★★ 모델을 바꾸면 **그 모델이 안 받는 값을 들고 있을 수 있다** — 광고 화면의
@@ -228,8 +220,7 @@ export default function ReelNewPage() {
 
       <section className="panel--wide">
         <div className="composer">
-          <textarea
-            ref={textRef}
+          <AutoTextarea
             className="field composer-text"
             value={text}
             maxLength={MAX_MATERIAL_TEXT}
@@ -421,13 +412,6 @@ export default function ReelNewPage() {
             </button>
           </div>
         </div>
-
-        {/* ★ 2026-09-02 사장님 지시 — 모드 하단 상시 안내: 프로에서 ＋인물이 왜 없는지를
-            만들기 전에 말해 둔다(원클릭 app/ads/new 와 같은 줄). */}
-        <p className="mode-note">
-          <Icon name="bang" size={14} />
-          프로 버전에서는 인물 사진 참조가 지원되지 않아요.
-        </p>
       </section>
     </>
   );

@@ -27,10 +27,12 @@ function walk(dir, out = []) {
   }
   return out;
 }
-// `<textarea` 뒤 400 자 안의 첫 className="..." 를 그 칸의 클래스로 본다.
+// 여는 태그 뒤 400 자 안의 첫 className="..." 를 그 칸의 클래스로 본다.
+// ★ 이제 그 태그는 `<AutoTextarea>` 다(스스로 자라는 칸). raw `<textarea>` 도 함께
+//   인정한다 — 이 그물이 재는 것은 **스타일을 받는가**이지 태그 이름이 아니다.
 function textareaClasses(src) {
   const out = [];
-  for (const m of src.matchAll(/<textarea/g)) {
+  for (const m of src.matchAll(/<(?:Auto)?[Tt]extarea/g)) {
     const chunk = src.slice(m.index, m.index + 400);
     const cls = chunk.match(/className="([^"]+)"/);
     out.push(cls ? cls[1].trim().split(/\s+/) : []);
@@ -44,7 +46,10 @@ function wrapperClasses(src, at) {
   const before = src.slice(Math.max(0, at - 300), at);
   return [...before.matchAll(/className="([^"]+)"/g)].flatMap((m) => m[1].trim().split(/\s+/));
 }
-const FILES = [...walk("app"), ...walk("components")].filter((f) => readFileSync(f, "utf8").includes("<textarea"));
+const FILES = [...walk("app"), ...walk("components")].filter((f) => /<(?:Auto)?[Tt]extarea/.test(readFileSync(f, "utf8")))
+  // ★ 자라는 칸을 소유한 파일은 뺀다 — 그 안의 raw <textarea> 는 클래스를 **받아 넘기는**
+  //   자리라(`{...rest}`) 스스로 달지 않는다. 클래스는 부르는 자리가 준다.
+  .filter((f) => !f.endsWith(join("components", "AutoTextarea.jsx")));
 
 describe("원클릭 ①입력 — 글 쓰는 칸", () => {
   const src = readFileSync("app/ads/[id]/page.js", "utf8");
@@ -69,7 +74,7 @@ describe("그물 — 이름만 있고 CSS 가 없는 칸이 또 생기지 않게
     const orphans = [];
     for (const f of FILES) {
       const src = readFileSync(f, "utf8");
-      const spots = [...src.matchAll(/<textarea/g)].map((m) => m.index);
+      const spots = [...src.matchAll(/<(?:Auto)?[Tt]extarea/g)].map((m) => m.index);
       const all = textareaClasses(src);
       all.forEach((cls, i) => {
         // ① 자기 클래스가 규칙을 갖는가 (`textarea.field { … }` · `.ref { … }`)

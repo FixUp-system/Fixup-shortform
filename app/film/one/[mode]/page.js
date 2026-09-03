@@ -36,6 +36,7 @@ import { STYLE_PRESETS } from "../../../../lib/styles";
 // 화면은 통과시키는데 서버가 400 을 내고, 사장님은 다 올린 뒤에야 거절당한다.
 import { MAX_PHOTOS } from "../../../../lib/photos";
 import { MAX_MATERIAL_TEXT } from "../../../../lib/material";
+import AutoTextarea from "../../../../components/AutoTextarea";
 
 // 화풍은 영상용 문구가 있는 것만 고를 수 있다 — 광고 화면(app/ads/new/page.js)과 같은 규칙이다.
 const AD_STYLES = STYLE_PRESETS.filter((s) => Object.keys(AD_STYLE_LINES).includes(s.id));
@@ -311,7 +312,7 @@ export default function FilmPage() {
       {!id && (
         <section className="panel--wide">
           <div className="composer">
-            <textarea
+            <AutoTextarea
               className="field composer-text"
               value={text}
               maxLength={MAX_MATERIAL_TEXT}

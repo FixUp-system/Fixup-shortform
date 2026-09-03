@@ -10,6 +10,7 @@ import { planReelBake, reelSheetUrl, reelWholePrompt, canBakeReel } from "../../
 import PromptWithKo from "../../../../components/PromptWithKo";
 import { REEL_STEPS, reelStepHref } from "../../../../lib/reel/steps";
 import ReelBack from "../../../../components/ReelBack";
+import AutoTextarea from "../../../../components/AutoTextarea";
 
 // 4 영상 프롬프트 — **굽기 전이다.** 여기서 고치는 것은 값이 들지 않는다.
 //
@@ -161,7 +162,7 @@ export default function ReelPromptsPage() {
           {/* ★ 한국어로 고쳐 달라고 적는 자리 — ②·③와 같은 모양이다.
               요청은 makeAll() 이 실어 보낸다(안 실으면 지문이 예전과 글자 그대로다). */}
           <div className="note-form">
-            <textarea
+            <AutoTextarea
               className="field"
               rows={3}
               value={note}
@@ -199,7 +200,7 @@ export default function ReelPromptsPage() {
           <section key={i} className="panel">
             <h3>컷 {i + 1}</h3>
             {c.image?.url && <img className="thumb-media" src={c.image.url} alt={`컷 ${i + 1}`} />}
-            <textarea
+            <AutoTextarea
               className="field"
               defaultValue={c.clip_prompt || ""}
               onBlur={(e) => { if (e.target.value.trim() !== (c.clip_prompt || "")) save(i, e.target.value); }}
@@ -220,7 +221,7 @@ export default function ReelPromptsPage() {
             호출 자체가 없다(프롬프트가 시나리오 원문이다). */}
       {!oneShot && cuts.some((c) => c?.clip_prompt) && (
         <div className="note-form">
-          <textarea
+          <AutoTextarea
             className="field"
             rows={3}
             value={note}

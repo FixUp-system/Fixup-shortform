@@ -32,11 +32,14 @@ describe("화면이 스스로를 설명하지 않는다", () => {
   });
 });
 
+// ★ 칸은 이제 `<AutoTextarea>` 다(components/AutoTextarea.jsx — 스스로 자란다).
+//   raw `<textarea>` 도 함께 인정한다 — 이 판이 재는 것은 **그 자리에 여러 줄 칸이
+//   있는가**이지 태그 이름이 아니다.
 describe("남길 것은 남는다", () => {
   // ★ 그림·입력 칸·버튼은 그대로다 — 걷어내는 것은 **설명**이지 기능이 아니다.
   it("스토리보드 그림과 프롬프트 칸은 그대로다", () => {
     expect(clean).toContain("sheet-view");
-    expect(clean).toContain("textarea");
+    expect(clean).toMatch(/<(?:Auto)?[Tt]extarea/);
   });
 
   // ★ 아직 못 하는 상태를 알리는 말은 남는다 — 그건 설명이 아니라 **막힌 이유**다.

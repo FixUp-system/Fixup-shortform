@@ -52,23 +52,27 @@ describe("원클릭 화면 — 프로면 ＋인물 이 사라진다", () => {
   });
 });
 
-describe("모드 하단 안내 — ! 아이콘 옆 한 줄", () => {
+// ★★★ 2026-09-03 저녁 뒤집힘 — **이 안내를 걷었다**(사장님 지시).
+//   문구는 09-02 에 "프로에서 ＋인물 버튼이 왜 없는지"를 미리 말해 두려고 넣은 것이다.
+//   그런데 같은 날 `facesInRefs: false` 가 걷히면서(lib/clip-limits.js) **얼굴 든 참조를
+//   막는 모델이 하나도 남지 않았다** — ＋인물 은 프로에서도 그려지는데 화면만 "지원되지
+//   않는다"고 말하고 있었다. 화면이 코드보다 낡아 거짓을 말하던 자리다.
+// ★ 판을 지우지 않고 **부재를 지킨다** — 문구가 되살아나면 그날 다시 거짓이 되기 때문이다.
+//   막는 모델이 생기면 그때는 문구가 아니라 `blocksFaces*` 가 참이 되는 자리부터 세운다.
+describe("모드 하단 안내 — 걷었다", () => {
   const NOTE = "프로 버전에서는 인물 사진 참조가 지원되지 않아요";
 
-  it("★★ 원클릭 하단에 있다", () => {
-    const src = strip(readFileSync("app/ads/new/page.js", "utf8"));
-    expect(src).toMatch(new RegExp(NOTE));
-    expect(src, "안내에 ! 아이콘이 없다").toMatch(/mode-note[\s\S]{0,200}name="bang"/);
+  it("★★★ 원클릭에 그 문구가 없다", () => {
+    expect(readFileSync("app/ads/new/page.js", "utf8")).not.toMatch(new RegExp(NOTE));
   });
 
-  it("★★ 단계별 하단에도 있다 — 두 모드가 같은 문구를 쓴다", () => {
-    const src = strip(readFileSync("app/reel/new/page.js", "utf8"));
-    expect(src).toMatch(new RegExp(NOTE));
-    expect(src).toMatch(/mode-note[\s\S]{0,200}name="bang"/);
+  it("★★★ 단계별에도 없다 — 두 모드가 같이 걷혔다", () => {
+    expect(readFileSync("app/reel/new/page.js", "utf8")).not.toMatch(new RegExp(NOTE));
   });
 
-  it("★ 아이콘·줄 스타일이 실제로 있다 — 클래스만 적고 규칙이 없으면 맨글자다", () => {
-    expect(readFileSync("components/Icon.jsx", "utf8")).toMatch(/bang:/);
-    expect(readFileSync("app/globals.css", "utf8")).toMatch(/\n\.mode-note \{/);
+  it("★★ 걷은 근거가 코드에 서 있다 — 얼굴 든 참조를 막는 모델이 하나도 없다", () => {
+    for (const id of ["seedance-2.5", "seedance-2.0", "minimax-h3"]) {
+      expect(blocksFacesForEndpoint(adEndpoint(id, "r2v")), id).toBe(false);
+    }
   });
 });

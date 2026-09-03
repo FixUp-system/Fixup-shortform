@@ -34,15 +34,18 @@ describe("실행 버튼은 **선 아래**, 이전으로와 같은 줄이다", ()
   });
 });
 
+// ★ 칸은 이제 `<AutoTextarea>` 다(components/AutoTextarea.jsx — 스스로 자란다).
+//   raw `<textarea>` 도 함께 인정한다 — 이 판이 재는 것은 **그 자리에 여러 줄 칸이
+//   있는가**이지 태그 이름이 아니다.
 describe("수정 요청 폼", () => {
   it("여러 줄로 적을 수 있다", () => {
-    expect(clean).toContain("textarea");
+    expect(clean).toMatch(/<(?:Auto)?[Tt]extarea/);
     expect(clean).toContain("note-form");
   });
 
   // ★★ 영상이 있을 때만 보인다 — 만들기 전에는 고칠 것이 없다.
   it("만든 뒤에만 보인다", () => {
-    const at = clean.indexOf("<textarea");
+    const at = clean.search(/<(?:Auto)?[Tt]extarea/);
     expect(at).toBeGreaterThan(-1);
     // ★ 조건에 이름이 붙었다(`asking`) — 굽는 버튼의 자리가 이 값 하나로 갈리기 때문이다.
     //   그 이름이 실제로 "만든 뒤이고 굽는 중이 아니다"인지도 같이 본다.

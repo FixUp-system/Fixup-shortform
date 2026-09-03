@@ -19,6 +19,7 @@ import { scenarioLock } from "../../../../lib/reel/doc";
 // 영어 원문 + 한국어를 한 덩어리로(2026-09-03) — 원문은 안 건드린다.
 import PromptWithKo from "../../../../components/PromptWithKo";
 import ReelBack from "../../../../components/ReelBack";
+import AutoTextarea from "../../../../components/AutoTextarea";
 import { reelNarration, narrationLimit } from "../../../../lib/reel/narration";
 import { speechLangOf } from "../../../../lib/subtitle-langs";
 // ★ 실패를 사장님 말로 옮기는 자리는 lib/failure.js 하나다 — 화면이 문구를 손으로 적으면
@@ -191,7 +192,7 @@ export default function ReelScenarioPage() {
             말이 아니다. 도는 표시는 위 시나리오 자리 하나가 맡는다. */}
       {!lock && scenario?.text && (
         <div className="note-form">
-          <textarea
+          <AutoTextarea
             className="field"
             rows={3}
             value={note}

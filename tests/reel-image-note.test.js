@@ -48,13 +48,16 @@ describe("라우트가 요청을 나른다", () => {
   });
 });
 
+// ★ 칸은 이제 `<AutoTextarea>` 다(components/AutoTextarea.jsx — 스스로 자란다).
+//   raw `<textarea>` 도 함께 인정한다 — 이 판이 재는 것은 **그 자리에 여러 줄 칸이
+//   있는가**이지 태그 이름이 아니다.
 describe("화면에 수정 폼이 있다", () => {
   const page = readFileSync("app/reel/[id]/images/page.js", "utf8");
   it("여러 줄로 적을 수 있다", () => {
-    expect(page).toContain("textarea");
+    expect(page).toMatch(/<(?:Auto)?[Tt]extarea/);
   });
   it("이미지가 있을 때만 보인다 — 없으면 고칠 것이 없다", () => {
-    const at = page.indexOf("<textarea");
+    const at = page.search(/<(?:Auto)?[Tt]extarea/);
     expect(page.slice(Math.max(0, at - 300), at)).toMatch(/sheetUrl|hasImages/);
   });
 });

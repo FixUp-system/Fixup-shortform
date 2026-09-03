@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useProject } from "../../components/ProjectContext";
 import { useMe } from "../../components/MeContext";
-import { useAutoGrow } from "../../components/useAutoGrow";
+import AutoTextarea from "../../components/AutoTextarea";
 import { TARGET_CHOICES } from "../../lib/script";
 import { DEFAULT_STYLE_ID } from "../../lib/styles";
 import { ASPECTS, DEFAULT_ASPECT_ID, aspectFor } from "../../lib/aspects";
@@ -59,17 +59,12 @@ export default function CreatePage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const fileRef = useRef(null);
-  const textRef = useRef(null);
 
   // 이 모델이 여는 화질 목록 — 비면 화질 칩을 아예 안 그린다(Kling·LTX)
   const resolutions = resolutionsForModel(model);
 
   // 새 프로젝트를 시작하는 자리 — 이전 프로젝트의 단계가 사이드바에 남지 않게 비운다
   useEffect(() => { setProject(null); }, [setProject]);
-
-  // 글이 늘면 칸이 아래로 밀린다 — 안에서 스크롤하지 않는다. 바닥은 CSS 의 min-height 가
-  // 잡고, 재는 규칙은 훅 하나다(components/useAutoGrow.js).
-  useAutoGrow(textRef, text);
 
   async function onFiles(e) {
     for (const file of e.target.files) {
@@ -139,7 +134,7 @@ export default function CreatePage() {
               사장님은 여전히 "적을 자리가 없다"고 느낀다.
               (걷어낸 라벨을 여기 그대로 옮겨 적지 않는다: 화면 계약이 소스 문자열을 훑어
                재므로 주석의 낱말도 "칸이 남아 있다"로 읽힌다 — 오늘 세 번째다.) */}
-          <textarea ref={textRef} className="field composer-text" value={text} maxLength={MAX_MATERIAL_TEXT}
+          <AutoTextarea className="field composer-text" value={text} maxLength={MAX_MATERIAL_TEXT}
             onChange={(e) => setText(e.target.value)}
             placeholder="무엇을 알리고 싶으세요? 제품 설명·홍보 포인트·손님 이야기를 자유롭게 적어 주세요. 원하는 분위기나 촬영 느낌이 있으면 그것도 여기 함께 적어 주세요" />
 

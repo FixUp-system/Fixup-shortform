@@ -57,16 +57,19 @@ describe("라우트가 요청을 나른다", () => {
   });
 });
 
+// ★ 칸은 이제 `<AutoTextarea>` 다(components/AutoTextarea.jsx — 스스로 자란다).
+//   raw `<textarea>` 도 함께 인정한다 — 이 판이 재는 것은 **그 자리에 여러 줄 칸이
+//   있는가**이지 태그 이름이 아니다.
 describe("화면에 적는 자리가 있다", () => {
   it("여러 줄로 적을 수 있다", () => {
-    expect(page).toContain("textarea");
+    expect(page).toMatch(/<(?:Auto)?[Tt]extarea/);
   });
   // ⚠️ 고치면 이미지를 다시 만들어야 한다 — **항상** 말해 준다(2026-08-25 사장님 지시).
   //   전에는 그림이 있을 때만 떴는데, 그러면 그림을 만들기 전에 고치려는 사람은
   //   그 사실을 모른다. 수정 폼 바로 아래가 그 말을 할 자리다.
   it("이미지를 다시 만들어야 한다고 폼 아래에서 말한다", () => {
     expect(page).toMatch(/이미지를 다시/);
-    const ta = page.indexOf("textarea");
+    const ta = page.search(/<(?:Auto)?[Tt]extarea/);
     const msg = page.indexOf("이미지를 다시");
     expect(msg, "안내가 입력 칸보다 앞에 있다").toBeGreaterThan(ta);
   });
@@ -85,7 +88,7 @@ describe("새 CSS 를 안 만든다", () => {
   //   스타일이 조용히 안 먹는다 — 테스트는 그런데도 그린이라 눈으로만 발견된다.
   it("입력 칸이 쓰는 클래스가 CSS 에 있다", () => {
     const css = readFileSync("app/globals.css", "utf8");
-    const at = page.indexOf("textarea");
+    const at = page.search(/<(?:Auto)?[Tt]extarea/);
     const around = page.slice(Math.max(0, at - 200), at + 200);
     const m = around.match(/className="([a-z- ]+)"/);
     expect(m, "textarea 의 className 을 못 찾았다").toBeTruthy();
@@ -100,7 +103,7 @@ describe("폼이 세로로 쌓인다", () => {
   //   설명이 옆에 붙고 칸 폭이 줄어들어 시나리오 본문과 가로가 안 맞는다.
   //   입력 칸은 자기 블록(.note-form)에서 세로로 쌓여야 한다.
   it("입력 칸이 .step-actions 안에 있지 않다", () => {
-    const ta = page.indexOf("<textarea");
+    const ta = page.search(/<(?:Auto)?[Tt]extarea/);
     const acts = page.indexOf('className="step-actions"');
     expect(ta).toBeGreaterThan(-1);
     expect(acts).toBeGreaterThan(-1);

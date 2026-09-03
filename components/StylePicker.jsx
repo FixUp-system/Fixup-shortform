@@ -9,23 +9,13 @@
 //
 // bare=true 는 입력 박스의 서랍 안에서 쓰는 모양이다 — 박스가 이미 라벨을 이고 있어
 // 제목을 또 붙이면 같은 말이 두 번 나온다. 목록·설명·보정은 그대로 공유한다.
-import { useEffect, useRef } from "react";
+import AutoTextarea from "./AutoTextarea";
 import { STYLE_PRESETS, STYLE_NOTE_MAX, styleFor } from "../lib/styles";
 
 export default function StylePicker({
   preset, note, onPreset, onNote, onNoteCommit, disabled, warn, bare,
 }) {
   const current = styleFor(preset);
-  const noteRef = useRef(null);
-
-  // 박스 안(bare)에서는 보정 칸에 테두리가 없어 스크롤이 생기면 잘린 것처럼 보인다.
-  // 자료 칸과 같은 방식으로 아래로 밀어 둔다 — auto 로 되돌린 뒤 재므로 지우면 다시 접힌다.
-  useEffect(() => {
-    const el = noteRef.current;
-    if (!el || !bare) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, [note, bare]);
   return (
     <>
       {!bare && <div className="eyebrow">영상 컨셉 <small>이 그림으로 영상이 만들어져요</small></div>}
@@ -40,7 +30,7 @@ export default function StylePicker({
       <div className={bare ? "tray-note" : "script-src"}>{current.desc}</div>
       {warn && <div className={bare ? "tray-note" : "script-src warn"}>{warn}</div>}
       {bare ? (
-        <textarea ref={noteRef} rows={1} className="field tray-input" maxLength={STYLE_NOTE_MAX}
+        <AutoTextarea rows={1} className="field tray-input" maxLength={STYLE_NOTE_MAX}
           placeholder='더 바라는 결이 있으면 한 줄 (예: "따뜻한 파스텔톤")'
           value={note} disabled={disabled}
           onChange={(e) => onNote(e.target.value)} onBlur={onNoteCommit} />

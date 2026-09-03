@@ -21,6 +21,7 @@ import { isReelClipStale } from "../../../../lib/reel/steps";
 import { startPolling } from "../../../../lib/poll";
 import { REEL_STEPS, reelStepHref } from "../../../../lib/reel/steps";
 import ReelBack from "../../../../components/ReelBack";
+import AutoTextarea from "../../../../components/AutoTextarea";
 
 export default function ReelVideoPage() {
   const { id } = useParams();
@@ -305,7 +306,7 @@ export default function ReelVideoPage() {
           ★ 만든 뒤에만 보인다 — 만들기 전에는 고칠 것이 없다. */}
       {asking && (
         <div className="note-form">
-          <textarea
+          <AutoTextarea
             className="field"
             rows={3}
             value={note}
