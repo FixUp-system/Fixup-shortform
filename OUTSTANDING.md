@@ -16,7 +16,7 @@
 | 워크트리 | `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` |
 | 브랜치 | `feat/reel-cut-r2v` (09-03). ⚠️ **09-03 작업 전부가 아직 로컬에만 있다.** ★ HEAD·미푸시 수는 **적지 않는다** — 이 문서를 고치는 커밋이 그 수를 또 바꿔서 적는 순간 낡는다. **세라**: `git log -1 --format='%h %s'` · `git rev-list --count fixup/main..HEAD` |
 | 테스트 | **5,677 그린** (10 skipped) — `npx vitest run` · `npx next build` 통과(09-03 실측) |
-| 배포 | **프로덕션 라이브 `ikhspn29e`**(09-03 오후 · `dpl_B5BywrYBaPSCKUqbGakNXPck7Sm8` · 코드 `092fa71`, 격자 수정 포함). **검증**: `npx vercel inspect fixup-shortform-service.vercel.app` 가 그 `dpl_` 를 그대로 돌려준다(alias→배포 직접 대조 — 이번 수정은 **서버 전용**이라 클라이언트 청크 지문으로는 못 잰다). `/login`·`/archive` **200**. 앞선 배포: `5x74i94xy`(코드 `3dede6f`) ← `4l168opih`(09-02 밤) ← `2jhi19mik`(09-02 저녁) |
+| 배포 | **프로덕션 라이브 `bvfdlns4k`**(09-03 오후 · `dpl_Br8efZccG8sp4vMWyZEJXJZ9Usyv` · 코드 `a78223a`, 격자 2차 수정 포함). **검증**: `npx vercel inspect fixup-shortform-service.vercel.app` 가 그 `dpl_` 를 그대로 돌려준다(alias→배포 직접 대조). `/login`·`/archive` **200**. 앞선 배포: `ikhspn29e`(격자 1차) ← `5x74i94xy` ← `4l168opih`(09-02 밤) |
 | ★ 정식 도메인 | **`https://fixup-shortform-service.vercel.app`** 다. `vercel deploy` 가 찍어 주는 `...-ju8okg74p-fix-up1.vercel.app` 쪽은 **Deployment Protection(SSO)에 걸려 전부 302** 라 검증에 쓰면 안 된다 — 09-02 에 한 번 속았다 |
 | 미배포 | ✅ **없다**(09-03 오후 두 번째 배포 기준). ⚠️ **배포 ≠ 푸시다** — `git archive` 로 올리므로 배포해도 브랜치는 여전히 미푸시다(아래 푸시 줄). 올리는 법은 §0 '배포하는 법' |
 | 푸시 | 🔴 **미푸시 있음** — 수는 위 줄의 명령으로 센다(09-03 마지막 실측 11). ⚠️ **URL 로 직접 푸시하면 로컬 추적 ref 가 안 움직여** '미푸시 N' 착시가 난다 — 정정은 `git fetch <원격> <브랜치>:refs/remotes/<원격>/<브랜치>`. ⚠️ `git push` 가 자격증명 대기로 매달리면 `GIT_TERMINAL_PROMPT=0` 을 걸어 바로 실패시켜라 |
@@ -329,7 +329,16 @@ cd <빈폴더> && npx vercel deploy --prod --yes --project fixup-shortform-servi
      판의 주제가 바로 광고판 속 인물이라 정통으로 맞았다.
    → `findFaceBoxes`(배열)로 고쳤고 **덮은 자리 4곳 → 11곳**(같은 판 실측). 작은 얼굴이
      흰 덩어리가 되던 것도 칸 수를 줄여 잡았다. 커밋 `4428fb4` · **미배포·유료 미검증**.
+   ⚠️ **1차 수정으로는 안 풀렸다** — 요청 `01a065aa` 가 또 422. fal 이 되돌려준 입력을 눈으로
+     보니 격자는 붙었는데 **얼굴을 못 깨고 있었다**. 원인 셋(전부 실측):
+     · 칸 수를 고정해 큰 상자에서 **선 간격이 52px** — 얼굴이 격자 한 칸에 통째로 들어갔다
+     · 가로·세로에 같은 칸 수 — 153×837 상자에서 세로 19px / **가로 105px**
+     · **한 회차 좌표가 못 미덥다** — 같은 칸을 네 번 물으니 상자가 흩어졌고, 칸 0 에서는
+       격자가 **하늘에** 그려져 얼굴이 통째로 노출됐다
+     → 2차 수정 `a78223a`: 간격 **20px 절대값** · 가로·세로 **따로** · 지문을 얼굴만으로 ·
+       **3회 물어 겹치는 상자 합치기**(`mergeRects`). 같은 판 실측 **다섯 칸 전부 덮임**.
    ⚠️ 탐지는 여전히 비결정적이라 **"이제 안 거절당한다"고 말할 수 없다** — 확률을 올렸을 뿐이다.
+   ⚠️ 판이 상당히 지워진다 — 참조 정보량이 줄어 **결과물 품질이 떨어질 수 있다**(미측정).
    ⚠️ 오류가 **문서에 안 남았다** — `reel.error` 가 null 인데 화면에는 422 가 떴다.
      수거 GET 이 던진 것을 화면에만 주고 문서에 안 적는 길이 있다(아직 안 고쳤다).
 
