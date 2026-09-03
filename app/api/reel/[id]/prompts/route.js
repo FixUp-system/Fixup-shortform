@@ -6,6 +6,11 @@ import { putReel } from "../../../../../lib/reel/doc.js";
 import { rewriteWholePrompt } from "../../../../../lib/reel/whole-prompt.js";
 import { reelWholePrompt } from "../../../../../lib/reel/oneshot.js";
 
+// ★ 2026-09-03 — **배포 기본 상한에 잘리던 자리다.** LLM 이 컷마다 영상 프롬프트를 쓴다
+//   상한이 없으면 함수가 조용히 끊기고, 그때 fal 은 계속 만들어 과금하는데 우리 문서에는
+//   아무것도 안 남는다(사장님이 겪은 "계속 로딩 중"의 뿌리 중 하나다).
+export const maxDuration = 300;
+
 // 영상 프롬프트 만들기.
 //
 // ★ 기다린다(fire-and-forget 이 아니다). 컷 서넛에 LLM 호출이 짧아 서버리스 상한 안에서

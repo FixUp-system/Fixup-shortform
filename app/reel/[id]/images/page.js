@@ -19,6 +19,8 @@ import {
   reelOf, reelErrorFor, canDrawReelImages, isReelRendering, isImagesLocked, imageTriesLeft, imageTriesLeftLifetime,
 } from "../../../../lib/reel/doc";
 import { reelSheetUrl, storyboardGridFor } from "../../../../lib/reel/oneshot";
+// 보드 주소에 싣는 **내용 지문** — 서버와 같은 함수를 쓴다(두 벌이면 캐시가 안 맞는다).
+import { boardKey } from "../../../../lib/reel/board-key";
 // ★ 칸에 실리는 지문 한 줄 — **지문을 만드는 쪽과 같은 함수**다(lib/reel/panels.js).
 //   화면에서 다시 조립하면 실제로 나간 글과 갈린다.
 import { panelBody, panelSay, buildStoryboardPrompt } from "../../../../lib/reel/panels";
@@ -30,6 +32,10 @@ export default function ReelImagesPage() {
   const stepLabel = REEL_STEPS.find((x) => x.key === "images")?.label || "";
   const { project, reload } = useReelProject();
   const [busy, setBusy] = useState("");
+  // ★★★ 2026-09-03 사장님 지시 — **보드가 오는 동안에도 로딩을 보여 준다.**
+  //   그전에는 `drawingNow`(그림을 만드는 중)일 때만 표시가 떴고, 보드 그림이 서버에서
+  //   그려져 도착하기까지는 **빈 자리**였다 — 사장님에게는 멈춘 화면으로 보인다.
+  const [boardReady, setBoardReady] = useState(false);
   const [err, setErr] = useState("");
   // ★ 사장님이 한국어로 적는 수정 요청. 보낸 뒤에는 비운다 — 남아 있으면 다음에
   //   또 누를 때 같은 요청이 두 번 실린다(②시나리오와 같은 처방).
@@ -44,6 +50,8 @@ export default function ReelImagesPage() {
   const scenario = project?.scenario;
   const rendering = isReelRendering(reel);
   const drawingNow = isImagesLocked(reel) || !!busy;
+  // 보드 주소 — 내용 지문을 실어 캐시가 컷에 맞물리게 한다(lib/reel/board-key.js).
+  const boardHref = `/api/reel/${id}/board?v=${boardKey(cuts)}`;
   const triesLeft = imageTriesLeft(reel);
   const triesLeftLifetime = imageTriesLeftLifetime(reel);
   // 문 판정은 순수 함수 하나다 — 서버(app/api/reel/[id]/images/route.js)와 같은 값을 본다.
@@ -114,6 +122,9 @@ export default function ReelImagesPage() {
   // ★ 아직 안 그렸으면 지금 값으로 **미리보기**를 만든다(같은 함수 하나로 만든다).
   //   첨부 사진 줄은 사진이 있는지만 보고 붙으므로 장수만 넘긴다.
   const savedPrompt = cuts.map((c) => c.image?.of).find(Boolean) || "";
+  // 보드 주소가 바뀌면(컷을 고쳤다) 다시 "오는 중"으로 되돌린다.
+  useEffect(() => { setBoardReady(false); }, [boardHref]);
+
   const previewGrid = storyboardGridFor(cuts.length, {
     resolution: project?.settings?.resolution,
     aspect: project?.settings?.aspect_ratio,
@@ -196,11 +207,26 @@ export default function ReelImagesPage() {
       {sheetUrl && (
         <div className="sheet-block">
           <div className="sheet-view sheet-view--sm">
-            <img src={`/api/reel/${id}/board`} alt="스토리보드" />
-            {drawingNow && <div className="frame-busy"><span className="spinner" aria-hidden="true" /></div>}
+            {/* ★★★ 2026-09-03 — 주소에 **내용 지문**을 싣는다(boardKey). 컷이 그대로면 같은
+                주소라 브라우저 캐시가 그대로 맞고(라우트가 1년·immutable 로 답한다), 컷을
+                고치면 주소가 달라져 **자동으로** 새로 그린다. 무효화를 손으로 안 한다.
+                ★ key 도 같은 값이다 — 주소가 바뀌면 <img> 를 새로 만들어 onLoad 가 다시
+                  불린다(안 그러면 새 그림이 오는 동안 옛 그림 위에 로딩이 안 뜬다). */}
+            <img
+              key={boardHref}
+              src={boardHref}
+              alt="스토리보드"
+              onLoad={() => setBoardReady(true)}
+              onError={() => setBoardReady(true)}
+            />
+            {/* 그리는 중이거나 **보드가 아직 안 온 동안** 덮개를 씌운다 — 빈 자리를 두면
+                멈춘 화면으로 보인다(사장님 지적). */}
+            {(drawingNow || !boardReady) && (
+              <div className="frame-busy"><span className="spinner" aria-hidden="true" /></div>
+            )}
           </div>
           <div className="panel-act">
-            <a className="mini" href={`/api/reel/${id}/board?download=1`} download>전체 내려받기</a>
+            <a className="mini" href={`${boardHref}${boardHref.includes("?") ? "&" : "?"}download=1`} download>전체 내려받기</a>
           </div>
         </div>
       )}

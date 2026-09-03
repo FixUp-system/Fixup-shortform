@@ -7,6 +7,11 @@ import { isReelClipStale } from "../../../../../lib/reel/steps.js";
 //   시작하자마자 "멈췄어요"가 뜬다(lib/progress.js 의 stalledFor 머리말).
 import { stalledFor } from "../../../../../lib/progress.js";
 
+// ★ 2026-09-03 — **배포 기본 상한에 잘리던 자리다.** collectReelOneShot 이 fal 에 두 번 다녀온다
+//   상한이 없으면 함수가 조용히 끊기고, 그때 fal 은 계속 만들어 과금하는데 우리 문서에는
+//   아무것도 안 남는다(사장님이 겪은 "계속 로딩 중"의 뿌리 중 하나다).
+export const maxDuration = 60;
+
 // 화면이 두드리는 상태 라우트 — 이 계약은 다음 태스크(화면)가 소비한다. 모양을 여기서
 // 못 박는다:
 //   { status, error, progress, stalled_for_ms, cuts: [{ idx, image, clip_prompt, video, stale }] }

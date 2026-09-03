@@ -3,6 +3,11 @@ import { runScenarioStep } from "../../../../../lib/ad/pipeline.js";
 import { getProject } from "../../../../../lib/projects.js";
 import { loadAd } from "../route.js";
 
+// ★ 2026-09-03 — **배포 기본 상한에 잘리던 자리다.** LLM 시나리오 — 504 를 겪은 자리다
+//   상한이 없으면 함수가 조용히 끊기고, 그때 fal 은 계속 만들어 과금하는데 우리 문서에는
+//   아무것도 안 남는다(사장님이 겪은 "계속 로딩 중"의 뿌리 중 하나다).
+export const maxDuration = 300;
+
 // 동기다 — LLM 만 쓰고 몇 초면 끝난다. fire-and-forget 으로 만들 이유가 없다.
 // (유료 생성만 fire-and-forget 이다.)
 // ★ 선택 body `{ shots, globals }` — 사장님이 컷이나 **영상 전체 값**(인물·무대·옷차림…)을

@@ -13,6 +13,11 @@ import {
   planReelImages, drawStoryboardSheet, mergeImages,
 } from "../../../../../lib/reel/storyboard.js";
 
+// ★ 2026-09-03 — **배포 기본 상한에 잘리던 자리다.** 스토리보드 한 장을 fal 동기 호출로 끝까지 기다린다
+//   상한이 없으면 함수가 조용히 끊기고, 그때 fal 은 계속 만들어 과금하는데 우리 문서에는
+//   아무것도 안 남는다(사장님이 겪은 "계속 로딩 중"의 뿌리 중 하나다).
+export const maxDuration = 300;
+
 // 만든 그림만 컷에 얹는다 — **컷 목록을 대체하지 않는다.** 다시 내보내는 이유: 이것이
 // N1 의 수정 전부다("실패해도 뒤 컷이 살아남는가"), 테스트가 이것을 직접 부른다
 // (tests/reel-routes.test.js).

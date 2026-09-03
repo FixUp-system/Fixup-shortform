@@ -15,6 +15,11 @@ import {
 import { validateCast, validateProps } from "../../../../../lib/validate.js";
 import { callJson as callCastJson } from "../../../../../lib/llm.js";
 
+// ★ 2026-09-03 — **배포 기본 상한에 잘리던 자리다.** LLM 시나리오
+//   상한이 없으면 함수가 조용히 끊기고, 그때 fal 은 계속 만들어 과금하는데 우리 문서에는
+//   아무것도 안 남는다(사장님이 겪은 "계속 로딩 중"의 뿌리 중 하나다).
+export const maxDuration = 300;
+
 // 시나리오의 shot 하나가 컷 하나다 — 옮기는 것은 코드다(LLM 이 두 번 답하면 화면이 본
 // 대사와 실제로 만들어지는 대사가 갈릴 수 있다, lib/cuts.js 의 shotsToCuts 와 같은 이유).
 //

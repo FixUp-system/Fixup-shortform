@@ -5,6 +5,11 @@ import { collectReelOneShot } from "../../../../lib/reel/pipeline.js";
 // 자막 설정의 되돌리기 규칙은 lib 하나가 쥔다 — 라우트가 다시 적으면 갈린다.
 import { normalizeSubtitle } from "../../../../lib/subtitles.js";
 
+// ★ 2026-09-03 — **배포 기본 상한에 잘리던 자리다.** 보는 문도 수거한다(collectReelOneShot)
+//   상한이 없으면 함수가 조용히 끊기고, 그때 fal 은 계속 만들어 과금하는데 우리 문서에는
+//   아무것도 안 남는다(사장님이 겪은 "계속 로딩 중"의 뿌리 중 하나다).
+export const maxDuration = 60;
+
 // reel 문서를 **읽는 문**.
 //
 // ★★ 이 자리가 비어 있던 것이 사고였다(2026-08-21, Task 12 브리핑 도중 발견). reel 을

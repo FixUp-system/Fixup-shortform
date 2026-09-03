@@ -5,6 +5,11 @@ import { runFilmImages } from "../../../../../lib/film/pipeline.js";
 import { updateProject } from "../../../../../lib/projects.js";
 import { filmOf, putFilm, MAX_FILM_IMAGE_TRIES, isDrawLocked } from "../../../../../lib/film/doc.js";
 
+// ★ 2026-09-03 — **배포 기본 상한에 잘리던 자리다.** 같은 동기 이미지 경로다
+//   상한이 없으면 함수가 조용히 끊기고, 그때 fal 은 계속 만들어 과금하는데 우리 문서에는
+//   아무것도 안 남는다(사장님이 겪은 "계속 로딩 중"의 뿌리 중 하나다).
+export const maxDuration = 300;
+
 // 그림 만들기 — 방식이 정한 계획대로 몇 장을 만든다(장면 순서는 장면 수만큼, 참고 그림은 셋).
 //
 // ★ 기다린다(fire-and-forget 이 아니다). 이미지 몇 장이라 서버리스 상한 안에서 끝나고,

@@ -7,6 +7,11 @@ import { loadAd } from "../route.js";
 import { getStore } from "../../../../../lib/store/index.js";
 import { tierOf, tierAllowsModel } from "../../../../../lib/tiers.js";
 
+// ★ 2026-09-03 — **배포 기본 상한에 잘리던 자리다.** startAdRender 를 fire-and-forget 한다
+//   상한이 없으면 함수가 조용히 끊기고, 그때 fal 은 계속 만들어 과금하는데 우리 문서에는
+//   아무것도 안 남는다(사장님이 겪은 "계속 로딩 중"의 뿌리 중 하나다).
+export const maxDuration = 300;
+
 // ★ 유료 입구다. 청구는 파이프라인이 하지만, **낼 수 있는지는 여기서 먼저 본다** —
 //   그래야 사장님이 402 를 HTTP 로 받는다. 파이프라인은 fire-and-forget 이라
 //   거기서 던지면 응답이 이미 나가 있다.

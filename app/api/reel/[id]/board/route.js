@@ -55,8 +55,16 @@ export const GET = withUser(async (req, { params }, user) => {
       "Content-Type": "image/png",
       // 이름을 우리가 준다 — 누르면 저장이 되고, 파일명으로 어느 편인지 알 수 있다.
       "Content-Disposition": `${wantsFile ? "attachment" : "inline"}; filename="storyboard-${id.slice(0, 8)}.png"`,
-      // 컷이 바뀌면 달라지는 그림이라 오래 안 쥔다.
-      "Cache-Control": "private, max-age=60",
+      // ★★★ 2026-09-03 — **주소에 내용 지문(`?v=`)이 실리면 오래 쥐어도 안전하다**
+      //   (lib/reel/board-key.js). 컷을 고치면 화면이 만드는 주소가 달라져 **자동으로**
+      //   새로 그려지므로, 낡은 그림이 남을 길이 없다.
+      //   그전에는 60초였고, 그래서 화면을 다시 열 때마다 보드를 다시 그렸다 —
+      //   사장님이 "매번 불러오는 데 시간이 걸린다"고 한 자리다.
+      // ★ `v` 가 없는 옛 주소(북마크·직접 호출)는 **짧게** 쥔다 — 그 주소는 내용이
+      //   바뀌어도 그대로라 오래 쥐면 낡은 그림이 굳는다.
+      "Cache-Control": new URL(req.url).searchParams.has("v")
+        ? "private, max-age=31536000, immutable"
+        : "private, max-age=60",
     },
   });
 });

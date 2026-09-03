@@ -14,6 +14,11 @@ import { getProject } from "../../../../../lib/projects.js";
 import { reelSheetUrl } from "../../../../../lib/reel/oneshot.js";
 import { fetchImageBytes } from "../../../../../lib/reel/storyboard.js";
 
+// ★ 2026-09-03 — **배포 기본 상한에 잘리던 자리다.** 판을 내려받아 다시 그린다
+//   상한이 없으면 함수가 조용히 끊기고, 그때 fal 은 계속 만들어 과금하는데 우리 문서에는
+//   아무것도 안 남는다(사장님이 겪은 "계속 로딩 중"의 뿌리 중 하나다).
+export const maxDuration = 60;
+
 export const GET = withUser(async (_req, { params }, user) => {
   const { id } = await params;
   const project = await getProject(id, user.id);

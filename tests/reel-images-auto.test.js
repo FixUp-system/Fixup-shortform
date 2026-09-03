@@ -76,7 +76,8 @@ describe("보여 주는 것은 컷별 [그림 · 지문] 이다", () => {
   //     ④프롬프트·⑤영상에서 여전히 보인다. 바뀐 것은 **이 화면이 보여 주는 것**뿐이다.
   it("★ 보드를 내려받을 수 있다 — 그려서 흘려주므로 링크만으로는 저장이 안 된다", () => {
     expect(src).toContain("전체 내려받기");
-    expect(src).toMatch(/\/board`/);
+    // 주소는 boardHref 가 만든다(2026-09-03, 캐시 지문 `?v=`).
+    expect(src).toMatch(/\/board\?v=/);
     const route = readFileSync("app/api/reel/[id]/board/route.js", "utf8");
     expect(route, "내려받기 헤더가 없다").toContain("Content-Disposition");
     // ★ 화면이 준 주소를 그대로 열면 아무 URL 이나 받아 오는 문이 된다(SSRF).
@@ -107,7 +108,8 @@ describe("보여 주는 것은 컷별 [그림 · 지문] 이다", () => {
   //   되어 있는데 그냥 고정 이미지로 배치해줘")로 토글이 사라졌다. 항상 보이는 것이 계약이다.
   it("(1) 스토리보드가 **고정 이미지**다 — 접는 토글이 없다", () => {
     expect(src, "접는 토글이 돌아왔다").not.toContain("sheet-foldable");
-    expect(src, "보드 이미지가 없다").toMatch(/<img src=\{`\/api\/reel\/\$\{id\}\/board`\}/);
+    // ★ 2026-09-03 — 주소를 boardHref 변수가 만든다(캐시 지문 `?v=`). 뜻으로 잰다.
+    expect(src, "보드 이미지가 없다").toMatch(/<img[\s\S]{0,120}?src=\{boardHref\}/);
   });
 
   // (옛 판 "내려받기는 접힘 밖" 은 2026-09-02 토글 제거로 뜻을 잃어 걷어냈다 —

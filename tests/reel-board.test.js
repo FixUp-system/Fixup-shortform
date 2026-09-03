@@ -245,10 +245,16 @@ describe("화면·라우트 배선", () => {
   it("★★ 미리보기와 내려받기가 **다른 주소**다", () => {
     // 한 주소로 겸할 수 없다 — `attachment` 를 늘 붙이면 <img> 가 아무것도 못 그린다
     // (2026-09-02, 화면을 실제로 열어 보고 알았다. 판도 빌드도 그때 그린이었다).
-    expect(page, "미리보기가 내려받기 주소를 쓴다").toMatch(/<img src=\{`\/api\/reel\/\$\{id\}\/board`\}/);
+    // ★ 2026-09-03 — 주소를 **변수 하나**(boardHref)가 만든다. 내용 지문(`?v=`)을 실어
+    //   캐시가 컷에 맞물리게 하려고 그렇게 바꿨다(lib/reel/board-key.js). 그래서 여기서는
+    //   글자 그대로가 아니라 **뜻**을 잰다: 미리보기는 download 를 안 붙이고, 내려받기만 붙인다.
+    expect(page, "보드 주소를 만드는 자리가 없다").toMatch(/const boardHref = `\/api\/reel\/\$\{id\}\/board\?v=\$\{boardKey\(/);
+    expect(page, "미리보기가 그 주소를 안 쓴다").toMatch(/<img[\s\S]{0,120}?src=\{boardHref\}/);
+    expect(page, "미리보기에 download 가 붙었다 — <img> 가 아무것도 못 그린다")
+      .not.toMatch(/<img[\s\S]{0,200}?download=1/);
     // ★ 2026-09-02 — 토글을 걷어냈다(사장님: "그냥 고정 이미지로"). 항상 붙는다.
     expect(page, "토글이 남아 있다").not.toContain("boardOpen");
-    expect(page, "내려받기가 download 인자를 안 준다").toMatch(/\/board\?download=1`\}[^>]*download/);
+    expect(page, "내려받기가 download 인자를 안 준다").toMatch(/href=\{`\$\{boardHref\}[^`]*download=1`\}[^>]*download/);
     expect(route, "라우트가 그 인자를 안 본다").toContain('searchParams.has("download")');
   });
 

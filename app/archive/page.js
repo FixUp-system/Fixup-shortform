@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { loadProjects } from "../../lib/projects-client";
 import ProjectCards from "../../components/ProjectCards";
 import { useDialog } from "../../components/DialogProvider";
@@ -19,6 +19,7 @@ function ArchiveBody() {
   // ★ 첫 탭은 **주소**가 정한다(2026-08-19). 상세에서 [보관함으로]로 돌아올 때 보던 탭이
   //   실려 오므로, 화면 안 상태로만 기억하면 돌아올 때마다 [내 영상]으로 떨어진다.
   const params = useSearchParams();
+  const router = useRouter();
   // ★ 로그인 없이 보고 있는가. 손님에게는 **"내 영상"이라는 개념이 없다** — 그 칸을
   //   그리면 누를 수 없는 자리를 누른 것처럼 보인다(라우트는 늘 전체로 답한다).
   const [guest, setGuest] = useState(false);
@@ -105,6 +106,14 @@ function ArchiveBody() {
     if (next === scope) return;
     stopSelecting();
     setScope(next);
+    // ★★★ 2026-09-03 사장님 지적 — **주소도 함께 옮긴다.** 위 useState 는 첫 값만
+    //   주소에서 읽는데(그 주석이 "첫 탭은 주소가 정한다"고 말한다) 정작 탭을 바꿀 때
+    //   주소를 안 고치고 있었다. 그래서 [전체]를 보다가 **새로고침하면 [내 영상]으로**
+    //   떨어졌다 — 주소에 scope 가 없으니 기본값으로 되돌아간 것이다.
+    //   ★ push 가 아니라 replace 다 — 탭 전환은 되돌아갈 자리가 아니라 지금 보는 자리다.
+    //     push 로 쌓으면 [뒤로]가 탭 전환을 거슬러 올라가 보관함을 못 빠져나간다.
+    //   ★ scroll:false — 탭만 바꾸는데 목록이 맨 위로 튀지 않게.
+    router.replace(next === "all" ? "/archive?scope=all" : "/archive", { scroll: false });
   }
 
   return (

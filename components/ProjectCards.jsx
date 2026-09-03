@@ -148,10 +148,17 @@ export default function ProjectCards({ projects, limit, onDeleted, selecting, se
               </span>
               <span className="project-meta">
                 <span className="title">{p.title || "제목 없음"}</span>
-                {/* 종류 표시 — 광고 문서에만 붙는다. 옛 문서는 이 배지가 아예 없다 */}
+                {/* ★★★ 2026-09-03 사장님 지시 — **어느 모드로 만든 것인지 카드가 말한다.**
+                    그전에는 광고(원클릭)와 film(한 번에)에만 배지가 붙고 **단계별은 아무
+                    표시가 없어서**, 배지 없는 카드가 "단계별"인지 "옛 문서라 종류를 모르는
+                    것"인지 구별되지 않았다. 이제 셋이 모두 자기 이름을 단다.
+                    ★ 이름은 사이드바·상세와 같은 말이다(원클릭 영상 · 단계별 영상 ·
+                      한 번에 굽는 영상) — 자리마다 다르게 부르면 같은 것을 다른 것으로 읽는다.
+                    ★ 판정 순서가 곧 규칙이다: ad·film 이 아니면 단계별이다(상세 화면
+                      app/archive/[id]/page.js 가 쓰는 것과 같은 갈래). */}
                 {isAd && <span className="badge ai">원클릭</span>}
-                {/* 종류 표시 — 한 번에 굽는 영상. 옛 문서는 이 배지가 아예 없다 */}
                 {isFilm && <span className="badge ai">한 번에</span>}
+                {!isAd && !isFilm && <span className="badge ai">단계별</span>}
                 {/* ★ 어느 방식으로 구웠는지 — film 은 한 프로젝트가 두 편을 담는다.
                     이름은 표(FILM_MODES)에서 가져온다: 손으로 적으면 방식이 늘 때 빠진다.
                     아직 안 구웠으면 목록이 빈 배열을 주므로 배지가 안 붙는다. */}

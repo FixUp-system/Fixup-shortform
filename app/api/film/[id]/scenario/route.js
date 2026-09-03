@@ -5,6 +5,11 @@ import { generateScenario, pickEditedShots, pickEditedGlobals, readPhotoVision }
 import { MAX_SCENARIO_TRIES } from "../../../../../lib/pricing.js";
 import { scenarioLock } from "../../../../../lib/film/doc.js";
 
+// ★ 2026-09-03 — **배포 기본 상한에 잘리던 자리다.** LLM 시나리오
+//   상한이 없으면 함수가 조용히 끊기고, 그때 fal 은 계속 만들어 과금하는데 우리 문서에는
+//   아무것도 안 남는다(사장님이 겪은 "계속 로딩 중"의 뿌리 중 하나다).
+export const maxDuration = 300;
+
 // 시나리오 — 동기다(LLM 만 쓰고 몇 초면 끝난다).
 //
 // ★★ **이 라우트만 방식(mode)을 안 본다.** 시나리오는 두 방식이 **공유하는 하나**여야 한다:

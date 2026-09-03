@@ -6,6 +6,11 @@ import { startFilmRender } from "../../../../../lib/film/pipeline.js";
 import { assertCanAfford, chargeAd, refundAd, NoCredits } from "../../../../../lib/charges.js";
 import { adVideoPrice } from "../../../../../lib/pricing.js";
 
+// ★ 2026-09-03 — **배포 기본 상한에 잘리던 자리다.** 같은 fire-and-forget 굽기다
+//   상한이 없으면 함수가 조용히 끊기고, 그때 fal 은 계속 만들어 과금하는데 우리 문서에는
+//   아무것도 안 남는다(사장님이 겪은 "계속 로딩 중"의 뿌리 중 하나다).
+export const maxDuration = 300;
+
 // 굽기 접수 — **유료 입구다.**
 //
 // ★★ 청구가 접수 **앞**에 선다(lib/ad/pipeline.js 의 startAdRender 와 같은 이유):
