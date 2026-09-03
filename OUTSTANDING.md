@@ -16,10 +16,10 @@
 | 워크트리 | `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` |
 | 브랜치 | `feat/reel-cut-r2v` (09-03 저녁). ★ 수는 **적지 않는다** — 이 문서를 고치는 커밋이 그 수를 또 바꾼다. **세라**: `git log -1 --format='%h %s'` · `git rev-list --count fixup/main..HEAD` |
 | 테스트 | **5,744 그린** (10 skipped · 336 파일) — `npx vitest run` · `npx next build` 통과(09-03 **밤** 재실측, 얼굴 제한 걷은 뒤 포함) |
-| 배포 | **프로덕션 라이브 `7qq7axl24`**(09-03 저녁 · 코드 `93d9ca4`). Ready · `/login`·`/archive` 200 · 프로덕션 CSS 번들에서 `.prompt-head`·`.prompt-ko` 실측 확인 |
+| 배포 | **프로덕션 라이브 `h1te17h9m`**(09-03 **밤** · 코드 `6bb3f53` · `dpl_3JQc9XADSToAAbo6mM6yGEkzQhRa`). READY · `/login` 200 · ★ **실측 증거**: 정식 도메인의 CSS 번들에서 이번에 걷어낸 `.mode-note` 가 **0건**이다(새 빌드라는 직접 증거). `::selection`·`textarea.field{overflow-y:hidden}` 은 그대로 |
 | ★ 정식 도메인 | **`https://fixup-shortform-service.vercel.app`** 다. `vercel deploy` 가 찍어 주는 `...-ju8okg74p-fix-up1.vercel.app` 쪽은 **Deployment Protection(SSO)에 걸려 전부 302** 라 검증에 쓰면 안 된다 — 09-02 에 한 번 속았다 |
-| 미배포 | ⚠️ **있다** — 09-03 밤 커밋 여섯(`0725f8c`·`b737fc4`·`674a000`·`5db864b`)이 프로덕션(`93d9ca4`)보다 앞이다. 화면 고침이라 **배포하면 사장님 눈에 바로 보인다** — 다만 배포는 사장님이 지시할 때만 |
-| 푸시 | ⚠️ **미푸시 6**(09-03 밤 작업 — 세라: `git rev-list --count fixup/feat/reel-cut-r2v..HEAD`). 그 앞까지는 두 원격에 밀었다(09-03 저녁 · `fixup`·`origin` 의 `feat/reel-cut-r2v`). ⚠️ URL 로 직접 푸시하면 추적 ref 가 안 움직여 '미푸시 N' 착시가 난다 — 정정은 `git fetch <원격> <브랜치>:refs/remotes/<원격>/<브랜치>`. ⚠️ 자격증명 대기로 매달리면 `GIT_TERMINAL_PROMPT=0` |
+| 미배포 | **없다** — 09-03 밤 작업이 전부 프로덕션이다(이 문서 커밋만 그 뒤). 배포 전 점검 둘 통과: **새 env 0 · 마이그레이션 0** |
+| 푸시 | ⚠️ **여전히 미푸시**(배포와 푸시는 다른 일이다 — 09-03 밤 작업 — 세라: `git rev-list --count fixup/feat/reel-cut-r2v..HEAD`). 그 앞까지는 두 원격에 밀었다(09-03 저녁 · `fixup`·`origin` 의 `feat/reel-cut-r2v`). ⚠️ URL 로 직접 푸시하면 추적 ref 가 안 움직여 '미푸시 N' 착시가 난다 — 정정은 `git fetch <원격> <브랜치>:refs/remotes/<원격>/<브랜치>`. ⚠️ 자격증명 대기로 매달리면 `GIT_TERMINAL_PROMPT=0` |
 | main 과의 거리 | `fixup/main` = `6e9bd8f`(그 안의 코드 커밋이 `23b80a2`) · HEAD 가 **34커밋 앞**(이 문서 커밋 전 실측 — 세라)(뒤처진 것 0). 09-03 작업이 브랜치에만 쌓였다 — **main 병합은 사장님이 지시할 때만** 한다 |
 | ⚠️ 배포 함정 | **`.vercel` 폴더가 이 워크트리에 없다.** 그래서 `--project` 를 **반드시** 준다 — 안 주면 폴더 이름으로 새 프로젝트를 만든다(팀에 `step-gate` 라는 **실수로 생긴 프로젝트**가 그 증거다) |
 | ★ origin 푸시 | `origin` 은 URL 에 계정이 안 박혀 있다. 이 회차에는 `git push origin <브랜치>` 가 그냥 통과했지만, 자격증명 대기로 멈추면 계정을 실어라: `git push https://jaechanyoon0519-Fixup@github.com/FixUp-system/Fixup-shortform.git <브랜치>` |
@@ -439,7 +439,7 @@ fal 에 **접수만 하고 즉시 돌아오므로** 그 반환은 "다 됐다"�
 > ⚠️ **`git checkout <파일>` 을 쓰지 마라.** 진행 중 작업이 사라진다.
 > ⚠️ **병렬 세션이 있으면 커밋 직전에 `git branch --show-current`.**
 
-### 배포하는 법 (08-27 두 번 · 08-31 한 번, 이 길로 했다)
+### 배포하는 법 (08-27 두 번 · 08-31 한 번 · **09-03 밤 한 번**, 이 길로 했다)
 
 ```bash
 # 커밋 이메일이 GitHub 계정과 안 맞아 Git 트리거가 0ms 에서 멈춘다 → git 없는 폴더에서 올린다
@@ -447,7 +447,13 @@ rm -rf <빈폴더> && mkdir -p <빈폴더>
 git archive --format=tar HEAD | tar -x -C <빈폴더>
 cd <빈폴더> && npx vercel deploy --prod --yes --project fixup-shortform-service
 ```
-★ **배포 명령은 이 세션의 자동 모드에서 막힌다** — 사장님이 `!` 로 직접 실행해야 한다.
+★ ~~배포 명령은 이 세션의 자동 모드에서 막힌다~~ -> **2026-09-03 밤에는 그냥 통과했다.**
+  막히면 그때 사장님이 `!` 로 직접 실행한다.
+★ **배포 폴더는 `C:\Users\fixup\shotform-deploy` 를 재활용한다** — 거기 `.vercel/project.json`
+  (`fixup-shortform-service`)이 **이미 있다**. `.vercel` **만 남기고** 나머지를 지운 뒤 archive 를 푼다:
+  `find <폴더> -mindepth 1 -maxdepth 1 ! -name .vercel -exec rm -rf {} +`
+★ 올린 뒤 검증은 **정식 도메인**에서 한다. 로그인 벽 뒤 화면을 못 볼 때 가장 싼 증거는
+  **CSS 번들에서 이번에 걷어낸 규칙이 사라졌는지**다(09-03 밤에는 `.mode-note` 로 그렇게 쟀다).
 
 ### 프로덕션 env — 오늘 하나 늘었다
 
