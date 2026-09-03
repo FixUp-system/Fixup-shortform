@@ -21,6 +21,7 @@ import {
 import { reelSheetUrl, storyboardGridFor } from "../../../../lib/reel/oneshot";
 // 보드 주소에 싣는 **내용 지문** — 서버와 같은 함수를 쓴다(두 벌이면 캐시가 안 맞는다).
 import { boardKey } from "../../../../lib/reel/board-key";
+import PromptWithKo from "../../../../components/PromptWithKo";
 // ★ 칸에 실리는 지문 한 줄 — **지문을 만드는 쪽과 같은 함수**다(lib/reel/panels.js).
 //   화면에서 다시 조립하면 실제로 나간 글과 갈린다.
 import { panelBody, panelSay, buildStoryboardPrompt } from "../../../../lib/reel/panels";
@@ -122,6 +123,10 @@ export default function ReelImagesPage() {
   // ★ 아직 안 그렸으면 지금 값으로 **미리보기**를 만든다(같은 함수 하나로 만든다).
   //   첨부 사진 줄은 사진이 있는지만 보고 붙으므로 장수만 넘긴다.
   const savedPrompt = cuts.map((c) => c.image?.of).find(Boolean) || "";
+  // ★ 한국어 번역은 **판 단위로 하나**다(2026-09-03) — 컷마다 같은 글을 저장하지 않는다.
+  //   옛 문서에는 없다(사장님 결정: 앞으로 만드는 것에만) → 그때는 화면이 그 줄을 안 그린다.
+  //   ★ 미리보기(아직 안 그린 상태)에는 번역이 없다 — 저장된 지문이 있을 때만 짝이 맞는다.
+  const savedPromptKo = savedPrompt ? (reel?.image_prompt_ko || "") : "";
   // 보드 주소가 바뀌면(컷을 고쳤다) 다시 "오는 중"으로 되돌린다.
   useEffect(() => { setBoardReady(false); }, [boardHref]);
 
@@ -345,7 +350,7 @@ export default function ReelImagesPage() {
             이미지 생성 지문 전체
             {savedPrompt ? "" : " (미리보기 — 아직 안 그렸어요)"}
           </summary>
-          <p className="script-src">{fullPrompt}</p>
+          <PromptWithKo text={fullPrompt} ko={savedPromptKo} />
           {/* ★★ 2026-09-03 사장님 지시 — **지문 아래 줄에 [전체 내려받기]**.
               스토리보드까지 함께 받는 자리다(보드 옆 버튼은 보드 한 장만 받는다).
               ★ 같은 주소를 쓴다 — 보드 라우트가 컷 그림을 모아 한 장으로 그려 주므로

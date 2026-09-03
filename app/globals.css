@@ -2407,6 +2407,21 @@ h1.login-head { margin-inline: auto; }
 
 /* 지문 절 안의 내려받기 — 지문 본문과 버튼 사이를 띄운다(본문에 붙으면 글의 일부로 읽힌다) */
 .lib-fold .prompt-dl { margin-top: var(--sp-3); }
+
+/* ★★ 영어 지문 아래의 한국어(2026-09-03 사장님 지시) — 원문과 **한눈에 갈려야** 한다.
+   왼쪽 선 하나로 "이건 곁들인 글"임을 표시한다: 배경을 깔면 원문보다 무거워 보이고,
+   글자만 흐리게 하면 읽으라고 붙인 글이 읽기 힘들어진다. */
+.prompt-ko {
+  margin-top: var(--sp-3);
+  padding-left: 12px;
+  border-left: 2px solid var(--line);
+}
+.prompt-ko-label {
+  display: inline-block;
+  margin-bottom: 6px;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
 /* 접힌 스토리보드 — 펴기 전에는 한 줄(약 40px)이다. 펴면 그 아래에 한 장이 선다. */
 .sheet-foldable > summary { cursor: pointer; }
 .sheet-foldable[open] > summary { margin-bottom: 10px; }

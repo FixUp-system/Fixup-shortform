@@ -3,6 +3,8 @@ import { getProject, updateProject } from "../../../../../lib/projects.js";
 import { generateScenario, pickEditedShots, readPhotoVision } from "../../../../../lib/reel/scenario.js";
 import { isNarrationSpeaker } from "../../../../../lib/cuts.js";
 import { scenarioLock, putReel } from "../../../../../lib/reel/doc.js";
+// 지문을 사장님 말로 곁들인다(2026-09-03) — 원문은 안 건드린다.
+import { translatePrompt } from "../../../../../lib/reel/translate.js";
 import { reelSceneCountRule } from "../../../../../lib/reel/scenario-rules.js";
 // ★ 그 프로젝트 모델이 참조 이미지로 받는 가로세로비 한계 — 컷 수 후보를 좁히는 자다.
 import { refAspectFor, clipProfileForProject } from "../../../../../lib/clip-limits.js";
@@ -141,7 +143,9 @@ export const POST = withUser(async (req, { params }, user) => {
   //   안 치렀고 다시 그릴 수 있다"며 허용한다(같은 판단).
   if ((project.cuts || []).some((c) => c.video?.url)) {
     return Response.json(
-      { error: "이미 만든 클립이 있어요 — 시나리오를 바꾸려면 새로 시작해 주세요" },
+      // ★ 문구는 scenarioLock 과 같은 한 마디다(2026-09-03 사장님 지시) — 화면에서
+      //   두 자리가 서로 다른 말을 하면 같은 상태가 다른 일로 읽힌다.
+      { error: "수정됨" },
       { status: 400 }
     );
   }
@@ -230,11 +234,19 @@ export const POST = withUser(async (req, { params }, user) => {
   const fallback = buildReelCast(scenario, uncovered);
   const cast = [...casted.cast, ...fallback];
 
+  // 번역은 저장 **전에** 만든다 — updateProject 안에서 부르면 그 프로젝트의 모든 저장이
+  // 그 왕복만큼 멈춘다(lib/projects.js 의 patchFn 주석).
+  const scenarioKo = await translatePrompt(scenario?.text, { projectId: id });
+
   await updateProject(id, user.id, (p) => {
     const updated = {
       ...p,
       scenario: {
         ...scenario,
+        // ★★ 2026-09-03 사장님 지시 — **한국어 번역을 곁들인다.** 이 글은 모델이 읽는
+        //   영어 지시문인데 사장님이 확인하는 자리이기도 하다. 원문(text)은 그대로다.
+        //   ★ 실패하면 빈 값이라 화면이 그 줄을 안 그린다(본 일을 안 망친다).
+        ...(scenarioKo ? { text_ko: scenarioKo } : {}),
         // ★★ C4 — speechFor 의 내레이션 갈래(lib/cuts.js:1456)는 scenario.narrator_voice 를
         //   읽는데 validateScenario 는 그 필드를 안 만든다(voice 만 만든다). 광고형 시나리오는
         //   "내레이션" 화자인 컷이 기본이라, 안 채우면 그 컷 전부가 Voice: 절 없이 나가

@@ -12,8 +12,10 @@ const scenario = readFileSync("app/reel/[id]/scenario/page.js", "utf8");
 const clean = page.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
 describe("②시나리오와 같은 형식", () => {
+  // ★ 2026-09-03 — 두 화면 다 <PromptWithKo> 로 그린다(영어 원문 + 한국어 번역).
+  //   `script-src` 는 그 컴포넌트 안으로 옮겨 갔다 — 여기서는 **그 자리를 쓰는가**를 잰다.
   it("프롬프트를 읽는 글로 보여 준다", () => {
-    expect(clean, "script-src 로 안 그린다").toContain("script-src");
+    expect(clean, "지문을 그리는 자리가 없다").toContain("<PromptWithKo");
   });
 
   // ★ 직접 타자로 고치는 칸(onBlur 저장)은 없앤다 — ②에 없는 조작이다.
@@ -30,12 +32,21 @@ describe("②시나리오와 같은 형식", () => {
     expect(clean).toContain("note-form");
   });
 
-  // ★★ 두 화면이 **같은 클래스**를 쓴다 — 한쪽만 바꾸면 갈린다.
-  it("②가 쓰는 것과 같은 클래스를 쓴다", () => {
-    for (const cls of ["script-src", "note-form"]) {
-      expect(scenario, `②에 ${cls} 가 없다`).toContain(cls);
-      expect(clean, `④에 ${cls} 가 없다`).toContain(cls);
+  // ★★ 두 화면이 **같은 자리**를 쓴다 — 한쪽만 바꾸면 갈린다.
+  //   ★ 2026-09-03 — 지문은 공용 컴포넌트가 그리므로 그 이름으로 잰다(클래스는 그 안에 있다).
+  it("②가 쓰는 것과 같은 자리를 쓴다", () => {
+    for (const token of ["<PromptWithKo", "note-form"]) {
+      expect(scenario, `②에 ${token} 가 없다`).toContain(token);
+      expect(clean, `④에 ${token} 가 없다`).toContain(token);
     }
+  });
+
+  // ★★ 번역은 **곁들이는 값**이다 — 원문이 먼저 서고, 없으면 그 줄을 아예 안 그린다
+  //   (옛 문서는 번역이 없다 — 사장님 결정: 앞으로 만드는 것에만).
+  it("★★ 지문 컴포넌트가 원문을 먼저 그리고, 번역은 있을 때만 그린다", () => {
+    const src = readFileSync("components/PromptWithKo.jsx", "utf8");
+    expect(src, "원문을 안 그린다").toMatch(/<p className=\{className\}>\{body\}<\/p>/);
+    expect(src, "번역이 없어도 빈 상자를 그린다").toMatch(/\{trans && \(/);
   });
 });
 
@@ -46,10 +57,12 @@ describe("②시나리오와 같은 형식", () => {
 //     ③ 입력폼은 **그대로 서 있는다**(칸이 사라지면 화면이 접혔다 펴진다)
 //     ④ 안내문은 **누르기 전에만** 뜨고, 버튼은 자리를 지키되 잠긴다
 describe("다시 쓰는 동안의 모양도 ②와 같다", () => {
-  it("① 옛 글 대신 한 줄이 뜬다 — 그 줄이 script-src 보다 앞에 있다", () => {
+  // ★ 2026-09-03 — 지문을 그리는 자리가 <PromptWithKo> 로 바뀌었다(영어 원문 + 한국어).
+  //   `script-src` 는 이제 그 컴포넌트 안에 있으므로, 여기서는 **글을 그리는 자리**를 잰다.
+  it("① 옛 글 대신 한 줄이 뜬다 — 그 줄이 지문보다 앞에 있다", () => {
     const busy = clean.indexOf('영상 프롬프트를 다시 쓰고 있어요');
     expect(busy, "다시 쓰는 중 문구가 없다").toBeGreaterThan(-1);
-    expect(clean.indexOf("script-src"), "옛 글이 busy 갈래보다 앞에 있다").toBeGreaterThan(busy);
+    expect(clean.indexOf("<PromptWithKo"), "옛 글이 busy 갈래보다 앞에 있다").toBeGreaterThan(busy);
   });
 
   it("② 도는 표시가 함께 뜬다", () => {

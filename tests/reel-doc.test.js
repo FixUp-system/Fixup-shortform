@@ -35,7 +35,10 @@ describe("시나리오 잠금", () => {
   it("완성본이 있으면 잠근다", () => {
     const lock = scenarioLock({ reel: { ...emptyReel(), video: { url: "https://x/v.mp4" } } });
     expect(lock.reason).toBe("baked");
-    expect(lock.message).toMatch(/새로 시작/);
+    // ★ 2026-09-03 사장님 지시로 문구가 **"수정됨" 한 마디**가 됐다 — "새로 시작해
+    //   주세요"가 무엇을 하라는 말인지 안 드러나 헷갈린다는 지적이었다.
+    //   못 고친다는 사실은 버튼이 잠긴 것으로 이미 보인다.
+    expect(lock.message).toBe("수정됨");
   });
 
   it("굽는 중에도 잠근다 — 값은 이미 나갔다", () => {

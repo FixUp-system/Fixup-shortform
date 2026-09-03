@@ -6,6 +6,8 @@ import { useParams } from "next/navigation";
 import { useReelProject } from "../layout";
 import { isPromptsReady } from "../../../../lib/reel/doc";
 import { planReelBake, reelSheetUrl, reelWholePrompt, canBakeReel } from "../../../../lib/reel/oneshot";
+// 영어 원문 + 한국어를 한 덩어리로 — 세 화면이 같은 모양을 쓴다.
+import PromptWithKo from "../../../../components/PromptWithKo";
 import { REEL_STEPS, reelStepHref } from "../../../../lib/reel/steps";
 import ReelBack from "../../../../components/ReelBack";
 
@@ -153,7 +155,7 @@ export default function ReelPromptsPage() {
               <span className="spinner" aria-hidden="true" /> 영상 프롬프트를 다시 쓰고 있어요
             </p>
           ) : (
-            <p className="script-src">{whole}</p>
+            <PromptWithKo text={whole} ko={project?.reel?.prompt_ko} />
           )}
 
           {/* ★ 한국어로 고쳐 달라고 적는 자리 — ②·③와 같은 모양이다.

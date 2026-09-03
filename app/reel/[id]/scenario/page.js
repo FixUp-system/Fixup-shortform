@@ -16,6 +16,8 @@ import { useParams } from "next/navigation";
 import { useReelProject } from "../layout";
 import { REEL_STEPS, reelStepHref } from "../../../../lib/reel/steps";
 import { scenarioLock } from "../../../../lib/reel/doc";
+// 영어 원문 + 한국어를 한 덩어리로(2026-09-03) — 원문은 안 건드린다.
+import PromptWithKo from "../../../../components/PromptWithKo";
 import ReelBack from "../../../../components/ReelBack";
 import { reelNarration, narrationLimit } from "../../../../lib/reel/narration";
 import { speechLangOf } from "../../../../lib/subtitle-langs";
@@ -153,7 +155,7 @@ export default function ReelScenarioPage() {
           {scenario?.text ? "시나리오를 다시 쓰고 있어요" : "시나리오를 쓰고 있어요"}
         </p>
       ) : scenario?.text ? (
-        <p className="script-src">{scenario.text}</p>
+        <PromptWithKo text={scenario.text} ko={scenario.text_ko} />
       ) : (
         <p className="pgsub">아직 시나리오가 없어요 — 아래에서 다시 쓸 수 있어요.</p>
       )}

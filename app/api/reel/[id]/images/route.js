@@ -1,4 +1,6 @@
 import { withUser } from "../../../../../lib/auth/require-user.js";
+// 지문을 사장님 말로 곁들인다(2026-09-03) — 원문은 안 건드린다.
+import { translatePrompt } from "../../../../../lib/reel/translate.js";
 import { getProject, updateProject } from "../../../../../lib/projects.js";
 import { generateImage, imageResolutionFor } from "../../../../../lib/imagegen.js";
 import { buildImagePrompt } from "../../../../../lib/cuts.js";
@@ -180,9 +182,22 @@ export const POST = withUser(async (req, { params }, user) => {
   //   화면의 ref 로만 막으면 새로고침 한 번에 그 기억이 사라져 또 나간다($0.401).
   //   ★ 성공·실패를 가리지 않고 적는다 — 실패했다고 자동으로 또 시도하면 같은 사유로
   //     계속 돈이 나간다. 다시 하는 것은 사장님의 버튼 몱이다.
+  // ★★ 2026-09-03 사장님 지시 — **지문의 한국어 번역을 곁들여 저장한다.** 사장님이
+  //   이 지문을 확인하는 자리인데 영어뿐이라 따로 번역기를 돌려야 했다.
+  //   ★ 컷마다가 아니라 **판 단위로 하나**다 — 한 장에 다 그리므로 지문도 하나이고,
+  //     컷마다 같은 글을 여섯 번 저장할 이유가 없다.
+  //   ★ 원문(cut.image.of)은 그대로다 — 각인이 무는 것은 언제나 원문 하나다.
+  //   ★ 실패하면 빈 값이라 화면이 그 줄을 안 그린다(본 일을 안 망친다).
+  const drawnPrompt = [...made.values()].map((im) => im?.of).find(Boolean) || "";
+  const promptKo = drawnPrompt ? await translatePrompt(drawnPrompt, { projectId: id }) : "";
+
   const merge = (p) => putReel(
     { ...p, cuts: mergeImages(p.cuts, made) },
-    { imagesDrawing: false, ...(auto ? { autoImaged: true } : {}) },
+    {
+      imagesDrawing: false,
+      ...(auto ? { autoImaged: true } : {}),
+      ...(promptKo ? { image_prompt_ko: promptKo } : {}),
+    },
   );
 
   if (failure) {

@@ -4,6 +4,8 @@ import { getProject, updateProject } from "../../../../../lib/projects.js";
 import { LEDGER_PROMPT_MAX } from "../../../../../lib/costs.js";
 import { putReel } from "../../../../../lib/reel/doc.js";
 import { rewriteWholePrompt } from "../../../../../lib/reel/whole-prompt.js";
+// 지문을 사장님 말로 곁들인다 — 원문은 안 건드린다(lib/reel/translate.js).
+import { translatePrompt } from "../../../../../lib/reel/translate.js";
 import { reelWholePrompt } from "../../../../../lib/reel/oneshot.js";
 
 // ★ 2026-09-03 — **배포 기본 상한에 잘리던 자리다.** LLM 이 컷마다 영상 프롬프트를 쓴다
@@ -53,7 +55,12 @@ export const POST = withUser(async (req, { params }, user) => {
         { status: 400 }
       );
     }
-    await updateProject(id, user.id, (p) => putReel(p, { prompt: next }));
+    // ★★ 2026-09-03 사장님 지시 — **한국어 번역을 곁들여 저장한다.** 사장님이 지문을
+    //   확인하는 자리인데 영어뿐이라 따로 번역기를 돌려야 했다.
+    //   ★ 원문(prompt)은 그대로다 — 모델에게 나가는 것도, 각인이 무는 것도 원문 하나다.
+    //   ★ 번역이 실패하면 **빈 값**이라 화면이 그 줄을 안 그린다(본 일을 안 망친다).
+    const promptKo = await translatePrompt(next, { projectId: id });
+    await updateProject(id, user.id, (p) => putReel(p, { prompt: next, prompt_ko: promptKo }));
     return Response.json({ ok: true });
   }
 
