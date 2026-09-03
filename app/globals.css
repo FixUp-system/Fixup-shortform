@@ -76,6 +76,9 @@
   /* 액센트 핑크와 헷갈리지 않게 더 노란 쪽으로 옮긴 값 */
   --warn: #E5B93C;
   --warn-soft: rgba(229, 185, 60, 0.14);
+  /* 드래그로 고른 글자의 바탕. 어두운 칸(--deep) 위에서 한눈에 보여야 하고, 글자색
+     (--ink)을 덮지 않을 만큼만 밝다 — 대비를 잃으면 고른 글을 못 읽는다. */
+  --sel: rgba(255, 90, 82, 0.32);
 
   /* ★ 버튼 치수 3단(2026-08-18 사장님 지적: "어떤 버튼은 작고 어떤 버튼은 크다").
      이름이 없어서 자리마다 픽셀을 새로 적고 있었다 — 같은 .mini 가 50px·46px·38px·
@@ -154,6 +157,8 @@
   --good-soft: rgba(14, 124, 87, 0.12);
   --warn: #9A6400;
   --warn-soft: rgba(154, 100, 0, 0.12);
+  /* 밝은 바탕에서는 같은 색이 너무 옅어 안 보인다 — 진하게 잡는다(위 --sel 주석 참고) */
+  --sel: rgba(196, 24, 95, 0.22);
 }
 
 * { box-sizing: border-box; }
@@ -1935,6 +1940,15 @@ textarea.field {
 }
 textarea.field:focus { outline: 1px solid var(--line); }
 textarea.field::placeholder { color: var(--ink-soft); }
+
+/* ★★ 2026-09-03 사장님 지시 — **드래그가 어디까지 잡혔는지 보이게** 한다.
+   그전에는 선택 하이라이트가 브라우저 기본색이라 어두운 바탕(--deep) 위에서 옅게 깔렸고,
+   "전체가 잡힌 건지 보이는 데까지만 잡힌 건지" 눈으로 가릴 수 없었다.
+   ★ 진짜 뿌리는 칸이 안 자란 것이었고(components/useAutoGrow.js) 이것은 그 위에 얹는
+     둘째 겹이다 — 잘리지 않게 만든 뒤에도 선택 범위는 뚜렷해야 한다.
+   ★ 색은 토큰으로 쓴다(hex 리터럴은 tests/design-system.test.js 가 막는다). */
+::selection { background: var(--sel); color: var(--ink); }
+textarea.field::selection, input.field::selection { background: var(--sel); color: var(--ink); }
 
 /* 자료 칸만 처음 높이가 크다 — 이 화면에서 가장 많이 쓰는 자리다 */
 .composer textarea.composer-text { min-height: 132px; }

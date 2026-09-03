@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useProject } from "../../components/ProjectContext";
 import { useMe } from "../../components/MeContext";
+import { useAutoGrow } from "../../components/useAutoGrow";
 import { TARGET_CHOICES } from "../../lib/script";
 import { DEFAULT_STYLE_ID } from "../../lib/styles";
 import { ASPECTS, DEFAULT_ASPECT_ID, aspectFor } from "../../lib/aspects";
@@ -66,15 +67,9 @@ export default function CreatePage() {
   // 새 프로젝트를 시작하는 자리 — 이전 프로젝트의 단계가 사이드바에 남지 않게 비운다
   useEffect(() => { setProject(null); }, [setProject]);
 
-  // 글이 늘면 칸이 아래로 밀린다 — 안에서 스크롤하지 않는다.
-  // height 를 auto 로 되돌린 뒤 재야 줄일 때도 따라온다(지운 만큼 다시 접힌다).
-  // 바닥은 CSS 의 min-height 가 잡는다.
-  useEffect(() => {
-    const el = textRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, [text]);
+  // 글이 늘면 칸이 아래로 밀린다 — 안에서 스크롤하지 않는다. 바닥은 CSS 의 min-height 가
+  // 잡고, 재는 규칙은 훅 하나다(components/useAutoGrow.js).
+  useAutoGrow(textRef, text);
 
   async function onFiles(e) {
     for (const file of e.target.files) {

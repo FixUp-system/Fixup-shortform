@@ -28,6 +28,7 @@ import {
 // 프로(2.5)가 얼굴 든 참조를 거절하는가 — 표는 clip-limits 의 프로필 하나다(단계별과 같은 판).
 import { blocksFacesForEndpoint } from "../../../lib/clip-limits";
 import Icon from "../../../components/Icon";
+import { useAutoGrow } from "../../../components/useAutoGrow";
 // 길이 칩에 정가를 같이 보여준다 — 사장님이 고르기 전에 값을 알아야 한다. 숫자는 여기 안 적는다.
 import { priceLabel, adVideoPrice } from "../../../lib/pricing";
 // app/create/page.js 와 같은 이유로 쓴다 — 새 광고를 시작하는 자리에서 이전 광고의
@@ -86,13 +87,9 @@ export default function AdNewPage() {
   // 새 광고를 시작하는 자리 — 이전 광고의 단계가 사이드바에 남지 않게 비운다
   useEffect(() => { setProject(null); }, [setProject]);
 
-  // 글이 늘면 칸이 아래로 밀린다 — 안에서 스크롤하지 않는다(app/create/page.js 와 같은 규칙).
-  useEffect(() => {
-    const el = textRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, [text]);
+  // 글이 늘면 칸이 아래로 밀린다 — 안에서 스크롤하지 않는다. 규칙은 훅 하나다
+  // (components/useAutoGrow.js) — 그전에는 같은 다섯 줄이 화면마다 복사돼 있었다.
+  useAutoGrow(textRef, text);
 
   // ★ 어느 버튼을 눌렀는지 기억한다(2026-08-31). 파일 input 은 **하나만** 둔다 —
   //   셋으로 늘리면 업로드 상태(uploading)와 ref 도 셋이 되고, 그중 하나만 안 풀려도
