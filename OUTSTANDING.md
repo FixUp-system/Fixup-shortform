@@ -16,9 +16,9 @@
 | 워크트리 | `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` |
 | 브랜치 | `feat/reel-cut-r2v` (09-03). ⚠️ **09-03 작업 전부가 아직 로컬에만 있다.** ★ HEAD·미푸시 수는 **적지 않는다** — 이 문서를 고치는 커밋이 그 수를 또 바꿔서 적는 순간 낡는다. **세라**: `git log -1 --format='%h %s'` · `git rev-list --count fixup/main..HEAD` |
 | 테스트 | **5,677 그린** (10 skipped) — `npx vitest run` · `npx next build` 통과(09-03 실측) |
-| 배포 | **프로덕션 라이브 `5x74i94xy`**(09-03 오후 · `dpl_CQBiTUkSPftwZ9c2PZSgLSBYQeoc` · 코드 `3dede6f`). **검증**: `/login`·`/archive` **200** + `/archive` 의 클라이언트 청크에 09-03 배지(`{className:"badge ai",children:"단계별"}`)가 실제로 서빙되는 것을 실측. ⚠️ 사이드바의 **"단계별 영상"은 옛 문자열이라 지문이 못 된다** — 이번에 한 번 이걸로 착각했다. 지문은 **오늘 새로 들어간 문자열**이어야 한다. 앞선 배포: `4l168opih`(09-02 밤 · 코드 `23b80a2`) ← `2jhi19mik`(09-02 저녁 · 코드 `d32daa0`) |
+| 배포 | **프로덕션 라이브 `ikhspn29e`**(09-03 오후 · `dpl_B5BywrYBaPSCKUqbGakNXPck7Sm8` · 코드 `092fa71`, 격자 수정 포함). **검증**: `npx vercel inspect fixup-shortform-service.vercel.app` 가 그 `dpl_` 를 그대로 돌려준다(alias→배포 직접 대조 — 이번 수정은 **서버 전용**이라 클라이언트 청크 지문으로는 못 잰다). `/login`·`/archive` **200**. 앞선 배포: `5x74i94xy`(코드 `3dede6f`) ← `4l168opih`(09-02 밤) ← `2jhi19mik`(09-02 저녁) |
 | ★ 정식 도메인 | **`https://fixup-shortform-service.vercel.app`** 다. `vercel deploy` 가 찍어 주는 `...-ju8okg74p-fix-up1.vercel.app` 쪽은 **Deployment Protection(SSO)에 걸려 전부 302** 라 검증에 쓰면 안 된다 — 09-02 에 한 번 속았다 |
-| 미배포 | 🔴 **다시 생겼다** — 격자 수정 `4428fb4`(아래 §1-A ★1). 그 앞까지는 `5x74i94xy` 로 올라가 있다(09-03 오후). 09-03 작업 전부(코드 7 + 문서)가 `5x74i94xy` 로 올라갔다. ⚠️ **배포 ≠ 푸시다** — 이 저장소는 `git archive` 로 올리므로 배포해도 브랜치는 여전히 미푸시다(아래 푸시 줄). 올리는 법은 §0 '배포하는 법' |
+| 미배포 | ✅ **없다**(09-03 오후 두 번째 배포 기준). ⚠️ **배포 ≠ 푸시다** — `git archive` 로 올리므로 배포해도 브랜치는 여전히 미푸시다(아래 푸시 줄). 올리는 법은 §0 '배포하는 법' |
 | 푸시 | 🔴 **미푸시 있음** — 수는 위 줄의 명령으로 센다(09-03 마지막 실측 11). ⚠️ **URL 로 직접 푸시하면 로컬 추적 ref 가 안 움직여** '미푸시 N' 착시가 난다 — 정정은 `git fetch <원격> <브랜치>:refs/remotes/<원격>/<브랜치>`. ⚠️ `git push` 가 자격증명 대기로 매달리면 `GIT_TERMINAL_PROMPT=0` 을 걸어 바로 실패시켜라 |
 | main 과의 거리 | `fixup/main` = **`6e9bd8f`**(배포 코드 `23b80a2` 위에 "배포 완료 반영" docs 한 줄). `origin/main` 도 같은 커밋(09-03 실측 — 두 원격이 아직 맞다). HEAD 가 그만큼 **앞**, 뒤처진 것 0 — 세는 법은 `git rev-list --left-right --count fixup/main...HEAD`. 그 뒤 작업이 브랜치에만 쌓였다. **main 병합·푸시는 사장님이 지시할 때만** 한다 |
 | ⚠️ 배포 함정 | **`.vercel` 폴더가 이 워크트리에 없다.** 그래서 `--project` 를 **반드시** 준다 — 안 주면 폴더 이름으로 새 프로젝트를 만든다(팀에 `step-gate` 라는 **실수로 생긴 프로젝트**가 그 증거다) |
