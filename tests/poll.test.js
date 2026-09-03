@@ -19,12 +19,16 @@ function fakeTimers() {
 const ok = (body) => async () => ({ ok: true, json: async () => body });
 
 describe("폴링 한 벌", () => {
-  // 이 태스크의 존재 이유가 이 숫자 셋을 그대로 옮기는 것이다. 다른 테스트는 전부
-  // 자기 값을 주입하거나 timer 를 손으로 밀어서, 셋이 조용히 바뀌어도 초록이 난다.
-  it("세 숫자는 화면이 쓰던 값 그대로다", () => {
+  // 이 판의 존재 이유는 셋이 **조용히** 바뀌는 것을 막는 것이다 — 다른 테스트는 전부
+  // 자기 값을 주입하거나 timer 를 손으로 밀어서, 셋이 달라져도 초록이 난다.
+  // ★★ 2026-09-03 — maxFailures 를 5 → 15 로 올렸다(2초 간격에서 10초 → 30초).
+  //   5 는 수거를 겸하는 상태 라우트에서 너무 짧았다: fal 이 한 번 느리면 10초 만에
+  //   폴링이 죽고, 죽으면 아무도 결과를 줍지 않아 화면이 영영 "만드는 중"이었다.
+  //   ★ 간격·상한은 안 건드렸다 — 바꾼 것은 "얼마나 참는가" 하나다.
+  it("세 숫자는 정한 값 그대로다", () => {
     expect(POLL_INTERVAL_MS).toBe(2000);
     expect(POLL_TIMEOUT_MS).toBe(300000);
-    expect(POLL_MAX_FAILURES).toBe(5);
+    expect(POLL_MAX_FAILURES).toBe(15);
   });
 
   it("응답을 onTick 에 넘긴다", async () => {
