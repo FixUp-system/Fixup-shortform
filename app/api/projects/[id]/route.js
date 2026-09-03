@@ -1,4 +1,8 @@
-import { getProject, getProjectForViewing, updateProject, isStepDoc } from "../../../../lib/projects";
+import {
+  getProject, getProjectForViewing, updateProject, isStepDoc,
+  // 지우기도 판정을 그 파일 하나가 한다(2026-09-03) — 운영자는 남의 것도 지운다.
+  deleteProject as deleteProjectDoc,
+} from "../../../../lib/projects";
 import { clipLimitsForProject, I2V_MODEL_IDS, isResolutionFor, resolutionForProject } from "../../../../lib/clip-limits";
 import { normalizeStyle, normalizePromptNote } from "../../../../lib/styles";
 import { isAspect } from "../../../../lib/aspects";
@@ -414,9 +418,11 @@ export const PATCH = withUser(async (req, { params }, user) => {
 export const DELETE = withUser(async (_req, { params }, user) => {
   const { id } = await params;
 
-  // 소유자 확인은 스토어가 한다(owner_id 를 조건에 넣는다) — 없는 것과 남의 것을
-  // 같은 404 로 답해 존재 여부를 흘리지 않는다(GET·PATCH 와 같은 규칙).
-  const gone = await getStore().deleteProject(id, user.id);
+  // ★ 판정은 lib/projects.js 의 deleteProject 하나가 한다(2026-09-03) — 그전에는 여기서
+  //   스토어를 직접 불러 **ownerScope 를 안 지났고**, 그래서 읽기·고치기는 운영자에게
+  //   열려 있는데 지우기만 소유자 전용으로 남아 있었다.
+  //   없는 것과 남의 것은 **같은 404** 다 — 존재 여부를 흘리지 않는다(GET·PATCH 와 같은 규칙).
+  const gone = await deleteProjectDoc(id, user.id);
   if (!gone) return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
 
   // ★★ film 은 **한 프로젝트에서 두 편**을 굽는다(order·refs) — 이름이 `<id>-<방식>.mp4` 라

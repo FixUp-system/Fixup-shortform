@@ -7,6 +7,8 @@ import { loadProjects } from "../../lib/projects-client";
 import ProjectCards from "../../components/ProjectCards";
 import { useDialog } from "../../components/DialogProvider";
 import Icon from "../../components/Icon";
+// 운영자인가 — **서버가 내려 준 값**을 읽는다(판정은 라우트가 이미 했다).
+import { useMe } from "../../components/MeContext";
 
 function ArchiveBody() {
   const [projects, setProjects] = useState(null); // null = 불러오는 중
@@ -20,6 +22,12 @@ function ArchiveBody() {
   //   실려 오므로, 화면 안 상태로만 기억하면 돌아올 때마다 [내 영상]으로 떨어진다.
   const params = useSearchParams();
   const router = useRouter();
+  // ★★ 2026-09-03 사장님 지시 — **관리자는 전체 영상을 지운다.** 서버도 같이 열렸다
+  //   (lib/projects.js 의 deleteProject 가 ownerScope 를 지난다) — 화면만 열어 404 를
+  //   만드는 상황이 아니다.
+  //   ★ 등급을 **모르는 동안에는 안 넓힌다**(ready) — 다른 화면이 쓰는 그 규율 그대로다.
+  const { me, ready } = useMe();
+  const isAdmin = ready && me?.isAdmin === true;
   // ★ 로그인 없이 보고 있는가. 손님에게는 **"내 영상"이라는 개념이 없다** — 그 칸을
   //   그리면 누를 수 없는 자리를 누른 것처럼 보인다(라우트는 늘 전체로 답한다).
   const [guest, setGuest] = useState(false);
@@ -100,8 +108,8 @@ function ArchiveBody() {
   const count = projects?.length || 0;
   const isAll = scope === "all";
 
-  // 범위를 바꿀 때는 고르던 것을 버린다 — 남긴 채 넘어가면 [전체]에서 고른 남의 카드가
-  // 선택에 남아 지우기가 404 로 떨어진다.
+  // 범위를 바꿀 때는 고르던 것을 버린다 — 남긴 채 넘어가면 [전체]에서 고른 카드가
+  // 선택에 남는다(운영자가 아니면 그 지우기가 404 다).
   function changeScope(next) {
     if (next === scope) return;
     stopSelecting();
@@ -176,18 +184,20 @@ function ArchiveBody() {
                   **여러 편 골라 지우기**다(모두 선택 · 취소 · N편 지우기).
                 ★ 아이콘도 휴지통이다. 톱니바퀴는 "설정" 으로 읽혀 실제 동작과 어긋난다.
                 ★ [전체] 에서 못 쓰는 이유는 그대로다 — 그 목록에는 남의 카드가 섞여 있어
-                  "모두 선택" 이 지울 수 없는 것까지 고른다. 이제 그 이유를 화면이 말한다. */}
+                  "모두 선택" 이 지울 수 없는 것까지 고른다. 이제 그 이유를 화면이 말한다.
+                ★★ **운영자는 예외다**(2026-09-03 사장님 지시) — 남의 것도 지울 수 있으므로
+                  [전체] 에서도 열린다. 서버가 같이 열려 있어 "골랐는데 404" 가 안 난다. */}
             <button
               className="mini"
               aria-label="영상 정리"
               title={
-                isAll
+                isAll && !isAdmin
                   ? "전체에서는 고를 수 없어요 — 남이 만든 영상이 섞여 있어요"
                   : count > 0
                     ? "여러 편을 골라 지워요"
                     : "정리할 영상이 없어요"
               }
-              disabled={isAll || count === 0}
+              disabled={(isAll && !isAdmin) || count === 0}
               onClick={() => setSelecting(true)}
             >
               <Icon name="trash" size={13} /> 정리
@@ -218,6 +228,7 @@ function ArchiveBody() {
       {projects && projects.length > 0 && (
         <ProjectCards
           scope={scope}
+          canDeleteAny={isAdmin}
           projects={projects}
           selecting={selecting}
           selected={selected}

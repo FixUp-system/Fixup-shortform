@@ -82,7 +82,7 @@ function Thumb({ video, image, alt }) {
 //
 // ★ 두 세계가 한 목록에 섞인다(단계별 영상 · 광고). listProjects 요약의 kind 로 가른다 —
 // 없으면(옛 문서) null 이고, 그때는 기존 동작 그대로다.
-export default function ProjectCards({ projects, limit, onDeleted, selecting, selected, onToggleSelect, scope }) {
+export default function ProjectCards({ projects, limit, onDeleted, selecting, selected, onToggleSelect, scope, canDeleteAny = false }) {
   const shown = limit ? projects.slice(0, limit) : projects;
   const { confirm, alert } = useDialog();
   const [busyId, setBusyId] = useState(null);
@@ -169,12 +169,17 @@ export default function ProjectCards({ projects, limit, onDeleted, selecting, se
                 {selecting && (
                   <span className="card-pick" aria-hidden="true">{selected?.has(p.id) ? "✓" : ""}</span>
                 )}
-                {/* ★ 남이 만든 카드에는 쓰기 버튼을 아예 안 그린다(mine === false).
-                    보관함 [전체]는 읽기만 여는 자리다 — 눌러도 404 인 버튼을 그리면
-                    "왜 안 되지"만 남는다. 목록에 mine 이 없는 옛 호출부(홈)는 지금 그대로다.
+                {/* ★ 남이 만든 카드에는 쓰기 버튼을 아예 안 그린다(mine === false) —
+                    눌러도 404 인 버튼을 그리면 "왜 안 되지"만 남는다. 목록에 mine 이 없는
+                    옛 호출부(홈)는 지금 그대로다.
+                    ★★ **운영자는 예외다**(2026-09-03 사장님 지시: "관리자는 전체 영상을
+                    삭제할 수 있는 권한"). 서버도 같이 열렸으므로(lib/projects.js 의
+                    deleteProject) 화면만 열어 404 를 만드는 상황이 아니다.
+                    ⚠️ 이 값은 **화면이 정하지 않는다** — 부르는 쪽이 /api/me 의 isAdmin 을
+                    보고 넘긴다. 여기서 역할을 직접 읽으면 판정이 두 벌이 된다.
                     고르는 동안에는 낱개 지우기를 감춘다 — 두 가지 지우는 길이 한 화면에
                     있으면 어느 것이 지금 도는 길인지 흐려진다 */}
-                {onDeleted && !selecting && p.mine !== false && (
+                {onDeleted && !selecting && (canDeleteAny || p.mine !== false) && (
                   <button
                     className="card-del"
                     aria-label="이 영상 지우기"
