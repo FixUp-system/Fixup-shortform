@@ -41,8 +41,9 @@
 >   ⚠️ **브랜치 `feat/reel-cut-r2v` 에만 최신이다** — 워크트리
 >   `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` 에서 세션을 열어라.
 >   메인 저장소(main)에서 열면 09-02 판을 읽는다.
-> · **왜 그렇게 했나(회차 서사)** → `C:\Users\fixup\obsidian_jaechan\sources\shotform-face-grid-2026-09-03.md`
->   (그 앞 회차: `shotform-board-and-collect-recovery-2026-09-02` ·
+> · **왜 그렇게 했나(회차 서사)** → `C:\Users\fixup\obsidian_jaechan\sources\shotform-oneshot-status-and-ui-2026-09-03.md`
+>   (그 앞 회차: `shotform-face-grid-2026-09-03`(얼굴 격자) ·
+>    `shotform-board-and-collect-recovery-2026-09-02` ·
 >    `shotform-archive-admin-and-ui-2026-09-01`)
 >   그리고 그 wiki 의 `index.md` → `products/shotform-saas.md` 순으로 내려가면 전체가 보인다.
 
