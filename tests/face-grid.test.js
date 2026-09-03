@@ -57,9 +57,26 @@ describe("boxToRect — 얼굴 상자를 픽셀로", () => {
 
 describe("gridSvg — 그리는 것", () => {
   it("★★ 사각형마다 선이 그려지고 불투명이다", () => {
-    const svg = gridSvg(100, 100, [{ left: 10, top: 10, width: 50, height: 50 }]).toString();
+    const svg = gridSvg(1000, 1000, [{ left: 10, top: 10, width: 500, height: 500 }]).toString();
     expect(svg).toContain('stroke="#FFFFFF"');
     expect(svg).toContain('stroke-opacity="1"');
+    expect((svg.match(/<line/g) || []).length).toBe((FACE_GRID.cells + 1) * 2);
+  });
+
+  // ★★★ 2026-09-03 오후 — 여러 얼굴을 덮게 하자 **작은 얼굴이 흰 덩어리**가 됐다.
+  //   48px 짜리 배경 얼굴에 10칸·굵기 8 이면 선 사이 간격이 음수다 — 격자가 아니라 페인트다.
+  //   판을 덮는 것이 목적인데 그림을 지워 버리면 모델이 그 칸을 못 읽는다.
+  //   ★ 굵기는 **실측값을 지키고**(얇으면 탐지기가 얼굴을 그대로 읽는다) 칸 수를 줄인다.
+  it("★★★ 작은 얼굴에서도 격자로 남는다 — 선이 붙으면 흰 덩어리가 되어 그림을 버린다", () => {
+    const svg = gridSvg(400, 400, [{ left: 0, top: 0, width: 48, height: 48 }]).toString();
+    const xs = [...svg.matchAll(/x1="(\d+)"/g)].map((m) => Number(m[1]));
+    const verticals = [...new Set(xs)].sort((a, b) => a - b);
+    const gaps = verticals.slice(1).map((v, i) => v - verticals[i]);
+    expect(Math.min(...gaps), "선 간격이 굵기보다 좁다 = 덩어리").toBeGreaterThanOrEqual(FACE_GRID.stroke);
+  });
+
+  it("★★ 큰 얼굴에서는 실측 칸 수를 그대로 쓴다", () => {
+    const svg = gridSvg(1000, 1000, [{ left: 0, top: 0, width: 600, height: 600 }]).toString();
     expect((svg.match(/<line/g) || []).length).toBe((FACE_GRID.cells + 1) * 2);
   });
 
@@ -77,7 +94,7 @@ describe("판에 씌우기 — 얼굴을 못 찾으면 손대지 않는다", () 
     const bytes = await solid(600, 400);
     const out = await gridFacesOnSheet({
       bytes, cells: 2, grid: { rows: 1, cols: 2 },
-      deps: { findFaceBox: async () => null },
+      deps: { findFaceBoxes: async () => [] },
     });
     expect(out.faces).toBe(0);
     expect(out.bytes).toBe(bytes);
@@ -87,7 +104,7 @@ describe("판에 씌우기 — 얼굴을 못 찾으면 손대지 않는다", () 
     const bytes = await solid(600, 400);
     const out = await gridFacesOnSheet({
       bytes, cells: 2, grid: { rows: 1, cols: 2 },
-      deps: { findFaceBox: async () => ({ x: 0.3, y: 0.3, w: 0.4, h: 0.4 }) },
+      deps: { findFaceBoxes: async () => [{ x: 0.3, y: 0.3, w: 0.4, h: 0.4 }] },
     });
     expect(out.faces).toBe(2);
     expect(out.bytes).not.toBe(bytes);
@@ -97,10 +114,10 @@ describe("판에 씌우기 — 얼굴을 못 찾으면 손대지 않는다", () 
 
   it("★★ 사진 한 장 갈래도 같은 규율이다", async () => {
     const bytes = await solid(300, 500);
-    const none = await gridFacesOnPhoto({ bytes, deps: { findFaceBox: async () => null } });
+    const none = await gridFacesOnPhoto({ bytes, deps: { findFaceBoxes: async () => [] } });
     expect(none.bytes).toBe(bytes);
     const some = await gridFacesOnPhoto({
-      bytes, deps: { findFaceBox: async () => ({ x: 0.2, y: 0.2, w: 0.5, h: 0.5 }) },
+      bytes, deps: { findFaceBoxes: async () => [{ x: 0.2, y: 0.2, w: 0.5, h: 0.5 }] },
     });
     expect(some.faces).toBe(1);
     expect(some.bytes).not.toBe(bytes);
@@ -116,5 +133,55 @@ describe("배선 — 굽기가 실제로 이 길을 지난다", () => {
     expect(src, "격자 판을 안 보낸다").toMatch(/refs: \[sheetRef\]/);
     expect(src, "꼬리를 조건 없이 붙이거나 아예 안 붙인다")
       .toMatch(/gridded \? `\$\{prompt\}[\s\S]{0,20}\$\{GRID_SUPPRESS_LINE\}` : prompt/);
+  });
+});
+
+// ★★★ 2026-09-03 오후 — **실측으로 드러난 구멍.** 프로덕션 편 `00b1885a` 가 격자를 씌우고도
+//   422(초상)로 거절됐다. 그 판을 그대로 내려받아 재현해 보니 원인이 둘이었다:
+//     ① 칸 하나에 얼굴이 여럿인데 **한 개만** 돌려받았다(실측: 칸 0=3 · 칸 1=2 · 칸 5=2)
+//     ② 같은 칸·같은 지문인데 **회차마다 답이 달랐다**(칸 3: 0개 → 1개)
+//   덮다 만 판은 안 덮은 판과 같다 — 얼굴 하나가 남으면 거절은 그대로 난다.
+describe("얼굴이 여럿인 칸 — 하나라도 남기면 거절은 그대로 난다", () => {
+  it("★★★ 한 칸에 얼굴이 둘이면 **둘 다** 덮는다", async () => {
+    const bytes = await solid(600, 400);
+    const out = await gridFacesOnSheet({
+      bytes, cells: 1, grid: { rows: 1, cols: 1 },
+      deps: { findFaceBoxes: async () => [
+        { x: 0.1, y: 0.1, w: 0.2, h: 0.2 },
+        { x: 0.6, y: 0.6, w: 0.2, h: 0.2 },
+      ] },
+    });
+    expect(out.faces, "칸 하나에서 얼굴 둘을 다 세지 않는다").toBe(2);
+  });
+
+  it("★★★ 사진 갈래도 얼굴을 여럿 덮는다", async () => {
+    const bytes = await solid(400, 400);
+    const out = await gridFacesOnPhoto({
+      bytes, deps: { findFaceBoxes: async () => [
+        { x: 0.1, y: 0.1, w: 0.2, h: 0.2 },
+        { x: 0.5, y: 0.5, w: 0.2, h: 0.2 },
+      ] },
+    });
+    expect(out.faces).toBe(2);
+    expect(out.bytes).not.toBe(bytes);
+  });
+
+  it("★★ 얼굴 상자마다 격자 그룹이 하나씩 그려진다", async () => {
+    const svg = gridSvg(200, 200, [
+      { left: 0, top: 0, width: 40, height: 40 },
+      { left: 60, top: 60, width: 40, height: 40 },
+      { left: 120, top: 120, width: 40, height: 40 },
+    ]).toString();
+    expect((svg.match(/<g /g) || []).length).toBe(3);
+  });
+
+  it("★★★ 찾는 지문이 **배경·광고판·작은 얼굴**까지 부른다 — 이 판의 주제가 광고판 속 인물이다", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("lib/reel/face-grid.js", "utf8");
+    const ask = src.slice(src.indexOf("findFaceBoxes"));
+    for (const w of ["EVERY", "background", "billboard", "small"]) {
+      expect(ask, `지문이 ${w} 를 안 부른다`).toContain(w);
+    }
+    expect(ask, "얼굴 하나만 받는 옛 모양이 남아 있다").not.toMatch(/"face":true\|false/);
   });
 });
