@@ -197,6 +197,9 @@ export const POST = withUser(async (req, { params }, user) => {
       imagesDrawing: false,
       ...(auto ? { autoImaged: true } : {}),
       ...(promptKo ? { image_prompt_ko: promptKo } : {}),
+      // ★ 2026-09-03 사장님 지시 — 사장님 요청이 실린 지문이면 화면이 "수정됨"을 단다.
+      //   ★ 한 번 서면 안 내린다 — 그 뒤로 계속 그 요청이 실린 지문이기 때문이다.
+      ...(note ? { image_edited: true } : {}),
     },
   );
 

@@ -206,6 +206,34 @@ describe("cropStoryboardCells — 칸을 잘라낸다", () => {
     }
   });
 
+  // ★★★ 2026-09-03 사장님 지적("흰선 없이 이미지만") — 골 판정이 **빗나가도** 흰 줄이
+  //   남으면 안 된다. 실측에서 왼쪽 첫 열 평균 223·227 이 임계(235)를 못 넘어 그대로
+  //   남았다. 그래서 판정과 무관한 **최소 여유**를 늘 걷는다.
+  it("★★★ 골 판정이 빗나가도 가장자리 한 줄은 안 남는다 — 최소 여유를 늘 걷는다", async () => {
+    const grid = storyboardGridFor(4); // 2행 2열
+    const cellW = 180, cellH = 320;
+    // 판정에 안 걸리는 **애매한 밝기**(210)의 1px 테두리를 칸마다 두른다.
+    const px = Buffer.alloc(cellW * 2 * cellH * 2 * 3, 60);
+    const W = cellW * 2, H = cellH * 2;
+    const put = (x, y, v) => { const i = (y * W + x) * 3; px[i] = px[i + 1] = px[i + 2] = v; };
+    for (let r = 0; r < 2; r++) for (let c = 0; c < 2; c++) {
+      const x0 = c * cellW, y0 = r * cellH;
+      for (let x = x0; x < x0 + cellW; x++) { put(x, y0, 210); put(x, y0 + cellH - 1, 210); }
+      for (let y = y0; y < y0 + cellH; y++) { put(x0, y, 210); put(x0 + cellW - 1, y, 210); }
+    }
+    const sheet = await sharp(px, { raw: { width: W, height: H, channels: 3 } }).png().toBuffer();
+    const cells = await cropStoryboardCells(sheet, grid);
+    for (const cell of cells) {
+      const { data, info } = await sharp(cell).greyscale().raw().toBuffer({ resolveWithObject: true });
+      const w = info.width, h = info.height;
+      const colAvg = (x) => { let s = 0; for (let y = 0; y < h; y++) s += data[y * w + x]; return s / h; };
+      const rowAvg = (y) => { let s = 0; for (let x = 0; x < w; x++) s += data[y * w + x]; return s / w; };
+      for (const v of [colAvg(0), colAvg(w - 1), rowAvg(0), rowAvg(h - 1)]) {
+        expect(v, "테두리가 남아 있다").toBeLessThan(180);
+      }
+    }
+  });
+
   it("★ 진짜 내용은 안 걷는다 — 균일하지 않은 밝은 가장자리(하늘·흰 벽)는 남는다", async () => {
     const grid = storyboardGridFor(4);
     const cellW = 180, cellH = 320;

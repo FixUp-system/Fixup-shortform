@@ -178,7 +178,14 @@ export default function ReelVideoPage() {
 
   return (
     <section className="panel panel--wide">
-      <h2>영상</h2>
+      {/* ★★ 2026-09-03 사장님 지시 — 낡았으면 **제목 옆에서** 말한다.
+          그전에는 재생기 아래에 "그림이나 시나리오가 바뀌었어요 — 다시 만들어 주세요"라는
+          두 마디가 있었는데, 무엇이 바뀌었는지는 사장님이 방금 한 일이라 이미 알고
+          **무엇을 해야 하는지**만 필요했다. 제목 옆이 그 자리다(③이미지의 "수정됨"과 같은 결). */}
+      <h2>
+        영상
+        {oneShotStale && cuts[0]?.video?.url && <span className="tag warn">다시 만들어주세요</span>}
+      </h2>
       {/* ★★ 통짜 갈래에서는 아무 말도 안 한다(2026-08-25 사장님 지시 — "스토리보드 한 장으로
           N컷" 문구 삭제). 스토리보드 한 장을 통째로 넘긴다는 것은 **안쪽 사정**이지
           사장님이 알아야 할 일이 아니다(이 화면의 말투 규칙과 같다).
@@ -235,11 +242,6 @@ export default function ReelVideoPage() {
           playsInline
           preload="metadata"
         />
-      )}
-      {/* ★ 낡음 경고가 갈 곳이 없어졌다 — 통짜 갈래는 영상이 나오면 아래 칸을 안 그린다
-          (그 칸의 배지가 원래 이 말을 했다). 재생기 옆에서 말한다. */}
-      {oneShot && oneShotStale && cuts[0]?.video?.url && (
-        <p className="pgsub warn">그림이나 시나리오가 바뀌었어요 — 다시 만들어 주세요.</p>
       )}
 
       {/* ★★ 통짜 갈래에서 **영상이 나온 뒤에는 이 칸을 안 그린다**(2026-08-25 사장님 지시).

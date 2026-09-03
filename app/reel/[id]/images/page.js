@@ -127,6 +127,8 @@ export default function ReelImagesPage() {
   //   옛 문서에는 없다(사장님 결정: 앞으로 만드는 것에만) → 그때는 화면이 그 줄을 안 그린다.
   //   ★ 미리보기(아직 안 그린 상태)에는 번역이 없다 — 저장된 지문이 있을 때만 짝이 맞는다.
   const savedPromptKo = savedPrompt ? (reel?.image_prompt_ko || "") : "";
+  // 사장님 요청이 실린 지문인가 — 라우트가 note 를 받아 그릴 때 남긴다.
+  const imageEdited = !!reel?.image_edited && !!savedPrompt;
   // 보드 주소가 바뀌면(컷을 고쳤다) 다시 "오는 중"으로 되돌린다.
   useEffect(() => { setBoardReady(false); }, [boardHref]);
 
@@ -349,21 +351,16 @@ export default function ReelImagesPage() {
           <summary>
             이미지 생성 지문 전체
             {savedPrompt ? "" : " (미리보기 — 아직 안 그렸어요)"}
+            {/* ★★ 2026-09-03 사장님 지시 — 사장님 요청이 반영된 지문이면 **여기서 말한다**.
+                그전에는 고쳐 달라고 적어 다시 그려도 지문이 그대로인지 바뀐 것인지
+                화면 어디에도 표시가 없었다. */}
+            {imageEdited && <span className="badge ai">수정됨</span>}
           </summary>
+          {/* ★★ 2026-09-03 사장님 지시(2차) — 이 절은 **지문 → 번역 → (아래) 수정 요청**
+              셋으로만 둔다. 같은 날 오전에 여기 넣었던 [전체 내려받기]는 뺐다 —
+              받는 자리는 보드 아래 버튼 하나로 모은다(같은 한 장을 두 자리에서 받으면
+              무엇이 다른지 묻게 된다). */}
           <PromptWithKo text={fullPrompt} ko={savedPromptKo} />
-          {/* ★★ 2026-09-03 사장님 지시 — **지문 아래 줄에 [전체 내려받기]**.
-              스토리보드까지 함께 받는 자리다(보드 옆 버튼은 보드 한 장만 받는다).
-              ★ 같은 주소를 쓴다 — 보드 라우트가 컷 그림을 모아 한 장으로 그려 주므로
-                "스토리보드 포함"이 그 한 장으로 성립한다. */}
-          <div className="panel-act prompt-dl">
-            <a
-              className="mini"
-              href={`${boardHref}${boardHref.includes("?") ? "&" : "?"}download=1`}
-              download
-            >
-              전체 내려받기
-            </a>
-          </div>
         </details>
       )}
 

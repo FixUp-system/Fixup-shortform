@@ -1833,7 +1833,12 @@ input.field::placeholder { color: var(--ink-soft); }
      아래로 밀려 영상 윗변과 31px 어긋났다 — 제목을 1행 왼쪽 칸에 두고 상자와 영상을
      2행에 나란히 세우면 **숫자를 박지 않고** 윗변이 맞는다(2026-08-13 사용자 요청). */
   display: grid;
-  grid-template-columns: auto auto;
+  /* ★★★ 2026-09-03 사장님 지적("영역을 벗어나고 있고") — **`auto auto` 는 안 줄어든다.**
+     조절판(약 335px) + 영상(최대 560px)이 카드 안쪽(1440px 화면에서 832px)보다 넓어
+     격자가 통째로 넘쳤다. 1:1 영상에서 특히 그렇다(9:16 은 영상이 360px 이라 들어갔다).
+     `minmax(0, auto)` 로 바꿔 **모자라면 줄어들 수 있게** 한다 — 아래 min-width:0 과 한 짝이다
+     (격자 칸은 기본이 min-width:auto 라 그것만으로는 max-width 가 안 먹는다). */
+  grid-template-columns: minmax(0, auto) minmax(0, auto);
   /* ★ 조절판을 영상 높이(640px)까지 늘려 봤다가 **되돌렸다**(2026-08-13 사용자 요청).
      늘리면 네 줄(위치·글꼴·색·크기) 사이가 허옇게 벌어져, 빽빽한 조절판이 아니라
      빈 상자로 보인다. 조절판은 제 내용만큼만 차지하고 윗변만 영상과 맞춘다. */
@@ -1860,6 +1865,12 @@ input.field::placeholder { color: var(--ink-soft); }
   width: min(560px, calc(640px * var(--ar, 0.5625)));
   max-width: 100%;
 }
+/* ★ 격자 칸이 **줄어들 수 있게** 한다 — 기본값(min-width:auto)이면 내용 크기 아래로 안
+   내려가 위 max-width 가 무시된다. 이 한 줄이 없으면 카드 밖으로 삐져나온다. */
+.done-stage > * { min-width: 0; }
+/* ★ 영상 자체도 상자를 넘지 않는다 — <video> 는 기본이 제 원본 크기라 부모가 줄어도
+   따라 줄지 않는다(자막 좌표는 비율이라 크기가 줄어도 자리는 그대로다). */
+.done-stage .done-preview video { max-width: 100%; height: auto; }
 /* 좁아지면 나란히 두는 것이 오히려 손해다 — 둘 다 못 쓰게 좁아진다.
    한 칸짜리 격자로 바꾸고 셋을 순서대로 쌓는다(제목 → 조절판 → 영상). */
 @media (max-width: 900px) {
@@ -2390,20 +2401,28 @@ h1.login-head { margin-inline: auto; }
 /* ③이미지 맨 위의 통합 한 장 — **작게** 둔다(2026-08-27). 그 화면의 본문은 아래 컷별
    목록이고, 이 한 장은 전체 흐름을 한눈에 보는 자리다.
    ④·⑤에서 쓰는 기본 크기(68vh)는 그대로다 — 거기서는 이 한 장이 본문이다. */
-/* ★★ 2026-09-03 사장님 지시 — 보드와 내려받기가 **한 줄에 나란히** 선다.
-   그전에는 버튼이 보드 아래에 있어서 "무엇을 받는 버튼인가"가 자리로 안 드러났다.
-   ★ 위쪽 정렬이다 — 보드가 세로로 길어 가운데 정렬하면 버튼이 화면 한참 아래로 내려간다.
-   ★ 좁은 화면에서는 아래로 접힌다(wrap) — 나란히 세우려다 보드가 눌리면 안 된다. */
+/* ★★ 2026-09-03 사장님 지시(3차) — **보드는 가운데, 버튼은 보드 폭 안 우측 하단.**
+   같은 날 세 번 옮겼다: 보드 아래 줄 → 보드 옆 → 지금.
+   ★ 바깥 상자가 가운데 정렬하고(align-items:center), 안쪽에서 **보드와 버튼이 같은
+     폭**을 갖는다 — 그래야 버튼의 오른쪽 끝이 보드의 오른쪽 끝과 맞는다. 상자 전체
+     기준으로 오른쪽에 붙이면 보드가 좁을 때 버튼만 멀찍이 떨어져 남의 것처럼 보인다. */
 .sheet-block {
   margin-top: var(--sp-4);
-  display: flex;
-  align-items: flex-start;
-  gap: var(--sp-3);
-  flex-wrap: wrap;
+  /* ★ 상자가 **보드 폭만큼만** 차지하고 가운데 선다(fit-content + auto 여백).
+     그래야 그 안의 버튼줄도 보드와 같은 폭이 되어, 오른쪽 끝이 보드 오른쪽 끝과 맞는다.
+     상자를 꽉 채우면(기본 block) 버튼만 카드 끝으로 날아가 남의 것처럼 보인다. */
+  width: fit-content;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
 }
-/* 보드가 남는 자리를 다 갖고, 버튼은 제 크기만 차지한다. */
-.sheet-block > .sheet-view { flex: 1 1 260px; min-width: 0; }
-.sheet-block > .sheet-act { flex: 0 0 auto; }
+.sheet-block > .sheet-view { max-width: 100%; }
+/* 보드 바로 아래, 그 폭 안에서 오른쪽 끝 */
+.sheet-block > .sheet-act {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
 
 /* 지문 절 안의 내려받기 — 지문 본문과 버튼 사이를 띄운다(본문에 붙으면 글의 일부로 읽힌다) */
 .lib-fold .prompt-dl { margin-top: var(--sp-3); }
@@ -2505,6 +2524,12 @@ h1.login-head { margin-inline: auto; }
 .panel-body::-webkit-scrollbar-track { background: transparent; }
 /* 내려받기는 카드 안 오른쪽 아래 — 프롬프트 수정 버튼이 서는 자리와 같은 규칙(.note-act). */
 .panel-act { display: flex; justify-content: flex-end; margin-top: 10px; }
+/* ★★★ 2026-09-03 사장님 지시 — **카드 안 [내려받기]는 우측 하단에 고정**이다.
+   카드는 이미 세로 flex 지만(위 .panel-card) 버튼줄을 아래로 **미는** 규칙이 없어서,
+   지문 길이가 카드마다 다르면 버튼이 제각각 높이에 섰다(줄이 들쭉날쭉해 보인다).
+   `margin-top: auto` 가 남는 세로 공간을 전부 위쪽에 몰아 버튼을 바닥에 붙인다.
+   ★ 카드 안(.panel-card)에서만 그렇게 한다 — 보드 아래 버튼(.sheet-act)은 제 자리가 따로 있다. */
+.panel-card .panel-act { margin-top: auto; padding-top: 10px; }
 .panel-dl { flex: none; }
 
 
