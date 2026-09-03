@@ -79,10 +79,19 @@ function ArchiveBody() {
   // ★ 성공한 것만 목록에서 뺀다 — 실패한 카드는 남아 있어야 다시 시도할 수 있다.
   async function removeSelected() {
     if (!selected.size || busy) return;
+    // ★★★ 2026-09-03 사장님 지시 — **남의 것이 섞였으면 그 수를 세어 말한다.**
+    //   운영자에게 [전체]가 열리면서 "모두 선택"이 남이 만든 영상까지 고를 수 있게 됐다.
+    //   몇 편인지 모른 채 누르면 남의 작업물이 조용히 사라진다 — 되돌릴 수 없는 일이다.
+    //   ★ 세는 기준은 `mine === false` 다("내 것이 아님이 확인된 것"만).
+    const others = (projects || []).filter((p) => selected.has(p.id) && p.mine === false).length;
     const ok = await confirm({
-      title: `${selected.size}편을 지울까요?`,
-      body: "만든 영상과 그림이 함께 지워지고 되돌릴 수 없어요.\n쓴 크레딧은 돌아오지 않아요.",
-      confirmLabel: "지우기",
+      title: others
+        ? `${selected.size}편을 지울까요? (남이 만든 것 ${others}편 포함)`
+        : `${selected.size}편을 지울까요?`,
+      body: others
+        ? `고른 ${selected.size}편 가운데 **${others}편은 다른 사람이 만든 것**이에요. 만든 사람에게는 알림이 가지 않고, 지우면 되돌릴 수 없어요.\n만든 영상과 그림이 함께 지워지고, 쓴 크레딧도 돌아오지 않아요.`
+        : "만든 영상과 그림이 함께 지워지고 되돌릴 수 없어요.\n쓴 크레딧은 돌아오지 않아요.",
+      confirmLabel: others ? "그래도 지우기" : "지우기",
     });
     if (!ok) return;
 

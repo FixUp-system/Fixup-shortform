@@ -225,8 +225,20 @@ export default function ReelImagesPage() {
               <div className="frame-busy"><span className="spinner" aria-hidden="true" /></div>
             )}
           </div>
-          <div className="panel-act">
-            <a className="mini" href={`${boardHref}${boardHref.includes("?") ? "&" : "?"}download=1`} download>전체 내려받기</a>
+          {/* ★★ 2026-09-03 사장님 지시 — **스토리보드 옆에** 내려받기를 둔다.
+              그전에는 보드 아래 줄에만 있었고 이름이 [전체 내려받기]라, 무엇을 받는지가
+              자리와 이름 둘 다에서 흐렸다. 이제 **보는 것 옆에서 그것을 받는다**.
+              ★ 이름을 [보드 내려받기]로 좁힌다 — 아래 지문 절의 [전체 내려받기]와 뜻이
+                겹치지 않게. 실제로 받는 것은 같은 한 장이지만, 사장님이 **어느 자리에서
+                눌렀는가**로 무엇을 받는지 알 수 있어야 한다. */}
+          <div className="sheet-act">
+            <a
+              className="mini"
+              href={`${boardHref}${boardHref.includes("?") ? "&" : "?"}download=1`}
+              download
+            >
+              보드 내려받기
+            </a>
           </div>
         </div>
       )}
@@ -322,15 +334,31 @@ export default function ReelImagesPage() {
         </ul>
       )}
 
-      {/* ★ 접어 둔다 — 지문이 길어서 펼쳐 두면 위의 컷 목록이 저 아래로 밀린다.
-          <details> 를 쓰는 이유는 키보드·스크린리더 동작이 이미 붙어 있어서다. */}
+      {/* ★★ 2026-09-03 사장님 지시 — **기본이 펼침이다**(`open`). 그전에는 접어 두었고
+          이유가 "지문이 길어서 펴 두면 위의 컷 목록이 저 아래로 밀린다"였는데, 사장님은
+          지문을 **늘 보면서** 고치는 자리라 접힌 채로 두면 매번 한 번 더 눌러야 했다.
+          <details> 는 그대로 쓴다 — 접는 길은 남기고 **첫 상태만** 뒤집었다.
+          ★ 키보드·스크린리더 동작이 이미 붙어 있어 <details> 를 계속 쓴다. */}
       {fullPrompt && (
-        <details className="lib-fold">
+        <details className="lib-fold" open>
           <summary>
             이미지 생성 지문 전체
             {savedPrompt ? "" : " (미리보기 — 아직 안 그렸어요)"}
           </summary>
           <p className="script-src">{fullPrompt}</p>
+          {/* ★★ 2026-09-03 사장님 지시 — **지문 아래 줄에 [전체 내려받기]**.
+              스토리보드까지 함께 받는 자리다(보드 옆 버튼은 보드 한 장만 받는다).
+              ★ 같은 주소를 쓴다 — 보드 라우트가 컷 그림을 모아 한 장으로 그려 주므로
+                "스토리보드 포함"이 그 한 장으로 성립한다. */}
+          <div className="panel-act prompt-dl">
+            <a
+              className="mini"
+              href={`${boardHref}${boardHref.includes("?") ? "&" : "?"}download=1`}
+              download
+            >
+              전체 내려받기
+            </a>
+          </div>
         </details>
       )}
 

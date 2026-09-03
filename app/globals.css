@@ -2390,7 +2390,23 @@ h1.login-head { margin-inline: auto; }
 /* ③이미지 맨 위의 통합 한 장 — **작게** 둔다(2026-08-27). 그 화면의 본문은 아래 컷별
    목록이고, 이 한 장은 전체 흐름을 한눈에 보는 자리다.
    ④·⑤에서 쓰는 기본 크기(68vh)는 그대로다 — 거기서는 이 한 장이 본문이다. */
-.sheet-block { margin-top: var(--sp-4); }
+/* ★★ 2026-09-03 사장님 지시 — 보드와 내려받기가 **한 줄에 나란히** 선다.
+   그전에는 버튼이 보드 아래에 있어서 "무엇을 받는 버튼인가"가 자리로 안 드러났다.
+   ★ 위쪽 정렬이다 — 보드가 세로로 길어 가운데 정렬하면 버튼이 화면 한참 아래로 내려간다.
+   ★ 좁은 화면에서는 아래로 접힌다(wrap) — 나란히 세우려다 보드가 눌리면 안 된다. */
+.sheet-block {
+  margin-top: var(--sp-4);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+/* 보드가 남는 자리를 다 갖고, 버튼은 제 크기만 차지한다. */
+.sheet-block > .sheet-view { flex: 1 1 260px; min-width: 0; }
+.sheet-block > .sheet-act { flex: 0 0 auto; }
+
+/* 지문 절 안의 내려받기 — 지문 본문과 버튼 사이를 띄운다(본문에 붙으면 글의 일부로 읽힌다) */
+.lib-fold .prompt-dl { margin-top: var(--sp-3); }
 /* 접힌 스토리보드 — 펴기 전에는 한 줄(약 40px)이다. 펴면 그 아래에 한 장이 선다. */
 .sheet-foldable > summary { cursor: pointer; }
 .sheet-foldable[open] > summary { margin-bottom: 10px; }

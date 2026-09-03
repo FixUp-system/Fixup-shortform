@@ -94,10 +94,19 @@ export default function ProjectCards({ projects, limit, onDeleted, selecting, se
     e.stopPropagation();
     if (busyId) return;
     const name = p.title ? `"${p.title}"` : "이 영상";
+    // ★★★ 2026-09-03 사장님 지시 — **남의 것을 지울 때는 다르게 묻는다.**
+    //   운영자에게 [전체]가 열리면서 같은 버튼이 두 가지 일을 하게 됐다: 내 것 지우기와
+    //   **남이 만든 것 지우기**. 문구가 같으면 그 둘이 손끝에서 구별되지 않는다 —
+    //   격자로 촘촘한 목록에서 오조작이 쉬운 자리라(위 remove 주석) 더 위험하다.
+    //   ★ 판정은 `p.mine === false` 다 — "내 것이 아님이 **확인된** 카드"에만 붙는다.
+    //     목록에 mine 이 없는 옛 호출부(홈)는 undefined 라 예전 문구 그대로다.
+    const others = p.mine === false;
     const ok = await confirm({
-      title: `${name} 을 지울까요?`,
-      body: "만든 영상과 그림이 함께 지워지고 되돌릴 수 없어요.\n쓴 크레딧은 돌아오지 않아요.",
-      confirmLabel: "지우기",
+      title: others ? `남이 만든 ${name} 을 지울까요?` : `${name} 을 지울까요?`,
+      body: others
+        ? "이 영상은 **다른 사람이 만든 것**이에요. 만든 사람에게는 알림이 가지 않고, 지우면 되돌릴 수 없어요.\n만든 영상과 그림이 함께 지워지고, 쓴 크레딧도 돌아오지 않아요."
+        : "만든 영상과 그림이 함께 지워지고 되돌릴 수 없어요.\n쓴 크레딧은 돌아오지 않아요.",
+      confirmLabel: others ? "그래도 지우기" : "지우기",
     });
     if (!ok) return;
     setBusyId(p.id);
