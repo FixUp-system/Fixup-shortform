@@ -101,7 +101,21 @@ export const POST = withUser(async (req, { params }, user) => {
       //   ★ "done" 이 아니다 — 이건 클립(컷별 영상) 생성이 끝난 것이고, 최종 완성본은
       //   /render 가 만든다(REEL_STEPS 의 ⑤영상 단계 ≠ ⑥완성 단계). "clips" 로 구분해서
       //   /render 라우트가 다시 "rendering" 으로 바꿔도 뜻이 안 겹친다.
+      // ★★★ 2026-09-03 — **통짜 갈래에서는 여기서 상태를 옮기지 않는다**(사장님 지시).
+      //   통짜(oneshot)는 fal 에 **접수만 하고 즉시 돌아온다** — 그 반환은 "다 됐다"가
+      //   아니라 "접수했다"이다. 그런데 여기서 `status:"clips"` 를 찍고 있었고, 그 한 줄이
+      //   넷을 동시에 망가뜨렸다(09-03 오후에 세 번 밟았다):
+      //     · 화면 폴링이 `status !== "rendering"` 이면 멈춘다 → **접수하자마자 폴링이 죽는다**
+      //     · 아무도 수거하지 않는다 → 사장님이 새로고침해야 결과가 걷힌다
+      //     · 수거가 적어 둔 오류를 이 쓰기가 **덮는다** → error 는 null 인데 화면엔 실패가 뜬다
+      //     · ★ **다음 클릭이 헛돈다** — 접수증이 안 지워진 채 남아 runReelOneShot 이
+      //       `if (job?.requestId) return;` 로 그냥 돌아간다. 프롬프트를 고쳐도 새 요청이
+      //       안 나가고 옛 거절만 계속 보였다.
+      //   → 통짜의 **완료 판정은 수거 하나**다(collectReelOneShot 이 status 를 옮긴다).
+      //   ★ 컷별(percut)은 그대로다 — runReelClips 는 **실제로 다 굽고** 돌아오므로 여기서
+      //     안 옮기면 status 가 영원히 "rendering" 이다(2026-08-21 리뷰 C1 이 세운 그 줄).
       .then(async () => {
+        if (plan.mode === "oneshot") return;
         await updateProject(id, user.id, (p) => putReel(p, { status: "clips", error: null })).catch(() => {});
       })
       .catch(async (e) => {
