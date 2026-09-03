@@ -19,8 +19,10 @@ import { adEndpoint } from "../lib/ad/models.js";
 const strip = (s) => s.replace(/(^|[^:])\/\/.*$/gm, "$1").replace(/\/\*[\s\S]*?\*\//g, "");
 
 describe("판정 — 어느 광고 모델이 얼굴 든 참조를 막나", () => {
-  it("★★★ 프로(2.5)는 막는다 — 실측 9건 전부 거절한 그 모델이다", () => {
-    expect(blocksFacesForEndpoint(adEndpoint("seedance-2.5", "r2v"))).toBe(true);
+  // ★★★ 2026-09-03 뒤집힘 — 격자로 통과시킨다(2.5 를 4초 480p 로 실측, billable 38.83).
+  //   그전 "9건 전부 거절"은 격자가 판 전체·시안·반투명이었던 탓이다.
+  it("★★★ 프로(2.5)도 이제 안 막는다", () => {
+    expect(blocksFacesForEndpoint(adEndpoint("seedance-2.5", "r2v"))).toBe(false);
   });
 
   it("★★ 기본(H3)은 안 막는다 — 모르면 안 막는 것이 이 저장소의 규율이다", () => {
