@@ -9,6 +9,7 @@ import { describe, it, expect } from "vitest";
 import sharp from "sharp";
 import {
   FACE_GRID, GRID_SUPPRESS_LINE, boxToRect, gridSvg, gridFacesOnSheet, gridFacesOnPhoto,
+  findFaceBoxes, mergeRects,
 } from "../lib/reel/face-grid.js";
 
 const solid = (w, h, v = 120) =>
@@ -23,8 +24,13 @@ describe("설정 — 실측으로 정해진 값이다", () => {
     expect(FACE_GRID.color).toBe("#FFFFFF");
   });
 
-  it("★★ 촘촘하고 굵다 — 얇으면 얼굴이 그대로 읽힌다", () => {
-    expect(FACE_GRID.cells).toBeGreaterThanOrEqual(8);
+  // ★★★ 2026-09-03 오후 실측 — **칸 수가 아니라 선 간격이 본질이다.**
+  //   09-03 오전에 통한 설정은 "얼굴에 딱 맞는 상자에 10칸" = 간격 20px 안팎이었다.
+  //   그런데 칸 수를 고정해 두면 상자가 커질수록 성겨진다 — 프로덕션에서 상자가
+  //   515x1248px(칸의 72%x98%)로 잡혀 간격이 52px 이 됐고, 얼굴이 격자 한 칸 안에
+  //   통째로 들어가 그대로 읽혀 거절됐다(요청 01a065aa).
+  it("★★★ 촘촘함은 **간격**으로 정한다 — 칸 수를 고정하면 큰 상자에서 성겨진다", () => {
+    expect(FACE_GRID.spacing).toBeLessThanOrEqual(24);
     expect(FACE_GRID.stroke).toBeGreaterThanOrEqual(6);
   });
 
@@ -60,7 +66,7 @@ describe("gridSvg — 그리는 것", () => {
     const svg = gridSvg(1000, 1000, [{ left: 10, top: 10, width: 500, height: 500 }]).toString();
     expect(svg).toContain('stroke="#FFFFFF"');
     expect(svg).toContain('stroke-opacity="1"');
-    expect((svg.match(/<line/g) || []).length).toBe((FACE_GRID.cells + 1) * 2);
+    expect((svg.match(/<line/g) || []).length).toBeGreaterThan(0);
   });
 
   // ★★★ 2026-09-03 오후 — 여러 얼굴을 덮게 하자 **작은 얼굴이 흰 덩어리**가 됐다.
@@ -75,9 +81,20 @@ describe("gridSvg — 그리는 것", () => {
     expect(Math.min(...gaps), "선 간격이 굵기보다 좁다 = 덩어리").toBeGreaterThanOrEqual(FACE_GRID.stroke);
   });
 
-  it("★★ 큰 얼굴에서는 실측 칸 수를 그대로 쓴다", () => {
-    const svg = gridSvg(1000, 1000, [{ left: 0, top: 0, width: 600, height: 600 }]).toString();
-    expect((svg.match(/<line/g) || []).length).toBe((FACE_GRID.cells + 1) * 2);
+  // ★★★ 프로덕션에서 실제로 온 상자 모양이다(칸 5: 515x1248 — 세로가 가로의 2.4배).
+  //   옛 코드는 **가로·세로에 같은 칸 수**를 써서, 세로선은 19px 간격인데 가로선은 105px
+  //   간격이 나왔다. 한쪽만 촘촘하면 얼굴은 그대로 읽힌다.
+  it("★★★ 큰 상자·길쭉한 상자에서도 **양쪽 다** 촘촘하다", () => {
+    const svg = gridSvg(2160, 2560, [{ left: 0, top: 0, width: 515, height: 1248 }]).toString();
+    // ★ 정규식은 **리터럴로** 쓴다 — 템플릿 문자열 안에 넣으면 역슬래시가 한 겹 먹혀
+    //   `\d` 가 `d` 가 되고, 아무것도 안 맞아 **판이 헛돌며 통과한다**(방금 밟았다).
+    const gaps = (re) => {
+      const v = [...new Set([...svg.matchAll(re)].map((m) => Number(m[1])))].sort((a, b) => a - b);
+      expect(v.length, "좌표를 하나도 못 읽었다 = 판이 헛돈다").toBeGreaterThan(2);
+      return Math.max(...v.slice(1).map((n, i) => n - v[i]));
+    };
+    expect(gaps(/x1="(\d+)"/g), "세로선이 성기다").toBeLessThanOrEqual(24);
+    expect(gaps(/y1="(\d+)"/g), "가로선이 성기다").toBeLessThanOrEqual(24);
   });
 
   it("★ 사각형이 여럿이면 그룹도 여럿이다", () => {
@@ -178,10 +195,49 @@ describe("얼굴이 여럿인 칸 — 하나라도 남기면 거절은 그대로
   it("★★★ 찾는 지문이 **배경·광고판·작은 얼굴**까지 부른다 — 이 판의 주제가 광고판 속 인물이다", async () => {
     const { readFileSync } = await import("node:fs");
     const src = readFileSync("lib/reel/face-grid.js", "utf8");
-    const ask = src.slice(src.indexOf("findFaceBoxes"));
-    for (const w of ["EVERY", "background", "billboard", "small"]) {
+    // ★ 지문은 `askFaceBoxesOnce`(한 회차를 묻는 함수) 안에 있다 — `findFaceBoxes` 는
+    //   그것을 여러 번 부르는 껍데기라 그 뒤부터 자르면 지문을 놓친다(한 번 놓쳤다).
+    const ask = src.slice(src.indexOf("askFaceBoxesOnce"));
+    for (const w of ["EVERY", "background", "billboard", "small", "TIGHT", "forehead", "chin", "shoulders"]) {
       expect(ask, `지문이 ${w} 를 안 부른다`).toContain(w);
     }
     expect(ask, "얼굴 하나만 받는 옛 모양이 남아 있다").not.toMatch(/"face":true\|false/);
+  });
+});
+
+// ★★★ 2026-09-03 오후 — **좌표가 회차마다 크게 흔들린다.** 같은 칸을 네 번 물었더니
+//   얼굴 상자가 (0.31,0.10) · (0.37,0.05) · (0.35,0.06) · (0.33,0.14) 로 흩어졌고,
+//   **한 회차만 쓰면 얼굴을 빗나간다**(프로덕션 판 칸 0 에서 격자가 하늘에 그려졌다).
+//   그런데 넷을 합치면 얼굴이 덮인다. 비결정성을 약점이 아니라 재료로 쓴다.
+describe("여러 번 물어 합친다 — 한 번으로는 좌표가 빗나간다", () => {
+  it("★★★ 설정한 횟수만큼 묻는다", async () => {
+    let calls = 0;
+    const fetchImpl = async () => {
+      calls++;
+      return { ok: true, json: async () => ({ choices: [{ message: { content: '{"faces":[{"x":0.1,"y":0.1,"w":0.1,"h":0.1}]}' } }] }) };
+    };
+    const out = await findFaceBoxes({ bytes: Buffer.from("x"), fetchImpl, apiKey: "k" });
+    expect(calls, "한 번만 묻는다").toBe(FACE_GRID.passes);
+    expect(FACE_GRID.passes).toBeGreaterThanOrEqual(2);
+    expect(out.length).toBe(FACE_GRID.passes);
+  });
+
+  it("★★★ 겹치는 상자는 **하나로 합쳐** 그린다 — 겹쳐 그리면 선이 엇갈려 덩어리가 된다", () => {
+    const merged = mergeRects([
+      { left: 0, top: 0, width: 100, height: 100 },
+      { left: 50, top: 50, width: 100, height: 100 },
+      { left: 400, top: 400, width: 50, height: 50 },
+    ]);
+    expect(merged.length, "겹친 둘을 안 합쳤다").toBe(2);
+    const big = merged.find((r) => r.width > 100);
+    expect([big.left, big.top, big.width, big.height]).toEqual([0, 0, 150, 150]);
+  });
+
+  it("★★ 안 겹치면 그대로 둔다", () => {
+    const merged = mergeRects([
+      { left: 0, top: 0, width: 10, height: 10 },
+      { left: 100, top: 100, width: 10, height: 10 },
+    ]);
+    expect(merged.length).toBe(2);
   });
 });
