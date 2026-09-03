@@ -36,10 +36,14 @@
 > 옛 문장은 "의도적 미커밋이다(주석에 '커밋하지 않는다')" 였는데 **둘 다 사실이 아니다**:
 > 파일은 추적되고 있고 그런 주석도 없다. 이 두 벌 상태가 위 함정의 원인이었다.
 >
-> ★ **이어서 하는 세션이 읽을 두 장**(2026-09-02 갱신 — 그전에는 08-14 페이지를 가리키고
-> 있어 2주 낡아 있었다):
-> · **상태와 남은 일** → 이 저장소의 `OUTSTANDING.md` (브랜치 `feat/reel-cut-r2v`)
-> · **왜 그렇게 했나(회차 서사)** → `C:\Users\fixup\obsidian_jaechan\sources\shotform-archive-admin-and-ui-2026-09-01.md`
+> ★ **이어서 하는 세션이 읽을 두 장**(2026-09-03 갱신):
+> · **상태와 남은 일** → 이 저장소의 `OUTSTANDING.md`
+>   ⚠️ **브랜치 `feat/reel-cut-r2v` 에만 최신이다** — 워크트리
+>   `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` 에서 세션을 열어라.
+>   메인 저장소(main)에서 열면 09-02 판을 읽는다.
+> · **왜 그렇게 했나(회차 서사)** → `C:\Users\fixup\obsidian_jaechan\sources\shotform-face-grid-2026-09-03.md`
+>   (그 앞 회차: `shotform-board-and-collect-recovery-2026-09-02` ·
+>    `shotform-archive-admin-and-ui-2026-09-01`)
 >   그리고 그 wiki 의 `index.md` → `products/shotform-saas.md` 순으로 내려가면 전체가 보인다.
 
 > ## ★★ 화면 파일을 손댔으면 **한 번 굽는다**
