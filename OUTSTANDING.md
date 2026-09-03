@@ -1,4 +1,4 @@
-# 이어서 할 일 — `feat/reel-cut-r2v` (2026-09-02 저녁 기준 · **다섯째 갱신**)
+# 이어서 할 일 — `feat/reel-cut-r2v` (2026-09-03 기준 · **여섯째 갱신**)
 
 이 문서는 **다음 세션이 이 브랜치를 그대로 이어받기 위한 것**이다.
 사실은 코드가 진실의 원천이다. 여기 적힌 것과 코드가 어긋나면 코드를 믿고 이 문서를 고쳐라.
@@ -16,11 +16,11 @@
 | 워크트리 | `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` |
 | 브랜치 | `feat/reel-cut-r2v` (09-03). ⚠️ **09-03 작업 전부가 아직 로컬에만 있다.** ★ HEAD·미푸시 수는 **적지 않는다** — 이 문서를 고치는 커밋이 그 수를 또 바꿔서 적는 순간 낡는다. **세라**: `git log -1 --format='%h %s'` · `git rev-list --count fixup/main..HEAD` |
 | 테스트 | **5,677 그린** (10 skipped) — `npx vitest run` · `npx next build` 통과(09-03 실측) |
-| 배포 | **프로덕션 라이브 `2jhi19mik`**(09-02 저녁 · `dpl_9Bo5aGPAdedSDBCvg7H2TYiYS8pC` · 코드 `d32daa0`). `/login`·`/archive` 200 · 로그의 deploymentId 전환 실측. 이 날 배포 넷: `ju8okg74p`(비용표) → `q9ahk21if`(max_tokens) → `db4m9knyf`(재시도금지·failure배선) → 이것(보드 전체·수거 복구·자동재시도 제거·프롬프트) |
+| 배포 | **프로덕션 라이브 `4l168opih`**(09-02 밤 · `dpl_G2ueZcpkhNYEGJTia8QcnmaXK1oe` · 코드 `23b80a2`). 09-03 재확인 — `/login`·`/archive` **200**. ⚠️ 이 줄은 09-03 아침까지 **`2jhi19mik`(09-02 저녁 · 코드 `d32daa0`)** 로 낡아 있었다 — 밤 배포를 §0 미배포 줄과 §11 에만 적고 여기는 안 고친 탓이다. 같은 사실을 세 자리에 적은 결과다 |
 | ★ 정식 도메인 | **`https://fixup-shortform-service.vercel.app`** 다. `vercel deploy` 가 찍어 주는 `...-ju8okg74p-fix-up1.vercel.app` 쪽은 **Deployment Protection(SSO)에 걸려 전부 302** 라 검증에 쓰면 안 된다 — 09-02 에 한 번 속았다 |
 | 미배포 | 🔴 **있다** — 09-03 작업 전부(코드 7 + 문서). 마지막 배포는 09-02 밤 **`4l168opih`**(`dpl_G2ueZcpkhNYEGJTia8QcnmaXK1oe` · 코드 `23b80a2`) — 그 뒤로 안 올렸다. 올리는 법은 §0 '배포하는 법' |
 | 푸시 | 🔴 **미푸시 있음** — 수는 위 줄의 명령으로 센다(09-03 마지막 실측 11). ⚠️ **URL 로 직접 푸시하면 로컬 추적 ref 가 안 움직여** '미푸시 N' 착시가 난다 — 정정은 `git fetch <원격> <브랜치>:refs/remotes/<원격>/<브랜치>`. ⚠️ `git push` 가 자격증명 대기로 매달리면 `GIT_TERMINAL_PROMPT=0` 을 걸어 바로 실패시켜라 |
-| main 과의 거리 | `fixup/main` = `23b80a2` · HEAD 가 **그만큼 앞**(뒤처진 것 0 — `git rev-list --left-right --count fixup/main...HEAD`). 09-02 에 두 원격 main 을 맞춰 두었고 그 뒤 작업이 브랜치에만 쌓였다. **main 병합·푸시는 사장님이 지시할 때만** 한다 |
+| main 과의 거리 | `fixup/main` = **`6e9bd8f`**(배포 코드 `23b80a2` 위에 "배포 완료 반영" docs 한 줄). `origin/main` 도 같은 커밋(09-03 실측 — 두 원격이 아직 맞다). HEAD 가 그만큼 **앞**, 뒤처진 것 0 — 세는 법은 `git rev-list --left-right --count fixup/main...HEAD`. 그 뒤 작업이 브랜치에만 쌓였다. **main 병합·푸시는 사장님이 지시할 때만** 한다 |
 | ⚠️ 배포 함정 | **`.vercel` 폴더가 이 워크트리에 없다.** 그래서 `--project` 를 **반드시** 준다 — 안 주면 폴더 이름으로 새 프로젝트를 만든다(팀에 `step-gate` 라는 **실수로 생긴 프로젝트**가 그 증거다) |
 | ★ origin 푸시 | `origin` 은 URL 에 계정이 안 박혀 있다. 이 회차에는 `git push origin <브랜치>` 가 그냥 통과했지만, 자격증명 대기로 멈추면 계정을 실어라: `git push https://jaechanyoon0519-Fixup@github.com/FixUp-system/Fixup-shortform.git <브랜치>` |
 | 개발 서버 | `npx next dev -p 3111` (이 회차에 쓴 포트). `.env.local` 의 `SHOTFORM_DEV_USER` 가 **로그인을 건너뛰고 운영자 신원**을 준다 — 관리자·비용 화면을 그대로 볼 수 있다 |
