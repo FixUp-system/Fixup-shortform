@@ -3,7 +3,7 @@
 import { describe, it, expect } from "vitest";
 import {
   AD_FORMATS, AD_MOODS, AD_LANGS, AD_STYLE_LINES,
-  DEFAULT_AD_OPTIONS, normalizeAdOptions, REEL_STYLE_OMIT, reelStyleLine,
+  DEFAULT_AD_OPTIONS, normalizeAdOptions,
 } from "../lib/ad/options.js";
 import { STYLE_PRESETS } from "../lib/styles.js";
 import { readFileSync } from "node:fs";
@@ -124,56 +124,28 @@ describe("광고 옵션", () => {
 });
 
 
-// ── 흐름이 갈렸다 — 단계별만 빼는 낱말 ──────────────────────────────────────
+// ── 흐름은 갈리지 않는다 — 화풍 줄은 한 벌이다 ──────────────────────────────
 //
-// 2026-09-03 사장님 지시: *"단계별 영상에서는 일단 제거하고 원클릭은 그대로 두자."*
-// 단계별은 스토리보드 판 한 장을 참조로 굽는데(r2v), 그 판에 얼굴이 사진처럼 그려지면
-// fal 이 초상 정책으로 거절한다. 원클릭은 그 자리에서 겪는 문제가 아니라 그대로 둔다.
+// ★★★ 2026-09-03 하루에 두 번 뒤집힌 자리다. 판을 남겨 두는 이유는 **되돌린 사실 자체**를
+//   지키기 위해서다 — 다시 가르려면 근거가 새로 있어야 한다.
 //
-// ⚠️ 이 낱말이 거절의 **원인이라는 확증은 없다** — 09-03 실측에서 완전히 빼고 같은 판으로
-//   다시 구웠는데 똑같이 422 였다($0). 뿌리는 판에 그려진 얼굴이다. 이 판이 지키는 것은
-//   "원인"이 아니라 **흐름이 갈렸다는 사실**이다 — 한쪽만 고치면 조용히 도로 합쳐진다.
-describe("화풍 줄 — 원클릭은 그대로, 단계별만 뺀다", () => {
+//   ① `hyper-realistic detail` 이 초상 거절의 원인이라 보고 단계별에서만 뺐다.
+//   ② **실측으로 반증**: 완전히 빼고 같은 판으로 다시 구웠는데 똑같이 422($0).
+//      거절 위치가 `body.image_urls` 라 처음부터 글이 아니라 그림을 가리키고 있었다.
+//   ③ 판에 흰 격자를 덧그리는 방법이 통했다(6×6·굵기12·불투명100% + 억제 힌트).
+//      4초 480p·15초 720p 두 번 다 통과, 출력물에 격자 흔적 0.
+//   ④ 뺄 이유가 사라져 **사장님 지시로 되돌렸다** — 세 흐름이 같은 표를 쓴다.
+describe("화풍 줄 — 흐름이 갈리지 않는다", () => {
   const strip = (s) => s.replace(/(^|[^:])\/\/.*$/gm, "$1").replace(/\/\*[\s\S]*?\*\//g, "");
 
-  it("★★★ 원클릭이 쓰는 표에는 그 낱말이 남아 있다", () => {
+  it("★★ 실사 줄에 그 낱말이 있다 — 되돌린 상태다", () => {
     expect(AD_STYLE_LINES.photo).toMatch(/hyper-realistic detail/);
   });
 
-  it("★★★ 단계별이 쓰는 값에는 없다", () => {
-    expect(reelStyleLine("photo")).not.toMatch(/hyper-realistic/);
-  });
-
-  it("★★ 뺀 자리에 쉼표가 겹쳐 남지 않는다 — 지문이 지저분해진다", () => {
-    expect(reelStyleLine("photo")).not.toMatch(/,\s*,/);
-    expect(reelStyleLine("photo")).toMatch(/^live-action cinematic footage, lifelike movement,/);
-  });
-
-  it("★★ 빼는 목록이 없는 화풍은 **글자 그대로** 같다 — 모르면 안 건드린다", () => {
-    for (const id of Object.keys(AD_STYLE_LINES)) {
-      if (REEL_STYLE_OMIT[id]) continue;
-      expect(reelStyleLine(id), `${id} 가 달라졌다`).toBe(AD_STYLE_LINES[id]);
-    }
-  });
-
-  it("★ 모르는 화풍에도 안 던진다", () => {
-    expect(reelStyleLine("no-such-style")).toBeUndefined();
-  });
-
-  it("★★★ 단계별 두 자리가 **같은 값**을 쓴다 — 시나리오와 판이 어긋나면 안 된다", () => {
-    for (const p of ["lib/reel/scenario.js", "lib/reel/panels.js"]) {
+  it("★★★ 세 흐름이 **같은 표**를 읽는다 — 한 곳만 갈면 화풍이 조용히 어긋난다", () => {
+    for (const p of ["lib/reel/scenario.js", "lib/reel/panels.js", "lib/ad/scenario.js", "lib/film/scenario.js"]) {
       const src = strip(readFileSync(p, "utf8"));
-      expect(src, `${p} 가 reelStyleLine 을 안 쓴다`).toMatch(/reelStyleLine\(/);
-      expect(src, `${p} 가 표를 직접 읽어 원클릭 값을 쓴다`)
-        .not.toMatch(/AD_STYLE_LINES\[/);
-    }
-  });
-
-  it("★★ 원클릭·film 은 표를 그대로 읽는다 — 여기까지 빼면 사장님 지시와 어긋난다", () => {
-    for (const p of ["lib/ad/scenario.js", "lib/film/scenario.js"]) {
-      const src = strip(readFileSync(p, "utf8"));
-      expect(src, `${p} 가 단계별 값을 쓴다`).not.toMatch(/reelStyleLine/);
-      expect(src).toMatch(/AD_STYLE_LINES\[/);
+      expect(src, `${p} 가 표를 안 읽는다`).toMatch(/AD_STYLE_LINES\[/);
     }
   });
 });
