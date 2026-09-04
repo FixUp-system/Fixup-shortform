@@ -147,7 +147,7 @@ describe("배선 — 굽기가 실제로 이 길을 지난다", () => {
     const src = readFileSync("lib/reel/pipeline.js", "utf8")
       .replace(/(^|[^:])\/\/.*$/gm, "$1").replace(/\/\*[\s\S]*?\*\//g, "");
     expect(src, "격자를 안 씌운다").toMatch(/gridFacesOnSheet\(/);
-    expect(src, "격자 판을 안 보낸다").toMatch(/refs: \[sheetRef\]/);
+    expect(src, "격자 판을 안 보낸다").toMatch(/refs: \[sheetRef,/);
     expect(src, "꼬리를 조건 없이 붙이거나 아예 안 붙인다")
       .toMatch(/gridded \? `\$\{prompt\}[\s\S]{0,20}\$\{GRID_SUPPRESS_LINE\}` : prompt/);
   });

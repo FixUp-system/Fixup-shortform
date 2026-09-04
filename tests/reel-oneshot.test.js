@@ -56,7 +56,11 @@ describe("순수 규율", () => {
     // ★ 2026-08-31 — `../aspects.js` 를 더했다. **import 가 0 건인 순수 데이터 파일**이라
     //   (실측) 이 판이 지키려는 것("사슬 끝에 fs·env 가 안 닿는다")을 안 깬다. 여기서
     //   "9:16" 을 손으로 파싱하면 화면 비율 표와 두 벌이 된다.
-    const ALLOWED_OUTSIDE = ["../clip-limits.js", "../progress.js", "../cuts.js", "../aspects.js"];
+    // ★ 2026-09-04 — `../photos.js` 를 더했다. **import 가 0 건인 순수 파일**이고 화면
+    //   둘(app/reel/new · app/ads/new)이 이미 읽는다. 통짜가 함께 보낼 사진을 고르려면
+    //   "인물인가"(isPersonPhoto)와 첨부 문구(attachedRoleLine)가 필요한데, 여기서 다시
+    //   적으면 컷별 갈래와 **두 벌**이 되어 갈래마다 다른 지시가 나간다.
+    const ALLOWED_OUTSIDE = ["../clip-limits.js", "../progress.js", "../cuts.js", "../aspects.js", "../photos.js"];
     for (const spec of specs) {
       if (ALLOWED_OUTSIDE.includes(spec)) continue;
       expect(spec, `허용 밖의 import: ${spec}`).toMatch(/^\.\//);
