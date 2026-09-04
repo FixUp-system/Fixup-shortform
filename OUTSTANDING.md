@@ -16,10 +16,10 @@
 | 워크트리 | `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` |
 | 브랜치 | `feat/reel-cut-r2v` (09-03 저녁). ★ 수는 **적지 않는다** — 이 문서를 고치는 커밋이 그 수를 또 바꾼다. **세라**: `git log -1 --format='%h %s'` · `git rev-list --count fixup/main..HEAD` |
 | 테스트 | **5,757 그린** (10 skipped · 337 파일) — `npx vitest run` · `npx next build` 통과(09-03 **밤** 재실측, 얼굴 제한 걷은 뒤 포함) |
-| 배포 | **프로덕션 라이브 `h1te17h9m`**(09-03 **밤** · 코드 `6bb3f53` · `dpl_3JQc9XADSToAAbo6mM6yGEkzQhRa`). READY · `/login` 200 · ★ **실측 증거**: 정식 도메인의 CSS 번들에서 이번에 걷어낸 `.mode-note` 가 **0건**이다(새 빌드라는 직접 증거). `::selection`·`textarea.field{overflow-y:hidden}` 은 그대로 |
+| 배포 | **프로덕션 라이브 `i7d0rc266`**(09-04 · 코드 `0b2f341` · `dpl_CiFQnyyTqhLECaq6JbnBRB883QhZ`). target=production · status=Ready · `/login`·`/archive` 200 · `/api/me` 401(로그인 벽, 정상) · ★ **확인법**: `npx vercel inspect fixup-shortform-service.vercel.app` 이 그 배포를 가리키는지 본다 — 이번엔 CSS 가 안 바뀌어 번들 해시로는 못 쟀다 |
 | ★ 정식 도메인 | **`https://fixup-shortform-service.vercel.app`** 다. `vercel deploy` 가 찍어 주는 `...-ju8okg74p-fix-up1.vercel.app` 쪽은 **Deployment Protection(SSO)에 걸려 전부 302** 라 검증에 쓰면 안 된다 — 09-02 에 한 번 속았다 |
-| 미배포 | ⚠️ **있다** — 09-04 의 자막 글자 칸(`e158b91`)이 프로덕션(`6bb3f53`)보다 앞이다. 그 앞(09-03 밤)까지는 전부 라이브다 |
-| 푸시 | ⚠️ **여전히 미푸시**(배포와 푸시는 다른 일이다 — 09-03 밤 작업 — 세라: `git rev-list --count fixup/feat/reel-cut-r2v..HEAD`). 그 앞까지는 두 원격에 밀었다(09-03 저녁 · `fixup`·`origin` 의 `feat/reel-cut-r2v`). ⚠️ URL 로 직접 푸시하면 추적 ref 가 안 움직여 '미푸시 N' 착시가 난다 — 정정은 `git fetch <원격> <브랜치>:refs/remotes/<원격>/<브랜치>`. ⚠️ 자격증명 대기로 매달리면 `GIT_TERMINAL_PROMPT=0` |
+| 미배포 | **없다** — 09-04 작업이 전부 프로덕션이다. 배포 전 점검 둘 통과: **새 env 0 · 마이그레이션 0** |
+| 푸시 | **두 원격에 밀었다**(09-04 · `fixup`·`origin` 의 `feat/reel-cut-r2v` = `0b2f341`, 미푸시 0). ⚠️ URL 로 직접 푸시하면 추적 ref 가 안 움직여 '미푸시 N' 착시가 난다 — 정정은 `git fetch <원격> <브랜치>:refs/remotes/<원격>/<브랜치>`. ⚠️ 자격증명 대기로 매달리면 `GIT_TERMINAL_PROMPT=0` |
 | main 과의 거리 | `fixup/main` = `6e9bd8f`(그 안의 코드 커밋이 `23b80a2`) · HEAD 가 **34커밋 앞**(이 문서 커밋 전 실측 — 세라)(뒤처진 것 0). 09-03 작업이 브랜치에만 쌓였다 — **main 병합은 사장님이 지시할 때만** 한다 |
 | ⚠️ 배포 함정 | **`.vercel` 폴더가 이 워크트리에 없다.** 그래서 `--project` 를 **반드시** 준다 — 안 주면 폴더 이름으로 새 프로젝트를 만든다(팀에 `step-gate` 라는 **실수로 생긴 프로젝트**가 그 증거다) |
 | ★ origin 푸시 | `origin` 은 URL 에 계정이 안 박혀 있다. 이 회차에는 `git push origin <브랜치>` 가 그냥 통과했지만, 자격증명 대기로 멈추면 계정을 실어라: `git push https://jaechanyoon0519-Fixup@github.com/FixUp-system/Fixup-shortform.git <브랜치>` |
