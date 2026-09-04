@@ -17,7 +17,8 @@ import { startPolling } from "../../../../lib/poll";
 import { REEL_STEPS, reelStepHref } from "../../../../lib/reel/steps";
 import ReelBack from "../../../../components/ReelBack";
 import { speechLangOf } from "../../../../lib/subtitle-langs";
-import { narrationChanged } from "../../../../lib/reel/narration";
+import { narrationChanged, bakedNarration, SAID_MAX } from "../../../../lib/reel/narration";
+import AutoTextarea from "../../../../components/AutoTextarea";
 import SubtitleEditor, { seedSubtitle } from "../../../../components/SubtitleEditor";
 
 const DONE_TIMEOUT_MS = 10 * 60 * 1000;
@@ -35,6 +36,12 @@ export default function ReelDonePage() {
   // 드래그 중인가 — 그동안은 서버 값으로 덮어쓰지 않는다(끄는 중에 값이 튄다).
   const dragRef = useRef(false);
 
+  // ★★★ 2026-09-04 — **자막 글자.** 이 영상이 말한 문장이고, 자막은 그것을 태운다
+  //   (lib/reel/narration.js 의 bakedNarration). 굽는 순간 코드가 적지만 **이미 구운
+  //   편에는 없어서**, 구운 뒤 내레이션을 고치면 자막과 소리가 갈렸다(2026-09-03 신고).
+  //   고치려고 다시 굽게 하면 글자 하나에 한 편 값이 나가므로 **여기서 0원에 고친다.**
+  const [said, setSaid] = useState(() => bakedNarration(project)?.text || "");
+
   useEffect(() => () => { stopRef.current?.(); stopRef.current = null; }, []);
 
   // 서버가 준 설정이 바뀌면 따라간다(불러오기·저장 뒤). 문자열로 비교하는 이유는 객체가
@@ -44,6 +51,10 @@ export default function ReelDonePage() {
     if (dragRef.current) return;
     setSub(seedSubtitle(project));
   }, [savedSubtitle]);
+
+  // 저장된 글자가 바뀌면 따라간다(저장·불러오기 뒤). 설정과 같은 처방이다.
+  const savedSaid = bakedNarration(project)?.text || "";
+  useEffect(() => { setSaid(savedSaid); }, [savedSaid]);
 
   function beginPolling() {
     stopRef.current?.();
@@ -82,6 +93,26 @@ export default function ReelDonePage() {
       throw new Error((await res?.json().catch(() => ({})))?.error || "자막 설정을 저장하지 못했어요");
     }
     await reload(id).catch(() => {});
+  }
+
+  // 자막 **글자**만 저장한다 — 굽지 않는다. 값이 안 나가는 것이 이 문의 요점이다.
+  // ★ 저장만 하고 굽지 않는 이유: 굽기(합성)는 몇 분 걸린다. 글자를 고칠 때마다 그것을
+  //   끌고 가면 고치는 일이 무거워진다 — 다 고친 뒤 [다시 만들기] 한 번이면 된다.
+  async function saveSaid() {
+    setBusy("said"); setErr("");
+    const res = await fetch(`/api/reel/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ said }),
+    }).catch(() => null);
+    const data = await res?.json().catch(() => ({}));
+    if (!res || !res.ok) {
+      setErr(data?.error || "자막 글자를 저장하지 못했어요");
+      setBusy("");
+      return;
+    }
+    await reload(id).catch((e) => setErr(e.message));
+    setBusy("");
   }
 
   async function startRender() {
@@ -148,7 +179,8 @@ export default function ReelDonePage() {
       {narrationChanged(project) && (
         <p className="pgsub warn">
           내레이션을 고치셨어요 — 이 영상의 자막은 영상이 말하는 문장 그대로예요.
-          고친 문장으로 바꾸려면 영상 화면에서 다시 만들어 주세요.
+          고친 문장을 영상에 넣으려면 영상 화면에서 다시 만들어 주세요.
+          자막 글자만 맞추시려면 아래 칸에서 고치시면 돼요.
         </p>
       )}
       {/* ★★ 2026-08-25 — 도는 표시를 붙이고 **busy 도 함께 본다**(사장님: "이대로 완성하기
@@ -184,6 +216,40 @@ export default function ReelDonePage() {
              (단계별 완성 화면이 2026-08-13 에 같은 이유로 버튼을 하나로 합쳤다). */
           onDragging={(v) => { dragRef.current = v; }}
         />
+      )}
+
+      {/* ★★★ 2026-09-04 — **자막 글자를 여기서 고친다.**
+          ★ 통짜로 구운 편에만 뜬다 — 컷별 갈래는 컷마다 sentence 가 자막이라 축이 다르다
+            (lib/reel/narration.js 의 putSaid 가 같은 판정을 한다. 화면은 가림막일 뿐이다).
+          ★ 새 CSS 를 안 만든다 — ②시나리오의 수정 요청 칸과 같은 옷을 입는다.
+          ★ **돈이 안 나가는 버튼**이라 자기 자리에 둘 수 있다. 값이 나가는 버튼은 아래
+            실행줄의 [다시 만들기] 하나다(이 저장소의 규율). */}
+      {cuts[0]?.video?.whole === true && cuts[0]?.video?.url && (
+        <div className="note-form">
+          <p className="pgsub">자막 글자 — 이 영상이 말하는 문장이에요. 비우면 시나리오의 내레이션을 따라요.</p>
+          <AutoTextarea
+            className="field"
+            rows={3}
+            value={said}
+            maxLength={SAID_MAX}
+            disabled={rendering || !!busy}
+            onChange={(e) => setSaid(e.target.value)}
+            placeholder="영상이 말하는 문장을 그대로 적어 주세요"
+          />
+          <div className="note-act">
+            {said.trim() !== savedSaid.trim() && busy !== "said" && (
+              <p className="pgsub note-hint">저장한 뒤 다시 만들어야 영상에 들어가요.</p>
+            )}
+            <button
+              type="button"
+              className="tag"
+              disabled={said.trim() === savedSaid.trim() || rendering || !!busy}
+              onClick={saveSaid}
+            >
+              {busy === "said" ? "저장하는 중…" : "자막 글자 저장"}
+            </button>
+          </div>
+        </div>
       )}
 
       {/* ★★ 실행줄은 **하나다**(2026-08-25 사장님 지시). 예전에는 [이대로 완성하기]가

@@ -4,6 +4,8 @@ import { getProject, getProjectForViewing, updateProject } from "../../../../lib
 import { collectReelOneShot } from "../../../../lib/reel/pipeline.js";
 // 자막 설정의 되돌리기 규칙은 lib 하나가 쥔다 — 라우트가 다시 적으면 갈린다.
 import { normalizeSubtitle } from "../../../../lib/subtitles.js";
+// 자막 **글자**를 고치는 규칙 — 라우트가 문서를 직접 주무르지 않는다(두 벌이 된다).
+import { putSaid } from "../../../../lib/reel/narration.js";
 
 // ★ 2026-09-03 — **배포 기본 상한에 잘리던 자리다.** 보는 문도 수거한다(collectReelOneShot)
 //   상한이 없으면 함수가 조용히 끊기고, 그때 fal 은 계속 만들어 과금하는데 우리 문서에는
@@ -74,10 +76,23 @@ export const GET = withUser(async (_req, { params }, user) => {
 // ★ **자막 설정만 받는다.** settings 를 통째로 머지하면 비율·모델·길이처럼 값이 나가는
 //   설정이 이 문으로 함께 들어온다 — 그것들은 닫힌 목록과 결제 잠금이 붙어 있는 값이라
 //   (app/api/projects/[id]/route.js 참고) 그물 없는 문을 새로 여는 셈이 된다.
+// ★★★ 2026-09-04 — **자막 글자(`said`)도 이 문으로 받는다.**
+//   굽는 순간 코드가 적는 값이라 이미 구운 편에는 없고, 없으면 자막이 **지금 시나리오**를
+//   태운다 — 구운 뒤 내레이션을 고친 편에서 자막과 소리가 갈리는 그 자리다(2026-09-03).
+//   고치려고 **다시 굽게 하면 글자 하나에 한 편 값**이 나가므로, 여기서 0원에 고친다.
+//   ★ 설정과 같은 문인 이유: 화면이 하나(⑥완성)이고 한 번에 저장하기 때문이다.
+//     ⚠️ 그래도 **받는 것은 여전히 닫힌 목록**이다 — settings 를 통째로 머지하지 않는다.
+// ★ 오류를 **둘로 가른다**: "못 찾았다"(404)와 "이 편에는 그 자리가 없다"(400)는 다른 말이다.
+//   updateProject 의 고침 함수는 재시도될 수 있으므로 바깥 변수 대신 **표를 붙여** 나른다.
+const BAD = "BAD_REQUEST:";
+
 export const PATCH = withUser(async (req, { params }, user) => {
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
-  if (body?.settings?.subtitle === undefined) {
+  const hasSub = body?.settings?.subtitle !== undefined;
+  // ★ 빈 문자열은 **되돌리기**이므로 유효한 값이다 — 있고 없음을 타입으로 가른다.
+  const hasSaid = typeof body?.said === "string";
+  if (!hasSub && !hasSaid) {
     return Response.json({ error: "저장할 자막 설정이 없어요" }, { status: 400 });
   }
 
@@ -86,10 +101,23 @@ export const PATCH = withUser(async (req, { params }, user) => {
       // ★ 격리는 양방향이다 — 다른 종류의 문서가 이 문으로 들어오면 없는 것과 같이 답한다
       //   (다른 reel 라우트들과 같은 결, 위 GET 의 검사와 같은 문구다).
       if (p?.kind !== "reel") throw new Error("프로젝트를 찾을 수 없어요");
-      return { ...p, settings: { ...p.settings, subtitle: normalizeSubtitle(body.settings.subtitle) } };
+      let next = p;
+      if (hasSub) {
+        next = { ...next, settings: { ...next.settings, subtitle: normalizeSubtitle(body.settings.subtitle) } };
+      }
+      if (hasSaid) {
+        const edited = putSaid(next, body.said);
+        if (!edited) {
+          throw new Error(`${BAD}이 영상은 자막 글자를 여기서 고칠 수 없어요 — 한 번에 통째로 만든 영상만 돼요.`);
+        }
+        next = edited;
+      }
+      return next;
     });
     return Response.json(project);
   } catch (e) {
-    return Response.json({ error: e.message }, { status: 404 });
+    const msg = String(e?.message || "");
+    const bad = msg.startsWith(BAD);
+    return Response.json({ error: bad ? msg.slice(BAD.length) : msg }, { status: bad ? 400 : 404 });
   }
 });
