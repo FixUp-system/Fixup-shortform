@@ -3,7 +3,7 @@
 // 이 파일이 지키는 것 넷:
 //   1) 가짜 판정 축 — `openai/gpt-image*` 는 **fal 축**이다. 안 그러면 SHOTFORM_FAKE=fal 에서
 //      진짜 돈이 나간다. 단 같은 `openai/` 를 쓰는 **LLM(gpt-4o)** 는 LLM 축 그대로여야 한다.
-//   2) 단가 — quality 가 값을 정한다(해상도가 아니다). low $0.012 · medium $0.101 · high $0.401.
+//   2) 단가 — quality 가 값을 정한다(해상도가 아니다). low $0.024 · medium $0.113 · high $0.413.
 //   3) 요청 모양 — image_size 는 **{width,height} 객체**, aspect_ratio·resolution 은 보내면 422.
 //   4) 기본 모델 — 코드 기본값과 .env.local.example 이 같아야 한다(갈리면 조용히 옛 모델).
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -53,30 +53,37 @@ describe("가짜 판정 축 — openai/gpt-image* 는 fal 이다", () => {
 });
 
 describe("단가 — quality 가 정한다(해상도가 아니다)", () => {
-  it("low $0.012 · medium $0.101 · high $0.401 (2026-08-24 fal 공식표)", () => {
-    expect(estimateCost(GPT, 1, "low")).toBe(0.012);
-    expect(estimateCost(GPT, 1, "medium")).toBe(0.101);
-    expect(estimateCost(GPT, 1, "high")).toBe(0.401);
+  // ★★★ 2026-09-04 — **공식표가 바뀌었다(또는 우리가 다른 줄을 읽고 있었다).**
+//   옛 값(low $0.012 · medium $0.101 · high $0.401)은 지금 공식표의 어느 줄과도 안 맞는다.
+//   지금 공식표는 **크기 × 품질**이고, 우리가 그리는 판이 가장 큰 줄에 해당한다:
+//     3840×2160  low $0.024 · medium $0.113 · high $0.413
+//   (판의 상한이 3840 이고 3×3 판이 2160×3840 이라 픽셀 수가 같다 — lib/reel/storyboard.js)
+//   ⚠️ 작은 판은 이보다 싸다. 값 축이 quality 하나라 크기를 못 실어 **가장 비싼 줄로 잡는다** —
+//     내려 잡으면 예산 가드가 뚫린다(lib/costs.js 의 그 줄 주석과 같은 규율).
+it("low $0.024 · medium $0.113 · high $0.413 (2026-09-04 fal 공식표 3840×2160 줄)", () => {
+    expect(estimateCost(GPT, 1, "low")).toBe(0.024);
+    expect(estimateCost(GPT, 1, "medium")).toBe(0.113);
+    expect(estimateCost(GPT, 1, "high")).toBe(0.413);
   });
 
   it("/edit 도 같은 단가다 — 접두사가 같다", () => {
-    expect(estimateCost(`${GPT}/edit`, 1, "high")).toBe(0.401);
+    expect(estimateCost(`${GPT}/edit`, 1, "high")).toBe(0.413);
   });
 
   it("모르는 값·생략은 가장 비싼 쪽으로 본다 — 내려 잡으면 예산 가드가 뚫린다", () => {
-    expect(estimateCost(GPT, 1)).toBe(0.401);
-    expect(estimateCost(GPT, 1, "auto")).toBe(0.401);
+    expect(estimateCost(GPT, 1)).toBe(0.413);
+    expect(estimateCost(GPT, 1, "auto")).toBe(0.413);
     // 기본값($0.1)으로 떨어지면 원장이 4배 적게 남는다 — 표에 없다는 뜻이다
     expect(estimateCost(GPT, 1)).not.toBe(0.1);
   });
 
   it("이미지 해상도 배수가 얹히지 않는다 — GPT 는 그 축이 아니다", () => {
-    expect(estimateCost(GPT, 1, "2K")).toBe(0.401);
-    expect(estimateCost(GPT, 1, "2K")).not.toBe(0.401 * IMAGE_RESOLUTION_MULTIPLIER["2K"]);
+    expect(estimateCost(GPT, 1, "2K")).toBe(0.413);
+    expect(estimateCost(GPT, 1, "2K")).not.toBe(0.413 * IMAGE_RESOLUTION_MULTIPLIER["2K"]);
   });
 
   it("장 수만큼 곱해진다", () => {
-    expect(estimateCost(GPT, 2, "high")).toBe(0.802);
+    expect(estimateCost(GPT, 2, "high")).toBe(0.826);
   });
 });
 
@@ -153,13 +160,13 @@ describe("요청 모양 — 모델마다 받는 필드가 다르다", () => {
 });
 
 describe("원장 — 실제로 나간 값과 장부가 같다", () => {
-  it("high 한 장이면 $0.401 로 남는다", async () => {
+  it("high 한 장이면 $0.413 로 남는다", async () => {
     await runWithActor("t-user", () =>
       generateImage({ prompt: "p", aspect_ratio: "9:16", projectId: "p-gpt", resolution: "2K", fetchImpl: ok({}) })
     );
     const row = (await memoryStore.allCosts()).find((r) => r.project_id === "p-gpt");
     expect(row.endpoint).toBe(GPT);
-    expect(row.est_cost_usd).toBe(0.401);
+    expect(row.est_cost_usd).toBe(0.413);
   });
 
   it("quality 를 내리면 장부도 따라 내려간다", async () => {
@@ -167,6 +174,6 @@ describe("원장 — 실제로 나간 값과 장부가 같다", () => {
       generateImage({ prompt: "p", aspect_ratio: "9:16", projectId: "p-low", quality: "low", fetchImpl: ok({}) })
     );
     const row = (await memoryStore.allCosts()).find((r) => r.project_id === "p-low");
-    expect(row.est_cost_usd).toBe(0.012);
+    expect(row.est_cost_usd).toBe(0.024);
   });
 });
