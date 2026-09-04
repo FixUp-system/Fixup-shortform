@@ -87,6 +87,21 @@ describe("지시문 — 사진이 붙으면 그 줄이 실린다", () => {
   it("★★ 사진이 없으면 그 줄이 **통째로 없다** — 옛 문서는 글자 그대로 예전이다", () => {
     expect(buildOneShotPrompt(grid, 3, "body", {})).not.toMatch(/One of the attached images/);
   });
+
+  // ★★★ 2026-09-04 사장님 지시 — **무엇이 정본인지 못 박는다.**
+  //   판에는 그림 모델이 다시 그린(=틀린) 로고가 있고, 첨부에는 원본이 있다. 둘이 함께
+  //   들어가는데 "어느 쪽을 믿어라"가 없으면 모델이 판을 따를 수 있다 — 그러면 원본을
+  //   보내는 뜻이 사라진다. 판은 **구도**, 첨부는 **글자·로고**의 정본이다.
+  it("★★★ 판과 첨부가 다투면 **첨부가 정본**이라고 말한다", () => {
+    const p = buildOneShotPrompt(grid, 3, "body", { photos: [P({ role: "logo" })] });
+    expect(p, "정본이 어느 쪽인지 안 말한다").toMatch(/authoritative/i);
+    // 판은 구도를 맡는다는 말도 함께 있어야 한다 — 첨부만 앞세우면 구도가 흔들린다.
+    expect(p).toMatch(/storyboard/i);
+  });
+
+  it("★★ 사진이 없으면 그 우선순위 문장도 **없다** — 없는 첨부를 가리키면 안 된다", () => {
+    expect(buildOneShotPrompt(grid, 3, "body", {})).not.toMatch(/authoritative/i);
+  });
 });
 
 describe("굽기 — 판 뒤에 사진을 붙인다", () => {
