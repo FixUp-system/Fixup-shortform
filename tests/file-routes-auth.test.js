@@ -260,6 +260,86 @@ describe("완성본 — 서명 URL 로 넘긴다", () => {
     }
   });
 
+  // ★★ 2026-09-07 — **전송(egress) 할당량 초과로 Supabase 가 프로젝트를 막았다.**
+  //
+  // 위의 304 절감은 프로덕션에서 **한 번도 안 돌고 있었다.** 302 응답에는 ETag 를 안 싣고
+  // `no-store` 까지 주므로 브라우저에는 되돌려 보낼 ETag 가 애초에 없다 —
+  // `if-none-match` 가 오는 길이 없으니 304 갈래는 로컬(메모리 저장소)에서만 돈다.
+  // 게다가 서명을 **매번 새로** 만들어 주소가 요청마다 달라지니, 브라우저 캐시도
+  // Storage 앞단 CDN 도 전부 빗나갔다. 그래서 볼 때마다 8~13MB 가 통째로 나갔다.
+  //
+  // 고치는 자리는 주소다: **같은 내용이면 같은 주소**를 준다. 그러면 브라우저가 이미
+  // 받아 둔 것을 그대로 쓴다(Storage 객체는 max-age 를 달고 나온다).
+  // 무효화는 ts 가 한다 — 아래 판이 그 짝이다.
+  it("★ 같은 영상(같은 ts)은 같은 주소로 넘긴다 — 주소가 매번 바뀌면 캐시가 통째로 빗나간다", async () => {
+    const p = await mk();
+    await putRenderObject(p.id);
+    const { getStore } = await import("../lib/store/index.js");
+    const row = await getStore().selectProject(p.id, A);
+    await getStore().updateProjectRow(p.id, A, row.version, { ...row.doc, render: { ts: 777 } });
+    let asked = 0;
+    memoryStore.signedObjectUrl = async () => {
+      asked += 1;
+      return `https://storage.example/signed?token=${asked}`;
+    };
+    try {
+      const one = await getRender(as(A), { params: Promise.resolve({ name: `${p.id}.mp4` }) });
+      const two = await getRender(as(A), { params: Promise.resolve({ name: `${p.id}.mp4` }) });
+      expect(one.status).toBe(302);
+      expect(two.status).toBe(302);
+      expect(two.headers.get("location")).toBe(one.headers.get("location"));
+      expect(asked, "같은 영상인데 서명을 두 번 만들었다").toBe(1);
+    } finally {
+      delete memoryStore.signedObjectUrl;
+    }
+  });
+
+  // 재사용이 **옛 영상을 붙드는 값**이 되면 안 된다. 다시 구우면 pipeline 이 ts 를 갱신하고,
+  // 같은 키(`<id>.mp4`)를 덮어쓴다. 주소가 그대로면 브라우저는 옛 영상을 계속 보여준다.
+  it("★ 다시 구우면(ts 가 바뀌면) 새 주소를 준다 — 캐시가 옛 영상을 붙들지 않는다", async () => {
+    const p = await mk();
+    await putRenderObject(p.id);
+    const { getStore } = await import("../lib/store/index.js");
+    const bump = async (ts) => {
+      const row = await getStore().selectProject(p.id, A);
+      await getStore().updateProjectRow(p.id, A, row.version, { ...row.doc, render: { ts } });
+    };
+    let asked = 0;
+    memoryStore.signedObjectUrl = async () => {
+      asked += 1;
+      return `https://storage.example/signed?token=${asked}`;
+    };
+    try {
+      await bump(777);
+      const before = await getRender(as(A), { params: Promise.resolve({ name: `${p.id}.mp4` }) });
+      await bump(888);
+      const after = await getRender(as(A), { params: Promise.resolve({ name: `${p.id}.mp4` }) });
+      expect(after.headers.get("location")).not.toBe(before.headers.get("location"));
+      expect(asked, "ts 가 바뀌었는데 서명을 새로 안 만들었다").toBe(2);
+    } finally {
+      delete memoryStore.signedObjectUrl;
+    }
+  });
+
+  // ts 가 없는 문서(옛 문서)는 **무효화할 방법이 없다.** 그때는 재사용하지 않는다 —
+  // 이 저장소의 규율대로 모르면 안전한 쪽(전송을 더 쓰더라도 옛 영상은 안 보여준다)이다.
+  it("ts 가 없으면 재사용하지 않는다 — 무효화할 수 없는 것은 캐시하지 않는다", async () => {
+    const p = await mk();
+    await putRenderObject(p.id);
+    let asked = 0;
+    memoryStore.signedObjectUrl = async () => {
+      asked += 1;
+      return `https://storage.example/signed?token=${asked}`;
+    };
+    try {
+      await getRender(as(A), { params: Promise.resolve({ name: `${p.id}.mp4` }) });
+      await getRender(as(A), { params: Promise.resolve({ name: `${p.id}.mp4` }) });
+      expect(asked, "ts 도 없는데 주소를 재사용했다").toBe(2);
+    } finally {
+      delete memoryStore.signedObjectUrl;
+    }
+  });
+
   it("★ 304 판정이 서명보다 앞이다 — 안 바뀐 영상은 서명도 안 만든다(전송 절감 유지)", async () => {
     const p = await mk();
     await putRenderObject(p.id);

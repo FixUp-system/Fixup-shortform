@@ -2,6 +2,7 @@ import { withUser } from "../../../../lib/auth/require-user.js";
 import { getProjectForViewing } from "../../../../lib/projects.js";
 import { getStore } from "../../../../lib/store/index.js";
 import { FILM_MODES } from "../../../../lib/film/mode.js";
+import { cachedSignedUrl } from "../../../../lib/signed-url-cache.js";
 
 // 파일명이 곧 프로젝트 id 다(lib/compose.js 가 `${projectId}.mp4` 로 올린다).
 // 그래서 별도 매핑 없이 소유자를 검사할 수 있다(uploads 와 달리 upload_owners 가 필요 없다).
@@ -74,9 +75,18 @@ export const GET = withUser(async (req, { params }, user) => {
   const store = getStore();
   if (typeof store.signedObjectUrl === "function") {
     const wantsDownload = new URL(req.url).searchParams.get("dl") === "1";
-    const signed = await store
-      .signedObjectUrl("renders", name, SIGNED_URL_SECONDS, wantsDownload ? { download: name } : {})
-      .catch(() => null);
+    // ★ 같은 영상에는 **같은 주소**를 준다(2026-09-07, lib/signed-url-cache.js).
+    //   서명을 매번 새로 만들면 주소가 요청마다 달라져 브라우저 캐시도 Storage 앞단 CDN 도
+    //   전부 빗나간다 — 그 상태로 전송 할당량이 터져 프로젝트가 402 로 막혔다.
+    //   위의 304 절감은 302 에 ETag 가 없어 프로덕션에서는 애초에 안 탄다. 실제로 무는 것은
+    //   이 재사용이다.
+    // ★ 무효화는 ts 다 — 다시 구우면 키가 바뀌어 새 주소가 나간다. ts 가 없으면(옛 문서)
+    //   키를 안 만든다 = 재사용하지 않는다.
+    // ★ 첨부(dl)는 서명 자체가 다르므로 키도 갈라 둔다 — 안 가르면 미리보기가 내려받기가 된다.
+    const key = ts ? `renders|${name}|${ts}|${wantsDownload ? "dl" : "inline"}` : null;
+    const signed = await cachedSignedUrl(key, SIGNED_URL_SECONDS, () =>
+      store.signedObjectUrl("renders", name, SIGNED_URL_SECONDS, wantsDownload ? { download: name } : {})
+    ).catch(() => null);
     if (signed) {
       return new Response(null, {
         status: 302,

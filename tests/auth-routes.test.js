@@ -114,6 +114,25 @@ describe("POST /api/auth/login", () => {
     expect(await a.json()).toEqual(await b.json());
   });
 
+  // ★ 402(서비스 제한)도 사용자 잘못이 아니다 — 2026-09-07 라이브에서 밟았다.
+  // Supabase 가 egress 할당량을 넘기면 프로젝트를 막고 auth·rest·storage 가 **전부 402** 를
+  // 준다. 그 402 가 여기서 401 WRONG 으로 뭉개져, 사장님은 멀쩡한 비밀번호를 의심하며
+  // 계속 다시 눌렀다(원인을 찾는 데 그 문구가 방해가 됐다).
+  // 이 계급은 "비밀번호가 틀렸다"가 아니라 "지금은 답할 수 없다"이다.
+  it("402(서비스 제한)는 401 이 아니라 500 이다", async () => {
+    signInWithPassword.mockResolvedValue({
+      data: null,
+      error: {
+        message:
+          "Service for this project is restricted due to the following violations: exceed_egress_quota.",
+        status: 402,
+      },
+    });
+    const res = await loginPOST(req({ email: "a@b.com", password: "hunter22" }));
+    expect(res.status).toBe(500);
+    expect((await res.json()).error).not.toBe(WRONG_TEXT);
+  });
+
   it("status 없는 오류는 여전히 401 — 안전한 쪽으로 떨어뜨린다", async () => {
     signInWithPassword.mockResolvedValue({ data: null, error: { message: "Invalid login credentials" } });
     const res = await loginPOST(req({ email: "a@b.com", password: "hunter22" }));

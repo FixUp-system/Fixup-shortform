@@ -41,8 +41,19 @@ const FILM_STATUS_LABEL = {
 // 카드 썸네일 — 완성본이 있으면 영상을, 없으면 첫 컷 그림을 보여준다.
 //
 // 영상은 마우스를 올렸을 때만 재생한다. 카드가 열 개여도 한 번에 하나만 움직이므로
-// 목록이 어수선해지지 않고, 재생 전에는 첫 프레임만 받는다(preload="metadata").
+// 목록이 어수선해지지 않는다.
 // muted 는 필수다 — 소리 있는 자동재생은 브라우저가 막고, 목록에서 소리가 나면 놀란다.
+//
+// ★★ 재생 전 첫 화면은 **그림(poster)** 이 그린다 (2026-09-07). 그전에는
+//   `preload="metadata"` 로 영상에서 첫 프레임을 받았는데, 그러면 **보관함을 여는 것만으로**
+//   카드 수만큼 영상 요청이 나간다. 완성본은 개당 8~13MB 다 — 이것이 전송(egress) 할당량을
+//   태워 Supabase 가 프로젝트를 402 로 막았고, 그날 로그인도 보관함도 죽었다.
+//   첫 컷 그림은 이미 목록에 실려 오고(image_url) uploads 라우트가 immutable 로 내보내
+//   한 번 받으면 다시 안 받는다. 보이는 것도 하는 일도 그대로고, 안 본 영상의 전송만 사라진다.
+//
+// ★ 그림이 없는 카드(광고처럼 cuts[0].image 가 없는 종류)까지 "none" 으로 내리면 그 카드가
+//   **빈 칸**이 된다. 그때는 지금처럼 첫 프레임을 받는다 — 전송을 아끼려고 보이던 것을
+//   없애지는 않는다.
 function Thumb({ video, image, alt }) {
   const ref = useRef(null);
 
@@ -61,9 +72,10 @@ function Thumb({ video, image, alt }) {
         ref={ref}
         className="thumb-media"
         src={video}
+        poster={image || undefined}
         muted
         playsInline
-        preload="metadata"
+        preload={image ? "none" : "metadata"}
         onMouseEnter={() => ref.current?.play().catch(() => {})}
         onMouseLeave={stop}
       />
