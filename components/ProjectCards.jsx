@@ -54,14 +54,36 @@ const FILM_STATUS_LABEL = {
 //   빈 칸으로 두면 고장으로 보이므로 그 자리는 말로 채운다 — 아래 참고.
 //   근본 해결은 **굽는 김에 표지 그림을 함께 만드는 것**이다(별도 작업).
 function Thumb({ video, image, alt }) {
+  // ★ 그림이 **안 올 수 있다**(2026-09-07 실측). 새 프로젝트로 이사한 뒤 파일이 아직
+  //   옛 프로젝트에 있어 업로드 사진이 전부 404 였다. 그대로 두면 브라우저가
+  //   ⚠️ 이 주석에 별표를 슬래시 뒤에 쓰지 마라 — 화면 계약을 재는 판의 주석 제거기가
+  //     그것을 블록 주석 시작으로 읽어 **파일 뒷부분을 통째로 삼킨다**(실제로 밟았다:
+  //     안 건드린 scope·kind 판 둘이 같이 빨개졌다).
+  //   **깨진 아이콘**을 그린다 — 전에는 <video> 라 검은 칸이어서 덜 흉했다.
+  //   못 받으면 말로 바꿔 준다. 고장을 더 흉하게 보이게 하는 것은 우리 책임이다.
+  const [broken, setBroken] = useState(false);
+
   // 그림이 있으면 그림 하나가 전부다. loading="lazy" 라 화면 밖 카드는 받지도 않는다.
   //
   // ★ thumbUrl 을 지난다 — 원본은 실측 평균 290KB 인데 카드는 화면에서 300~400px 다.
   //   우리 경로일 때만 작은 판을 부르고(외부 주소는 그대로), 라우트가 없으면 그때 만들어 둔다.
-  if (image) return <img className="thumb-media" src={thumbUrl(image)} alt={alt} loading="lazy" />;
+  if (image && !broken) {
+    return (
+      <img
+        className="thumb-media"
+        src={thumbUrl(image)}
+        alt={alt}
+        loading="lazy"
+        onError={() => setBroken(true)}
+      />
+    );
+  }
   // ★ 영상은 있는데 표지 그림이 없는 자리 — 실측 46편 중 **25편**이 여기로 온다.
   //   빈 칸으로 두면 고장 난 것처럼 보이므로, 없는 것과 안 보이는 것을 갈라 말해 준다.
   if (video) return <span className="thumb-empty">영상이 있어요 — 눌러서 보기</span>;
+  // ★ 문구를 가른다 — "아직 안 만들었다"와 "만들었는데 못 받았다"는 다른 상태다.
+  //   사장님이 그 둘을 구분해야 무엇을 할지 안다(만들기 vs 파일 복구).
+  if (broken) return <span className="thumb-empty">그림을 불러오지 못했어요</span>;
   // 아직 그림도 영상도 없는 프로젝트 — 빈 칸에 무엇을 기다리는지 적는다.
   return <span className="thumb-empty">아직 그림이 없어요</span>;
 }
