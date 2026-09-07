@@ -3,8 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 // 기본값은 가격표에서 온다 — 운영자가 매번 고르는 값이라도 출처는 한 곳이다.
 import { DEFAULT_GRANT } from "../../lib/pricing";
-// 내역의 말·부호는 사장님 화면과 **같은 표**를 쓴다 — 둘이 다른 말을 하면 안 된다
-import { ledgerLabel } from "../../lib/ledger";
 // 등급 표와 판정은 lib/tiers.js 한 벌이다 — 화면이 등급 이름을 복사하면 서버와 갈린다.
 import { TIERS, tierOf } from "../../lib/tiers";
 // 표시명 규칙 한 벌 — /me·원장과 같은 값을 써야 한다(이름이 없으면 이메일 앞부분).
@@ -85,12 +83,29 @@ export default function AdminPage() {
     setLedger(null);
   }
 
+  // ★★ 2026-09-07 — 여기서 읽는 것이 **크레딧 내역에서 실제 비용(USD)** 으로 바뀌었다
+  //   (사장님 지시). 운영자가 알고 싶은 것은 "이 사람이 우리 돈을 얼마나 썼나"다.
+  //   · 합계(total_usd)는 **서버가 전 기간으로** 낸다 — 이 화면이 받은 쪽만 더하면
+  //     20건짜리 합을 "전체 사용 비용"이라 적게 되고 그것은 거짓말이다.
+  //   · 크레딧 **넣기**와 상단 잔액은 그대로다. 바꾼 것은 "내역"이다.
   async function loadLedger(id) {
     setOpenId(id);
     setLedger(null);
     const r = await fetch(`/api/admin/users/${id}/ledger`);
-    if (!r.ok) { setErr("내역을 읽지 못했어요"); setOpenId(null); return; }
-    setLedger((await r.json()).rows || []);
+    if (!r.ok) { setErr("비용 내역을 읽지 못했어요"); setOpenId(null); return; }
+    setLedger(await r.json());
+  }
+
+  // 더 받기 — 커서는 **시각**이다(번호가 아니다). 그 사이 새 기록이 쌓여도 겹치거나
+  // 건너뛰지 않는다(원가는 생성 중에도 계속 쌓인다).
+  async function loadMoreLedger() {
+    const rows = ledger?.rows || [];
+    if (!openId || !rows.length) return;
+    const r = await fetch(`/api/admin/users/${openId}/ledger?before=${rows[rows.length - 1].ts}`);
+    if (!r.ok) { setErr("비용 내역을 더 읽지 못했어요"); return; }
+    const next = await r.json();
+    // 합계는 서버가 준 전 기간 값을 그대로 쓴다 — 이어 붙이는 것은 줄뿐이다.
+    setLedger({ ...next, rows: [...rows, ...(next.rows || [])] });
   }
 
   async function load() {
@@ -194,7 +209,11 @@ export default function AdminPage() {
       //   두 번째로 누를 때 실수로 또 넣기 쉽다.
       setGrantAmount(String(DEFAULT_GRANT));
       setGrantReason("체험");
-      // 내역도 함께 다시 읽는다 — 방금 넣은 줄이 그 자리에서 보여야 "들어갔다"를 안다.
+      // ★★ 2026-09-07 — **"들어갔다"의 증거가 바뀌었다.** 그전에는 아래 목록이 크레딧
+      //   내역이라 방금 넣은 줄이 그 자리에 떴다. 지금 그 목록은 **사용 비용(USD)** 이라
+      //   충전은 거기 안 나타난다 — 확인은 **목록의 잔액**이 오르는 것으로 한다(load()).
+      //   그래서 load() 가 이제 필수다. loadLedger 는 값이 그 사이 쌓였을 수 있어 함께 읽되,
+      //   충전을 보여 주는 자리가 아니다.
       await Promise.all([load(), loadLedger(id)]);
       // 남에게 넣었으면 상단바를 흔들 이유가 없다 — 내 것일 때만 다시 읽는다.
       if (id === myself?.id) await reloadMe();
@@ -422,29 +441,43 @@ export default function AdminPage() {
               )}
             </div>
 
-            {/* 내역 — 여는 순간 함께 읽는다. 합계로는 "누가 왜"를 확인할 수 없다. */}
-            <h3 className="dlg-title admin-panel-sub">내역</h3>
+            {/* 사용 비용 — 여는 순간 함께 읽는다. 합계로는 "누가 왜"를 확인할 수 없다.
+                ★ 단위가 **USD** 다(크레딧이 아니다). 합계는 서버가 전 기간으로 준 값이라
+                  아래 목록을 더 받아도 안 바뀐다. */}
+            <h3 className="dlg-title admin-panel-sub">사용 비용</h3>
             {ledger === null ? (
               <p className="pgsub">불러오는 중…</p>
-            ) : ledger.length === 0 ? (
-              <p className="pgsub">아직 쓰거나 충전한 내역이 없어요.</p>
             ) : (
-              <ul className="ledger admin-panel-ledger">
-                {ledger.map((r, i) => (
-                  <li className="ledger-row" key={`${r.ts}-${i}`}>
-                    <span className="ledger-date mono">{ymd(r.ts)}</span>
-                    <span className="ledger-what">
-                      {ledgerLabel(r.kind)}
-                      {r.project_id && (
-                        <span className="ledger-of"> · {r.project_title || "지운 영상"}</span>
-                      )}
-                    </span>
-                    <span className={`ledger-amt mono ${r.delta > 0 ? "led-plus" : ""}`}>
-                      {r.delta > 0 ? `+${r.delta}` : r.delta}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <>
+                <p className="pgsub">
+                  전체 사용 비용 <strong className="mono">${ledger.total_usd.toFixed(2)}</strong>
+                </p>
+                {!ledger.rows?.length ? (
+                  <p className="pgsub">아직 쓴 비용이 없어요.</p>
+                ) : (
+                  <>
+                    <ul className="ledger admin-panel-ledger">
+                      {ledger.rows.map((r) => (
+                        <li className="ledger-row" key={r.request_id}>
+                          <span className="ledger-date mono">{ymd(r.ts)}</span>
+                          <span className="ledger-what">
+                            {/* stage 는 실측으로 이미 사람 말이다("영상"·"이미지"·"검수").
+                                모델 이름(endpoint)은 사람 말이 아니라 뒤에 작게 붙인다. */}
+                            {r.stage || r.endpoint || "기타"}
+                            {r.project_id && (
+                              <span className="ledger-of"> · {r.project_title || "지운 영상"}</span>
+                            )}
+                          </span>
+                          <span className="ledger-amt mono">${r.est_cost_usd.toFixed(4)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    {ledger.has_more && (
+                      <button className="mini" onClick={loadMoreLedger}>더 보기</button>
+                    )}
+                  </>
+                )}
+              </>
             )}
 
             <div className="dlg-actions">
