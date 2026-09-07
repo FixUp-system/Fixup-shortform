@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+// ★ 순수 모듈이라 화면이 읽어도 된다 — 실제로 줄이는 lib/thumbs.js(sharp)는 서버 전용이다.
+//   여기서 그쪽을 import 하면 클라이언트 번들에 sharp 가 실려 빌드가 깨진다.
+import { thumbUrl } from "../lib/thumb-url.js";
 import Link from "next/link";
 import { useDialog } from "./DialogProvider";
 import { FILM_MODES, filmMode } from "../lib/film/mode";
@@ -52,7 +55,10 @@ const FILM_STATUS_LABEL = {
 //   근본 해결은 **굽는 김에 표지 그림을 함께 만드는 것**이다(별도 작업).
 function Thumb({ video, image, alt }) {
   // 그림이 있으면 그림 하나가 전부다. loading="lazy" 라 화면 밖 카드는 받지도 않는다.
-  if (image) return <img className="thumb-media" src={image} alt={alt} loading="lazy" />;
+  //
+  // ★ thumbUrl 을 지난다 — 원본은 실측 평균 290KB 인데 카드는 화면에서 300~400px 다.
+  //   우리 경로일 때만 작은 판을 부르고(외부 주소는 그대로), 라우트가 없으면 그때 만들어 둔다.
+  if (image) return <img className="thumb-media" src={thumbUrl(image)} alt={alt} loading="lazy" />;
   // ★ 영상은 있는데 표지 그림이 없는 자리 — 실측 46편 중 **25편**이 여기로 온다.
   //   빈 칸으로 두면 고장 난 것처럼 보이므로, 없는 것과 안 보이는 것을 갈라 말해 준다.
   if (video) return <span className="thumb-empty">영상이 있어요 — 눌러서 보기</span>;

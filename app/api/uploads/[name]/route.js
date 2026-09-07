@@ -4,6 +4,9 @@
 // 파일명에서 프로젝트를 되짚을 수 없다 — 그래서 별도 원장이 필요하다(renders 와 다른 이유).
 import { getStore } from "../../../../lib/store/index.js";
 import { withUser } from "../../../../lib/auth/require-user.js";
+// 이름 규약은 순수 모듈에, 실제로 줄이는 일은 서버 모듈에 — 카드도 앞엣것을 읽는다.
+import { thumbKeyFor } from "../../../../lib/thumb-url.js";
+import { makeThumb, THUMB_TYPE } from "../../../../lib/thumbs.js";
 
 const MIME = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" };
 const BUCKET = "uploads";
@@ -22,6 +25,42 @@ export const GET = withUser(async (req, { params }) => {
   if (!owner) {
     return new Response("파일을 찾을 수 없어요", { status: 404 });
   }
+  // ★ ?t=1 이면 **카드용 작은 판**을 준다 (2026-09-07).
+  //
+  //   카드에서 영상을 뺀 뒤 카드의 얼굴이 원본 사진이 됐는데, 실측 355장 평균 290KB 다
+  //   (카드는 화면에서 300~400px). 보관함 한 번 훑으면 5.8MB 가 나갔다.
+  //
+  //   ★★ **만든 것을 저장한다.** 그때그때 줄이기만 하면 Supabase 전송은 **안 준다** —
+  //     함수가 원본을 여전히 내려받기 때문이다(줄어드는 것은 Vercel 쪽뿐).
+  //     저장해 두면 다음 요청부터 작은 것만 오간다. 덤으로 **백필 스크립트가 필요 없다**:
+  //     옛 사진도 처음 보일 때 저절로 최적화된다.
+  //   ★ 저장에 실패해도 이번 응답은 그대로 나간다 — 사진 한 장을 못 보여줄 이유가 아니다.
+  //   ★ 주소를 안 바꾸는 이유는 이 파일 머리말과 같다(문서에 박힌 url 이 영구히 유효해야 한다).
+  const wantsThumb = /[?&]t=1(&|$)/.test(String(req?.url || ""));
+  if (wantsThumb) {
+    const key = thumbKeyFor(name);
+    try {
+      const small = await getStore().getObject(BUCKET, key).catch(async () => {
+        const orig = await getStore().getObject(BUCKET, name);
+        const made = await makeThumb(orig);
+        await getStore().putObject(BUCKET, key, made, THUMB_TYPE).catch((e) =>
+          console.error(`작은 판 저장 실패(응답은 그대로 나간다): ${key} — ${e?.message || e}`)
+        );
+        return made;
+      });
+      return new Response(small, {
+        headers: {
+          "Content-Type": THUMB_TYPE,
+          // 원본과 같은 규약 — 이름이 내용을 정하므로 오래 캐시해도 된다.
+          "Cache-Control": "private, max-age=31536000, immutable",
+        },
+      });
+    } catch (e) {
+      // 작은 판을 못 만들었다고 사진이 아예 안 보이면 안 된다 — 아래 원본 갈래로 떨어진다.
+      console.error(`작은 판 실패, 원본으로 떨어진다: ${name} — ${e?.message || e}`);
+    }
+  }
+
   let buf;
   try {
     buf = await getStore().getObject(BUCKET, name);
