@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useDialog } from "./DialogProvider";
 import { FILM_MODES, filmMode } from "../lib/film/mode";
@@ -38,50 +38,24 @@ const FILM_STATUS_LABEL = {
   scenario: "시나리오",
 };
 
-// 카드 썸네일 — 완성본이 있으면 영상을, 없으면 첫 컷 그림을 보여준다.
+// 카드 썸네일 — **그림만 그린다. 영상은 누른 다음에 본다.** (2026-09-07 사장님 지시)
 //
-// 영상은 마우스를 올렸을 때만 재생한다. 카드가 열 개여도 한 번에 하나만 움직이므로
-// 목록이 어수선해지지 않는다.
-// muted 는 필수다 — 소리 있는 자동재생은 브라우저가 막고, 목록에서 소리가 나면 놀란다.
+// ★★ 왜 이렇게까지 하나. 전송(egress) 할당량이 터져 Supabase 가 프로덕션을 402 로 막았고
+//   로그인까지 함께 죽었다. 되짚어 보니 목록이 영상을 물고 있었다:
+//     · 처음에는 `preload="metadata"` 라 **보관함을 여는 것만으로** 카드 수만큼 요청이 나갔다
+//     · 그다음엔 마우스를 올리면 재생했다 — **스치기만 해도** 바이트가 나간다
+//   실측으로 보관함 46편 중 **37편이 우리 스토리지**를 지난다(7편만 fal CDN 직접).
+//   그래서 목록에서는 영상을 **한 번도 안 문다.** 보려면 카드를 눌러 상세로 간다.
 //
-// ★★ 재생 전 첫 화면은 **그림(poster)** 이 그린다 (2026-09-07). 그전에는
-//   `preload="metadata"` 로 영상에서 첫 프레임을 받았는데, 그러면 **보관함을 여는 것만으로**
-//   카드 수만큼 영상 요청이 나간다. 완성본은 개당 8~13MB 다 — 이것이 전송(egress) 할당량을
-//   태워 Supabase 가 프로젝트를 402 로 막았고, 그날 로그인도 보관함도 죽었다.
-//   첫 컷 그림은 이미 목록에 실려 오고(image_url) uploads 라우트가 immutable 로 내보내
-//   한 번 받으면 다시 안 받는다. 보이는 것도 하는 일도 그대로고, 안 본 영상의 전송만 사라진다.
-//
-// ★ 그림이 없는 카드(광고처럼 cuts[0].image 가 없는 종류)까지 "none" 으로 내리면 그 카드가
-//   **빈 칸**이 된다. 그때는 지금처럼 첫 프레임을 받는다 — 전송을 아끼려고 보이던 것을
-//   없애지는 않는다.
+// ★ 그림이 없는 카드가 실측 **25/46** 이다(광고·필름은 cuts[0].image 가 없다).
+//   빈 칸으로 두면 고장으로 보이므로 그 자리는 말로 채운다 — 아래 참고.
+//   근본 해결은 **굽는 김에 표지 그림을 함께 만드는 것**이다(별도 작업).
 function Thumb({ video, image, alt }) {
-  const ref = useRef(null);
-
-  // 마우스를 떼면 처음으로 되감는다. 안 되감으면 다음에 올렸을 때 중간부터 시작해
-  // "첫 프레임"이라는 약속이 깨진다.
-  const stop = () => {
-    const el = ref.current;
-    if (!el) return;
-    el.pause();
-    el.currentTime = 0;
-  };
-
-  if (video) {
-    return (
-      <video
-        ref={ref}
-        className="thumb-media"
-        src={video}
-        poster={image || undefined}
-        muted
-        playsInline
-        preload={image ? "none" : "metadata"}
-        onMouseEnter={() => ref.current?.play().catch(() => {})}
-        onMouseLeave={stop}
-      />
-    );
-  }
+  // 그림이 있으면 그림 하나가 전부다. loading="lazy" 라 화면 밖 카드는 받지도 않는다.
   if (image) return <img className="thumb-media" src={image} alt={alt} loading="lazy" />;
+  // ★ 영상은 있는데 표지 그림이 없는 자리 — 실측 46편 중 **25편**이 여기로 온다.
+  //   빈 칸으로 두면 고장 난 것처럼 보이므로, 없는 것과 안 보이는 것을 갈라 말해 준다.
+  if (video) return <span className="thumb-empty">영상이 있어요 — 눌러서 보기</span>;
   // 아직 그림도 영상도 없는 프로젝트 — 빈 칸에 무엇을 기다리는지 적는다.
   return <span className="thumb-empty">아직 그림이 없어요</span>;
 }

@@ -1,14 +1,20 @@
 // 보관함 카드가 전송(egress)을 무는 자리 — 2026-09-07.
 //
-// ★ 왜 생겼나. Supabase 가 `exceed_egress_quota` 로 프로젝트를 통째로 막아(402) 로그인도
-//   보관함도 죽었다. 되짚어 보니 새는 자리가 둘이었다:
-//     ① 서명 URL 이 요청마다 달라져 캐시가 전부 빗나갔다 → lib/signed-url-cache.js 가 막는다.
-//     ② **보관함을 여는 것만으로** 카드 수만큼 영상 요청이 나갔다 — 이 판이 그것을 막는다.
+// ★ 왜 생겼나. Supabase 가 `exceed_egress_quota` 로 프로덕션을 402 로 막아 로그인도
+//   보관함도 죽었다. 새는 자리를 되짚다 카드가 영상을 물고 있는 것을 찾았다.
 //
-// ★ 카드는 첫 컷 그림(image)을 이미 쥐고 있다. 그림은 uploads 라우트가 immutable 로
-//   내보내므로 한 번 받으면 다시 안 받는다. 영상 첫 프레임을 받으려고 8~13MB 짜리 파일을
-//   건드릴 이유가 없다 — poster 에 그 그림을 걸고, 영상은 **마우스를 올렸을 때** 받는다.
-//   보이는 것도 하는 일도 그대로고, 안 보던 영상의 전송만 사라진다.
+// 이 파일은 **두 번 고쳐졌다.** 그 경과를 남긴다 — 다음 사람이 되돌리지 않도록:
+//   ① 아침: `preload="metadata"` → 그림이 있으면 `preload="none"` + `poster`.
+//      보관함을 여는 것만으로 카드 수만큼 영상 요청이 나가던 것을 막았다.
+//   ② 오후(사장님 지시): **카드에서 영상을 통째로 뺀다.** 마우스를 올리면 재생하던 것도
+//      없앤다 — **누르면 상세로 가서 거기서 본다.** 카드는 그림만 그린다.
+//      실측이 근거다: 보관함 46편 중 **37편이 우리 스토리지**를 지난다(7편만 fal CDN).
+//      마우스가 스치기만 해도 그 바이트가 나가던 것을 아예 없앤다.
+//
+// ★ 그런데 실측으로 **46편 중 25편이 영상은 있는데 그림이 없다**(광고·필름은 cuts[0].image
+//   가 없다). 그대로 그림만 그리면 절반이 넘는 카드가 **빈 칸**이 된다. 그래서 그 자리는
+//   "영상이 있다"고 **말해 주는** 자리로 채운다 — 없는 것과 안 보이는 것은 다르다.
+//   (근본 해결은 굽는 김에 표지 그림을 함께 만드는 것이다. 별도 작업.)
 //
 // 이 저장소의 JSX 는 소스를 읽어 잰다(주석은 strip 으로 걷어낸다 — 주석이 판정을 통과시키면
 // 안 된다).
@@ -18,27 +24,30 @@ import { readFileSync } from "node:fs";
 const strip = (s) => s.replace(/(^|[^:])\/\/.*$/gm, "$1").replace(/\/\*[\s\S]*?\*\//g, "");
 const cards = strip(readFileSync("components/ProjectCards.jsx", "utf8"));
 
-describe("보관함 카드 — 여는 것만으로 영상을 받지 않는다", () => {
-  it("★ preload 는 고정값이 아니다 — 그림이 있으면 \"none\" 으로 내려간다", () => {
-    // 고정 `preload="metadata"` 면 카드 수만큼 영상 요청이 나간다.
-    expect(cards).not.toMatch(/preload="metadata"/);
-    expect(cards).toMatch(/preload=\{/);
-    expect(cards).toMatch(/"none"/);
+describe("보관함 카드 — 영상을 아예 안 문다", () => {
+  it("★★ 카드에 <video> 가 없다 — 목록에서는 영상 바이트가 한 번도 안 나간다", () => {
+    expect(cards).not.toMatch(/<video/);
   });
 
-  // ★ 그림이 **없는** 카드까지 "none" 으로 내리면 그 카드는 빈 칸이 된다(광고처럼
-  //   cuts[0].image 가 없는 종류가 있다). 그때는 지금처럼 첫 프레임을 받는 쪽이 맞다 —
-  //   전송을 아끼려다 보이던 것을 없애지 않는다.
-  it("★ 그림이 없는 카드는 metadata 를 남긴다 — 첫 프레임이 사라지면 안 된다", () => {
-    expect(cards).toMatch(/"metadata"/);
+  it("★ 마우스를 올려도 재생하지 않는다 — 스치기만 해도 나가던 바이트를 없앤다", () => {
+    expect(cards).not.toMatch(/onMouseEnter/);
+    expect(cards).not.toMatch(/onMouseLeave/);
   });
 
-  it("★ 첫 화면은 poster(첫 컷 그림)가 그린다 — 영상 바이트를 안 건드린다", () => {
-    expect(cards).toMatch(/poster=\{/);
+  it("★ 그림은 그린다 — 카드의 얼굴은 <img> 다", () => {
+    expect(cards).toMatch(/<img/);
+  });
+});
+
+// 빈 칸은 버그처럼 보인다. 실측 25/46 이 이 갈래로 떨어지므로 여기가 기본 화면에 가깝다.
+describe("그림이 없는 카드 — 빈 칸으로 두지 않는다", () => {
+  it("★ 영상만 있고 그림이 없으면 '영상이 있다'고 알린다", () => {
+    // 문구가 **갈라져** 있어야 한다 — 없는 것과 안 보이는 것은 다르다.
+    expect(cards).toContain("영상이 있어요");
+    expect(cards).toMatch(/if\s*\(\s*video\s*\)/);
   });
 
-  it("마우스를 올리면 그때 재생한다 — 동작은 그대로다(회귀 방어)", () => {
-    expect(cards).toMatch(/onMouseEnter=\{/);
-    expect(cards).toMatch(/onMouseLeave=\{/);
+  it("아무것도 없는 프로젝트의 안내는 그대로다(회귀 방어)", () => {
+    expect(cards).toContain("아직 그림이 없어요");
   });
 });
