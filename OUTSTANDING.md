@@ -1,7 +1,11 @@
-# 이어서 할 일 — `feat/reel-cut-r2v` (2026-09-06 기준 · **여덟째 갱신**)
+# 이어서 할 일 — `feat/reel-cut-r2v` (2026-09-07 기준 · **아홉째 갱신**)
 
-> 09-06 은 **이어받으며 실측 대조만** 했다(코드 변경 0). 고친 것은 표 세 줄 —
-> 테스트가 그린이 아니었고, main 거리가 34→48 이었다.
+> 🔴 **09-07 은 사고 회차였다.** Supabase 무료 egress(5GB/월)를 다 써서 프로젝트가
+> **402 로 통째로 막혔고 서비스가 죽었다**. 새 Supabase 프로젝트로 옮겨 되살렸지만
+> **옛 파일 430개는 아직 못 데려왔다** — 보관함에 편은 46개 다 보이는데 **영상·사진이 404**다.
+> 자세한 것은 아래 「★★★ 09-07」. 다음 세션은 그 절부터 읽어라.
+>
+> (그 앞 09-06 은 이어받으며 실측 대조만 했다 — 코드 변경 0.)
 
 이 문서는 **다음 세션이 이 브랜치를 그대로 이어받기 위한 것**이다.
 사실은 코드가 진실의 원천이다. 여기 적힌 것과 코드가 어긋나면 코드를 믿고 이 문서를 고쳐라.
@@ -18,15 +22,118 @@
 |---|---|
 | 워크트리 | `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` |
 | 브랜치 | `feat/reel-cut-r2v` (09-03 저녁). ★ 수는 **적지 않는다** — 이 문서를 고치는 커밋이 그 수를 또 바꾼다. **세라**: `git log -1 --format='%h %s'` · `git rev-list --count fixup/main..HEAD` |
-| 테스트 | 🔴 **1 빨강** — 09-06 실측 `npx vitest run` = **5,772 통과 · 1 실패 · 10 skipped**(340 파일). 실패는 `tests/reel-oneshot.test.js > "프롬프트를 고치면 다시 굽는다"` **5초 타임아웃**. ★ **코드 결함이 아니라 판이 진짜 회선을 문다** — `pipeline.js:324` 의 `fetchImageBytes("https://fal/sheet.png")` 가 이 회선에서 **2,726ms**(DNS 죽는 데 걸리는 시간, 실측)를 먹는데 이 판만 통짜를 **두 번** 관통해 ~5.4초가 된다. 09-03 밤에 그린이던 것은 그때 회선이 빨리 죽었기 때문이고, **회선에 따라 빨강·초록이 갈린다**(같은 코드에서). 같은 값을 통짜를 관통하는 판 열 몇 개가 다 낸다 — 이 파일 하나가 전체 37초 중 **35초**를 쓴다. 고칠 자리: 격자 커밋(`4428fb4`)이 넣은 `fetchImageBytes` 를 **주입 가능한 deps 로** 빼면 판이 회선을 안 문다. `npx next build` 는 09-03 밤 이후 재실측 안 했다 |
-| 배포 | **프로덕션 라이브 `i7d0rc266`**(09-04 · 코드 `0b2f341` · `dpl_CiFQnyyTqhLECaq6JbnBRB883QhZ`). target=production · status=Ready · `/login`·`/archive` 200 · `/api/me` 401(로그인 벽, 정상) · ★ **확인법**: `npx vercel inspect fixup-shortform-service.vercel.app` 이 그 배포를 가리키는지 본다 — 이번엔 CSS 가 안 바뀌어 번들 해시로는 못 쟀다 |
+| 테스트 | 🔴 **1 빨강** — 09-07 12:56 실측 `npx vitest run` = **5,785 통과 · 1 실패 · 10 skipped**(342 파일 · 37초). 실패는 `tests/reel-oneshot.test.js > "프롬프트를 고치면 다시 굽는다"` **5초 타임아웃**. ★ **코드 결함이 아니라 판이 진짜 회선을 문다** — `pipeline.js:324` 의 `fetchImageBytes("https://fal/sheet.png")` 가 이 회선에서 **2,726ms**(DNS 죽는 데 걸리는 시간, 실측)를 먹는데 이 판만 통짜를 **두 번** 관통해 ~5.4초가 된다. 09-03 밤에 그린이던 것은 그때 회선이 빨리 죽었기 때문이고, **회선에 따라 빨강·초록이 갈린다**(같은 코드에서). 같은 값을 통짜를 관통하는 판 열 몇 개가 다 낸다 — 이 파일 하나가 전체 37초 중 **35초**를 쓴다. 고칠 자리: 격자 커밋(`4428fb4`)이 넣은 `fetchImageBytes` 를 **주입 가능한 deps 로** 빼면 판이 회선을 안 문다. `npx next build` 는 09-07 오전(`bec31e9`)에 통과했다 — 그 뒤 `b9b9830`(lib/compose.js) 는 화면 파일이 아니라 재굽기 안 했다 |
+| 배포 | **프로덕션 라이브 `6f4ehup0a`**(09-07 11:46 · 코드 `165df59` · `dpl_2Vw2h6T1FoR3DBBw877nhPWQZ1NH`). target=production · status=Ready · 09-07 12:5x 실측 `/login` 200 · `/api/me` 401(로그인 벽, 정상) · `/api/projects` 200(46건) · 🔴 `/api/renders/<옛 id>.mp4` **404**(아래 09-07 절 ③) · 그 앞 판은 `i7d0rc266`(09-04 · `0b2f341`) · ★ **확인법**: `npx vercel inspect fixup-shortform-service.vercel.app` 이 그 배포를 가리키는지 본다 — 이번엔 CSS 가 안 바뀌어 번들 해시로는 못 쟀다 |
 | ★ 정식 도메인 | **`https://fixup-shortform-service.vercel.app`** 다. `vercel deploy` 가 찍어 주는 `...-ju8okg74p-fix-up1.vercel.app` 쪽은 **Deployment Protection(SSO)에 걸려 전부 302** 라 검증에 쓰면 안 된다 — 09-02 에 한 번 속았다 |
-| 미배포 | **없다** — 09-04 작업이 전부 프로덕션이다. 배포 전 점검 둘 통과: **새 env 0 · 마이그레이션 0** |
-| 푸시 | **두 원격에 밀었다**(09-04 · `fixup`·`origin` 의 `feat/reel-cut-r2v` = `0b2f341`, 미푸시 0). ⚠️ URL 로 직접 푸시하면 추적 ref 가 안 움직여 '미푸시 N' 착시가 난다 — 정정은 `git fetch <원격> <브랜치>:refs/remotes/<원격>/<브랜치>`. ⚠️ 자격증명 대기로 매달리면 `GIT_TERMINAL_PROMPT=0` |
-| main 과의 거리 | `fixup/main` = `6e9bd8f`(그 안의 코드 커밋이 `23b80a2`) · HEAD 가 **48커밋 앞**(09-06 실측 — 세라)(뒤처진 것 0). 09-03 작업이 브랜치에만 쌓였다 — **main 병합은 사장님이 지시할 때만** 한다 |
+| 미배포 | **`b9b9830` 하나**(crf 26 + faststart — 굽는 영상이 −29%). 11:46 배포 뒤 11:59 에 커밋됐다. 새 env 하나 생김(`SHOTFORM_VIDEO_CRF`, 없으면 26이라 **안 넣어도 돈다**) · 마이그레이션 0 |
+| 푸시 | 🔴 **미푸시 5**(09-07 실측 — 코드 넷 `e96d8fc`·`bec31e9`·`165df59`·`b9b9830` + 이 문서 갱신 하나. ★ 세라: `git rev-list --count fixup/feat/reel-cut-r2v..HEAD`). 두 원격 다 `9a02896`(09-04)에 서 있다. ★ **사고 대응 코드가 원격에 하나도 없다** — 지금 원격만 보면 09-07 을 못 잇는다. ⚠️ URL 로 직접 푸시하면 추적 ref 가 안 움직여 '미푸시 N' 착시가 난다 — 정정은 `git fetch <원격> <브랜치>:refs/remotes/<원격>/<브랜치>`. ⚠️ 자격증명 대기로 매달리면 `GIT_TERMINAL_PROMPT=0` |
+| main 과의 거리 | `fixup/main` = `6e9bd8f`(그 안의 코드 커밋이 `23b80a2`) · HEAD 가 **53커밋 앞**(09-07 실측 — 세라)(뒤처진 것 0). 09-03 작업이 브랜치에만 쌓였다 — **main 병합은 사장님이 지시할 때만** 한다 |
 | ⚠️ 배포 함정 | **`.vercel` 폴더가 이 워크트리에 없다.** 그래서 `--project` 를 **반드시** 준다 — 안 주면 폴더 이름으로 새 프로젝트를 만든다(팀에 `step-gate` 라는 **실수로 생긴 프로젝트**가 그 증거다) |
 | ★ origin 푸시 | `origin` 은 URL 에 계정이 안 박혀 있다. 이 회차에는 `git push origin <브랜치>` 가 그냥 통과했지만, 자격증명 대기로 멈추면 계정을 실어라: `git push https://jaechanyoon0519-Fixup@github.com/FixUp-system/Fixup-shortform.git <브랜치>` |
 | 개발 서버 | `npx next dev -p 3111` (이 회차에 쓴 포트). `.env.local` 의 `SHOTFORM_DEV_USER` 가 **로그인을 건너뛰고 운영자 신원**을 준다 — 관리자·비용 화면을 그대로 볼 수 있다 |
+| 🔴 Supabase | **09-07 에 새 프로젝트로 옮겼다.** 프로덕션 env 다섯(`NEXT_PUBLIC_SUPABASE_URL`·`NEXT_PUBLIC_SUPABASE_ANON_KEY`·`SUPABASE_URL`·`SUPABASE_ANON_KEY`·`SUPABASE_SERVICE_ROLE_KEY`)이 09-07 오전에 새로 만들어졌다(`npx vercel env ls production --project fixup-shortform-service` 로 시각이 보인다). 새 ref 는 **Vercel 에만 있다** — 이 저장소·문서 어디에도 안 적혀 있다 |
+| 🔴 옛 Supabase | `tlgnfxjzkfxujytzoiji` — **09-07 12:5x 실측 아직 402**(`/storage/v1/bucket` 이 `exceed_cached_egress_quota, exceed_egress_quota` 를 그대로 돌려준다). **꺼내는 것 자체가 egress** 라 주기 리셋(또는 Pro 승급) 전에는 옛 파일을 못 데려온다 |
+| ⚠️ 로컬 `.env.local` | **옛 프로젝트를 가리킨다**(08-27 판, 09-07 에 안 고쳤다). 로컬에서 진짜 DB 를 보려면 새 값을 넣어야 한다 — 안 그러면 402 를 만난다 |
+| 덤프 | `C:\Users\fixup\shotform-migration-20260907\` · `dump.json`(2.2MB · 9표: projects 46 · users 13 · profiles 13 · identities 13 · cost_records 1,042 · credit_charges 52 · credit_grants 24 · upload_owners 346 · storage_objects 430) + `storage-inventory.json`(객체 430건의 버킷·이름·크기). ★ **저장소 밖이다 — 지우지 마라.** 옛 파일을 되찾을 때 대조표가 된다 |
+| 배포 사본 | `C:\Users\fixup\shotform-deploy-clean` = `165df59` 의 `git archive` 판(줄끝이 CRLF 라 파일 크기가 다르다 — 내용은 같다). `.vercel` 이 **없으므로** 여기서도 `--project fixup-shortform-service` 를 반드시 준다. 그 앞 사본 `shotform-deploy` 는 09-04 판 |
+
+### ★★★ 09-07 — 전송 할당량이 서비스를 죽였다 · 새 Supabase 로 이사 · R2 설계
+
+> 커밋 셋(`bec31e9` · `165df59` · `b9b9830`). 앞의 둘은 **프로덕션 반영됨**(11:46),
+> 마지막 하나는 **미배포**. 셋 다 **미푸시**.
+> ★ 이 절의 절반은 **커밋에 안 남는 일**이다(Supabase 이사·env·덤프). 여기 말고는 기록이 없다.
+
+#### ① 무슨 일이 있었나
+
+09-07 아침, **로그인도 보관함도 죽었다.** Vercel 이 아니라 Supabase 였다 —
+`auth`·`rest`·`storage` 세 갈래가 전부 **402**:
+
+```
+Service for this project is restricted due to the following violations:
+exceed_cached_egress_quota, exceed_egress_quota.
+```
+
+**전송량(egress)이다.** 저장 용량도 DB 크기도 아니다. 무료 5GB/월인데 완성본이 개당
+**8~13MB** 라 **재생 400~500회면 한 달이 끝난다.** 아껴 쓸 크기가 아니라 **구조가 안 맞는다.**
+
+#### ② 새는 자리 셋 (`bec31e9` · 배포됨)
+
+| 고친 것 | 무엇이었나 |
+|---|---|
+| `lib/auth/infra-error.js` — `isInfra` 에 **402 추가** | 402 가 `0·429·5xx` 그물에 안 걸려 401 WRONG 으로 뭉개졌다 → 화면엔 "이메일 또는 비밀번호가 맞지 않아요". **고칠 것은 결제인데 비밀번호를 의심하게 만들었다** |
+| `lib/signed-url-cache.js`(신규) + `renders/[name]/route.js` | 서명을 요청마다 새로 만들어 **주소가 매번 달랐다** → 브라우저 캐시도 CDN 도 전부 빗나가 볼 때마다 8~13MB 가 통째로 나갔다. 이제 같은 내용이면 같은 주소. 무효화는 `ts` 가 한다(`ts` 없는 옛 문서는 재사용 안 함) |
+| `components/ProjectCards.jsx` — `preload="none"` | `metadata` 라 **보관함을 여는 것만으로** 카드 수만큼 영상을 건드렸다. 첫 화면은 목록에 실려 오는 첫 컷 그림(poster)이 그린다. 그림 없는 종류(광고)는 `metadata` 유지 |
+
+★ **302 응답에는 ETag 가 없다** — 라우트의 304 절감은 프로덕션에서 한 번도 안 탔다.
+
+#### ③ 🔴🔴 새 Supabase 로 옮겼다 — **데이터는 살았고 파일은 안 왔다**
+
+옛 프로젝트가 402 로 막힌 채라, 새 Supabase 프로젝트를 세우고 **DB 를 덤프해 부었다**
+(덤프는 직결 Postgres 로 떴다 — REST·Storage 는 402 지만 DB 연결은 살아 있었다).
+Vercel 프로덕션 env 다섯을 새 값으로 갈고 11:46 에 배포했다.
+
+**살아난 것**(09-07 12:5x 실측):
+· `/login` 200 · 로그인 API 가 새 프로젝트로 붙는다(없는 계정에 401 WRONG)
+· `/api/projects` **46건** — 덤프의 46건과 **id 가 전부 일치**한다. 편·원장·크레딧이 그대로다
+
+**안 온 것**(같은 실측):
+· `/api/renders/3a125f05-….mp4` → **404 "없음"**
+· `/api/uploads/6be36664-….jpg` → **404 "파일을 찾을 수 없어요"**
+🔴 **객체 430개가 새 버킷에 없다.** 사장님 눈에는 *"보관함에 편은 다 있는데 영상이 안 열린다"*
+로 보인다. 카드 그림(poster)도 uploads 라 **같이 빈다.**
+
+🔴 **지금은 데려올 수도 없다** — 옛 프로젝트에서 **꺼내는 것 자체가 egress** 이고 그쪽은
+아직 402 다(위 §0 표에서 실측 확인). **청구 주기가 리셋되거나 Pro 로 올려야** 그때 옮긴다.
+대조표는 `storage-inventory.json`(430건)에 있다.
+
+#### ④ R2 설계를 문서로 못 박았다 (`165df59` · 코드 변경 0)
+
+`docs/superpowers/specs/2026-09-07-storage-to-r2-design.md` (337줄 + HLS 절).
+egress 절감은 **반복 조회**를 막을 뿐 **첫 재생**은 그대로 나간다 → 무료 5GB 로는 천장이 낮다.
+R2 는 egress 가 **요금 항목에 아예 없다**. 벽이 *"보면 닳는다"* 에서 *"만들면 쌓인다"* 로 바뀐다.
+
+· 이음매는 **함수 넷**(`putObject`·`getObject`·`signedObjectUrl`·`deleteObject`)과 버킷 둘.
+  호출처 12곳이 전부 `getStore()` 를 지나므로 **호출처는 한 줄도 안 바뀐다.** DB·인증은 그대로.
+· 라이브러리는 **`aws4fetch`(~2KB)** — 수 MB 짜리 AWS SDK 는 의존성 11개인 이 저장소에 안 맞는다.
+· 순서: ① 쓰기 R2 → ② 읽기 폴백(R2→Supabase) → ③ 배치 이관 → ④ 폴백 제거.
+  **②의 폴백이 안전핀** — ③이 절반만 돌아도 화면은 멀쩡하다.
+· 🔴 **③은 지금 못 한다**(위 ③과 같은 이유). ①②는 **지금 바로 된다** — 새로 굽는 영상부터
+  R2 로 가면 **새 프로젝트의 5GB 를 영상이 안 태운다.**
+· 🔴 **열린 것 하나(Task 1)**: `response-content-disposition` 을 R2 가 존중하는지 문서로 확인
+  못 했다. `?dl=1`(내려받기)이 여기 걸린다 — 버킷 하나로 **2분이면 잰다.**
+· HLS(§12-bis, 사장님 지시)는 **R2 다음** — 세그먼트 인가가 저장소에 달려 지금 지으면 두 번 만든다.
+
+#### ⑤ 굽는 크기 −29% (`b9b9830` · **미배포**)
+
+인코더가 `crf` 를 안 적어 libx264 기본값(23)에 맡기고 있었고 `faststart` 도 없었다.
+실측(`reel-final.mp4` 3,047KB 재인코딩): 기본 2,821KB → **crf 26 + faststart 2,151KB(−29%)**
+(crf 28 은 −42% 지만 눈에 띈다 · preset slow 는 2%p 더 줄이려 시간을 크게 쓴다).
+· **화질은 사장님이 정할 값**이라 `SHOTFORM_VIDEO_CRF` 로 뺐다(숫자가 아니면 26).
+· `faststart` 는 크기를 안 줄인다 — `moov` 를 앞으로 옮겨 재생 전 왕복 하나를 없앤다.
+· ★ **굽는 자리가 둘이다**(`buildFfmpegArgs`·`burnArgs`). 자막이 있으면 뒤엣것이 최종본이라
+  한쪽만 고치면 절감이 **절반만** 걸린다. 상수 하나를 둘이 함께 쓴다.
+
+#### ⑥ 🔴 다음 세션이 먼저 할 일 (이 사고 갈래)
+
+1. **사장님께 물을 것 — 옛 파일 430개를 언제 되찾나.** 선택지는 둘뿐이다:
+   (가) Supabase 청구 주기 리셋을 기다린다 (그동안 옛 영상은 계속 404)
+   (나) 옛 프로젝트를 **Pro 로 하루 올려** 꺼내고 내린다. 총량은 최대 1GB 다
+2. **R2 Task 1** — `?dl=1` 실측(버킷 하나, 2분). 여기서 4장이 확정된다
+3. **R2 ①②(쓰기+폴백) 구현** — 지금 가능하고, 하면 **새 프로젝트의 5GB 를 영상이 안 태운다**
+4. **`b9b9830` 배포** — 굽는 영상이 −29%. 새 env 는 선택(기본 26)
+5. **푸시** — 사고 대응 코드가 원격에 하나도 없다(원격은 09-04 `9a02896` 에 서 있다)
+
+#### ⑦ ★ 알면서 안 고치고 넘기는 것 (09-07)
+
+· 🔴 **옛 영상·사진 404** — 위 ③. **버그가 아니라 아직 못 옮긴 것**이다. 다음 세션이
+  "보관함이 깨졌다"로 다시 진단하지 마라
+· ⚠️ **새 Supabase ref 가 Vercel 에만 있다** — 로컬 `.env.local` 은 옛 것을 가리킨다
+· ⚠️ **`uploads` 는 바이트가 Vercel 함수를 지난다**(`app/api/uploads/[name]/route.js:27`).
+  302 로 바꾸면 Vercel 대역폭도 주는데 `immutable` 캐시 규약이 바뀌어 **별도 태스크**로 뺐다
+· ⚠️ **서명 수명**(`SIGNED_URL_SECONDS`, 지금 1800초)은 안 정했다 — 길수록 캐시 재사용이
+  늘지만 **공유 가능한 시간도 같이 는다.** 사장님 판단이 필요한 값이라 문서에 남겼다
+
+---
 
 ### ★★★ 09-03 **저녁** — 격자가 앱 경로로 통과했다 · 관리자 지우기 · 번역 · 화면 여덟
 
@@ -584,6 +691,10 @@ cd <빈폴더> && npx vercel deploy --prod --yes --project fixup-shortform-servi
 </details>
 
 ## 1-A. 🔴 **다음 세션이 먼저 볼 것** (2026-09-03 기준)
+
+> ⚠️ **09-07 정정 — 순서가 바뀌었다.** 이 절(격자·얼굴)보다 **「★★★ 09-07」 §⑥ 이 먼저**다.
+> 옛 영상 430개가 지금 안 열리는 것이 제품에 더 아프고, 사장님 판단이 필요한 항목이 있다.
+> 이 절은 **그 다음**이다.
 
 > ★★★ **얼굴 제한을 걷었다**(09-03 밤 · 커밋 `5db864b`). 처음에 나는 "이르다"고 답했다가
 >   **실측을 보고 뒤집었다** — 자세한 것은 위 「09-03 밤」 §★. 요지: 오후의 3연속 422 는
