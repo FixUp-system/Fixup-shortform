@@ -83,8 +83,8 @@ describe("PATCH /api/projects/[id] — 화질", () => {
 
   it("모델이 여는 화질은 저장된다", async () => {
     await seedSeedance();
-    expect((await PATCH(req({ resolution: "1080p" }), ctx())).status).toBe(200);
-    expect((await savedSettings()).resolution).toBe("1080p");
+    expect((await PATCH(req({ resolution: "480p" }), ctx())).status).toBe(200);
+    expect((await savedSettings()).resolution).toBe("480p");
   });
 
   it("모델에 없는 해상도는 저장을 거절한다", async () => {
@@ -98,19 +98,19 @@ describe("PATCH /api/projects/[id] — 화질", () => {
   // 화면에 없는 선택이 문서에 남고, 각인(lib/steps.js)이 그 값을 본다.
   it("해상도를 안 여는 모델(레거시=Kling)에는 어떤 값도 못 넣는다", async () => {
     await seedProject();   // i2v_model 없음 = 레거시 Kling
-    expect((await PATCH(req({ resolution: "1080p" }), ctx())).status).toBe(400);
+    expect((await PATCH(req({ resolution: "480p" }), ctx())).status).toBe(400);
     expect((await savedSettings()).resolution).toBeUndefined();
   });
 
   // ★★ 모델을 함께 바꾸는 PATCH. 판정을 **바뀌기 전 모델**로 하면
-  // "Seedance 의 1080p 니까 통과" → 저장된 모델은 Kling 이 되어 없는 파라미터가 남는다.
+  // "Seedance 의 480p 니까 통과" → 저장된 모델은 Kling 이 되어 없는 파라미터가 남는다.
   //
   // ★ **문구까지 단정한다.** 상태 코드 400 만 보면 이 테스트가 화질 게이트를 안 잰다 —
   //   모델 잠금도 400 을 주기 때문이다(리뷰 실측: 판정을 merged → project 로 되돌려도
   //   11건이 전부 그린이었다). 화질 게이트가 무는 문이라는 것을 문구가 증명한다.
-  it("모델을 Kling 으로 바꾸면서 1080p 를 함께 보내도 통과하지 않는다 — 막는 것은 화질 게이트다", async () => {
+  it("모델을 Kling 으로 바꾸면서 480p 를 함께 보내도 통과하지 않는다 — 막는 것은 화질 게이트다", async () => {
     await seedSeedance();
-    const res = await PATCH(req({ i2v_model: "kling-v3", resolution: "1080p" }), ctx());
+    const res = await PATCH(req({ i2v_model: "kling-v3", resolution: "480p" }), ctx());
     expect(res.status).toBe(400);
     expect((await res.json()).error).toBe("그 화질은 몰라요");
     const s = await savedSettings();
@@ -127,9 +127,9 @@ describe("PATCH /api/projects/[id] — 화질", () => {
   });
 });
 
-// ★★ 돈이 새던 자리 — 화질은 **정가를 바꾼다**(Seedance 30초: 720p 160 · 1080p 360).
+// ★★ 돈이 새던 자리 — 화질은 **정가를 바꾼다**(Seedance 30초: 720p 160 · 480p 360).
 // 정가는 ③목소리에서 걷히고 화질 칩은 ②대본에 있다. 화면은 결제 뒤 칩을 잠그는데
-// 서버가 안 막아서, 720p 로 내고 PATCH 로 1080p 로 바꾸면 ⑤에서 requireVideoCharge 가
+// 서버가 안 막아서, 720p 로 내고 PATCH 로 480p 로 바꾸면 ⑤에서 requireVideoCharge 가
 // **살아 있는 청구를 보고 그냥 지나간다**(lib/charges.js:131) — 160 을 내고 원가 2.25배를 받는다.
 describe("PATCH /api/projects/[id] — 결제 뒤 화질 잠금", () => {
   const seed = (settings) =>
@@ -145,7 +145,7 @@ describe("PATCH /api/projects/[id] — 결제 뒤 화질 잠금", () => {
   it("정가를 낸 뒤에는 화질을 못 바꾼다", async () => {
     await seed({ target_seconds: 30, i2v_model: "seedance-2.0", resolution: "720p" });
     await pay();
-    const res = await PATCH(req({ resolution: "1080p" }), ctx());
+    const res = await PATCH(req({ resolution: "480p" }), ctx());
     expect(res.status).toBe(400);
     expect((await res.json()).error).toMatch(/바꿀 수 없어요/);
     expect((await savedSettings()).resolution).toBe("720p");
@@ -166,10 +166,10 @@ describe("PATCH /api/projects/[id] — 결제 뒤 화질 잠금", () => {
     expect((await PATCH(req({ resolution: "720p" }), ctx())).status).toBe(200);
   });
 
-  it("저장값이 없는데 1080p 로 올리는 것은 막는다", async () => {
+  it("저장값이 없는데 480p 로 올리는 것은 막는다", async () => {
     await seed({ target_seconds: 30, i2v_model: "seedance-2.0" });
     await pay();
-    expect((await PATCH(req({ resolution: "1080p" }), ctx())).status).toBe(400);
+    expect((await PATCH(req({ resolution: "480p" }), ctx())).status).toBe(400);
     expect((await savedSettings()).resolution).toBeUndefined();
   });
 
@@ -181,21 +181,21 @@ describe("PATCH /api/projects/[id] — 결제 뒤 화질 잠금", () => {
     await memoryStore.insertCharge({
       idem_key: `refund:${P}:1`, user_id: A, project_id: P, kind: "refund", credits: -160,
     });
-    expect((await PATCH(req({ resolution: "1080p" }), ctx())).status).toBe(200);
-    expect((await savedSettings()).resolution).toBe("1080p");
+    expect((await PATCH(req({ resolution: "480p" }), ctx())).status).toBe(200);
+    expect((await savedSettings()).resolution).toBe("480p");
   });
 
   it("결제 전에는 자유롭게 고른다", async () => {
     await seed({ target_seconds: 30, i2v_model: "seedance-2.0", resolution: "720p" });
-    expect((await PATCH(req({ resolution: "1080p" }), ctx())).status).toBe(200);
-    expect((await savedSettings()).resolution).toBe("1080p");
+    expect((await PATCH(req({ resolution: "480p" }), ctx())).status).toBe(200);
+    expect((await savedSettings()).resolution).toBe("480p");
   });
 
   // ★★★ 경합(TOCTOU) — 이 태스크의 존재 이유.
   //
-  // 사전 판정은 updateProject 의 직렬 큐·version **밖**에 있다. PATCH(1080p) 와 ③목소리
+  // 사전 판정은 updateProject 의 직렬 큐·version **밖**에 있다. PATCH(480p) 와 ③목소리
   // 결제를 동시에 쏘면 ①PATCH 가 charged=false 를 읽고 → ②720p 로 청구가 확정되고 →
-  // ③1080p 가 저장되는 순서가 성립한다. 즉 이 문이 막으려던 바로 그 시나리오가 통한다.
+  // ③480p 가 저장되는 순서가 성립한다. 즉 이 문이 막으려던 바로 그 시나리오가 통한다.
   //
   // 재현: 저장소의 selectProject 를 세어 **두 번째 호출**(= updateProject 가 락 안에서 읽는
   // 그 읽기) 때 결제 행을 끼워 넣는다. 사전 판정 시점(첫 번째 읽기)엔 미결제라 그 문은
@@ -214,7 +214,7 @@ describe("PATCH /api/projects/[id] — 결제 뒤 화질 잠금", () => {
       return row;
     });
     try {
-      const res = await PATCH(req({ resolution: "1080p" }), ctx());
+      const res = await PATCH(req({ resolution: "480p" }), ctx());
       expect(res.status).toBe(400);
       expect((await res.json()).error).toBe(
         "이미 결제된 영상은 화질을 바꿀 수 없어요 — 새로 만들어 주세요"
@@ -273,7 +273,7 @@ describe("PATCH /api/projects/[id] — 광고 문서", () => {
       { id: P, created_ts: 1, kind: "ad", status: "draft", settings: { i2v_model: "seedance-2.0" } },
       A
     );
-    const res = await PATCH(req({ resolution: "1080p" }), ctx());
+    const res = await PATCH(req({ resolution: "480p" }), ctx());
     expect(res.status).toBe(404);
     expect((await res.json()).error).toBe("프로젝트를 찾을 수 없어요");
   });

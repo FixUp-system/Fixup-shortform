@@ -63,17 +63,17 @@ describe("화질이 저장부터 각인까지 관통한다", () => {
   });
   afterEach(() => { delete process.env.SHOTFORM_FAKE; });
 
-  it("1080p 를 저장하면 가격·요청·각인이 모두 1080p 를 본다", async () => {
-    expect((await patch({ resolution: "1080p" })).status).toBe(200);
+  it("480p 를 저장하면 가격·요청·각인이 모두 480p 를 본다", async () => {
+    expect((await patch({ resolution: "480p" })).status).toBe(200);
 
     const project = await saved();
-    expect(project.settings.resolution).toBe("1080p");
+    expect(project.settings.resolution).toBe("480p");
 
     // ① 가격 — 라우트들이 넘기는 것과 같은 모양이다(modelIdForProject·resolutionForProject).
     const price = videoPrice(project.settings.target_seconds, modelIdForProject(project), resolutionForProject(project));
     // ★ 숫자를 손으로 적지 않는다(2026-08-27 정가 갱신에서 깨졌다) — 여기서 재는 것은
     //   "고른 화질이 값까지 관통하는가"지 특정 숫자가 아니다. 표에서 읽어 대조한다.
-    expect(price).toBe(VIDEO_PRICE["seedance-2.0"]["1080p"][30]);
+    expect(price).toBe(VIDEO_PRICE["seedance-2.0"]["480p"][30]);
     // 720p 값으로 걷히면 원가 2.25배를 우리가 문다 — 같은 숫자가 아님을 못 박는다.
     expect(price).not.toBe(videoPrice(project.settings.target_seconds, modelIdForProject(project), "720p"));
 
@@ -82,11 +82,11 @@ describe("화질이 저장부터 각인까지 관통한다", () => {
     await runWithActor("t-user", () =>
       generateClip({ imageUrl: "https://x/i.png", seconds: 5, aspect_ratio: "9:16", prompt: "움직인다", projectId: P, project, fetchImpl })
     );
-    expect(box.body.resolution).toBe("1080p");
+    expect(box.body.resolution).toBe("480p");
 
     // ③ 각인 — 화질을 바꿨으면 이미 만든 클립이 낡아야 한다.
     const cut = { idx: 0, image: { url: "https://x/i.png" }, seconds: 5, motion: "천천히" };
-    expect(clipKey(cut, project)).toContain("1080p");
+    expect(clipKey(cut, project)).toContain("480p");
   });
 
   it("셋이 같은 출처를 본다 — 화질을 480p 로 바꾸면 셋이 함께 따라온다", async () => {

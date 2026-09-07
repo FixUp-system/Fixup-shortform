@@ -344,9 +344,9 @@ describe("고른 화질이 요청에 실린다", () => {
   it("Seedance 요청에 고른 해상도가 실린다", async () => {
     const { box, fetchImpl } = captor();
     await runWithActor("t-user", () =>
-      generateClip({ ...base, project: { settings: { i2v_model: "seedance-2.0", resolution: "1080p" } }, fetchImpl })
+      generateClip({ ...base, project: { settings: { i2v_model: "seedance-2.0", resolution: "480p" } }, fetchImpl })
     );
-    expect(box.body.resolution).toBe("1080p");
+    expect(box.body.resolution).toBe("480p");
   });
 
   it("해상도를 안 고르면 기본값이 실린다", async () => {
@@ -369,7 +369,7 @@ describe("고른 화질이 요청에 실린다", () => {
   it("Kling 요청에는 resolution 키가 아예 없다", async () => {
     const { box, fetchImpl } = captor();
     await runWithActor("t-user", () =>
-      generateClip({ ...base, project: { settings: { i2v_model: "kling-v3", resolution: "1080p" } }, fetchImpl })
+      generateClip({ ...base, project: { settings: { i2v_model: "kling-v3", resolution: "480p" } }, fetchImpl })
     );
     expect("resolution" in box.body).toBe(false);
   });
@@ -380,21 +380,21 @@ describe("고른 화질이 요청에 실린다", () => {
     expect("resolution" in box.body).toBe(false);
   });
 
-  // ★ 원장과 실청구가 갈리는 자리 — 1080p 를 사고 720p 로 기록하면 원가가 절반 이하로 남는다.
+  // ★ 원장과 실청구가 갈리는 자리 — 480p 를 사고 720p 로 기록하면 원가가 절반 이하로 남는다.
   it("원가 기록도 같은 해상도를 본다", async () => {
     const { fetchImpl } = captor();
     await runWithActor("t-user", () =>
       generateClip({
         ...base, projectId: "p-1080",
-        project: { settings: { i2v_model: "seedance-2.0", resolution: "1080p" } },
+        project: { settings: { i2v_model: "seedance-2.0", resolution: "480p" } },
         fetchImpl,
       })
     );
     const rows = await memoryStore.allCosts();
     const mine = rows.filter((r) => r.project_id === "p-1080");
     expect(mine).toHaveLength(1);
-    // 5초 × $0.682(1080p) — 720p($0.3034)로 기록되면 여기서 갈린다
-    expect(mine[0].est_cost_usd).toBeCloseTo(estimateCost("bytedance/seedance-2.0/image-to-video", 5, "1080p"), 6);
+    // 5초 × $0.682(480p) — 720p($0.3034)로 기록되면 여기서 갈린다
+    expect(mine[0].est_cost_usd).toBeCloseTo(estimateCost("bytedance/seedance-2.0/image-to-video", 5, "480p"), 6);
     expect(mine[0].est_cost_usd).not.toBeCloseTo(estimateCost("bytedance/seedance-2.0/image-to-video", 5, "720p"), 6);
   });
 });

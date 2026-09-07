@@ -724,13 +724,13 @@ describe("clipKey — 해상도", () => {
   });
 
   it("Seedance 는 해상도가 각인에 들어간다", () => {
-    const p = { settings: { i2v_model: "seedance-2.0", resolution: "1080p" } };
-    expect(clipKey(cut, p)).toContain("1080p");
+    const p = { settings: { i2v_model: "seedance-2.0", resolution: "480p" } };
+    expect(clipKey(cut, p)).toContain("480p");
   });
 
   it("해상도를 바꾸면 각인이 달라진다 — 그래야 클립이 낡는다", () => {
     const a = { settings: { i2v_model: "seedance-2.0", resolution: "720p" } };
-    const b = { settings: { i2v_model: "seedance-2.0", resolution: "1080p" } };
+    const b = { settings: { i2v_model: "seedance-2.0", resolution: "480p" } };
     expect(clipKey(cut, a)).not.toBe(clipKey(cut, b));
   });
 

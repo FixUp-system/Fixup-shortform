@@ -110,7 +110,7 @@ describe("단계별 — 화질은 768P·2K (원클릭과 같다)", () => {
   });
 
   it("Seedance 쪽 화질은 한 글자도 안 바뀐다", () => {
-    expect(resolutionsForModel("seedance-2.0")).toEqual(["480p", "720p", "1080p"]);
+    expect(resolutionsForModel("seedance-2.0")).toEqual(["480p", "720p"]);
     expect(resolutionsForModel("seedance-2.5")).toEqual(["480p", "720p"]);
     expect(defaultResolutionForModel("seedance-2.0")).toBe("720p");
   });

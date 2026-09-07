@@ -402,7 +402,7 @@ const klingP = { settings: { i2v_model: "kling-v3" } };
 
 describe("해상도 목록", () => {
   it("Seedance 만 해상도를 연다", () => {
-    expect(resolutionsForProject(seedanceP)).toEqual(["480p", "720p", "1080p"]);
+    expect(resolutionsForProject(seedanceP)).toEqual(["480p", "720p"]);
     // Kling 에는 fal 스키마에 resolution 이 아예 없다(2026-08-13 확인).
     // 빈 목록이면 화면이 선택지를 안 띄운다 — "고를 수 있는 척"을 막는다.
     expect(resolutionsForProject(klingP)).toEqual([]);
@@ -414,14 +414,17 @@ describe("해상도 목록", () => {
   });
 
   it("저장값이 그 모델에 있으면 그것을 쓴다", () => {
-    const p = { settings: { i2v_model: "seedance-2.0", resolution: "1080p" } };
-    expect(resolutionForProject(p)).toBe("1080p");
+    const p = { settings: { i2v_model: "seedance-2.0", resolution: "480p" } };
+    expect(resolutionForProject(p)).toBe("480p");
   });
 
+  // ★ 2026-09-07 — 예시가 1080p 였다. 그 값은 이제 clip 축에서 안 열리므로(사장님 지시)
+  //   **고를 수 있는 값**으로 바꿨다. 판이 재는 것은 "저장값을 그대로 쓰는가"이지
+  //   특정 화질이 아니다.
   it("해상도를 안 받는 모델에는 아예 안 보낸다", () => {
-    // Seedance 1080p 로 저장해 두고 Kling 으로 바꾼 프로젝트. Kling 에는 resolution 파라미터
+    // Seedance 480p 로 저장해 두고 Kling 으로 바꾼 프로젝트. Kling 에는 resolution 파라미터
     // 자체가 없으니 기본값으로 떨어뜨리는 것이 아니라 **아무것도 안 싣는다**.
-    const p = { settings: { i2v_model: "kling-v3", resolution: "1080p" } };
+    const p = { settings: { i2v_model: "kling-v3", resolution: "480p" } };
     expect(resolutionForProject(p)).toBe("");
   });
 
@@ -433,7 +436,7 @@ describe("해상도 목록", () => {
   // 화면은 "저장된 모델"이 아니라 "지금 고르려는 모델"의 목록을 그린다 —
   // 그때 가짜 project 객체를 만들지 않도록 id 로 묻는 자리가 있어야 한다.
   it("모델 id 로도 물을 수 있다 — 화면이 가짜 project 를 만들지 않게", () => {
-    expect(resolutionsForModel("seedance-2.0")).toEqual(["480p", "720p", "1080p"]);
+    expect(resolutionsForModel("seedance-2.0")).toEqual(["480p", "720p"]);
     expect(resolutionsForModel("kling-v3")).toEqual([]);
     // 모르는 id·없는 id 는 모델 판정 규칙 그대로 Kling(LEGACY)으로 떨어진다
     expect(resolutionsForModel("뒤죽박죽")).toEqual([]);
@@ -441,7 +444,11 @@ describe("해상도 목록", () => {
   });
 
   it("모델에 없는 해상도는 거절한다", () => {
-    expect(isResolutionFor("1080p", seedanceP)).toBe(true);
+    // ★ 2026-09-07 — 이 줄은 원래 `1080p → true` 였다. 1080p 를 clip 축에서 닫으면서
+    //   **판이 제 이름과 맞게 됐다**: 목록에 없으니 거절이다. 이 값이 다시 true 가 되면
+    //   화면에서 뺀 화질이 라우트로는 들어온다는 뜻이다(고르는 목록이 곧 방어선이다).
+    expect(isResolutionFor("1080p", seedanceP)).toBe(false);
+    expect(isResolutionFor("480p", seedanceP)).toBe(true);
     expect(isResolutionFor("2160p", seedanceP)).toBe(false);
     expect(isResolutionFor("720p", klingP)).toBe(false);
   });

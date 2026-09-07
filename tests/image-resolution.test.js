@@ -22,8 +22,13 @@ describe("이미지 해상도 — 영상 화질을 따라간다", () => {
     expect(imageResolutionFor(project("720p"))).toBe("1K");
   });
 
-  it("★ 1080p 영상은 2K — 1K 가 상한이 되지 않게", () => {
-    expect(imageResolutionFor(project("1080p"))).toBe("2K");
+  // ★★ 2026-09-07 — **clip 축에서 1080p 를 닫았다**(사장님 지시). 그래서 저장값이 1080p 여도
+  //   `resolutionForProject` 가 그 모델의 기본(720p)으로 떨어뜨리고, 이미지는 1K 가 된다.
+  //   `imageResolutionFor` 의 1080p→2K 대응은 **지우지 않았다** — 광고 축에는 1080p 가
+  //   그대로 있고, clip 축에 다시 열리는 날 이 줄이 판이 된다(광고 표의 4K 를 안 지운 것과
+  //   같은 규율이다: 값 조회에서 죽지 않게, 고르는 목록에만 없다).
+  it("★ 1080p 로 저장돼 있어도 이제 1K — clip 축이 그 화질을 안 열기 때문이다", () => {
+    expect(imageResolutionFor(project("1080p"))).toBe("1K");
   });
 
   it("화질 축이 없는 옛 프로젝트도 1K 로 떨어진다 — 던지지 않는다", () => {
