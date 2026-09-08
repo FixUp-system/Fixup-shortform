@@ -44,6 +44,32 @@ describe("썸네일 위 뱃지는 사진 위에서 보인다", () => {
     expect(values.length, `--on-media 정의가 ${values.length}개다 — :root 한 곳이어야 한다`).toBe(1);
     expect(values[0], "다른 토큰을 참조하면 바탕색을 따라 움직인다").not.toMatch(/var\(/);
   });
+
+  // ★★★ 2026-09-08(Task 5) — 위 판은 `.thumb-tag` **한 자리만** 잰다. 그래서 같은 결함이
+  //   세 자리에 더 살아 있었다: `.thumb .num`(④이미지) · `.cut-shot .no`(reel) ·
+  //   `.up .tag`(올린 사진 파일명). 셋 다 배경이 **고정 검정 리터럴**인데 글자는 var(--ink)
+  //   였다 — 밝은 벌로 갈면서 #141413(거의 검정)이 되어 사진 위에서 안 읽힌다
+  //   (실측 대비 1.06~3.21:1, --on-media 로 바꾸면 5.74~21:1).
+  //
+  //   이름으로 자리를 하나씩 적는 판은 자리가 늘 때마다 뒤처진다. 그래서 **성질로** 잰다:
+  //   바탕을 고정 어두운 리터럴로 칠한 규칙이 글자색을 정하면, 그 색은 --on-media 여야 한다.
+  it("★★★ 고정 어두운 바탕 위 글자는 전부 그 토큰을 쓴다 — 자리마다 적지 않는다", () => {
+    const body = css.replace(/\/\*[\s\S]*?\*\//g, "");
+    const offenders = [];
+    for (const m of body.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+      const selector = m[1].trim().split("\n").pop().trim();
+      const decls = m[2];
+      const bg = decls.match(/background(-color)?:\s*rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+      if (!bg) continue;
+      const dark = [bg[2], bg[3], bg[4]].every((v) => Number(v) <= 64);
+      if (!dark) continue;
+      const color = decls.match(/(?:^|[;{\s])color:\s*([^;]+)/);
+      if (!color) continue; // ::backdrop 처럼 글자가 없는 자리는 잴 것이 없다
+      if (color[1].trim() !== "var(--on-media)") offenders.push(`${selector} → ${color[1].trim()}`);
+    }
+    expect(offenders, "고정 검정 위에 테마를 타는 글자색을 얹었다 — 밝은 벌에서 검정 위 검정이 된다")
+      .toEqual([]);
+  });
 });
 
 // ★★ 카드 아래 제목과 뱃지가 겹쳐 보였다(같은 지적).
