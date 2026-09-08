@@ -70,9 +70,6 @@
   --btn: #B0446A;
   --btn-ink: #FFFFFF;
 
-  /* ★ 홈에서 "권장"을 다는 색(2026-08-28). --accent(로즈)는 진행 표시 전용이라 못 쓰고,
-     --good(초록)은 "됐다"는 뜻이라 권유와 다르다. 고르라고 손짓하는 자리에만 쓴다. */
-  --pick: #C2402C;
   --good: #0E7C57;
   --good-soft: rgba(14, 124, 87, 0.12);
   /* 밝은 바탕에서 노랑은 글자로 안 읽힌다 — 호박색 쪽으로 깊게 잡은 값 */
@@ -2578,156 +2575,87 @@ h1.login-head { margin-inline: auto; }
 }
 @media (prefers-reduced-motion: reduce) { .running-dot { animation: none; } }
 
-/* ── 홈 — 만드는 방식을 고르는 첫 화면 (2026-08-28) ──────────────────────
-   ★★ 사장님이 캔버스에서 다듬은 시안을 그대로 옮긴 것이다. 캔버스 산출물은 전부
-     인라인 스타일인데 이 저장소는 그것을 막으므로(tests/design-system.test.js 가 막는다:
-     인라인 스타일 상한 · :root 밖 hex 금지) 클래스로 옮겼다.
-     **보이는 것은 그대로다** — 치수·간격을 한 톨도 안 바꿨다.
-   ★ 시안의 줄무늬 배경은 **실제 썸네일이 들어갈 자리**라고
-     사장님이 메모에 적었다. 그 무늬는 이 저장소가 금지하는 표현이라 단색 면으로 두었다 —
-     실물에서는 그 자리에 그림이 들어간다. */
+/* ── 홈 — 결과물로 여는 첫 화면 (2026-09-08) ──────────────────────────────
+   ★ 순서가 곧 말이다: **결과물 → 도구 → 작동 원리.** 그전에는 "만드는 방식을 고르는"
+     도해 두 장이 첫 화면이었고(2026-08-28), 그 도해가 쓰던 스타일 뭉치를 여기서 걷었다:
+     .home-modes · .home-mode · .home-stage · .home-sealed · .home-out · .home-film ·
+     .home-facts · .home-pick · .home-down · .home-arw · .home-note · .home-models ·
+     .home-model. (그 뭉치의 유일한 소비자였던 --pick 토큰과, 새 도입부에 <strong> 이
+     없어 함께 죽은 `.home .lede strong` 도 걷었다 — 쓰는 자리가 없는 색·규칙은 다음
+     사람에게 거짓말을 한다.)
+   ★ .home-steps · .home-step 은 **이름만 살아남았다.** 뜻이 다르다 — 도해의 세 칸이던
+     것이 작동 원리 4단이 됐다. 옛 규칙을 남겨 두면 새 격자 위에 옛 flex 가 겹쳐
+     조용히 어긋난다(그래서 "안 쓰니 놔둔다"가 아니라 지운다).
+   ★ 띠는 --band 다. --deep 으로는 안 된다 — 그것은 밝은 벌 안에서 한 단계 가라앉은
+     칸이라, 그 위에 놓으면 "만든 것"이 화면에서 앞으로 나오지 않는다. */
 .home { max-width: 1100px; }
 .home .lede { font-size: 16px; color: var(--ink-soft); margin: 0 0 34px; max-width: 62ch; text-wrap: pretty; }
-.home .lede strong { color: var(--ink); font-weight: 600; }
 
-.home-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: stretch; }
-@media (max-width: 900px) { .home-modes { grid-template-columns: 1fr; } }
+/* 결과물 띠 — 어두운 면 위에 **표지 그림만** 늘어놓는다.
+   ★★ 여기에 <video> 를 두지 마라. 2026-09-07 에 보관함 목록이 영상을 물고 있어서
+      화면을 여는 것만으로 전송량 할당량이 탔고, Supabase 가 프로젝트를 402 로 막아
+      로그인까지 함께 죽었다. tests/home-sections-ui.test.js 가 그것을 잰다. */
+.home-band {
+  background: var(--band);
+  color: var(--band-ink);
+  border-radius: var(--r-card);
+  padding: var(--sp-5);
+  margin: var(--sp-5) 0;
+}
+/* ★★ 액센트를 쓰는 자리는 **`.home` 아래임을 선택자로 증명한다**(2026-09-08, Task 4).
+   앱층(작업 화면)에서 액센트는 "지금 몇 단계인가" 하나만 가리켜야 하고, 그것을
+   tests/design-system.test.js 의 "액센트는 진행 중 단계 표시에만 쓴다"가 잰다. 홈은
+   사이드바 스테퍼가 아예 없는 **보여 주는 화면**이라 경쟁할 상대가 없어서 면제인데,
+   그 면제를 이름 앞자리(`.home-…`)로 주면 **보관함 머리인 `.home-header` 까지** 딸려
+   나간다(그쪽은 이름만 같은 앱층 화면이다). 그래서 뿌리를 적어 범위를 증명한다 —
+   여섯 글자로 판이 이름이 아니라 자리를 보게 된다. 아래 .home-slug·.home-n 도 같다. */
+.home .home-band .eyebrow { color: var(--accent-fill); }
+.home-band h2 { color: var(--band-ink); font-size: 18px; font-weight: 700; margin: 0 0 var(--sp-4); }
+.home-reel { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-3); }
+.home-reel-item { display: block; text-decoration: none; }
+/* 그림이 아직 안 왔을 때도 칸이 무너지지 않게 --stage-dark 를 깔아 둔다 —
+   띠(--band)보다 더 어두운 면이라 "여기에 그림이 들어온다"가 읽힌다. */
+.home-reel-item img {
+  width: 100%; aspect-ratio: 9 / 16; object-fit: cover;
+  border-radius: var(--r-ctl); background: var(--stage-dark);
+}
+.home-reel-item span {
+  display: block; margin-top: var(--sp-2);
+  font-size: 12px; color: var(--band-soft);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
-.home-mode {
+/* 도구 격자 — 세 갈래를 같은 무게로 늘어놓는다(권장 배지를 안 단다:
+   무엇을 만드는지에 따라 답이 달라지는데 화면이 미리 고를 수는 없다). */
+.home-tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-4); }
+.home-tool {
+  display: flex; flex-direction: column; gap: var(--sp-2);
   background: var(--surface); border: 1px solid var(--line);
-  border-radius: var(--r-card); padding: 24px 26px 26px;
-  display: flex; flex-direction: column; gap: 20px;
+  border-radius: var(--r-card); padding: var(--sp-5);
+  color: inherit; text-decoration: none;
 }
-.home-mode h2 { font-size: 18px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
-.home-mode .head { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; }
-.home-mode .sub { font-size: 14px; color: var(--ink-soft); margin: 0; }
+.home-tool h2 { font-size: 18px; font-weight: 700; margin: 0; letter-spacing: -0.02em; }
+.home-tool p { margin: 0; font-size: 14px; color: var(--ink-soft); }
+.home .home-slug {
+  align-self: flex-start; font-size: 12px;
+  padding: var(--sp-1) var(--sp-2); border-radius: var(--r-ctl);
+  background: var(--accent-soft); color: var(--accent);
+}
+/* margin-top:auto 로 바닥에 붙인다 — 설명 줄 수가 달라도 세 카드의 마지막 줄이 맞는다. */
+.home-how { margin-top: auto; padding-top: var(--sp-3); font-size: 12px; color: var(--ink-soft); }
 
-/* 권장 — 고르라고 손짓하는 자리. 진행 표시(--accent)와 섞이지 않게 --pick 을 쓴다. */
-.home-pick {
-  font-size: 12px; font-weight: 600; color: var(--pick);
-  border: 1px solid var(--pick); border-radius: var(--r-pill);
-  padding: 1px 9px; white-space: nowrap;
-}
+/* 작동 원리 4단 — 세로줄로만 가른다(칸을 그리면 위 도구 격자와 경쟁한다). */
+.home-steps { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: var(--sp-5); border-top: 1px solid var(--line); }
+.home-step { padding: var(--sp-4) var(--sp-4) var(--sp-4) 0; border-right: 1px solid var(--line); }
+.home-step:last-child { border-right: 0; }
+.home .home-n { font-size: 12px; font-weight: 700; color: var(--accent); }
+.home-step h3 { margin: var(--sp-2) 0 var(--sp-1); font-size: 16px; font-weight: 700; }
+.home-step p { margin: 0; font-size: 14px; color: var(--ink-soft); }
 
-/* 도해 무대 — 두 카드가 같은 높이로 서야 구조가 견줘진다. */
-.home-stage {
-  background: var(--deep); border: 1px solid var(--line);
-  border-radius: var(--r-card); padding: 22px 18px; min-height: 250px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+@media (max-width: 900px) {
+  .home-reel, .home-steps { grid-template-columns: 1fr 1fr; }
+  .home-tools { grid-template-columns: 1fr; }
 }
-
-/* 원클릭 — 칸이 안에 있지만 덮여 있다. */
-/* ★ 안쪽 칸이 단계별과 **같은 폭**이어야 두 도해를 견줄 수 있다(2026-08-28 사장님 지적).
-   폭에서 빠지는 여백을 양쪽 56px 로 맞춘다:
-     단계별  gap 8×4 + 화살표 12×2          = 56
-     원클릭  테두리 1×2 + 안여백 15×2 + gap 12×2 = 56
-   칸은 둘 다 16:9 라 폭이 같으면 높이도 같아진다. */
-.home-sealed {
-  position: relative; width: 100%;
-  border: 1px solid var(--line); border-radius: var(--r-ctl);
-  /* ★ 아래 여백이 위보다 두껍다 — 단계별은 칸 밑에 라벨 두 줄(이름·행동)이 서는데
-     원클릭에는 그 줄이 없어(볼 수 없다는 뜻이다) 상자가 그만큼 짧았고, 그래서 아래
-     화살표와 필름의 높이가 어긋났다. 라벨 자리(12px 두 줄 + 사이 2px + 위 8px ≈ 49)
-     에서 위아래 여백 30 을 뺀 만큼을 아래에 더한다. */
-  background: var(--bg); padding: 15px 15px 32px;
-  display: flex; gap: 12px; overflow: hidden;
-}
-.home-sealed .pane { flex: 1; min-width: 0; aspect-ratio: 16 / 9; border-radius: var(--r-ctl); background: var(--surface2); opacity: .35; }
-.home-sealed .veil {
-  position: absolute; inset: 0 0 17px 0; display: grid; place-items: center;
-  background: rgba(16, 16, 16, .55);
-}
-.home-sealed .veil span {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px; color: var(--ink-soft); letter-spacing: 0.04em;
-}
-
-/* 단계별 — 같은 칸이 열려 있다. */
-.home-steps { display: flex; align-items: flex-start; gap: 8px; width: 100%; }
-.home-step { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-.home-step .pane {
-  min-width: 0; aspect-ratio: 16 / 9;
-  border: 1px solid var(--ink-soft); border-radius: var(--r-ctl); background: var(--surface2);
-}
-.home-step .cap { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.home-step .name { font-size: 12px; font-weight: 600; color: var(--ink); white-space: nowrap; }
-.home-step .act { font-size: 12px; color: var(--good); white-space: nowrap; }
-
-/* 화살표 — 가로(칸 사이) · 세로(결과로) */
-.home-arw {
-  flex: none; width: 12px; height: 1px; background: var(--line);
-  position: relative; margin-top: 26px;
-}
-.home-arw::after {
-  content: ""; position: absolute; right: -1px; top: -3.5px;
-  width: 0; height: 0; border-left: 5px solid var(--line);
-  border-top: 3.5px solid transparent; border-bottom: 3.5px solid transparent;
-}
-.home-down { width: 1px; height: 18px; background: var(--ink-soft); position: relative; }
-.home-down::after {
-  content: ""; position: absolute; left: -3.5px; bottom: -1px;
-  width: 0; height: 0; border-top: 5px solid var(--ink-soft);
-  border-left: 3.5px solid transparent; border-right: 3.5px solid transparent;
-}
-
-/* 결과 — 만드는 방식이 다르니 나오는 모양도 다르다. */
-.home-out { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
-.home-out .cap { font-size: 12px; color: var(--ink-soft); }
-.home-film { display: flex; width: 100%; height: 58px; border: 1px solid var(--ink-soft); border-radius: var(--r-ctl); overflow: hidden; }
-.home-film i { flex: 1; display: block; background: var(--surface2); }
-/* 이어 붙인 쪽은 칸 사이가 보인다 */
-.home-film.joined { border: 0; gap: 3px; }
-.home-film.joined i { border: 1px solid var(--ink-soft); border-radius: var(--r-ctl); }
-
-/* 사실 목록 */
-.home-facts { display: flex; flex-direction: column; gap: 7px; margin: 0; padding: 0; list-style: none; }
-.home-facts li { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; }
-.home-facts .no { color: var(--ink-soft); }
-.home-facts strong { color: var(--ink); font-weight: 600; }
-.home-facts .m { flex: none; width: 13px; height: 20px; position: relative; }
-.home-facts .m.ok::before {
-  content: ""; position: absolute; left: 2px; top: 6px; width: 4px; height: 8px;
-  border-right: 2px solid var(--good); border-bottom: 2px solid var(--good);
-  transform: rotate(42deg);
-}
-.home-facts .m.nope::before, .home-facts .m.nope::after {
-  content: ""; position: absolute; left: 1px; top: 9px;
-  width: 11px; height: 2px; background: var(--warn);
-}
-.home-facts .m.nope::before { transform: rotate(45deg); }
-.home-facts .m.nope::after { transform: rotate(-45deg); }
-
-/* 각주 — 어느 쪽을 권하는지 두 카드 아래에서 한 번 더 말한다. */
-.home-note {
-  margin-top: 14px; font-size: 12px; color: var(--ink-soft);
-  display: flex; gap: 6px; align-items: baseline;
-}
-.home-note b { color: var(--pick); font-weight: 600; }
-
-/* 모델 */
-.home-models { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-@media (max-width: 900px) { .home-models { grid-template-columns: 1fr; } }
-.home-model {
-  background: var(--surface); border: 1px solid var(--line);
-  border-radius: var(--r-card); padding: 16px 18px;
-  display: flex; align-items: baseline; gap: 12px;
-}
-.home-model .name { font-size: 16px; font-weight: 700; }
-.home-model .len {
-  font-size: 12px; color: var(--ink-soft);
-  border: 1px solid var(--line); border-radius: var(--r-pill);
-  padding: 2px 9px; font-variant-numeric: tabular-nums;
-}
-.home-model .why { font-size: 14px; color: var(--ink-soft); margin-left: auto; }
-.home-model .why strong { color: var(--ink); font-weight: 600; }
-
-/* ★ 두 카드의 실행 버튼을 **바닥에 붙인다**(2026-08-28 사장님 지적: "좌 우 버튼 사이즈
-   위치가 달라"). 카드 높이는 그리드가 맞춰 주는데(align-items:stretch) 글 길이가 달라
-   — 단계별의 "이미지에 맞추느라 …"가 두 줄이다 — 버튼만 아래위로 어긋났다.
-   ★ 폭도 같아진다: .home-mode 가 세로 flex 라 자식이 가로로 늘어난다(기본 stretch).
-   ★ 높이는 --ctl-md 그대로다 — 이 저장소는 버튼 치수를 3단으로 못 박았고, 새 치수를
-     만들면 그 규율이 무너진다(globals.css 의 버튼 치수 주석). */
-.home-mode .cta { margin-top: auto; align-self: stretch; }
 
 /* ── 전시층 ──────────────────────────────────────────────────────────────
    **보여 주는 화면에서만** 쓴다(home · 로그인 전). 작업 화면에 새면 판이 잡는다

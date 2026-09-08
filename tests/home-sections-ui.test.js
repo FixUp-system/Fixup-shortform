@@ -1,0 +1,61 @@
+// home 은 **결과물로 연다**(2026-09-08 사장님 확정). 그전에는 "만드는 방식 고르기"로 열었다.
+// 이 저장소의 화면 계약은 소스 문자열로 잰다 — 렌더 테스트 인프라가 없다.
+//
+// ★★ 그래서 이 파일의 단정은 **이름이 적혀 있는가**가 아니라 **코드가 그렇게 생겼는가**를
+//   잰다. 처음에는 `/thumbUrl/`·`/\/api\/projects/` 처럼 이름만 찾았는데, 실제로 호출을
+//   걷어내고 돌려 보니 **초록이었다** — 바로 위 주석이 그 이름을 말하고 있어서다
+//   (2026-09-08 변이 검증). 이 저장소는 규칙 위에 이유를 적는 문화라 그 배치가 흔하고,
+//   그러면 판이 조용히 "항상 참"이 된다. 주석을 걷어내고 재는 방법도 있지만, 그 제거기는
+//   `//   ★ …` 같은 줄에 취약하다는 것이 이미 실측돼 있다(components/ProjectCards.jsx
+//   머리말). 그래서 **주석에는 못 나오는 모양**을 직접 잰다.
+import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+
+const src = readFileSync("app/home/page.js", "utf8");
+
+describe("home 은 결과물로 연다", () => {
+  it("★ 최근 완성본을 불러온다", () => {
+    // 부르는 자리를 잰다 — 주소를 말만 하는 주석은 통과하면 안 된다.
+    expect(src, "목록을 안 부른다").toMatch(/fetch\(\s*["'`]\/api\/projects/);
+  });
+
+  it("★★ 목록에서 영상을 물지 않는다 — 표지 그림만 그린다", () => {
+    // 2026-09-07 전송량 사고: 목록이 <video> 를 물면 그것만으로 할당량이 탄다.
+    //
+    // ★ 이 단정만 **날 것 그대로** 잰다(주석까지 센다). 여기서는 주석이 판을 더 엄하게
+    //   만든다 — 그 태그 이름이 소스에 적혀 있다는 것 자체가 돌아오는 길목이라,
+    //   아예 안 적는 편이 낫다(테마 분기를 세는 판과 같은 규율). 그래서 app/home/page.js
+    //   의 주석은 "영상 태그"라고만 쓰고 꺾쇠를 붙이지 않는다.
+    expect(src, "<video> 가 목록에 있다").not.toMatch(/<video/);
+    // 표지 그림이 **실제로** 작은 판을 지나는지 본다. `/thumbUrl/` 로만 재면 호출을
+    // 걷어내도 주석 한 줄이 단정을 통과시킨다(실측).
+    expect(src, "표지 그림이 thumbUrl 을 안 지난다").toMatch(/src=\{thumbUrl\(/);
+    expect(src, "thumbUrl 을 안 가져온다").toMatch(/import\s*\{[^}]*\bthumbUrl\b[^}]*\}\s*from/);
+  });
+
+  it("★ 완성본이 없으면 결과물 띠를 감춘다 — 빈 격자를 보이지 않는다", () => {
+    // 조건이 **그 띠를** 가리는지까지 본다. 어딘가에 `.length > 0` 이 있기만 하면
+    // 통과하는 단정은 띠가 무조건 그려져도 초록이다.
+    expect(src, "완성본이 없어도 띠를 그린다").toMatch(
+      /length\s*>\s*0\s*&&\s*\(?\s*<div className="home-band"/
+    );
+  });
+
+  it("★ 도구 격자가 세 갈래를 모두 연다", () => {
+    // 표(TOOLS)의 path 칸을 잰다 — 주석에 적힌 주소로는 못 지난다.
+    // ★ `/ads`·`/reel` 에는 화면이 없다(app/ads/new · app/reel/new 만 있다). 그래서
+    //   뿌리로 시작하는지만 보고 끝까지 못 박지 않는다 — 못 박으면 문이 옮겨갈 때마다
+    //   이 판이 화면과 함께 두 벌로 갈린다.
+    for (const path of ["/ads", "/create", "/reel"]) {
+      expect(src, `${path} 로 가는 길이 없다`).toMatch(
+        new RegExp(`path:\\s*"${path}`)
+      );
+    }
+    // 표를 만들어 놓고 안 쓰면 아무 데도 못 간다.
+    expect(src, "표의 path 를 링크에 안 건다").toMatch(/href=\{t\.path\}/);
+  });
+
+  it("★ 전시층은 여기서만 쓴다", () => {
+    expect(src, "display 제목이 없다").toMatch(/className="display"|class="display"/);
+  });
+});

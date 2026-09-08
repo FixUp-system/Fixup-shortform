@@ -68,7 +68,24 @@ function cssRules() {
     const parts = selector.split(",").map((s) => s.trim()).filter(Boolean);
     const display = parts.length > 0 && parts.every((s) => /\.display(?![\w-])/.test(s));
 
-    rules.push({ selector, body: m[2], display });
+    // ★★ 2026-09-08(Task 4) — 면제가 **둘**이 됐다. 액센트만 범위가 다르기 때문이다.
+    //   · display — 전시층 글자(크기·굵기). 액센트도 여기 포함된다(`.display em`).
+    //   · showcase — **보여 주는 화면 전체**(home). 액센트 판만 이것을 본다.
+    //
+    //   왜 하나로 안 묶나. 홈도 글자 크기·굵기는 앱층 규율(12·14·16·18·30 / 400·600·700)을
+    //   그대로 지켜야 한다 — 묶으면 홈이 그 그물에서 통째로 빠져 30px·900 짜리 카드 제목이
+    //   조용히 통과한다. 반대로 액센트는 홈에서 자유롭다: 그 화면에는 사이드바 스테퍼가
+    //   없어 "지금 몇 단계인가"와 경쟁할 상대가 아예 없다.
+    //
+    //   ★ 판정은 **이름이 아니라 자리**로 한다. `^\.home-` 로 재면 보관함 머리인
+    //     `.home-header` 까지 면제된다 — 이름만 같은 **앱층** 화면이라 거기서 액센트가
+    //     새면 잡아야 한다. 그래서 `.home` 뿌리 아래임을 요구한다(`.home` 뒤가 낱말
+    //     문자나 하이픈이면 안 된다). CSS 쪽이 그 뿌리를 실제로 적는다.
+    const showcase =
+      display ||
+      (parts.length > 0 && parts.every((s) => /^\.home(?![\w-])/.test(s)));
+
+    rules.push({ selector, body: m[2], display, showcase });
   }
   return rules;
 }
@@ -191,9 +208,13 @@ describe("주 실행 버튼", () => {
     //   그 자리(home · 로그인 전)에는 사이드바 스테퍼가 아예 없어서 "지금 몇 단계인가"와
     //   경쟁할 상대가 없다 — 앱층 안에서 가장 강한 색이 하나뿐이라는 성질은 그대로다.
     //   면제 판정은 cssRules() 하나가 한다(옛 굵기 판·옛 크기 판과 같은 정의를 본다).
+    // ★★ 2026-09-08(Task 4) — 그 면제를 **화면 단위**로 넓혔다(showcase). 홈이 결과물로
+    //   열리며 액센트를 쓰는 자리가 셋 늘었다: 띠의 눈썹(--accent-fill) · 도구 카드의
+    //   경로 칩 · 작동 원리의 번호. 셋 다 전시층 **글자**가 아니라 전시 **화면의 부속**이라
+    //   `.display` 면제로는 못 지난다. 크기·굵기 판은 여전히 홈을 잰다(cssRules 주석 참고).
     const users = [];
-    for (const { selector, body, display } of cssRules()) {
-      if (display) continue;
+    for (const { selector, body, showcase } of cssRules()) {
+      if (showcase) continue;
       if (/var\(--accent/.test(body)) users.push(selector);
     }
     // 화면에서 가장 강한 색은 사장님이 가장 알아야 할 것 — 지금 몇 단계인가 — 을 가리킨다.
