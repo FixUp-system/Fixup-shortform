@@ -25,33 +25,18 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    // ★★★ 2026-09-01 — **밝은 테마에서 화면이 깨졌다**(사장님 지적, 로컬 실측).
-    //   아래 <head> 스크립트가 리액트가 붙기 **전에** `data-theme="light"` 를 여기에 찍는데,
-    //   서버 HTML 에는 없던 속성이라 hydration 이 불일치로 본다 — 개발에서는 오버레이가
-    //   화면을 통째로 덮고, 운영에서는 조용히 루트부터 다시 그린다.
-    //   ★ 스크립트를 없애면 번쩍임이 돌아온다(그 스크립트가 있는 이유). 그래서 고칠 곳은
-    //     스크립트가 아니라 **단정하는 쪽**이고, 리액트가 그 자리를 위해 둔 것이 이 속성이다.
+    // ★ 2026-09-08 — 벌이 하나(밝은 벌)로 합쳐지면서 테마를 먼저 칠하던 <head> 인라인
+    //   스크립트를 걷어냈다. 고를 것이 없으니 첫 칠 전에 정할 것도 없다.
+    //   ★ `suppressHydrationWarning` 은 **남긴다.** 그 스크립트가 리액트보다 먼저 루트 요소에
+    //     속성을 찍어 hydration 불일치를 냈던 것이 원래 이유였는데(2026-09-01 사장님 지적:
+    //     개발에서는 오버레이가 화면을 덮고, 운영에서는 조용히 루트부터 다시 그린다),
+    //     확장 프로그램도 같은 자리에 속성을 찍어 같은 증상을 낸다.
     //   ★ 범위는 **이 요소의 속성 한 겹**뿐이다 — 아래 트리의 hydration 검사는 그대로 산다.
     <html
       lang="ko"
       className={`${GeistSans.variable} ${pretendard.variable}`}
       suppressHydrationWarning
     >
-      <head>
-        {/* ★★ 테마는 **첫 칠 전에** 정해져야 한다(2026-08-18). 리액트가 붙은 뒤에 칠하면
-            밝은 화면을 고른 사장님이 새로고침마다 어두운 화면을 한 번 보고 지나간다 —
-            그 번쩍임은 버그로 읽힌다. 그 일을 할 수 있는 것은 <head> 의 인라인 스크립트뿐이다.
-            ★ 기본은 어둡다: 저장된 값이 없으면 아무것도 안 찍는다(:root 가 그대로 선다).
-            ★ try/catch — 사생활 보호 모드에서는 localStorage 접근 자체가 던진다. 테마를
-              못 읽었다고 화면이 안 뜨면 안 된다. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html:
-              "try{var t=localStorage.getItem('shortform-theme');" +
-              "if(t==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}",
-          }}
-        />
-      </head>
       <body>
         {/* BETA 배너·사이드바는 AppShell이 화면(경로)에 따라 그린다 — 로그인/대기 화면은
             단독 화면이다(components/AppShell.jsx) */}

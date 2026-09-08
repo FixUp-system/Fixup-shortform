@@ -106,8 +106,10 @@ describe("선택 범위가 눈에 보인다", () => {
     expect(css).toMatch(/::selection\s*\{[^}]*background:\s*var\(--sel\)/);
   });
 
-  it("★★ --sel 이 **두 테마 모두** 정의돼 있다 — 한쪽만 있으면 다른 테마에서 안 보인다", () => {
+  // ★ 2026-09-08 — 벌이 하나(밝은 벌)가 되면서 "두 테마 모두"는 잴 수 없어졌다. 지키려던
+  //   것은 그대로다: ::selection 이 참조하는 토큰이 **실제로 정의돼 있어야** 고른 글이 보인다.
+  it("★★ --sel 이 :root 에 정의돼 있다 — 없으면 고른 글이 안 보인다", () => {
     const hits = css.match(/--sel:\s*[^;]+;/g) || [];
-    expect(hits.length, `--sel 정의가 ${hits.length}개다`).toBeGreaterThanOrEqual(2);
+    expect(hits.length, `--sel 정의가 ${hits.length}개다 — :root 한 곳이어야 한다`).toBe(1);
   });
 });

@@ -24,8 +24,9 @@ function readAll() {
 }
 
 // :root 안은 토큰을 정의하는 곳이라 hex가 있어야 한다. 그 블록만 도려낸다.
-// ★ 2026-08-18 — 토큰을 정의하는 블록이 **둘**이 됐다. 밝은 팔레트가 `:root[data-theme="light"]`
-//   에서 같은 이름들을 덮어쓴다(고른 사람만 본다). 그 블록도 정의 자리이므로 함께 도려낸다 —
+// ★ 2026-09-08 — 정의 블록은 다시 **하나**다(밝은 벌 한 벌). 2026-08-18 에 밝은 팔레트가
+//   `:root[data-theme="light"]` 로 덮어쓰던 시절 정의 블록이 둘이었고, 아래 정규식의
+//   `(\[[^\]]*\])?` 가 그 흔적이다 — 속성 선택자가 붙은 :root 도 함께 도려낸다.
 //   안 도려내면 "토큰으로만 색을 쓴다"는 이 규칙이 **정의 자체를 위반으로 잡는다**.
 // 주석도 함께 지운다 — 주석 안의 설명이 검사에 걸리면 안 되고,
 // 선택자 추출 검사에서 주석이 선택자에 섞이는 것도 막는다.
@@ -55,18 +56,21 @@ describe("색", () => {
   it("토큰이 스펙 값과 같다", () => {
     const css = readFileSync("app/globals.css", "utf8");
     const expected = {
-      "--bg": "#1A1A1A",
-      "--surface": "#232323",
-      "--surface2": "#2E2E2E",
-      "--deep": "#101010",
-      "--line": "#3A3A3A",
-      "--ink": "#F5F5F5",
-      "--ink-soft": "#A0A0A0",
-      "--accent": "#FF58AE",
-      "--btn": "#F5F5F5",
-      "--btn-ink": "#1A1A1A",
-      "--good": "#57B383",
-      "--warn": "#E5B93C",
+      "--bg": "#F5F4ED",
+      "--surface": "#FFFFFF",
+      "--surface2": "#FAF9F5",
+      "--deep": "#EFEDE4",
+      "--line": "#E8E6DC",
+      "--ink": "#141413",
+      "--ink-soft": "#5E5D59",
+      "--accent": "#B0446A",
+      "--btn": "#B0446A",
+      "--btn-ink": "#FFFFFF",
+      "--good": "#0E7C57",
+      "--warn": "#9A6400",
+      "--band": "#1C1B19",
+      "--band-ink": "#ECEAE2",
+      "--accent-fill": "#C96A8A",
     };
     for (const [name, value] of Object.entries(expected)) {
       expect(css, `${name} 토큰`).toMatch(

@@ -16,7 +16,6 @@
 import { usePathname } from "next/navigation";
 import Sidebar from "./Sidebar";
 import UserMenu from "./UserMenu";
-import ThemeToggle from "./ThemeToggle";
 // BARE_PATHS(사이드바 경계)의 유일한 출처. middleware.js의 PUBLIC_PATHS(로그인 경계)와
 // 다른 목록이다 — "/pending"은 로그인은 필요하지만 사이드바는 없어야 한다. 왜 둘로
 // 나뉘는지, 왜 합치면 안 되는지는 lib/auth/paths.js 주석 참고.
@@ -44,8 +43,6 @@ export default function AppShell({ children }) {
           <b>BETA</b> 시험 서비스 — 대본부터 완성까지 자동으로 만듭니다
         </span>
         <span className="belt-side belt-right">
-          {/* 화면 밝기 — 계정 메뉴 옆이다. 어느 화면에서든 같은 자리에 있어야 찾는다. */}
-          <ThemeToggle />
           <UserMenu />
         </span>
       </div>

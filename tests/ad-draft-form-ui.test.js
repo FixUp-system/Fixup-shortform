@@ -120,19 +120,19 @@ describe("칩 안의 [관리자] 표시", () => {
 //
 // ★ 개발에서는 오버레이가 덮고, 운영에서는 조용히 루트부터 다시 그린다 — 둘 다
 //   "UI 가 깨진다" 로 보인다. 어두운 테마에서는 스크립트가 아무것도 안 찍어서 안 난다.
-describe("테마를 먼저 칠하는 스크립트와 hydration", () => {
+//
+// ★★ 2026-09-08 — 벌이 하나(밝은 벌)로 합쳐지면서 **그 스크립트를 걷어냈다.** 고를 것이
+//   없으니 첫 칠 전에 정할 것도 없고, 번쩍임도 돌아오지 않는다. 그래서 "스크립트가 그대로
+//   있다"를 재던 단정은 지웠다. 남은 것은 `suppressHydrationWarning` 하나다 — 확장
+//   프로그램도 <html> 에 속성을 찍어 같은 증상을 낸다.
+describe("<html> 의 속성 불일치 삼키기", () => {
   const layout = readFileSync("app/layout.js", "utf8");
 
-  it("★★★ <html> 이 속성 불일치를 삼킨다 — 없으면 밝은 테마에서 오버레이가 뜬다", () => {
+  it("★★★ <html> 이 속성 불일치를 삼킨다 — 없으면 확장 프로그램이 찍은 속성에 오버레이가 뜬다", () => {
     const at = layout.indexOf("<html");
     expect(at, "<html> 이 없다 — 이 판이 낡았다").toBeGreaterThan(-1);
     expect(layout.slice(at, at + 260), "suppressHydrationWarning 이 없다")
       .toMatch(/suppressHydrationWarning/);
-  });
-
-  it("★★ 먼저 칠하는 스크립트는 **그대로 있다** — 지우면 번쩍임이 돌아온다", () => {
-    expect(layout).toMatch(/shortform-theme/);
-    expect(layout).toMatch(/setAttribute\('data-theme','light'\)/);
   });
 });
 
