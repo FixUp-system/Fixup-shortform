@@ -49,6 +49,12 @@
 }
 
 :root {
+  /* ★ 브라우저가 **직접 그리는 것**들에게도 벌을 알린다 — 달력 팝업 · <select> 목록 ·
+     스크롤바 · 기본 포커스 링. 이 한 줄이 없으면 OS 를 다크로 쓰는 사장님에게만 그 위젯들이
+     어둡게 뜬다(화면은 밝은데 달력만 검다). 옛 기본이 어두웠을 때는 그 어긋남이 오히려
+     맞았고, 벌이 뒤집히며 어긋났다. 색이 아니라 **벌의 선언**이라 토큰이 아니다. */
+  color-scheme: light;
+
   --bg: #F5F4ED;
   --surface: #FFFFFF;
   --surface2: #FAF9F5;
@@ -667,7 +673,8 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
   cursor: pointer;
   flex: none;
 }
-.chat-input button:hover { background: var(--ink); }
+/* hover 는 `.cta` 와 **같은 방식**이다 — 같은 로즈를 어둡게만 한다(그쪽 주석에 이유가 있다) */
+.chat-input button:hover { filter: brightness(0.92); }
 .chat-input button:disabled { opacity: 0.4; cursor: default; }
 
 /* ── 생성 중 스피너 / 결과 */
@@ -817,7 +824,11 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
   padding: 9px 16px;
   font-size: 14px;
 }
-.mini.confirm-btn:hover { background: var(--ink); color: var(--btn-ink); }
+/* hover 는 `.cta` 와 **같은 방식**이다 — 같은 로즈를 어둡게만 한다(그쪽 주석에 이유가 있다).
+   ★ 여기만 테두리가 있다. 옛 줄은 바탕만 `--ink` 로 덮고 `border-color: var(--btn)` 은
+     그대로 둬서 **검정 면에 로즈 테두리**가 남았다. filter 는 면과 테두리를 함께 어둡게 해
+     그 어긋남이 애초에 생기지 않는다. */
+.mini.confirm-btn:hover { filter: brightness(0.92); }
 .mini.confirm-btn:disabled { opacity: 0.4; cursor: default; }
 
 /* ── 사이드바 링크 공통 (a 태그) */
@@ -873,8 +884,6 @@ a.side-item { text-decoration: none; }
   border: 1px solid var(--line);
   background: var(--surface);
 }
-/* 달력 아이콘이 어두운 바탕에서 안 보인다 — 밝게 뒤집는다. */
-.cost-filters input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.7); cursor: pointer; }
 .cost-filter-q { min-width: 200px; }
 /* 고르기 칸은 이 줄에서만 좁게 — 기본 폭(--ctl-w 234px)은 이 줄에 과하다. */
 .cost-filter-pick { width: 160px; }
@@ -1355,7 +1364,10 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
 .dlg-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
 .dlg-actions .mini { height: var(--ctl-lg); padding: 0 18px; font-size: 14px; }
 
-/* 주 실행 버튼 — 한 화면에 하나. 바탕의 반대색이라 화면에서 유일하게 가장 밝다. */
+/* 주 실행 버튼 — 한 화면에 하나. **액센트(로즈)를 채운다.**
+   ★ 옛 규칙은 "바탕의 반대색이라 화면에서 유일하게 가장 밝다"였다. 그것은 바탕이 어두울
+     때의 말이고, 밝은 벌에서 그대로 따르면 **검은 버튼**이 되어 크레딧 자리(로즈)와 다른
+     가족으로 읽힌다(스펙 §2-1 이 일부러 버린 모양이다). 흰 글자 위 로즈가 5.4:1 이다. */
 .cta {
   display: inline-flex;
   align-items: center;
@@ -1373,11 +1385,21 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
   cursor: pointer;
   margin-top: 20px;
 }
-.cta:hover { background: var(--ink); }
+/* ★★ hover 는 **색을 바꾸지 않는다 — 같은 로즈를 어둡게만 한다.**
+   옛 줄은 `background: var(--ink)` 였다. 어두운 벌에서는 `--btn` 과 `--ink` 가 같은 값
+   (#F5F5F5)이라 그 줄이 **아무 일도 안 했고**, 벌이 뒤집히며 살아나 주버튼이 마우스만
+   올려도 거의 검정이 됐다 — 위 머리 주석이 버린 바로 그 모양이다.
+   새 색을 만들 자리가 아니다(색은 사장님이 확정한 값이다). 눌리는 느낌만 남기면 된다.
+   ⚠️ 돈이 나가는 버튼 **셋이 같은 방식**이어야 한다 — 여기 · `.chat-input button` ·
+      `.mini.confirm-btn`. 제각각이면 같은 성격의 버튼이 화면마다 다르게 반응한다. */
+.cta:hover { filter: brightness(0.92); }
 .cta:disabled { opacity: 0.4; cursor: default; }
-/* 버튼 안 크레딧 — 얼마 나가는지를 누르는 자리에서 말한다 */
+/* 버튼 안 크레딧 — 얼마 나가는지를 누르는 자리에서 말한다.
+   ★ 로즈 버튼 **안**이라 흰 글자 아래 살짝 어두운 판이어야 한다. 옛 값
+     `rgba(26,26,26,.12)` 는 폐지된 어두운 벌의 `--bg`(#1A1A1A)를 리터럴로 베낀 것이라
+     지금은 아무 토큰도 안 가리켰다 — 잉크를 12% 섞어 토큰에 도로 묶는다. */
 .cta .cr {
-  background: rgba(26, 26, 26, 0.12);
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
   border-radius: var(--r-ctl);
   padding: 1px 8px;
   font-size: 12px;
@@ -2646,7 +2668,11 @@ h1.login-head { margin-inline: auto; }
 
 /* 작동 원리 4단 — 세로줄로만 가른다(칸을 그리면 위 도구 격자와 경쟁한다). */
 .home-steps { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: var(--sp-5); border-top: 1px solid var(--line); }
-.home-step { padding: var(--sp-4) var(--sp-4) var(--sp-4) 0; border-right: 1px solid var(--line); }
+/* ★ 사방에 여백을 준다. 왼쪽을 0 으로 두었더니 02·03·04 의 글이 **앞 칸 세로줄에 딱
+   붙었다**(2026-09-08 화면 실측). 첫 칸만 예외로 0 이다 — 그 칸은 격자 왼쪽 끝에
+   맞아야 위 도구 격자와 같은 축에 선다. */
+.home-step { padding: var(--sp-4); border-right: 1px solid var(--line); }
+.home-step:first-child { padding-left: 0; }
 .home-step:last-child { border-right: 0; }
 .home .home-n { font-size: 12px; font-weight: 700; color: var(--accent); }
 .home-step h3 { margin: var(--sp-2) 0 var(--sp-1); font-size: 16px; font-weight: 700; }
@@ -2655,6 +2681,11 @@ h1.login-head { margin-inline: auto; }
 @media (max-width: 900px) {
   .home-reel, .home-steps { grid-template-columns: 1fr 1fr; }
   .home-tools { grid-template-columns: 1fr; }
+  /* ★ 두 열이 되면 세로줄의 짝이 달라진다. `:last-child` 만 지우면 **2번 칸의 오른쪽 선이
+     격자 오른쪽 끝에 홀로** 남아 칸을 가르지 않고 화면을 가른다. 줄은 언제나 열 사이에만. */
+  .home-step:nth-child(2n) { border-right: 0; }
+  /* 왼쪽 열은 1·3 이다 — 첫 칸만 0 으로 두면 3번만 들여써져 왼쪽 축이 둘이 된다. */
+  .home-step:nth-child(2n+1) { padding-left: 0; }
 }
 
 /* ── 전시층 ──────────────────────────────────────────────────────────────
