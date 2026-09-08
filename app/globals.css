@@ -1,6 +1,7 @@
 /* shortform 디자인 토큰 — MCS 와 같은 디자인 언어(밝은 벌 한 벌, 2026-09-08)
    규칙: 색은 반드시 토큰으로 참조한다(:root 밖 hex 금지) · 모서리 3단 ·
    굵기 400/600/700 · 크기 12/14/16/18/30 · 그라디언트 없음 ·
+   ★ 그 굵기·크기는 **앱층**(작업 화면)의 것이다. 전시층 `.display`(파일 끝)만 예외다 ·
    주 실행 버튼은 액센트를 채운다(밝은 바탕에서 "바탕의 반대색"은 검정 버튼이 된다) */
 /* ── 자막 폰트 — ⑥완성의 자막 미리보기가 쓴다.
    ★ font-family 이름은 lib/subtitles.js 의 SUBTITLE_FONTS[].**cssFamily** 와 글자 그대로 같다
@@ -131,8 +132,12 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  /* 라틴·숫자는 Geist, 한글은 Pretendard가 받는다 (app/layout.js에서 주입) */
-  font-family: var(--font-geist-sans), var(--font-pretendard), system-ui, sans-serif;
+  /* 한 벌이다 — MCS 와 같은 서체를 쓴다(숫자까지). 라틴 서체를 따로 받던 벌은 2026-09-08 에
+     걷었다(app/layout.js 에서 주입).
+     ★ 여기 이름을 "Pretendard" 로 줄이면 안 된다 — 파일 위 @font-face 의 "Pretendard Subtitle"
+       과 한 가족이 되어, 이기는 쪽이 빌드 순서에 달리고 뒤집히면 전 화면이 1.5MB 자막 OTF 를
+       받는다. 그래서 UI 서체는 next/font 가 내는 **변수**로만 부른다. */
+  font-family: var(--font-pretendard), "Apple SD Gothic Neo", system-ui, sans-serif;
   line-height: 1.6;
   font-size: 16px;
 }
@@ -198,7 +203,7 @@ main.work {
   flex-direction: column;
   justify-content: center;
 }
-h1.pgtitle { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 4px; }
+h1.pgtitle { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 4px; }
 .pgsub { color: var(--ink-soft); font-size: 14px; margin: 0 0 18px; }
 /* 경고 문구 — 실패·주의를 말하는 한 줄.
    .badge.warn 은 배경까지 갖는 별개 규칙이고 구체성이 높아 이 규칙에 지지 않는다. */
@@ -831,7 +836,7 @@ a.side-item { text-decoration: none; }
 }
 .cost-tile small { color: var(--ink-soft); font-size: 12px; display: block; }
 .cost-tile b {
-  font-size: 28px;
+  font-size: 30px;
   font-weight: 700;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
@@ -2723,3 +2728,17 @@ h1.login-head { margin-inline: auto; }
    ★ 높이는 --ctl-md 그대로다 — 이 저장소는 버튼 치수를 3단으로 못 박았고, 새 치수를
      만들면 그 규율이 무너진다(globals.css 의 버튼 치수 주석). */
 .home-mode .cta { margin-top: auto; align-self: stretch; }
+
+/* ── 전시층 ──────────────────────────────────────────────────────────────
+   **보여 주는 화면에서만** 쓴다(home · 로그인 전). 작업 화면에 새면 판이 잡는다
+   (tests/design-system.test.js 의 "전시층 글자는 .display 안에서만 쓴다").
+   근거: MCS 실측 — 68px·900·자간 −3.06px 짜리 제목은 랜딩에만 있고 작업 화면은 30px·700 이다. */
+.display {
+  font-size: clamp(38px, 6vw, 62px);
+  font-weight: 900;
+  line-height: 1.06;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+  margin: 0 0 20px;
+}
+.display em { font-style: normal; color: var(--accent); }

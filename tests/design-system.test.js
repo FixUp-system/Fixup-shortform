@@ -36,6 +36,43 @@ function cssWithoutRoot() {
     .replace(/:root(\[[^\]]*\])?\s*\{[^}]*\}/g, "");
 }
 
+// ── 규칙 블록 자르기 + 전시층(.display) 면제 판정 — **한 자리에서만** ──────────────
+// 2026-09-08. 글자가 두 층이 되면서(앱층 = 작업 화면 · 전시층 = 보여 주는 화면) 같은
+// 면제 판정을 보는 자리가 넷이 됐다: 전시층 굵기 판 · 옛 굵기 판 · 옛 크기 판 · 액센트 판.
+// 네 벌로 적으면 언젠가 갈리고, 갈리는 쪽은 대개 **느슨한 쪽**이라 그물이 조용히 뚫린다.
+//
+// ★ cssWithoutRoot() 로 재는 것이 핵심이다(주석이 지워진 본문). 날 것에서 재면 규칙
+//   **바로 위 주석**이 선택자로 딸려 들어와, 그 주석이 ".display" 를 언급하기만 해도
+//   아래 면제 조건을 통과한다. 이 저장소는 규칙 위에 이유를 적는 문화라 그 배치가
+//   흔하다 — 실제로 `/* 전시층(.display)은 ... */` 한 줄을 위에 붙이자 900 짜리 위반이
+//   그대로 통과했다(2026-09-08 실측). 그러면 "항상 참"인 빈 그물이 된다.
+function cssRules() {
+  const css = cssWithoutRoot()
+    // @media·@supports 껍데기를 벗긴다. 안 벗기면 그 안의 첫 규칙이 껍데기 이름
+    // ("@media (max-width: 560px)")을 선택자로 달고 나와, 전시층을 반응형으로 조정하는
+    // 순간 이 판이 애먼 곳에서 빨개진다.
+    .replace(/@(media|supports)[^{]*\{/g, "");
+
+  const rules = [];
+  for (const m of css.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+    const selector = m[1].trim();
+
+    // 면제는 **조각마다** 따진다. 쉼표 목록을 통째로 보면 `h1, .display { … }` 에서
+    // .display 하나가 h1 까지 데리고 빠져나간다 — 작업 화면의 h1 이 굵어지는 그 사고를
+    // 이 판이 막으려고 있는 것이다.
+    // 그리고 `.display` 는 **클래스 이름 그대로**여야 한다. 부분 문자열로 보면
+    // `.displayed`·`.display-none` 처럼 전시층과 아무 상관없는 이름이 면제된다.
+    // (`.display-xl` 같은 전시층 **변종**도 여기서는 막힌다. 그것은 실수가 아니라 결정이다 —
+    //  스펙이 못 박은 것은 ".display 안에서만"이고, 변종이 필요해지면 이 판을 고쳐
+    //  **의도적으로** 여는 편이 낫다. 그 비용을 감수한다.)
+    const parts = selector.split(",").map((s) => s.trim()).filter(Boolean);
+    const display = parts.length > 0 && parts.every((s) => /\.display(?![\w-])/.test(s));
+
+    rules.push({ selector, body: m[2], display });
+  }
+  return rules;
+}
+
 describe("색", () => {
   it(":root 밖에는 hex 색 리터럴이 없다", () => {
     const offenders = [];
@@ -150,10 +187,14 @@ describe("주 실행 버튼", () => {
   });
 
   it("액센트는 진행 중 단계 표시에만 쓴다", () => {
+    // ★ 2026-09-08(Task 3) — **앱층에서만** 그렇다. 전시층(`.display em`)은 액센트를 쓴다.
+    //   그 자리(home · 로그인 전)에는 사이드바 스테퍼가 아예 없어서 "지금 몇 단계인가"와
+    //   경쟁할 상대가 없다 — 앱층 안에서 가장 강한 색이 하나뿐이라는 성질은 그대로다.
+    //   면제 판정은 cssRules() 하나가 한다(옛 굵기 판·옛 크기 판과 같은 정의를 본다).
     const users = [];
-    for (const m of cssWithoutRoot().matchAll(/([^{}]+)\{([^}]*)\}/g)) {
-      const [, selector, body] = m;
-      if (/var\(--accent/.test(body)) users.push(selector.trim());
+    for (const { selector, body, display } of cssRules()) {
+      if (display) continue;
+      if (/var\(--accent/.test(body)) users.push(selector);
     }
     // 화면에서 가장 강한 색은 사장님이 가장 알아야 할 것 — 지금 몇 단계인가 — 을 가리킨다.
     expect(users.length, "액센트를 쓰는 자리가 하나도 없다").toBeGreaterThan(0);
@@ -161,23 +202,33 @@ describe("주 실행 버튼", () => {
   });
 });
 
+// ★ 2026-09-08 — 아래 두 판은 이제 **앱층**(작업 화면)만 잰다. 전시층(`.display`)은
+//   cssRules() 의 면제를 타고 빠져나가고, 그쪽 굵기는 "전시층 글자는 .display 안에서만
+//   쓴다"가 따로 잰다. 두 층을 한 목록으로 묶으면 둘 중 하나가 반드시 거짓말이 된다 —
+//   앱층에 62px·900 을 허락하거나, 전시층을 30px·700 으로 눌러 표지가 표지가 아니게 되거나.
 describe("타이포", () => {
   it("font-weight는 400 · 600 · 700만 쓴다", () => {
     const ALLOWED = ["400", "600", "700", "inherit", "normal"];
     const offenders = [];
-    for (const m of cssWithoutRoot().matchAll(/font-weight:\s*([^;]+);/g)) {
-      const v = m[1].trim();
-      if (!ALLOWED.includes(v)) offenders.push(v);
+    for (const { display, body } of cssRules()) {
+      if (display) continue;
+      for (const m of body.matchAll(/font-weight:\s*([^;]+);?/g)) {
+        const v = m[1].trim();
+        if (!ALLOWED.includes(v)) offenders.push(v);
+      }
     }
     expect(offenders).toEqual([]);
   });
 
-  it("font-size는 12 · 14 · 16 · 18 · 28px만 쓴다", () => {
-    const ALLOWED = ["12px", "14px", "16px", "18px", "28px", "inherit"];
+  it("font-size는 12 · 14 · 16 · 18 · 30px만 쓴다", () => {
+    const ALLOWED = ["12px", "14px", "16px", "18px", "30px", "inherit"];
     const offenders = [];
-    for (const m of cssWithoutRoot().matchAll(/font-size:\s*([^;]+);/g)) {
-      const v = m[1].trim();
-      if (!ALLOWED.includes(v)) offenders.push(v);
+    for (const { display, body } of cssRules()) {
+      if (display) continue;
+      for (const m of body.matchAll(/font-size:\s*([^;]+);?/g)) {
+        const v = m[1].trim();
+        if (!ALLOWED.includes(v)) offenders.push(v);
+      }
     }
     expect(offenders).toEqual([]);
   });
@@ -228,17 +279,53 @@ describe("글리프", () => {
   });
 });
 
+// ★★ 2026-09-08(Task 3) — **서체는 한 벌이다.** 라틴·숫자를 Geist 가, 한글을 Pretendard 가
+//   받던 두 벌 구성을 걷었다. 숫자가 다른 서체로 그려지면(원가 타일·크레딧·초 표시가 전부
+//   숫자다) 같은 화면 안에서 인상이 갈리고, MCS 와 "같은 디자인 언어"가 숫자에서 깨진다.
 describe("서체", () => {
   it("layout.js 가 폰트를 실제로 주입한다", () => {
     const layout = readFileSync("app/layout.js", "utf8");
-    expect(layout).toMatch(/from ["']geist\/font\/sans["']/);
     expect(layout).toMatch(/from ["']next\/font\/local["']/);
   });
 
   it("body 는 주입된 폰트 변수를 쓴다", () => {
     const css = readFileSync("app/globals.css", "utf8");
-    expect(css).toMatch(/var\(--font-geist-sans\)/);
     expect(css).toMatch(/var\(--font-pretendard\)/);
+  });
+
+  it("★ 라틴 서체를 다시 끌어오지 않는다 — 지웠다고 믿지 말고 센다", () => {
+    // 왜 걷었는지는 **주석으로 남긴다**(globals.css 의 body · layout.js 머리). 그래서 이 판은
+    // 산문이 아니라 **실제로 서체를 붙이는 것**만 본다 — import 문 · 변수 이름 · 주입 식별자.
+    // 주석 속 단어 하나까지 빨개지게 만들면 다음 사람이 이유를 지우는 쪽으로 고친다.
+    const layout = readFileSync("app/layout.js", "utf8");
+    expect(layout, "layout.js 가 라틴 서체를 다시 import 한다").not.toMatch(/from ["']geist\//);
+    expect(layout, "layout.js 가 라틴 서체 변수를 다시 주입한다").not.toMatch(/GeistSans/);
+    // 주석이 지워진 본문에서 잰다 — 위 주석이 이름을 언급하는 것만으로 빨개지면 안 된다.
+    expect(cssWithoutRoot(), "body 가 --font-geist-sans 를 다시 쓴다").not.toMatch(
+      /--font-geist-sans/
+    );
+  });
+
+  it("★★ 주입한 굵기 범위가 CSS 가 쓰는 굵기를 덮는다 — 안 덮으면 조용히 눌려 그려진다", () => {
+    // 가변 폰트는 선언한 범위 **밖**의 굵기를 오류 없이 양 끝으로 눌러 그린다. 범위가
+    // "400 800" 인 채로 전시층에 900 을 쓰면 판은 전부 그린인데 화면만 800 이다 —
+    // 이 저장소가 가장 싫어하는 모양(아무도 안 알려 주는 조용한 격하)이다.
+    // 값은 하나가 정한다: **CSS 가 실제로 쓰는 최대 굵기**. 전시층 굵기를 바꾸면 이 판이
+    // 따라 움직인다(숫자를 두 벌 적지 않는다).
+    // 근거: node_modules/pretendard 의 pretendardvariable.css 가 `font-weight: 45 920` 을
+    // 선언한다 — 900 은 이 파일이 실제로 가진 굵기라 범위만 열면 된다(용량은 그대로다).
+    const layout = readFileSync("app/layout.js", "utf8");
+    const range = layout.match(/weight:\s*"(\d+)\s+(\d+)"/);
+    expect(range, "layout.js 가 굵기 범위를 선언하지 않는다").not.toBeNull();
+
+    const used = [...cssWithoutRoot().matchAll(/font-weight:\s*(\d{3,4})/g)].map((m) =>
+      Number(m[1])
+    );
+    expect(used.length, "CSS 에 숫자 굵기가 하나도 없다 — 이 판이 낡았다").toBeGreaterThan(0);
+    expect(
+      Number(range[2]),
+      `선언한 최대 굵기(${range[2]})가 CSS 가 쓰는 최대 굵기(${Math.max(...used)})에 못 미친다`
+    ).toBeGreaterThanOrEqual(Math.max(...used));
   });
 });
 
@@ -317,38 +404,16 @@ describe("테마는 한 벌이다", () => {
     // 전시층(표지·큰 제목)은 800 이상으로 굵어도 되지만, 작업 화면이 같이 굵어지면
     // 화면 전체가 소리를 질러 사장님이 **지금 눌러야 할 것**을 못 고른다.
     //
-    // ★ cssWithoutRoot() 로 재는 것이 핵심이다(주석이 지워진 본문). 날 것에서 재면
-    //   규칙 **바로 위 주석**이 선택자로 딸려 들어와, 그 주석이 ".display" 를 언급하기만
-    //   해도 아래 면제 조건을 통과한다. 이 저장소는 규칙 위에 이유를 적는 문화라 그 배치가
-    //   흔하다 — 실제로 `/* 전시층(.display)은 ... */` 한 줄을 위에 붙이자 900 짜리 위반이
-    //   그대로 통과했다(2026-09-08 실측). 그러면 "항상 참"인 빈 그물이 된다.
-    const css = cssWithoutRoot()
-      // @media·@supports 껍데기를 벗긴다. 안 벗기면 그 안의 첫 규칙이 껍데기 이름
-      // ("@media (max-width: 560px)")을 선택자로 달고 나와, 전시층을 반응형으로 조정하는
-      // 순간 이 판이 애먼 곳에서 빨개진다.
-      .replace(/@(media|supports)[^{]*\{/g, "");
-
-    // 규칙 블록을 { 단위로 자르고, 굵기 800 이상이 나온 블록의 선택자를 본다
+    // ★★ 2026-09-08(Task 3) — 옛 굵기 판("font-weight는 400 · 600 · 700만 쓴다")이 이제
+    //   전시층을 놓아준다. 그 순간부터 **이 판이 800+ 를 막는 유일한 파수꾼**이다.
+    //   면제 정의(cssRules)를 손댈 때는 여기가 먼저 무너진다고 생각하고 손대라.
     const offenders = [];
-    for (const m of css.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
-      const selector = m[1].trim();
-
-      // 면제는 **조각마다** 따진다. 쉼표 목록을 통째로 보면 `h1, .display { … }` 에서
-      // .display 하나가 h1 까지 데리고 빠져나간다 — 작업 화면의 h1 이 굵어지는 그 사고를
-      // 이 판이 막으려고 있는 것이다.
-      // 그리고 `.display` 는 **클래스 이름 그대로**여야 한다. 부분 문자열로 보면
-      // `.displayed`·`.display-none` 처럼 전시층과 아무 상관없는 이름이 면제된다.
-      // (`.display-xl` 같은 전시층 **변종**도 여기서는 막힌다. 그것은 실수가 아니라 결정이다 —
-      //  스펙이 못 박은 것은 ".display 안에서만"이고, 변종이 필요해지면 이 판을 고쳐
-      //  **의도적으로** 여는 편이 낫다. 그 비용을 감수한다.)
-      const parts = selector.split(",").map((s) => s.trim()).filter(Boolean);
-      const exempt = parts.length > 0 && parts.every((s) => /\.display(?![\w-])/.test(s));
-
+    for (const { selector, body, display } of cssRules()) {
       // 블록 안 **모든** 선언을 본다 — 첫 것만 보면 `font-weight: 400` 뒤에 오는 `900` 을
       // 놓친다. 자릿수는 3~4 다: `font-weight: 1000` 이 합법값(CSS Fonts 4)이라 `\d{3}` 이면
       // "100" 만 물어 800 미만으로 조용히 통과한다.
-      for (const w of m[2].matchAll(/font-weight:\s*(\d{3,4})/g)) {
-        if (Number(w[1]) >= 800 && !exempt) offenders.push(`${selector} → ${w[1]}`);
+      for (const w of body.matchAll(/font-weight:\s*(\d{3,4})/g)) {
+        if (Number(w[1]) >= 800 && !display) offenders.push(`${selector} → ${w[1]}`);
       }
     }
     expect(offenders, `전시층이 작업 화면으로 샜다:\n  ${offenders.join("\n  ")}`).toEqual([]);

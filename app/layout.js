@@ -1,5 +1,4 @@
 import "./globals.css";
-import { GeistSans } from "geist/font/sans";
 import localFont from "next/font/local";
 import { ProjectProvider } from "../components/ProjectContext";
 import { AdProjectProvider } from "../components/AdProjectContext";
@@ -8,13 +7,20 @@ import { ReelProjectProvider } from "../components/ReelProjectContext";
 import AppShell from "../components/AppShell";
 import DialogProvider from "../components/DialogProvider";
 
-// 라틴·숫자는 Geist가, 한글은 Pretendard가 받는다 (Geist에 한글 글리프가 없다).
+// ★ 2026-09-08 — **서체는 한 벌이다.** 라틴·숫자를 따로 받던 서체를 걷어내고 라틴·한글·숫자를
+// 전부 Pretendard 가 받는다(MCS 와 같은 디자인 언어). 두 벌이면 숫자가 다른 획으로 그려지는데
+// 이 앱은 화면마다 숫자를 내민다(원가·크레딧·초·컷 수).
 // 파일은 npm 패키지 pretendard 에서 app/fonts 로 복사해 둔 것 — 빌드 재현성을 위해
 // CDN 링크를 쓰지 않는다. 서체 인상이 기대와 다르면 이 파일만 되돌리면 된다.
 const pretendard = localFont({
   src: "./fonts/PretendardVariable.woff2",
   variable: "--font-pretendard",
-  weight: "400 800",
+  // ★ 2026-09-08 — 상한을 800 → 900 으로 연다. 전시층(.display)이 900 을 쓰는데 범위가
+  // 800 이면 브라우저가 오류 없이 800 으로 눌러 그린다(가변 폰트는 범위 밖을 양 끝으로
+  // 클램프한다) — 판은 전부 그린인데 화면만 안 굵은 상태가 된다.
+  // 실측 근거: 이 파일(PretendardVariable)의 배포 CSS 가 `font-weight: 45 920` 을 선언한다.
+  // 같은 파일이라 용량은 그대로다 — 여는 것은 선언뿐이다.
+  weight: "400 900",
   display: "swap",
 });
 
@@ -34,7 +40,7 @@ export default function RootLayout({ children }) {
     //   ★ 범위는 **이 요소의 속성 한 겹**뿐이다 — 아래 트리의 hydration 검사는 그대로 산다.
     <html
       lang="ko"
-      className={`${GeistSans.variable} ${pretendard.variable}`}
+      className={pretendard.variable}
       suppressHydrationWarning
     >
       <body>
