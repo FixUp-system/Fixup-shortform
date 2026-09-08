@@ -295,3 +295,48 @@ describe("한 줄에 선 버튼은 높이가 같다", () => {
     expect(has(".home-header .cta", "margin-top"), ".home-header .cta 의 여백을 안 지운다").toBe(true);
   });
 });
+
+// ★★ 2026-09-08 — 지운 것이 되돌아오지 못하게 세우는 판 둘이다(밝은 벌 한 벌로 옮기는 개편).
+//   앞 회차가 어두운 벌(`:root[data-theme="light"]` 블록 · ThemeToggle · layout.js 의 테마
+//   부팅 스크립트)을 **지웠는데**, 지운 것은 다음 사람이 무심코 되살릴 수 있다. 지웠다는
+//   기억이 아니라 **매 회차 세는 판**이 그것을 막는다.
+describe("테마는 한 벌이다", () => {
+  it("★ data-theme 흔적이 코드에 없다 — 지웠다고 믿지 말고 센다", () => {
+    // 주석을 지우지 않고 **날 것 그대로** 센다. 이 판에서는 주석이 판을 **더 엄하게** 만든다
+    // — "data-theme 은 이제 없다" 같은 주석 한 줄도 분기가 돌아오는 길목이라 지우는 편이 낫다.
+    // (아래 굵기 판은 정반대다. 거기서는 주석이 판을 **느슨하게** 만들어 반드시 지워야 한다.)
+    // app/globals.css 를 따로 읽지 않는다 — readAll() 의 ROOTS(app·components)가 .css 도
+    // 훑어서 globals.css 가 이미 그 목록에 있다(두 번 읽으면 같은 파일이 두 번 보고된다).
+    const hits = readAll()
+      .filter(({ text }) => /data-theme/.test(text))
+      .map(({ path }) => path);
+    expect(hits, `테마 분기가 남아 있다:\n  ${hits.join("\n  ")}`).toEqual([]);
+  });
+
+  it("★★ 전시층 글자는 .display 안에서만 쓴다", () => {
+    // 전시층(표지·큰 제목)은 800 이상으로 굵어도 되지만, 작업 화면이 같이 굵어지면
+    // 화면 전체가 소리를 질러 사장님이 **지금 눌러야 할 것**을 못 고른다.
+    //
+    // ★ cssWithoutRoot() 로 재는 것이 핵심이다(주석이 지워진 본문). 날 것에서 재면
+    //   규칙 **바로 위 주석**이 선택자로 딸려 들어와, 그 주석이 ".display" 를 언급하기만
+    //   해도 아래 면제 조건을 통과한다. 이 저장소는 규칙 위에 이유를 적는 문화라 그 배치가
+    //   흔하다 — 실제로 `/* 전시층(.display)은 ... */` 한 줄을 위에 붙이자 900 짜리 위반이
+    //   그대로 통과했다(2026-09-08 실측). 그러면 "항상 참"인 빈 그물이 된다.
+    const css = cssWithoutRoot()
+      // @media·@supports 껍데기를 벗긴다. 안 벗기면 그 안의 첫 규칙이 껍데기 이름
+      // ("@media (max-width: 560px)")을 선택자로 달고 나와, 전시층을 반응형으로 조정하는
+      // 순간 이 판이 애먼 곳에서 빨개진다.
+      .replace(/@(media|supports)[^{]*\{/g, "");
+
+    // 규칙 블록을 { 단위로 자르고, 굵기 800 이상이 나온 블록의 선택자를 본다
+    const offenders = [];
+    for (const m of css.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+      const selector = m[1].trim();
+      const w = m[2].match(/font-weight:\s*(\d{3})/);
+      if (w && Number(w[1]) >= 800 && !selector.includes(".display")) {
+        offenders.push(`${selector} → ${w[1]}`);
+      }
+    }
+    expect(offenders, `전시층이 작업 화면으로 샜다:\n  ${offenders.join("\n  ")}`).toEqual([]);
+  });
+});
