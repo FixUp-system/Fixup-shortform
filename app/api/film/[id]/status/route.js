@@ -43,6 +43,11 @@ export const GET = withUser(async (_req, { params }, user) => {
       images: film.images || [],
       video: film.video || null,
       error: film.error || null,
+      // ★★ 마무리가 남았다는 신호(2026-09-08). fal 은 끝났고 우리 쪽 내려받기·저장·자막만
+      //   남은 상태다. 화면은 이것을 보고 전용 라우트(POST …/finish, 상한 300초)를 그 방식에
+      //   대해 **한 번** 부른다 — 무거운 일을 이 60초 라우트로 되돌리지 마라(광고가 그렇게
+      //   죽었고, 이 라우트는 방식마다 도니 두 배로 위험하다).
+      finish_needed: Boolean(film.job?.ready),
       // ★★ "지금 그릴 수 있는가"를 **서버가 계산해서** 내려준다.
       //   화면은 status 만 보고 잠그는데, 인스턴스가 죽어 "drawing" 이 남으면 서버는 10분 뒤
       //   열어 주고 화면은 잠긴 채다 — 사장님에게는 다시 그릴 길이 아예 없어 보인다.

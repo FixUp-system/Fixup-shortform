@@ -32,7 +32,7 @@ import { createProject, updateProject, getProject } from "../lib/projects.js";
 import { runWithActor } from "../lib/actor.js";
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
 import { putFilm, FILM_IMAGE_LOCK_MS, MAX_FILM_IMAGE_TRIES } from "../lib/film/doc.js";
-import { collectFilmRender, startFilmRender } from "../lib/film/pipeline.js";
+import { collectFilmRender, finishFilmRender, startFilmRender } from "../lib/film/pipeline.js";
 import { chargeAd, balanceFor } from "../lib/charges.js";
 import { adVideoPrice } from "../lib/pricing.js";
 import { GET as statusGET } from "../app/api/film/[id]/status/route.js";
@@ -124,14 +124,19 @@ describe("수거 — 실제 동작", () => {
     stubFetch();
     const burnt = [];
     for (const mode of ["order", "refs"]) {
+      // ★★ 2026-09-08 — 수거는 "끝났다"만 적고, 무거운 일은 마무리가 한다(두 걸음).
+      //   자세한 내력은 tests/film-finish-lock.test.js 참고.
+      const got = await runWithActor(U, () =>
+        collectFilmRender(p.id, U, mode, { collectAdVideo: async () => DONE })
+      );
+      expect(got).toEqual({ changed: true, ready: true });
       const out = await runWithActor(U, () =>
-        collectFilmRender(p.id, U, mode, {
-          collectAdVideo: async () => DONE,
+        finishFilmRender(p.id, U, mode, {
           // 진짜 ffmpeg 를 안 부른다 — 여기서 재는 것은 **이름**이다
           burn: async (args) => { burnt.push(args); return { url: `/api/renders/${args.projectId}.mp4` }; },
         })
       );
-      expect(out).toEqual({ changed: true, done: true });
+      expect(out).toEqual({ finished: true });
     }
     const back = await runWithActor(U, () => getProject(p.id, U));
     expect(back.films.order.video.url).toBe(`/api/renders/${p.id}-order.mp4`);
@@ -153,13 +158,11 @@ describe("수거 — 실제 동작", () => {
   it("★ 자막을 못 태워도 원본을 완성본으로 쓴다 — 이미 값을 치른 영상을 잃지 않는다", async () => {
     const p = await bothRendering();
     stubFetch();
+    await runWithActor(U, () => collectFilmRender(p.id, U, "order", { collectAdVideo: async () => DONE }));
     const out = await runWithActor(U, () =>
-      collectFilmRender(p.id, U, "order", {
-        collectAdVideo: async () => DONE,
-        burn: async () => { throw new Error("ffmpeg 가 없어요"); },
-      })
+      finishFilmRender(p.id, U, "order", { burn: async () => { throw new Error("ffmpeg 가 없어요"); } })
     );
-    expect(out.done).toBe(true);
+    expect(out.finished).toBe(true);
     const back = await runWithActor(U, () => getProject(p.id, U));
     expect(back.films.order.status).toBe("done");
     expect(back.films.order.video.url).toBe(`/api/renders/${p.id}-order-raw.mp4`);
@@ -295,11 +298,9 @@ describe("방식이 들어간 이름도 열린다", () => {
   it("★ film 영상도 304 를 탄다 — ETag 는 films[방식].video.ts 에서 온다", async () => {
     const p = await bothRendering();
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, arrayBuffer: async () => BYTES.buffer })));
+    await runWithActor(U, () => collectFilmRender(p.id, U, "order", { collectAdVideo: async () => DONE }));
     await runWithActor(U, () =>
-      collectFilmRender(p.id, U, "order", {
-        collectAdVideo: async () => DONE,
-        burn: async (args) => ({ url: `/api/renders/${args.projectId}.mp4` }),
-      })
+      finishFilmRender(p.id, U, "order", { burn: async (args) => ({ url: `/api/renders/${args.projectId}.mp4` }) })
     );
     vi.unstubAllGlobals();
     const name = `${p.id}-order.mp4`;

@@ -26,6 +26,10 @@ export default function FilmVideoPage() {
   // canDraw·triesLeft 가 여기에만 실려 온다 — 그 둘이 막다른 길을 걷어내는 열쇠다.
   const [live, setLive] = useState(null);
   const stopRef = useRef(null);
+  // ★★ 마무리를 부르는 중인가(2026-09-08). 폴링은 2초마다 도는데 마무리는 몇십 초가
+  //   걸린다 — 이 자리가 없으면 도는 동안 폴링이 그것을 계속 또 부른다. 그 겹치기가
+  //   광고에서 프로덕션을 죽인 원인이었다(서버에도 잠금이 있지만 헛요청부터 안 보낸다).
+  const finishRef = useRef(false);
 
   // ★★ 방식을 건너가면(같은 프로젝트, 다른 mode) 이 컴포넌트는 **마운트된 채로 남는다.**
   //   그래서 값을 비우는 것만으로는 부족하다 — 돌던 폴링의 onTick 은 **옛 mode 를 클로저에
@@ -56,6 +60,17 @@ export default function FilmVideoPage() {
       onTick: (st) => {
         const f = st?.films?.[mode] || null;
         setLive(f);
+        // ★★★ fal 은 끝났고 우리 쪽 마무리(내려받기·저장·자막)만 남았다는 신호.
+        //   전용 라우트(상한 300초)를 **한 번만** 부른다 — 상태 라우트는 60초라 이 일을
+        //   못 끝낸다(그래서 겹치고 죽었다, 2026-09-08). 실패하면 다음 회차가 다시 부른다.
+        if (f?.finish_needed && !finishRef.current) {
+          finishRef.current = true;
+          fetch(`/api/film/${id}/finish`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ mode }),
+          }).catch(() => {}).finally(() => { finishRef.current = false; });
+        }
         // ★ 판정은 화면과 **같은 함수**다 — 만료된 "drawing" 은 drawingNow 가 false 라,
         //   눌러앉은 상태로 영원히 두드리지 않는다.
         const g = filmGates(f);

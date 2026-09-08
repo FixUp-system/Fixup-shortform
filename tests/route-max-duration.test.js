@@ -32,6 +32,10 @@ const HEAVY = [
   /runInBackground/,
   /generateImage|drawStoryboardSheet|submitClip|generateClip|synthesize/,
   /collectReelOneShot|collectAdRender|collectFilmRender|collectClip/,
+  // ★ 마무리 라우트(2026-09-08) — 내려받기·저장·자막 굽기가 여기로 옮겨 왔다.
+  //   상한이 빠지면 그 무거운 일이 배포 기본값에 잘리고, 잘리면 문서가 rendering 인 채
+  //   남아 화면이 "만드는 중"에 갇힌다. 바로 그 사고를 고치며 만든 자리라 그물을 넓힌다.
+  /finishAdRender|finishFilmRender/,
   /runReel\w*|runAd\w*|runFilm\w*|startAdRender|makeReelScenario|makeAdScenario|makeFilmScenario|buildReelPrompts/,
 ];
 
