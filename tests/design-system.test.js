@@ -332,9 +332,23 @@ describe("테마는 한 벌이다", () => {
     const offenders = [];
     for (const m of css.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
       const selector = m[1].trim();
-      const w = m[2].match(/font-weight:\s*(\d{3})/);
-      if (w && Number(w[1]) >= 800 && !selector.includes(".display")) {
-        offenders.push(`${selector} → ${w[1]}`);
+
+      // 면제는 **조각마다** 따진다. 쉼표 목록을 통째로 보면 `h1, .display { … }` 에서
+      // .display 하나가 h1 까지 데리고 빠져나간다 — 작업 화면의 h1 이 굵어지는 그 사고를
+      // 이 판이 막으려고 있는 것이다.
+      // 그리고 `.display` 는 **클래스 이름 그대로**여야 한다. 부분 문자열로 보면
+      // `.displayed`·`.display-none` 처럼 전시층과 아무 상관없는 이름이 면제된다.
+      // (`.display-xl` 같은 전시층 **변종**도 여기서는 막힌다. 그것은 실수가 아니라 결정이다 —
+      //  스펙이 못 박은 것은 ".display 안에서만"이고, 변종이 필요해지면 이 판을 고쳐
+      //  **의도적으로** 여는 편이 낫다. 그 비용을 감수한다.)
+      const parts = selector.split(",").map((s) => s.trim()).filter(Boolean);
+      const exempt = parts.length > 0 && parts.every((s) => /\.display(?![\w-])/.test(s));
+
+      // 블록 안 **모든** 선언을 본다 — 첫 것만 보면 `font-weight: 400` 뒤에 오는 `900` 을
+      // 놓친다. 자릿수는 3~4 다: `font-weight: 1000` 이 합법값(CSS Fonts 4)이라 `\d{3}` 이면
+      // "100" 만 물어 800 미만으로 조용히 통과한다.
+      for (const w of m[2].matchAll(/font-weight:\s*(\d{3,4})/g)) {
+        if (Number(w[1]) >= 800 && !exempt) offenders.push(`${selector} → ${w[1]}`);
       }
     }
     expect(offenders, `전시층이 작업 화면으로 샜다:\n  ${offenders.join("\n  ")}`).toEqual([]);
