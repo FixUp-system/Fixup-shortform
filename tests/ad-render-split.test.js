@@ -13,7 +13,7 @@ import { resetMemoryStore } from "../lib/store/memory.js";
 import { getStore } from "../lib/store/index.js";
 import { createProject, getProject } from "../lib/projects.js";
 import { runWithActor } from "../lib/actor.js";
-import { startAdRender, collectAdRender } from "../lib/ad/pipeline.js";
+import { startAdRender, collectAdRender, finishAdRender } from "../lib/ad/pipeline.js";
 import { balanceFor } from "../lib/charges.js";
 import { listRecords } from "../lib/costs.js";
 
@@ -74,7 +74,10 @@ describe("광고 굽기 — 접수와 수거를 나눈다", () => {
     expect(back.video_error ?? null).toBe(null);
   });
 
-  it("끝났으면 수거가 영상을 남기고 done 으로 넘긴다", async () => {
+  // ★★ 2026-09-08 — **셋으로 나뉘었다**: 접수 → 수거(가볍다) → 마무리(무겁다).
+  //   수거가 내려받기·저장·자막까지 하던 시절에 프로덕션이 죽었다(겹친 무거운 일이 인스턴스
+  //   메모리를 태웠다). 자세한 내력과 잠금 판은 tests/ad-finish-lock.test.js 에 있다.
+  it("끝났으면 수거는 표시만 남기고, 마무리가 done 으로 넘긴다", async () => {
     const p = await makeAd();
     await runWithActor(U, () => startAdRender(p.id, U, { submitAdVideo: submitOk, storeVideo: storeOk }));
 
@@ -84,6 +87,13 @@ describe("광고 굽기 — 접수와 수거를 나눈다", () => {
         storeVideo: storeOk,
       })
     );
+    const mid = await getProject(p.id, U);
+    // 수거는 아직 완성으로 넘기지 않는다 — 남은 것은 마무리다
+    expect(mid.status).toBe("rendering");
+    expect(mid.ad_job?.ready?.url).toBe("https://fal.example/v.mp4");
+
+    await runWithActor(U, () => finishAdRender(p.id, U, { storeVideo: storeOk }));
+
     const back = await getProject(p.id, U);
     expect(back.status).toBe("done");
     expect(back.videos).toHaveLength(1);
@@ -92,7 +102,7 @@ describe("광고 굽기 — 접수와 수거를 나눈다", () => {
     expect(back.ad_job ?? null).toBe(null);
   });
 
-  it("★ 수거가 겹쳐도 두 번 처리되지 않는다", async () => {
+  it("★ 수거가 겹쳐도 fal 에 두 번 묻지 않는다", async () => {
     const p = await makeAd();
     await runWithActor(U, () => startAdRender(p.id, U, { submitAdVideo: submitOk, storeVideo: storeOk }));
 
@@ -106,9 +116,10 @@ describe("광고 굽기 — 접수와 수거를 나눈다", () => {
     };
     await runWithActor(U, () => collectAdRender(p.id, U, deps));
     await runWithActor(U, () => collectAdRender(p.id, U, deps));
-
-    // 두 번째는 ad_job 이 없으니 fal 에 묻지도 않는다
+    // 두 번째는 "끝났다"가 이미 적혀 있으니 묻지 않는다 — 다시 물으면 원장이 두 번 쌓인다
     expect(collected).toBe(1);
+
+    await runWithActor(U, () => finishAdRender(p.id, U, { storeVideo: storeOk }));
     const back = await getProject(p.id, U);
     expect(back.videos).toHaveLength(1);
   });

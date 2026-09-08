@@ -84,6 +84,10 @@ export default function AdDetailPage() {
   // 컷 편집 모드 — 켜면 장면 필드가 열리고 유료 버튼이 숨는다.
   const [editing, setEditing] = useState(false);
   const pollRef = useRef(null);
+  // ★★ 마무리를 부르는 중인가(2026-09-08). 폴링은 2초마다 도는데 마무리는 몇십 초가
+  //   걸린다 — 이 자리가 없으면 마무리가 도는 동안 폴링이 그것을 계속 또 부른다.
+  //   그 겹치기가 이 사고의 원인이었다(서버에도 잠금이 있지만, 헛요청부터 안 보낸다).
+  const finishRef = useRef(false);
   // 편집한 값을 걷어올 자리(장면 목록). 아래 rewriteWithEdits 주석 참고.
   const editRef = useRef(null);
   // 전역 값은 editRef 밖에 있다(장면 목록과 다른 덩어리다) — 걷는 자리를 따로 둔다.
@@ -222,6 +226,15 @@ export default function AdDetailPage() {
           videos: st.video ? [st.video] : p?.videos || [],
           video_error: st.error || null,
         }));
+        // ★★★ fal 은 끝났고 우리 쪽 마무리(내려받기·저장·자막)만 남았다는 신호.
+        //   전용 라우트(상한 300초)를 **한 번만** 부른다 — 상태 라우트는 60초라 이 일을
+        //   못 끝낸다(그래서 겹치고 죽었다, 2026-09-08). 실패하면 다음 폴링이 다시 부른다.
+        if (st.finish_needed && !finishRef.current) {
+          finishRef.current = true;
+          fetch(`/api/ads/${id}/finish`, { method: "POST" })
+            .catch(() => {})
+            .finally(() => { finishRef.current = false; });
+        }
         if (st.status !== "rendering") stop(false);
       } catch {
         failures += 1;
