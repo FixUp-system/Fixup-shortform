@@ -221,6 +221,28 @@ describe("주 실행 버튼", () => {
     expect(users.length, "액센트를 쓰는 자리가 하나도 없다").toBeGreaterThan(0);
     expect(users.filter((s) => !s.includes(".side-step.on"))).toEqual([]);
   });
+
+  // ★★★ 2026-09-08(Task 5) — 위 면제의 **짝**이다. 위 판은 "`.home` 뿌리 아래면 액센트를
+  //   봐준다"까지만 증명한다. 그 뿌리를 **누가 다는가**는 아무도 안 재고 있었다.
+  //   다른 화면이 `className="... home"` 을 달면 그 순간 앱층 화면 하나가 통째로 면제를
+  //   받는다 — 액센트가 사이드바 스테퍼와 경쟁해도 판이 조용하다.
+  //   이 저장소는 이미 `home-header`(보관함)라는 이름 충돌을 겪었다. 그래서 실제 마크업
+  //   쪽에도 자물쇠를 건다.
+  //   ★ 낱말로 자른다 — 정규식 `\bhome\b` 로 재면 하이픈이 낱말 경계라 `home-header` 가
+  //     걸린다(실측). className 값을 공백으로 쪼개 **정확히 그 토큰**인지 본다.
+  it("★★★ `home` 클래스를 다는 화면은 app/home/page.js 하나뿐이다", () => {
+    const wearers = [];
+    for (const { path, text } of readAll()) {
+      if (path.endsWith(".css")) continue;
+      for (const m of text.matchAll(/className="([^"]*)"/g)) {
+        if (m[1].split(/\s+/).includes("home")) wearers.push(path.replace(/\\/g, "/"));
+      }
+    }
+    expect(
+      [...new Set(wearers)],
+      "액센트 면제(showcase)가 이 클래스에 딸려 있다 — 다른 화면이 달면 그 화면이 통째로 면제된다"
+    ).toEqual(["app/home/page.js"]);
+  });
 });
 
 // ★ 2026-09-08 — 아래 두 판은 이제 **앱층**(작업 화면)만 잰다. 전시층(`.display`)은
