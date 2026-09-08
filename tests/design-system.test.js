@@ -1,4 +1,6 @@
-// 시각 규칙 검사 — 스펙 docs/superpowers/specs/2026-07-27-visual-magnific-design.md
+// 시각 규칙 검사 — 스펙 docs/superpowers/specs/2026-09-08-light-theme-mcs-design.md
+// (2026-09-08 에 갈아탔다. 그 전 스펙 `2026-07-27-visual-magnific-design.md`("Magnific 다크")는
+//  어두운 벌의 것이라, 이 판이 재는 값과 더는 같은 것을 가리키지 않는다.)
 // 시각 변경은 단위 테스트로 잡히지 않는다. 소스를 직접 훑어 규칙 위반을 잡는다.
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
