@@ -1,4 +1,9 @@
-# 이어서 할 일 — `feat/reel-cut-r2v` (2026-09-07 기준 · **아홉째 갱신**)
+# 이어서 할 일 — `feat/reel-cut-r2v` (2026-09-08 기준 · **열째 갱신**)
+
+> 📌 **09-08 은 이어받으며 실측 대조만 했다 — 코드 변경 0.** 고친 것은 이 문서다:
+> §0 의 수 넷(테스트·미배포·미푸시·main 거리)이 낡아 있었고, **09-07 오후 커밋 다섯이
+> 문서에 아예 없었다**(아래 「09-07 오후」 절을 새로 넣었다). 09-08 11:0x 실측:
+> 옛 Supabase **여전히 402** · 프로덕션 `/login` 200 · 테스트 5,818 통과 · 1 실패(같은 판).
 
 > 🔴 **09-07 은 사고 회차였다.** Supabase 무료 egress(5GB/월)를 다 써서 프로젝트가
 > **402 로 통째로 막혔고 서비스가 죽었다**. 새 Supabase 프로젝트로 옮겨 되살렸지만
@@ -22,20 +27,98 @@
 |---|---|
 | 워크트리 | `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` |
 | 브랜치 | `feat/reel-cut-r2v` (09-03 저녁). ★ 수는 **적지 않는다** — 이 문서를 고치는 커밋이 그 수를 또 바꾼다. **세라**: `git log -1 --format='%h %s'` · `git rev-list --count fixup/main..HEAD` |
-| 테스트 | 🔴 **1 빨강** — 09-07 12:56 실측 `npx vitest run` = **5,785 통과 · 1 실패 · 10 skipped**(342 파일 · 37초). 실패는 `tests/reel-oneshot.test.js > "프롬프트를 고치면 다시 굽는다"` **5초 타임아웃**. ★ **코드 결함이 아니라 판이 진짜 회선을 문다** — `pipeline.js:324` 의 `fetchImageBytes("https://fal/sheet.png")` 가 이 회선에서 **2,726ms**(DNS 죽는 데 걸리는 시간, 실측)를 먹는데 이 판만 통짜를 **두 번** 관통해 ~5.4초가 된다. 09-03 밤에 그린이던 것은 그때 회선이 빨리 죽었기 때문이고, **회선에 따라 빨강·초록이 갈린다**(같은 코드에서). 같은 값을 통짜를 관통하는 판 열 몇 개가 다 낸다 — 이 파일 하나가 전체 37초 중 **35초**를 쓴다. 고칠 자리: 격자 커밋(`4428fb4`)이 넣은 `fetchImageBytes` 를 **주입 가능한 deps 로** 빼면 판이 회선을 안 문다. `npx next build` 는 09-07 오전(`bec31e9`)에 통과했다 — 그 뒤 `b9b9830`(lib/compose.js) 는 화면 파일이 아니라 재굽기 안 했다 |
-| 배포 | **프로덕션 라이브 `6f4ehup0a`**(09-07 11:46 · 코드 `165df59` · `dpl_2Vw2h6T1FoR3DBBw877nhPWQZ1NH`). target=production · status=Ready · 09-07 12:5x 실측 `/login` 200 · `/api/me` 401(로그인 벽, 정상) · `/api/projects` 200(46건) · 🔴 `/api/renders/<옛 id>.mp4` **404**(아래 09-07 절 ③) · 그 앞 판은 `i7d0rc266`(09-04 · `0b2f341`) · ★ **확인법**: `npx vercel inspect fixup-shortform-service.vercel.app` 이 그 배포를 가리키는지 본다 — 이번엔 CSS 가 안 바뀌어 번들 해시로는 못 쟀다 |
+| 테스트 | 🔴 **1 빨강** — **09-08 11:06 재실측** `npx vitest run` = **5,818 통과 · 1 실패 · 10 skipped**(342 파일 · 37.7초). 실패는 **09-07 과 같은 판·같은 이유**다(아래). 09-07 12:56 실측은 5,785 통과였고 그 뒤 커밋 넷이 판을 보탰다. 실패는 `tests/reel-oneshot.test.js > "프롬프트를 고치면 다시 굽는다"` **5초 타임아웃**. ★ **코드 결함이 아니라 판이 진짜 회선을 문다** — `pipeline.js:324` 의 `fetchImageBytes("https://fal/sheet.png")` 가 이 회선에서 **2,726ms**(DNS 죽는 데 걸리는 시간, 실측)를 먹는데 이 판만 통짜를 **두 번** 관통해 ~5.4초가 된다. 09-03 밤에 그린이던 것은 그때 회선이 빨리 죽었기 때문이고, **회선에 따라 빨강·초록이 갈린다**(같은 코드에서). 같은 값을 통짜를 관통하는 판 열 몇 개가 다 낸다 — 이 파일 하나가 전체 37초 중 **35초**를 쓴다. 고칠 자리: 격자 커밋(`4428fb4`)이 넣은 `fetchImageBytes` 를 **주입 가능한 deps 로** 빼면 판이 회선을 안 문다. `npx next build` 는 09-07 오전(`bec31e9`)에 통과했다 — 그 뒤 `b9b9830`(lib/compose.js) 는 화면 파일이 아니라 재굽기 안 했다 |
+| 배포 | 🔵 **09-08 실측 정정 — 지금 라이브는 `dpl_5twijBmQk7sfYTZbQqMKT3HzVdpn`**(별칭 `...-8xu0l4lc3-fix-up1` · **09-07 17:43** · target=production · Ready · 코드 = **HEAD `d826317` 와 같음**). 09-07 문서가 마지막으로 아는 판은 아래 11:46 판이었다 — 그 뒤 **오후 커밋까지 배포된 것이 문서에 안 적혔다.** `npx vercel inspect fixup-shortform-service.vercel.app` 이 이것을 가리킨다. ⚠️ 배포에 git meta 가 없다(git 없는 폴더에서 올린다) — **어느 코드인지는 `shotform-deploy-clean` 과 파일 대조로만 안다** |
+| 배포(그 앞) | **`6f4ehup0a`**(09-07 11:46 · 코드 `165df59` · `dpl_2Vw2h6T1FoR3DBBw877nhPWQZ1NH`). target=production · status=Ready · 09-07 12:5x 실측 `/login` 200 · `/api/me` 401(로그인 벽, 정상) · `/api/projects` 200(46건) · 🔴 `/api/renders/<옛 id>.mp4` **404**(아래 09-07 절 ③) · 그 앞 판은 `i7d0rc266`(09-04 · `0b2f341`) · ★ **확인법**: `npx vercel inspect fixup-shortform-service.vercel.app` 이 그 배포를 가리키는지 본다 — 이번엔 CSS 가 안 바뀌어 번들 해시로는 못 쟀다 |
 | ★ 정식 도메인 | **`https://fixup-shortform-service.vercel.app`** 다. `vercel deploy` 가 찍어 주는 `...-ju8okg74p-fix-up1.vercel.app` 쪽은 **Deployment Protection(SSO)에 걸려 전부 302** 라 검증에 쓰면 안 된다 — 09-02 에 한 번 속았다 |
-| 미배포 | **`b9b9830` 하나**(crf 26 + faststart — 굽는 영상이 −29%). 11:46 배포 뒤 11:59 에 커밋됐다. 새 env 하나 생김(`SHOTFORM_VIDEO_CRF`, 없으면 26이라 **안 넣어도 돈다**) · 마이그레이션 0 |
-| 푸시 | 🔴 **미푸시 5**(09-07 실측 — 코드 넷 `e96d8fc`·`bec31e9`·`165df59`·`b9b9830` + 이 문서 갱신 하나. ★ 세라: `git rev-list --count fixup/feat/reel-cut-r2v..HEAD`). 두 원격 다 `9a02896`(09-04)에 서 있다. ★ **사고 대응 코드가 원격에 하나도 없다** — 지금 원격만 보면 09-07 을 못 잇는다. ⚠️ URL 로 직접 푸시하면 추적 ref 가 안 움직여 '미푸시 N' 착시가 난다 — 정정은 `git fetch <원격> <브랜치>:refs/remotes/<원격>/<브랜치>`. ⚠️ 자격증명 대기로 매달리면 `GIT_TERMINAL_PROMPT=0` |
-| main 과의 거리 | `fixup/main` = `6e9bd8f`(그 안의 코드 커밋이 `23b80a2`) · HEAD 가 **53커밋 앞**(09-07 실측 — 세라)(뒤처진 것 0). 09-03 작업이 브랜치에만 쌓였다 — **main 병합은 사장님이 지시할 때만** 한다 |
+| 미배포 | ✅ **없다**(09-08 실측). 09-07 **17:43 에 한 번 더 배포됐고**(문서에 안 적혀 있었다) 그 판이 **HEAD 와 같은 코드**다 — 대조: `shotform-deploy-clean` 이 16:17 에 다시 떠졌고 `lib/cost-read.js`·`app/api/ads/[id]/status/route.js` 가 HEAD 와 바이트 동일, `SHOTFORM_VIDEO_CRF` 도 들어 있다. ⚠️ 09-08 오전에 이 자리에 "미배포 6커밋"이라고 잘못 적었다가 실측으로 정정했다 — **배포 사본 폴더의 시각이 이 표보다 정확하다** |
+| 푸시 | 🔴 **미푸시 10**(09-08 실측 · 두 원격 모두 10 — 09-07 문서가 적은 5 에 **오후 커밋 다섯**이 더 얹혔다. 그 앞 목록: 코드 넷 `e96d8fc`·`bec31e9`·`165df59`·`b9b9830` + 문서 하나. ★ 세라: `git rev-list --count fixup/feat/reel-cut-r2v..HEAD`). 두 원격 다 `9a02896`(09-04)에 서 있다. ★ **사고 대응 코드가 원격에 하나도 없다** — 지금 원격만 보면 09-07 을 못 잇는다. ⚠️ URL 로 직접 푸시하면 추적 ref 가 안 움직여 '미푸시 N' 착시가 난다 — 정정은 `git fetch <원격> <브랜치>:refs/remotes/<원격>/<브랜치>`. ⚠️ 자격증명 대기로 매달리면 `GIT_TERMINAL_PROMPT=0` |
+| main 과의 거리 | `fixup/main` = `6e9bd8f`(그 안의 코드 커밋이 `23b80a2`) · HEAD 가 **58커밋 앞**(09-08 실측 — 세라)(뒤처진 것 0. `origin/main` 도 같은 `6e9bd8f`). 09-03 작업이 브랜치에만 쌓였다 — **main 병합은 사장님이 지시할 때만** 한다 |
 | ⚠️ 배포 함정 | **`.vercel` 폴더가 이 워크트리에 없다.** 그래서 `--project` 를 **반드시** 준다 — 안 주면 폴더 이름으로 새 프로젝트를 만든다(팀에 `step-gate` 라는 **실수로 생긴 프로젝트**가 그 증거다) |
 | ★ origin 푸시 | `origin` 은 URL 에 계정이 안 박혀 있다. 이 회차에는 `git push origin <브랜치>` 가 그냥 통과했지만, 자격증명 대기로 멈추면 계정을 실어라: `git push https://jaechanyoon0519-Fixup@github.com/FixUp-system/Fixup-shortform.git <브랜치>` |
 | 개발 서버 | `npx next dev -p 3111` (이 회차에 쓴 포트). `.env.local` 의 `SHOTFORM_DEV_USER` 가 **로그인을 건너뛰고 운영자 신원**을 준다 — 관리자·비용 화면을 그대로 볼 수 있다 |
 | 🔴 Supabase | **09-07 에 새 프로젝트로 옮겼다.** 프로덕션 env 다섯(`NEXT_PUBLIC_SUPABASE_URL`·`NEXT_PUBLIC_SUPABASE_ANON_KEY`·`SUPABASE_URL`·`SUPABASE_ANON_KEY`·`SUPABASE_SERVICE_ROLE_KEY`)이 09-07 오전에 새로 만들어졌다(`npx vercel env ls production --project fixup-shortform-service` 로 시각이 보인다). 새 ref 는 **Vercel 에만 있다** — 이 저장소·문서 어디에도 안 적혀 있다 |
-| 🔴 옛 Supabase | `tlgnfxjzkfxujytzoiji` — **09-07 12:5x 실측 아직 402**(`/storage/v1/bucket` 이 `exceed_cached_egress_quota, exceed_egress_quota` 를 그대로 돌려준다). **꺼내는 것 자체가 egress** 라 주기 리셋(또는 Pro 승급) 전에는 옛 파일을 못 데려온다 |
+| 🔴 옛 Supabase | `tlgnfxjzkfxujytzoiji` — **09-08 11:0x 재실측 여전히 402**(하루가 지나도 안 풀렸다 · 09-07 12:5x 에도 402)(`/storage/v1/bucket` 이 `exceed_cached_egress_quota, exceed_egress_quota` 를 그대로 돌려준다). **꺼내는 것 자체가 egress** 라 주기 리셋(또는 Pro 승급) 전에는 옛 파일을 못 데려온다 |
 | ⚠️ 로컬 `.env.local` | **옛 프로젝트를 가리킨다**(08-27 판, 09-07 에 안 고쳤다). 로컬에서 진짜 DB 를 보려면 새 값을 넣어야 한다 — 안 그러면 402 를 만난다 |
 | 덤프 | `C:\Users\fixup\shotform-migration-20260907\` · `dump.json`(2.2MB · 9표: projects 46 · users 13 · profiles 13 · identities 13 · cost_records 1,042 · credit_charges 52 · credit_grants 24 · upload_owners 346 · storage_objects 430) + `storage-inventory.json`(객체 430건의 버킷·이름·크기). ★ **저장소 밖이다 — 지우지 마라.** 옛 파일을 되찾을 때 대조표가 된다 |
 | 배포 사본 | `C:\Users\fixup\shotform-deploy-clean` = `165df59` 의 `git archive` 판(줄끝이 CRLF 라 파일 크기가 다르다 — 내용은 같다). `.vercel` 이 **없으므로** 여기서도 `--project fixup-shortform-service` 를 반드시 준다. 그 앞 사본 `shotform-deploy` 는 09-04 판 |
+
+### ★★★ 09-08 — 🔴 **프로덕션 사고: 원클릭이 "25분째 만드는 중"** (원인 확정 · 고침 · **미커밋**)
+
+> 사장님 신고: *"원클릭에서 여전히 영상이 fal.ai 에서는 만들어졌음에도 25분째 만드는 중이라고 표시가 돼"*
+
+#### ① 증거 (프로덕션 로그 실측 · 09-08 11:09:33~11:12:54 KST)
+
+`GET /api/ads/0603d9bf-…/status` 가 **한 번도 성공하지 못했다.** 3분 21초 창에서 100건 중 84건이 그 라우트:
+
+```
+70건  500  instance was killed because it ran out of available memory
+14건  504  Task timed out after 60 seconds
+ 0건  성공
+```
+
+`npx vercel logs fixup-shortform-service.vercel.app --json` 로 확인. 같은 창에 film 은 0건.
+
+#### ② 원인 — 무거운 일이 폴링 요청 안에 있었다
+
+수거(`collectAdRender`)가 fal 완성을 보는 순간 **그 요청 안에서** ①내려받기 → ②Supabase 업로드 →
+③ffmpeg 자막 굽기까지 했다. 그 라우트 상한은 **60초**이고, 화면은 `setInterval` 이라 **응답을
+안 기다리고 2초마다** 새 요청을 쏜다. 그래서 무거운 일이 수십 개 겹쳐 인스턴스가 죽었다.
+★ **완료 기록(=`ad_job` 지우기)이 그 무거운 일 뒤에 있어서**, 아무도 못 끝내면 겹치기가 영영
+안 멈춘다 — **자기 강화 고리**다. 문서는 영영 `rendering`, fal 에는 영상이 멀쩡히 있다.
+겹치기를 막는 장치는 "먼저 끝낸 쪽이 접수증을 지운다"(코드 주석)뿐이었고, **아무도 못 끝내면 무효**다.
+
+#### ③ 고친 모양 — 수거는 가볍게, 마무리는 잠금 쥔 하나만
+
+| 자리 | 무엇 |
+|---|---|
+| `lib/ad/pipeline.js` | 수거는 fal 에 묻고 **`ad_job.ready` 만 적는다**(무거운 일 0). `finishAdRender` 신설 — 문서에 잠금(`ad_job.finish={token,at}`, **수명 6분**)을 쥔 하나만 내려받기·저장·자막 |
+| `app/api/ads/[id]/finish/route.js` | **신규 · maxDuration 300**. 마무리 전용 |
+| `app/api/ads/[id]/status/route.js` | 60초 유지(가벼워졌다) · 응답에 `finish_needed` |
+| `app/ads/[id]/page.js` | `finish_needed` 를 보면 마무리를 **한 번만** 부른다(`finishRef`) |
+| `lib/film/pipeline.js` 외 3 | **필름도 같은 모양으로**(사장님 지시). 잠금은 **방식별**(`films[mode].job.finish`) — 프로젝트 단위로 두면 두 편 굽기가 반쪽이 된다. 라우트 `app/api/film/[id]/finish`(300초, `{mode}` 본문) · 화면 둘(`film/one/[mode]`·`film/[id]/[mode]/video`) |
+
+★ **잠금에 수명이 필수인 이유**: 이 사고에서 잠금을 쥘 인스턴스가 바로 그렇게 죽었다.
+★ **`ready` 가 적힌 뒤에는 상한 판정을 건너뛴다** — 안 그러면 fal 이 다 만들어 값까지 나간
+영상을 "너무 오래 걸림"으로 환불·폐기한다.
+
+#### ④ 검증
+
+· 새 판 **21개**(광고 10 · 필름 11) — 전부 **빨간 것을 먼저 보고** 구현했다.
+  핵심은 *"마무리가 진짜로 겹쳐도 한 번만 내려받는다"*(첫 판을 붙잡아 둔 채 둘·셋을 밀어 넣는다)와
+  *"잠금 쥔 채 죽은 인스턴스가 있어도 살아난다"*, 필름의 *"잠금은 방식별이다"*.
+· `tests/route-max-duration.test.js` 의 그물에 `finishAdRender|finishFilmRender` 를 넣었고,
+  **상한을 일부러 지워 빨개지는 것까지 확인**했다(빈 그물이 아니다).
+· 전체 **5,841 통과 · 1 실패** — 그 1은 이 저장소의 기준선 빨강(`reel-oneshot` 회선 타임아웃, §0 참고).
+· `npx next build` 통과, 새 라우트 둘이 출력에 잡힌다.
+· 기존 판 5개는 의도한 행동 변경이라 두 걸음(수거→마무리)으로 고쳤다.
+
+#### ⑤ 🔴 다음 세션이 알아야 할 것
+
+1. **미커밋·미배포다.** 배포해야 그 편(`0603d9bf`)이 살아난다 — 배포 뒤 화면을 열면 수거가
+   fal 의 COMPLETED 를 보고 → 마무리 라우트가 300초 안에 완성으로 넘긴다. **돈은 이미 나갔다.**
+2. **릴(통짜)은 이 사고 밖이다** — 무거운 합성이 `/render`(300초)에 있어 폴링이 안 문다.
+3. ⚠️ **마무리 한 판이 실제로 몇 초·몇 MB 인지는 아직 안 쟀다.** 단독 실행이 60초를 넘겨도
+   이제는 300초 라우트라 여유가 있지만, 그 값을 재 두면 상한을 근거로 정할 수 있다.
+
+---
+
+### ★★★ 09-07 **오후** — 문서에 안 적힌 채 남아 있던 커밋 다섯 (09-08 에 이어받으며 채움)
+
+> 이 다섯은 **인계 문서가 13:03 에 커밋된 뒤**(`36ff90e`) 만들어졌다. 그래서 09-08 세션이
+> 문서를 열었을 때 §0 의 수(미푸시 5 · main 53 앞 · 미배포 하나)가 전부 낡아 있었다.
+> **전부 미배포·미푸시다** — 프로덕션에는 아직 `165df59`(11:46 판)가 서 있다.
+> 상세한 근거는 각 커밋 메시지에 길게 남아 있다. 여기는 **무엇이 바뀌었나만** 적는다.
+
+| 커밋 | 무엇 |
+|---|---|
+| `90dafec` 14:26 | **보관함 카드에서 `<video>` 를 아예 뺐다**(사장님 지시). 아침의 `preload="none"` 로도 부족했다 — 마우스를 스치기만 해도 바이트가 나갔다. 실측 46편 중 **37편이 우리 스토리지**를 지난다. 이제 목록에서 영상 바이트가 **한 번도** 안 나가고, 보려면 카드를 눌러 상세로 간다. ★ 그림 없는 카드가 **25/46**(광고·필름은 `cuts[0].image` 가 없다) → 그 자리를 "영상이 있어요 — 눌러서 보기"로 채웠다. **근본은 굽는 김에 표지 그림을 함께 만드는 것**(별도 작업, 미착수) |
+| `bec6ea8` 14:34 | **업로드 사진의 카드용 작은 그림을 만들어 저장한다**(sharp w480 webp q72 · 실측 59KB→**8KB**). 전송이 영상에서 사진으로 옮겨갔을 뿐이던 것을 막았다(사진 355장 평균 290KB). ★ **만든 것을 저장**하므로 백필이 필요 없다 — 옛 사진도 처음 보일 때 저절로 최적화된다. 주소는 그대로 두고 `?t=1` 로 부른다. fal 주소에는 안 붙인다. 못 만들면 원본으로 떨어진다 |
+| `9666196` 14:59 | 그림을 못 받을 때 **깨진 아이콘 대신 말**. 원인은 썸네일이 아니라 **파일 미이관**(위 09-07 §③)이고, 카드를 `<img>` 로 바꾸며 더 흉해 보이게 만든 것이 우리였다. 문구를 **가른다** — "아직 그림이 없어요"(안 만들었다) ≠ "그림을 불러오지 못했어요"(못 받았다). ⚠️ 함정: 주석에 `/`+`*` 를 쓰면 화면 계약 판의 주석 제거기가 파일 뒷부분을 삼켜 **손도 안 댄 판 둘**이 빨개진다 |
+| `fc11a7a` 16:06 | **단계별에서 1080p 를 닫았다**(사장님 지시). clip 축에서 1080p 를 열던 프로필은 `seedance-2.0` **하나뿐**이었다. `VIDEO_PRICE` 의 1080p 는 **남기고** `resolutions` 에서만 뺐다(광고 축 선례 그대로). ★ **광고는 그대로다**(`lib/ad/models.js` 는 독립된 표 · 관리자 전용). 실측 1080p 로 저장된 프로젝트 **0건**, 목록 밖 값은 `resolutionForProject` 가 720p 로 떨어뜨린다. 판 24개가 함께 움직였다 — 1080p 를 "값이 다른 화질"의 예시로 쓰던 자리를 **480p** 로 옮겼다 |
+| `d826317` 16:13 | 관리자 **사용자 관리의 "내역"을 크레딧 → 실제 비용(USD)** 으로(사장님 지시). 이 저장소는 **장부가 둘**이다 — 청구=크레딧 · 원가=USD(`cost_records`). `lib/cost-read.js` 신설, `listCosts` 에 `actor`·`before`, **합계는 SQL 이 낸다**(받은 20건만 더하면 거짓말이고 PostgREST 1000행 상한에 조용히 걸린다). 커서는 번호가 아니라 **시각**. `lib/ledger-read.js`(마이페이지)는 안 건드렸다 — 거기서는 크레딧이 맞는 단위다. ⚠️ **"충전됐다"의 증거가 바뀌었다** — 목록이 비용이라 충전 줄이 안 뜬다. 확인은 **잔액**으로 |
+
+---
 
 ### ★★★ 09-07 — 전송 할당량이 서비스를 죽였다 · 새 Supabase 로 이사 · R2 설계
 
