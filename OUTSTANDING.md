@@ -182,7 +182,7 @@ POST /api/reel/14fd0ce0-e4fa-40a1-b4f9-59816f20b2af/attach
    접근만 풀리면 그 폴더에서 **`npx vercel deploy --prod --yes` 한 줄**이다
 2. **attach 미실행**(위 ④) — 배포 뒤 첫 일
 3. **낭독과 입이 안 맞는다**(위 ④) — `lib/reel/scenario.js`
-4. **내가 만든 헛 Vercel 프로젝트 둘을 지워야 한다**(사장님 손이 필요하다 · 아래 절)
+4. ~~**내가 만든 헛 Vercel 프로젝트 둘**~~ → ✅ **09-09 저녁 삭제 완료**(사장님 지시 · 아래 절 ②)
 
 ### 🏠 09-09 — 첫 화면을 랜딩으로 (`9cb4842` · **미푸시·미배포**)
 
@@ -239,12 +239,16 @@ orgId     team_aCz9KRKti2eU2OI5lewdTYPM
 조용히 **새 프로젝트를 만든다**(`✓ Created <팀>/<이름>`). 이 문서가 이미 경고한
 "팀에 `step-gate` 라는 실수로 생긴 프로젝트"와 **같은 사고**이고, 09-09 에 두 번 더 냈다:
 
-| 유령 | 팀 |
-|---|---|
-| `prj_0u0WSAIsRnaca8nOHqbHHq1cvfYc` | `fixups-projects-1617c44a` |
-| `prj_9Vxr51E9gVQlachipuYSjjW7dxd2` | `fixuperp` |
+| 유령 | 팀 | 상태 |
+|---|---|---|
+| `prj_0u0WSAIsRnaca8nOHqbHHq1cvfYc` | `fixups-projects-1617c44a` | ✅ **09-09 저녁 삭제** |
+| `prj_9Vxr51E9gVQlachipuYSjjW7dxd2` | `fixuperp` | ✅ **09-09 저녁 삭제** |
 
-둘 다 배포 0·env 0 이다. 지우기: `npx vercel project rm fixup-shortform-service --scope <팀> --yes`.
+둘 다 배포 0·env 0 이었다. **사장님 지시로 지웠다**(HTTP 204 · 삭제 뒤 두 팀 목록에서 사라졌고
+라이브 `/login` 은 그대로 200 · 두 팀의 다른 프로젝트도 온전).
+★ **지울 때는 이름이 아니라 id 로 지운다** — `DELETE /v9/projects/<prj_…>?teamId=<team_…>`.
+이름으로 지우면(`vercel project rm fixup-shortform-service --scope <팀>`) **동명인 진짜를
+잘못 짚을 위험**이 있다. 이 사고의 원인 자체가 "이름이 같으면 같은 것"이라는 가정이었다.
 ★ 링크할 일이 있으면 이름이 아니라 **`.vercel` 을 복사해 넣어라**(배포할 때 쓰는 그 방법).
 
 **③ 🔴🔴 지금 CLI 로그인이 진짜 org 를 못 본다 — 09-09 저녁에 API 로 확정했다.**
@@ -266,7 +270,7 @@ npx vercel deploy --prod --yes  (.vercel 복사해 넣은 폴더에서)  → "No
 즉 **이 계정은 라이브를 소유한 팀의 멤버가 아니다.** 09-08 17:07 배포가 됐다는 것은
 그때는 **다른 계정이 로그인돼 있었다**는 뜻이다. 재로그인을 몇 번 해도 이 벽은 안 뚫린다.
 
-★ **동명 프로젝트에 속지 마라.** `vercel project ls` 를 두 팀에서 돌리면 양쪽 다
+★ **동명 프로젝트에 속지 마라.**(유령 둘은 지웠지만, 같은 사고를 또 낼 수 있다) 그때 `vercel project ls` 를 두 팀에서 돌리면 양쪽 다
 `fixup-shortform-service` 가 보이는데, **둘 다 09-09 에 내가 만든 유령**이다(위 ②).
 가르는 법: `Latest Production URL` 이 `--` 이고 `alias` 가 비어 있으면 유령이다.
 진짜는 별칭 `fixup-shortform-service.vercel.app` 을 쥐고 있다(09-09 저녁 `/login` **200**).
