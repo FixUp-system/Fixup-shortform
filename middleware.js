@@ -158,5 +158,11 @@ export const config = {
 // ★ samples/ — 가짜 모드가 쓰는 스토리보드 표본(public/samples).
   //   빼지 않으면 로그인 벽에 막혀 **307 이 되고 그림이 통째로 안 뜼다**
   //   (2026-08-25 실측). fonts/ 와 같은 성격이다 — 신원과 무관한 정적 파일.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|fonts/|samples/).*)"],
+  // ★ showcase/ — 랜딩에 굽어 넣은 표지(public/showcase · 2026-09-10). fonts/·samples/ 와
+  //   같은 성격이다: 신원과 무관한 정적 파일이고, 손님이 처음 보는 화면이 그것으로 그려진다.
+  //   ⚠️ 빼지 않으면 **307 → /login** 이 되어 표지가 통째로 안 뜬다. 같은 날 실측으로
+  //     확인했다 — `/samples/…`(빠져 있음) 200 · `/board-logo.png`(안 빠짐) **307**.
+  //   ★ 넓히는 것은 이 한 자리뿐이고, 넓어진 범위는 tests/showcase-static.test.js 가
+  //     matcher 를 정규식으로 되살려 잰다(앱 경로·API 가 여전히 걸리는지까지).
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|fonts/|samples/|showcase/).*)"],
 };

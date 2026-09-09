@@ -1,81 +1,58 @@
-"use client";
-
-// 첫 화면의 **덮개와 결과물 벽** — 만든 것을 비율 그대로 늘어놓는다 (2026-09-09 밤 개편).
+// 첫 화면의 **덮개와 결과물 벽** — 굽힌 표지에서 그린다 (2026-09-10 개편).
 //
-// ★★ 여기서 영상 태그를 쓰지 마라. 2026-09-07 에 이 서비스가 죽었다 — 보관함 목록이
-//   그 태그를 물고 있어서 **화면을 여는 것만으로** 전송량 할당량이 탔고, Supabase 가
-//   프로젝트를 402 로 막아 로그인까지 함께 죽었다. 여기는 표지 그림만 그리고, 영상은
-//   눌러서 상세에서 본다. 덮개는 **화면을 가득 채우므로** 더더욱 그렇다 — 손님이 오는
-//   화면이라 한 자리라도 물면 방문 수만큼 나간다.
+// ★★★ **클라이언트 부품이 아니다.** 2026-09-10 에 서버로 내렸다(사장님 지시: "파일 자체를
+//   올린다던가 하는 방식으로 해결할 수 없을까?"). 그전에는 이랬다:
+//     화면이 뜬다 → JS 가 붙는다 → `/api/projects` (0.85~1.5초) → **그제야** 표지 25장 출발
+//     → 그중 스무 장이 404(장당 3.34초) → 브라우저가 404 를 맞고 나서야 그 칸을 지운다
+//   라이브 실측으로 첫 방문 **7.5초**였고, 09-09 에 엣지가 쥐게 고쳐도 **첫 방문은 그대로**였다.
+//   지금은 사슬이 통째로 없다 — 목록도 표지도 **굽는 시점**에 정해진다.
+//     API 표지  19KB  → 첫 1.2~2.7초 · 캐시 0.18초
+//     정적 파일 607KB → 첫 0.65초    · 캐시 **0.076초**  ← 큰 파일이 더 빠르다
+//
+// ★★ 그리고 **죽은 칸이 원리적으로 없다.** 굽는 스크립트가 실제로 200 으로 받아지는 것만
+//   남긴다(scripts/showcase-refresh.mjs). 그래서 onError 도 lost Set 도 필요 없어졌다.
+//   ⚠️ 2026-09-10 실측: 후보 22편 중 **살아 있는 것은 다섯**뿐이다(09-07 파일 미이관).
+//     벽이 얇아 보이는 것은 화면 탓이 아니라 **되찾을 파일이 아직 안 왔기 때문**이다.
+//
+// ★★ 여기서 영상 태그를 쓰지 마라. 2026-09-07 에 이 서비스가 죽었다 — 목록이 그 태그를
+//   물어서 **화면을 여는 것만으로** 전송량 할당량이 탔고 로그인까지 함께 죽었다.
+//   정적으로 바뀌었다고 물어도 되는 것이 아니다 — 오히려 엣지에서 그대로 빠져나간다.
 //   ⚠️ 그래서 이 파일에는 그 태그를 **여는 꺾쇠까지 붙여 적지 않는다** — 주석에도다.
-//   tests/home-sections-ui.test.js 가 소스를 날 것 그대로 훑기 때문이고, 그것이 의도다.
 //
-// ★★★ **덮개는 목록이 비어도 그린다.** 옛 코드는 완성본이 없으면 부품 전체가 null 이었다.
-//   그때는 벽만 들어 있었으니 맞았지만, 지금은 덮개 안에 **브랜드와 로그인 문**이 얹혀
-//   있다 — 그대로 두면 목록이 빈 순간 껍데기가 통째로 증발한다. 감추는 것은 **벽**이다.
-//
-// ★★ 껍데기(nav)는 **서버가 만들어 건넨다.** 신원(로그인 여부)은 요청 헤더에 있고 이
-//   부품은 클라이언트라 그것을 모른다. 그래서 app/home/page.js 가 만들어 prop 으로 준다.
-//
-// ★★ 카드에 **글을 안 단다.** 2026-09-09 프로덕션 실측: 완성본 여섯 편 중 셋의 이름이
-//   영어 지문 원문이었다(저장된 이름 칸에 사장님이 적은 소재가 그대로 들어간다).
-//   손님이 이 화면을 보므로 그 글자가 서비스의 얼굴이 된다.
+// ★★ 카드에 **글을 안 단다.** 저장된 이름이 영어 지문 원문인 편이 섞여 있다(09-09 실측).
 //   ⚠️ 그 낱말을 주석에도 영어로 적지 마라 — 판이 날 것으로 센다.
 //
-// ★★ **비율을 안 정한다.** 타일 높이는 그림이 정한다(`img { width:100%; height:auto }`).
-//   숏폼은 9:16 이 많고 메인에 걸 것은 16:9 라 비율이 섞이는데, 여기서 한 비율로 못 박으면
-//   그림이 잘리거나 늘어난다. 다단(column)으로 흘려 두면 어떤 비율이 와도 제 모양으로 선다.
-//   ★ 목록 API 는 화면 비율을 안 실어 준다 — 그림 자체가 비율이므로 물어볼 필요가 없다.
-//   ★ 단 **덮개만은 예외**다. 화면 상단을 가득 채우는 자리라 높이를 CSS 가 정하고 그림은
-//     잘라 맞춘다(object-fit). 거기 걸릴 것은 새로 만들 16:9 한 편이다.
-//
-// ★ 그림이 **안 열리는 칸은 스스로 빠진다.** 2026-09-09 실측: 표지 주소가 있는 25편 중
-//   실제로 열리는 것은 다섯뿐이다(09-07 파일 미이관). 덮개도 같은 그물을 탄다 —
-//   덮개 그림이 죽으면 그 편이 빠지고 **다음 편이 덮개로 올라온다.**
-import { useEffect, useState } from "react";
+// ★ **비율을 안 정한다.** 타일 높이는 그림이 정한다. 숏폼은 9:16 이 많고 메인에 걸 것은
+//   16:9 라 섞이는데, 한 비율로 못 박으면 그림이 잘리거나 늘어난다.
+//   ★ 대신 **크기를 적어 준다**(w·h). 굽는 시점에 실제 파일에서 쟀으므로 브라우저가 자리를
+//     미리 잡는다 — 표지가 하나씩 뜰 때 아래가 밀리지 않는다.
 import Link from "next/link";
-import { thumbUrl } from "../lib/thumb-url";
+import { SHOWCASE } from "../lib/showcase.js";
 
-// 벽에 거는 최대 개수. 잘리는 선 아래는 어차피 안 보이지만, 열 균형을 위해 넉넉히 건다.
-const MAX = 24;
+// 맨 앞이 덮개로 올라가고 나머지가 벽이 된다.
+const COVER = SHOWCASE[0] || null;
+const WALL = SHOWCASE.slice(1);
 
 export default function HomeMade({ nav = null }) {
-  const [pool, setPool] = useState([]);
-  // 그림을 못 받은 편. Set 을 **새로 만들어** 넣는다 — 제자리에서 고치면 리렌더가 안 온다.
-  const [lost, setLost] = useState(() => new Set());
-
-  useEffect(() => {
-    let alive = true;
-    fetch("/api/projects")
-      .then((r) => (r.ok ? r.json() : { projects: [] }))
-      .then((d) => {
-        if (!alive) return;
-        setPool((d.projects || []).filter((p) => p.video_url && p.image_url).slice(0, MAX));
-      })
-      .catch(() => {});
-    return () => { alive = false; };
-  }, []);
-
-  const made = pool.filter((p) => !lost.has(p.id));
-  const cover = made[0] || null;
-
   return (
     <>
-      {/* ★★ 덮개 — 화면 상단을 **가득** 채운다(사장님 2026-09-09 밤). 새로 만들 16:9 한
-          편이 들어갈 자리이고, 지금은 가장 최근 완성본의 표지를 건다.
-          ★ 껍데기가 이 안에 얹힌다 — 그래서 목록이 비어도 이 덩어리는 늘 그린다. */}
+      {/* ★★ 덮개 — 화면 상단을 **가득** 채운다(사장님 2026-09-09). 새로 만들 16:9 한 편이
+          들어갈 자리이고, 지금은 굽힌 표지의 맨 앞을 건다.
+          ★ 껍데기가 이 안에 얹힌다 — 그래서 표지가 하나도 없어도 이 덩어리는 늘 그린다. */}
       <div className="stage-cover">
-        {cover && (
+        {COVER && (
           <img
             className="stage-cover-img"
-            src={thumbUrl(cover.image_url)}
+            src={`/showcase/${COVER.file}`}
             alt=""
-            onError={() => setLost((was) => new Set(was).add(cover.id))}
+            width={COVER.w}
+            height={COVER.h}
+            fetchPriority="high"
           />
         )}
         {nav}
-        {cover && (
-          <Link href={`/archive/${cover.id}`} className="stage-cover-play" aria-label="최근 만든 영상 보기">
+        {COVER && (
+          <Link href={`/archive/${COVER.id}`} className="stage-cover-play" aria-label="최근 만든 영상 보기">
             <span className="stage-bigplay" aria-hidden="true">
               <svg width="20" height="24" viewBox="0 0 20 24" fill="currentColor"><path d="M0 0l20 12L0 24z" /></svg>
             </span>
@@ -83,24 +60,26 @@ export default function HomeMade({ nav = null }) {
         )}
       </div>
 
-      {made.length > 0 && (
+      {WALL.length > 0 && (
         <div className="stage-band">
           <div className="stage-bar">
             <span>만든 것</span>
-            <span><b>{made.length}</b> 편</span>
+            <span><b>{SHOWCASE.length}</b> 편</span>
           </div>
 
-          {/* ★★ 벽을 **한 선에서 자른다.** 자유 배치는 열마다 바닥이 들쭉날쭉한데, 잘라 버리면
-              그 아래가 곧은 한 줄이 된다 — 어질러 보이지 않으면서 "더 있다"도 전해진다. */}
+          {/* ★★ 벽을 **한 선에서 자른다.** 비율이 제각각이라 열마다 바닥이 들쭉날쭉한데,
+              잘라 버리면 그 아래가 곧은 한 줄이 된다. 지금처럼 장수가 적으면 잘릴 것이
+              없어 그냥 제 높이로 선다 — 자르는 자리는 장수가 늘면 저절로 일한다. */}
           <div className="stage-cut">
             <div className="stage-wall">
-              {made.map((p) => (
-                <Link key={p.id} href={`/archive/${p.id}`} className="stage-tile">
+              {WALL.map((t) => (
+                <Link key={t.file} href={`/archive/${t.id}`} className="stage-tile">
                   <img
-                    src={thumbUrl(p.image_url)}
+                    src={`/showcase/${t.file}`}
                     alt="만든 영상"
+                    width={t.w}
+                    height={t.h}
                     loading="lazy"
-                    onError={() => setLost((was) => new Set(was).add(p.id))}
                   />
                   <span className="stage-play" aria-hidden="true">
                     <svg width="9" height="11" viewBox="0 0 9 11" fill="currentColor"><path d="M0 0l9 5.5L0 11z" /></svg>

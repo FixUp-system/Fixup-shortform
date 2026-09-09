@@ -18,19 +18,23 @@
 // ★★ 그래서 단정은 **이름이 적혀 있는가**가 아니라 **코드가 그렇게 생겼는가**를 잰다.
 //   이름만 재면 바로 위 주석 한 줄로도 통과한다(2026-09-08 변이 검증에서 실제로 겪었다).
 //
-// ★ 화면이 세 파일이다. 껍데기(app/home/page.js)는 서버 컴포넌트라 신원을 읽고,
-//   목록을 무는 덮개·벽이 클라이언트 부품(components/HomeMade.jsx)이며,
+// ★ 화면이 세 파일이다. 껍데기(app/home/page.js)와 덮개·벽(components/HomeMade.jsx)이
+//   **둘 다 서버 컴포넌트**이고(2026-09-10 — 표지를 구워 넣으며 클라이언트를 걷었다),
 //   틀을 걷는 판단은 components/AppShell.jsx 가 한다.
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 
 const src = readFileSync("app/home/page.js", "utf8");
 const made = readFileSync("components/HomeMade.jsx", "utf8");
 const shell = readFileSync("components/AppShell.jsx", "utf8");
 
 describe("home — 화면을 채우는 어두운 무대", () => {
-  it("★ 최근 완성본을 불러온다", () => {
-    expect(made, "목록을 안 부른다").toMatch(/fetch\(\s*["'`]\/api\/projects/);
+  it("★ 굽힌 목록에서 그린다 — 부르지 않는다", () => {
+    // ★ 이 판은 원래 "목록을 부르는가"였다. 2026-09-10 에 **부르지 않는 것이 계약**이 됐다
+    //   (표지를 파일로 구워 넣었다 — 이유는 tests/showcase-static.test.js 머리말).
+    //   지우지 않고 뒤집는다 — 다음 사람이 "왜 안 부르지"를 여기서 알 수 있어야 한다.
+    expect(made, "굽힌 목록을 안 읽는다").toMatch(/SHOWCASE/);
+    expect(made, "다시 목록을 부른다").not.toMatch(/fetch\(/);
   });
 
   it("★★★ 어디에도 영상 태그가 없다 — 벽도, 덮개도", () => {
@@ -43,9 +47,18 @@ describe("home — 화면을 채우는 어두운 무대", () => {
     expect(made, "<video> 가 덮개·벽에 있다").not.toMatch(/<video/);
   });
 
-  it("★ 표지 그림은 작은 판을 지난다", () => {
-    expect(made, "표지 그림이 thumbUrl 을 안 지난다").toMatch(/src=\{thumbUrl\(/);
-    expect(made, "thumbUrl 을 안 가져온다").toMatch(/import\s*\{[^}]*\bthumbUrl\b[^}]*\}\s*from/);
+  it("★★ 표지는 여전히 작다 — 굽는 자리가 바뀌었을 뿐 이유는 그대로다", async () => {
+    // 원래는 `?t=1`(thumbUrl)로 작은 판을 받았다. 지금은 **굽는 스크립트가** 작은 판을 받아
+    // 파일로 떨어뜨리므로 화면에는 그 흔적이 없다. 그래도 지켜야 할 것은 같다 — 손님이
+    // 처음 보는 화면이라 한 장이 커지면 방문 수만큼 곱해진다(2026-09-07 사고의 교훈).
+    // ★ 그래서 이름이 아니라 **실제 파일 크기**를 잰다.
+    const { SHOWCASE } = await import("../lib/showcase.js");
+    expect(SHOWCASE.length, "굽힌 표지가 없다").toBeGreaterThan(0);
+    for (const t of SHOWCASE) {
+      const kb = statSync("public/showcase/" + t.file).size / 1024;
+      expect(kb, t.file + " 이 크다 — 표지는 카드 크기면 된다").toBeLessThan(120);
+    }
+    expect(made, "굽힌 자리에서 안 읽는다").toMatch(/\/showcase\//);
   });
 
   it("★★ 덮개가 화면을 채우고 그 위에 껍데기가 얹힌다", () => {
@@ -53,7 +66,7 @@ describe("home — 화면을 채우는 어두운 무대", () => {
     expect(made, "덮개가 없다").toMatch(/className="stage-cover"/);
     expect(src, "덮개 위에 얹을 껍데기가 없다").toMatch(/className="stage-nav"/);
     // ★ 껍데기는 **덮개 안으로** 들어가야 한다 — 서버가 신원을 읽어 만들고
-    //   클라이언트 부품이 덮개 안에 꽂는다. 그래서 prop 으로 건네고 거기서 받는다.
+    //   덮개 부품이 그 안에 꽂는다. 그래서 prop 으로 건네고 거기서 받는다(둘 다 서버다).
     expect(src, "껍데기를 덮개에 안 건넨다").toMatch(/<HomeMade[^>]*\bnav=\{/);
     expect(made, "덮개가 껍데기를 안 받는다").toMatch(/function HomeMade\(\s*\{[^}]*\bnav\b/);
   });
@@ -62,12 +75,16 @@ describe("home — 화면을 채우는 어두운 무대", () => {
     // 옛 코드는 목록이 비면 **부품 전체**가 null 이었다. 껍데기가 덮개 안으로 들어온
     // 지금 그대로 두면 브랜드와 로그인 문이 통째로 증발한다.
     // 그래서 감추는 것은 **벽**이고, 덮개는 늘 선다.
-    expect(made, "완성본이 없으면 부품 전체가 사라진다").not.toMatch(
-      /return\s*\(?\s*made\.length\s*>\s*0\s*&&/
+    expect(made, "표지가 없으면 부품 전체가 사라진다").not.toMatch(
+      /return\s*\(?\s*(SHOWCASE|WALL|COVER)[\w.]*\s*(\.length\s*>\s*0\s*)?&&/
     );
     expect(made, "벽을 조건부로 감추지 않는다").toMatch(
-      /made\.length\s*>\s*0\s*&&\s*\(?\s*<div className="stage-band"/
+      /WALL\.length\s*>\s*0\s*&&\s*\(?\s*<div className="stage-band"/
     );
+    // ★ 덮개 **그림**은 없을 수 있다(굽힌 표지가 0장인 저장소에서 받아 갈 수도 있다).
+    //   그때도 껍데기는 서야 하므로 그림만 조건부다.
+    expect(made, "덮개 그림이 무조건 그려진다 — 표지가 0장이면 깨진 칸이 뜬다")
+      .toMatch(/\{COVER\s*&&/);
   });
 
   it("★★ 머리글을 걷었다 — 덮개가 말한다", () => {
@@ -117,9 +134,21 @@ describe("home — 화면을 채우는 어두운 무대", () => {
     expect(made, "저장된 이름을 카드에 싣는다").not.toMatch(/\btitle\b/);
   });
 
-  it("★ 그림이 안 열리는 칸은 스스로 빠진다", () => {
-    // 2026-09-09 실측: 표지 주소가 있는 25편 중 다섯만 실제로 열린다(09-07 파일 미이관).
-    expect(made, "못 받은 그림을 그대로 둔다").toMatch(/onError=\{/);
+  it("★★ 깨진 칸이 **원리적으로** 없다 — 화면에서 지우는 것이 아니라 애초에 안 굽는다", () => {
+    // ★ 이 판은 원래 "onError 로 스스로 빠지는가"였다. 2026-09-10 에 **필요 없어졌다**:
+    //   굽는 스크립트가 실제로 200 으로 받아지는 것만 남기기 때문이다
+    //   (scripts/showcase-refresh.mjs · 09-10 실측: 후보 22편 중 **다섯**만 살아 있었다).
+    //   화면이 404 를 맞고 나서 지우는 것과, 애초에 안 거는 것은 다르다 —
+    //   앞엣것은 그 404 하나하나가 3.34초짜리 느린 요청이었다.
+    // ★★ 그래서 여기서는 **굽힌 것이 실제로 다 있는지**를 잰다. 목록과 파일이 갈리면
+    //   그 순간 깨진 칸이 생기고, 그것이 이 방식의 유일한 실패 모양이다.
+    const { existsSync } = require("node:fs");
+    const list = readFileSync("lib/showcase.js", "utf8");
+    const files = [...list.matchAll(/file:\s*"([^"]+)"/g)].map((m) => m[1]);
+    expect(files.length, "굽힌 목록이 비어 있다").toBeGreaterThan(0);
+    for (const f of files) {
+      expect(existsSync("public/showcase/" + f), f + " 이 목록에만 있고 파일이 없다").toBe(true);
+    }
   });
 
   it("★★ 벽은 한 선에서 잘리고 그 위에 더 보러가기가 선다", () => {
