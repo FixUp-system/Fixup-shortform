@@ -95,6 +95,42 @@
 뭉개져서 "`\s` 가 `\s` 로 들어갔다"는 헛말이 됐고, 그 자리에서 Edit 로 고쳤다.
 **코드도 문서도 heredoc 말고 Write/Edit 로 넣어라.**
 
+#### 🔴🔴 09-09 — Vercel 프로젝트를 찾다가 알아낸 것 (**다음 배포 전에 읽어라**)
+
+로컬에서 새 Supabase 값을 받으려다 세 번 헛짚었다. 남은 사실이 배포에 직결된다.
+
+**① 진짜 프로젝트의 좌표는 배포 폴더에만 있다** — 이 저장소·이 문서 어디에도 없었다.
+
+```
+projectId prj_CvJ8kKLFYowtSP3dMCyCoCuxVkiu
+orgId     team_aCz9KRKti2eU2OI5lewdTYPM
+출처      shotform-deploy-clean/.vercel/project.json (shotform-deploy 도 같다)
+```
+
+**② `vercel link --project <이름>` 은 링크가 아니라 *만들기* 다.** 그 이름이 그 팀에 없으면
+조용히 **새 프로젝트를 만든다**(`✓ Created <팀>/<이름>`). 이 문서가 이미 경고한
+"팀에 `step-gate` 라는 실수로 생긴 프로젝트"와 **같은 사고**이고, 09-09 에 두 번 더 냈다:
+
+| 유령 | 팀 |
+|---|---|
+| `prj_0u0WSAIsRnaca8nOHqbHHq1cvfYc` | `fixups-projects-1617c44a` |
+| `prj_9Vxr51E9gVQlachipuYSjjW7dxd2` | `fixuperp` |
+
+둘 다 배포 0·env 0 이다. 지우기: `npx vercel project rm fixup-shortform-service --scope <팀> --yes`.
+★ 링크할 일이 있으면 이름이 아니라 **`.vercel` 을 복사해 넣어라**(배포할 때 쓰는 그 방법).
+
+**③ 🔴 지금 CLI 로그인이 진짜 org 를 못 본다.** `npx vercel whoami` = `fixup-system` 인데,
+`vercel link` 가 보여 준 팀 목록은 `fixups-projects-1617c44a`·`fixuperp` **둘뿐**이고
+진짜 org(`team_aCz9…`)는 **거기 없다**. `.vercel` 을 복사해 넣고 `env pull` 을 해도
+`Could not retrieve Project Settings` 로 막힌다.
+**09-08 17:07 배포는 됐으므로 그 뒤에 로그인이 바뀌었거나 권한이 빠진 것이다.**
+→ **다음 배포 전에 `npx vercel login` 으로 그 org 를 볼 수 있는 계정인지 먼저 확인해라.**
+   미배포가 15커밋인데 그 자리에서 막히면 회차가 통째로 날아간다.
+
+**④ 그래서 로컬은 여전히 옛 Supabase 를 본다.** `.env.local` 은 **손대지 않았다**
+(백업 `env.local.bak` 과 바이트 동일). 결과물 띠는 로컬에서 여전히 안 뜬다 —
+배포 뒤 프로덕션에서 보거나, Supabase 대시보드에서 값을 직접 넣어야 한다.
+
 ---
 
 ### 🎨 09-08 **저녁** — 밝은 벌 한 벌로 (MCS 와 같은 디자인 언어 · 코드 커밋 **여덟** · **미푸시·미배포**)
