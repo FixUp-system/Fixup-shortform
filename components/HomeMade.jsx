@@ -24,8 +24,13 @@ import Link from "next/link";
 import { thumbUrl } from "../lib/thumb-url";
 
 // 화면에 서는 칸 수. 후보는 이보다 넉넉히 받는다 — 못 받는 그림이 섞이기 때문이다.
-const SHOW = 4;
-const CANDIDATES = 12;
+//
+// ★ 2026-09-09 에 넷에서 여덟으로 늘렸다(사장님: "만든 영상들이 쭉 나오고"). 칸은
+//   **가로로 흐른다**(app/globals.css 의 .home-reel) — 격자로 두면 편 수가 열 수의 배수가
+//   아닐 때 마지막 줄에 빈 칸이 남아 고장으로 보인다. 지금 프로덕션에서 표지가 실제로
+//   열리는 편은 **다섯**뿐이라(09-07 파일 미이관) 그 상황이 기본값이다.
+const SHOW = 8;
+const CANDIDATES = 24;
 
 export default function HomeMade() {
   const [pool, setPool] = useState([]);

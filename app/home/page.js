@@ -34,13 +34,18 @@ import HomeMade from "../../components/HomeMade.jsx";
 // ★ path 와 slug 는 다르다. slug 는 **눈에 보이는 이름표**(그 갈래의 뿌리 주소)이고,
 //   path 는 **실제로 여는 문**이다. 둘이 같아야 할 것 같지만 `/ads`·`/reel` 에는 화면이
 //   없다(`app/ads/new` · `app/reel/new` 만 있다) — 뿌리를 그대로 걸면 404 다.
+// ★★ 2026-09-09 — 셋에서 **둘**이 됐다(사장님 확정). 이름이 엇갈려 있었다:
+//   여기서는 `/reel/new` 를 「통짜 릴」, `/create` 를 「단계별 영상」이라 불렀는데,
+//   사이드바는 `/reel` 을 **「단계별 영상」**으로 부르고 `/create` 는 **감춘다**
+//   (components/Sidebar.jsx 의 SIDEBAR_FLOWS `create: false`, 2026-08-25 사장님 결정).
+//   그래서 이 화면만 **끈 흐름을 광고하고**, 살아 있는 흐름을 다른 이름으로 부르고 있었다.
+//   ★ 되살릴 때는 SIDEBAR_FLOWS 와 이 표를 **함께** 켠다 — 한쪽만 켜면 다시 갈린다.
+//     (판이 그것을 잰다: tests/home-sections-ui.test.js)
 const TOOLS = [
   { path: "/ads/new", slug: "/ads", name: "원클릭 영상",
     sub: "소재만 적으면 시나리오부터 완성본까지 한 번에 나옵니다.", how: "소재 → 시나리오 → 완성" },
-  { path: "/create", slug: "/create", name: "단계별 영상",
-    sub: "시나리오·목소리·그림·영상을 단계마다 확인하고 고칩니다.", how: "6단계 · 컷마다 다시 만들기" },
-  { path: "/reel/new", slug: "/reel", name: "통짜 릴",
-    sub: "스토리보드 한 장을 통째로 넘겨 한 편으로 굽습니다.", how: "보드 1장 → 한 편" },
+  { path: "/reel/new", slug: "/reel", name: "단계별 영상",
+    sub: "시나리오와 스토리보드를 단계마다 확인하고 한 편으로 굽습니다.", how: "단계마다 확인 → 한 편" },
 ];
 
 // 만드는 법은 **세 걸음**이다(2026-09-09). 넷째 칸이던 "보관함"은 만드는 방법이 아니라
@@ -56,13 +61,18 @@ export default async function HomePage() {
 
   return (
     <section className="panel panel--wide home">
+      {/* ★★ 2026-09-09 — **만든 영상이 맨 먼저다**(사장님 지시, higgsfield.ai/ko 를 가리키며:
+          "만든 영상들이 쭉 나오고 그 아래에 간단한 설명이 나오면 좋을 것 같아").
+          실측으로도 그 페이지는 큰 글자 없이 **세로형 격자로 곧장 연다** — 설명 절은
+          전부 그 아래다. 그래서 여기서도 말보다 결과물이 먼저 선다.
+          ★ 글(제목·리드·버튼)은 그 아래로 내려갔다. 순서만 바뀌었고 내용은 그대로다. */}
+      <HomeMade />
+
       <h1 className="display">소재만 적으면<br /><em>한 편이 나옵니다</em></h1>
       <p className="lede">시나리오·목소리·그림·영상이 한 줄기로 이어집니다.</p>
       <Link className="cta" href={signedIn ? "/ads/new" : "/login"}>
         {signedIn ? "만들러 가기" : "무료로 시작하기"}
       </Link>
-
-      <HomeMade />
 
       {/* ★ 절마다 이름을 단다(2026-09-09). 그전에는 이 띠가 화면 맨 아래에 조용히 깔린
           꼬리였는데, 이제 손님이 두 번째로 읽는 자리다 — 이름이 없으면 숫자 셋이
