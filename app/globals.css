@@ -91,14 +91,12 @@
      "보는 면은 어둡게, 조작하는 면만 밝게" — 이 개편의 경계선이다. */
   --stage-dark: #101010;
 
-  /* 결과물 어두운 띠 — 테마가 아니라 **구간**이다. --deep 은 가라앉은 칸이라 못 쓴다
-     (var(--deep) 을 쓰는 16곳 중 .side-step.on i 는 그 값을 글자색으로 쓴다). */
-  --band: #1C1B19;
-  --band-ink: #ECEAE2;
-  --band-soft: #9A968C;
-  /* 로즈의 밝은 쪽. **띠 안에서만** 쓴다 — 밝은 바탕에 흰 글자를 얹으면 AA(4.5)에 모자란다.
-     (대비 수를 여기 적지 않는다: 유일한 자리는 OUTSTANDING.md 「09-08 저녁」 §⑥ 표다) */
-  --accent-fill: #C96A8A;
+  /* ★★ 2026-09-09 — 여기 있던 넷(--band · --band-ink · --band-soft · --accent-fill)을
+     **지웠다.** 넷 다 결과물 띠가 어두울 때만 쓰이던 값인데, 사장님 지적("뒤에 백그라운드가
+     검정색이라 뭔가 이질감이 드는데")으로 그 띠가 밝은 면(--deep)이 되면서 **소비자가 0**이
+     됐다. 이 저장소의 규칙 그대로다: 쓰는 자리가 없는 색은 다음 사람에게 거짓말을 한다.
+     어두운 띠를 되살릴 일이 생기면 값은 이 주석에 있다 — #1C1B19 / #ECEAE2 / #9A968C /
+     #C96A8A. 되살릴 때는 tests/design-system.test.js 의 기대 표에도 함께 넣어라. */
 
   /* ★ 버튼 치수 3단(2026-08-18 사장님 지적: "어떤 버튼은 작고 어떤 버튼은 크다").
      이름이 없어서 자리마다 픽셀을 새로 적고 있었다 — 같은 .mini 가 50px·46px·38px·
@@ -2614,8 +2612,10 @@ h1.login-head { margin-inline: auto; }
    ★ .home-steps · .home-step 은 **이름만 살아남았다.** 뜻이 다르다 — 도해의 세 칸이던
      것이 작동 원리 4단이 됐다. 옛 규칙을 남겨 두면 새 격자 위에 옛 flex 가 겹쳐
      조용히 어긋난다(그래서 "안 쓰니 놔둔다"가 아니라 지운다).
-   ★ 띠는 --band 다. --deep 으로는 안 된다 — 그것은 밝은 벌 안에서 한 단계 가라앉은
-     칸이라, 그 위에 놓으면 "만든 것"이 화면에서 앞으로 나오지 않는다. */
+   ★ 띠는 --deep 이다(2026-09-09). 그전에는 --band(#1C1B19) 였고 "가라앉은 칸으로는
+     만든 것이 앞으로 안 나온다"는 것이 이유였는데, 09-09 에 그 띠가 **화면의 첫 칸**으로
+     올라오면서 검은 면이 첫인상을 통째로 차지해 어긋남이 더 커졌다(사장님 지적).
+     덩어리로 앞에 나온다는 뜻은 그대로 두고, 그 덩어리를 어둡게 하지 않는 쪽을 골랐다. */
 .home { max-width: 1100px; }
 .home .lede { font-size: 16px; color: var(--ink-soft); margin: 0 0 var(--sp-4); max-width: 62ch; text-wrap: pretty; }
 /* 첫 화면의 주 버튼. 전역 .cta 의 margin-top(20px)은 폼 아래에 홀로 설 때의 값이라
@@ -2624,13 +2624,19 @@ h1.login-head { margin-inline: auto; }
      이 여백이 딸려 들어가지 않는다. */
 .home > .cta { margin-top: var(--sp-2); }
 
-/* 결과물 띠 — 어두운 면 위에 **표지 그림만** 늘어놓는다.
+/* 결과물 띠 — **표지 그림만** 늘어놓는다.
    ★★ 여기에 <video> 를 두지 마라. 2026-09-07 에 보관함 목록이 영상을 물고 있어서
       화면을 여는 것만으로 전송량 할당량이 탔고, Supabase 가 프로젝트를 402 로 막아
-      로그인까지 함께 죽었다. tests/home-sections-ui.test.js 가 그것을 잰다. */
+      로그인까지 함께 죽었다. tests/home-sections-ui.test.js 가 그것을 잰다.
+   ★★ 2026-09-09 — 면을 **어두운 벌(--band #1C1B19)에서 가라앉은 밝은 면(--deep)으로**
+      바꿨다(사장님: "뒤에 백그라운드가 검정색이라 뭔가 이질감이 드는데").
+      어두운 띠는 09-08 에 화면이 아직 어두운 벌이던 시절의 값이었고, 벌이 밝아진 뒤에도
+      혼자 남아 있었다. 09-09 에 그 띠가 **화면의 첫 칸**으로 올라오면서 첫인상을
+      통째로 차지하게 되어 어긋남이 커졌다.
+   ★ 그래도 면은 **남긴다**(투명이 아니다) — 이 절만 한 덩어리로 앞에 나와야 한다는 09-08 의
+     뜻은 그대로다. 바뀐 것은 그 덩어리를 **어둡게** 만들지 않는다는 것뿐이다. */
 .home-band {
-  background: var(--band);
-  color: var(--band-ink);
+  background: var(--deep);
   border-radius: var(--r-card);
   padding: var(--sp-5);
   margin: var(--sp-5) 0;
@@ -2645,8 +2651,8 @@ h1.login-head { margin-inline: auto; }
    그 면제를 이름 앞자리(`.home-…`)로 주면 **보관함 머리인 `.home-header` 까지** 딸려
    나간다(그쪽은 이름만 같은 앱층 화면이다). 그래서 뿌리를 적어 범위를 증명한다 —
    여섯 글자로 판이 이름이 아니라 자리를 보게 된다. 아래 .home-slug·.home-n 도 같다. */
-.home .home-band .eyebrow { color: var(--accent-fill); }
-.home-band h2 { color: var(--band-ink); font-size: 18px; font-weight: 700; margin: 0 0 var(--sp-4); }
+.home .home-band .eyebrow { color: var(--accent); }
+.home-band h2 { font-size: 18px; font-weight: 700; margin: 0 0 var(--sp-4); }
 /* ★★ 칸은 **가로로 흐른다**(2026-09-09). 격자로 두면 편 수가 열 수의 배수가 아닐 때
    마지막 줄에 빈 칸이 남아 고장으로 보인다 — 지금 프로덕션에서 표지가 실제로 열리는
    편은 **다섯**뿐이라(09-07 파일 미이관) 그 상황이 예외가 아니라 기본값이다.
@@ -2657,11 +2663,14 @@ h1.login-head { margin-inline: auto; }
   scroll-snap-type: x proximity;
 }
 .home-reel-item { display: block; text-decoration: none; scroll-snap-align: start; }
-/* 그림이 아직 안 왔을 때도 칸이 무너지지 않게 --stage-dark 를 깔아 둔다 —
-   띠(--band)보다 더 어두운 면이라 "여기에 그림이 들어온다"가 읽힌다. */
+/* 그림이 아직 안 왔을 때도 칸이 무너지지 않게 면을 깔아 둔다 —
+   띠(--deep)보다 한 단계 진한 --line 이라 "여기에 그림이 들어온다"가 읽힌다. */
 .home-reel-item img {
   width: 100%; aspect-ratio: 9 / 16; object-fit: cover;
-  border-radius: var(--r-ctl); background: var(--stage-dark);
+  /* ★ 아직 안 온 그림의 자리. 2026-09-09 에 --stage-dark(#101010) 에서 --line 으로
+     바꿨다 — 밝은 면 위에서 검은 칸은 **고장으로 보인다**(사장님 지적). 자막 무대의
+     --stage-dark 는 그대로다: 거기는 흰 자막을 판단하는 자리라 어두워야 한다. */
+  border-radius: var(--r-ctl); background: var(--line);
 }
 /* ★★ 카드 아래 글자를 **걷었다**(2026-09-09). 저장된 이름 칸에는 사장님이 적은 소재가
    그대로 들어가는데, 실측하니 여섯 편 중 셋이 영어 지문 원문이었다("You are creating a
@@ -2671,14 +2680,14 @@ h1.login-head { margin-inline: auto; }
 
 /* 보관함으로 나가는 길. 08-27 지시("기본으로 보관함 바로 확인")를 첫 화면이 바뀌어도
    지키는 자리다 — 손님이 여기서 막다른 길을 만나면 안 된다.
-   ★ --band-soft 의 **유일한 소비자**다(옛 카드 글자에서 물려받았다). 이 줄을 지우면
-     토큰도 함께 지워라 — 쓰는 자리가 없는 색은 다음 사람에게 거짓말을 한다. */
+   ★ 옛 카드 글자에서 색을 물려받은 자리다. 2026-09-09 에 띠가 밝아지며
+     --band-soft 에서 --ink-soft 로 옮겼고, 그 토큰은 소비자가 0 이 되어 지웠다. */
 .home-more {
   display: inline-block; margin-top: var(--sp-4);
-  font-size: 14px; color: var(--band-soft); text-decoration: none;
+  font-size: 14px; color: var(--ink-soft); text-decoration: none;
   border-bottom: 1px solid currentColor; padding-bottom: 1px;
 }
-.home-more:hover { color: var(--band-ink); }
+.home-more:hover { color: var(--ink); }
 
 /* 도구 격자 — 세 갈래를 같은 무게로 늘어놓는다(권장 배지를 안 단다:
    무엇을 만드는지에 따라 답이 달라지는데 화면이 미리 고를 수는 없다). */
