@@ -103,6 +103,11 @@
   --stage-line: #1C1C20;
   --stage-edge: rgba(255, 255, 255, .08);
   --stage-glass: rgba(255, 255, 255, .22);
+  /* 랜딩의 기둥과 여백 — 프로토타입이 쓰던 값 그대로다(`max-width:1400px` + 이 여백).
+     ★ 고정 24px 로 두면 넓은 모니터에서 벽이 화면 끝에 붙어 답답하고, 좁은 화면에서는
+       도리어 넓다. 실측 2560px 화면에서 그 차이가 그대로 보였다. */
+  --stage-gap: clamp(20px, 4vw, 56px);
+  --stage-col: 1400px;
 
   /* ★★ 2026-09-09 — 여기 있던 넷(--band · --band-ink · --band-soft · --accent-fill)을
      **지웠다.** 넷 다 결과물 띠가 어두울 때만 쓰이던 값인데, 사장님 지적("뒤에 백그라운드가
@@ -217,6 +222,21 @@ main.work {
   display: flex;
   flex-direction: column;
   justify-content: center;
+}
+/* work--flush — 랜딩 전용. 기둥(1160)도 여백도 걷고 화면을 통째로 내준다.
+   ★ 2026-09-09 밤에 생겼다. 랜딩을 어둡게 만들어 두고도 프로토타입과 딴판이었던 이유가
+     여기였다 — 색이 아니라 **틀**이 달랐다. 사이드바·띠는 AppShell 이 걷고(isLandingPath)
+     남은 기둥과 여백을 이 수식자가 편다. 새 수식자라 다른 화면에는 안 샌다.
+   ⚠️ 선택자를 `main.work--flush` 로 적는다. `.work--flush` 만 쓰면 바로 위
+     `main.work`(원소+클래스)가 **명시도에서 이겨** 기둥과 여백이 그대로 남는다 —
+     2026-09-09 밤에 실제로 그렇게 만들었고, 화면에는 "틀을 걷었는데 여전히 좁은 칸"으로
+     나타나 원인을 눈으로는 못 알아봤다(브라우저에서 계산값을 재고서야 보였다). */
+main.work--flush {
+  max-width: none;
+  width: 100%;
+  padding: 0;
+  margin-inline: 0;
+  min-height: 100dvh;
 }
 h1.pgtitle { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 4px; }
 .pgsub { color: var(--ink-soft); font-size: 14px; margin: 0 0 18px; }
@@ -2610,7 +2630,7 @@ h1.login-head { margin-inline: auto; }
 }
 @media (prefers-reduced-motion: reduce) { .running-dot { animation: none; } }
 
-/* ── 홈 — **어두운 무대**로 여는 첫 화면 (2026-09-09) ──────────────────────
+/* ── 홈 — **화면을 가득 채우는 어두운 무대** (2026-09-09 밤) ─────────────────
    ★★★ 여기가 이 저장소에서 **밝은 벌을 안 따르는 유일한 화면**이다.
      09-08 에 화면을 밝은 벌 한 벌로 바꾸고 어두운 벌을 파일째 지웠는데, 랜딩은 다시
      어두워졌다. 되돌린 것이 아니라 **경계가 하나 생긴 것**이다 — 자막 무대에만 살던
@@ -2619,52 +2639,105 @@ h1.login-head { margin-inline: auto; }
      hex 금지), **쓰는 자리는 `.home` 뿌리 아래뿐**이다. 이름 앞자리로 면제를 주면
      이름만 같은 앱층 화면(`.home-header`)이 딸려 나간다 — 09-08 에 이미 겪은 함정이고,
      tests/design-system.test.js 의 showcase 판정이 그 뿌리를 요구한다.
-   ★ 값은 사장님이 준 캡처에서 픽셀로 쟀다(설계 문서 §1-1):
-     바탕 #000000 · 껍데기 글자 #C8C8C8 · 무대 위 글자 #F7F7F7.
-     밝은 것은 **작품 위 글자뿐**이고 껍데기는 일부러 물러난다.
-   ★ 순서가 곧 말이다: **히어로 영상 → 만든 것 → 만드는 법.** 손님이 처음 오는 화면이라
-     말보다 결과물이 먼저 눈에 들어와야 한다.
+
+   ★★★ **09-09 밤에 고친 것은 색이 아니라 틀이다.** 색 토큰은 프로토타입과 글자까지
+     같았는데(바탕 #000000 · 껍데기 글자 #C8C8C8 · 무대 위 글자 #F7F7F7 · 버튼 #B0446A)
+     화면은 딴판이었다 — 프로토타입은 **검은 화면 전체**였고 여기는 **밝은 앱 틀 안에 뜬
+     검은 카드**였다. 기둥(1240)과 둥근 모서리와 여백이 랜딩을 액자에 넣고 있었고,
+     바깥에서는 사이드바와 띠가 한 겹 더 감싸고 있었다.
+     → 틀은 AppShell 이 걷고(isLandingPath → work--flush), 카드였던 것은 여기서 편다.
+
+   ★ 순서가 곧 말이다: **덮개(가득 찬 영상) → 만든 것 → 만드는 법.**
+     머리글은 걷었다(사장님 지시) — 첫 화면에서 결과물이 유일한 주인공이 된다.
    ★★ 그라디언트를 쓰지 않는다(이 저장소의 규칙). 그래서 벽의 아래쪽은 **흐려지지 않고
-     한 선에서 그냥 잘린다** — 사장님이 요청한 것도 "같은 라인으로 자르고"다. */
+     한 선에서 그냥 잘린다** — 사장님이 요청한 것도 "같은 라인으로 자르고"다.
+     같은 이유로 덮개 위 글자도 **띠를 깔아 읽히게 하지 않는다** — 그림 자체를 어둡게
+     깔아(opacity) 판을 낮춘다. 흐림띠는 그라디언트이고, 불투명 띠는 껍데기를 막대로
+     만든다. 둘 다 프로토타입에 없던 것이다. */
 .home {
-  max-width: 1240px;
   background: var(--stage-bg);
   color: var(--stage-ink);
-  border-radius: var(--r-card);
-  padding: var(--sp-5) var(--sp-5) var(--sp-4);
 }
-/* 무대 안에서만 전시층·리드·눈썹이 어두운 벌을 따른다. 밖에는 안 샌다(뿌리를 적었다). */
-.home .display { color: var(--stage-ink); }
-.home .lede { margin: 0; font-size: 16px; color: var(--stage-chrome); text-wrap: pretty; }
+/* 무대 안에서만 눈썹이 어두운 벌을 따른다. 밖에는 안 샌다(뿌리를 적었다). */
 .home .eyebrow { color: var(--stage-chrome); }
 
-/* 머리 — 글 한 덩어리와 주 버튼이 한 줄에 선다.
-   ★ 글에 max-width 를 걸지 마라. `ch` 는 **그 원소의** 글자 크기 기준이라, 16px 부모에
-     34ch 을 걸면 300px 이 되어 스물다섯 자짜리 리드가 두 줄로 잘린다(2026-09-09 실측). */
-.home .stage-top { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--sp-5); flex-wrap: wrap; margin-bottom: var(--sp-5); }
-.home .stage-top > div { flex: 1 1 auto; min-width: 0; }
-.home .stage-top .display { margin-bottom: var(--sp-3); }
-.home .stage-top .cta { margin-top: 0; }
-
-/* 히어로 영상 자리 — 새로 만들 16:9 한 편이 들어간다. 지금은 최근 완성본의 표지다.
-   ★ 영상 태그는 안 쓴다(2026-09-07 전송량 사고). 재생은 누른 뒤 상세에서. */
-.home .stage-hero {
-  position: relative; display: block; aspect-ratio: 16 / 9; overflow: hidden;
-  border-radius: var(--r-card); background: var(--stage-panel); text-decoration: none;
+/* 기둥 — 덮개만 화면을 가득 채우고, **읽는 절들은 프로토타입의 기둥으로 돌아온다**.
+   ★ 2560px 화면 실측: 기둥 없이 두면 4단 벽의 타일 하나가 600px 을 넘어 "벽"이 아니라
+     "큰 사진 넷"이 된다. 프로토타입이 1400px 로 묶어 둔 이유가 그것이었다.
+   ★ 덮개를 여기서 빼는 것은 사장님 지시다 — 히어로는 화면 상단에 가득 차야 한다. */
+.home .stage-band,
+.home .eyebrow,
+.home .stage-steps {
+  max-width: var(--stage-col);
+  margin-inline: auto;
+  padding-inline: var(--stage-gap);
 }
-.home .stage-hero img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: .74; }
-.home .stage-hero::after {
-  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
-  box-shadow: inset 0 0 0 1px var(--stage-edge);
+
+/* ★★ 덮개 — 화면 상단을 **가득** 채운다. 여기가 이번 회차의 요구 그 자체다.
+   ★ 높이를 vh 로 잡되 위아래를 clamp 로 막는다. 낮은 노트북에서 껍데기와 그림이 겹쳐
+     찌그러지고, 큰 모니터에서는 첫 화면이 통째로 사진 한 장이 되어 아래가 안 보인다.
+   ★ 덮개만은 비율을 CSS 가 정한다(벽은 반대다 — 그림이 정한다). 화면 폭을 채워야 하는
+     자리라 어떤 비율이 와도 잘라 맞춰야 한다. */
+.home .stage-cover {
+  position: relative;
+  height: clamp(420px, 76vh, 880px);
+  overflow: hidden;
+  background: var(--stage-panel);
+}
+/* ★ 그림을 눌러 깐다. 껍데기 글자가 흰색이라 밝은 사진 위에서 읽히려면 판이 낮아야
+   하는데, 흐림띠(그라디언트)도 불투명 띠도 이 저장소·이 디자인에서는 못 쓴다.
+   그림 자체의 불투명도를 낮추면 뒤의 `--stage-panel` 이 비쳐 **고르게** 어두워진다. */
+.home .stage-cover-img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  opacity: .62;
+}
+
+/* ★★ 껍데기 — 사이드바가 그리던 브랜드와 띠가 그리던 신원 영역이 덮개 **위로** 올라온다
+   (2026-09-09 밤 사장님 지시). 주 버튼도 여기 선다. */
+.home .stage-nav {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  /* 껍데기도 같은 기둥에 선다 — 브랜드가 아래 벽의 왼쪽 끝과 맞는다. */
+  max-width: var(--stage-col);
+  margin-inline: auto;
+  padding: var(--sp-4) var(--stage-gap) 0;
+}
+.home .stage-brand {
+  display: inline-flex; align-items: center;
+  font-size: 18px; font-weight: 700; letter-spacing: -0.01em;
+  color: var(--on-media); text-decoration: none;
+}
+.home .stage-nav-right { display: flex; align-items: center; gap: var(--sp-3); }
+/* 신원 영역은 앱층과 **같은 부품**(UserMenu)이라 밝은 벌 색을 들고 온다. 사진 위에서만
+   되돌린다 — 뿌리를 적었으니 앱층 상단바에는 안 샌다. */
+.home .stage-nav .um-btn {
+  color: var(--on-media);
+  background: rgba(0, 0, 0, .42);
+  box-shadow: inset 0 0 0 1px var(--stage-glass);
+  border-radius: var(--r-pill);
+}
+.home .stage-nav .um-btn:hover { background: rgba(0, 0, 0, .58); }
+.home .stage-nav .um-credit { color: var(--on-media); }
+
+/* 재생 표시 — 덮개 한가운데. 누르면 그 편의 상세로 간다(영상 태그는 여기 없다). */
+.home .stage-cover-play {
+  position: absolute; inset: 0; z-index: 1;
+  display: grid; place-items: center;
+  text-decoration: none;
 }
 .home .stage-bigplay {
-  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center;
+  width: 72px; height: 72px; border-radius: 50%;
+  display: grid; place-items: center;
   color: var(--on-media); background: rgba(0, 0, 0, .42);
   box-shadow: inset 0 0 0 1px var(--stage-glass);
   transition: transform .3s cubic-bezier(.2, .7, .2, 1);
 }
-.home .stage-hero:hover .stage-bigplay { transform: translate(-50%, -50%) scale(1.07); }
+.home .stage-cover-play:hover .stage-bigplay { transform: scale(1.07); }
 
 /* 절 이름 줄 — 껍데기와 같은 급이다(작은 대문자·넓은 자간, 물러난 회색). */
 .home .stage-bar {
@@ -2714,7 +2787,10 @@ h1.login-head { margin-inline: auto; }
 .home .stage-more:hover { transform: translateX(-50%) translateY(-2px); }
 
 /* 만드는 법 세 걸음 — 세로줄로만 가른다(칸을 그리면 위 벽과 경쟁한다). */
-.home .stage-steps { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--stage-line); }
+.home .stage-steps {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid var(--stage-line);
+}
 .home .stage-step { padding: var(--sp-4) var(--sp-4) var(--sp-5); border-right: 1px solid var(--stage-line); }
 .home .stage-step:first-child { padding-left: 0; }
 .home .stage-step:last-child { border-right: 0; }

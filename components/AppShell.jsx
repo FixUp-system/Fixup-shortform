@@ -21,7 +21,7 @@ import UserMenu from "./UserMenu";
 // 나뉘는지, 왜 합치면 안 되는지는 lib/auth/paths.js 주석 참고.
 // 이 모듈은 순수 상수만 담고 있어 next/server 같은 서버 전용 의존을 끌고 오지 않는다 —
 // 클라이언트 컴포넌트(AppShell)에서 안전하게 import 할 수 있다.
-import { isBarePath } from "../lib/auth/paths.js";
+import { isBarePath, isLandingPath } from "../lib/auth/paths.js";
 // 내 정보 공유본 — 상단바·사이드바·마이페이지가 GET /api/me 를 한 번만 읽어 나눠 쓴다.
 // ★ bare 갈래에는 두지 않는다: /login·/pending 에서 그 요청은 401(승인 대기자는 403)이다.
 import { MeProvider } from "./MeContext";
@@ -33,6 +33,20 @@ export default function AppShell({ children }) {
     // work--bare — 사이드바가 없으니 기둥(1160)을 화면 가운데로 옮긴다. 새 수식자라
     // 사이드바가 있는 화면(.work 만 쓰는 쪽)에는 새지 않는다.
     return <main className="work work--bare">{children}</main>;
+  }
+
+  // 랜딩 — 틀을 걷고 화면을 통째로 내준다(2026-09-09 저녁 사장님 지시: 히어로를 화면
+  // 상단에 가득 채우고 브랜드·로그인을 그 위에 얹는다). 사이드바와 띠가 그리던 것은
+  // 랜딩이 **자기 껍데기로** 다시 그린다 — 브랜드는 .stage-brand, 신원은 같은 UserMenu.
+  // ★ MeProvider 는 남긴다. 그 UserMenu 가 손님(로그인 문)과 들어온 사람(메뉴)을 다
+  //   그리기 때문이다. bare 갈래와 다른 점이 이것이다 — 거기는 UserMenu 자체가 없다.
+  // ★ work--flush 는 기둥(1160)과 여백을 걷는 수식자다. .work 만 쓰는 화면에는 안 샌다.
+  if (isLandingPath(pathname)) {
+    return (
+      <MeProvider>
+        <main className="work work--flush">{children}</main>
+      </MeProvider>
+    );
   }
 
   return (
