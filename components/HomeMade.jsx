@@ -1,78 +1,97 @@
 "use client";
 
-// 첫 화면의 **결과물 띠** — 만든 것을 먼저 보인다 (2026-09-09).
+// 첫 화면의 **결과물 벽** — 만든 것을 비율 그대로 늘어놓는다 (2026-09-09 개편).
 //
 // ★★ 여기서 영상 태그를 쓰지 마라. 2026-09-07 에 이 서비스가 죽었다 — 보관함 목록이
 //   그 태그를 물고 있어서 **화면을 여는 것만으로** 전송량 할당량이 탔고, Supabase 가
 //   프로젝트를 402 로 막아 로그인까지 함께 죽었다. 여기는 표지 그림만 그리고, 영상은
-//   카드를 눌러 상세에서 본다(components/ProjectCards.jsx 와 같은 규율).
+//   카드를 눌러 상세에서 본다. 손님이 오는 화면이라 한 자리라도 물면 방문 수만큼 나간다.
 //   ⚠️ 그래서 이 파일에는 그 태그를 **여는 꺾쇠까지 붙여 적지 않는다** — 주석에도다.
 //   tests/home-sections-ui.test.js 가 소스를 날 것 그대로 훑기 때문이고, 그것이 의도다.
 //
 // ★★ 카드에 **글을 안 단다.** 2026-09-09 프로덕션 실측: 완성본 여섯 편 중 셋의 이름이
-//   "You are creating a premium advertisement image…" 라는 영어 지문 원문이었다(저장된
-//   이름 칸에 사장님이 적은 소재가 그대로 들어간다). 이제 손님도 이 화면을 보므로 그
-//   글자가 서비스의 얼굴이 된다. 레퍼런스(dropshot·deevid)도 예시 항목에 글을 안 단다.
+//   영어 지문 원문이었다(저장된 이름 칸에 사장님이 적은 소재가 그대로 들어간다).
+//   손님이 이 화면을 보므로 그 글자가 서비스의 얼굴이 된다.
 //   ⚠️ 그 낱말을 주석에도 영어로 적지 마라 — 판이 날 것으로 센다.
 //
+// ★★ **비율을 안 정한다.** 타일 높이는 그림이 정한다(`img { width:100%; height:auto }`).
+//   숏폼은 9:16 이 많고 메인에 걸 것은 16:9 라 비율이 섞이는데, 여기서 한 비율로 못 박으면
+//   그림이 잘리거나 늘어난다. 다단(column)으로 흘려 두면 어떤 비율이 와도 제 모양으로 선다.
+//   ★ 목록 API 는 화면 비율을 안 실어 준다 — 그림 자체가 비율이므로 물어볼 필요가 없다.
+//
 // ★ 그림이 **안 열리는 칸은 스스로 빠진다.** 2026-09-09 실측: 표지 주소가 있는 25편 중
-//   실제로 열리는 것은 **5편뿐**이다(09-07 파일 미이관). 주소가 있는지만 보고 실으면
-//   첫 화면이 빈 칸으로 찬다. 그래서 후보를 넉넉히 받아 두고, 못 받은 칸을 빼면서
-//   뒤에 있던 후보로 자리를 메운다.
+//   실제로 열리는 것은 **다섯**뿐이다(09-07 파일 미이관).
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { thumbUrl } from "../lib/thumb-url";
 
-// 화면에 서는 칸 수. 후보는 이보다 넉넉히 받는다 — 못 받는 그림이 섞이기 때문이다.
-//
-// ★ 2026-09-09 에 넷에서 여덟으로 늘렸다(사장님: "만든 영상들이 쭉 나오고"). 칸은
-//   **가로로 흐른다**(app/globals.css 의 .home-reel) — 격자로 두면 편 수가 열 수의 배수가
-//   아닐 때 마지막 줄에 빈 칸이 남아 고장으로 보인다. 지금 프로덕션에서 표지가 실제로
-//   열리는 편은 **다섯**뿐이라(09-07 파일 미이관) 그 상황이 기본값이다.
-const SHOW = 8;
-const CANDIDATES = 24;
+// 벽에 거는 최대 개수. 잘리는 선 아래는 어차피 안 보이지만, 열 균형을 위해 넉넉히 건다.
+const MAX = 24;
 
 export default function HomeMade() {
   const [pool, setPool] = useState([]);
   // 그림을 못 받은 편. Set 을 **새로 만들어** 넣는다 — 제자리에서 고치면 리렌더가 안 온다.
   const [lost, setLost] = useState(() => new Set());
 
-  // ★ 목록만 부른다. 영상은 안 문다(위 머리말).
   useEffect(() => {
     let alive = true;
     fetch("/api/projects")
       .then((r) => (r.ok ? r.json() : { projects: [] }))
       .then((d) => {
         if (!alive) return;
-        const done = (d.projects || []).filter((p) => p.video_url && p.image_url);
-        setPool(done.slice(0, CANDIDATES));
+        setPool((d.projects || []).filter((p) => p.video_url && p.image_url).slice(0, MAX));
       })
       .catch(() => {});
     return () => { alive = false; };
   }, []);
 
-  const made = pool.filter((p) => !lost.has(p.id)).slice(0, SHOW);
+  const made = pool.filter((p) => !lost.has(p.id));
 
   return (
     made.length > 0 && (
-      <div className="home-band">
-        <p className="eyebrow">만든 것</p>
-        <h2>이 서비스로 만든 영상</h2>
-        <div className="home-reel">
-          {made.map((p) => (
-            <Link key={p.id} href={`/archive/${p.id}`} className="home-reel-item">
-              <img
-                src={thumbUrl(p.image_url)}
-                alt="만든 영상"
-                loading="lazy"
-                onError={() => setLost((was) => new Set(was).add(p.id))}
-              />
-            </Link>
-          ))}
+      <div className="stage-band">
+        {/* ★★ 히어로 자리 — **새로 만들 16:9 한 편**이 들어갈 곳이다(사장님 2026-09-09).
+            지금은 가장 최근 완성본의 표지를 걸고, 누르면 그 편의 상세로 간다.
+            ★ 여기서도 영상 태그를 쓰지 않는다 — 손님이 오는 화면이라 한 자리라도 물면
+              방문 수만큼 바이트가 나간다(2026-09-07 사고). 재생은 누른 뒤 상세에서. */}
+        <Link href={`/archive/${made[0].id}`} className="stage-hero">
+          <img src={thumbUrl(made[0].image_url)} alt="최근 완성본" />
+          <span className="stage-bigplay" aria-hidden="true">
+            <svg width="20" height="24" viewBox="0 0 20 24" fill="currentColor"><path d="M0 0l20 12L0 24z" /></svg>
+          </span>
+        </Link>
+
+        <div className="stage-bar">
+          <span>만든 것</span>
+          <span><b>{made.length}</b> 편</span>
         </div>
-        {/* 2026-08-27 사장님 지시("기본으로 보관함 바로 확인")를 첫 화면이 바뀌어도 지킨다 —
-            손님이 여기서 막다른 길을 만나면 안 된다. */}
-        <Link href="/archive" className="home-more">보관함에서 더 보기</Link>
+
+        {/* ★★ 벽을 **한 선에서 자른다.** 자유 배치는 열마다 바닥이 들쭉날쭉한데, 잘라 버리면
+            그 아래가 곧은 한 줄이 된다 — 어질러 보이지 않으면서 "더 있다"도 전해진다. */}
+        <div className="stage-cut">
+          <div className="stage-wall">
+            {made.map((p) => (
+              <Link key={p.id} href={`/archive/${p.id}`} className="stage-tile">
+                <img
+                  src={thumbUrl(p.image_url)}
+                  alt="만든 영상"
+                  loading="lazy"
+                  onError={() => setLost((was) => new Set(was).add(p.id))}
+                />
+                <span className="stage-play" aria-hidden="true">
+                  <svg width="9" height="11" viewBox="0 0 9 11" fill="currentColor"><path d="M0 0l9 5.5L0 11z" /></svg>
+                </span>
+              </Link>
+            ))}
+          </div>
+          {/* 2026-08-27 사장님 지시("기본으로 보관함 바로 확인")를 첫 화면이 바뀌어도 잇는 문. */}
+          <Link href="/archive" className="stage-more">
+            더 보러가기
+            <svg width="13" height="9" viewBox="0 0 13 9" fill="none" aria-hidden="true">
+              <path d="M1 4.5h10M7.5 1l3.5 3.5L7.5 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </Link>
+        </div>
       </div>
     )
   );
