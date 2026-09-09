@@ -12,7 +12,7 @@ import {
   ONESHOT_MAX_SECONDS, planReelBake, reelSheetUrl, reelWholePrompt,
   buildOneShotPrompt, reelVoice, reelNarrates, canBakeReel, isReelOneShotStale, storyboardGridFor,
 } from "../lib/reel/oneshot.js";
-import { runReelOneShot, collectReelOneShot } from "../lib/reel/pipeline.js";
+import { runReelOneShot, collectReelOneShot, attachReelVideo } from "../lib/reel/pipeline.js";
 // ★★ 2026-08-31 — 통짜가 **큐로 옮겨 갔다.** 굽기는 이제 접수만 하고 돌아오고, 결과는
 //   상태 조회가 수거한다(lib/reel/pipeline.js 의 collectReelOneShot). 그래서 주입 이름이
 //   makeClip → submitClip 이고, **결과를 재는 판은 수거까지 거쳐야** 한다.
@@ -640,5 +640,85 @@ describe("runReelOneShot — 격자 기록", () => {
       }),
     });
     expect(seen2[0].refs[0]).toEqual({ url: "https://fal/sheet.png" });
+  });
+});
+
+// ── 잃어버린 영상 붙이기 (운영자 전용 구조선) ─────────────────────────────
+//
+// ★★★ 2026-09-09 — 광고에는 있는데(app/api/ads/[id]/attach) **reel 에는 없었다.**
+//   fal 에서는 완성됐는데 우리 수거가 죽어 문서에 못 붙은 편이 생기면, 이미 값을 치른
+//   영상을 앱에서 되찾을 길이 없다. 오늘 실물로 그런 편이 생겼다(14fd0ce0 — 거절 뒤
+//   pad 를 키워 다시 구웠고, 그 결과물이 우리 파이프라인 밖에 있다).
+// ★ **굽지 않는다.** 이 문으로는 값이 새로 안 나간다 — 판이 그것을 잰다.
+describe("attachReelVideo — 잃어버린 영상을 문서에 도로 붙인다", () => {
+  const RESULT = { video: { url: "https://fal/rescued.mp4", duration: 30 } };
+  const okFetch = async () => ({ ok: true, status: 200, json: async () => RESULT });
+
+  it("★ 접수번호를 주면 fal 결과를 받아 첫 컷에 붙인다", async () => {
+    const f = fixture();
+    const out = await attachReelVideo("pid", "uid", { requestId: "req-9" }, { ...f, fetchImpl: okFetch });
+    expect(out).toMatchObject({ attached: true });
+    expect(f.doc.cuts[0].video.url).toBe("https://fal/rescued.mp4");
+    expect(f.doc.cuts[0].video.whole).toBe(true);
+  });
+
+  it("★ 주소를 직접 줘도 붙는다 — 큐를 안 부른다", async () => {
+    const f = fixture();
+    let called = 0;
+    await attachReelVideo("pid", "uid", { url: "https://x/direct.mp4" },
+      { ...f, fetchImpl: async () => { called++; return { ok: true, status: 200, json: async () => RESULT }; } });
+    expect(called, "주소를 줬는데 큐를 불렀다").toBe(0);
+    expect(f.doc.cuts[0].video.url).toBe("https://x/direct.mp4");
+  });
+
+  it("★★★ 굽지 않는다 — 이 문으로는 값이 새로 안 나간다", async () => {
+    const f = fixture();
+    let baked = 0;
+    await attachReelVideo("pid", "uid", { url: "https://x/d.mp4" },
+      { ...f, fetchImpl: okFetch, submitClip: async () => { baked++; return JOB; } });
+    expect(baked, "구조선이 굽기를 불렀다").toBe(0);
+  });
+
+  it("★★ 굽는 중이면 안 붙인다 — 도는 굽기를 덮으면 그 값이 사라진다", async () => {
+    const f = fixture({ reel: { status: "rendering" } });
+    const out = await attachReelVideo("pid", "uid", { url: "https://x/d.mp4" }, { ...f, fetchImpl: okFetch });
+    expect(out).toMatchObject({ rendering: true });
+    expect(f.doc.cuts[0].video, "굽는 중인데 덮었다").toBeUndefined();
+  });
+
+  it("★★ 나머지 컷의 옛 클립을 걷어낸다 — 안 걷으면 완성본이 한 편 + 옛 컷들이 된다", async () => {
+    const f = fixture();
+    f.doc.cuts[1].video = { url: "https://old/1.mp4", seconds: 5 };
+    f.doc.cuts[2].video = { url: "https://old/2.mp4", seconds: 5 };
+    await attachReelVideo("pid", "uid", { url: "https://x/d.mp4" }, { ...f, fetchImpl: okFetch });
+    expect(f.doc.cuts[1].video).toBeUndefined();
+    expect(f.doc.cuts[2].video).toBeUndefined();
+  });
+
+  it("★★ 오류·접수증을 지우고 단계를 clips 로 옮긴다 — 안 옮기면 화면이 실패에 머문다", async () => {
+    const f = fixture({ reel: { status: "error", error: "초상 거절", errorStep: "video", job: { requestId: "old" } } });
+    await attachReelVideo("pid", "uid", { url: "https://x/d.mp4" }, { ...f, fetchImpl: okFetch });
+    expect(f.doc.reel).toMatchObject({ status: "clips", error: null, errorStep: null, job: null });
+  });
+
+  it("★★★ 붙이자마자 낡음으로 잡히면 안 된다 — 각인을 지금 값으로 찍는다", async () => {
+    const f = fixture();
+    await attachReelVideo("pid", "uid", { url: "https://x/d.mp4" }, { ...f, fetchImpl: okFetch });
+    expect(isReelOneShotStale(f.doc), "붙이자마자 낡았다고 나온다").toBe(false);
+  });
+
+  it("★ 결과에 영상이 없으면 아무것도 안 바꾼다", async () => {
+    const f = fixture();
+    const out = await attachReelVideo("pid", "uid", { requestId: "req-9" },
+      { ...f, fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({}) }) });
+    expect(out.error).toBeTruthy();
+    expect(f.doc.cuts[0].video).toBeUndefined();
+  });
+
+  it("★ fal 이 안 주면 그 사유를 그대로 돌려준다", async () => {
+    const f = fixture();
+    const out = await attachReelVideo("pid", "uid", { requestId: "req-9" },
+      { ...f, fetchImpl: async () => ({ ok: false, status: 404, text: async () => "no such request" }) });
+    expect(out.error).toContain("404");
   });
 });
