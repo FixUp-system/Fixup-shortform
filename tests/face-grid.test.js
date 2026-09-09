@@ -34,6 +34,31 @@ describe("설정 — 실측으로 정해진 값이다", () => {
     expect(FACE_GRID.stroke).toBeGreaterThanOrEqual(6);
   });
 
+  // ★★★ 2026-09-09 실측 — **여유(pad)가 좁으면 덮다 만다.**
+  //   프로덕션 편 14fd0ce0 이 초상으로 거절됐다. 그 판을 그대로 내려받아 재현하니
+  //   탐지는 멀쩡했다(얼굴 있는 칸 일곱 개를 전부 찾아 아홉 자리에 격자를 그렸다).
+  //   그런데 **상자가 얼굴보다 조금 작고 조금 밀려** 칸 0 의 여자는 오른쪽 절반이,
+  //   칸 6 의 남자는 얼굴 윗부분이 격자 밖에 남았다. 얼굴 하나만 읽히면 거절은 그대로 난다.
+  //   · pad 0.15 → fal 거절 (판 넓이의 28.3% 를 덮음)
+  //   · pad 0.5  → **통과. 720p·30초 완성본이 나왔다** (49.7% 를 덮음)
+  //   ★ 그러니 이 값은 취향이 아니라 **좌표 오차를 흡수하는 여유**다. VLM 이 위치를
+  //     정확히 못 맞춘다는 것이 이 저장소의 실측이고(09-03), 그 오차가 상자 크기의
+  //     3할 안팎이었다. 여유가 그보다 작으면 덮다 만다.
+  it("★★★ 여유는 좌표 오차를 흡수할 만큼 넓다 — 좁으면 덮다 말고, 덮다 만 판은 안 덮은 판과 같다", () => {
+    expect(FACE_GRID.pad, "pad 가 좁다 — 2026-09-09 실측으로 0.15 는 거절, 0.5 는 통과").toBeGreaterThanOrEqual(0.4);
+    // 위쪽도 막는다 — 여유가 1 을 넘으면 상자가 세 배가 되어 칸을 통째로 지운다.
+    expect(FACE_GRID.pad, "pad 가 너무 넓다 — 그림이 통째로 사라진다").toBeLessThanOrEqual(0.8);
+  });
+
+  it("★★ 여유가 실제로 상자를 키운다 — 값만 크고 안 쓰면 아무 일도 안 한다", () => {
+    // 상자 하나를 넣어 **그려지는 사각형**이 커지는지 본다(값을 읽는 것이 아니다).
+    const box = { x: 0.4, y: 0.4, w: 0.2, h: 0.2 };
+    const tight = boxToRect(box, 1000, 1000, 0);
+    const eased = boxToRect(box, 1000, 1000, FACE_GRID.pad);
+    expect(eased.width, "여유가 넓이를 안 키운다").toBeGreaterThan(tight.width * 1.7);
+    expect(eased.left, "여유가 왼쪽으로 안 넓힌다").toBeLessThan(tight.left);
+  });
+
   it("★★ 억제 꼬리가 격자·오버레이·메쉬를 모두 부른다 — 하나만 적으면 다른 이름으로 남는다", () => {
     for (const w of ["grid", "overlay", "mesh"]) {
       expect(GRID_SUPPRESS_LINE.toLowerCase()).toContain(w);
