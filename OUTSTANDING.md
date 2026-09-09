@@ -42,11 +42,11 @@
 | 워크트리 | `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` |
 | 브랜치 | `feat/reel-cut-r2v` (09-03 저녁). ★ 수는 **적지 않는다** — 이 문서를 고치는 커밋이 그 수를 또 바꾼다. **세라**: `git log -1 --format='%h %s'` · `git rev-list --count fixup/main..HEAD` |
 | 테스트 | ✅ **09-09 저녁 실측 전체 초록** — `npx vitest run` = **5,879 통과 · 0 실패 · 10 skipped**(어두운 무대 회차가 판을 24개 보탰다) · `npx next build` **exit 0**. 그 앞 09-09 아침 실측은 **5,855 통과 · 0 실패 · 10 skipped** / 파일 **346 통과 · 2 skipped**(348 파일 · exit 0). 아래 「1 빨강」은 **회선이 죽는 속도에 달린 것**이라 이 회선에서는 안 났다 — *같은 코드에서 빨강·초록이 갈린다*는 이 문서의 진단이 반대쪽으로 한 번 더 확인됐다. 그래도 **고칠 자리는 그대로다**(`fetchImageBytes` 를 주입 가능한 deps 로). ⚠️ 같은 회차 **첫 실행**에서는 워커 하나가 통째로 죽어(`Worker exited unexpectedly`) 판 15개가 안 돌았다 — 파일은 못 짚었고 재실행에서 **재현 안 됨**. 아래는 09-08 실측 기록이다: 🔴 **1 빨강** — **09-08 저녁 재실측**(밝은 벌 전환 뒤) `npx vitest run` = **5,854 통과 · 1 실패 · 10 skipped** / 파일 **345 통과 · 1 실패 · 2 skipped**(348 파일 · 35.9초). 그 앞 09-08 11:06 실측은 5,818 통과였고, 그 사이 밝은 벌 회차가 판을 **36개** 보탰다(디자인 판 넷·홈 판 다섯 등). 실패는 **09-07 과 같은 판·같은 이유**다(아래). 09-07 12:56 실측은 5,785 통과였고 그 뒤 커밋 넷이 판을 보탰다. 실패는 `tests/reel-oneshot.test.js > "프롬프트를 고치면 다시 굽는다"` **5초 타임아웃**. ★ **코드 결함이 아니라 판이 진짜 회선을 문다** — `pipeline.js:324` 의 `fetchImageBytes("https://fal/sheet.png")` 가 이 회선에서 **2,726ms**(DNS 죽는 데 걸리는 시간, 실측)를 먹는데 이 판만 통짜를 **두 번** 관통해 ~5.4초가 된다. 09-03 밤에 그린이던 것은 그때 회선이 빨리 죽었기 때문이고, **회선에 따라 빨강·초록이 갈린다**(같은 코드에서). 같은 값을 통짜를 관통하는 판 열 몇 개가 다 낸다 — 이 파일 하나가 전체 37초 중 **35초**를 쓴다. 고칠 자리: 격자 커밋(`4428fb4`)이 넣은 `fetchImageBytes` 를 **주입 가능한 deps 로** 빼면 판이 회선을 안 문다. `npx next build` 는 09-07 오전(`bec31e9`)에 통과했다 — 그 뒤 `b9b9830`(lib/compose.js) 는 화면 파일이 아니라 재굽기 안 했다 |
-| 배포 | ✅ **프로덕션 라이브 `hifms0j0g`**(`dpl_7bxGhTFxiwQ4k6uS2E7HRyUDAQJQ` · **09-08 17:07** · target=production · Ready · 별칭 `fixup-shortform-service.vercel.app` 붙음 · 코드 = **`90a4872`**, 즉 09-08 사고 수정이 라이브다). 실측: `/login` 200 · `/api/me` 401(로그인 벽) · **`/api/ads/<id>/finish` 401**(새 라우트가 살아 있다). 빌드 출력에 `/api/ads/[id]/finish`·`/api/film/[id]/finish` 둘 다 잡혔다 |
+| 배포 | ✅ **프로덕션 라이브 `h7qic4374`**(`dpl_2gi8mGj64Uzc7ruAcB3x9xjFt8fm` · **2026-09-09 18:12 KST** · target=production · READY · 별칭 `fixup-shortform-service.vercel.app` 이 이것을 가리킨다(`vercel inspect` 실측) · 코드 = **`bea465c`**). **26커밋이 한 번에 나갔다** — 밝은 벌 여덟 + 어두운 랜딩 + 얼굴 격자 `pad 0.5` + attach 라우트 둘. 나눌 수 없는 한 줄기라 사장님께 범위를 물어 **"프로덕션에 전부 배포"** 를 받고 올렸다. 배포 전 점검 둘 통과: `.env.local.example` 새 env **0** · `db/schema.sql` diff **없음**. 라이브 실측: `/login` 200 · `/home` 200(`class="home"` · CSS 에 `--stage-bg:#000000` · **영상 태그 0**) · `/api/me` 401 · `/api/projects` 200(56건 중 **표지+영상 25건** = 벽 후보) · `/api/reel/<id>/attach` **401**(404 가 아니다 = 나갔고 운영자 벽이 선다). ★ `stage-hero`·`stage-wall` 이 SSR HTML 에 **0건인 것이 정상**이다 — 벽은 클라이언트 부품이라 hydrate 뒤에 그려진다. <br>**그 앞**: `hifms0j0g`(`dpl_7bxGhTFxiwQ4k6uS2E7HRyUDAQJQ` · 09-08 17:07 · 코드 `90a4872`, 09-08 사고 수정). 실측: `/login` 200 · `/api/me` 401(로그인 벽) · **`/api/ads/<id>/finish` 401**(새 라우트가 살아 있다). 빌드 출력에 `/api/ads/[id]/finish`·`/api/film/[id]/finish` 둘 다 잡혔다 |
 | 배포(그 앞) | `dpl_5twijBmQk7sfYTZbQqMKT3HzVdpn`(별칭 `...-8xu0l4lc3` · 09-07 17:43 · 코드 `d826317`). 09-07 문서는 이 판을 몰랐다 — 오후 커밋까지 배포된 것이 안 적혀 있었다. ⚠️ 배포에 git meta 가 없다(git 없는 폴더에서 올린다) — **어느 코드인지는 `shotform-deploy-clean` 과 파일 대조로만 안다** |
 | 배포(그 앞) | **`6f4ehup0a`**(09-07 11:46 · 코드 `165df59` · `dpl_2Vw2h6T1FoR3DBBw877nhPWQZ1NH`). target=production · status=Ready · 09-07 12:5x 실측 `/login` 200 · `/api/me` 401(로그인 벽, 정상) · `/api/projects` 200(46건) · 🔴 `/api/renders/<옛 id>.mp4` **404**(아래 09-07 절 ③) · 그 앞 판은 `i7d0rc266`(09-04 · `0b2f341`) · ★ **확인법**: `npx vercel inspect fixup-shortform-service.vercel.app` 이 그 배포를 가리키는지 본다 — 이번엔 CSS 가 안 바뀌어 번들 해시로는 못 쟀다 |
 | ★ 정식 도메인 | **`https://fixup-shortform-service.vercel.app`** 다. `vercel deploy` 가 찍어 주는 `...-ju8okg74p-fix-up1.vercel.app` 쪽은 **Deployment Protection(SSO)에 걸려 전부 302** 라 검증에 쓰면 안 된다 — 09-02 에 한 번 속았다 |
-| 미배포 | 🔴 **26 커밋**(09-09 **저녁** 실측 · `git rev-list --count 90a4872..HEAD` · **이 문서를 고치는 커밋들 포함**. 09-08 저녁엔 12였고 그 뒤 `e533410`(밝은 벌 결함 넷)·`3200df8`(문서)가 얹혔다). 라이브는 `90a4872` 이고, 그 뒤 **구조선 하나**(`3d70395`)와 **밝은 벌 여덟**(설계·계획 둘 + 코드 여섯), 그리고 **마무리 셋**(`ab8d486` 사진 위 글자 · `2771eca` 판 둘 · 이 문서)이 쌓였다. **화면이 통째로 바뀌었으니 배포는 사장님이 눈으로 보고 지시할 때만** 한다(이 저장소 규칙). 그 앞 상태는 아래 원문 참고: 09-07 **17:43 에 한 번 더 배포됐고**(문서에 안 적혀 있었다) 그 판이 **HEAD 와 같은 코드**다 — 대조: `shotform-deploy-clean` 이 16:17 에 다시 떠졌고 `lib/cost-read.js`·`app/api/ads/[id]/status/route.js` 가 HEAD 와 바이트 동일, `SHOTFORM_VIDEO_CRF` 도 들어 있다. ⚠️ 09-08 오전에 이 자리에 "미배포 6커밋"이라고 잘못 적었다가 실측으로 정정했다 — **배포 사본 폴더의 시각이 이 표보다 정확하다** |
+| 미배포 | ✅ **0 커밋**(09-09 18:12 배포 뒤 · `git rev-list --count bea465c..HEAD`). 그 앞에 26커밋이 쌓여 있었고 **한 번에 나갔다** — 라이브가 곧 HEAD 다. ⚠️ 이 표를 다시 읽을 때는 그 사이 커밋이 얹혔을 수 있으니 **세라**(`git rev-list --count bea465c..HEAD`) |
 | 푸시 | 🔴 **미푸시 39**(09-09 **저녁** 실측 · 두 원격 모두 39 · **이 문서를 고치는 커밋 셋 포함** — 아침의 10 에 09-08 사고 수정과 **밝은 벌 여덟**, 마무리 셋이 얹혔다. 그 앞 목록: 코드 넷 `e96d8fc`·`bec31e9`·`165df59`·`b9b9830` + 문서 하나. ★ 세라: `git rev-list --count fixup/feat/reel-cut-r2v..HEAD`). 두 원격 다 `9a02896`(09-04)에 서 있다. ★ **사고 대응 코드가 원격에 하나도 없다** — 지금 원격만 보면 09-07 을 못 잇는다. ⚠️ URL 로 직접 푸시하면 추적 ref 가 안 움직여 '미푸시 N' 착시가 난다 — 정정은 `git fetch <원격> <브랜치>:refs/remotes/<원격>/<브랜치>`. ⚠️ 자격증명 대기로 매달리면 `GIT_TERMINAL_PROMPT=0` |
 | main 과의 거리 | `fixup/main` = `6e9bd8f`(그 안의 코드 커밋이 `23b80a2`) · HEAD 가 **87커밋 앞**(09-09 **저녁** 실측 · 이 문서를 고치는 커밋 셋 포함 — 낡으면 세라)(뒤처진 것 0. `origin/main` 도 같은 `6e9bd8f`). 09-03 작업이 브랜치에만 쌓였다 — **main 병합은 사장님이 지시할 때만** 한다 |
 | ⚠️ 배포 함정 | **`.vercel` 폴더가 이 워크트리에 없다.** 그래서 `--project` 를 **반드시** 준다 — 안 주면 폴더 이름으로 새 프로젝트를 만든다(팀에 `step-gate` 라는 **실수로 생긴 프로젝트**가 그 증거다) |
@@ -176,11 +176,14 @@ POST /api/reel/14fd0ce0-e4fa-40a1-b4f9-59816f20b2af/attach
 
 #### ⑦ 🔴 이 갈래에서 아직 안 된 것
 
-1. **배포가 막혀 있다** — 아래 「Vercel 프로젝트를 찾다가」 절 ③ 을 읽어라. 로그인은 **정상**이고(`whoami` = `fixup-system`), 막힌 것은 **소속**이다 — 그 계정은 라이브를 소유한 팀의 멤버가 아니다(09-09 저녁 API 로 확정). 옛 문장은 이렇게 적혀 있었다: `npx vercel whoami`
-   가 `Not authorized` 이고 `npx vercel login` 을 해도 그대로다. **배포용 폴더는 HEAD 로
-   다시 구웠다** — `C:\Users\fixup\shotform-deploy-0909`(= `200ede4` · `.vercel` 들어 있음).
-   접근만 풀리면 그 폴더에서 **`npx vercel deploy --prod --yes` 한 줄**이다
-2. **attach 미실행**(위 ④) — 배포 뒤 첫 일
+1. ~~**배포가 막혀 있다**~~ → ✅ **09-09 18:12 배포 완료**(위 §0 「배포」). 사장님이
+   **`jaechanyoon0519-8298` 로 다시 로그인**하자 `fix-up1` 이 열렸고 그 자리에서 나갔다.
+   ★ **다음 세션도 계정부터 확인해라** — `npx vercel whoami` 가 `fixup-system` 이면
+   그 계정으로는 **영원히 안 된다**(아래 절 ③).
+2. 🔴 **attach 미실행**(아래 🎬 절 ④) — 배포는 됐고 라우트도 살아 있다(401). **막는 것은
+   운영자 로그인이다** — 그 라우트는 `adminOnly` 라 세션 쿠키가 필요한데 내가 사장님
+   비밀번호로 로그인할 수는 없다. 사장님이 로그인한 브라우저에서 부르거나, 운영자 화면에
+   붙이는 것이 다음 수다
 3. **낭독과 입이 안 맞는다**(위 ④) — `lib/reel/scenario.js`
 4. ~~**내가 만든 헛 Vercel 프로젝트 둘**~~ → ✅ **09-09 저녁 삭제 완료**(사장님 지시 · 아래 절 ②)
 
