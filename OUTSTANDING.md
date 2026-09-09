@@ -176,9 +176,10 @@ POST /api/reel/14fd0ce0-e4fa-40a1-b4f9-59816f20b2af/attach
 
 #### ⑦ 🔴 이 갈래에서 아직 안 된 것
 
-1. **배포가 막혀 있다** — 아래 「Vercel 좌표와 로그인 벽」 절을 읽어라. `npx vercel whoami`
-   가 `Not authorized` 이고, `npx vercel login` 을 해도 그대로다. 배포용 폴더는
-   `C:\Users\fixup\shotform-deploy-0909` 에 준비돼 있다
+1. **배포가 막혀 있다** — 아래 「Vercel 프로젝트를 찾다가」 절 ③ 을 읽어라. 로그인은 **정상**이고(`whoami` = `fixup-system`), 막힌 것은 **소속**이다 — 그 계정은 라이브를 소유한 팀의 멤버가 아니다(09-09 저녁 API 로 확정). 옛 문장은 이렇게 적혀 있었다: `npx vercel whoami`
+   가 `Not authorized` 이고 `npx vercel login` 을 해도 그대로다. **배포용 폴더는 HEAD 로
+   다시 구웠다** — `C:\Users\fixup\shotform-deploy-0909`(= `200ede4` · `.vercel` 들어 있음).
+   접근만 풀리면 그 폴더에서 **`npx vercel deploy --prod --yes` 한 줄**이다
 2. **attach 미실행**(위 ④) — 배포 뒤 첫 일
 3. **낭독과 입이 안 맞는다**(위 ④) — `lib/reel/scenario.js`
 4. **내가 만든 헛 Vercel 프로젝트 둘을 지워야 한다**(사장님 손이 필요하다 · 아래 절)
@@ -246,13 +247,35 @@ orgId     team_aCz9KRKti2eU2OI5lewdTYPM
 둘 다 배포 0·env 0 이다. 지우기: `npx vercel project rm fixup-shortform-service --scope <팀> --yes`.
 ★ 링크할 일이 있으면 이름이 아니라 **`.vercel` 을 복사해 넣어라**(배포할 때 쓰는 그 방법).
 
-**③ 🔴 지금 CLI 로그인이 진짜 org 를 못 본다.** `npx vercel whoami` = `fixup-system` 인데,
-`vercel link` 가 보여 준 팀 목록은 `fixups-projects-1617c44a`·`fixuperp` **둘뿐**이고
-진짜 org(`team_aCz9…`)는 **거기 없다**. `.vercel` 을 복사해 넣고 `env pull` 을 해도
-`Could not retrieve Project Settings` 로 막힌다.
-**09-08 17:07 배포는 됐으므로 그 뒤에 로그인이 바뀌었거나 권한이 빠진 것이다.**
-→ **다음 배포 전에 `npx vercel login` 으로 그 org 를 볼 수 있는 계정인지 먼저 확인해라.**
-   미배포가 15커밋인데 그 자리에서 막히면 회차가 통째로 날아간다.
+**③ 🔴🔴 지금 CLI 로그인이 진짜 org 를 못 본다 — 09-09 저녁에 API 로 확정했다.**
+
+옛 진단("로그인이 만료됐다")은 **틀렸다.** `npx vercel login` 뒤 `whoami` 는 정상으로
+`fixup-system` 을 돌려준다. 막힌 것은 로그인이 아니라 **소속**이다:
+
+```
+계정      fixup-system (system@fix-up.kr)      ← 커밋 작성자와 같은 이메일
+소속 팀   team_ZwfUh5xstIaGDccewwWN4XAP  FIxup's projects
+          team_ufq9RiAvT7dJ9fNtOvtYEUgo  Fixup_ERP
+          ...그리고 그게 전부다(GET /v2/teams 실측)
+
+GET /v2/team?teamId=team_aCz9KRKti2eU2OI5lewdTYPM        → not_found
+GET /v9/projects/prj_CvJ8kK…?teamId=team_aCz9…           → forbidden "Not authorized"
+npx vercel deploy --prod --yes  (.vercel 복사해 넣은 폴더에서)  → "Not authorized"
+```
+
+즉 **이 계정은 라이브를 소유한 팀의 멤버가 아니다.** 09-08 17:07 배포가 됐다는 것은
+그때는 **다른 계정이 로그인돼 있었다**는 뜻이다. 재로그인을 몇 번 해도 이 벽은 안 뚫린다.
+
+★ **동명 프로젝트에 속지 마라.** `vercel project ls` 를 두 팀에서 돌리면 양쪽 다
+`fixup-shortform-service` 가 보이는데, **둘 다 09-09 에 내가 만든 유령**이다(위 ②).
+가르는 법: `Latest Production URL` 이 `--` 이고 `alias` 가 비어 있으면 유령이다.
+진짜는 별칭 `fixup-shortform-service.vercel.app` 을 쥐고 있다(09-09 저녁 `/login` **200**).
+
+→ **뚫는 길은 셋뿐이다**(전부 사장님 손이 필요하다):
+   ① 그 팀을 소유한 계정으로 `npx vercel login` (09-08 에 쓰던 그 계정)
+   ② 그 팀에 `system@fix-up.kr` 을 멤버로 초대
+   ③ 접근 권한이 있는 계정에서 토큰을 발급해 `VERCEL_TOKEN` 으로 넘김
+   (지금 이 머신에 토큰은 없다 — `auth.json` 한 벌뿐이고 그게 `fixup-system` 이다)
 
 **④ 그래서 로컬은 여전히 옛 Supabase 를 본다.** `.env.local` 은 **손대지 않았다**
 (백업 `env.local.bak` 과 바이트 동일). 결과물 띠는 로컬에서 여전히 안 뜬다 —
