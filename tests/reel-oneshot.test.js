@@ -220,6 +220,15 @@ function fixture(over = {}) {
     getProject: async () => d,
     updateProject: async (_id, _owner, fn) => { Object.assign(d, fn(d)); return d; },
     toFalUrl: async (u) => u,
+    // ★★★ 2026-09-09 — **판이 회선을 물지 않게 한다.** 그전에는 굽기가 `plan.sheet`
+    //   (`https://fal/sheet.png`)를 진짜로 내려받으려 했고, DNS 가 죽는 데 걸리는 시간을
+    //   통짜를 관통하는 판마다 먹었다(실측 2.7초). 이 파일 하나가 전체 37초 중 35초를
+    //   썼고, 회선이 느린 날에는 5초 상한을 넘겨 **같은 코드가 빨강·초록으로 갈렸다** —
+    //   이 저장소가 "기준선 빨강"이라 부르며 여러 회차를 넘긴 그 판이다.
+    //   ★ null 을 돌려준다 = "판 바이트를 못 받았다". 격자를 안 씌우므로 refs 는
+    //     주소 그대로이고, 이 파일의 옛 단정들이 재던 모양이 그대로 유지된다.
+    //     격자가 **걸린** 길은 아래 「격자 기록」 절이 따로 잰다.
+    fetchImageBytes: async () => null,
   };
 }
 
@@ -545,5 +554,91 @@ describe("runReelOneShot — 화면 밖 목소리", () => {
     await runReelOneShot("pid", "uid", { ...f, submitClip: async () => ({ requestId: "req-1", statusUrl: "s", responseUrl: "r", endpoint: "e", seconds: 15 }), });
     expect(f.doc.reel.job.of).toBe("A quiet workshop bench.");
     expect(f.doc.reel.job.of).not.toContain("voiceover");
+  });
+});
+
+// ── 격자를 씌웠는지 문서에 남는다 ─────────────────────────────────────────
+//
+// ★★★ 2026-09-09 — 프로덕션 편 `14fd0ce0` 이 또 초상으로 거절됐는데(fal 422 ·
+//   `loc:["body","image_urls"]`), **격자를 씌웠는지 알 방법이 없었다.** `gridded` 는 지역
+//   변수로 만들어져 프롬프트 꼬리를 붙일지 정하는 데만 쓰이고 버려졌고, 접수증은 접수가
+//   422 로 죽어 아예 안 생겼다. 그래서 셋이 구분이 안 됐다:
+//     ① 얼굴을 못 찾아 격자를 아예 안 씌웠다   ② 씌웠는데 좌표가 빗나갔다
+//     ③ 판 내려받기·sharp 가 터져 원본을 보냈다(console.error 만 남는다)
+//   ①②는 어디에도 안 남는다. 09-03 회차가 매번 판을 내려받아 재현해야 했던 이유다.
+//
+// ★ 그래서 이 판이 지키는 것은 **화면에 보이는 값**이 아니라 **다음 거절을 가를 근거**다.
+//   기록은 접수 **앞**에 적어야 한다 — 거절이 나는 순간이 이 기록이 필요한 유일한 순간이고,
+//   접수 뒤에 적으면 바로 그때 안 남는다.
+describe("runReelOneShot — 격자 기록", () => {
+  const SHEET = Buffer.from("sheet-bytes");
+  const bake = (over = {}) => ({
+    fetchImageBytes: async () => SHEET,
+    gridFacesOnSheet: async () => ({ bytes: Buffer.from("gridded"), faces: 3 }),
+    submitClip: async () => JOB,
+    ...over,
+  });
+
+  it("★ 격자를 씌우면 몇 자리인지 남는다", async () => {
+    const f = fixture();
+    await runReelOneShot("pid", "uid", { ...f, ...bake() });
+    expect(f.doc.reel.faceGrid).toMatchObject({ gridded: true, faces: 3, reason: "ok" });
+  });
+
+  it("★★ 얼굴을 못 찾았으면 그것이 남는다 — 탐지가 죽은 것과 좌표가 빗나간 것을 가른다", async () => {
+    const f = fixture();
+    await runReelOneShot("pid", "uid", {
+      ...f, ...bake({ gridFacesOnSheet: async () => ({ bytes: SHEET, faces: 0 }) }),
+    });
+    expect(f.doc.reel.faceGrid).toMatchObject({ gridded: false, faces: 0, reason: "no-faces" });
+  });
+
+  it("★ 판을 못 받았으면 그것이 남는다", async () => {
+    const f = fixture();
+    await runReelOneShot("pid", "uid", { ...f, ...bake({ fetchImageBytes: async () => null }) });
+    expect(f.doc.reel.faceGrid).toMatchObject({ gridded: false, reason: "no-sheet" });
+  });
+
+  it("★ 격자가 터져도 남는다 — console.error 는 사장님이 못 본다", async () => {
+    const f = fixture();
+    await runReelOneShot("pid", "uid", {
+      ...f, ...bake({ gridFacesOnSheet: async () => { throw new Error("sharp 가 죽었다"); } }),
+    });
+    expect(f.doc.reel.faceGrid).toMatchObject({ gridded: false, reason: "error" });
+    expect(f.doc.reel.faceGrid.detail).toContain("sharp 가 죽었다");
+  });
+
+  it("★★★ 접수가 거절돼도 기록은 남아 있다 — 그때가 이 기록이 필요한 유일한 순간이다", async () => {
+    const f = fixture();
+    await expect(runReelOneShot("pid", "uid", {
+      ...f,
+      ...bake({
+        gridFacesOnSheet: async () => ({ bytes: SHEET, faces: 0 }),
+        submitClip: async () => { throw new Error('영상 생성 실패 (422) content_policy_violation'); },
+      }),
+    })).rejects.toThrow("422");
+    expect(f.doc.reel.faceGrid, "접수가 죽으면서 기록도 함께 사라졌다").toMatchObject({
+      gridded: false, faces: 0, reason: "no-faces",
+    });
+  });
+
+  it("★ 격자를 씌운 판만 바이트로 보낸다 — 못 씌우면 주소 그대로다(옛 계약)", async () => {
+    const seen = [];
+    const f = fixture();
+    await runReelOneShot("pid", "uid", {
+      ...f, ...bake({ submitClip: async (a) => { seen.push(a); return JOB; } }),
+    });
+    expect(seen[0].refs[0]).toMatchObject({ key: "sheet.jpg" });
+
+    const g = fixture();
+    const seen2 = [];
+    await runReelOneShot("pid", "uid", {
+      ...g,
+      ...bake({
+        gridFacesOnSheet: async () => ({ bytes: SHEET, faces: 0 }),
+        submitClip: async (a) => { seen2.push(a); return JOB; },
+      }),
+    });
+    expect(seen2[0].refs[0]).toEqual({ url: "https://fal/sheet.png" });
   });
 });

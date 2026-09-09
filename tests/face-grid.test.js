@@ -146,8 +146,21 @@ describe("배선 — 굽기가 실제로 이 길을 지난다", () => {
     const { readFileSync } = await import("node:fs");
     const src = readFileSync("lib/reel/pipeline.js", "utf8")
       .replace(/(^|[^:])\/\/.*$/gm, "$1").replace(/\/\*[\s\S]*?\*\//g, "");
-    expect(src, "격자를 안 씌운다").toMatch(/gridFacesOnSheet\(/);
+    // ★ 2026-09-09 — 호출 이름이 `gridFaces(` 로 바뀌었다(주입 가능한 이음매로 뺐다).
+    //   그래서 **이름이 아니라 사슬**을 잰다: 기본값이 진짜 함수로 묶여 있고, 그 묶인
+    //   이름이 실제로 불린다. 둘 중 하나만 보면 배선이 끊겨도 통과한다.
+    expect(src, "격자 기본값이 진짜 함수가 아니다")
+      .toMatch(/gridFaces\s*=\s*deps\.gridFacesOnSheet\s*\|\|\s*gridFacesOnSheet/);
+    expect(src, "격자를 안 씌운다").toMatch(/await\s+gridFaces\(/);
     expect(src, "격자 판을 안 보낸다").toMatch(/refs: \[sheetRef,/);
+    // ★★ 2026-09-09 — **씌웠는지 문서에 남기는 것**도 이 배선의 일부다. 이것이 없으면
+    //   거절이 났을 때 "안 씌운 것"과 "빗나간 것"을 영영 못 가른다(프로덕션 편 14fd0ce0).
+    //   ★ 접수 **앞**이어야 한다 — 접수가 422 로 죽으면 그 뒤의 쓰기는 안 돈다.
+    const at = src.indexOf("faceGrid: { ...faceGrid");
+    const submitAt = src.indexOf("await submit(");
+    expect(at, "격자 결과를 문서에 안 남긴다").toBeGreaterThan(-1);
+    expect(submitAt, "접수하는 자리를 못 찾았다 — 이 판이 낡았다").toBeGreaterThan(-1);
+    expect(at, "기록이 접수 뒤에 있다 — 거절나면 그때 안 남는다").toBeLessThan(submitAt);
     expect(src, "꼬리를 조건 없이 붙이거나 아예 안 붙인다")
       .toMatch(/gridded \? `\$\{prompt\}[\s\S]{0,20}\$\{GRID_SUPPRESS_LINE\}` : prompt/);
   });
