@@ -275,11 +275,46 @@ npx vercel deploy --prod --yes  (.vercel 복사해 넣은 폴더에서)  → "No
 가르는 법: `Latest Production URL` 이 `--` 이고 `alias` 가 비어 있으면 유령이다.
 진짜는 별칭 `fixup-shortform-service.vercel.app` 을 쥐고 있다(09-09 저녁 `/login` **200**).
 
+**★★ 빠진 조각은 wiki 에 있었다**(09-09 저녁에 찾았다 —
+`sources/shotform-deploy-and-qa-2026-08-14`). 08-14 첫 배포 회차가 이미 같은 벽에서
+2시간을 썼고, 거기 **팀 이름과 배포 계정 이름이 적혀 있다**:
+
+```
+팀(scope)   fix-up1                 ← team_aCz9KRKti2eU2OI5lewdTYPM 의 slug
+프로젝트     fixup-shortform-service
+배포 계정    jaechanyoon0519-8298    ← ★ 지금 로그인된 fixup-system 이 아니다
+```
+
+08-14 기록의 한 줄이 이 회차를 그대로 설명한다 —
+> 저장소 소유자는 GitHub `FixUp-system`(조직이 아니라 **개인 계정**)이고
+> Vercel 로그인은 `jaechanyoon0519-8298`. **둘이 다른 사람이었다.**
+
+즉 **shotform 배포는 처음부터 `jaechanyoon0519-8298` 로만 됐다.** `fixup-system` 으로
+된 적이 없다. 09-09 저녁 실측도 그대로다 —
+`npx vercel project ls --scope fix-up1` → **"The specified scope does not exist"**
+(이 계정에게는 그 scope 자체가 없다).
+
 → **뚫는 길은 셋뿐이다**(전부 사장님 손이 필요하다):
-   ① 그 팀을 소유한 계정으로 `npx vercel login` (09-08 에 쓰던 그 계정)
-   ② 그 팀에 `system@fix-up.kr` 을 멤버로 초대
+   ① **`jaechanyoon0519-8298` 계정으로 `npx vercel login`** ← 가장 확실하다.
+      그 계정이 `fix-up1` 을 쥐고 있다
+   ② `fix-up1` 팀에 `system@fix-up.kr` 을 멤버로 초대 (앞으로 이 벽이 안 생긴다)
    ③ 접근 권한이 있는 계정에서 토큰을 발급해 `VERCEL_TOKEN` 으로 넘김
    (지금 이 머신에 토큰은 없다 — `auth.json` 한 벌뿐이고 그게 `fixup-system` 이다)
+
+**④ 배포 명령은 두 벌이고 둘 다 맞다** — 어느 쪽이든 **git 없는 폴더**에서 돈다
+(커밋 이메일 검사를 피하는 것이 요점이다):
+
+```bash
+# ㉮ 좌표를 이름으로 준다 (wiki · products/shotform-saas.md 의 방식)
+npx vercel deploy --prod --yes --project fixup-shortform-service --scope fix-up1
+
+# ㉯ 좌표를 .vercel 로 준다 (저장소 CLAUDE.md 의 방식 · 지금 배포 폴더가 이 모양)
+npx vercel deploy --prod --yes
+```
+
+★ **㉯ 가 더 안전하다.** ㉮ 는 이름으로 찾으므로 **scope 를 잘못 주면 그 팀에 같은 이름의
+새 프로젝트를 만든다** — 이번 회차의 유령 둘이 정확히 그렇게 생겼다. ㉯ 는 id 가 박혀 있어
+없는 프로젝트면 그냥 거절한다.
 
 **④ 그래서 로컬은 여전히 옛 Supabase 를 본다.** `.env.local` 은 **손대지 않았다**
 (백업 `env.local.bak` 과 바이트 동일). 결과물 띠는 로컬에서 여전히 안 뜬다 —
