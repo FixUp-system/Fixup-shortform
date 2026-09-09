@@ -1,8 +1,6 @@
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
-import { USER_HEADER } from "../lib/auth/headers.js";
 
-// 루트는 **지금 쓰는 흐름의 첫 화면**으로 보낸다.
+// 루트는 **첫 화면으로 보내기만 한다.**
 //
 // ★★ 2026-08-25 — 사이드바에서 단계별·수정을 걸렀는데(SIDEBAR_FLOWS)
 //   여기가 그대로 /create 를 가리켜, 주소창에 아무것도 안 치고 들어오면
@@ -16,16 +14,16 @@ import { USER_HEADER } from "../lib/auth/headers.js";
 // ★ 뒷단은 **그대로 살아 있다**: components/QuickCreate.jsx · lib/auto.js ·
 //   POST /api/projects/[id]/auto. 되살릴 때 커밋을 뒤지지 않아도 되게 남겨 뒀다.
 //   (지금은 아무 화면도 QuickCreate 를 그리지 않는다.)
-// ★★ 2026-08-27 — **들어오는 문이 갈린다**(사장님 지시: "기본으로 보관함 바로 확인하고
-//   상세 기능들을 사용하려면 로그인 및 회원가입 해야 볼 수 있는 걸로").
-//   · 로그인했으면 → 만들기 첫 화면(하던 일로 바로 간다)
-//   · 아니면 → 보관함(결과물부터 보여 준다. 만드는 문은 로그인이 지킨다)
 //
-// ★ 신원은 middleware 가 요청 헤더에 넣어 준 값을 읽기만 한다 — 여기서 세션을 다시 확인하면
-//   그 판정이 두 벌이 된다(lib/auth/require-user.js 와 같은 규율).
-// ★ 손님이 이 자리에 닿으려면 `/` 가 손님 목록에 있어야 한다(lib/auth/guest.js).
+// ★★ 2026-09-09 — **목적지가 하나가 됐다**(사장님 확정). 그전에는 여기가 신원을 읽어
+//   갈랐다: 로그인했으면 /home, 아니면 /archive(2026-08-27 지시 "기본으로 보관함 바로
+//   확인하고 상세 기능들을 사용하려면 로그인 및 회원가입 해야 볼 수 있는 걸로").
+//   이제 **홈 자체가 손님에게도 열려** 그 갈래가 필요 없다 — 갈리는 것은 화면 안의
+//   버튼이고(app/home/page.js), 08-27 지시는 홈의 결과물 띠가 들고 있는 보관함 길이 잇는다.
+//   목적지가 하나이므로 여기서는 신원을 **읽지 않는다.** 읽으면 아무것도 안 하는 판정이
+//   남아, 다음 사람이 "여기가 무언가 가른다"고 오해한다.
+// ★ 손님이 이 자리에 닿으려면 `/` 와 `/home` 이 손님 목록에 있어야 한다(lib/auth/guest.js).
 //   스위치가 꺼져 있으면 middleware 가 그 앞에서 /login 으로 보내므로 예전과 같다.
-export default async function Home() {
-  const id = (await headers()).get(USER_HEADER);
-  redirect(id ? "/home" : "/archive");
+export default function Home() {
+  redirect("/home");
 }

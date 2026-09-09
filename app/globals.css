@@ -2599,8 +2599,12 @@ h1.login-head { margin-inline: auto; }
 }
 @media (prefers-reduced-motion: reduce) { .running-dot { animation: none; } }
 
-/* ── 홈 — 결과물로 여는 첫 화면 (2026-09-08) ──────────────────────────────
-   ★ 순서가 곧 말이다: **결과물 → 도구 → 작동 원리.** 그전에는 "만드는 방식을 고르는"
+/* ── 홈 — 결과물로 여는 첫 화면 (2026-09-08 · 09-09 에 손님에게도 열렸다) ──────
+   ★ 순서가 곧 말이다: **결과물 → 만드는 법 → 도구.** 2026-09-09 에 도구와 만드는 법의
+     자리가 바뀌었다 — 손님이 첫 화면에 닿게 되면서, 만들어 본 적 없는 사람이 먼저
+     읽어야 할 것이 "어떻게 만드나"이지 "무엇으로 만드나"가 아니게 됐다.
+     (레퍼런스 둘도 같은 순서다: 결과물 → 작동 방식 → 도구·템플릿.)
+   ★ 그전에는 "만드는 방식을 고르는"
      도해 두 장이 첫 화면이었고(2026-08-28), 그 도해가 쓰던 스타일 뭉치를 여기서 걷었다:
      .home-modes · .home-mode · .home-stage · .home-sealed · .home-out · .home-film ·
      .home-facts · .home-pick · .home-down · .home-arw · .home-note · .home-models ·
@@ -2613,7 +2617,12 @@ h1.login-head { margin-inline: auto; }
    ★ 띠는 --band 다. --deep 으로는 안 된다 — 그것은 밝은 벌 안에서 한 단계 가라앉은
      칸이라, 그 위에 놓으면 "만든 것"이 화면에서 앞으로 나오지 않는다. */
 .home { max-width: 1100px; }
-.home .lede { font-size: 16px; color: var(--ink-soft); margin: 0 0 34px; max-width: 62ch; text-wrap: pretty; }
+.home .lede { font-size: 16px; color: var(--ink-soft); margin: 0 0 var(--sp-4); max-width: 62ch; text-wrap: pretty; }
+/* 첫 화면의 주 버튼. 전역 .cta 의 margin-top(20px)은 폼 아래에 홀로 설 때의 값이라
+   여기서는 죈다 — 도입부 세 줄(제목·리드·버튼)이 한 덩어리로 읽혀야 한다.
+   ★ `.home > .cta` 다 — 자식만 잡는다. 아래 도구 격자·띠 안에 나중에 .cta 가 생겨도
+     이 여백이 딸려 들어가지 않는다. */
+.home > .cta { margin-top: var(--sp-2); }
 
 /* 결과물 띠 — 어두운 면 위에 **표지 그림만** 늘어놓는다.
    ★★ 여기에 <video> 를 두지 마라. 2026-09-07 에 보관함 목록이 영상을 물고 있어서
@@ -2643,11 +2652,22 @@ h1.login-head { margin-inline: auto; }
   width: 100%; aspect-ratio: 9 / 16; object-fit: cover;
   border-radius: var(--r-ctl); background: var(--stage-dark);
 }
-.home-reel-item span {
-  display: block; margin-top: var(--sp-2);
-  font-size: 12px; color: var(--band-soft);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+/* ★★ 카드 아래 글자를 **걷었다**(2026-09-09). 저장된 이름 칸에는 사장님이 적은 소재가
+   그대로 들어가는데, 실측하니 여섯 편 중 셋이 영어 지문 원문이었다("You are creating a
+   premium advertisement image…"). 손님이 보는 첫 화면이라 그 글자가 서비스의 얼굴이 된다.
+   레퍼런스로 삼은 두 곳(dropshot·deevid)도 예시 항목에 글을 안 단다 — 그림만 깐다.
+   ★ 그 규칙은 components/HomeMade.jsx 가 지키고 판이 잰다. 여기서는 자리만 없앤다. */
+
+/* 보관함으로 나가는 길. 08-27 지시("기본으로 보관함 바로 확인")를 첫 화면이 바뀌어도
+   지키는 자리다 — 손님이 여기서 막다른 길을 만나면 안 된다.
+   ★ --band-soft 의 **유일한 소비자**다(옛 카드 글자에서 물려받았다). 이 줄을 지우면
+     토큰도 함께 지워라 — 쓰는 자리가 없는 색은 다음 사람에게 거짓말을 한다. */
+.home-more {
+  display: inline-block; margin-top: var(--sp-4);
+  font-size: 14px; color: var(--band-soft); text-decoration: none;
+  border-bottom: 1px solid currentColor; padding-bottom: 1px;
 }
+.home-more:hover { color: var(--band-ink); }
 
 /* 도구 격자 — 세 갈래를 같은 무게로 늘어놓는다(권장 배지를 안 단다:
    무엇을 만드는지에 따라 답이 달라지는데 화면이 미리 고를 수는 없다). */
@@ -2668,8 +2688,13 @@ h1.login-head { margin-inline: auto; }
 /* margin-top:auto 로 바닥에 붙인다 — 설명 줄 수가 달라도 세 카드의 마지막 줄이 맞는다. */
 .home-how { margin-top: auto; padding-top: var(--sp-3); font-size: 12px; color: var(--ink-soft); }
 
-/* 작동 원리 4단 — 세로줄로만 가른다(칸을 그리면 위 도구 격자와 경쟁한다). */
-.home-steps { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: var(--sp-5); border-top: 1px solid var(--line); }
+/* 만드는 법 3단 — 세로줄로만 가른다(칸을 그리면 아래 도구 격자와 경쟁한다).
+   ★ 2026-09-09 에 넷에서 셋이 됐다. 넷째 칸이던 "보관함"은 만드는 방법이 아니라 결과다.
+     칸 수는 화면(app/home/page.js 의 STEPS)이 정하고 판이 센다 — 여기 값과 그 표가
+     갈리면 마지막 칸이 반으로 눌린다. */
+/* ★ 위 여백은 0 이다 — 절 이름(.eyebrow)이 이미 18px 를 들고 온다(2026-09-09).
+     둘을 다 주면 이름과 격자 사이가 아니라 **이름 위쪽**만 벌어져 이름이 앞 절에 붙는다. */
+.home-steps { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 0; border-top: 1px solid var(--line); }
 /* ★ 사방에 여백을 준다. 왼쪽을 0 으로 두었더니 02·03·04 의 글이 **앞 칸 세로줄에 딱
    붙었다**(2026-09-08 화면 실측). 첫 칸만 예외로 0 이다 — 그 칸은 격자 왼쪽 끝에
    맞아야 위 도구 격자와 같은 축에 선다. */
