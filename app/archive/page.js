@@ -10,6 +10,33 @@ import Icon from "../../components/Icon";
 // 운영자인가 — **서버가 내려 준 값**을 읽는다(판정은 라우트가 이미 했다).
 import { useMe } from "../../components/MeContext";
 
+// 상세가 읽을 종류 자국이 사는 자리 — app/archive/[id]/page.js 가 같은 열쇠로 읽는다.
+// 두 파일이 같은 글자여야 하므로 tests/archive-detail-doors.test.js 가 대조한다.
+const KIND_HINT_KEY = "shotform:archive-kind";
+
+// ★★★ 2026-09-10 — **종류를 상세에 물려 준다.**
+//   상세는 종류를 모르면 읽는 문 넷을 **차례로** 두드린다. 네 문 전부 문서를 통째로 읽고
+//   나서 404 를 내므로 버려질 응답에도 바이트가 다 나간다 — 09-07 덤프 46편 실측으로
+//   reel 한 편이 3회 101KB, 종류 없는 옛 문서가 4회 49KB 다. 왕복이 직렬이라 지연이
+//   곱해지고, 보관함 상세 2.07초의 큰 몫이 여기였다.
+//   목록은 이 값을 **이미 들고 있다**(GET /api/projects 의 kind, 카드 배지가 그것으로 그려진다).
+//   그것을 안 넘기고 있었을 뿐이다.
+// ★ 왜 주소가 아니라 자국인가 — 카드 링크를 만드는 자리는 이 파일이 아니라
+//   components/ProjectCards.jsx 다(이번 작업의 파일 범위 밖). 상세는 주소의 `?kind=` 도
+//   읽으므로, 그 링크에 값이 실리면 자국 없이도 곧바로 맞는 문으로 간다.
+// ★ 힌트일 뿐이다 — 못 적어도(비공개 모드 등) 상세는 예전처럼 네 문을 두드린다.
+//   그래서 실패를 삼킨다: 목록을 그리는 일이 이것 때문에 죽으면 안 된다.
+// ★ 종류 없는 옛 문서(kind null)도 적는다 — 그 편이 왕복 4회로 가장 비싸다.
+function rememberKinds(list) {
+  try {
+    const seen = JSON.parse(sessionStorage.getItem(KIND_HINT_KEY) || "{}");
+    for (const p of list) seen[p.id] = p.kind || "step";
+    sessionStorage.setItem(KIND_HINT_KEY, JSON.stringify(seen));
+  } catch {
+    // 자국을 못 남겨도 상세는 열린다
+  }
+}
+
 function ArchiveBody() {
   const [projects, setProjects] = useState(null); // null = 불러오는 중
   const [err, setErr] = useState("");
@@ -50,6 +77,8 @@ function ArchiveBody() {
       if (!alive) return;
       setProjects(projects);
       setErr(err);
+      // 카드를 누르면 상세가 이 자국을 읽어 **맞는 문 하나만** 두드린다(위 주석 참고).
+      rememberKinds(projects);
       // 손님(비로그인)인가 — 라우트가 말해 준다(lib/auth/guest.js). 짐작하지 않는다.
       setGuest(guest);
     });

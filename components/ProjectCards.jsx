@@ -152,7 +152,18 @@ export default function ProjectCards({ projects, limit, onDeleted, selecting, se
         // ★ 보던 탭을 주소에 실어 보낸다(2026-08-19) — 상세의 [보관함으로]가 그 값을
         //   되돌려 받아야 [전체]에서 들어간 사람이 [내 영상]으로 떨어지지 않는다.
         //   "mine" 은 안 싣는다: 기본값이라 붙이면 주소만 길어진다.
-        const href = scope === "all" ? `/archive/${p.id}?scope=all` : `/archive/${p.id}`;
+        // ★★ 2026-09-10 — **종류를 함께 실어 보낸다.** 상세는 종류를 모르면 읽는 문 넷을
+        //   차례로 두드리는데, 네 문 전부 문서를 통째로 읽고 나서 404 를 낸다(09-07 덤프
+        //   실측: reel 한 편이 3회 101KB · 종류 없는 옛 문서가 4회 49KB). 목록은 이 값을
+        //   이미 쥐고 있다 — 안 넘기고 있었을 뿐이다.
+        //   ★ **힌트일 뿐이다.** URL 로 오는 값이라 사장님이 바꿀 수 있으므로, 어느 문을
+        //     먼저 두드릴지 순서만 정하고 판정(소유자·종류)은 서버가 그대로 한다.
+        //     틀린 값을 줘도 문이 하나도 사라지지 않는다(tests/archive-detail-doors).
+        //   ★ 종류 없는 옛 문서는 `step` 이다 — 그 편이 왕복 4회로 가장 비싸다.
+        const q = new URLSearchParams();
+        if (scope === "all") q.set("scope", "all");
+        q.set("kind", p.kind || "step");
+        const href = `/archive/${p.id}?${q}`;
         const label = isAd
           ? (AD_STATUS_LABEL[p.status] || p.status)
           : isFilm

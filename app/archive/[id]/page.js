@@ -33,6 +33,55 @@ import { REEL_STEPS, reelStepHref, currentReelStepKey } from "../../../lib/reel/
 //   판정은 lib 하나다(planReelBake) — 화면이 초를 다시 세면 제작 화면과 갈린다.
 import { planReelBake, reelWholePrompt } from "../../../lib/reel/oneshot";
 
+// ── 읽는 문 표 ────────────────────────────────────────────────────────────────
+//
+// 종류마다 읽는 문이 다르다(서로를 404 로 거절한다 — 양방향 격리). 주소만으로는 종류를
+// 알 수 없어서 200 이 나올 때까지 두드린다.
+//
+// ★ 왜 표로 뺐나 — 네 문 전부 문서를 **통째로 읽고 나서** kind 로 404 를 낸다. 버려질
+//   응답에도 바이트가 다 나가고, 왕복이 직렬이라 지연이 곱해진다. 09-07 덤프 46편 실측:
+//   광고 1회 7KB · film 2회 19KB · reel 3회 101KB(17/46편) · 종류 없는 옛 문서 4회 49KB.
+//   그래서 **맞는 문을 먼저** 두드릴 수 있게 순서를 값으로 만들었다(아래 doorsFor).
+// ★ 종류가 늘면 여기 한 줄을 더한다 — tests/step-doc-gate.test.js 가 그것을 잰다.
+// ★ 이름(ad·film·reel)은 문서의 doc.kind 그대로다. 목록(GET /api/projects)이 주는 값과
+//   같은 말이어야 힌트가 맞는다. 종류가 없는 옛 문서는 kind 가 null 이라 부를 이름이
+//   없어서 "step"(단계별)으로 적는다.
+const ARCHIVE_DOORS = [
+  ["ad", (id) => `/api/ads/${id}`],
+  ["film", (id) => `/api/film/${id}`],
+  ["reel", (id) => `/api/reel/${id}`],
+  ["step", (id) => `/api/projects/${id}`],
+];
+
+// 힌트가 가리키는 문을 맨 앞으로 당긴다. **나머지는 순서 그대로 뒤에 남는다.**
+//
+// ★★ 힌트는 **순서를 정하는 것뿐**이고 권한이 아니다. 이 값은 주소에서 오므로 사장님이
+//   바꿀 수 있다 — 문을 지우는 방식으로 고쳤다면 틀린 kind 하나로 열려야 할 영상이
+//   "찾을 수 없어요"가 된다. 실제 판정(소유자·종류)은 그대로 서버가 한다.
+//   그래서 **틀린 힌트를 줘도 결과가 같다**: 더 빨리 찾거나, 예전과 똑같이 네 번 두드린다.
+// ★ 모르는 힌트(옛 링크·손으로 친 값)는 아무 문과도 안 맞아 예전 순서 그대로가 된다.
+function doorsFor(hint) {
+  return [
+    ...ARCHIVE_DOORS.filter(([kind]) => kind === hint),
+    ...ARCHIVE_DOORS.filter(([kind]) => kind !== hint),
+  ];
+}
+
+// 목록이 남긴 종류 자국이 사는 자리. app/archive/page.js 가 적고 여기서 읽는다 —
+// 두 파일이 같은 글자여야 하므로 tests/archive-detail-doors.test.js 가 대조한다.
+const KIND_HINT_KEY = "shotform:archive-kind";
+
+// 주소에 kind 가 없을 때(카드를 눌러 들어온 평소 길) 목록이 남긴 자국을 본다.
+// ★ 힌트일 뿐이다 — 비공개 모드처럼 저장소 접근 자체가 던지는 자리가 있어서 감싼다.
+//   못 읽으면 예전처럼 네 문을 차례로 두드린다.
+function storedKindHint(id) {
+  try {
+    return JSON.parse(sessionStorage.getItem(KIND_HINT_KEY) || "{}")[id] || null;
+  } catch {
+    return null;
+  }
+}
+
 // 한 줄짜리 정보. 값이 없으면 줄째 안 그린다 — 빈 칸을 늘어놓으면 무엇이 없는지가 아니라
 // 화면이 덜 만들어진 것처럼 보인다.
 function Row({ label, children }) {
@@ -48,7 +97,11 @@ function Row({ label, children }) {
 function ArchiveDetailPageBody() {
   // ★ 어디서 왔는지 주소가 말해 준다(2026-08-19). [보관함으로]가 **두 곳**이라 값을
   //   한 자리에서 판다 — 두 번 적으면 언젠가 한쪽만 고쳐져 갈린다.
-  const backTo = useSearchParams().get("scope") === "all" ? "/archive?scope=all" : "/archive";
+  const sp = useSearchParams();
+  const backTo = sp.get("scope") === "all" ? "/archive?scope=all" : "/archive";
+  // 어느 종류인가 — **목록이 이미 안다**(GET /api/projects 가 kind 를 실어 준다).
+  // 그 값이 주소에 실려 오면 맞는 문을 처음부터 두드린다(아래 doorsFor).
+  const kindHint = sp.get("kind");
   const { id } = useParams();
   const [doc, setDoc] = useState(null);
   const [err, setErr] = useState("");
@@ -61,13 +114,19 @@ function ArchiveDetailPageBody() {
       //
       // ★ film 문을 빠뜨리면 film 카드는 **눌러도 아무것도 안 열린다** — /api/ads 도
       //   /api/projects 도 그 문서를 404 로 거절하기 때문이다(2026-08-19에 실제로 그랬다).
-      //   종류가 늘 때 여기 한 줄을 더하는 것을 tests/step-doc-gate.test.js 가 잰다.
+      //   종류가 늘 때 문 표(ARCHIVE_DOORS)에 한 줄을 더하는 것을
+      //   tests/step-doc-gate.test.js 가 잰다.
       // ★★ 2026-08-21 리뷰 A1 — reel 이 정확히 그 상태였다: 사이드바 진입점도 없었고
-      //   이 배열에도 없어서 주소를 직접 쳐야만 열렸다. `/api/reel/${id}` 를 더한다
-      //   (app/api/reel/[id]/route.js — 이 태스크(Task 12) 도중에야 생긴 문).
-      for (const url of [`/api/ads/${id}`, `/api/film/${id}`, `/api/reel/${id}`, `/api/projects/${id}`]) {
+      //   그 목록에도 없어서 주소를 직접 쳐야만 열렸다.
+      //
+      // ★★★ 2026-09-10 — **차례로 두드리는 값이 비쌌다.** 네 문 전부 문서를 통째로 읽고
+      //   나서 404 를 내므로 버려질 응답에도 바이트가 다 나가고, 왕복이 직렬이라 지연이
+      //   곱해진다(reel 한 편이 3회 101KB). 그런데 목록은 이미 종류를 안다 — 그 값을
+      //   힌트로 받아 **맞는 문을 먼저** 두드린다. 힌트가 없거나 틀리면 예전 그대로
+      //   네 문을 차례로 간다(doorsFor 주석 참고).
+      for (const [, door] of doorsFor(kindHint || storedKindHint(id))) {
         try {
-          const res = await fetch(url);
+          const res = await fetch(door(id));
           if (!res.ok) continue;
           const data = await res.json();
           if (alive) setDoc(data);
@@ -79,7 +138,7 @@ function ArchiveDetailPageBody() {
       if (alive) setErr("찾을 수 없어요 — 지워졌거나 다른 계정의 영상일 수 있어요");
     })();
     return () => { alive = false; };
-  }, [id]);
+  }, [id, kindHint]);
 
   if (err) {
     return (
