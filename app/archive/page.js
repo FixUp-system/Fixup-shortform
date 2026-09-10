@@ -213,7 +213,10 @@ function ArchiveBody() {
             </button>
               </>
             )}
-            <Link href="/create" className="cta">
+            {/* ★ 2026-09-10 — `/create`(단계별)에서 **원클릭**으로 옮겼다(사장님 지시).
+                랜딩의 [만들러 가기]가 이미 `/ads/new` 라, 같은 말을 하는 버튼이 자리에
+                따라 다른 제품으로 데려가고 있었다(tests/archive-create-entry.test.js). */}
+            <Link href="/ads/new" className="cta">
               + 새 영상 만들기
             </Link>
           </div>
