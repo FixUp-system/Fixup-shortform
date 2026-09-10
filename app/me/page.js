@@ -1,6 +1,6 @@
 "use client";
 
-// 마이페이지 — 이용자가 스스로 고칠 수 있는 것과 자기 크레딧만 둔다.
+// 마이페이지 — 이용자가 스스로 고칠 수 있는 것(이름·비밀번호)만 둔다.
 //
 // 보관함은 흡수하지 않는다(목록을 여기 그리지 않는다). 링크조차 두지 않는 이유는
 // **사이드바에 늘 있기 때문**이다 — "내 영상 25편 · 보관함 열기" 줄은 같은 말을 한 번 더
@@ -9,16 +9,9 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { NAME_MAX } from "../../lib/display-name";
 // 말·부호 규칙은 lib 하나가 쥔다 — 화면이 다시 적으면 언젠가 한쪽이 뒤집힌다
-import { ledgerLabel } from "../../lib/ledger";
 import { useMe } from "../../components/MeContext";
 
 // 그 사람의 시계로 본 날짜. Intl 로 돌리면 기기 설정에 따라 "2026. 8. 13." 처럼 나와
-// 열 폭이 흔들린다 — 자리수를 고정한다.
-function ymd(ts) {
-  const d = new Date(ts);
-  const p2 = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
-}
 
 export default function MePage() {
   const router = useRouter();
@@ -35,32 +28,7 @@ export default function MePage() {
   // [저장] 을 누르면 저장돼 있던 이름이 지워진다.
   const loadErr = failed ? "내 정보를 읽지 못했어요 — 잠시 뒤 다시 시도해 주세요." : "";
 
-  // 크레딧 내역 — 잔액 숫자 하나만으로는 "왜 줄었는지"를 알 수 없다. null 은 불러오는 중.
-  const [ledger, setLedger] = useState(null);
-  const [ledgerErr, setLedgerErr] = useState("");
-  const [ledgerMore, setLedgerMore] = useState(false);
-  const [ledgerBusy, setLedgerBusy] = useState(false);
 
-  // before 를 주면 그 시각보다 앞선 것만 온다 — 이어 받는 동안 새 줄이 생겨도
-  // 이미 본 줄이 다시 나오거나 건너뛰지 않는다(번호 커서였다면 밀린다).
-  async function loadLedger(before) {
-    setLedgerBusy(true);
-    try {
-      const q = before ? `?before=${before}` : "";
-      const res = await fetch(`/api/credits/history${q}`);
-      if (!res.ok) throw new Error();
-      const d = await res.json();
-      setLedger((prev) => (before ? [...(prev || []), ...d.rows] : d.rows));
-      setLedgerMore(!!d.has_more);
-    } catch {
-      // 조용히 비우지 않는다 — 빈 목록과 "못 읽었다"가 같아 보이면 사장님이 내역이
-      // 없는 줄 안다. 여기는 돈에 관한 화면이라 그 오해가 특히 나쁘다.
-      setLedgerErr("내역을 읽지 못했어요 — 잠시 뒤 다시 시도해 주세요.");
-    } finally {
-      setLedgerBusy(false);
-    }
-  }
-  useEffect(() => { loadLedger(); }, []);
 
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -246,51 +214,9 @@ export default function MePage() {
         {pwMsg && <p className="pgsub">{pwMsg}</p>}
       </section>
 
-      {/* ★ 크레딧을 끈 동안(내부 QA)에는 이 묶음을 통째로 안 그린다 — 안 쓰는 값을
-          계속 말하면 혼란만 준다. 기록은 DB 에 그대로 쌓인다(사용자 결정): 나중에
-          얼마 썼는지 운영자 화면(/admin·/costs)에서 볼 수 있다. */}
-      {me?.gated !== false && (
-      <section className="panel me-panel">
-        <h2 className="me-h">크레딧 내역</h2>
-        <p className="pgsub">지금 {me ? <b>{me.balance}</b> : "…"} 크레딧이 남았어요.</p>
-        {ledgerErr && <p className="pgsub warn">{ledgerErr}</p>}
-        {!ledgerErr && ledger === null && <p className="pgsub">불러오는 중…</p>}
-        {!ledgerErr && ledger?.length === 0 && (
-          <p className="pgsub">아직 쓰거나 충전한 내역이 없어요.</p>
-        )}
-        {ledger?.length > 0 && (
-          <ul className="ledger">
-            {ledger.map((r, i) => (
-              <li className="ledger-row" key={`${r.ts}-${i}`}>
-                {/* ★ 사장님 시계로 찍는다. toISOString 은 UTC 라 한국(+9)에서는 오전에 쓴
-                    내역이 하루 전으로 보인다(08-13 08:00 KST = 08-12 23:00 UTC). */}
-                <span className="ledger-date mono">{ymd(r.ts)}</span>
-                <span className="ledger-what">
-                  {ledgerLabel(r.kind)}
-                  {/* 지운 영상의 내역은 장부에 남는다(지워도 환불하지 않는다) — 제목이
-                      없다고 빈칸으로 두면 "무엇에 썼는지 모르는 줄"이 된다. */}
-                  {r.project_id && (
-                    <span className="ledger-of"> · {r.project_title || "지운 영상"}</span>
-                  )}
-                </span>
-                <span className={`ledger-amt mono ${r.delta > 0 ? "led-plus" : ""}`}>
-                  {r.delta > 0 ? `+${r.delta}` : r.delta}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-        {ledgerMore && (
-          <button
-            className="mini"
-            disabled={ledgerBusy}
-            onClick={() => loadLedger(ledger[ledger.length - 1].ts)}
-          >
-            {ledgerBusy ? "불러오는 중…" : "더 보기"}
-          </button>
-        )}
-      </section>
-      )}
+      {/* ★ 크레딧 내역은 2026-09-10 에 걷었다(사장님 지시) — 상용화를 앞두고 비용 정책을
+          새로 정할 예정이라, 낡은 정책을 화면이 계속 말하면 그것이 약속처럼 읽힌다.
+          ★ 우리가 실제로 낸 돈(cost_records)은 그대로 쌓인다 — 새 정책의 근거가 그 장부다. */}
 
 
     </>

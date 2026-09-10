@@ -52,12 +52,6 @@ describe("첫 화면 — 화질 선택", () => {
     expect(fn, "모델에 없는 화질을 그대로 둔다").toMatch(/setResolution\(/);
   });
 
-  it("칩마다 그 화질의 정가를 적는다 — 값이 달라지는 것이 고르는 이유다", () => {
-    expect(script).toMatch(/videoPrice\([\s\S]{0,120}?\)/);
-    // 셋째 인자로 그 칩의 해상도가 들어가야 한다. 안 넘기면 세 칩이 같은 값을 적는다.
-    expect(script).toMatch(/videoPrice\(\s*seconds\s*,\s*model\s*,\s*r\s*\)/);
-  });
-
   it("만들 때 고른 화질을 함께 보낸다 — 안 보내면 말없이 기본값이 된다", () => {
     const submit = script.match(/async function submit\([\s\S]*?\n  \}/)?.[0] || "";
     expect(submit, "submit 을 못 찾았다").toBeTruthy();
@@ -78,16 +72,6 @@ describe("표시용 가격도 화질을 본다", () => {
     expect(video).toMatch(/regenPrice\("clip"[\s\S]{0,160}?resolutionForProject\(project\)/);
   });
 
-  // 프로젝트가 아직 없는 자리(자료 화면·빠른 생성)는 저장된 화질이 없다.
-  // 그래도 기본값을 **명시**로 넘긴다 — 인자를 비우면 다음 사람이 "해상도를 안 보는 자리"로
-  // 읽는다.
-  // ★★ 2026-08-31 — 넘기는 값이 **전역 720p → 그 모델의 기본**으로 바뀌었다. 그전에는
-  //   "값은 중립이다(생략도 720p 열로 떨어진다)" 가 참이었는데, 기본 모델이 H3 로 옮겨
-  //   가면서 720p 는 **그 모델에 없는 값**이 됐다(768P·2K). 재는 것은 그대로다 —
-  //   **명시로 넘기는가**.
-  it("자료 화면은 그 모델의 기본 화질을 명시로 넘긴다", () => {
-    expect(create).toMatch(/videoPrice\([\s\S]{0,80}?defaultResolutionForModel/);
-  });
   it("빠른 생성도 그 모델의 기본 화질을 명시로 넘긴다", () => {
     const calls = quick.match(/videoPrice\([\s\S]{0,140}?\)/g) || [];
     expect(calls.length).toBe(2);

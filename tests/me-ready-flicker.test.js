@@ -32,7 +32,8 @@ const strip = (t) => t.replace(/(^|[^:])\/\/.*$/gm, "$1").replace(/\/\*[\s\S]*?\
 const CREDIT_SCREENS = [
   "app/ads/new/page.js",
   "app/ads/[id]/page.js",
-  "app/create/page.js",
+  // ★ app/create/page.js 는 2026-09-10 에 크레딧을 걷어 이 목록에서 빠졌다.
+  //   나머지 셋은 아직 값을 말한다 — 그 화면들을 걷을 때 이 목록도 함께 비운다.
   "app/create/[id]/images/page.js",
 ];
 

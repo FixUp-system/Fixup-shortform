@@ -23,16 +23,6 @@ describe("화면 — 크레딧", () => {
     expect(quick).not.toMatch(/videos_left/);
     expect(admin).not.toMatch(/videos_left/);
   });
-  // 2026-08-07: 크레딧이 사이드바에서 상단 계정 바로 옮겨갔다. 판정 대상만 옮긴다 —
-  // 이 단정을 지우면 "크레딧이 화면에서 사라지는" 회귀를 아무도 못 잡는다.
-  // 2026-08-07(2차): 읽는 자리가 또 옮겨갔다 — 이제 GET /api/me 는 공유본
-  // (components/MeContext.jsx)이 한 번만 읽고 상단 바가 그 값을 받는다.
-  // 판정 대상만 따라 옮긴다: 잔액이 **서버 값**이라는 것과 화면에 남아 있다는 것.
-  it("상단 계정 바가 잔액을 서버에서 읽어 크레딧으로 보여준다", () => {
-    expect(menu).toMatch(/useMe\(\)/);
-    expect(menu).toMatch(/me\.balance/);
-    expect(ctxSrc).toMatch(/\/api\/me/);
-  });
   it("요약 카드가 이 영상의 정가를 보여준다", () => {
     expect(quick).toMatch(/videoPrice/);
     expect(quick).toMatch(/크레딧/);
@@ -108,11 +98,6 @@ describe("영상 모델은 만들 때 한 번 고른다", () => {
   it("자료 화면이 모델을 고르고 만들 때 함께 보낸다", () => {
     expect(create).toMatch(/I2V_MODELS/);
     expect(create).toMatch(/i2v_model/);
-  });
-
-  it("값·이름을 화면이 손으로 적지 않는다 — 표와 가격표에서 온다", () => {
-    expect(create).toMatch(/videoPrice/);
-    expect(create, "모델 이름을 화면에 박았다").not.toMatch(/Seedance|Kling/);
   });
 
   // ★ 뒤 단계는 모델을 **말하지도 않는다**(2026-08-13). 자료 화면에서 이미 골랐고,

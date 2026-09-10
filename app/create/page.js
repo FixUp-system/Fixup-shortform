@@ -20,20 +20,15 @@ import { ASPECTS, DEFAULT_ASPECT_ID, aspectFor } from "../../lib/aspects";
 import { I2V_MODELS, DEFAULT_I2V_MODEL, DEFAULT_RESOLUTION, resolutionsForModel, defaultResolutionForModel } from "../../lib/clip-limits";
 import { SUBTITLE_LANGS, DEFAULT_SPEECH_LANG } from "../../lib/subtitle-langs";
 // 값은 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다)
-import { videoPrice } from "../../lib/pricing";
 import StylePicker from "../../components/StylePicker";
 import { MAX_MATERIAL_TEXT } from "../../lib/material";
 
 export default function CreatePage() {
   const router = useRouter();
   const { setProject } = useProject();
-  // 크레딧을 끈 동안(내부 QA)에는 값 이야기를 안 한다 — 판정은 서버가 내려 준 gated 하나다.
-  // ★ `!== false` 로 본다: me 를 아직 못 읽은 동안(null)에는 지금까지처럼 값을 보여준다.
-  //   반대로 두면 크레딧이 켜진 정상 배포에서 값이 잠깐 사라졌다 나타난다.
   const { me, ready } = useMe();
-  // ★ ready 를 함께 본다(2026-08-31) — 모르는 동안 `me?.gated !== false` 는 **참**이라
-  //   크레딧이 반짝 보였다가 사라졌다. 모르는 동안에는 값 이야기를 아예 안 한다.
-  const showCredits = ready && me?.gated !== false;
+  // ★ 값(크레딧) 이야기는 2026-09-10 에 걷었다(사장님 지시) — 상용화를 앞두고 비용
+  //   정책을 새로 정할 예정이라, 낡은 값을 화면이 말하면 그것이 약속처럼 읽힌다.
   const [text, setText] = useState("");
   const [photos, setPhotos] = useState([]); // {id, filename, url}
   // ★ 기본 30초. 예전에는 null(자동 · 자료가 정함)이 기본이었는데, 길이가 **정가를 정하는
@@ -46,9 +41,7 @@ export default function CreatePage() {
   // 바꾸면 낸 값과 만드는 값이 어긋난다. 차액 정산은 만들지 않았다.
   const [model, setModel] = useState(DEFAULT_I2V_MODEL);
   // ★ 화질도 **여기서** 고른다(2026-08-18, 사용자 지시) — ①자료에 있던 칩을 옮겼다.
-  //   화질이 정가를 바꾸므로(Seedance 30초: 480p 80 · 720p 160) 고르는 자리는 결제 앞이어야
-  //   ★ 2026-09-07 — **1080p 를 닫았다**(사장님 지시). 30초 360 크레딧이라 고를 수 있게
-  //     두는 것 자체가 비용이었다. 목록은 lib/clip-limits.js 가 정하므로 이 화면은 무수정이다.
+  //   화질이 값을 바꾸므로 고르는 자리는 만들기 **앞**이어야
   //   하고, 만들기 전이 가장 앞이다. 여기에는 잠금(project.charged)이 없다 — 아직 청구가
   //   없으니 잠글 것도 없고, 그 대신 **모델과 어긋난 값이 남지 않게** pickModel 이 맞춰 준다.
   // ★ 2026-08-31 — 이 화면도 DEFAULT_I2V_MODEL 을 공유한다. 기본이 H3 로 옮겨 가면서
@@ -166,10 +159,7 @@ export default function CreatePage() {
                   {I2V_MODELS.map((m) => (
                     <button key={m.id} className={`chip${model === m.id ? " on" : ""}`}
                       onClick={() => pickModel(m.id)}>
-                      {/* ★ 칩마다의 값은 **기본 화질** 기준이다 — 모델을 고르는 순간의 화질을
-                          쓰면, 그 모델이 그 화질을 열지 않을 때 없는 값의 가격을 적게 된다.
-                          고른 화질의 정확한 값은 바로 아래 화질 칩이 적는다. */}
-                      {m.label}{showCredits && ` · ${videoPrice(seconds, m.id, defaultResolutionForModel(m.id))} 크레딧`}
+                      {m.label}
                     </button>
                   ))}
                 </div>
@@ -190,8 +180,7 @@ export default function CreatePage() {
                     {resolutions.map((r) => (
                       <button key={r} className={`chip${resolution === r ? " on" : ""}`}
                         onClick={() => setResolution(r)}>
-                        {/* 칩마다 그 화질의 정가를 적는다 — 값이 달라지는 것이 고르는 이유다 */}
-                        {r}{showCredits && ` · ${videoPrice(seconds, model, r)} 크레딧`}
+                        {r}
                       </button>
                     ))}
                   </div>

@@ -68,9 +68,8 @@ export default function UserMenu() {
 
   return (
     <div className="um" ref={box}>
-      {/* ★ 크레딧을 끈 동안(내부 QA)에는 안 보여준다 — 판정은 서버가 내려 준 gated
-          하나다(/api/me). 화면이 스스로 판정하면 두 벌이 되어 언젠가 어긋난다. */}
-      {me && me.gated !== false && <span className="um-credit">크레딧 <b>{me.balance}</b></span>}
+      {/* ★ 크레딧 잔액은 2026-09-10 에 걷었다(사장님 지시) — 상용화를 앞두고 비용 정책을
+          새로 정할 예정이라, 낡은 정책이 화면에 남아 있으면 그것이 곧 약속처럼 읽힌다. */}
       <button
         className="um-btn"
         onClick={() => setOpen((v) => !v)}
