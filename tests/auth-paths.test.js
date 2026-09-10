@@ -11,9 +11,17 @@ describe("공개 경로", () => {
   //     **닫힌 쪽으로** 떨어진다(app/api/cron/collect/route.js · tests/cron-collect.test.js).
   //   ★ 경로를 **하나씩** 적었다 — 접두사(`/api/cron`)로 열면 앞으로 만드는 크론이
   //     비밀 검사를 빠뜨린 채로도 공개가 된다.
-  it("넷뿐이다", () => {
+  // ★★★ 2026-09-10 **저녁 — 넷에서 다섯이 됐다.** 늘린 것은 **fal 웹훅** 문 하나다.
+  //   fal 은 로그인 없이 우리를 부르고, 문서가 못 박는다: *"Redirects are not followed …
+  //   a 3xx status code … is treated as a permanent failure and is not retried."*
+  //   벽 안에 두면 **307 한 번에 영영 재시도가 없다**.
+  //   ★ 자물쇠는 로그인이 아니라 **ED25519 서명**이다(lib/fal-webhook.js) — 검증이 안 되면
+  //     401 이고, JWKS 를 못 받아도 401 이다(모르면 닫는다).
+  //   ★ 그리고 그 문은 **페이로드를 안 믿는다** — "이 편을 걷어라"는 방아쇠로만 쓰고
+  //     무엇이 끝났는지는 우리가 fal 에 다시 묻는다. 뚫려도 돈이 안 나간다.
+  it("다섯뿐이다", () => {
     expect([...PUBLIC_PATHS].sort()).toEqual(
-      ["/api/auth/login", "/api/auth/signup", "/api/cron/collect", "/login"].sort()
+      ["/api/auth/login", "/api/auth/signup", "/api/cron/collect", "/api/fal/webhook", "/login"].sort()
     );
   });
 
