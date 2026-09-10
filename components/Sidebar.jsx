@@ -335,8 +335,12 @@ export default function Sidebar() {
             <span className="ic"><Icon name="sparkle" /></span>영상 만들기 (단계별)
           </Link>
           {inCreate && <StepList pathname={pathname} />}
+          {/* ★ 2026-09-10 — 아래 [+ 새로 만들기]를 `/create`(단계별)에서 **원클릭**으로
+              옮겼다(사장님 지시). 랜딩·보관함의 만들기 버튼이 이미 `/ads/new` 라, 같은
+              말을 하는 버튼이 자리에 따라 다른 제품으로 데려가고 있었다
+              (tests/archive-create-entry.test.js 가 셋을 함께 못 박는다). */}
           {inCreate && project?.id && (
-            <Link href="/create" className="side-new">+ 새로 만들기</Link>
+            <Link href="/ads/new" className="side-new">+ 새로 만들기</Link>
           )}
         </>
       )}
