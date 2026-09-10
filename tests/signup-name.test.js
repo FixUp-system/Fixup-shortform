@@ -55,12 +55,30 @@ describe("가입 — 이름을 함께 받는다", () => {
     expect(route, "NAME_MAX 를 안 가져온다").toMatch(/from\s+["'][^"']*display-name[^"']*["']/);
   });
 
-  it("★ 이름은 **선택**이다 — 없어도 가입을 막지 않는다", () => {
-    // 이메일·비밀번호만 400 으로 막는다. 이름까지 필수로 만들면 가입 문턱이 올라가고,
-    // 화면(required)과 라우트(400)가 갈리면 그 자리가 조용한 실패가 된다.
-    expect(route, "이름이 없다고 막는다").not.toMatch(
-      /!name[\s\S]{0,80}status:\s*400|!email\s*\|\|\s*!password\s*\|\|\s*!name/
-    );
-    expect(ui, "이름 칸을 필수로 만들었다").not.toMatch(/aria-label="이름"[\s\S]{0,200}required/);
+  // ★★★ 2026-09-10 **저녁에 뒤집혔다.** 이 자리에는 "이름은 선택이다 — 없어도 가입을
+  //   막지 않는다"가 서 있었고, 근거는 "가입 문턱을 올리지 않는다"였다.
+  //   사장님이 뒤집었다: *"이름 선택으로 두지 말고 그냥 필수값으로 적용해줘."*
+  //   판을 지우지 않고 **반대 방향으로 다시 못 박는다** — 그래야 다음 세션이 옛 주석을
+  //   읽고 "선택이 원래 설계였네" 하며 되돌리지 못한다.
+  it("★★★ 이름은 **필수**다 — 라우트가 400 으로 막는다", () => {
+    // 화면만 막으면 fetch 로 부르는 쪽이 그대로 지나간다. 진짜 문지기는 라우트다.
+    expect(route, "이름이 없어도 라우트가 통과시킨다").toMatch(/!name[\s\S]{0,120}status:\s*400/);
+    // 공백만 적은 이름은 없는 것과 같다 — **이름을** trim 한 값으로 재야 한다.
+    // (파일 첫 `.trim()` 은 이메일 것이라 그걸로 재면 무엇을 고쳐도 초록이다.)
+    const nameLine = route.match(/const name = [^\n]*/);
+    expect(nameLine, "이름을 읽는 줄이 없다").toBeTruthy();
+    expect(nameLine[0], "이름을 trim 하지 않는다").toMatch(/\.trim\(\)/);
+    const gateAt = route.search(/if\s*\(!name\)/);
+    expect(gateAt, "이름 게이트가 없다").toBeGreaterThan(-1);
+    expect(route.indexOf(nameLine[0]), "게이트가 이름을 읽기 전에 선다").toBeLessThan(gateAt);
+  });
+
+  it("★★ 화면도 함께 막는다 — 서버만 막으면 빈 칸으로 눌러 보고 오류를 받는다", () => {
+    const at = ui.indexOf('aria-label="이름"');
+    expect(at, "이름 칸이 없다").toBeGreaterThan(-1);
+    const field = ui.slice(ui.lastIndexOf("<input", at), at);
+    expect(field, "이름 칸에 required 가 없다").toMatch(/\brequired\b/);
+    // 자리표시자가 아직 "(선택)" 이면 화면이 거짓말을 한다 — 눌러 봐야 필수인 줄 안다.
+    expect(field, "자리표시자가 아직 선택이라고 말한다").not.toMatch(/선택/);
   });
 });

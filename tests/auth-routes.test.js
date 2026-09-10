@@ -144,13 +144,29 @@ describe("POST /api/auth/login", () => {
 describe("POST /api/auth/signup", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  // ★ 2026-09-10 저녁 — 아래 몸통에 `name` 이 붙어 있는 이유: **이름이 필수가 됐다**
+  //   (사장님 지시). 이름 없는 몸통은 이제 signUp 에 닿기도 전에 400 이라, 그러면
+  //   여기 판들이 재려는 것(세션·오류 옮김)을 하나도 못 잰다.
+  it("★★★ 이름이 없으면 400 — signUp 까지 가지도 않는다", async () => {
+    const res = await signupPOST(req({ email: "a@b.com", password: "hunter22" }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/이름/);
+    expect(signUp, "이름도 없이 가입을 시도했다").not.toHaveBeenCalled();
+  });
+
+  it("★★ 공백만 적은 이름도 400 — trim 뒤에 잰다", async () => {
+    const res = await signupPOST(req({ name: "   ", email: "a@b.com", password: "hunter22" }));
+    expect(res.status).toBe(400);
+    expect(signUp).not.toHaveBeenCalled();
+  });
+
   it("가입하면 200", async () => {
     // 세션이 서야 진짜 가입이다 — 목도 실물처럼 세션을 담는다.
     signUp.mockResolvedValue({
       data: { user: { id: "u1" }, session: { access_token: "t" } },
       error: null,
     });
-    const res = await signupPOST(req({ email: "a@b.com", password: "hunter22" }));
+    const res = await signupPOST(req({ name: "홍길동", email: "a@b.com", password: "hunter22" }));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });
     expect(signUp).toHaveBeenCalledWith({ email: "a@b.com", password: "hunter22" });
@@ -162,7 +178,7 @@ describe("POST /api/auth/signup", () => {
   it("오류가 없는데 세션도 없으면(Confirm email 켜짐) 200 이 아니라 500 이다", async () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     signUp.mockResolvedValue({ data: { user: { id: "u1" }, session: null }, error: null });
-    const res = await signupPOST(req({ email: "a@b.com", password: "hunter22" }));
+    const res = await signupPOST(req({ name: "홍길동", email: "a@b.com", password: "hunter22" }));
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.ok).toBeUndefined();
@@ -175,28 +191,28 @@ describe("POST /api/auth/signup", () => {
 
   it("가입 실패는 원인을 알려 준다 — 로그인과 달리 사용자에게 필요한 정보다", async () => {
     signUp.mockResolvedValue({ data: null, error: { message: "User already registered" } });
-    const res = await signupPOST(req({ email: "a@b.com", password: "hunter22" }));
+    const res = await signupPOST(req({ name: "홍길동", email: "a@b.com", password: "hunter22" }));
     expect(res.status).toBe(400);
     expect((await res.json()).error).toMatch(/이미/);
   });
 
   it("약한 비밀번호도 원인을 알려 준다", async () => {
     signUp.mockResolvedValue({ data: null, error: { message: "Password should be at least 6 characters" } });
-    const res = await signupPOST(req({ email: "a@b.com", password: "12" }));
+    const res = await signupPOST(req({ name: "홍길동", email: "a@b.com", password: "12" }));
     expect(res.status).toBe(400);
     expect((await res.json()).error).toMatch(/비밀번호/);
   });
 
   it("응답 어디에도 비밀번호가 없다", async () => {
     signUp.mockResolvedValue({ data: null, error: { message: "User already registered" } });
-    const body = await (await signupPOST(req({ email: "a@b.com", password: "s3cret-pw" }))).text();
+    const body = await (await signupPOST(req({ name: "홍길동", email: "a@b.com", password: "s3cret-pw" }))).text();
     expect(body).not.toContain("s3cret-pw");
   });
 
   it("서버 로그에도 비밀번호가 없다", async () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     signUp.mockResolvedValue({ data: null, error: { message: "User already registered" } });
-    await signupPOST(req({ email: "a@b.com", password: "s3cret-pw" }));
+    await signupPOST(req({ name: "홍길동", email: "a@b.com", password: "s3cret-pw" }));
     expect(spy).toHaveBeenCalled();
     expect(logged(spy)).not.toContain("s3cret-pw");
     spy.mockRestore();
@@ -204,25 +220,25 @@ describe("POST /api/auth/signup", () => {
 
   it("Supabase 5xx 는 400 이 아니라 500 이다 — 사용자 잘못이 아니다", async () => {
     signUp.mockResolvedValue({ data: null, error: { message: "Service unavailable", status: 503 } });
-    expect((await signupPOST(req({ email: "a@b.com", password: "hunter22" }))).status).toBe(500);
+    expect((await signupPOST(req({ name: "홍길동", email: "a@b.com", password: "hunter22" }))).status).toBe(500);
   });
 
   it("네트워크 실패(status 0)도 500 이다", async () => {
     signUp.mockResolvedValue({ data: null, error: { message: "Failed to fetch", status: 0 } });
-    expect((await signupPOST(req({ email: "a@b.com", password: "hunter22" }))).status).toBe(500);
+    expect((await signupPOST(req({ name: "홍길동", email: "a@b.com", password: "hunter22" }))).status).toBe(500);
   });
 
   // 가입도 같은 계약이다 — 세 라우트가 429 를 똑같이 다룬다.
   it("429(요청 과다)는 400 이 아니라 429 다", async () => {
     signUp.mockResolvedValue({ data: null, error: { message: "over_request_rate_limit", status: 429 } });
-    const res = await signupPOST(req({ email: "a@b.com", password: "hunter22" }));
+    const res = await signupPOST(req({ name: "홍길동", email: "a@b.com", password: "hunter22" }));
     expect(res.status).toBe(429);
     expect((await res.json()).error).toMatch(/잠시 후/);
   });
 
   it("status 없는 오류는 여전히 400 — 원인을 풀어 준다", async () => {
     signUp.mockResolvedValue({ data: null, error: { message: "User already registered" } });
-    const res = await signupPOST(req({ email: "a@b.com", password: "hunter22" }));
+    const res = await signupPOST(req({ name: "홍길동", email: "a@b.com", password: "hunter22" }));
     expect(res.status).toBe(400);
     expect((await res.json()).error).toMatch(/이미/);
   });

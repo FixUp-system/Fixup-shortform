@@ -55,13 +55,13 @@ describe("로그인 화면 시각", () => {
 
   // 제목·부제가 카드와 같은 기둥에 서지 않으면 한 화면에 정렬 축이 둘이 된다
   // (1280 실측: 제목 x≈28 vs 카드 x≈368 — 340px 차이).
-  it("제목·부제가 카드와 같은 폭의 기둥에 선다", () => {
+  // ★ 2026-09-10 저녁 — **제목이 이 줄에서 빠졌다.** 브랜드가 화면 좌상단 고정
+  //   (`.login-brand`)이 되면서 흐름을 떠났다(사장님 지시 · tests/brand-login-ui.test.js 가
+  //   그 자리를 못 박는다). 여기 남는 것은 부제 하나다 — 그것은 여전히 카드와 같은
+  //   기둥에 서야 한다(안 그러면 부제만 화면 왼쪽 끝에 선다).
+  it("부제가 카드와 같은 폭의 기둥에 선다", () => {
     expect(css).toMatch(/\.login-head \{[^}]*max-width:\s*420px/);
     expect(css).toMatch(/\.login-head \{[^}]*margin-inline:\s*auto/);
-    // h1 은 전역 `h1.pgtitle`(구체성이 한 단 높다)의 margin 단축 속성에 져서 폭만 걸리고
-    // 가운데로는 안 갔다(실측 x 88 vs 카드 430). 이 한 줄이 그 자리를 붙잡는다.
-    expect(css).toMatch(/h1\.login-head \{[^}]*margin-inline:\s*auto/);
-    expect(login).toMatch(/pgtitle login-head/);
     expect(login).toMatch(/pgsub login-head/);
   });
 

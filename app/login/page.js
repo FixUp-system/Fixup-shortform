@@ -55,8 +55,23 @@ export default function LoginPage() {
 
   return (
     <>
-      {/* login-head — 제목·부제를 카드와 같은 420px 기둥에 세운다(정렬 축을 하나로). */}
-      <h1 className="pgtitle login-head">shortform</h1>
+      {/* ★★ 2026-09-10 저녁 — 브랜드를 **화면 좌상단에 고정**한다(사장님 지시:
+          "shortform 부분을 고정 위치로 적용해줘").
+          그전에는 카드 위 가운데에 서 있었는데, 이 화면은 `.work--bare` 라 **세로 가운데
+          정렬**이다 — 회원가입 탭으로 바꾸면 이름 칸(52+16px)이 늘어난 만큼 제목이 위로
+          튀었다. 오류 한 줄이 떠도 같은 일이 났다. 흐름에서 빼면 아래가 무엇으로 늘든
+          제목은 안 움직인다.
+          ★ 그리고 이 자리가 **메인으로 가는 문**을 겸한다(사장님: "로그인 페이지에서 메인
+            페이지로 이동할 방법이 없어서") — 로고를 누르면 첫 화면으로 가는 것은 웹의
+            관례라, 새 낱말을 늘리지 않고 길이 하나 생긴다. 다만 그 관례는 **아는 사람만**
+            아니까 아래 안내줄에 글자로 된 문도 함께 둔다.
+          ⚠️ `/home` 이 손님에게 열리는 판정은 `SHOTFORM_PUBLIC_ARCHIVE` 다
+            (lib/auth/guest.js). 스위치가 꺼지면 이 문은 로그인으로 되돌아온다 — 바로 아래
+            보관함 문이 이미 같은 성질이라 새로 생기는 함정은 아니다. */}
+      <h1 className="login-brand">
+        <Link href="/home">shortform</Link>
+      </h1>
+      {/* login-head — 부제를 카드와 같은 420px 기둥에 세운다(정렬 축을 하나로). */}
       <p className="pgsub login-head">
         {isSignup
           ? "이메일과 비밀번호로 가입해요. 운영자 승인 뒤에 쓸 수 있어요."
@@ -104,19 +119,25 @@ export default function LoginPage() {
             placeholder="비밀번호"
             aria-label="비밀번호"
           />
-          {/* ★ 이름은 **선택**이다(required 를 안 단다) — 안 적으면 화면이 이메일
-              앞부분을 쓴다(lib/display-name.js). 문턱을 올리지 않는다.
+          {/* ★★ 2026-09-10 저녁 — 이름은 **필수**다(사장님 지시: "이름 선택으로 두지 말고
+              그냥 필수값으로 적용해줘"). 같은 날 오전에 넣을 때는 선택이었다 — "가입 문턱을
+              올리지 않는다"는 판단이었는데 사장님이 뒤집었다. 그 옛 판단을 근거로 다시
+              선택으로 되돌리지 마라.
+              ★ 화면의 `required` 는 **문지기가 아니다** — fetch 로 직접 부르면 그냥 지나간다.
+                진짜 판정은 라우트가 한다(app/api/auth/signup/route.js 의 400).
+                이 저장소의 규율 그대로다: "판정만 하고 강제하지 않으면 안 된다"(CLAUDE.md).
               ★ 자리는 비밀번호 **아래**다: 눈이 익은 두 칸을 먼저 만나고, 새로 생긴
                 칸이 마지막에 온다. */}
           {isSignup && (
             <input
               type="text"
+              required
               autoComplete="name"
               maxLength={NAME_MAX}
               className="sent-input sent-input--lg"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="이름 (선택)"
+              placeholder="이름"
               aria-label="이름"
             />
           )}
@@ -136,11 +157,17 @@ export default function LoginPage() {
           로그아웃 직후 · 주소창 자동완성 · 만들기 화면에서 튕겨 온 경우.
           그때 여기서 나갈 길이 없으면 로그인이 **유일한 문**처럼 보인다.
           ★ 로그인은 그대로 위에 있다 — 이건 보는 길일 뿐 문을 대신하지 않는다. */}
-      <p className="login-help">
+      {/* ★★ 2026-09-10 저녁 — 문이 둘이 됐다. 위 로고가 이미 메인으로 가지만 그것은
+          관례라 아는 사람만 안다 — 사장님이 "이동할 방법이 없다"고 한 것이 그 증거다.
+          ⚠️ 두 문이 **한 줄에 붙어** 버리는 자리다: `.mini` 는 inline-flex 이고, 줄바꿈만
+            둔 JSX 공백은 사라진다(이 저장소가 2026-09-01 에 "🗑정리" 로 겪었다).
+            그래서 `.login-help--doors` 가 flex 로 사이를 벌린다. */}
+      <p className="login-help login-help--doors">
         {/* ★★ 2026-09-01 사장님 지적 — 맨 <Link> 라 브라우저 기본 밑줄이 그어져
             "링크"로 보였다. 이 저장소가 2026-08-25 에 같은 지적을 받고 `.mini` 에
             밑줄 해제를 넣어 두었다(app/globals.css) — 새 스타일을 만들지 않고
             그것을 쓴다. 테두리·높이까지 옆 화면들과 같은 모양이 된다. */}
+        <Link className="mini" href="/home">메인 화면 보기 →</Link>
         <Link className="mini" href="/archive">로그인 없이 보관함 보기 →</Link>
       </p>
     </>

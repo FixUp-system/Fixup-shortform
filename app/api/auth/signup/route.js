@@ -32,12 +32,19 @@ export async function POST(req) {
   const body = await req.json().catch(() => ({}));
   const email = typeof body?.email === "string" ? body.email.trim() : "";
   const password = typeof body?.password === "string" ? body.password : "";
-  // ★ 이름은 **선택**이다. 필수로 만들면 가입 문턱이 올라가고, 화면(required)과 여기(400)가
-  //   갈리면 그 자리가 조용한 실패가 된다. 안 적으면 화면이 이메일 앞부분을 쓴다
-  //   (lib/display-name.js 의 displayNameOf — 이미 그렇게 돌고 있다).
+  // ★★ 2026-09-10 저녁 — 이름은 **필수**다(사장님 지시: "이름 선택으로 두지 말고 그냥
+  //   필수값으로 적용해줘"). 같은 날 오전에는 선택이었고, 그 자리 주석은 "필수로 만들면
+  //   가입 문턱이 올라간다"였다 — 사장님이 뒤집었으니 그 문장을 근거로 되돌리지 마라.
+  // ★ **여기가 진짜 문지기다.** 화면의 `required` 는 브라우저가 지키는 예의일 뿐이고,
+  //   fetch 로 직접 부르면 그냥 지나간다. 둘 다 있어야 "화면은 막는데 서버는 통과"가 없다.
+  // ★ trim 을 **먼저** 한다 — 공백만 적은 이름은 없는 것과 같다(displayNameOf 도 trim 한다).
   const name = (typeof body?.name === "string" ? body.name : "").trim().slice(0, NAME_MAX);
   if (!email || !password) {
     return Response.json({ error: "이메일과 비밀번호를 넣어 주세요" }, { status: 400 });
+  }
+  // 문구를 따로 두는 이유: 셋을 한 문장으로 뭉치면 무엇이 빠졌는지 화면에서 안 보인다.
+  if (!name) {
+    return Response.json({ error: "이름을 넣어 주세요" }, { status: 400 });
   }
 
   let supabase;
