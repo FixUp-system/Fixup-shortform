@@ -144,6 +144,38 @@ describe("쓸기 — 누구의 이름으로 걷는가", () => {
   });
 });
 
+describe("쓸기 — **진짜 경로**로 한 번 지나간다 (스텁이 가린 자리)", () => {
+  it("★★★ 소유자 없는 옛 편도 **실제로 걷힌다** — 스텁 없이 lib/projects 를 지난다", async () => {
+    // ⚠️⚠️ 위 판들은 수거 함수를 **스텁으로 갈아 끼운다.** 그래서 `getProject` 가
+    //   소유자를 어떻게 다루는지 한 번도 안 지났고, 그 사이에 진짜 결함이 숨어 있었다:
+    //     ownerScope(null) → requireOwner(null) → **던진다**  (lib/projects.js:30-42)
+    //   role 검사보다 **먼저** 던지므로, 크론이 "cron" 이라는 이름을 세워도 소용이 없다.
+    //   그러면 collectReelOneShot 안의 `.catch(() => null)` 이 그것을 삼켜
+    //   `{changed:false}` 로 조용히 나가고, 쓸기는 그것을 **성공으로 셌다**.
+    // ★ 이 판은 그래서 **진짜 수거 함수**를 쓴다. fal 경계만 막는다(돈도 회선도 안 쓴다).
+    const { collectReelOneShot } = await import("../lib/reel/pipeline.js");
+    await memoryStore.insertProject(
+      { id: "old", kind: "reel", cuts: [{ idx: 0 }], reel: { job: { requestId: "r1", of: "각인" } } },
+      null,
+    );
+    let asked = false;
+
+    const out = await sweepBakingProjects({
+      store: { selectBakingProjects: async () => [{ id: "old", owner_id: null, kind: "reel" }] },
+      collectReelOneShot: (id, owner) =>
+        collectReelOneShot(id, owner, {
+          // fal 은 안 부른다 — "아직 안 끝났다"만 답한다. 여기까지 왔다는 것이 곧 증거다.
+          collectClip: async () => { asked = true; return { done: false }; },
+        }),
+      collectAdRender: async () => {},
+      finishAdRender: async () => {},
+    });
+
+    expect(asked, "소유자가 없다고 fal 에 묻지도 못하고 되돌아왔다").toBe(true);
+    expect(out.collected, "걷지도 못했는데 걷었다고 셌다").toBe(1);
+  });
+});
+
 describe("쓸기 — 한 편이 죽어도 나머지를 걷는다", () => {
   it("★★★ 앞 편이 던져도 뒤 편을 계속 걷는다", async () => {
     // 크론은 한 번에 여러 편을 훑는다. 첫 편에서 터져 나가면 나머지는 **다음 분에도**
