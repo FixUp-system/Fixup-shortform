@@ -6,7 +6,7 @@
 > ★ 사장님이 밝힌 맥락: **내부 테스트 중 · 상용화 준비 단계**이고, 선결 둘이
 >   **새 비용 정책**과 **보안**이다. **"지출 상한은 필요 없다"** 고 명시했다(내 제안 반려).
 >
-> 📌 **라이브는 `8bb4858`**(09-10 00:45 배포). 미배포 **3커밋**이 쌓여 있다.
+> 📌 **라이브는 `8bb4858`**(09-10 00:45 배포). 미배포 **4커밋**(코드 셋 + 이 문서)이 쌓여 있다.
 > 09-10 회차에 나간 것: **랜딩 표지를 정적 파일로** 구워 **첫 방문 7.5초 → 1.6초**
 > (그전 09-10 00:09 에는 `a30767a` 로 격자 값·표지 캐시가 나갔다).
 >
@@ -63,9 +63,9 @@
 | 배포(그 앞) | `dpl_5twijBmQk7sfYTZbQqMKT3HzVdpn`(별칭 `...-8xu0l4lc3` · 09-07 17:43 · 코드 `d826317`). 09-07 문서는 이 판을 몰랐다 — 오후 커밋까지 배포된 것이 안 적혀 있었다. ⚠️ 배포에 git meta 가 없다(git 없는 폴더에서 올린다) — **어느 코드인지는 `shotform-deploy-clean` 과 파일 대조로만 안다** |
 | 배포(그 앞) | **`6f4ehup0a`**(09-07 11:46 · 코드 `165df59` · `dpl_2Vw2h6T1FoR3DBBw877nhPWQZ1NH`). target=production · status=Ready · 09-07 12:5x 실측 `/login` 200 · `/api/me` 401(로그인 벽, 정상) · `/api/projects` 200(46건) · 🔴 `/api/renders/<옛 id>.mp4` **404**(아래 09-07 절 ③) · 그 앞 판은 `i7d0rc266`(09-04 · `0b2f341`) · ★ **확인법**: `npx vercel inspect fixup-shortform-service.vercel.app` 이 그 배포를 가리키는지 본다 — 이번엔 CSS 가 안 바뀌어 번들 해시로는 못 쟀다 |
 | ★ 정식 도메인 | **`https://fixup-shortform-service.vercel.app`** 다. `vercel deploy` 가 찍어 주는 `...-ju8okg74p-fix-up1.vercel.app` 쪽은 **Deployment Protection(SSO)에 걸려 전부 302** 라 검증에 쓰면 안 된다 — 09-02 에 한 번 속았다 |
-| 미배포 | 🔴 **3 커밋**(09-10 실측 · `git rev-list --count 8bb4858..HEAD`): `f131c6e`(이름표·버튼) · `45a71e1`(가입 이름) · `5203965`(크레딧 1/4). ★ **크레딧 걷기가 중간이다** — 배포하면 화면 셋에서만 크레딧이 사라지고 나머지 화면·게이트는 그대로다. 어중간한 상태가 싫으면 2단계까지 하고 함께 올린다 |
-| 푸시 | 🔴 **미푸시 54**(09-10 실측 · 세라: `git rev-list --count fixup/feat/reel-cut-r2v..HEAD`). 두 원격 다 `9a02896`(09-04)에 서 있다. ★ **09-07 사고 대응부터 09-10 까지 원격에 하나도 없다** — 지금 원격만 보면 이 갈래를 못 잇는다. ⚠️ URL 로 직접 푸시하면 추적 ref 가 안 움직여 착시가 난다 — 정정은 `git fetch <원격> <브랜치>:refs/remotes/<원격>/<브랜치>`. ⚠️ 자격증명 대기로 매달리면 `GIT_TERMINAL_PROMPT=0` |
-| main 과의 거리 | `fixup/main` = `6e9bd8f` · HEAD 가 **102커밋 앞**(09-10 실측 `git rev-list --left-right --count fixup/main...HEAD` = `0 102` — 뒤처진 것 **0**). **main 병합은 사장님이 지시할 때만** 한다 |
+| 미배포 | 🔴 **4 커밋**(09-10 11:0x 재실측 · `git rev-list --count 8bb4858..HEAD`) = 코드 셋 + 이 문서 하나: `f131c6e`(이름표·버튼) · `45a71e1`(가입 이름) · `5203965`(크레딧 1/4) · `16257ac`(문서). ★ **크레딧 걷기가 중간이다** — 배포하면 화면 셋에서만 크레딧이 사라지고 나머지 화면·게이트는 그대로다. 어중간한 상태가 싫으면 2단계까지 하고 함께 올린다 |
+| 푸시 | 🔴 **미푸시 55**(09-10 11:0x 재실측 · 세라: `git rev-list --count fixup/feat/reel-cut-r2v..HEAD`). 두 원격 다 `9a02896`(09-04)에 서 있다. ★ **09-07 사고 대응부터 09-10 까지 원격에 하나도 없다** — 지금 원격만 보면 이 갈래를 못 잇는다. ⚠️ URL 로 직접 푸시하면 추적 ref 가 안 움직여 착시가 난다 — 정정은 `git fetch <원격> <브랜치>:refs/remotes/<원격>/<브랜치>`. ⚠️ 자격증명 대기로 매달리면 `GIT_TERMINAL_PROMPT=0` |
+| main 과의 거리 | `fixup/main` = `6e9bd8f` · HEAD 가 **103커밋 앞**(09-10 11:0x 재실측 `git rev-list --left-right --count fixup/main...HEAD` = `0 103` — 뒤처진 것 **0**). **main 병합은 사장님이 지시할 때만** 한다 |
 | ⚠️ 배포 함정 | **`.vercel` 폴더가 이 워크트리에 없다.** 그래서 `--project` 를 **반드시** 준다 — 안 주면 폴더 이름으로 새 프로젝트를 만든다(팀에 `step-gate` 라는 **실수로 생긴 프로젝트**가 그 증거다) |
 | ★ origin 푸시 | `origin` 은 URL 에 계정이 안 박혀 있다. 이 회차에는 `git push origin <브랜치>` 가 그냥 통과했지만, 자격증명 대기로 멈추면 계정을 실어라: `git push https://jaechanyoon0519-Fixup@github.com/FixUp-system/Fixup-shortform.git <브랜치>` |
 | 개발 서버 | `npx next dev -p 3111` (이 회차에 쓴 포트). `.env.local` 의 `SHOTFORM_DEV_USER` 가 **로그인을 건너뛰고 운영자 신원**을 준다 — 관리자·비용 화면을 그대로 볼 수 있다 |
