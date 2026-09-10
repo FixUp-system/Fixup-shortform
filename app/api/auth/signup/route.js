@@ -7,6 +7,11 @@ import { authClient } from "../../../../lib/auth/supabase-server.js";
 // ★ 사용자 잘못이 아닌 실패(네트워크·5xx·429)의 판정과 문구는 lib/auth/infra-error.js
 // 한 곳에 있다 — 로그인·비밀번호 변경과 같은 계약이다.
 import { isInfra, infraResponse } from "../../../../lib/auth/infra-error.js";
+// 이름을 프로필에 적는다(2026-09-10 사장님 지시: "가입 시 아이디 비밀번호 이외에 이름").
+// ★ 길이 규칙은 **마이페이지와 같은 자리**에서 가져온다 — 손으로 20 을 적으면 나중에
+//   한쪽만 바뀐다(이 저장소가 반복해 겪은 "값이 두 벌" 사고 · CLAUDE.md 「값이 사는 곳」).
+import { NAME_MAX } from "../../../../lib/display-name.js";
+import { getStore } from "../../../../lib/store/index.js";
 
 // 계정은 만들어졌는데 로그인이 안 되는 상태다. 사장님이 고칠 것은 없고, 운영자가
 // Supabase 설정 한 곳만 끄면 된다 — 무엇을 말해야 하는지까지 문구에 담는다.
@@ -27,6 +32,10 @@ export async function POST(req) {
   const body = await req.json().catch(() => ({}));
   const email = typeof body?.email === "string" ? body.email.trim() : "";
   const password = typeof body?.password === "string" ? body.password : "";
+  // ★ 이름은 **선택**이다. 필수로 만들면 가입 문턱이 올라가고, 화면(required)과 여기(400)가
+  //   갈리면 그 자리가 조용한 실패가 된다. 안 적으면 화면이 이메일 앞부분을 쓴다
+  //   (lib/display-name.js 의 displayNameOf — 이미 그렇게 돌고 있다).
+  const name = (typeof body?.name === "string" ? body.name : "").trim().slice(0, NAME_MAX);
   if (!email || !password) {
     return Response.json({ error: "이메일과 비밀번호를 넣어 주세요" }, { status: 400 });
   }
@@ -61,6 +70,20 @@ export async function POST(req) {
       "user:", data?.user?.id || "(없음)"
     );
     return Response.json({ error: NO_SESSION }, { status: 500 });
+  }
+
+  // ★★ 이름을 프로필에 적는다 — 여기서 적는 이유는 **트리거가 이메일만 넣기 때문**이다
+  //   (db/schema.sql 의 handle_new_user 는 `(id, email)` 만 넣는다). auth 메타데이터로
+  //   넘겨 트리거가 옮기게 하려면 **스키마를 고쳐야 하고**, 그러면 "스키마를 라이브에 먼저
+  //   올려라"는 배포 순서 규칙이 딸려 온다. 지금은 고칠 자리가 여기 하나뿐이다.
+  // ★★★ **실패해도 가입은 성공으로 돌려준다.** 계정은 이미 만들어졌고 세션도 섰다 —
+  //   여기서 500 을 내면 사장님은 "가입 실패"로 읽고 다시 시도하다 "이미 가입된 이메일"을
+  //   만난다. 이름은 마이페이지에서 언제든 고칠 수 있으니 막을 이유가 없다.
+  //   (업로드 라우트의 "작은 판 저장에 실패해도 응답은 그대로 나간다"와 같은 규율이다.)
+  if (name && data?.user?.id) {
+    await getStore()
+      .updateProfile(data.user.id, { display_name: name })
+      .catch((e) => console.error(`가입 이름 저장 실패(가입은 그대로 성공): ${e?.message || e}`));
   }
   return Response.json({ ok: true });
 }

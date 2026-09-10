@@ -7,6 +7,8 @@
 // 이 저장소의 다른 화면과 같은 패널·버튼 클래스를 쓴다(app/globals.css, tests/design-system.test.js).
 import Link from "next/link";
 import { useState } from "react";
+// 길이 상한은 마이페이지와 **같은 자리**에서 온다 — 손으로 적으면 한쪽만 낡는다.
+import { NAME_MAX } from "../../lib/display-name.js";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
@@ -14,6 +16,8 @@ export default function LoginPage() {
   const [tab, setTab] = useState("login");     // "login" | "signup"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // 가입에서만 쓴다 — 로그인 탭에서는 칸도 안 뜨고 몸통에도 안 실린다.
+  const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -27,7 +31,9 @@ export default function LoginPage() {
       const res = await fetch(isSignup ? "/api/auth/signup" : "/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        // ★ 이름은 **가입일 때만** 싣는다. 로그인 몸통에 넣으면 라우트가 안 읽는 값이
+        //   섞여 다음 사람이 "로그인도 이름을 보나" 하고 헷갈린다.
+        body: JSON.stringify(isSignup ? { email, password, name } : { email, password }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -98,6 +104,22 @@ export default function LoginPage() {
             placeholder="비밀번호"
             aria-label="비밀번호"
           />
+          {/* ★ 이름은 **선택**이다(required 를 안 단다) — 안 적으면 화면이 이메일
+              앞부분을 쓴다(lib/display-name.js). 문턱을 올리지 않는다.
+              ★ 자리는 비밀번호 **아래**다: 눈이 익은 두 칸을 먼저 만나고, 새로 생긴
+                칸이 마지막에 온다. */}
+          {isSignup && (
+            <input
+              type="text"
+              autoComplete="name"
+              maxLength={NAME_MAX}
+              className="sent-input sent-input--lg"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="이름 (선택)"
+              aria-label="이름"
+            />
+          )}
           <button type="submit" className="cta cta--block" disabled={busy}>
             {busy ? "확인 중…" : isSignup ? "가입하기" : "로그인"}
           </button>
