@@ -73,14 +73,14 @@
 |---|---|
 | 워크트리 | `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` |
 | 브랜치 | `feat/reel-cut-r2v` (09-03 저녁). ★ 수는 **적지 않는다** — 이 문서를 고치는 커밋이 그 수를 또 바꾼다. **세라**: `git log -1 --format='%h %s'` · `git rev-list --count fixup/main..HEAD` |
-| 테스트 | ✅ **09-10 오후 재실측 전체 초록** — `npx vitest run` = **5,900 통과 · 0 실패 · 10 skipped** / 파일 **348 통과 · 2 skipped**(350) · **exit 0**. ⚠️ **이 회차에는 `npx next build` 를 안 돌렸다** — dev 서버 셋(3000·3001·3111)이 떠 있어 `.next` 를 덮으면 남의 세션이 죽는다(CLAUDE.md 규칙대로 "테스트 그린"으로 갈음). 화면 파일은 안 건드렸다. <br>그 앞: 09-10 오전 5,878. ⚠️ 수가 09-09 밤(5,895)보다 **줄었다** — 크레딧 걷기 1단계에서 크레딧 전용 판 둘을 지우고 다른 판의 크레딧 단정을 뺐기 때문이다(기능이 사라졌으니 그 판도 사라진 것이 맞다). 그 앞: 09-09 밤 5,895 · 저녁 5,879 · 아침 5,855 |
+| 테스트 | ✅ **09-10 오후 재실측 전체 초록** — `npx vitest run` = **5,929 통과 · 0 실패 · 10 skipped** / 파일 **353 통과 · 2 skipped**(355) · **exit 0**. `npx next build` **exit 0**(09-10 저녁 · 함수 번들 좁히기 검증 때 실제로 구웠다). ⚠️ **이 회차에는 `npx next build` 를 안 돌렸다** — dev 서버 셋(3000·3001·3111)이 떠 있어 `.next` 를 덮으면 남의 세션이 죽는다(CLAUDE.md 규칙대로 "테스트 그린"으로 갈음). 화면 파일은 안 건드렸다. <br>그 앞: 09-10 오전 5,878. ⚠️ 수가 09-09 밤(5,895)보다 **줄었다** — 크레딧 걷기 1단계에서 크레딧 전용 판 둘을 지우고 다른 판의 크레딧 단정을 뺐기 때문이다(기능이 사라졌으니 그 판도 사라진 것이 맞다). 그 앞: 09-09 밤 5,895 · 저녁 5,879 · 아침 5,855 |
 | 배포 | ✅ **프로덕션 라이브 `9s729yvsd`**(`dpl_9BnqHgmuGarTD9XcaXE9AnHJz2RX` · **2026-09-10 00:45 KST** · target=production · Ready · 별칭 `fixup-shortform-service.vercel.app` 이 이것을 가리킨다(`vercel inspect` 실측) · 코드 = **`8bb4858`**). 랜딩 표지를 **정적 파일로** 굽는 판이 나갔다. 라이브 실측(09-10): `/login` 200 · `/home` 200 · `/api/me` 401 · **`/showcase/01.webp` 200**(307 이 아니다 = matcher 가 맞다) · 랜딩 전체 **1.6초 → 0.6초**(전에는 첫 방문 7.5초). <br>**그 앞**: `lfqxyburu`(09-10 00:09 · `a30767a` · 격자 값·표지 캐시) · `h7qic4374`(09-09 18:12 · `bea465c`) · `hifms0j0g`(09-08 17:07 · `90a4872`) |
 | 배포(그 앞) | `dpl_5twijBmQk7sfYTZbQqMKT3HzVdpn`(별칭 `...-8xu0l4lc3` · 09-07 17:43 · 코드 `d826317`). 09-07 문서는 이 판을 몰랐다 — 오후 커밋까지 배포된 것이 안 적혀 있었다. ⚠️ 배포에 git meta 가 없다(git 없는 폴더에서 올린다) — **어느 코드인지는 `shotform-deploy-clean` 과 파일 대조로만 안다** |
 | 배포(그 앞) | **`6f4ehup0a`**(09-07 11:46 · 코드 `165df59` · `dpl_2Vw2h6T1FoR3DBBw877nhPWQZ1NH`). target=production · status=Ready · 09-07 12:5x 실측 `/login` 200 · `/api/me` 401(로그인 벽, 정상) · `/api/projects` 200(46건) · 🔴 `/api/renders/<옛 id>.mp4` **404**(아래 09-07 절 ③) · 그 앞 판은 `i7d0rc266`(09-04 · `0b2f341`) · ★ **확인법**: `npx vercel inspect fixup-shortform-service.vercel.app` 이 그 배포를 가리키는지 본다 — 이번엔 CSS 가 안 바뀌어 번들 해시로는 못 쟀다 |
 | ★ 정식 도메인 | **`https://fixup-shortform-service.vercel.app`** 다. `vercel deploy` 가 찍어 주는 `...-ju8okg74p-fix-up1.vercel.app` 쪽은 **Deployment Protection(SSO)에 걸려 전부 302** 라 검증에 쓰면 안 된다 — 09-02 에 한 번 속았다 |
-| 미배포 | 🔴 **6 커밋**(09-10 오후 재실측 · `git rev-list --count 8bb4858..HEAD`) = 코드 셋 + 이 문서 하나: `f131c6e`(이름표·버튼) · `45a71e1`(가입 이름) · `5203965`(크레딧 1/4) · `16257ac`(문서) · `4c15925`(문서 수 정정) · **`fcb9ed1`(1분 크론 수거)**. 🔴 **크론은 `CRON_SECRET` 을 프로덕션 env 에 넣어야 돈다** — 안 넣으면 라우트가 401 로 닫힌다(일부러 그렇게 했다). ★ **크레딧 걷기가 중간이다** — 배포하면 화면 셋에서만 크레딧이 사라지고 나머지 화면·게이트는 그대로다. 어중간한 상태가 싫으면 2단계까지 하고 함께 올린다 |
-| 푸시 | 🔴 **미푸시 57**(09-10 오후 재실측 · 세라: `git rev-list --count fixup/feat/reel-cut-r2v..HEAD`). 두 원격 다 `9a02896`(09-04)에 서 있다. ★ **09-07 사고 대응부터 09-10 까지 원격에 하나도 없다** — 지금 원격만 보면 이 갈래를 못 잇는다. ⚠️ URL 로 직접 푸시하면 추적 ref 가 안 움직여 착시가 난다 — 정정은 `git fetch <원격> <브랜치>:refs/remotes/<원격>/<브랜치>`. ⚠️ 자격증명 대기로 매달리면 `GIT_TERMINAL_PROMPT=0` |
-| main 과의 거리 | `fixup/main` = `6e9bd8f` · HEAD 가 **105커밋 앞**(09-10 오후 재실측 `git rev-list --left-right --count fixup/main...HEAD` = `0 105` — 뒤처진 것 **0**). **main 병합은 사장님이 지시할 때만** 한다 |
+| 미배포 | 🔴 **15 커밋**(09-10 저녁 재실측 · `git rev-list --count 8bb4858..HEAD`) = 코드 셋 + 이 문서 하나: `f131c6e`(이름표·버튼) · `45a71e1`(가입 이름) · `5203965`(크레딧 1/4) · `16257ac`(문서) · `4c15925`(문서 수 정정) · **`fcb9ed1`(1분 크론 수거)**. 🔴 **크론은 `CRON_SECRET` 을 프로덕션 env 에 넣어야 돈다** — 안 넣으면 라우트가 401 로 닫힌다(일부러 그렇게 했다). ★ **크레딧 걷기가 중간이다** — 배포하면 화면 셋에서만 크레딧이 사라지고 나머지 화면·게이트는 그대로다. 어중간한 상태가 싫으면 2단계까지 하고 함께 올린다 |
+| 푸시 | 🔴 **미푸시 66**(09-10 저녁 재실측 · 세라: `git rev-list --count fixup/feat/reel-cut-r2v..HEAD`). 두 원격 다 `9a02896`(09-04)에 서 있다. ★ **09-07 사고 대응부터 09-10 까지 원격에 하나도 없다** — 지금 원격만 보면 이 갈래를 못 잇는다. ⚠️ URL 로 직접 푸시하면 추적 ref 가 안 움직여 착시가 난다 — 정정은 `git fetch <원격> <브랜치>:refs/remotes/<원격>/<브랜치>`. ⚠️ 자격증명 대기로 매달리면 `GIT_TERMINAL_PROMPT=0` |
+| main 과의 거리 | `fixup/main` = `6e9bd8f` · HEAD 가 **114커밋 앞**(09-10 저녁 재실측 `git rev-list --left-right --count fixup/main...HEAD` = `0 114` — 뒤처진 것 **0**). **main 병합은 사장님이 지시할 때만** 한다 |
 | ⚠️ 배포 함정 | **`.vercel` 폴더가 이 워크트리에 없다.** 그래서 `--project` 를 **반드시** 준다 — 안 주면 폴더 이름으로 새 프로젝트를 만든다(팀에 `step-gate` 라는 **실수로 생긴 프로젝트**가 그 증거다) |
 | ★ origin 푸시 | `origin` 은 URL 에 계정이 안 박혀 있다. 이 회차에는 `git push origin <브랜치>` 가 그냥 통과했지만, 자격증명 대기로 멈추면 계정을 실어라: `git push https://jaechanyoon0519-Fixup@github.com/FixUp-system/Fixup-shortform.git <브랜치>` |
 | 개발 서버 | `npx next dev -p 3111` (이 회차에 쓴 포트). `.env.local` 의 `SHOTFORM_DEV_USER` 가 **로그인을 건너뛰고 운영자 신원**을 준다 — 관리자·비용 화면을 그대로 볼 수 있다 |
@@ -188,6 +188,41 @@ fal 접수
 ★ **불투명도 상한을 `0.6 → 0.65` 로 고쳐야 2단이 산다** — `tests/face-grid.test.js` 가
   `≤ 0.6` 으로 막는데, **같은 판이 인용하는 유료 실측은 0.65 에서 통과·인물 일치**다.
   상한이 실측된 안전값보다 낮게 잡혀 있다.
+
+### 🧱 09-10 **저녁** — Vercel Function Storage 초과: 404 화면이 46MB였다 (`d77f471`)
+
+사장님 신고: *"지금 fuction storage가 제공량을 초과했는데"*. 속도 리뷰 §10(가)가 짚은 자리다.
+
+**원인(배포 실물 실측)** — `next.config.mjs` 의 `outputFileTracingIncludes` 가 `"/*"` 로
+ffmpeg-static **80MB** + assets **30MB** 를 **모든 함수**에 붙이고 있었다:
+```
+λ index (46.11MB) · λ _not-found (46.11MB) · λ admin (46.11MB) … 출력 197개
+```
+그것이 **보관 배포 166개**에 쌓여 있었다.
+
+**고친 것**
+- 목록을 **손으로 안 적는다** — `lib/build/compose-routes.mjs` 가 import 그래프에서
+  `lib/compose.js` 에 닿는 진입점을 계산한다. 옛 주석이 `/*` 를 고른 이유("라우트마다
+  적으면 새 라우트를 빠뜨린다")는 옳았고, 그 걱정을 **계산으로** 없앤다.
+- 아바타 참조(`assets/refs`)는 **104K** 뿐이고 쓰는 문이 40개라 전역으로 남겼다.
+  무거운 둘(ffmpeg · `assets/subtitle-*`)만 합성 문에.
+
+★★ **소스 판정으로 안 끝냈다 — 실제로 굽고 산출물을 열었다**(이 좁히기는 조용히 실패한다:
+  폰트가 빠져도 오류 없이 자막만 두부가 된다 · 2026-08-13 사고):
+```
+추적 파일 99개 중 ffmpeg 를 진 것        99 → 37
+필수 넷(reel render·ads finish·film finish·cron collect)  ffmpeg 있음 + 폰트 8종
+무관한 넷(/api/me·404·/login·auth/login)                   ffmpeg 0
+```
+
+**배포 정리** — 166개 → **5개**. 남긴 것은 라이브 `9s729yvsd` + 롤백용 `lfqxyburu`·`h7qic4374`.
+⚠️ 못 지운 둘이 남아 있다: `f10vvrich`(16d) · `dcte9gmcj`(28d). 둘 다 상태가 **UNKNOWN**(실패
+빌드)이라 `vercel remove` 의 "Found N for removal" 에서 걸러진다 — 지우려면 대시보드로.
+★ 삭제 뒤 라이브 실측: `/home`·`/login`·`/archive`·`/api/projects` 전부 **200**.
+
+⚠️ **대량 삭제는 이 세션에서 자동 승인기에 막힌다**(한 건씩은 통과). 사장님이
+`! xargs -a <목록> -n 20 sh -c 'npx vercel remove "$@" --safe --yes' _` 로 직접 돌렸다.
+`--safe` 가 별칭 붙은 배포를 건너뛰므로 라이브를 실수로 지울 수 없다.
 
 ### 📏 09-10 — 압축 측정: **리뷰의 "헤더 한 줄" 가설은 반증됐다 (하지 마라)**
 
