@@ -20,6 +20,19 @@
 > `feat/step-resolution` · `feature/i2v-model` · `fix/step-gate-unlock` · `worktree-agent-*` **10개**.
 > ★ **남은 7개는 전부 워크트리가 쥐고 있어** 손대지 않았다(아래 「남은 정리」).
 >
+> 🔐 **16:1x — 로그인 화면 셋**(사장님 지시 · `1bf341e` · **미배포**).
+> ① **이름이 필수가 됐다** — 같은 날 오전에는 선택이었다("문턱을 올리지 않는다"). 뒤집혔으니
+>   그 옛 주석을 근거로 되돌리지 마라. 문지기는 **라우트의 400** 이다(화면 `required` 는 예의일 뿐).
+>   trim 을 먼저 해 **공백만 적은 이름도 막는다**.
+> ② **`shortform` 을 좌상단에 고정**했다. 원인은 `.work--bare` 의 **세로 가운데 정렬** —
+>   카드가 한 줄만 길어져도(가입 탭의 이름 칸 · 오류 한 줄) 그 절반만큼 위가 밀려 제목이 튀었다.
+>   낮은 화면(`max-height: 560px`)에서는 고정을 풀어 넘친 카드와 겹치지 않게 한다.
+> ③ **메인으로 가는 문** — 로고가 문을 겸하고(관례), 안내줄에 글자 문([메인 화면 보기 →])도 뒀다.
+> 실물 검증(dev `:3111`): `/login` **200**·HTML 에 `login-brand` 있음·`이름 (선택)` 없음 ·
+> 이름 없이/공백만 가입 POST **둘 다 400 "이름을 넣어 주세요"**(게이트가 Supabase 앞이라 계정은 안 생긴다).
+> ⚠️ **굽지는 못했다** — dev 서버 셋(3000·3001·3111)이 떠 있어 `.next` 를 덮으면 죽는다.
+> 저장소 규칙의 갈음(**판 그린 + 화면 200**)으로 대신했다. 판 **6,028 통과 · exit 0**(+8).
+>
 > 🚀 **그리고 15:5x 에 원격으로 올렸다**(사장님 지시) — `fixup`·`origin` **둘 다** `9a02896`(09-04)
 > 에서 여기까지 **fast-forward 80커밋**. **09-07 사고 대응부터 09-10 까지가 이제 원격에 있다.**
 > ⚠️ **푸시했다고 배포된 것이 아니다** — 직후 `vercel inspect` 에서 라이브는 그대로
@@ -109,9 +122,9 @@
 | 배포(그 앞) | `dpl_5twijBmQk7sfYTZbQqMKT3HzVdpn`(별칭 `...-8xu0l4lc3` · 09-07 17:43 · 코드 `d826317`). 09-07 문서는 이 판을 몰랐다 — 오후 커밋까지 배포된 것이 안 적혀 있었다. ⚠️ 배포에 git meta 가 없다(git 없는 폴더에서 올린다) — **어느 코드인지는 `shotform-deploy-clean` 과 파일 대조로만 안다** |
 | 배포(그 앞) | **`6f4ehup0a`**(09-07 11:46 · 코드 `165df59` · `dpl_2Vw2h6T1FoR3DBBw877nhPWQZ1NH`). target=production · status=Ready · 09-07 12:5x 실측 `/login` 200 · `/api/me` 401(로그인 벽, 정상) · `/api/projects` 200(46건) · 🔴 `/api/renders/<옛 id>.mp4` **404**(아래 09-07 절 ③) · 그 앞 판은 `i7d0rc266`(09-04 · `0b2f341`) · ★ **확인법**: `npx vercel inspect fixup-shortform-service.vercel.app` 이 그 배포를 가리키는지 본다 — 이번엔 CSS 가 안 바뀌어 번들 해시로는 못 쟀다 |
 | ★ 정식 도메인 | **`https://fixup-shortform-service.vercel.app`** 다. `vercel deploy` 가 찍어 주는 `...-ju8okg74p-fix-up1.vercel.app` 쪽은 **Deployment Protection(SSO)에 걸려 전부 302** 라 검증에 쓰면 안 된다 — 09-02 에 한 번 속았다 |
-| 미배포 | ✅ **코드 미배포 0** — 라이브가 `67fb29f` 이고 그 뒤는 **문서 커밋뿐**이다(09-10 16:0x 실측 **4** — ★ **이 커밋까지 포함해 센 수다** · 전부 `docs:`). ★ **수를 믿지 말고 앵커를 믿어라** — 이 문서를 고치는 커밋이 그 수를 매번 1 늘린다. 판정법: `git log --oneline 67fb29f..HEAD` 에 **`docs:` 아닌 줄이 섞이면** 그때부터 진짜 미배포다. 🔴 **크론 등록은 빠진 채다** — Hobby 라 1분 크론이 배포를 거부한다(맨 위 배너). ★ **크레딧 걷기가 1/4 인 채로 라이브다**(아래 🧾 절 ④) |
-| 푸시 | ✅ **미푸시 0** — 09-10 **15:5x~16:0x 에 전부 올렸다**(사장님 지시). `git push fixup feat/reel-cut-r2v` · `git push origin …` · 그리고 `git push <원격> HEAD:main` **둘 다** — 두 원격이 `9a02896`(09-04)/`6e9bd8f` 에서 여기까지 **fast-forward**(강제 없음). ★ **09-07 사고 대응부터 09-10 까지가 이제 원격과 main 에 있다** — 이 워크트리가 죽어도 갈래를 잇는다. ⚠️ **푸시는 배포가 아니다** — 푸시 직후 `vercel inspect` 재실측에서 라이브는 그대로 `dpl_9pvb…`(15:27:50)였다. 커밋 이메일(`system@fix-up.kr`)이 GitHub 계정과 안 맞아 Git 트리거 빌드가 0ms 에서 멎기 때문이다(저장소 `CLAUDE.md`). 세라: `git rev-list --count fixup/feat/reel-cut-r2v..HEAD`. ⚠️ URL 로 직접 푸시하면 추적 ref 가 안 움직여 착시가 난다 — 이번엔 **원격 이름으로** 밀어 ref 가 따라왔다. ⚠️ 자격증명 대기로 매달리면 `GIT_TERMINAL_PROMPT=0` |
-| main 과의 거리 | ✅ **0 — 같은 자리다.** 09-10 **16:0x 에 사장님 지시로 `main` 에 병합**했다 — `6e9bd8f` → `6e84a84` **fast-forward 129커밋**(병합 커밋 없음 · 뒤처진 것이 0 이라 FF 가 됐다). `fixup/main`·`origin/main` **둘 다** 올라갔다. ⚠️ **로컬 `main` ref 만 아직 `da6bfbd`(08-18)에 멈춰 있다** — 09-02 배포용 임시 워크트리(`AppData/Local/Temp/.../scratchpad/deploy` · **파일 453개가 다 지워진 껍데기**)가 그 ref 를 쥐고 있어 못 옮긴다. 푸는 법: `git worktree remove --force <그 경로>` → `git branch -f main fixup/main`. **원격 main 이 진실이므로 실무에는 지장이 없다.** |
+| 미배포 | 🔴 **코드 1커밋** — `1bf341e`(로그인 화면: 이름 필수·좌상단 고정 브랜드·메인 문). 라이브는 여전히 `67fb29f` 다. 세는 법: `git log --oneline 67fb29f..HEAD` 에서 **`docs:` 아닌 줄**을 센다(문서 커밋은 이 문서를 고칠 때마다 늘어 수로 세면 못 믿는다 · 09-10 16:1x 실측 = 문서 6 + 코드 1). 🔴 **크론 등록은 빠진 채다** — Hobby 라 1분 크론이 배포를 거부한다(맨 위 배너). ★ **크레딧 걷기가 1/4 인 채로 라이브다**(아래 🧾 절 ④) |
+| 푸시 | 🔴 **미푸시 3** — `aafd890`(문서)·`1bf341e`(로그인 화면)·이 문서 커밋. 09-10 16:1x 실측 · ★ **이 커밋 포함**. 그 앞은 **15:5x~16:0x 에 전부 올렸다**(사장님 지시): 브랜치를 `fixup`·`origin` 둘 다, 그리고 `git push <원격> HEAD:main` 으로 **main 까지**. 두 원격이 `9a02896`(09-04)/`6e9bd8f` 에서 **fast-forward**(강제 없음)로 따라왔다. ★ **09-07 사고 대응부터 09-10 까지가 이제 원격과 main 에 있다.** ⚠️ **푸시는 배포가 아니다** — 푸시 직후 `vercel inspect` 재실측에서 라이브는 그대로 `dpl_9pvb…`(15:27:50)였다. 커밋 이메일(`system@fix-up.kr`)이 GitHub 계정과 안 맞아 Git 트리거 빌드가 0ms 에서 멎기 때문이다(저장소 `CLAUDE.md`). 세라: `git rev-list --count fixup/feat/reel-cut-r2v..HEAD`. ⚠️ URL 로 직접 푸시하면 추적 ref 가 안 움직여 착시가 난다 — **원격 이름으로** 밀어라. ⚠️ 자격증명 대기로 매달리면 `GIT_TERMINAL_PROMPT=0` |
+| main 과의 거리 | **3커밋 앞**(뒤처진 것 0 · 09-10 16:1x 실측 · ★ **이 커밋 포함**). ✅ **16:0x 에 사장님 지시로 `main` 에 병합했다** — `6e9bd8f` → `6e84a84` **fast-forward 129커밋**(병합 커밋 없음). `fixup/main`·`origin/main` 둘 다. 그 뒤로 이 브랜치에 3커밋이 더 쌓였다(문서 둘·로그인 화면 하나). ⚠️ **로컬 `main` ref 만 아직 `da6bfbd`(08-18)에 멈춰 있다** — 09-02 배포용 임시 워크트리(`AppData/Local/Temp/.../scratchpad/deploy` · **파일 453개가 다 지워진 껍데기**)가 그 ref 를 쥐고 있다. 푸는 법: `git worktree remove --force <그 경로>` → `git branch -f main fixup/main`. **원격 main 이 진실이므로 실무에는 지장이 없다.** |
 | ⚠️ 배포 함정 | **`.vercel` 폴더가 이 워크트리에 없다.** 그래서 `--project` 를 **반드시** 준다 — 안 주면 폴더 이름으로 새 프로젝트를 만든다(팀에 `step-gate` 라는 **실수로 생긴 프로젝트**가 그 증거다) |
 | ★ origin 푸시 | `origin` 은 URL 에 계정이 안 박혀 있다. 이 회차에는 `git push origin <브랜치>` 가 그냥 통과했지만, 자격증명 대기로 멈추면 계정을 실어라: `git push https://jaechanyoon0519-Fixup@github.com/FixUp-system/Fixup-shortform.git <브랜치>` |
 | 개발 서버 | `npx next dev -p 3111` (이 회차에 쓴 포트). `.env.local` 의 `SHOTFORM_DEV_USER` 가 **로그인을 건너뛰고 운영자 신원**을 준다 — 관리자·비용 화면을 그대로 볼 수 있다 |
