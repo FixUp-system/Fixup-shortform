@@ -1,5 +1,24 @@
 # 이어서 할 일 — `feat/reel-cut-r2v` (2026-09-10 기준 · **열여섯째 갱신**)
 
+> ✅ **09-10 밤 — 병렬 세 갈래까지 배포 완료.** 라이브 `dpl_9pvbSfsuMTkk8yYAyEU2yLvtMacC`
+> (별칭이 이것을 가리킨다 · 코드 `67fb29f` · **미배포 0** · 테스트 **6,020 그린**).
+>
+> 🎉 **멈춰 있던 광고 둘을 실제로 되살렸다** — `0603d9bf`(09-08부터)·`26cfd4a2`(09-04부터).
+> 쓸기 문을 눌러 확인했다: `collected:2` → `finished:1` → `finished:1` → `swept:0`.
+> 둘 다 `status: done` · `ad_job` 지워짐 · 자막까지 태워짐 · 파일 302(열린다).
+> ★ **이것으로 film 질의가 라이브에서 돈다는 것도 확인됐다**(문법이 틀렸으면 500 이 났다).
+>
+> 병렬 갈래 셋(`40c7a41`·`48be110`·`fd7d9d3`)과 뒤이은 고침(`67fb29f`):
+> · 완성본 302 에 `max-age` — 라이브 실측 **reel `private, max-age=300`**
+> · 보관함 상세 왕복 **reel 3회 → 1회**(101KB → ~34KB)
+> · 수거가 **film 까지** 훑는다 + 상한·정렬·회차 예산·실패 로그
+> ⚠️ **광고 완성본의 캐시는 이번 배포 뒤 마무리부터** 걸린다 — 각인(`videos[0].ts`)이
+>   그때부터 붙는다. 옛 광고는 계속 `no-cache` 다(옛 영상을 밀어낼 방법이 없어 그게 맞다).
+> ⚠️ **`CRON_SECRET` 을 이 회차에 새로 돌렸다**(옛 값은 죽었다). 지금 값은 Vercel 에만 있다.
+>
+> 🔴 **`db/schema.sql` 의 projects 인덱스 셋은 사장님이 라이브에 올렸다**(09-10 밤).
+>   다음에 스키마를 고칠 때 그 파일을 통째로 다시 올리면 된다(전부 `if not exists`).
+>
 > ✅ **09-10 저녁 — 오늘 작업 전부 배포됐다.** 라이브 `16nbazqod`
 > (별칭 `fixup-shortform-service.vercel.app` · 코드 `0f3115a` · **미배포 0**).
 > 라이브 실측: `/home`·`/login`·`/archive` 200 · 표지 16장 200 ·
@@ -53,14 +72,14 @@
 |---|---|
 | 워크트리 | `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` |
 | 브랜치 | `feat/reel-cut-r2v` (09-03 저녁). ★ 수는 **적지 않는다** — 이 문서를 고치는 커밋이 그 수를 또 바꾼다. **세라**: `git log -1 --format='%h %s'` · `git rev-list --count fixup/main..HEAD` |
-| 테스트 | ✅ **09-10 저녁 실측 전체 초록** — `npx vitest run` = **5,959 통과 · 0 실패 · 10 skipped** / 파일 **359 통과 · 2 skipped**(361) · **exit 0**. `npx next build` **exit 0**(같은 날 저녁, 함수 번들 좁히기를 검증하려고 실제로 구워 산출물을 열어 봤다 — 추적 파일 99개 중 ffmpeg 를 진 것 37개). <br>그 앞: 09-10 오후 5,929 · 오전 5,878 · 09-09 밤 5,895. ⚠️ 09-10 오전에 수가 줄어든 것은 크레딧 걷기 1단계에서 크레딧 전용 판을 지웠기 때문이다(기능이 사라졌으니 판도 사라진 것이 맞다) |
+| 테스트 | ✅ **09-10 저녁 실측 전체 초록** — `npx vitest run` = **6,020 통과 · 0 실패 · 10 skipped** / 파일 **365 통과 · 2 skipped**(367) · **exit 0**. `npx next build` **exit 0**(같은 날 저녁, 함수 번들 좁히기를 검증하려고 실제로 구워 산출물을 열어 봤다 — 추적 파일 99개 중 ffmpeg 를 진 것 37개). <br>그 앞: 09-10 오후 5,929 · 오전 5,878 · 09-09 밤 5,895. ⚠️ 09-10 오전에 수가 줄어든 것은 크레딧 걷기 1단계에서 크레딧 전용 판을 지웠기 때문이다(기능이 사라졌으니 판도 사라진 것이 맞다) |
 | 배포 | ✅ **프로덕션 라이브 `16nbazqod`**(2026-09-10 14:1x KST · target=production · Ready · 별칭 `fixup-shortform-service.vercel.app` 이 이것을 가리킨다(`vercel inspect` 실측) · 코드 **`0f3115a`**). 라이브 실측: `/home`·`/login`·`/archive` **200** · `/showcase/*.webp` **16장 전부 200** · `/api/cron/collect` **401**(비밀 없이·틀린 비밀 둘 다 — fail-closed 정상). ★★ **함수 하나가 46.11MB → 1.27MB**(가벼운 라우트 기준 · 36배). <br>**그 앞**: `9s729yvsd`(09-10 00:45 · `8bb4858`) · `lfqxyburu`(09-10 00:09 · `a30767a`) · `h7qic4374`(09-09 18:12 · `bea465c`) |
 | 배포(그 앞) | `dpl_5twijBmQk7sfYTZbQqMKT3HzVdpn`(별칭 `...-8xu0l4lc3` · 09-07 17:43 · 코드 `d826317`). 09-07 문서는 이 판을 몰랐다 — 오후 커밋까지 배포된 것이 안 적혀 있었다. ⚠️ 배포에 git meta 가 없다(git 없는 폴더에서 올린다) — **어느 코드인지는 `shotform-deploy-clean` 과 파일 대조로만 안다** |
 | 배포(그 앞) | **`6f4ehup0a`**(09-07 11:46 · 코드 `165df59` · `dpl_2Vw2h6T1FoR3DBBw877nhPWQZ1NH`). target=production · status=Ready · 09-07 12:5x 실측 `/login` 200 · `/api/me` 401(로그인 벽, 정상) · `/api/projects` 200(46건) · 🔴 `/api/renders/<옛 id>.mp4` **404**(아래 09-07 절 ③) · 그 앞 판은 `i7d0rc266`(09-04 · `0b2f341`) · ★ **확인법**: `npx vercel inspect fixup-shortform-service.vercel.app` 이 그 배포를 가리키는지 본다 — 이번엔 CSS 가 안 바뀌어 번들 해시로는 못 쟀다 |
 | ★ 정식 도메인 | **`https://fixup-shortform-service.vercel.app`** 다. `vercel deploy` 가 찍어 주는 `...-ju8okg74p-fix-up1.vercel.app` 쪽은 **Deployment Protection(SSO)에 걸려 전부 302** 라 검증에 쓰면 안 된다 — 09-02 에 한 번 속았다 |
 | 미배포 | ✅ **0 커밋** — 오늘 작업이 전부 나갔다(09-10 13:55 · 세라: `git rev-list --count 0f3115a..HEAD`). 그 전까지 19커밋이 밀려 있었다. 🔴 **단 크론 등록은 빠진 채 나갔다** — Hobby 라 1분 크론이 배포를 거부했다(맨 위 배너). ★ **크레딧 걷기가 1/4 인 채로 라이브다** — 화면 셋에서만 크레딧이 사라졌고 나머지 화면·게이트는 그대로다(아래 🧾 절 ④) |
-| 푸시 | 🔴 **미푸시 70**(09-10 저녁 재실측 · 세라: `git rev-list --count fixup/feat/reel-cut-r2v..HEAD`). 두 원격 다 `9a02896`(09-04)에 서 있다. ★ **09-07 사고 대응부터 09-10 까지 원격에 하나도 없다** — 지금 원격만 보면 이 갈래를 못 잇는다. ⚠️ URL 로 직접 푸시하면 추적 ref 가 안 움직여 착시가 난다 — 정정은 `git fetch <원격> <브랜치>:refs/remotes/<원격>/<브랜치>`. ⚠️ 자격증명 대기로 매달리면 `GIT_TERMINAL_PROMPT=0` |
-| main 과의 거리 | `fixup/main` = `6e9bd8f` · HEAD 가 **118커밋 앞**(09-10 저녁 재실측 `git rev-list --left-right --count fixup/main...HEAD` = `0 118` — 뒤처진 것 **0**). **main 병합은 사장님이 지시할 때만** 한다 |
+| 푸시 | 🔴 **미푸시 77**(09-10 저녁 재실측 · 세라: `git rev-list --count fixup/feat/reel-cut-r2v..HEAD`). 두 원격 다 `9a02896`(09-04)에 서 있다. ★ **09-07 사고 대응부터 09-10 까지 원격에 하나도 없다** — 지금 원격만 보면 이 갈래를 못 잇는다. ⚠️ URL 로 직접 푸시하면 추적 ref 가 안 움직여 착시가 난다 — 정정은 `git fetch <원격> <브랜치>:refs/remotes/<원격>/<브랜치>`. ⚠️ 자격증명 대기로 매달리면 `GIT_TERMINAL_PROMPT=0` |
+| main 과의 거리 | `fixup/main` = `6e9bd8f` · HEAD 가 **125커밋 앞**(09-10 저녁 재실측 `git rev-list --left-right --count fixup/main...HEAD` = `0 125` — 뒤처진 것 **0**). **main 병합은 사장님이 지시할 때만** 한다 |
 | ⚠️ 배포 함정 | **`.vercel` 폴더가 이 워크트리에 없다.** 그래서 `--project` 를 **반드시** 준다 — 안 주면 폴더 이름으로 새 프로젝트를 만든다(팀에 `step-gate` 라는 **실수로 생긴 프로젝트**가 그 증거다) |
 | ★ origin 푸시 | `origin` 은 URL 에 계정이 안 박혀 있다. 이 회차에는 `git push origin <브랜치>` 가 그냥 통과했지만, 자격증명 대기로 멈추면 계정을 실어라: `git push https://jaechanyoon0519-Fixup@github.com/FixUp-system/Fixup-shortform.git <브랜치>` |
 | 개발 서버 | `npx next dev -p 3111` (이 회차에 쓴 포트). `.env.local` 의 `SHOTFORM_DEV_USER` 가 **로그인을 건너뛰고 운영자 신원**을 준다 — 관리자·비용 화면을 그대로 볼 수 있다 |
