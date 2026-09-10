@@ -21,7 +21,7 @@
 // ★ 전송량 규율(09-07 사고): 굽는 편이 하나도 없으면 **fal 도 저장소도 안 두드린다.**
 //   1분마다 도는 크론이라 여기가 무거우면 그것 자체가 다음 사고가 된다.
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { sweepBakingProjects } from "../lib/collect-sweep.js";
 import { memoryStore } from "../lib/store/memory.js";
 
@@ -320,12 +320,24 @@ describe("크론 문 — 비밀이 지킨다", () => {
 });
 
 describe("배선 — 1분마다 돈다", () => {
-  it("★★★ vercel.json 에 1분 크론이 등록돼 있다", () => {
+  // ★★★ 2026-09-10 **저녁 — 크론 등록을 뺐다. 이 계정이 Hobby 라서다.**
+  //   배포가 통째로 거부됐다(실측 그대로):
+  //     "Hobby accounts are limited to daily cron jobs.
+  //      This cron expression (* * * * *) would run more than once per day."
+  //   즉 한 줄 때문에 **다른 18커밋까지 못 올라갔다.** 그래서 등록만 빼고 라우트는 남긴다 —
+  //   Pro 로 올리거나 외부 스케줄러를 붙이면 그날 바로 산다.
+  // ★ 그러므로 이 판은 "등록돼 있다"가 아니라 **"등록한다면 1분이어야 한다"** 를 지킨다.
+  //   등록이 없는 지금도 통과하고, 되살릴 때 엉뚱한 주기로 넣으면 잡는다.
+  it("★★★ 크론을 등록한다면 **1분**이어야 한다 (지금은 Hobby 라 등록이 없다)", () => {
     const cfg = JSON.parse(readFileSync("vercel.json", "utf8"));
     const cron = (cfg.crons || []).find((c) => c.path === "/api/cron/collect");
-
-    expect(cron, "크론이 등록되지 않았다 — 라우트만 있으면 아무도 안 부른다").toBeTruthy();
+    if (!cron) return;                       // 지금 상태 — Hobby 라 못 건다
     expect(cron.schedule, "1분마다가 아니다").toBe("* * * * *");
+  });
+
+  it("★★★ 부르는 문은 **살아 있다** — 등록만 빠졌지 기능이 빠진 게 아니다", () => {
+    // 외부 스케줄러(GitHub Actions·cron-job.org)나 Pro 승급이 그대로 이 문을 부른다.
+    expect(existsSync("app/api/cron/collect/route.js"), "크론 라우트가 사라졌다").toBe(true);
   });
 
   it("★★★ 크론 경로가 **로그인 벽에 안 막힌다** — 그리고 그 경로 하나뿐이다", async () => {
