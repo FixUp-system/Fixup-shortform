@@ -19,7 +19,7 @@ import { describe, it, expect } from "vitest";
 import sharp from "sharp";
 import {
   FACE_GRID, GRID_SUPPRESS_LINE, boxToRect, gridSvg, gridFacesOnSheet, gridFacesOnPhoto,
-  findFaceBoxes, mergeRects,
+  findFaceBoxes, mergeRects, consensusBoxes, padFor,
 } from "../lib/reel/face-grid.js";
 
 const solid = (w, h, v = 120) =>
@@ -315,5 +315,148 @@ describe("여러 번 물어 합친다 — 한 번으로는 좌표가 빗나간�
       { left: 100, top: 100, width: 10, height: 10 },
     ]);
     expect(merged.length).toBe(2);
+  });
+});
+
+
+// ★★★ 2026-09-10 저녁 — **회차 상자를 union 하지 않고 대표값 하나로 줄인다**(사장님 지시).
+//
+// 프로덕션 편 `de1cd655`(2.0 · 1행 5열 · 480p)에서 격자가 **판의 63.2%** 를 덮었다.
+// 사장님 신고는 "영상 속 인물이 스토리보드와 다르다" 였고, 원인은 얼굴을 가린 것이 아니라
+// **사람을 지운 것**이었다. 같은 판에서 pad 를 0.15 로 낮춰도 50.4% 라 **pad 탓이 아니다**:
+//   얼굴 하나 = 회차 3개 = 상자 3개 → 각각 pad 로 부푼 뒤 union → 흔들림이 **상자 크기**가 된다.
+// 여기 판들은 그 구조가 되돌아오는 것을 막는다.
+describe("대표값으로 줄이기 — 흔들림이 상자 크기가 되면 안 된다", () => {
+  // 09-03 실측에서 온 흔들림 모양이다(같은 얼굴을 네 번 물었을 때의 흩어짐).
+  const wobble = [
+    { x: 0.31, y: 0.10, w: 0.20, h: 0.20 },
+    { x: 0.37, y: 0.05, w: 0.20, h: 0.20 },
+    { x: 0.35, y: 0.06, w: 0.20, h: 0.20 },
+  ];
+
+  it("★★★ 같은 얼굴의 회차 상자 셋이 **하나**가 된다", () => {
+    const out = consensusBoxes(wobble);
+    expect(out.length, "회차마다 상자가 하나씩 남았다").toBe(1);
+  });
+
+  it("★★★ 대표 상자는 **얼굴 크기**다 — union 처럼 흔들림을 더하지 않는다", () => {
+    const [rep] = consensusBoxes(wobble);
+    // 중앙값이라 원본 상자와 같은 크기여야 한다.
+    expect(rep.w).toBeCloseTo(0.20, 5);
+    expect(rep.h).toBeCloseTo(0.20, 5);
+    // union 이었다면 흔들림 폭(0.31~0.57 · 0.05~0.30)만큼 커졌을 것이다.
+    const unionW = Math.max(...wobble.map((b) => b.x + b.w)) - Math.min(...wobble.map((b) => b.x));
+    expect(rep.w, "union 만큼 커졌다 = 줄이기가 안 걸렸다").toBeLessThan(unionW);
+  });
+
+  it("★★★ 축마다 중앙값이라 **빗나간 한 회차**를 버린다", () => {
+    // 09-03 에 실제로 본 실패 모양: 셋 중 하나가 하늘을 가리킨다. 다만 그 상자가 겹쳐
+    // 들어오면 union 은 그것까지 감싼다 — 중앙값은 가운데 값만 남긴다.
+    const [rep] = consensusBoxes([
+      { x: 0.30, y: 0.10, w: 0.20, h: 0.20 },
+      { x: 0.31, y: 0.10, w: 0.20, h: 0.20 },
+      { x: 0.32, y: 0.10, w: 0.20, h: 0.60 },  // 혼자 세로로 3배
+    ]);
+    expect(rep.h, "빗나간 회차에 끌려갔다").toBeCloseTo(0.20, 5);
+  });
+
+  it("★★★ **다른 얼굴은 안 합친다** — 하나라도 남으면 거절은 그대로 난다", () => {
+    const out = consensusBoxes([
+      { x: 0.05, y: 0.05, w: 0.15, h: 0.15 },
+      { x: 0.70, y: 0.70, w: 0.15, h: 0.15 },
+    ]);
+    expect(out.length).toBe(2);
+  });
+
+  it("★★ 한 회차에서만 나온 상자도 **살려 둔다** — 놓치면 거절이다", () => {
+    const out = consensusBoxes([...wobble, { x: 0.80, y: 0.80, w: 0.10, h: 0.10 }]);
+    expect(out.length).toBe(2);
+  });
+
+  // 이 판이 63.2% 회귀의 문지기다.
+  it("★★★ 같은 흔들림에서 **덮는 넓이가 옛 방식보다 작다**", () => {
+    const W = 480, H = 848;   // 문제의 판에서 온 칸 크기(1행 5열)
+    const area = (rs) => rs.reduce((s, r) => s + r.width * r.height, 0) / (W * H);
+    // 옛 방식: 상자마다 pad 를 먹인 뒤 union
+    const before = area(mergeRects(wobble.map((b) => boxToRect(b, W, H))));
+    // 지금: 대표값으로 줄인 뒤 pad
+    const after = area(mergeRects(consensusBoxes(wobble).map((b) => boxToRect(b, W, H))));
+    expect(after, "줄이기가 넓이를 못 줄인다").toBeLessThan(before);
+    // 얼굴 하나가 칸의 4%(0.2×0.2)인데, pad 0.3 을 먹여도 한 자릿수 %에 머물러야 한다.
+    expect(after, "얼굴 하나가 칸을 통째로 덮는다").toBeLessThan(0.15);
+  });
+
+  it("★★★ 판 갈래가 실제로 그 줄이기를 쓴다 — 모듈에만 있고 안 부르면 소용없다", async () => {
+    const bytes = await solid(600, 400);
+    const out = await gridFacesOnSheet({
+      bytes, cells: 1, grid: { rows: 1, cols: 1 },
+      deps: { findFaceBoxes: async () => wobble },
+    });
+    expect(out.faces, "회차 셋이 그대로 상자 셋이 됐다").toBe(1);
+  });
+
+  it("★★★ 사진 갈래도 같은 줄이기를 쓴다 — 두 갈래가 갈리면 한쪽만 사람을 지운다", async () => {
+    const bytes = await solid(400, 400);
+    const out = await gridFacesOnPhoto({ bytes, deps: { findFaceBoxes: async () => wobble } });
+    expect(out.faces).toBe(1);
+  });
+});
+
+
+// ★★★ 2026-09-10 저녁 — **여유(pad)에 상한을 둔다.** 줄이기만으로는 63.8% → 52.7% 였다.
+//   상자를 수로 찍어 보니 지배적인 항이 흔들림이 아니라 **VLM 이 돌려준 상자 자체**였다:
+//     칸 0  w=0.52 h=0.77 → 칸의 40%   ·   칸 4  w=0.61 h=0.78 → 칸의 48%
+//   지문이 "TIGHT · 몸·어깨 금지"라고 못 박아도 클로즈업 칸에서는 안 지킨다. 거기에
+//   pad 0.3(면적 2.56배)이 곱해지면 h 가 1.23 이 되어 칸을 넘는다.
+//   상한을 넣으면 같은 판이 **32.8%** 가 된다(상자 재사용 실측).
+describe("여유 상한 — 이미 큰 상자를 더 키우지 않는다", () => {
+  it("★★★ 실측 상자(칸의 40%·48%)에는 여유를 **안 준다**", () => {
+    expect(padFor({ x: 0.23, y: 0.03, w: 0.52, h: 0.77 })).toBe(0);
+    expect(padFor({ x: 0.17, y: 0.10, w: 0.61, h: 0.78 })).toBe(0);
+  });
+
+  it("★★★ 작은 얼굴에는 여유를 그대로 준다 — 좌표 오차를 흡수해야 한다", () => {
+    // 칸 2 에서 온 실측 상자들(칸의 2~7%)이 이 크기다.
+    expect(padFor({ x: 0.12, y: 0.18, w: 0.12, h: 0.19 })).toBe(FACE_GRID.pad);
+  });
+
+  it("★★★ 중간 상자는 **상한에 닿을 만큼만** 준다", () => {
+    const box = { x: 0.25, y: 0.16, w: 0.36, h: 0.40 };   // 칸의 14% (실측)
+    const p = padFor(box);
+    expect(p, "여유가 아예 사라졌다").toBeGreaterThan(0);
+    expect(p, "설정값을 넘었다").toBeLessThanOrEqual(FACE_GRID.pad);
+    const grown = box.w * (1 + p * 2) * box.h * (1 + p * 2);
+    expect(grown, "부풀린 넓이가 상한을 넘는다").toBeLessThanOrEqual(FACE_GRID.maxCell + 1e-9);
+  });
+
+  it("★★★ 부풀린 상자가 **칸을 안 넘는다** — 칸 0·4 가 위아래로 꽉 찼던 그 자리다", () => {
+    const W = 480, H = 848;
+    const box = { x: 0.23, y: 0.03, w: 0.52, h: 0.77 };
+    const r = boxToRect(box, W, H, padFor(box));
+    expect(r.height / H, "칸 높이를 통째로 덮는다").toBeLessThan(0.9);
+  });
+
+  it("★★★ 판 갈래가 실제로 상한을 쓴다 — 상수에만 있고 안 부르면 소용없다", async () => {
+    const bytes = await solid(480, 848);
+    const big = { x: 0.23, y: 0.03, w: 0.52, h: 0.77 };
+    const out = await gridFacesOnSheet({
+      bytes, cells: 1, grid: { rows: 1, cols: 1 },
+      deps: { findFaceBoxes: async () => [big] },
+    });
+    expect(out.faces).toBe(1);
+    // 상한이 안 걸리면 h 가 1.23 이라 칸 높이 전체가 덮인다.
+    const svg = gridSvg(480, 848, [{ ...boxToRect(big, 480, 848, padFor(big)) }]).toString();
+    const ys = [...svg.matchAll(/y1="(\d+)"/g)].map((m) => Number(m[1]));
+    // ★ 이 저장소가 밟은 함정: 정규식이 아무것도 못 맞히면 max=-Infinity·min=Infinity 라
+    //   차가 -Infinity 가 되어 **판이 헛돌며 통과한다**. 먼저 읽혔는지를 잰다.
+    expect(ys.length, "좌표를 하나도 못 읽었다 = 판이 헛돈다").toBeGreaterThan(2);
+    expect(Math.max(...ys) - Math.min(...ys), "격자가 칸 높이를 다 덮는다").toBeLessThan(848 * 0.9);
+  });
+
+  it("★★ 사진 갈래도 같은 상한을 쓴다", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("lib/reel/face-grid.js", "utf8");
+    const photo = src.slice(src.indexOf("export async function gridFacesOnPhoto"));
+    expect(photo, "사진 갈래가 상한 없이 pad 를 먹인다").toMatch(/padFor\(/);
   });
 });
