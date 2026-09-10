@@ -82,7 +82,9 @@ export default async function HomePage() {
     <section className="home">
       <HomeMade nav={nav} />
 
-      <p className="eyebrow">이렇게 만듭니다</p>
+      {/* ★ 눈썹("이렇게 만듭니다")은 **걷었다**(2026-09-10 사장님 지시). 아래 세 걸음이
+          01·02·03 으로 이미 "순서"라고 말한다 — 그 위에 이름표를 또 달 이유가 없다.
+          ★ 세 걸음 자체는 남긴다. 지운 것은 **이름표**이지 내용이 아니다. */}
       <div className="stage-steps">
         {STEPS.map((s) => (
           <div key={s.n} className="stage-step">

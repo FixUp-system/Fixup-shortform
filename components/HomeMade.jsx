@@ -62,10 +62,9 @@ export default function HomeMade({ nav = null }) {
 
       {WALL.length > 0 && (
         <div className="stage-band">
-          <div className="stage-bar">
-            <span>만든 것</span>
-            <span><b>{SHOWCASE.length}</b> 편</span>
-          </div>
+          {/* ★ 절 이름 줄("만든 것 · N 편")은 **걷었다**(2026-09-10 사장님 지시).
+              그림이 이미 "만든 것"이라고 말한다 — 그 위에 글자를 얹으면 설명이 결과보다
+              앞선다. 랜딩에서 글을 덜어내는 이 회차의 방향과 같다(머리글도 같은 이유로 뺐다). */}
 
           {/* ★★ 벽을 **한 선에서 자른다.** 비율이 제각각이라 열마다 바닥이 들쭉날쭉한데,
               잘라 버리면 그 아래가 곧은 한 줄이 된다. 지금처럼 장수가 적으면 잘릴 것이

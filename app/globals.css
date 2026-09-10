@@ -2658,15 +2658,14 @@ h1.login-head { margin-inline: auto; }
   background: var(--stage-bg);
   color: var(--stage-ink);
 }
-/* 무대 안에서만 눈썹이 어두운 벌을 따른다. 밖에는 안 샌다(뿌리를 적었다). */
-.home .eyebrow { color: var(--stage-chrome); }
+/* ★ 눈썹(.eyebrow)은 2026-09-10 에 화면에서 걷었다 — 세 걸음이 01·02·03 으로 이미
+   순서라고 말해서 이름표가 필요 없었다. 색 규칙도 함께 걷는다(죽은 선택자를 안 남긴다). */
 
 /* 기둥 — 덮개만 화면을 가득 채우고, **읽는 절들은 프로토타입의 기둥으로 돌아온다**.
    ★ 2560px 화면 실측: 기둥 없이 두면 4단 벽의 타일 하나가 600px 을 넘어 "벽"이 아니라
      "큰 사진 넷"이 된다. 프로토타입이 1400px 로 묶어 둔 이유가 그것이었다.
    ★ 덮개를 여기서 빼는 것은 사장님 지시다 — 히어로는 화면 상단에 가득 차야 한다. */
 .home .stage-band,
-.home .eyebrow,
 .home .stage-steps {
   max-width: var(--stage-col);
   margin-inline: auto;
@@ -2713,6 +2712,24 @@ h1.login-head { margin-inline: auto; }
   color: var(--on-media); text-decoration: none;
 }
 .home .stage-nav-right { display: flex; align-items: center; gap: var(--sp-3); }
+
+/* ★★★ 두 버튼을 **한 급으로** 맞춘다 (2026-09-10 사장님: "로그인 만들러가기 버튼 사이즈가
+   비율이 너무 안맞아"). 안 맞을 수밖에 없었다 — 둘은 원래 **다른 자리의 버튼**이다:
+     .cta    = 앱 화면의 주 실행 버튼 — 높이 40px · 글자 16px · 모서리 8px · **margin-top 20px**
+     .um-btn = 상단 띠의 작은 신원 버튼 — 높이 ≈22px · 글자 12px
+   높이가 거의 두 배였고, 게다가 `.cta` 의 `margin-top` 이 그 줄에서 버튼을 아래로 밀어
+   **세로 정렬까지 어긋나** 있었다(랜딩에서는 위아래 여백을 껍데기가 준다).
+   ★ 랜딩 껍데기에서는 둘이 **짝**이다 — 같은 높이·같은 모서리·같은 글자 크기로 두고,
+     주 버튼임은 **색**이 말한다(채운 버튼 vs 비친 버튼). 크기로 소리치지 않는다. */
+.home .stage-nav .cta,
+.home .stage-nav .um-btn {
+  height: var(--ctl-md);
+  padding: 0 18px;
+  border-radius: var(--r-pill);
+  font-size: 14px;
+  font-weight: 600;
+  margin-top: 0;
+}
 /* 신원 영역은 앱층과 **같은 부품**(UserMenu)이라 밝은 벌 색을 들고 온다. 사진 위에서만
    되돌린다 — 뿌리를 적었으니 앱층 상단바에는 안 샌다. */
 .home .stage-nav .um-btn {
@@ -2739,14 +2756,6 @@ h1.login-head { margin-inline: auto; }
 }
 .home .stage-cover-play:hover .stage-bigplay { transform: scale(1.07); }
 
-/* 절 이름 줄 — 껍데기와 같은 급이다(작은 대문자·넓은 자간, 물러난 회색). */
-.home .stage-bar {
-  display: flex; justify-content: space-between; align-items: baseline;
-  margin-top: var(--sp-5); padding-bottom: var(--sp-3);
-  border-bottom: 1px solid var(--stage-line);
-  font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--stage-chrome);
-}
-.home .stage-bar b { color: var(--stage-ink); font-weight: 700; }
 
 /* 벽 — **비율을 안 정한다.** 타일 높이는 그림이 정한다. 숏폼은 9:16 이 많고 메인에 걸 것은
    16:9 라 섞이는데, 한 비율로 못 박으면 그림이 잘리거나 늘어난다.
