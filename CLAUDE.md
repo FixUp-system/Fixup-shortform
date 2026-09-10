@@ -36,18 +36,21 @@
 > 옛 문장은 "의도적 미커밋이다(주석에 '커밋하지 않는다')" 였는데 **둘 다 사실이 아니다**:
 > 파일은 추적되고 있고 그런 주석도 없다. 이 두 벌 상태가 위 함정의 원인이었다.
 >
-> ★ **이어서 하는 세션이 읽을 두 장**(2026-09-07 갱신):
-> 🔴 **09-07 사고 회차는 `OUTSTANDING.md` 의 「★★★ 09-07」 절 하나에만 있다**(wiki 서사 없음).
->   Supabase egress 402 → 새 프로젝트로 이사 → **옛 파일 430개 아직 못 옮김**. 거기부터 읽어라.
-> · **상태와 남은 일** → 이 저장소의 `OUTSTANDING.md`
+> ★ **이어서 하는 세션이 읽을 두 장**(2026-09-10 15:46 갱신):
+> · **상태와 남은 일** → 이 저장소의 `OUTSTANDING.md` — **여기부터 읽어라.**
 >   ⚠️ **브랜치 `feat/reel-cut-r2v` 에만 최신이다** — 워크트리
 >   `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` 에서 세션을 열어라.
 >   메인 저장소(main)에서 열면 09-02 판을 읽는다.
-> · **왜 그렇게 했나(회차 서사)** → `C:\Users\fixup\obsidian_jaechan\sources\shotform-oneshot-status-and-ui-2026-09-03.md`
->   (그 앞 회차: `shotform-face-grid-2026-09-03`(얼굴 격자) ·
->    `shotform-board-and-collect-recovery-2026-09-02` ·
->    `shotform-archive-admin-and-ui-2026-09-01`)
+> · **왜 그렇게 했나(회차 서사)** → `C:\Users\fixup\obsidian_jaechan\sources\` 의
+>   `shotform-webhook-collect-and-function-storage-2026-09-10.md`(가장 최신 · 수거·웹훅·함수 저장량)
+>   ← `shotform-credit-teardown-and-static-showcase-2026-09-10`(같은 날 앞부분)
+>   ← `shotform-face-pad-and-dark-stage-2026-09-09`
+>   ← **`shotform-egress-outage-and-migration-2026-09-07`**(egress 402 사고 · 새 프로젝트로 이사)
+>   ← `shotform-oneshot-status-and-ui-2026-09-03` · `shotform-face-grid-2026-09-03`.
 >   그리고 그 wiki 의 `index.md` → `products/shotform-saas.md` 순으로 내려가면 전체가 보인다.
+> ⚠️ **정정(09-10)**: 이 자리에 오랫동안 *"09-07 사고 회차는 wiki 서사가 없다"* 고 적혀 있었는데
+>   **사실이 아니다** — 위 `…-2026-09-07` 페이지가 09-07 15:42 에 이미 쓰여 있었다.
+>   다만 **옛 파일 430개를 아직 못 옮긴 것**은 지금도 맞다(`OUTSTANDING.md` 의 「★★★ 09-07」 절).
 
 > ## ★★ 화면 파일을 손댔으면 **한 번 굽는다**
 >

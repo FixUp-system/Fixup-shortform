@@ -1,4 +1,17 @@
-# 이어서 할 일 — `feat/reel-cut-r2v` (2026-09-10 기준 · **열여섯째 갱신**)
+# 이어서 할 일 — `feat/reel-cut-r2v` (2026-09-10 기준 · **열일곱째 갱신**)
+
+> 📌 **09-10 15:46 — 이어받으며 실측 대조만 했다. 코드 변경 0.** 고친 것은 이 문서다.
+> 맞았던 것: 테스트 **6,020 그린 exit 0**(재실행) · 라이브 `/home`·`/login`·`/archive` **200** ·
+> 크론 문 **401** · 웹훅 GET **405** · 미커밋 **0**.
+> 어긋나 있던 것 셋은 **전부 하나씩** 모자랐다 — 문서 커밋 1→**2** · 미푸시 78→**79** ·
+> main 거리 126→**127**. 원인은 하나다: **직전 인계 커밋이 자기 자신을 안 세었다.**
+> 그래서 §0 의 수는 **이 커밋까지 포함한 값**(문서 3 · 미푸시 80 · main 128)으로 적었다 —
+> 커밋하고 나면 맞는 수다. 거기에 **앵커 고정 수**(`67fb29f` 기준 코드분: 미푸시 77 · main 125)를
+> 나란히 적었다 — 문서를 몇 번을 더 고쳐도 **안 낡는 수**라 다음 세션은 이쪽을 믿으면 된다.
+> ★ 그리고 **§0 「배포」 칸이 한 판 낡아 있었다** — 맨 위 배너는 `dpl_9pvb…`(코드 `67fb29f`)를
+> 적었는데 표는 그 앞 판 `16nbazqod` 를 적고 있었다. `vercel inspect` 로 별칭이 가리키는 판을
+> 확인해 표를 고쳤다(**같은 사실을 두 곳에 적으면 한쪽이 낡는다**의 실례다).
+> wiki 서사 포인터도 09-01 판에 멈춰 있어 09-10 두 장으로 고쳤다(저장소 `CLAUDE.md` 포함).
 
 > ✅ **09-10 밤 — 병렬 세 갈래까지 배포 완료.** 라이브 `dpl_9pvbSfsuMTkk8yYAyEU2yLvtMacC`
 > (별칭이 이것을 가리킨다 · 코드 `67fb29f` · **미배포 0** · 테스트 **6,020 그린**).
@@ -19,8 +32,9 @@
 > 🔴 **`db/schema.sql` 의 projects 인덱스 셋은 사장님이 라이브에 올렸다**(09-10 밤).
 >   다음에 스키마를 고칠 때 그 파일을 통째로 다시 올리면 된다(전부 `if not exists`).
 >
-> ✅ **09-10 저녁 — 오늘 작업 전부 배포됐다.** 라이브 `16nbazqod`
-> (별칭 `fixup-shortform-service.vercel.app` · 코드 `0f3115a` · **미배포 0**).
+> ✅ **09-10 저녁 — 오늘 작업 전부 배포됐다.** 그때의 판은 `16nbazqod`
+> (코드 `0f3115a` · 그 시점 **미배포 0**). ⚠️ **이건 이제 지난 판이다** — 같은 날 밤 `dpl_9pvb…`
+> (코드 `67fb29f`)가 그 위에 올라갔다(맨 위 배너·§0 「배포」 칸이 지금 것이다).
 > 라이브 실측: `/home`·`/login`·`/archive` 200 · 표지 16장 200 ·
 > 웹훅 문 **401**(서명 없이도, 가짜 서명도 · **307 이 아니다** = 벽 밖에 제대로 섰다) ·
 > GET **405** · 크론 문 401. **함수 하나가 46.11MB → 1.27MB**(36배).
@@ -60,8 +74,14 @@
 이 문서는 **다음 세션이 이 브랜치를 그대로 이어받기 위한 것**이다.
 사실은 코드가 진실의 원천이다. 여기 적힌 것과 코드가 어긋나면 코드를 믿고 이 문서를 고쳐라.
 
-> 회차 서사(무엇을 왜 고쳤나)는 wiki 에 있다 —
-> `C:\Users\fixup\obsidian_jaechan\sources\shotform-archive-admin-and-ui-2026-09-01.md`.
+> 회차 서사(무엇을 왜 고쳤나)는 wiki 에 있다 — `C:\Users\fixup\obsidian_jaechan\sources\`.
+> **09-10 은 두 장이다**(이 순서로 읽어라):
+> `shotform-credit-teardown-and-static-showcase-2026-09-10.md`(09-09 밤~09-10 오전) →
+> `shotform-webhook-collect-and-function-storage-2026-09-10.md`(오후~밤 · 수거·웹훅·함수 저장량).
+> 그 앞: `shotform-face-pad-and-dark-stage-2026-09-09` ·
+> **`shotform-egress-outage-and-migration-2026-09-07`**(09-07 사고 — ★ **서사가 있다**.
+> 이 문서와 저장소 `CLAUDE.md` 가 오랫동안 "wiki 서사 없음"이라고 적어 왔는데 **사실이 아니다**) ·
+> `shotform-oneshot-status-and-ui-2026-09-03` · `shotform-face-grid-2026-09-03`.
 > 이 문서는 **상태와 남은 일**만 적는다.
 
 ---
@@ -72,14 +92,14 @@
 |---|---|
 | 워크트리 | `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` |
 | 브랜치 | `feat/reel-cut-r2v` (09-03 저녁). ★ 수는 **적지 않는다** — 이 문서를 고치는 커밋이 그 수를 또 바꾼다. **세라**: `git log -1 --format='%h %s'` · `git rev-list --count fixup/main..HEAD` |
-| 테스트 | ✅ **09-10 저녁 실측 전체 초록** — `npx vitest run` = **6,020 통과 · 0 실패 · 10 skipped** / 파일 **359 통과 · 2 skipped**(361) · **exit 0**. `npx next build` **exit 0**(같은 날 저녁, 함수 번들 좁히기를 검증하려고 실제로 구워 산출물을 열어 봤다 — 추적 파일 99개 중 ffmpeg 를 진 것 37개). <br>그 앞: 09-10 오후 5,929 · 오전 5,878 · 09-09 밤 5,895. ⚠️ 09-10 오전에 수가 줄어든 것은 크레딧 걷기 1단계에서 크레딧 전용 판을 지웠기 때문이다(기능이 사라졌으니 판도 사라진 것이 맞다) |
-| 배포 | ✅ **프로덕션 라이브 `16nbazqod`**(2026-09-10 14:1x KST · target=production · Ready · 별칭 `fixup-shortform-service.vercel.app` 이 이것을 가리킨다(`vercel inspect` 실측) · 코드 **`0f3115a`**). 라이브 실측: `/home`·`/login`·`/archive` **200** · `/showcase/*.webp` **16장 전부 200** · `/api/cron/collect` **401**(비밀 없이·틀린 비밀 둘 다 — fail-closed 정상). ★★ **함수 하나가 46.11MB → 1.27MB**(가벼운 라우트 기준 · 36배). <br>**그 앞**: `9s729yvsd`(09-10 00:45 · `8bb4858`) · `lfqxyburu`(09-10 00:09 · `a30767a`) · `h7qic4374`(09-09 18:12 · `bea465c`) |
+| 테스트 | ✅ **09-10 15:46 재실측 전체 초록** — `npx vitest run` = **6,020 통과 · 0 실패 · 10 skipped** / 파일 **359 통과 · 2 skipped**(361) · **exit 0**(19.2초). 같은 날 저녁 값과 **한 자리도 안 달라졌다**(그 뒤 커밋이 문서뿐이라 맞다). `npx next build` **exit 0**(같은 날 저녁, 함수 번들 좁히기를 검증하려고 실제로 구워 산출물을 열어 봤다 — 추적 파일 99개 중 ffmpeg 를 진 것 37개). <br>그 앞: 09-10 오후 5,929 · 오전 5,878 · 09-09 밤 5,895. ⚠️ 09-10 오전에 수가 줄어든 것은 크레딧 걷기 1단계에서 크레딧 전용 판을 지웠기 때문이다(기능이 사라졌으니 판도 사라진 것이 맞다) |
+| 배포 | ✅ **프로덕션 라이브 `dpl_9pvbSfsuMTkk8yYAyEU2yLvtMacC`**(별칭 슬러그 `…-1suguzmtl-fix-up1` · **2026-09-10 15:27:50 KST** · target=production · Ready · 코드 **`67fb29f`**). **09-10 15:46 `vercel inspect` 재실측** — 별칭 `fixup-shortform-service.vercel.app` 이 이것을 가리킨다(⚠️ 이 칸은 15:40 판까지 한 판 낡은 `16nbazqod` 를 적고 있었다. 맨 위 배너만 맞았다). 같은 시각 라이브 실측: `/home`·`/login`·`/archive` **200** · `/api/cron/collect` **401**(비밀 없이) · `/api/fal/webhook` GET **405**. 함수 크기는 **1.27MB**(inspect 출력 · 좁히기 전 46.11MB 에서 36배). <br>**그 앞**: `16nbazqod`(09-10 14:1x · `0f3115a` · 이때 `/showcase/*.webp` 16장 전부 200 실측) · `9s729yvsd`(09-10 00:45 · `8bb4858`) · `lfqxyburu`(09-10 00:09 · `a30767a`) · `h7qic4374`(09-09 18:12 · `bea465c`) |
 | 배포(그 앞) | `dpl_5twijBmQk7sfYTZbQqMKT3HzVdpn`(별칭 `...-8xu0l4lc3` · 09-07 17:43 · 코드 `d826317`). 09-07 문서는 이 판을 몰랐다 — 오후 커밋까지 배포된 것이 안 적혀 있었다. ⚠️ 배포에 git meta 가 없다(git 없는 폴더에서 올린다) — **어느 코드인지는 `shotform-deploy-clean` 과 파일 대조로만 안다** |
 | 배포(그 앞) | **`6f4ehup0a`**(09-07 11:46 · 코드 `165df59` · `dpl_2Vw2h6T1FoR3DBBw877nhPWQZ1NH`). target=production · status=Ready · 09-07 12:5x 실측 `/login` 200 · `/api/me` 401(로그인 벽, 정상) · `/api/projects` 200(46건) · 🔴 `/api/renders/<옛 id>.mp4` **404**(아래 09-07 절 ③) · 그 앞 판은 `i7d0rc266`(09-04 · `0b2f341`) · ★ **확인법**: `npx vercel inspect fixup-shortform-service.vercel.app` 이 그 배포를 가리키는지 본다 — 이번엔 CSS 가 안 바뀌어 번들 해시로는 못 쟀다 |
 | ★ 정식 도메인 | **`https://fixup-shortform-service.vercel.app`** 다. `vercel deploy` 가 찍어 주는 `...-ju8okg74p-fix-up1.vercel.app` 쪽은 **Deployment Protection(SSO)에 걸려 전부 302** 라 검증에 쓰면 안 된다 — 09-02 에 한 번 속았다 |
-| 미배포 | ✅ **1 커밋** — 이 문서뿐이다(코드는 전부 나갔다). 세라: `git rev-list --count 67fb29f..HEAD`. 🔴 **크론 등록은 빠진 채다** — Hobby 라 1분 크론이 배포를 거부한다(맨 위 배너). ★ **크레딧 걷기가 1/4 인 채로 라이브다**(아래 🧾 절 ④) |
-| 푸시 | 🔴 **미푸시 78**(09-10 저녁 재실측 · 세라: `git rev-list --count fixup/feat/reel-cut-r2v..HEAD`). 두 원격 다 `9a02896`(09-04)에 서 있다. ★ **09-07 사고 대응부터 09-10 까지 원격에 하나도 없다** — 지금 원격만 보면 이 갈래를 못 잇는다. ⚠️ URL 로 직접 푸시하면 추적 ref 가 안 움직여 착시가 난다 — 정정은 `git fetch <원격> <브랜치>:refs/remotes/<원격>/<브랜치>`. ⚠️ 자격증명 대기로 매달리면 `GIT_TERMINAL_PROMPT=0` |
-| main 과의 거리 | `fixup/main` = `6e9bd8f` · HEAD 가 **126커밋 앞**(09-10 저녁 재실측 `git rev-list --left-right --count fixup/main...HEAD` = `0 126` — 뒤처진 것 **0**). **main 병합은 사장님이 지시할 때만** 한다 |
+| 미배포 | ✅ **코드 미배포 0** — 라이브가 `67fb29f` 이고 그 뒤는 **문서 커밋뿐**이다(09-10 15:46 실측 **3** — ★ **이 인계 커밋까지 포함해 센 수다**). ★ **수를 믿지 말고 앵커를 믿어라** — 이 문서를 고치는 커밋이 그 수를 매번 1 늘린다. 판정법: `git log --oneline 67fb29f..HEAD` 에 **`docs:` 아닌 줄이 섞이면** 그때부터 진짜 미배포다. 🔴 **크론 등록은 빠진 채다** — Hobby 라 1분 크론이 배포를 거부한다(맨 위 배너). ★ **크레딧 걷기가 1/4 인 채로 라이브다**(아래 🧾 절 ④) |
+| 푸시 | 🔴 **미푸시 80**(09-10 **15:46** 재실측 · ★ **이 인계 커밋 포함** · 세라: `git rev-list --count fixup/feat/reel-cut-r2v..HEAD`). ★ 그 중 **코드분 77 은 안 낡는다**(앵커 고정: `git rev-list --count fixup/feat/reel-cut-r2v..67fb29f`) — 나머지는 문서 커밋이다. 두 원격 다 `9a02896`(09-04)에 서 있다. ★ **09-07 사고 대응부터 09-10 까지 원격에 하나도 없다** — 지금 원격만 보면 이 갈래를 못 잇는다. ⚠️ URL 로 직접 푸시하면 추적 ref 가 안 움직여 착시가 난다 — 정정은 `git fetch <원격> <브랜치>:refs/remotes/<원격>/<브랜치>`. ⚠️ 자격증명 대기로 매달리면 `GIT_TERMINAL_PROMPT=0` |
+| main 과의 거리 | `fixup/main` = `6e9bd8f` · HEAD 가 **128커밋 앞**(09-10 **15:46** 재실측 · ★ **이 인계 커밋 포함** · `git rev-list --left-right --count fixup/main...HEAD` = `0 128` — 뒤처진 것 **0**). ★ 코드분은 **125**(앵커 고정: `git rev-list --count fixup/main..67fb29f`). **main 병합은 사장님이 지시할 때만** 한다 |
 | ⚠️ 배포 함정 | **`.vercel` 폴더가 이 워크트리에 없다.** 그래서 `--project` 를 **반드시** 준다 — 안 주면 폴더 이름으로 새 프로젝트를 만든다(팀에 `step-gate` 라는 **실수로 생긴 프로젝트**가 그 증거다) |
 | ★ origin 푸시 | `origin` 은 URL 에 계정이 안 박혀 있다. 이 회차에는 `git push origin <브랜치>` 가 그냥 통과했지만, 자격증명 대기로 멈추면 계정을 실어라: `git push https://jaechanyoon0519-Fixup@github.com/FixUp-system/Fixup-shortform.git <브랜치>` |
 | 개발 서버 | `npx next dev -p 3111` (이 회차에 쓴 포트). `.env.local` 의 `SHOTFORM_DEV_USER` 가 **로그인을 건너뛰고 운영자 신원**을 준다 — 관리자·비용 화면을 그대로 볼 수 있다 |
