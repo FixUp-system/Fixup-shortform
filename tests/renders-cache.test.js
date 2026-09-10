@@ -185,3 +185,29 @@ describe("GET /api/renders/[name] — 302 를 실제로 받아 본다", () => {
     expect(b.headers.get("Location")).not.toBe(a.headers.get("Location"));
   });
 });
+
+// ★★★ 2026-09-10 **라이브 실측 뒤 보탠 판.** 배포하고 나서 재 보니 주력 둘이 캐시를
+//   전혀 안 타고 있었다:
+//     reel → private, no-cache   (각인이 `reel.video.ts` 인데 라우트가 `render.ts` 만 봤다)
+//     ad   → private, no-cache   (`videos[0]` 에 각인이 **아예 없었다**)
+//   각인이 없으면 캐시를 안 거는 규칙 자체는 옳다(재굽기 때 옛 영상을 못 밀어낸다).
+//   틀린 것은 **각인을 찾는 자리**였다 — 그래서 절감이 단계별·film 에만 걸렸다.
+describe("각인을 찾는 자리 — 주력 둘이 빠져 있었다", () => {
+  const route = readFileSync("app/api/renders/[name]/route.js", "utf8");
+  const bare = route.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+  it("★★★ reel 의 각인(`reel.video.ts`)을 읽는다", () => {
+    expect(bare, "reel 각인을 안 본다 — 주력이 캐시를 못 탄다").toMatch(/reel\?\.video\?\.ts|reel\.video\.ts/);
+  });
+
+  it("★★★ 광고의 각인(`videos[0].ts`)을 읽는다", () => {
+    expect(bare, "광고 각인을 안 본다").toMatch(/videos\?\.\[0\]\?\.ts|videos\[0\]\.ts/);
+  });
+
+  it("★★★ 광고 완성본에 각인을 **적는다** — 없으면 읽어도 소용없다", () => {
+    const ad = readFileSync("lib/ad/pipeline.js", "utf8");
+    const i = ad.indexOf("videos: [{");
+    expect(i, "완성본을 적는 자리를 못 찾았다").toBeGreaterThan(0);
+    expect(ad.slice(i, i + 200), "각인 없이 적는다 — 재굽기를 구별할 수 없다").toMatch(/\bts\b/);
+  });
+});

@@ -56,7 +56,16 @@ export const GET = withUser(async (req, { params }, user) => {
   //   이름에서 되찾은 방식으로 그 자리의 ts 를 읽는다(안 읽으면 이 경로의 영상만 304 를
   //   못 타 볼 때마다 전량이 다시 나간다). 광고 이름은 m[2] 가 없어 예전 자리를 그대로 본다.
   const mode = m[2] ? m[2].slice(1) : null;
-  const ts = mode ? project.films?.[mode]?.video?.ts : project.render?.ts;
+  // ★★★ 2026-09-10 **라이브 실측 뒤 고침** — 각인이 종류마다 **다른 자리**에 산다.
+  //   배포하고 재 보니 주력 둘이 캐시를 전혀 안 타고 있었다(둘 다 `private, no-cache`):
+  //     reel → 각인이 `reel.video.ts` 인데 여기서 `render.ts` 만 봤다
+  //     ad   → `videos[0]` 에 각인이 **아예 없었다**(그래서 lib/ad/pipeline.js 에 적게 했다)
+  //   각인이 없으면 캐시를 안 거는 규칙은 옳다(재굽기 때 옛 영상을 못 밀어낸다) — 틀린 것은
+  //   **찾는 자리**였고, 그 탓에 절감이 단계별·film 에만 걸렸다.
+  // ★ 순서대로 본다: film(방식별) → reel → 광고 → 단계별.
+  const ts = mode
+    ? project.films?.[mode]?.video?.ts
+    : project.reel?.video?.ts ?? project.videos?.[0]?.ts ?? project.render?.ts;
   const etag = ts ? `"${ts}"` : null;
   if (etag && req.headers.get("if-none-match") === etag) {
     return new Response(null, { status: 304, headers: { ETag: etag, "Cache-Control": "private, no-cache" } });

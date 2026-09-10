@@ -228,3 +228,23 @@ describe("원클릭 — 수거는 가볍고 마무리는 하나만", () => {
     expect(out.nothing).toBe(true);
   });
 });
+
+// ★★★ 2026-09-10 — 완성본에 **각인(ts)** 이 붙는지 **실행으로** 잰다.
+//   소스 문자열로만 재면 못 잡는 것이 있다: 각인을 처음 넣을 때 `now()` 를 썼는데 그
+//   함수 안에 `now` 가 없어 **판은 초록인데 실행이 ReferenceError 로 죽는** 상태였다.
+//   (이 저장소의 화면 판이 문법 오류를 못 잡는 것과 같은 결의 함정이다.)
+// ★ 각인이 필요한 이유: 완성본 주소는 다시 구워도 `<id>.mp4` 로 같아서, 이것 없이는
+//   app/api/renders 가 캐시를 걸 수 없다(옛 영상을 밀어낼 방법이 없다).
+describe("완성본 각인 — 캐시가 걸릴 수 있게", () => {
+  beforeEach(() => resetMemoryStore());
+
+  it("★★★ 마무리가 videos[0].ts 를 **숫자로** 남긴다", async () => {
+    const p = await submitted();
+    await runWithActor(U, () => collectAdRender(p.id, U, { collectAdVideo: doneNow }));
+    await runWithActor(U, () => finishAdRender(p.id, U, { storeVideo: async () => "/api/renders/x.mp4" }));
+
+    const doc = await runWithActor(U, () => getProject(p.id, U));
+    expect(typeof doc.videos?.[0]?.ts, "각인이 숫자가 아니다 — 캐시가 안 걸린다").toBe("number");
+    expect(doc.videos[0].ts).toBeGreaterThan(0);
+  });
+});
