@@ -4,9 +4,16 @@ import { readFileSync } from "fs";
 import { PUBLIC_PATHS, isPublicPath, ADMIN_PATHS, isAdminPath } from "../lib/auth/paths.js";
 
 describe("공개 경로", () => {
-  it("셋뿐이다", () => {
+  // ★★★ 2026-09-10 — **셋에서 넷이 됐다.** 늘린 것은 크론 문 하나다.
+  //   Vercel 크론에는 로그인한 사람이 없어서, 여기 없으면 307 로 /login 에 튕기고
+  //   1분마다 아무 일도 안 일어난다(같은 날 표지 정적 파일이 그 자리에서 307 을 맞았다).
+  //   ★ 이 문을 지키는 것은 로그인이 아니라 **`CRON_SECRET`** 이고, 비밀이 없으면
+  //     **닫힌 쪽으로** 떨어진다(app/api/cron/collect/route.js · tests/cron-collect.test.js).
+  //   ★ 경로를 **하나씩** 적었다 — 접두사(`/api/cron`)로 열면 앞으로 만드는 크론이
+  //     비밀 검사를 빠뜨린 채로도 공개가 된다.
+  it("넷뿐이다", () => {
     expect([...PUBLIC_PATHS].sort()).toEqual(
-      ["/api/auth/login", "/api/auth/signup", "/login"].sort()
+      ["/api/auth/login", "/api/auth/signup", "/api/cron/collect", "/login"].sort()
     );
   });
 
