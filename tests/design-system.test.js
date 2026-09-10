@@ -466,3 +466,43 @@ describe("테마는 한 벌이다", () => {
     expect(offenders, `전시층이 작업 화면으로 샜다:\n  ${offenders.join("\n  ")}`).toEqual([]);
   });
 });
+
+
+// ★★ 2026-09-10 — 형제 제품 **MCS**(fixup-image-agent) 와 대조해 골격 셋을 맞췄다.
+//   색은 이미 같았다(우리 09-08 밝은 벌 전환이 그쪽을 보고 한 것이다). 남은 차이 중
+//   **문구를 안 건드리는 것**만 이번에 옮겼다 — 눈썹(eyebrow)·본문 기둥 정책은 사장님
+//   판단이 필요해 남겼다.
+describe("MCS 와 맞춘 골격 — 그림자 두 벌과 사이드바 폭", () => {
+  const css = readFileSync("app/globals.css", "utf8");
+  // ⚠️ `[^}]*` 로 자르면 안 된다 — :root 안 **주석에 `}` 가 있어서**(`.chips { gap: 7px }`)
+  //   거기서 끊긴다. 실제로 이 판을 그렇게 썼다가 토큰이 있는데 "없다"로 빨개졌다.
+  //   블록을 닫는 것은 **줄 맨 앞의 `}`** 다.
+  const root = css.match(/:root\s*\{[\s\S]*?\n\}/)[0];
+  // ★ 정규식을 만들지 않는다 — 선택자에 `.` 이 들어가 이스케이프가 필요하고, 이 저장소는
+  //   heredoc 으로 판을 쓸 때 역슬래시가 한 겹 먹혀 **아무것도 안 맞는 판**을 만든 적이 있다.
+  //   문자열로 자르면 그 함정이 아예 없다.
+  const rule = (sel) => {
+    const at = css.indexOf(`\n${sel} {`);
+    return at < 0 ? "" : css.slice(at, css.indexOf("}", at));
+  };
+
+  it("★★★ 그림자를 토큰 둘이 쥔다 — 제자리에 손으로 적으면 아홉 벌이 된다", () => {
+    expect(root, "--ring 토큰이 없다").toMatch(/--ring:\s*0 0 0 1px var\(--line\)/);
+    expect(root, "--elevate 토큰이 없다").toMatch(/--elevate:\s*0 4px 24px/);
+  });
+
+  it("★★★ 토큰만 있고 안 쓰면 아무 일도 안 한다 — 쓰는 자리를 잰다", () => {
+    expect(rule(".panel"), "카드가 링을 안 두른다").toMatch(/box-shadow:\s*var\(--ring\)/);
+    expect(rule(".dlg"), "떠 있는 면에 고도가 없다").toMatch(/box-shadow:\s*var\(--elevate\)/);
+  });
+
+  it("★★ 카드의 링은 border 가 아니라 그림자다 — border 면 여백이 1px 씩 밀린다", () => {
+    expect(rule(".panel"), "카드에 테두리를 달았다").not.toMatch(/border:/);
+  });
+
+  it("★★ 사이드바 폭이 고정값이 아니라 화면을 따라 늘어난다", () => {
+    expect(rule("aside.side"), "사이드바 폭이 아직 고정값이다").toMatch(
+      /width:\s*clamp\(236px,\s*15vw,\s*300px\)/
+    );
+  });
+});
