@@ -14,6 +14,30 @@ create table if not exists projects (
   doc         jsonb not null
 );
 
+-- projects 인덱스 (2026-09-10). **여기에 인덱스가 하나도 없었다.**
+--
+-- ★ 왜 필요한가. 가장 자주 도는 조회 셋이 전부 이 테이블인데 전부 전수 스캔이었다.
+--   목록 셀렉트가 `doc->…` 투영이라, 정렬하고 버릴 행의 jsonb 까지 detoast 한 뒤에야
+--   100건이 남는다 — 전송량으로 서비스가 통째로 죽은 저장소다(09-07 egress 402).
+--   인덱스가 있으면 정렬이 끝난 상태로 앞에서 100건만 집어 그만큼만 detoast 한다.
+-- ★ concurrently 를 안 쓴다 — 이 파일은 통째로 붙여 넣어 적용하는데 그 구문은 트랜잭션
+--   안에서 못 돈다(그러면 파일 전체가 그 줄에서 멈춘다). 행이 수백인 표라 잠깐이면 끝난다.
+
+-- ① 내 보관함 — owner_id 로 거르고 created_at 으로 정렬해 100건(listProjects·countProjects).
+--    열 순서를 뒤집으면 소유자 필터가 선두를 못 써서 그대로 전수 스캔이다.
+create index if not exists projects_owner_created_idx on projects (owner_id, created_at desc);
+
+-- ② 보관함 [전체] — 소유자 필터 없이 최신순 100건(listAllProjects). ①의 선두가 owner_id 라
+--    이 조회는 ①을 못 쓴다.
+create index if not exists projects_created_idx on projects (created_at desc);
+
+-- ③ 종류 거르기 — 크론이 1분마다(하루 1,440회) 굽는 편을 훑는다(selectBakingProjects).
+--    조회가 `doc->>'kind'` 로 묻으므로 인덱스도 **같은 표현식**이어야 planner 가 문다.
+--    생성 컬럼(generated always as)을 만드는 길도 있으나, 그러면 조회를 그 컬럼으로 옮겨야
+--    하고 그 조회는 lib/store/supabase.js 에 있다 — 컬럼만 만들고 조회를 안 옮기면 표만
+--    커지고 인덱스는 헛돈다. 표현식 인덱스는 조회를 한 글자도 안 고치고 태운다.
+create index if not exists projects_kind_idx on projects ((doc->>'kind'));
+
 create table if not exists cost_records (
   request_id    text primary key,                  -- 멱등키: 같은 호출을 두 번 기록하지 않는다
   ts            timestamptz not null,

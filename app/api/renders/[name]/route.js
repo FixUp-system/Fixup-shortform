@@ -84,13 +84,28 @@ export const GET = withUser(async (req, { params }, user) => {
     //   키를 안 만든다 = 재사용하지 않는다.
     // ★ 첨부(dl)는 서명 자체가 다르므로 키도 갈라 둔다 — 안 가르면 미리보기가 내려받기가 된다.
     const key = ts ? `renders|${name}|${ts}|${wantsDownload ? "dl" : "inline"}` : null;
-    const signed = await cachedSignedUrl(key, SIGNED_URL_SECONDS, () =>
+    // ★★ 2026-09-10 — **302 자체를 캐시하게 한다.** 여기가 `no-store` 이던 동안 브라우저는
+    //   같은 영상을 볼 때마다(그리고 `<video>` 가 되감기·이어보기로 다시 물을 때마다) 이 문을
+    //   다시 두드렸고, 두드릴 때마다 찬 인스턴스에 닿으면 주소가 갈려 이미 받아 둔 3~13MB 가
+    //   헛것이 됐다. 안 물으면 바이트가 아예 안 나간다 — 09-07 에 서비스를 죽인 그 전송이다.
+    // ★ 초는 **표가 정한다**(lib/signed-url-cache.js). 여기서 상수로 적으면 "표가 29분째
+    //   물고 있던 주소"에 30분짜리 캐시를 얹어 만료된 주소를 물리게 된다 — 그러면 영상이
+    //   안 열린다(이 장치의 유일한 위험). 표는 남은 수명에서 여유를 두 겹 빼고 준다.
+    // ★ maxAge 0 = "물고 있지 마라"(각인 없는 옛 문서). no-store 가 아니라 no-cache 인 것은
+    //   이 라우트의 나머지 자리와 같은 말을 쓰기 위해서다 — 어차피 302 에는 검증자가 없어
+    //   브라우저는 매번 다시 묻는다.
+    const { url: signed, maxAge } = await cachedSignedUrl(key, SIGNED_URL_SECONDS, () =>
       store.signedObjectUrl("renders", name, SIGNED_URL_SECONDS, wantsDownload ? { download: name } : {})
-    ).catch(() => null);
+    ).catch(() => ({ url: null, maxAge: 0 }));
     if (signed) {
       return new Response(null, {
         status: 302,
-        headers: { Location: signed, "Cache-Control": "private, no-store" },
+        headers: {
+          Location: signed,
+          // ★ private 이어야 한다 — 서명 주소는 그 자체가 열쇠다. 공유 캐시(CDN·프록시)에
+          //   남으면 로그인을 지나지 않고도 남의 영상에 닿는다.
+          "Cache-Control": maxAge > 0 ? `private, max-age=${maxAge}` : "private, no-cache",
+        },
       });
     }
   }
