@@ -1,3 +1,5 @@
+import { composeRouteKeys } from "./lib/build/compose-routes.mjs";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // ffmpeg-static 은 번들에 넣지 않는다.
@@ -18,10 +20,18 @@ const nextConfig = {
   //
   // ★ 폴더를 통째로 싣는다 — 바이너리 이름이 플랫폼마다 다르다(리눅스 `ffmpeg` ·
   //   윈도 `ffmpeg.exe`). 한 이름만 적으면 배포에서만 빈다.
-  // ★ 키는 **라우트 글롭**이다(Next 문서). 라우트를 하나씩 적지 않고 `/*`(전 라우트)로
-  //   덮는다 — 합성을 부르는 라우트가 여럿이고(render·subtitle·clips…) 새 라우트가 생길
-  //   때 빠뜨리기 때문이다. 네이티브 바이너리를 싣는 문서의 권장 패턴도 이 모양이다
-  //   (`'/*': ['node_modules/sharp/**/*']`).
+  // ★ 키는 **라우트 글롭**이다(Next 문서).
+  //
+  // ★★★ 2026-09-10 — **`/*`(전 라우트)를 걷었다. Function Storage 가 제공량을 넘겼다.**
+  //   옛 주석은 "라우트를 하나씩 적으면 빠뜨린다"는 이유로 `/*` 를 골랐는데, 그 대가가
+  //   드러났다 — 배포 실물에서 **함수 하나가 46.11MB** 였고 `_not-found`(404 화면)까지
+  //   같은 크기였다(출력 197개 × 보관 배포 20개 이상).
+  //   ⚠️ 그렇다고 손으로 목록을 적으면 옛 주석의 걱정이 그대로 현실이 된다 — 새 라우트가
+  //     compose 를 쓰기 시작한 날 아무도 모르게 빠지고, **그 실패는 조용하다**(libass 가
+  //     기본 폰트로 대체해 자막만 두부가 된다).
+  //   → 그래서 **손으로 안 적고 import 그래프에서 계산한다**(lib/build/compose-routes.mjs).
+  //     `lib/compose.js` 에 닿는 진입점만 무거운 것을 진다 — 실측 98개 중 **27개**.
+  //     tests/function-bundle-size.test.js 가 양쪽(덜 실었나·더 실었나)을 잰다.
   // ★ assets/ (자막 폰트)도 같은 이유로 같이 실어야 한다.
   //
   // lib/compose.js 의 fontsDir()이 `path.join(process.cwd(), "assets", …)` 로
@@ -31,7 +41,16 @@ const nextConfig = {
   // libass 는 지정한 폰트가 없으면 조용히 기본 폰트로 대체할 뿐이라, 배포에서 폰트
   // 파일이 빠져도 합성은 "성공"하고 자막 글자만 두부(□□□)나 엉뚱한 글꼴로 나온다.
   outputFileTracingIncludes: {
-    "/*": ["node_modules/ffmpeg-static/**/*", "assets/**/*"],
+    // 아바타 참조는 **104K** 뿐이고 쓰는 문이 40개다(lib/cast.js 의 avatarsDir).
+    // 그 정도면 전역으로 두는 쪽이 싸고, 빠뜨릴 위험도 없앤다.
+    "/*": ["assets/refs/**/*"],
+    // 무거운 둘(ffmpeg 80MB · 자막 폰트 30MB)은 **합성이 도는 문에만**.
+    ...Object.fromEntries(
+      composeRouteKeys().map((route) => [
+        route,
+        ["node_modules/ffmpeg-static/**/*", "assets/subtitle-*"],
+      ])
+    ),
   },
 };
 

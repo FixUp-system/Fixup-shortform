@@ -28,12 +28,15 @@ describe("배포 — ffmpeg 실행 파일이 함수에 실린다", () => {
     expect(config, "ffmpeg-static 을 통째로 안 싣는다").toMatch(/node_modules\/ffmpeg-static/);
   });
 
-  it("합성을 부르는 라우트가 전부 덮인다 — 키가 전 라우트다", () => {
-    // 합성은 /render·/subtitle·/clips 등 여러 라우트가 부른다(lib/compose.js).
-    // 라우트마다 적으면 새 라우트가 생길 때 빠뜨린다.
-    // ★ 키는 **라우트 글롭**이라 `/*` 가 전 라우트를 뜻한다(Next 문서의 네이티브
-    //   바이너리 권장 패턴과 같은 모양). 경로 글롭이 아니므로 `/api/**` 처럼 적으면
-    //   문서가 보증하는 자리에서 벗어난다.
-    expect(config, "전 라우트 키(/*)가 없다").toMatch(/["']\/\*["']\s*:/);
+  it("★★★ 합성을 부르는 문이 **빠짐없이** 덮인다 — 목록을 계산해서 쓴다", () => {
+    // 옛 판은 "키가 전 라우트(/*)다"였다. 그 걱정(라우트마다 적으면 새 라우트를 빠뜨린다)은
+    // 지금도 옳지만, 2026-09-10 에 그 대가가 드러났다 — `/*` 는 **모든 함수**에 110MB 를
+    // 붙였고(배포 실물 함수 하나 46.11MB · 404 화면까지) Function Storage 가 제공량을 넘겼다.
+    // 답은 "손으로 적는다"가 아니라 **import 그래프에서 계산한다**이다
+    // (lib/build/compose-routes.mjs — `lib/compose.js` 에 닿는 진입점만 무거운 것을 진다).
+    expect(config, "목록을 계산하지 않는다 — 손으로 적으면 새 라우트에서 빠진다")
+      .toMatch(/composeRouteKeys\(\)/);
+    const heavy = config.slice(config.indexOf("composeRouteKeys()"));
+    expect(heavy, "계산된 문에 ffmpeg 를 안 붙인다").toMatch(/node_modules\/ffmpeg-static/);
   });
 });

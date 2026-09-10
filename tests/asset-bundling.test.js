@@ -15,11 +15,20 @@ const config = readFileSync("next.config.mjs", "utf8");
 describe("배포 — assets(자막 폰트)가 함수에 실린다", () => {
   it("★ outputFileTracingIncludes 에 assets/ 가 들어 있다 — 없으면 자막이 조용히 두부가 된다", () => {
     expect(config, "outputFileTracingIncludes 가 없다").toMatch(/outputFileTracingIncludes/);
-    expect(config, "assets/ 를 안 싣는다").toMatch(/["']assets\/\*\*\/\*["']/);
+    // ★★ 2026-09-10 — `assets/**/*`(30MB 전부, 전 라우트) 에서 **자막 폰트만, 합성이
+    //   도는 문에만** 으로 좁혔다. Function Storage 가 제공량을 넘겨서다(함수 하나 46.11MB).
+    //   폰트 파일은 `assets/subtitle-*.ttf|otf` 다(lib/subtitle-langs.js 의 subtitleFontFor).
+    expect(config, "자막 폰트를 안 싣는다 — 자막이 조용히 두부가 된다")
+      .toMatch(/["']assets\/subtitle-\*["']/);
   });
 
-  it("합성을 부르는 라우트가 전부 덮인다 — 키가 전 라우트다", () => {
-    // ffmpeg-bundling.test.js 와 같은 이유: 라우트마다 적으면 새 라우트가 생길 때 빠뜨린다.
-    expect(config, "전 라우트 키(/*)가 없다").toMatch(/["']\/\*["']\s*:/);
+  it("★★★ 폰트가 **합성이 도는 문에** 붙는다 — 손으로 적은 목록이 아니다", () => {
+    // 옛 판은 "키가 전 라우트(/*)다"를 못 박았다. 그 이유(새 라우트를 빠뜨린다)는 지금도
+    // 옳지만, 답이 바뀌었다 — 이제 **import 그래프에서 계산**한다(lib/build/compose-routes.mjs).
+    // 손으로 적지 않으므로 빠뜨릴 수 없고, 전 라우트에 싣지도 않는다.
+    // ★ 계산 자체가 옳은지는 tests/function-bundle-size.test.js 가 잰다(비었나·필수가 빠졌나).
+    expect(config, "목록을 계산하지 않는다").toMatch(/composeRouteKeys\(\)/);
+    const heavy = config.slice(config.indexOf("composeRouteKeys()"));
+    expect(heavy, "계산된 문에 폰트를 안 붙인다").toMatch(/assets\/subtitle-\*/);
   });
 });
