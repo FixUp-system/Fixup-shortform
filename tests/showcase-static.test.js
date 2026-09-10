@@ -70,8 +70,15 @@ describe("정적 표지 — 화면이 무엇을 무는가", () => {
   it("★★★ 벽이 서버에서 그려진다 — 클라이언트 부품이 아니다", () => {
     // 클라이언트면 JS 가 붙기 전까지 벽이 비어 있다. 손님이 처음 보는 화면이라
     // **첫 그림(HTML)** 에 이미 들어 있어야 한다.
-    expect(made, '"use client" 가 남아 있다 — 벽이 hydration 을 기다린다').not.toMatch(/["']use client["']/);
-    expect(made, "리액트 상태를 쓴다 = 클라이언트다").not.toMatch(/useState|useEffect/);
+    // ★★ 2026-09-10 — **주석을 걷고 잰다.** 안 걷으면 "왜 클라이언트가 아닌가"를 설명한
+    //   주석이 그 지시어를 인용하기만 해도 빨간불이 난다(그날 실제로 그랬다). 판이 지켜야
+    //   하는 것은 **코드**이지 설명이 아니다.
+    const code = made
+      .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, "")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "");
+    expect(code, '"use client" 가 남아 있다 — 벽이 hydration 을 기다린다').not.toMatch(/["']use client["']/);
+    expect(code, "리액트 상태를 쓴다 = 클라이언트다").not.toMatch(/useState|useEffect/);
   });
 
   it("★★ 굽힌 목록에서 그린다", () => {

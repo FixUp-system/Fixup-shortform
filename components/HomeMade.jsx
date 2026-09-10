@@ -11,8 +11,9 @@
 //
 // ★★ 그리고 **죽은 칸이 원리적으로 없다.** 굽는 스크립트가 실제로 200 으로 받아지는 것만
 //   남긴다(scripts/showcase-refresh.mjs). 그래서 onError 도 lost Set 도 필요 없어졌다.
-//   ⚠️ 2026-09-10 실측: 후보 22편 중 **살아 있는 것은 다섯**뿐이다(09-07 파일 미이관).
-//     벽이 얇아 보이는 것은 화면 탓이 아니라 **되찾을 파일이 아직 안 왔기 때문**이다.
+//   ⚠️ 2026-09-10 **저녁 정정**: 표지를 올린 사진뿐 아니라 **영상 첫 장면**에서도 뽑게
+//     고쳐 다섯 → **열여섯 장**이 됐다(사진 7 + 영상 9). 그래도 천장은 낮다 — 우리 저장소
+//     영상 41편 중 37편이 옛 Supabase 에 갇혀 404 다. 더 채우려면 그 프로젝트를 되살려야 한다.
 //
 // ★★ 여기서 영상 태그를 쓰지 마라. 2026-09-07 에 이 서비스가 죽었다 — 목록이 그 태그를
 //   물어서 **화면을 여는 것만으로** 전송량 할당량이 탔고 로그인까지 함께 죽었다.
@@ -51,13 +52,13 @@ export default function HomeMade({ nav = null }) {
           />
         )}
         {nav}
-        {COVER && (
-          <Link href={`/archive/${COVER.id}`} className="stage-cover-play" aria-label="최근 만든 영상 보기">
-            <span className="stage-bigplay" aria-hidden="true">
-              <svg width="20" height="24" viewBox="0 0 20 24" fill="currentColor"><path d="M0 0l20 12L0 24z" /></svg>
-            </span>
-          </Link>
-        )}
+        {/* ★★ 2026-09-10 — 덮개의 **재생 링크를 걷었다**(사장님 지시: "히어로 페이지에 있는
+            영상을 클릭해도 영상 제작 페이지로 넘어가는데 그냥 아무 동작 없는 걸로").
+            그전에는 덮개 전체(inset:0)가 그 편의 상세로 가는 링크였다 — 첫 화면을 보려고
+            누른 손님이 엉뚱한 데로 갔다.
+            ★ 재생 표시도 함께 걷는다. 아무 일도 안 하는 재생 버튼은 없는 것보다 나쁘다 —
+              누를 수 있다고 약속해 놓고 안 지키는 셈이다.
+            ★ 영상을 보러 가는 길은 아래 벽과 [더 보러가기]가 그대로 맡는다. */}
         {/* ★★ 아래에 더 있다고 말하는 표시(2026-09-10). 히어로가 화면을 꽉 채우면서
             영상 벽이 통째로 화면 밖으로 밀렸다 — 이것이 없으면 손님은 첫 화면이 전부인
             줄 알고 나간다. 벽이 없으면 그릴 이유도 없으므로 장수를 보고 그린다. */}
@@ -107,6 +108,15 @@ export default function HomeMade({ nav = null }) {
               </svg>
             </Link>
           </div>
+          {/* ★★ 맨 위로 (2026-09-10 사장님 지시). **자바스크립트를 안 쓴다** — 이 화면은
+              서버가 통째로 그려 내려주는 자리라(첫 방문 7.5초 → 1.6초), 스크롤을 감지하려고
+              "use client" 를 들이면 그 최적화가 깨진다. 자리는 CSS 의 sticky 가 잡는다:
+              벽 안에서만 떠 있어 히어로에서는 안 보인다(app/globals.css 의 .stage-top). */}
+          <a href="#top" className="stage-top" aria-label="맨 위로">
+            <svg width="16" height="10" viewBox="0 0 16 10" fill="none" aria-hidden="true">
+              <path d="M1 9l7-7 7 7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </a>
         </div>
       )}
     </>

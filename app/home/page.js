@@ -47,16 +47,6 @@ import { USER_HEADER } from "../../lib/auth/headers.js";
 import HomeMade from "../../components/HomeMade.jsx";
 import UserMenu from "../../components/UserMenu.jsx";
 
-// 만드는 법은 **세 걸음**이다. 셋이 하나의 흐름으로 읽혀야 한다(2026-09-09 사장님 지적):
-// 준비한다 → 보고 고친다 → 고친 그대로 나온다.
-// ★ 셋째 줄이 둘째를 받는다 — "고친 그대로"가 이 제품의 뼈대다(컷을 이어붙이면 원고와
-//   글자 그대로 같다는 보장). 시스템 쪽 말("확정합니다")이 아니라 사장님이 하는 일로 쓴다.
-const STEPS = [
-  { n: "01", name: "소재", sub: "글과 사진을 준비합니다" },
-  { n: "02", name: "시나리오", sub: "보고 고칠 수 있습니다" },
-  { n: "03", name: "영상 생성", sub: "고친 그대로 만들어집니다" },
-];
-
 export default async function HomePage() {
   const signedIn = Boolean((await headers()).get(USER_HEADER));
 
@@ -78,22 +68,18 @@ export default async function HomePage() {
 
   // ★ 뿌리 클래스는 `home` 이다 — 액센트 면제(showcase)가 그 뿌리에 묶여 있고
   //   (tests/design-system.test.js), 그 클래스를 다는 화면은 이 파일 하나여야 한다.
+  // ★ `id="top"` 은 벽의 [맨 위로] 버튼이 가리키는 자리다(HomeMade 의 stage-top).
+  // ⚠️ 이 설명을 `return (` **안에** JSX 주석으로 넣지 마라 — 루트가 둘이 되어 문법이
+  //    깨진다. 그런데 이 저장소의 화면 판은 소스 문자열만 훑어서 **전부 초록인 채 앱만
+  //    안 뜬다**(2026-09-10 에 이 파일과 Sidebar.jsx 에서 두 번 밟았다).
   return (
-    <section className="home">
+    <section className="home" id="top">
       <HomeMade nav={nav} />
 
-      {/* ★ 눈썹("이렇게 만듭니다")은 **걷었다**(2026-09-10 사장님 지시). 아래 세 걸음이
-          01·02·03 으로 이미 "순서"라고 말한다 — 그 위에 이름표를 또 달 이유가 없다.
-          ★ 세 걸음 자체는 남긴다. 지운 것은 **이름표**이지 내용이 아니다. */}
-      <div className="stage-steps">
-        {STEPS.map((s) => (
-          <div key={s.n} className="stage-step">
-            <span className="stage-n">{s.n}</span>
-            <h3>{s.name}</h3>
-            <p>{s.sub}</p>
-          </div>
-        ))}
-      </div>
+      {/* ★★ 2026-09-10 — 만드는 법 **세 걸음(소재·시나리오·영상 생성)을 지웠다**(사장님 지시).
+          같은 날 눈썹("이렇게 만듭니다")을 걷은 것과 같은 방향이다 — 랜딩에서 글을 덜어내고
+          결과물이 혼자 말하게 둔다. 위 벽이 이미 "무엇을 만드는 곳인가"를 보여 준다.
+          ★ 되살릴 일이 생기면 문구는 git 이력에 있다(이 커밋 직전). */}
     </section>
   );
 }
