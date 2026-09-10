@@ -2664,9 +2664,42 @@ h1.login-head { margin-inline: auto; }
      자리라 어떤 비율이 와도 잘라 맞춰야 한다. */
 .home .stage-cover {
   position: relative;
-  height: clamp(420px, 76vh, 880px);
+  /* ★★★ 2026-09-10 — 첫 화면을 **꽉 채운다**(사장님 지시). 그전에는
+     `clamp(420px, 76vh, 880px)` 라 큰 모니터에서 880px 에 멈춰 위아래가 남았다.
+     ★ `vh` 를 먼저 적고 `dvh` 로 덮는다 — 모바일의 `100vh` 는 **주소창이 접힌** 높이라
+       주소창이 보이는 동안 히어로가 화면보다 커져 아래가 잘린다. `dvh` 는 지금 보이는
+       높이를 따른다. `dvh` 를 모르는 옛 브라우저는 앞 줄(`vh`)에 머문다. */
+  height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   background: var(--stage-panel);
+}
+
+/* ★★ 아래에 **더 있다**고 말하는 표시.
+   히어로가 화면을 꽉 채우면서 영상 벽이 통째로 화면 밖으로 밀렸다 — 이 표시가 없으면
+   손님은 첫 화면이 전부인 줄 알고 나간다. 사장님 요구 둘("꽉 채워라"·"만든 영상을
+   확인할 수 있게")이 서로 당기는 자리라, 그 둘을 잇는 것이 이 한 조각이다.
+   ★ 사진 위에 서므로 **벌을 안 탄다**(--on-media · --stage-glass — 껍데기 버튼과 같은 결).
+   ★ z-index 2 — 덮개 전체를 덮는 재생 링크(z-index 1) 위에 서야 눌린다. */
+.home .stage-down {
+  position: absolute; left: 50%; bottom: 24px; z-index: 2;
+  display: grid; place-items: center;
+  width: 40px; height: 40px; border-radius: 50%;
+  color: var(--on-media); text-decoration: none;
+  background: rgba(0, 0, 0, .42);
+  box-shadow: inset 0 0 0 1px var(--stage-glass);
+  animation: stage-down-hint 2.4s ease-in-out infinite;
+}
+.home .stage-down:hover { background: rgba(0, 0, 0, .58); }
+/* ★ 이 저장소는 스스로 도는 움직임을 아껴 쓴다. 여기 하나를 두는 이유는 그것이
+   "아래에 더 있다"를 말하는 **유일한 장치**라서다 — 대신 끄는 길을 연다(아래 media). */
+@keyframes stage-down-hint {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50%      { transform: translateX(-50%) translateY(5px); }
+}
+.home .stage-down { transform: translateX(-50%); }
+@media (prefers-reduced-motion: reduce) {
+  .home .stage-down { animation: none; }
 }
 /* ★ 그림을 눌러 깐다. 껍데기 글자가 흰색이라 밝은 사진 위에서 읽히려면 판이 낮아야
    하는데, 흐림띠(그라디언트)도 불투명 띠도 이 저장소·이 디자인에서는 못 쓴다.

@@ -14,9 +14,12 @@
 //
 // ★ 이 스크립트는 **읽기만 한다** — 프로덕션 공개 목록을 받아 파일로 떨어뜨릴 뿐,
 //   아무것도 고치지 않는다. 돈도 안 든다.
-import { mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { spawn } from "node:child_process";
 import sharp from "sharp";
+import ffmpegPath from "ffmpeg-static";
 
 const BASE = process.argv[2] || "https://fixup-shortform-service.vercel.app";
 const WANT = Number(process.argv[3]) || 12;
@@ -29,25 +32,82 @@ if (!res.ok) {
   process.exit(1);
 }
 const all = (await res.json()).projects || [];
-const cands = all.filter((p) => p.video_url && p.image_url && p.image_url.startsWith("/api/uploads/"));
+// ★★★ 2026-09-10 — 후보를 **영상이 있는 편 전부**로 넓혔다. 그전에는 올린 사진이
+//   우리 저장소에 있는 편만 봤는데(`image_url.startsWith("/api/uploads/")`), 그 사진
+//   대부분이 09-07 에 못 옮긴 옛 Supabase 에 있어 죽어 있다 — 그래서 벽이 **다섯 칸**이었다.
+//   전수 실측: 우리 저장소 영상 41편 중 **37편이 404**. 반면 fal 주소 영상은 살아 있다.
+const cands = all.filter((p) => p.video_url);
 console.log(`후보 ${cands.length}편 (전체 ${all.length})`);
+
+// 영상 앞부분만 받아 **첫 장면**을 뽑는다.
+//
+// ★★★ 전송량이 이 함수의 존재 이유다. 09-07 에 Supabase 무료 5GB 를 넘겨 서비스가 죽었다.
+//   영상을 통째로 받으면 41편에 155MB 인데, mp4 색인(moov)이 맨 앞이라(실측: 오프셋 36)
+//   **앞 64KB** 만 받아도 프레임이 나온다 — 전체의 1.6% 다.
+// ★ 그래도 안 나오는 편이 있을 수 있어 조금씩 넓혀 본다. 넓혀도 1MB 를 안 넘긴다.
+const HEADS_KB = [64, 256, 1024];
+
+function runFfmpeg(args) {
+  return new Promise((done) => {
+    const ps = spawn(ffmpegPath, args, { stdio: "ignore" });
+    ps.on("close", (code) => done(code === 0));
+    ps.on("error", () => done(false));
+  });
+}
+
+async function frameFromVideo(url) {
+  for (const kb of HEADS_KB) {
+    const res = await fetch(url, { headers: { Range: `bytes=0-${kb * 1024 - 1}` } }).catch(() => null);
+    if (!res || !(res.ok || res.status === 206)) continue;
+    const part = join(tmpdir(), `showcase-${Date.now()}-${kb}.mp4`);
+    const out = `${part}.jpg`;
+    try {
+      writeFileSync(part, Buffer.from(await res.arrayBuffer()));
+      // ★ `-ss` 를 안 준다 — 앞부분만 들고 있으므로 **첫 프레임**이 유일하게 확실한 자리다.
+      if (await runFfmpeg(["-v", "error", "-i", part, "-frames:v", "1", "-y", out])) {
+        const buf = readFileSync(out);
+        if (buf.length > 1000) return { buf, kb };
+      }
+    } catch {} finally {
+      for (const f of [part, out]) { try { unlinkSync(f); } catch {} }
+    }
+  }
+  return null;
+}
 
 if (existsSync(OUT_DIR)) rmSync(OUT_DIR, { recursive: true });
 mkdirSync(OUT_DIR, { recursive: true });
 
 const kept = [];
 let dead = 0;
+const abs = (u) => (u.startsWith("http") ? u : `${BASE}${u}`);
+
 for (const p of cands) {
   if (kept.length >= WANT) break;
-  const r = await fetch(`${BASE}${p.image_url}?t=1`);
-  if (!r.ok) { dead += 1; continue; }              // ★ 죽은 표지는 여기서 걸러진다
-  const buf = Buffer.from(await r.arrayBuffer());
-  const meta = await sharp(buf).metadata().catch(() => null);
+  let raw = null;
+  let from = "";
+
+  // ① 올린 사진이 **살아 있으면** 그것을 쓴다 — 가장 싸다(영상을 아예 안 건드린다).
+  if (p.image_url) {
+    const r = await fetch(`${abs(p.image_url)}${p.image_url.startsWith("http") ? "" : "?t=1"}`).catch(() => null);
+    if (r?.ok) { raw = Buffer.from(await r.arrayBuffer()); from = "사진"; }
+  }
+  // ② 죽었으면 **영상 첫 장면**에서 뽑는다(앞부분만 받는다 — frameFromVideo 주석 참고).
+  if (!raw) {
+    const got = await frameFromVideo(abs(p.video_url));
+    if (got) { raw = got.buf; from = `영상 ${got.kb}KB`; }
+  }
+  if (!raw) { dead += 1; continue; }               // ★ 둘 다 죽었으면 여기서 걸러진다
+
+  // ★ **webp 로 굽는다.** 그전에는 받은 바이트를 그대로 `.webp` 이름으로 썼다(사진이
+  //   jpg 여도). 영상에서 뽑은 것은 jpg 라 더 그렇다 — 이름과 내용을 맞춘다.
+  const buf = await sharp(raw).webp({ quality: 82 }).toBuffer().catch(() => null);
+  const meta = buf ? await sharp(buf).metadata().catch(() => null) : null;
   if (!meta?.width || !meta?.height) { dead += 1; continue; }
   const file = `${String(kept.length + 1).padStart(2, "0")}.webp`;
   writeFileSync(join(OUT_DIR, file), buf);
   kept.push({ file, w: meta.width, h: meta.height, id: p.id, kb: Math.round(buf.length / 1024) });
-  console.log(`  ✓ ${file}  ${meta.width}x${meta.height}  ${Math.round(buf.length / 1024)}KB`);
+  console.log(`  ✓ ${file}  ${meta.width}x${meta.height}  ${Math.round(buf.length / 1024)}KB  (${from})`);
 }
 console.log(`남긴 것 ${kept.length}장 · 죽어서 버린 것 ${dead}장 · 합계 ${kept.reduce((s, k) => s + k.kb, 0)}KB`);
 

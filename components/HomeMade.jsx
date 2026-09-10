@@ -58,10 +58,23 @@ export default function HomeMade({ nav = null }) {
             </span>
           </Link>
         )}
+        {/* ★★ 아래에 더 있다고 말하는 표시(2026-09-10). 히어로가 화면을 꽉 채우면서
+            영상 벽이 통째로 화면 밖으로 밀렸다 — 이것이 없으면 손님은 첫 화면이 전부인
+            줄 알고 나간다. 벽이 없으면 그릴 이유도 없으므로 장수를 보고 그린다. */}
+        {WALL.length > 0 && (
+          <a href="#made" className="stage-down" aria-label="만든 영상 보러 내려가기">
+            <svg width="16" height="10" viewBox="0 0 16 10" fill="none" aria-hidden="true">
+              <path d="M1 1l7 7 7-7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </a>
+        )}
       </div>
 
+      {/* ★ 아래 `id="made"` 는 히어로의 내려가는 표시가 가리키는 자리다(`href="#made"`).
+          ⚠️ 이 주석을 `WALL.length > 0 && (` **안으로** 넣지 마라 — 조건과 여는 태그가
+             붙어 있는지를 재는 판이 있다(tests/home-sections-ui.test.js). */}
       {WALL.length > 0 && (
-        <div className="stage-band">
+        <div className="stage-band" id="made">
           {/* ★ 절 이름 줄("만든 것 · N 편")은 **걷었다**(2026-09-10 사장님 지시).
               그림이 이미 "만든 것"이라고 말한다 — 그 위에 글자를 얹으면 설명이 결과보다
               앞선다. 랜딩에서 글을 덜어내는 이 회차의 방향과 같다(머리글도 같은 이유로 뺐다). */}
