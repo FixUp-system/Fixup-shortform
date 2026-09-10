@@ -175,16 +175,20 @@ describe("수거 — 실제 동작", () => {
     const p = await bothRendering();
     const out = await runWithActor(U, () =>
       collectFilmRender(p.id, U, "order", {
-        collectAdVideo: async () => { throw new Error("영상 생성 실패 (500)"); },
+        // ★★ 2026-09-10 — 표본을 **(500) → (422)** 로 바꿨다. 이제 제공자 5xx 는
+        //   **일시 오류**라 접수증을 지키고 아무것도 안 적는다(tests/film-collect-recovery).
+        //   이 판이 재려는 것은 "확정 실패가 그 방식의 회차만 되돌리는가"이므로
+        //   확정 표본으로 바꾼다 — reel 이 09-02 에 같은 자리에서 한 것과 같다.
+        collectAdVideo: async () => { throw new Error("영상 생성 실패 (422) content_policy_violation"); },
       })
     );
     // 던지지 않는다 — 상태 조회가 부르는 자리다
     expect(out.changed).toBe(true);
-    expect(out.error).toMatch(/500/);
+    expect(out.error).toMatch(/422/);
 
     const back = await runWithActor(U, () => getProject(p.id, U));
     expect(back.films.order.status).toBe("error");
-    expect(back.films.order.error).toMatch(/500/);
+    expect(back.films.order.error).toMatch(/422/);
     expect(back.films.order.job).toBeNull();
     // 옆 방식은 그대로 굽는 중이다
     expect(back.films.refs.status).toBe("rendering");
@@ -389,7 +393,12 @@ describe("상태 라우트", () => {
   it("★ 굽는 중이면 수거를 시도한다 — 아무도 안 두드리면 수거도 안 된다", async () => {
     const p = await bothRendering();
     // fal 로 진짜 나가지 않는다 — 상태 조회를 막는다(수거는 실패하고 문서에 남는다)
-    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 500, text: async () => "" })));
+    // ★★ 2026-09-10 — **500 → 422.** 5xx 는 이제 일시 오류라 접수증을 지키고 아무것도
+    //   안 적는다. 이 판이 재는 것은 "상태 조회가 수거를 **시도하는가**"이므로, 문서에
+    //   흔적이 남는 확정 표본을 쓴다.
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: false, status: 422, text: async () => "content_policy_violation",
+    })));
     const data = await (await statusGET(req(), ctx(p.id))).json();
     expect(data.films.order.status).toBe("error");
     expect(data.films.order.error).toBeTruthy();
