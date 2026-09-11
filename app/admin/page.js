@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 // 기본값은 가격표에서 온다 — 운영자가 매번 고르는 값이라도 출처는 한 곳이다.
 import { DEFAULT_GRANT } from "../../lib/pricing";
+// ★ 2026-09-11 — 안내 문구의 "N자 이상"을 손으로 적지 않는다. 라우트가 막는 값과 같아야 한다.
+import { PASSWORD_MIN } from "../../lib/password";
 // 등급 표와 판정은 lib/tiers.js 한 벌이다 — 화면이 등급 이름을 복사하면 서버와 갈린다.
 import { TIERS, tierOf } from "../../lib/tiers";
 // 표시명 규칙 한 벌 — /me·원장과 같은 값을 써야 한다(이름이 없으면 이메일 앞부분).
@@ -227,7 +229,7 @@ export default function AdminPage() {
   async function resetPassword(id) {
     const pw = await prompt({
       title: "비밀번호 재설정",
-      body: "새 비밀번호를 정해 주세요 (6자 이상). 상대에게는 따로 알려 주셔야 합니다.",
+      body: `새 비밀번호를 정해 주세요 (${PASSWORD_MIN}자 이상). 상대에게는 따로 알려 주셔야 합니다.`,
       password: true,
       confirmLabel: "재설정",
     });

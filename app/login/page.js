@@ -9,6 +9,9 @@ import Link from "next/link";
 import { useState } from "react";
 // 길이 상한은 마이페이지와 **같은 자리**에서 온다 — 손으로 적으면 한쪽만 낡는다.
 import { NAME_MAX } from "../../lib/display-name.js";
+// ★ 비밀번호 규칙도 **라우트와 같은 자리**에서 온다(lib/password.js). 화면이 먼저 막고
+//   라우트가 다시 막는다 — 둘이 다른 수를 보면 "화면은 통과인데 서버가 거절"이 난다.
+import { passwordProblem } from "../../lib/password.js";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
@@ -18,6 +21,10 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   // 가입에서만 쓴다 — 로그인 탭에서는 칸도 안 뜨고 몸통에도 안 실린다.
   const [name, setName] = useState("");
+  // ★★ 2026-09-11 — 비밀번호 확인 칸(형제 제품 MCS 의 가입 폼에서 가져왔다).
+  //   **가입 화면에만 있는 값**이라 라우트로 보내지 않는다 — 서버가 안 읽는 값을 몸통에
+  //   실으면 다음 사람이 "서버도 확인 칸을 보나" 하고 헷갈린다(이름 칸과 같은 판단).
+  const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -25,6 +32,13 @@ export default function LoginPage() {
 
   async function submit(e) {
     e.preventDefault();
+    // ★★ 화면에서 **먼저** 막는다 — 눌러 보고 서버 왕복을 기다린 뒤에야 "짧아요"를 듣는
+    //   것보다 낫다. 다만 이것은 예의이고 **문지기는 라우트**다(같은 함수를 본다).
+    //   ★ 확인 칸은 가입일 때만 잰다 — 로그인 탭에는 그 칸이 없다.
+    if (isSignup) {
+      const problem = passwordProblem(password, confirm);
+      if (problem) { setError(problem); return; }
+    }
     setBusy(true);
     setError("");
     try {
@@ -83,23 +97,26 @@ export default function LoginPage() {
           것이다. 가운데 칸을 그대로 쓰면 거짓말이 된다 — 우리는 이메일 인증을 안 쓰고
           (매직링크를 2026-08-06 에 걷어냈다), 가입 라우트는 그 설정이 켜져 있으면
           **설정 오류로 보고 500 을 낸다**. 우리의 가운데 칸은 **운영자 승인**이다.
-          ★ 강조는 **지금 탭이 선 걸음 하나**뿐이다. 지난 걸음에 완료 표시를 달지 않는다 —
-            로그인 탭에 선 사람이 승인을 받았는지 이 화면은 모른다(승인 대기자도 로그인한다).
+          ★★ **가입 탭에만 뜬다**(2026-09-11 사장님 지시: "로그인 부분에서는 없어도 될 것
+            같아"). 이미 가입한 사람에게 절차는 정보가 아니다 — 로그인하러 온 사람에게
+            "다음에 승인이 남았다"를 보여 줄 이유가 없고, 그 사람은 이미 승인을 받았거나
+            /pending 으로 간다.
+          ★ 그래서 강조는 늘 **첫 걸음**이다(탭이 하나뿐이므로 자리를 계산할 것이 없다).
+            지난 걸음에 완료 표시를 달지 않는다 — 여기는 아직 아무것도 안 끝난 자리다.
           ★ 번호는 **숫자 글리프**다. 원문자는 판이 막는다(design-system 의 글리프 판).
           ★ 색은 액센트가 아니라 먹색이다 — 이 저장소는 액센트를 **사이드바 스테퍼 하나**에만
             허락한다("앱에서 가장 강한 색은 지금 몇 단계인가를 가리킨다"). 로그인 화면이
             그것을 빌려 쓰면 그 규칙이 흐려진다. */}
-      <ol className="login-steps login-head">
-        {["가입 신청", "운영자 승인", "이용 시작"].map((label, i) => {
-          const here = (isSignup ? 0 : 2) === i;
-          return (
-            <li key={label} className={`login-step${here ? " on" : ""}`} aria-current={here ? "step" : undefined}>
+      {isSignup && (
+        <ol className="login-steps login-head">
+          {["가입 신청", "운영자 승인", "이용 시작"].map((label, i) => (
+            <li key={label} className={`login-step${i === 0 ? " on" : ""}`} aria-current={i === 0 ? "step" : undefined}>
               <span className="login-step-no">{i + 1}</span>
               {label}
             </li>
-          );
-        })}
-      </ol>
+          ))}
+        </ol>
+      )}
 
       <section className="panel login-card">
         <div className="login-tabs">
@@ -142,6 +159,20 @@ export default function LoginPage() {
             placeholder="비밀번호"
             aria-label="비밀번호"
           />
+          {/* ★ 비밀번호 확인 — 가입일 때만. 자리는 비밀번호 **바로 아래**다(두 칸이 붙어
+              있어야 "같은 것을 두 번 적는다"로 읽힌다). */}
+          {isSignup && (
+            <input
+              type="password"
+              required
+              autoComplete="new-password"
+              className="sent-input sent-input--lg"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              placeholder="비밀번호 확인"
+              aria-label="비밀번호 확인"
+            />
+          )}
           {/* ★★ 2026-09-10 저녁 — 이름은 **필수**다(사장님 지시: "이름 선택으로 두지 말고
               그냥 필수값으로 적용해줘"). 같은 날 오전에 넣을 때는 선택이었다 — "가입 문턱을
               올리지 않는다"는 판단이었는데 사장님이 뒤집었다. 그 옛 판단을 근거로 다시
@@ -168,30 +199,28 @@ export default function LoginPage() {
             {busy ? "확인 중…" : isSignup ? "가입하기" : "로그인"}
           </button>
         </form>
-        {error && <p className="pgsub warn">{error}</p>}
+        {/* ★ 2026-09-11 — `role="alert"` 을 단다. 화면을 읽어 주는 도구가 이 줄이 새로
+            생긴 것을 그 자리에서 알린다(MCS 의 오류 줄과 같은 계약). */}
+        {error && <p className="pgsub warn" role="alert">{error}</p>}
       </section>
 
       {/* 두 사이트 다 이 자리에 "비밀번호 찾기"를 둔다. 우리는 자가 재설정이 없어
           운영자에게 보낸다 — 없는 화면으로 보내지 않는 것이 요점이다. */}
       <p className="login-help">비밀번호를 잊으셨다면 운영자에게 문의해 주세요.</p>
 
-      {/* ★★ 2026-08-27 — **보관함으로 가는 문**(사장님 지적: "보관함을 확인할 수 있어야
-          해"). 첫 화면은 이미 보관함으로 가지만, 이 화면에 닿는 길이 여럿이다 —
-          로그아웃 직후 · 주소창 자동완성 · 만들기 화면에서 튕겨 온 경우.
-          그때 여기서 나갈 길이 없으면 로그인이 **유일한 문**처럼 보인다.
-          ★ 로그인은 그대로 위에 있다 — 이건 보는 길일 뿐 문을 대신하지 않는다. */}
-      {/* ★★ 2026-09-10 저녁 — 문이 둘이 됐다. 위 로고가 이미 메인으로 가지만 그것은
-          관례라 아는 사람만 안다 — 사장님이 "이동할 방법이 없다"고 한 것이 그 증거다.
-          ⚠️ 두 문이 **한 줄에 붙어** 버리는 자리다: `.mini` 는 inline-flex 이고, 줄바꿈만
-            둔 JSX 공백은 사라진다(이 저장소가 2026-09-01 에 "🗑정리" 로 겪었다).
-            그래서 `.login-help--doors` 가 flex 로 사이를 벌린다. */}
-      <p className="login-help login-help--doors">
+      {/* ★★ **나가는 문**. 이 화면에 닿는 길이 여럿이라(로그아웃 직후 · 주소창 자동완성 ·
+          만들기 화면에서 튕겨 옴) 나갈 길이 없으면 로그인이 **유일한 문**처럼 보인다.
+          ★★★ 2026-09-11 — 문이 **하나**가 됐다(사장님 지시). 그전에는 둘이었고, 걷어낸 쪽은
+            보관함 지름길이다. 그것은 2026-08-27 지시로 생긴 자리였는데 같은 분이 뒤집었으니
+            **옛 지시를 근거로 되살리지 마라.**
+          ★ 손님에게 보관함이 닫힌 것이 아니다 — 그 화면은 그대로 열려 있고(lib/auth/guest.js)
+            메인을 거쳐 간다. 즉 길이 사라진 것이 아니라 **한 번 더 거치는 길**이 됐다. */}
+      <p className="login-help">
         {/* ★★ 2026-09-01 사장님 지적 — 맨 <Link> 라 브라우저 기본 밑줄이 그어져
             "링크"로 보였다. 이 저장소가 2026-08-25 에 같은 지적을 받고 `.mini` 에
             밑줄 해제를 넣어 두었다(app/globals.css) — 새 스타일을 만들지 않고
             그것을 쓴다. 테두리·높이까지 옆 화면들과 같은 모양이 된다. */}
         <Link className="mini" href="/home">메인 화면 보기 →</Link>
-        <Link className="mini" href="/archive">로그인 없이 보관함 보기 →</Link>
       </p>
     </>
   );

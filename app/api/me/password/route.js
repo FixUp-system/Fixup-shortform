@@ -21,7 +21,9 @@ import { getStore } from "../../../../lib/store/index.js";
 // ★ 이 라우트는 재검증마다 **진짜 로그인 시도**를 쏘므로 429 에 가장 쉽게 닿는 자리다.
 import { isInfra, infraResponse } from "../../../../lib/auth/infra-error.js";
 
-const MIN_LENGTH = 6;   // 운영자 재설정 라우트와 같은 값
+// ★ 2026-09-11 — 길이는 lib/password.js 하나가 쥔다(옛 주석: "운영자 재설정 라우트와
+//   같은 값" — 주석이 같은 값이라고 말하고 있었다는 것이 두 벌이라는 증거였다).
+import { passwordProblem } from "../../../../lib/password.js";
 
 export const POST = withUser(async (req, _ctx, user) => {
   const body = await req.json().catch(() => ({}));
@@ -31,8 +33,9 @@ export const POST = withUser(async (req, _ctx, user) => {
   if (!current) {
     return Response.json({ error: "현재 비밀번호를 넣어 주세요" }, { status: 400 });
   }
-  if (next.length < MIN_LENGTH) {
-    return Response.json({ error: `새 비밀번호는 ${MIN_LENGTH}자 이상이어야 해요` }, { status: 400 });
+  const weak = passwordProblem(next);
+  if (weak) {
+    return Response.json({ error: `새 ${weak}` }, { status: 400 });
   }
 
   const profile = (await getStore().findProfiles([user.id])).get(user.id);

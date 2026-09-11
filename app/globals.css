@@ -2272,16 +2272,10 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
   font-size: 14px;
   text-align: center;
 }
-/* 문이 둘인 줄 — 메인·보관함 (2026-09-10 저녁).
-   ⚠️ `text-align: center` 만으로는 둘이 **붙는다**: `.mini` 는 inline-flex 이고 JSX 에서
-     줄바꿈만 둔 공백은 사라진다(이 저장소가 2026-09-01 에 "🗑정리" 로 겪은 그 자리).
-     그래서 사이를 gap 으로 벌린다. 좁은 화면에서는 접힌다. */
-.login-help--doors {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  flex-wrap: wrap;
-}
+/* ⚠️ 2026-09-11 — 여기 있던 `.login-help--doors`(문 둘을 flex 로 벌리던 수식자)를 **지웠다.**
+   사장님이 보관함 문을 걷어 문이 하나가 됐고(app/login/page.js), 남은 하나는 `.login-help`
+   의 `text-align: center` 로 그냥 가운데 선다 — inline-flex 도 그 정렬을 따른다.
+   ★ 쓰는 데가 없어진 규칙은 남기지 않는다. 남기면 다음 사람이 "문이 둘이었나" 하고 찾는다. */
 
 /* ── 마이페이지 */
 .me-panel { margin-bottom: 16px; }

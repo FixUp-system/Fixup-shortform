@@ -64,10 +64,11 @@ describe("로그인 브랜드 — 화면에 고정되고, 메인으로 가는 �
     expect(line, "버튼 모양(.mini)이 아니다").toMatch(/className="[^"]*\bmini\b/);
   });
 
-  it("★★ 두 문이 붙지 않는다 — flex 안에서 JSX 공백은 사라진다", () => {
-    // 2026-09-01 에 같은 성질로 "🗑정리" 가 붙어 나왔다. 사이는 gap 이 벌린다.
-    expect(login, "문 두 개를 감싼 줄에 수식자가 없다").toMatch(/login-help login-help--doors/);
-    expect(css, "gap 이 없어 두 문이 붙는다").toMatch(/\.login-help--doors \{[^}]*gap:/);
+  it("★★ 문은 **하나**다 — 사이를 벌리던 수식자도 함께 걷었다", () => {
+    // 2026-09-11 사장님이 보관함 문을 걷었다. 문이 하나면 `.login-help` 의 가운데 정렬로
+    // 충분하고, 쓰는 데 없는 규칙을 남기면 다음 사람이 "문이 둘이었나" 하고 찾는다.
+    expect(login, "쓰지 않는 수식자가 화면에 남아 있다").not.toMatch(/login-help--doors/);
+    expect(css, "쓰지 않는 규칙이 CSS 에 남아 있다").not.toMatch(/\.login-help--doors\s*\{/);
   });
 
   it("★ 낮은 화면에서는 고정을 푼다 — 안 그러면 넘친 카드와 겹친다", () => {
@@ -97,10 +98,13 @@ describe("가입 절차 세 걸음", () => {
       .not.toMatch(/이메일 인증/);
   });
 
-  it("★★★ 강조는 **지금 선 걸음 하나**다 — 탭에 따라 자리가 옮겨간다", () => {
-    // 로그인 탭이면 마지막 걸음, 가입 탭이면 첫 걸음.
-    expect(body, "현재 걸음을 탭에서 끌어오지 않는다").toMatch(/isSignup\s*\?\s*0\s*:\s*2/);
-    expect(body, "현재 걸음에 클래스를 안 준다").toMatch(/login-step\$\{\s*here\s*\?/);
+  it("★★★ **가입 탭에만** 뜬다 — 이미 가입한 사람에게 절차는 정보가 아니다", () => {
+    // 2026-09-11 사장님 지시. 로그인하러 온 사람은 이미 승인을 받았거나 /pending 으로 간다.
+    expect(body, "절차가 탭과 무관하게 늘 뜬다").toMatch(/isSignup\s*&&[\s\S]{0,80}login-steps/);
+  });
+
+  it("★★ 강조는 **첫 걸음 하나**다 — 여기서는 아직 아무것도 안 끝났다", () => {
+    expect(body, "현재 걸음에 클래스를 안 준다").toMatch(/login-step\$\{\s*i\s*===\s*0\s*\?/);
   });
 
   it("★★ 지난 걸음에 **완료 표시를 달지 않는다** — 승인을 받았는지 이 화면은 모른다", () => {

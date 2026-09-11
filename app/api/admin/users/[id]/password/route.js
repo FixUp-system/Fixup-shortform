@@ -5,15 +5,16 @@
 import { createClient } from "@supabase/supabase-js";
 import { withUser } from "../../../../../../lib/auth/require-user.js";
 import { getStore } from "../../../../../../lib/store/index.js";
-
-const MIN_LENGTH = 6;   // Supabase 기본 최소 길이와 같은 값
+// ★ 2026-09-11 — 길이를 손으로 적지 않는다. 같은 수가 네 곳에 흩어져 있던 자리다.
+import { PASSWORD_MIN, passwordProblem } from "../../../../../../lib/password.js";
 
 export const POST = withUser(async (req, { params }, user) => {
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
   const password = typeof body?.password === "string" ? body.password : "";
-  if (password.length < MIN_LENGTH) {
-    return Response.json({ error: `비밀번호는 ${MIN_LENGTH}자 이상이어야 해요` }, { status: 400 });
+  const weak = passwordProblem(password);
+  if (weak) {
+    return Response.json({ error: weak }, { status: 400 });
   }
 
   // 없는 사용자에게 조용히 성공을 주지 않는다 — 선례(승인 라우트)와 같은 방식.

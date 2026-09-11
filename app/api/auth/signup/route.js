@@ -11,6 +11,8 @@ import { isInfra, infraResponse } from "../../../../lib/auth/infra-error.js";
 // ★ 길이 규칙은 **마이페이지와 같은 자리**에서 가져온다 — 손으로 20 을 적으면 나중에
 //   한쪽만 바뀐다(이 저장소가 반복해 겪은 "값이 두 벌" 사고 · CLAUDE.md 「값이 사는 곳」).
 import { NAME_MAX } from "../../../../lib/display-name.js";
+// ★ 2026-09-11 — 비밀번호 규칙도 **한 자리**에서 온다(lib/password.js).
+import { passwordProblem } from "../../../../lib/password.js";
 import { getStore } from "../../../../lib/store/index.js";
 
 // 계정은 만들어졌는데 로그인이 안 되는 상태다. 사장님이 고칠 것은 없고, 운영자가
@@ -23,7 +25,7 @@ const NO_SESSION =
 function reason(message) {
   const m = String(message || "");
   if (/already registered|already exists/i.test(m)) return "이미 가입된 이메일이에요 — 로그인해 주세요";
-  if (/password/i.test(m)) return "비밀번호가 너무 짧아요 — 6자 이상으로 정해 주세요";
+  if (/password/i.test(m)) return passwordProblem("");
   if (/email/i.test(m)) return "이메일 주소를 다시 확인해 주세요";
   return "가입하지 못했어요 — 잠시 후 다시 시도해 주세요";
 }
@@ -45,6 +47,12 @@ export async function POST(req) {
   // 문구를 따로 두는 이유: 셋을 한 문장으로 뭉치면 무엇이 빠졌는지 화면에서 안 보인다.
   if (!name) {
     return Response.json({ error: "이름을 넣어 주세요" }, { status: 400 });
+  }
+  // ★★ 2026-09-11 — 비밀번호 길이를 **Supabase 앞에서** 잰다. 화면도 같은 함수로 먼저
+  //   막지만(app/login/page.js) 그것은 예의일 뿐이고, fetch 로 직접 부르면 지나간다.
+  const weak = passwordProblem(password);
+  if (weak) {
+    return Response.json({ error: weak }, { status: 400 });
   }
 
   let supabase;
