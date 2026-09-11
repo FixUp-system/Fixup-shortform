@@ -22,8 +22,8 @@ const ui = readFileSync("app/login/page.js", "utf8");
 describe("가입 — 이름을 함께 받는다", () => {
   it("★★★ 화면이 이름 칸을 낸다 — 그리고 가입할 때만 낸다", () => {
     // 로그인 탭에도 이름 칸이 뜨면 "로그인에 이름이 필요한가" 하고 멈칫한다.
-    expect(ui, "이름 칸이 없다").toMatch(/aria-label="이름"/);
-    expect(ui, "이름 칸이 가입일 때만 뜨지 않는다").toMatch(/isSignup\s*&&[\s\S]{0,400}aria-label="이름"/);
+    expect(ui, "이름 칸이 없다").toMatch(/id="name"/);
+    expect(ui, "이름 칸이 가입일 때만 뜨지 않는다").toMatch(/isSignup\s*&&[\s\S]{0,400}id="name"/);
   });
 
   it("★★ 화면이 이름을 실어 보낸다 — 칸만 있고 안 보내면 조용히 버려진다", () => {
@@ -74,11 +74,13 @@ describe("가입 — 이름을 함께 받는다", () => {
   });
 
   it("★★ 화면도 함께 막는다 — 서버만 막으면 빈 칸으로 눌러 보고 오류를 받는다", () => {
-    const at = ui.indexOf('aria-label="이름"');
+    const at = ui.indexOf('id="name"');
     expect(at, "이름 칸이 없다").toBeGreaterThan(-1);
-    const field = ui.slice(ui.lastIndexOf("<input", at), at);
+    const field = ui.slice(at, ui.indexOf("/>", at));
     expect(field, "이름 칸에 required 가 없다").toMatch(/\brequired\b/);
     // 자리표시자가 아직 "(선택)" 이면 화면이 거짓말을 한다 — 눌러 봐야 필수인 줄 안다.
-    expect(field, "자리표시자가 아직 선택이라고 말한다").not.toMatch(/선택/);
+    // 자리표시자는 라벨로 바뀌었다(2026-09-11) — 라벨이 "선택"이라고 말하면 안 된다.
+    const label = ui.slice(Math.max(0, at - 200), at);
+    expect(label, "라벨이 아직 선택이라고 말한다").not.toMatch(/선택/);
   });
 });
