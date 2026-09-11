@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>크레딧 마진 계산기</title>
+<style>
+  :root{
+    --bg:#141413; --panel:#1C1B19; --sunk:#232220; --line:#2E2C29; --rule:#3A3733;
+    --ink:#F2F0E9; --muted:#A5A29A; --accent:#E2849F; --accent-soft:#3A2028;
+    --good:#8FC3A3; --good-soft:#1E2C23; --warn:#D9A85C; --warn-soft:#2E2517; --stop:#E58C86; --stop-soft:#3A1F1D;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.6 system-ui,-apple-system,"Malgun Gothic",sans-serif}
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+  header{padding:18px 22px 10px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px}
+  header h1{margin:0;font-size:18px;font-weight:600}
+  header .sub{color:var(--muted);font-size:12.5px}
+  .layout{display:grid;grid-template-columns:380px 1fr;min-height:calc(100vh - 60px)}
+  @media (max-width:900px){.layout{grid-template-columns:1fr}}
+  aside{border-right:1px solid var(--line);padding:16px 18px 40px;overflow:auto}
+  main{padding:16px 22px 40px;overflow:auto;display:flex;flex-direction:column;gap:18px}
+  fieldset{border:1px solid var(--line);border-radius:8px;padding:12px 14px 6px;margin:0 0 14px}
+  legend{padding:0 6px;color:var(--muted);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600}
+  .row{display:grid;grid-template-columns:1fr 92px;gap:10px;align-items:center;margin:6px 0 10px}
+  .row label{font-size:13px}
+  .row small{display:block;color:var(--muted);font-size:11.5px;line-height:1.35}
+  input[type=number]{width:100%;background:var(--sunk);border:1px solid var(--rule);color:var(--ink);border-radius:6px;padding:6px 8px;font:13px ui-monospace,Menlo,Consolas,monospace;text-align:right}
+  input[type=number]:focus{outline:2px solid var(--accent);outline-offset:1px}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+  .slider{margin:4px 0 12px}
+  .slider .lbl{display:flex;justify-content:space-between;font-size:13px}
+  .slider .lbl b{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:500;color:var(--accent)}
+  .presets{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+  .presets button{background:var(--sunk);border:1px solid var(--rule);color:var(--ink);border-radius:999px;padding:5px 11px;font-size:12.5px;cursor:pointer}
+  .presets button:hover{border-color:var(--accent)}
+  .presets button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+  .mode{display:flex;gap:0;border:1px solid var(--rule);border-radius:7px;overflow:hidden;margin:4px 0 12px}
+  .mode button{flex:1;background:var(--sunk);border:0;color:var(--muted);padding:7px;font-size:12.5px;cursor:pointer}
+  .mode button.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+  details{margin:0 0 14px} summary{cursor:pointer;color:var(--muted);font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;padding:4px 0}
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+  th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;border-bottom:1px solid var(--rule)}
+  td.n,th.n{text-align:right;font-family:ui-monospace,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
+  td input[type=number]{width:84px;padding:4px 6px;font-size:12.5px}
+  .tbl{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+  .card .k{font-size:11.5px;color:var(--muted);letter-spacing:.04em}
+  .card .v{font-size:22px;font-weight:600;font-family:ui-monospace,Menlo,Consolas,monospace;margin-top:2px}
+  .card .s{font-size:12px;color:var(--muted)}
+  .pos{color:var(--good)} .neg{color:var(--stop)} .mid{color:var(--warn)}
+  .bar{height:8px;background:var(--sunk);border-radius:4px;overflow:hidden;min-width:60px}
+  .bar i{display:block;height:100%;background:var(--good)}
+  .bar i.warn{background:var(--warn)} .bar i.stop{background:var(--stop)}
+  h2{font-size:14px;margin:0 0 8px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+  canvas{width:100%;height:220px;background:var(--panel);border:1px solid var(--line);border-radius:8px;display:block}
+  .prompt{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;position:relative}
+  .prompt pre{margin:0;white-space:pre-wrap;font:12.5px/1.6 ui-monospace,Menlo,Consolas,monospace;color:var(--ink)}
+  .prompt button{position:absolute;top:10px;right:10px;background:var(--sunk);border:1px solid var(--rule);color:var(--ink);border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer}
+  .prompt button:hover{border-color:var(--accent)}
+  .note{font-size:12px;color:var(--muted)}
+  .pill{display:inline-block;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:5px;background:var(--sunk);color:var(--muted);margin-left:6px}
+</style>
+</head>
+<body>
+<header>
+  <h1>크레딧 마진 계산기 <span class="pill">shotform · 2026-09-11</span></h1>
+  <div class="sub">원가·판매가·사용자 수를 바꾸면 SKU별 마진과 총이익이 바로 바뀝니다. 노란 칸은 <b>추정값</b>이니 실제 값으로 덮어쓰세요.</div>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="presets" id="presets"></div>
+
+  <fieldset>
+    <legend>원가 기준</legend>
+    <div class="row"><label>크레딧당 원가 ($)<small>정가표 정의: 1크레딧 = $0.06</small></label><input type="number" id="usdPerCr" step="0.005" min="0.01"></div>
+    <div class="row"><label>환율 (₩/$)<small>노란 칸 — 오늘 환율로</small></label><input type="number" id="fx" step="10" min="900" style="border-color:var(--warn)"></div>
+    <div class="row"><label>와디즈 수수료 (%)<small>플랫폼+결제. 계약서 값으로</small></label><input type="number" id="feePct" step="0.5" min="0" max="50" style="border-color:var(--warn)"></div>
+    <div class="row"><label>월 고정비 (₩)<small>Vercel·Supabase 등. Pro 둘이면 ≈ ₩63,000</small></label><input type="number" id="fixed" step="10000" min="0"></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>판매가 ↔ 마진</legend>
+    <div class="mode">
+      <button id="modePrice" class="on">판매가를 넣고 마진 보기</button>
+      <button id="modeMargin">마진%를 넣고 판매가 보기</button>
+    </div>
+    <div class="slider" id="wrapPrice"><div class="lbl"><span>크레딧당 판매가</span><b id="lblPrice"></b></div><input type="range" id="krwPerCr" min="80" max="250" step="5"></div>
+    <div class="slider" id="wrapMargin" hidden><div class="lbl"><span>목표 마진 (수수료 뺀 순마진)</span><b id="lblMargin"></b></div><input type="range" id="targetMargin" min="0" max="70" step="1"></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>사용량</legend>
+    <div class="slider"><div class="lbl"><span>사용자 수</span><b id="lblUsers"></b></div><input type="range" id="users" min="1" max="3000" step="1"></div>
+    <div class="slider"><div class="lbl"><span>1인당 월 크레딧</span><b id="lblCr"></b></div><input type="range" id="crPerUser" min="20" max="3000" step="10"></div>
+    <div class="row"><label>"다시" 누수 배수<small>원장 실측: reel 1.3× · 광고 1.0×. 재생성 청구 뒤엔 1.1 안팎으로</small></label><input type="number" id="leak" step="0.05" min="1" max="3" style="border-color:var(--warn)"></div>
+    <div class="row"><label>실패 환불 비율 (%)<small>실측 광고 20%. fal 은 거절에 0원이라 원가는 안 나감</small></label><input type="number" id="refundPct" step="1" min="0" max="80"></div>
+  </fieldset>
+
+  <details open>
+    <summary>SKU 원가 직접 넣기 (1회 원가 $)</summary>
+    <div class="note" style="margin:6px 0 8px">정가(크레딧)는 코드 값입니다. 원가 칸을 실제 청구서 값으로 바꾸면 마진이 다시 계산됩니다. 2.5 는 <b>계산값</b>이라 실청구와 대조가 필요합니다.</div>
+    <div class="tbl"><table id="skuInputs"><thead><tr><th>SKU</th><th class="n">정가 cr</th><th class="n">원가 $</th></tr></thead><tbody></tbody></table></div>
+  </details>
+</aside>
+
+<main>
+  <section>
+    <h2>총이익 (월)</h2>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <section>
+    <h2>SKU별 마진 — 한 편 팔 때</h2>
+    <div class="tbl"><table id="skuOut"><thead><tr><th>SKU</th><th class="n">정가 cr</th><th class="n">판매가 ₩</th><th class="n">원가 ₩</th><th class="n">수수료 ₩</th><th class="n">남는 ₩</th><th class="n">순마진</th><th style="min-width:90px"></th></tr></thead><tbody></tbody></table></div>
+    <div class="note" id="skuNote" style="margin-top:6px"></div>
+  </section>
+
+  <section>
+    <h2>사용자 수에 따른 월 순이익</h2>
+    <canvas id="chart" width="900" height="220"></canvas>
+    <div class="note" id="chartNote" style="margin-top:6px"></div>
+  </section>
+
+  <section>
+    <h2>마진%별 판매가 · 손익분기</h2>
+    <div class="tbl"><table id="marginTable"><thead><tr><th class="n">목표 순마진</th><th class="n">필요 판매가 ₩/cr</th><th class="n">150cr 팩</th><th class="n">400cr 팩</th><th class="n">1,000cr 팩</th><th class="n">손익분기 사용자</th><th class="n">지금 사용자 수 이익</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section>
+    <h2>요약 (복사해서 전달)</h2>
+    <div class="prompt"><pre id="prompt"></pre><button id="copy">복사</button></div>
+  </section>
+</main>
+</div>
+
+<script>
+// ── 데이터: 이 세션에서 코드·원장으로 확인한 값 ──────────────────────────────
+// 정가(크레딧)는 lib/pricing.js. 1회 원가 $ 는 같은 파일 주석의 계산값(클립 + LLM $0.20 / reel 은 +판 $0.40 +$0.30).
+const SKUS = [
+  { key:"ad-h3-768",   name:"광고 H3 15초 768P",      credits:20,  cost:1.10 },
+  { key:"ad-h3-2k",    name:"광고 H3 15초 2K",        credits:40,  cost:2.15 },
+  { key:"ad-25-15-480",name:"광고 2.5 15초 480p",     credits:55,  cost:3.28,  est:true },
+  { key:"ad-25-15-720",name:"광고 2.5 15초 720p",     credits:120, cost:7.13,  est:true },
+  { key:"ad-25-30-480",name:"광고 2.5 30초 480p",     credits:110, cost:6.37,  est:true },
+  { key:"ad-25-30-720",name:"광고 2.5 30초 720p",     credits:240, cost:14.07, est:true },
+  { key:"reel-20-480", name:"reel 2.0 15초 480p",     credits:50,  cost:2.72 },
+  { key:"reel-20-720", name:"reel 2.0 15초 720p",     credits:90,  cost:5.25 },
+  { key:"reel-20-1080",name:"reel 2.0 15초 1080p",    credits:185, cost:10.93 },
+];
+
+const DEFAULTS = {
+  usdPerCr:0.06, fx:1400, feePct:10, fixed:63000,
+  mode:"price", krwPerCr:120, targetMargin:30,
+  users:100, crPerUser:150, leak:1.1, refundPct:20,
+};
+const PRESETS = {
+  "원가 확인 (₩84)":      { krwPerCr:85,  leak:1.3, users:100 },
+  "보수 (₩100)":          { krwPerCr:100, leak:1.1, users:100 },
+  "추천 (₩120)":          { krwPerCr:120, leak:1.1, users:100 },
+  "여유 (₩150)":          { krwPerCr:150, leak:1.1, users:100 },
+  "와디즈 300명":         { krwPerCr:120, leak:1.1, users:300, crPerUser:400 },
+};
+
+const state = { ...DEFAULTS, cost: Object.fromEntries(SKUS.map(s => [s.key, s.cost])) };
+
+// ── 계산 ───────────────────────────────────────────────────────────────────
+// 크레딧 1개의 원가(₩) = $/cr × 환율 × 누수배수. 환불은 매출을 깎지만 원가는 안 나간다(fal 거절 0원).
+const crCostKrw = () => state.usdPerCr * state.fx * state.leak;
+const fee = () => state.feePct / 100;
+const refund = () => state.refundPct / 100;
+// 판매가 p 일 때 크레딧 1개의 순이익(₩): p×(1−수수료)×(1−환불) − 원가
+const unitProfit = (p) => p * (1 - fee()) * (1 - refund()) - crCostKrw();
+// 순마진(매출 대비) m 을 내려면 필요한 판매가: p×(1−f)(1−r) − c = m×p → p = c / ((1−f)(1−r) − m)
+const priceForMargin = (m) => { const d = (1 - fee()) * (1 - refund()) - m; return d > 0.005 ? crCostKrw() / d : Infinity; };
+const effectivePrice = () => state.mode === "price" ? state.krwPerCr : priceForMargin(state.targetMargin / 100);
+const monthlyProfit = (users, p) => users * state.crPerUser * unitProfit(p) - state.fixed;
+const breakeven = (p) => { const u = unitProfit(p); return u <= 0 ? Infinity : Math.ceil(state.fixed / (state.crPerUser * u)); };
+
+const fmtKrw = (n) => (n === Infinity ? "∞" : (n < 0 ? "−" : "") + "₩" + Math.round(Math.abs(n)).toLocaleString("ko-KR"));
+const fmtPct = (x) => (x * 100).toFixed(1) + "%";
+const cls = (x) => x > 0.15 ? "pos" : x > 0 ? "mid" : "neg";
+
+// ── 렌더 ───────────────────────────────────────────────────────────────────
+function renderCards() {
+  const p = effectivePrice(), u = unitProfit(p);
+  const rev = state.users * state.crPerUser * p;
+  const cost = state.users * state.crPerUser * crCostKrw();
+  const feeKrw = rev * fee(), refundKrw = rev * (1 - fee()) * refund();
+  const net = monthlyProfit(state.users, p);
+  const margin = rev > 0 ? net / rev : 0;
+  const be = breakeven(p);
+  document.getElementById("cards").innerHTML = `
+    <div class="card"><div class="k">크레딧당 판매가</div><div class="v">${fmtKrw(p)}</div><div class="s">${state.mode === "margin" ? "목표 순마진 " + state.targetMargin + "% 에 필요한 값" : "크레딧당 원가 " + fmtKrw(crCostKrw()) + " (누수 ×" + state.leak + ")"}</div></div>
+    <div class="card"><div class="k">월 매출</div><div class="v">${fmtKrw(rev)}</div><div class="s">${state.users.toLocaleString()}명 × ${state.crPerUser}cr</div></div>
+    <div class="card"><div class="k">월 원가 + 수수료 + 환불</div><div class="v">${fmtKrw(cost + feeKrw + refundKrw)}</div><div class="s">원가 ${fmtKrw(cost)} · 수수료 ${fmtKrw(feeKrw)} · 환불 ${fmtKrw(refundKrw)}</div></div>
+    <div class="card"><div class="k">월 순이익 (고정비 뺀 뒤)</div><div class="v ${cls(margin)}">${fmtKrw(net)}</div><div class="s">순마진 ${fmtPct(margin)} · 고정비 ${fmtKrw(state.fixed)}</div></div>
+    <div class="card"><div class="k">손익분기 사용자 수</div><div class="v ${be === Infinity ? "neg" : ""}">${be === Infinity ? "불가" : be.toLocaleString() + "명"}</div><div class="s">${be === Infinity ? "이 판매가로는 크레딧당 손해" : "이 사용량 기준"}</div></div>
+    <div class="card"><div class="k">크레딧 1개당 남는 돈</div><div class="v ${u > 0 ? "pos" : "neg"}">${fmtKrw(u)}</div><div class="s">판매가 − 수수료 − 환불 − 원가</div></div>`;
+}
+
+function renderSku() {
+  const p = effectivePrice();
+  const tb = document.querySelector("#skuOut tbody");
+  tb.innerHTML = SKUS.map(s => {
+    const sell = s.credits * p;
+    const cost = state.cost[s.key] * state.fx * state.leak;
+    const f = sell * fee();
+    const left = sell - f - cost;
+    const m = sell > 0 ? left / sell : 0;
+    const w = Math.max(0, Math.min(100, m * 100 / 0.6 * 100 / 100 * (60 / 60)));  // 0~60% → 0~100px
+    return `<tr><td>${s.name}${s.est ? ' <span class="pill">추정</span>' : ""}</td><td class="n">${s.credits}</td><td class="n">${fmtKrw(sell)}</td><td class="n">${fmtKrw(cost)}</td><td class="n">${fmtKrw(f)}</td><td class="n ${cls(m)}">${fmtKrw(left)}</td><td class="n ${cls(m)}">${fmtPct(m)}</td><td><div class="bar"><i class="${m > 0.15 ? "" : m > 0 ? "warn" : "stop"}" style="width:${Math.max(0, Math.min(100, m / 0.6 * 100))}%"></i></div></td></tr>`;
+  }).join("");
+  const worst = SKUS.map(s => (s.credits * p * (1 - fee()) - state.cost[s.key] * state.fx * state.leak) / (s.credits * p)).sort((a, b) => a - b)[0];
+  document.getElementById("skuNote").textContent =
+    `이 표는 환불을 안 뺀 "한 편" 기준입니다(환불은 총이익 카드에서 뺍니다). 가장 마진이 얇은 SKU 순마진 ${fmtPct(worst)} — ` +
+    (worst < 0 ? "판매가가 원가를 밑도는 SKU 가 있습니다." : worst < 0.15 ? "누수·환불을 감안하면 여유가 거의 없습니다." : "누수·환불을 감안해도 남습니다.");
+}
+
+function renderChart() {
+  const c = document.getElementById("chart"), ctx = c.getContext("2d");
+  const W = c.width, H = c.height, padL = 64, padR = 16, padT = 14, padB = 30;
+  ctx.clearRect(0, 0, W, H);
+  const p = effectivePrice();
+  const maxU = Math.max(50, Math.ceil(state.users * 1.6 / 50) * 50);
+  const pts = []; for (let i = 0; i <= 60; i++) { const u = Math.round(maxU * i / 60); pts.push([u, monthlyProfit(u, p)]); }
+  const ys = pts.map(q => q[1]); const yMin = Math.min(0, ...ys), yMax = Math.max(1, ...ys);
+  const X = (u) => padL + (u / maxU) * (W - padL - padR);
+  const Y = (v) => padT + (1 - (v - yMin) / (yMax - yMin || 1)) * (H - padT - padB);
+  ctx.strokeStyle = "#3A3733"; ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) { const v = yMin + (yMax - yMin) * i / 4; ctx.beginPath(); ctx.moveTo(padL, Y(v)); ctx.lineTo(W - padR, Y(v)); ctx.stroke();
+    ctx.fillStyle = "#A5A29A"; ctx.font = "11px ui-monospace,Menlo,monospace"; ctx.textAlign = "right"; ctx.fillText(fmtKrw(v).replace("₩", ""), padL - 6, Y(v) + 4); }
+  ctx.strokeStyle = "#8FC3A3"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(X(0), Y(0)); ctx.lineTo(X(maxU), Y(0)); ctx.setLineDash([4, 4]); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle = "#E2849F"; ctx.lineWidth = 2.2; ctx.beginPath(); pts.forEach(([u, v], i) => i ? ctx.lineTo(X(u), Y(v)) : ctx.moveTo(X(u), Y(v))); ctx.stroke();
+  const cur = monthlyProfit(state.users, p);
+  ctx.fillStyle = "#E2849F"; ctx.beginPath(); ctx.arc(X(state.users), Y(cur), 4.5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#F2F0E9"; ctx.font = "12px system-ui"; ctx.textAlign = "left"; ctx.fillText(`${state.users}명 → ${fmtKrw(cur)}/월`, Math.min(X(state.users) + 8, W - 170), Y(cur) - 8);
+  ctx.fillStyle = "#A5A29A"; ctx.font = "11px ui-monospace,Menlo,monospace"; ctx.textAlign = "center";
+  for (let i = 0; i <= 4; i++) ctx.fillText(Math.round(maxU * i / 4) + "명", X(maxU * i / 4), H - 10);
+  const be = breakeven(p);
+  document.getElementById("chartNote").textContent = be === Infinity
+    ? "이 판매가로는 사용자가 늘수록 손해가 커집니다 — 크레딧당 원가가 판매가(수수료·환불 뺀 뒤)보다 큽니다."
+    : `점선이 0 입니다. ${be.toLocaleString()}명부터 고정비를 넘어 이익이 납니다. 1인당 월 ${state.crPerUser}cr 기준.`;
+}
+
+function renderMarginTable() {
+  const tb = document.querySelector("#marginTable tbody");
+  tb.innerHTML = [0, 10, 20, 30, 40, 50].map(m => {
+    const p = priceForMargin(m / 100);
+    const be = breakeven(p), prof = monthlyProfit(state.users, p);
+    const pack = (cr) => p === Infinity ? "—" : fmtKrw(Math.ceil(cr * p / 100) * 100);
+    return `<tr><td class="n">${m}%</td><td class="n"><b>${p === Infinity ? "불가" : fmtKrw(p)}</b></td><td class="n">${pack(150)}</td><td class="n">${pack(400)}</td><td class="n">${pack(1000)}</td><td class="n">${be === Infinity ? "불가" : be.toLocaleString() + "명"}</td><td class="n ${prof > 0 ? "pos" : "neg"}">${fmtKrw(prof)}</td></tr>`;
+  }).join("");
+}
+
+function updatePrompt() {
+  const p = effectivePrice(), net = monthlyProfit(state.users, p), be = breakeven(p);
+  const rev = state.users * state.crPerUser * p, margin = rev ? net / rev : 0;
+  const parts = [];
+  parts.push(`크레딧당 판매가 ${fmtKrw(p)}${state.mode === "margin" ? ` (목표 순마진 ${state.targetMargin}% 로 역산)` : ""}, 크레딧당 원가 $${state.usdPerCr} × 환율 ${state.fx} × 누수 ${state.leak} = ${fmtKrw(crCostKrw())}.`);
+  parts.push(`와디즈 수수료 ${state.feePct}%, 실패 환불 ${state.refundPct}%, 월 고정비 ${fmtKrw(state.fixed)}.`);
+  parts.push(`사용자 ${state.users.toLocaleString()}명이 월 ${state.crPerUser}cr 씩 쓰면 매출 ${fmtKrw(rev)}, 순이익 ${fmtKrw(net)} (순마진 ${fmtPct(margin)}). 손익분기 ${be === Infinity ? "없음(크레딧당 손해)" : be.toLocaleString() + "명"}.`);
+  const changed = SKUS.filter(s => Math.abs(state.cost[s.key] - s.cost) > 1e-9);
+  if (changed.length) parts.push("원가를 바꾼 SKU: " + changed.map(s => `${s.name} $${state.cost[s.key]}`).join(", ") + ".");
+  const worst = SKUS.map(s => ({ n: s.name, m: (s.credits * p * (1 - fee()) - state.cost[s.key] * state.fx * state.leak) / (s.credits * p) })).sort((a, b) => a.m - b.m)[0];
+  parts.push(`가장 얇은 SKU 는 ${worst.n} (한 편 순마진 ${fmtPct(worst.m)}).`);
+  document.getElementById("prompt").textContent = parts.join("\n");
+}
+
+function updateAll() {
+  document.getElementById("lblPrice").textContent = fmtKrw(state.krwPerCr) + "/cr";
+  document.getElementById("lblMargin").textContent = state.targetMargin + "%";
+  document.getElementById("lblUsers").textContent = state.users.toLocaleString() + "명";
+  document.getElementById("lblCr").textContent = state.crPerUser + "cr";
+  renderCards(); renderSku(); renderChart(); renderMarginTable(); updatePrompt();
+}
+
+// ── 컨트롤 배선 ─────────────────────────────────────────────────────────────
+const $ = (id) => document.getElementById(id);
+for (const k of ["usdPerCr", "fx", "feePct", "fixed", "leak", "refundPct"]) {
+  $(k).value = state[k]; $(k).addEventListener("input", () => { const v = parseFloat($(k).value); if (!isNaN(v)) { state[k] = v; markPreset(null); updateAll(); } });
+}
+for (const k of ["krwPerCr", "targetMargin", "users", "crPerUser"]) {
+  $(k).value = state[k]; $(k).addEventListener("input", () => { state[k] = parseFloat($(k).value); markPreset(null); updateAll(); });
+}
+$("modePrice").onclick = () => setMode("price"); $("modeMargin").onclick = () => setMode("margin");
+function setMode(m) { state.mode = m; $("modePrice").classList.toggle("on", m === "price"); $("modeMargin").classList.toggle("on", m === "margin"); $("wrapPrice").hidden = m !== "price"; $("wrapMargin").hidden = m !== "margin"; updateAll(); }
+
+const skuTb = document.querySelector("#skuInputs tbody");
+skuTb.innerHTML = SKUS.map(s => `<tr><td>${s.name}${s.est ? ' <span class="pill">추정</span>' : ""}</td><td class="n">${s.credits}</td><td class="n"><input type="number" step="0.01" min="0" data-k="${s.key}" value="${s.cost}" style="${s.est ? "border-color:var(--warn)" : ""}"></td></tr>`).join("");
+skuTb.querySelectorAll("input").forEach(inp => inp.addEventListener("input", () => { const v = parseFloat(inp.value); if (!isNaN(v)) { state.cost[inp.dataset.k] = v; updateAll(); } }));
+
+const presetsEl = $("presets");
+Object.keys(PRESETS).forEach(name => { const b = document.createElement("button"); b.textContent = name; b.onclick = () => applyPreset(name); presetsEl.appendChild(b); });
+function applyPreset(name) {
+  Object.assign(state, DEFAULTS, PRESETS[name]);
+  for (const k of ["usdPerCr", "fx", "feePct", "fixed", "leak", "refundPct", "krwPerCr", "targetMargin", "users", "crPerUser"]) $(k).value = state[k];
+  setMode("price"); markPreset(name);
+}
+function markPreset(name) { presetsEl.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.textContent === name)); }
+
+$("copy").onclick = async () => { try { await navigator.clipboard.writeText($("prompt").textContent); $("copy").textContent = "복사됨!"; setTimeout(() => $("copy").textContent = "복사", 1200); } catch { $("copy").textContent = "복사 실패"; } };
+
+applyPreset("추천 (₩120)");
+</script>
+</body>
+</html>
