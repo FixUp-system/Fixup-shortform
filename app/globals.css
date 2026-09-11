@@ -2128,7 +2128,15 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
      상자 구글 450 · 네이버 520 → 우리는 로고·약관·소셜이 없어 420
    색은 우리 토큰 그대로다 — 앱 내부와 끊기지 않게. (옛 주석은 "다크 유지"라고 적혀 있었다.
    2026-09-08 에 어두운 벌 자체가 사라져 지킬 다크가 없다.) */
-.login-card { max-width: 420px; margin: 0 auto; }
+/* ★★★ 2026-09-11 사장님 지적("사이즈는 왜 줄였어") — 재 보니 **한 번도 420px 이 된 적이
+   없었다.** 실측 287px. 원인은 `margin: 0 auto` 와 부모의 flex 세로 정렬 조합이다:
+   가로 여백이 auto 면 **stretch 가 꺼져** 카드가 내용 폭(fit-content)으로 쪼그라든다.
+   그래서 안의 글자가 바뀔 때마다(자리표시자 → 라벨) 카드 폭이 같이 흔들렸다.
+   ★ `width: 100%` 를 실어 stretch 대신 **직접 채운다**. 그러면 max-width 가 비로소 걸려
+     2026-08-06 실측값 420px 이 실제 폭이 된다(그전에는 상한일 뿐 아무 일도 안 했다).
+   ⚠️ auto 여백은 남긴다 — 부모가 flex 가 아닌 자리(혹시 모를 다른 문맥)에서 가운데 정렬을
+     맡는 것은 여전히 그쪽이다. */
+.login-card { width: 100%; max-width: 420px; margin: 0 auto; }
 
 /* 부제도 카드와 같은 기둥에 세운다. 안 두면 main.work 흐름 그대로라 화면 왼쪽
    끝(1280 실측 x≈28)에 서고 카드는 가운데(x≈368)에 서서 한 화면에 정렬 축이 둘이
@@ -2138,7 +2146,9 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
      맞춰 둔 한 줄)는 2026-09-10 저녁에 **지웠다** — 제목이 흐름을 떠나 아래
      `.login-brand`(고정)가 되면서 그 규칙이 아무것도 안 잡게 됐다. 죽은 규칙을 남기면
      다음 사람이 "제목도 이 기둥에 선다"로 읽는다. */
-.login-head { max-width: 420px; margin-inline: auto; }
+/* ★ 2026-09-11 — 카드와 같은 이유로 `width: 100%` 를 함께 싣는다. 안 그러면 부제·절차만
+   내용 폭으로 서서 카드와 폭이 갈린다(정렬 축이 둘이 되는 그 자리다). */
+.login-head { width: 100%; max-width: 420px; margin-inline: auto; }
 
 /* ── 로그인 브랜드 — **화면에 고정**한다 (2026-09-10 저녁, 사장님 지시)
    ★ 왜 흐름에서 뺐나. 이 화면은 `.work--bare` 라 세로 가운데 정렬이다. 그래서 카드가
@@ -2308,7 +2318,10 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
 .login-label {
   display: block;
   margin-bottom: 6px;
-  font-size: 12px;
+  /* ★ 2026-09-11 — 12px → **14px**. 그 자리에 있던 자리표시자가 16px 였는데 라벨이 12px 면
+     글자가 한 단 작아진 것으로 읽힌다(사장님: "사이즈는 왜 줄였어").
+     MCS 라벨은 13px(`text-sm`)이고 우리 사다리에는 13 이 없다 — 12 보다 **14 가 더 가깝다**. */
+  font-size: 14px;
   font-weight: 600;
   color: var(--ink-soft);
 }
