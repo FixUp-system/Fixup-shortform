@@ -36,13 +36,15 @@
 > 옛 문장은 "의도적 미커밋이다(주석에 '커밋하지 않는다')" 였는데 **둘 다 사실이 아니다**:
 > 파일은 추적되고 있고 그런 주석도 없다. 이 두 벌 상태가 위 함정의 원인이었다.
 >
-> ★ **이어서 하는 세션이 읽을 두 장**(2026-09-10 15:46 갱신):
+> ★ **이어서 하는 세션이 읽을 두 장**(2026-09-11 13:2x 갱신):
 > · **상태와 남은 일** → 이 저장소의 `OUTSTANDING.md` — **여기부터 읽어라.**
 >   ⚠️ **브랜치 `feat/reel-cut-r2v` 에만 최신이다** — 워크트리
 >   `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` 에서 세션을 열어라.
 >   메인 저장소(main)에서 열면 09-02 판을 읽는다.
 > · **왜 그렇게 했나(회차 서사)** → `C:\Users\fixup\obsidian_jaechan\sources\` 의
 >   `shotform-webhook-collect-and-function-storage-2026-09-10.md`(가장 최신 · 수거·웹훅·함수 저장량)
+>   ⚠️ **09-11 치는 아직 없다** — 로그인/MCS 맞추기·법률 문서·fal 보관 차단·
+>   폴링 좁히기·얼굴 격자 회차의 **상태는 `OUTSTANDING.md` 에 다 있고 서사만 비어 있다.**
 >   ← `shotform-credit-teardown-and-static-showcase-2026-09-10`(같은 날 앞부분)
 >   ← `shotform-face-pad-and-dark-stage-2026-09-09`
 >   ← **`shotform-egress-outage-and-migration-2026-09-07`**(egress 402 사고 · 새 프로젝트로 이사)
