@@ -14,7 +14,7 @@
 > 3. Vercel **Pro 승급 + 크론 그물** — 둘 다 설정이다.
 > 4. 🎬 히어로 영상 — **다른 세션(`fixup-ca`)이 맡았다.** 사장님 최신 지시는 "우리 파이프라인을
 >    보여주는 형식"이고 **승인된 스토리보드는 없다**. 그쪽에 레퍼런스·제약을 전달해 뒀다.
-> ⚠️ **`fixup` 에는 올라갔다**(09-11) — `origin` 은 아직이다(분류기가 막았다: `git push origin feat/reel-cut-r2v`). **배포는 아직 안 됐다** — 아래 「배포」 칸.
+> ⚠️ ✅ **두 원격 푸시 + 프로덕션 배포까지 끝났다**(09-11 14:43 · 코드 `d187bab`). 09-11 작업이 **전부 라이브다.** 남은 것은 ⑤영상 **배지 눈 확인 하나**(로그인이 필요해 손님으로는 못 봤다).
 
 > ✅ **09-11 13:2x — 이어받으며 실측 대조만 했다. 코드 변경 0.** 고친 것은 이 문서 두 줄이다.
 > 직전 회차(`647beaf`)가 적은 수를 **다른 세션이 독립적으로 다시 재서 전부 맞다고 확인했다** —
@@ -189,13 +189,13 @@
 | 워크트리 | `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` |
 | 브랜치 | `feat/reel-cut-r2v` (09-03 저녁). ★ 수는 **적지 않는다** — 이 문서를 고치는 커밋이 그 수를 또 바꾼다. **세라**: `git log -1 --format='%h %s'` · `git rev-list --count fixup/main..HEAD` |
 | 테스트 | ✅ **09-11 재실측 전체 초록** — `npx vitest run` = **6,118 통과 · 0 실패 · 10 skipped** / 파일 **364 통과 · 2 skipped**(366) · **exit 0**(cuts 레버 3단계 뒤 재실측 · +18). <br>그 앞: 09-10 저녁 6,020 · 오후 5,929 · 오전 5,878. ⚠️ 09-11 에 80개가 늘었다 — 로그인 화면·법률 문서·fal 머리말·폴링 좁히기의 새 판들이다 |
-| 배포 | ✅ **프로덕션 라이브 `dpl_9pvbSfsuMTkk8yYAyEU2yLvtMacC`**(별칭 슬러그 `…-1suguzmtl-fix-up1` · **2026-09-10 15:27:50 KST** · target=production · Ready · 코드 **`67fb29f`**). **09-10 15:46 `vercel inspect` 재실측** — 별칭 `fixup-shortform-service.vercel.app` 이 이것을 가리킨다(⚠️ 이 칸은 15:40 판까지 한 판 낡은 `16nbazqod` 를 적고 있었다. 맨 위 배너만 맞았다). 같은 시각 라이브 실측: `/home`·`/login`·`/archive` **200** · `/api/cron/collect` **401**(비밀 없이) · `/api/fal/webhook` GET **405**. 함수 크기는 **1.27MB**(inspect 출력 · 좁히기 전 46.11MB 에서 36배). <br>**그 앞**: `16nbazqod`(09-10 14:1x · `0f3115a` · 이때 `/showcase/*.webp` 16장 전부 200 실측) · `9s729yvsd`(09-10 00:45 · `8bb4858`) · `lfqxyburu`(09-10 00:09 · `a30767a`) · `h7qic4374`(09-09 18:12 · `bea465c`) |
+| 배포 | ✅ **프로덕션 라이브 `dpl_2kCoUbmPrcnSPTppHCWFU8Tk6s74`**(슬러그 `…-p1dcm62o1-fix-up1` · **2026-09-11 14:43:52 KST** · target=production · Ready · 코드 **`d187bab`**). 배포 직후 `vercel inspect` 로 **별칭이 이 판을 가리키는 것까지** 확인했다(09-10 에 한 판 낡은 것을 적었던 자리라 매번 확인한다). 라이브 실측: `/home`·`/login`·`/archive` **200** · 크론 **401** · 웹훅 GET **405** · **`/legal/terms`·`/legal/privacy` 200**(초안 띠 있음). 자세한 것은 아래 「✅ 09-11 14:43 배포 완료」 절. <br>**그 앞**: `dpl_9pvb…`(09-10 15:27 · `67fb29f`) · `16nbazqod`(09-10 14:1x · `0f3115a`) · `9s729yvsd`(09-10 00:45 · `8bb4858`) |
 | 배포(그 앞) | `dpl_5twijBmQk7sfYTZbQqMKT3HzVdpn`(별칭 `...-8xu0l4lc3` · 09-07 17:43 · 코드 `d826317`). 09-07 문서는 이 판을 몰랐다 — 오후 커밋까지 배포된 것이 안 적혀 있었다. ⚠️ 배포에 git meta 가 없다(git 없는 폴더에서 올린다) — **어느 코드인지는 `shotform-deploy-clean` 과 파일 대조로만 안다** |
 | 배포(그 앞) | **`6f4ehup0a`**(09-07 11:46 · 코드 `165df59` · `dpl_2Vw2h6T1FoR3DBBw877nhPWQZ1NH`). target=production · status=Ready · 09-07 12:5x 실측 `/login` 200 · `/api/me` 401(로그인 벽, 정상) · `/api/projects` 200(46건) · 🔴 `/api/renders/<옛 id>.mp4` **404**(아래 09-07 절 ③) · 그 앞 판은 `i7d0rc266`(09-04 · `0b2f341`) · ★ **확인법**: `npx vercel inspect fixup-shortform-service.vercel.app` 이 그 배포를 가리키는지 본다 — 이번엔 CSS 가 안 바뀌어 번들 해시로는 못 쟀다 |
 | ★ 정식 도메인 | **`https://fixup-shortform-service.vercel.app`** 다. `vercel deploy` 가 찍어 주는 `...-ju8okg74p-fix-up1.vercel.app` 쪽은 **Deployment Protection(SSO)에 걸려 전부 302** 라 검증에 쓰면 안 된다 — 09-02 에 한 번 속았다 |
-| 미배포 | 🔴 **코드 15커밋** — 09-10 밤 이후 라이브에 안 나간 것이 이만큼이다. 라이브는 여전히 `67fb29f` 다. 세는 법: `git log --oneline 67fb29f..HEAD` 에서 **`docs:` 아닌 줄**을 센다(09-11 재실측 = **코드 18** + 문서 18 = **36** · 이 커밋 포함. ★ 문서 커밋이 늘어도 **코드 18 은 안 변한다** — 이쪽을 믿어라). ★ 09-11 것은 **로그인/가입 화면 · 법률 문서 · fal 보관 차단 · 폴링 좁히기**다. 🔴 크론 등록은 빠진 채다(Hobby). ★ 크레딧 걷기가 1/4 인 채로 라이브다 |
-| 푸시 | ⚠️ **원격 둘이 갈렸다**(09-11 14:1x). `fixup` = **`bd73b00` 까지 올라갔다**(Vercel 이 보는 쪽 · 32커밋 · 미푸시 **1**=이 문서 커밋). `origin` 은 **`6e84a84`(09-10)에 멈춰 있다 — 미푸시 33**: 이 세션의 자동 승인 분류기가 공유 저장소(FixUp-system) 푸시를 막았다. 사람이 한 번 밀어야 한다: `git push origin feat/reel-cut-r2v`. ⚠️ **푸시는 배포가 아니다** — 커밋 이메일이 GitHub 계정과 안 맞아 Git 트리거 빌드가 0ms 에서 멎는다. ⚠️ URL 로 직접 푸시하면 추적 ref 가 안 움직인다 — **원격 이름으로** 밀어라 |
-| main 과의 거리 | **33커밋 앞**(뒤처진 것 0 · `origin/main` 기준 · 09-11 재실측 · ★ 이 커밋 포함). 09-10 에 `6e9bd8f` → `6e84a84` **FF 129커밋**으로 병합했고(두 원격 다) 그 뒤 쌓인 것이다. ⚠️ **로컬 `main` ref 만 아직 `da6bfbd`(08-18)에 멈춰 있다** — Temp 안 **빈 껍데기 워크트리**가 쥐고 있다. 푸는 법: `git worktree remove --force <그 경로>` → `git branch -f main fixup/main`. **원격 main 이 진실이다.** |
+| 미배포 | ✅ **코드 0.** 09-11 것은 **전부 라이브다**(코드 18커밋이 `d187bab` 로 나갔다). 남은 미배포는 **이 문서 커밋뿐**이다. 세는 법: `git log --oneline d187bab..HEAD` 에서 **`docs:` 아닌 줄**을 센다. 🔴 크론 등록은 여전히 빠진 채다(Hobby). ★ 크레딧 걷기가 1/4 인 채로 라이브다 |
+| 푸시 | ✅ **두 원격 다 올라가 있다**(09-11 · 배포된 코드는 `d187bab`). 미푸시는 **이 문서 커밋뿐**이다. 세라: `git rev-list --count fixup/feat/reel-cut-r2v..HEAD`(그리고 `origin/...`). ⚠️ **푸시는 배포가 아니다** — 커밋 이메일이 GitHub 계정과 안 맞아 Git 트리거 빌드가 0ms 에서 멎는다. 배포는 `shotform-deploy-0911` 같은 **git 없는 폴더**에서 따로 한다. ⚠️ URL 로 직접 푸시하면 추적 ref 가 안 움직인다 — **원격 이름으로** 밀어라 |
+| main 과의 거리 | **34커밋 앞**(뒤처진 것 0 · `origin/main` 기준 · 09-11 재실측 · ★ 이 커밋 포함). 09-10 에 `6e9bd8f` → `6e84a84` **FF 129커밋**으로 병합했고(두 원격 다) 그 뒤 쌓인 것이다. ⚠️ **로컬 `main` ref 만 아직 `da6bfbd`(08-18)에 멈춰 있다** — Temp 안 **빈 껍데기 워크트리**가 쥐고 있다. 푸는 법: `git worktree remove --force <그 경로>` → `git branch -f main fixup/main`. **원격 main 이 진실이다.** |
 | ⚠️ 배포 함정 | **`.vercel` 폴더가 이 워크트리에 없다.** 그래서 `--project` 를 **반드시** 준다 — 안 주면 폴더 이름으로 새 프로젝트를 만든다(팀에 `step-gate` 라는 **실수로 생긴 프로젝트**가 그 증거다) |
 | ★ origin 푸시 | `origin` 은 URL 에 계정이 안 박혀 있다. 이 회차에는 `git push origin <브랜치>` 가 그냥 통과했지만, 자격증명 대기로 멈추면 계정을 실어라: `git push https://jaechanyoon0519-Fixup@github.com/FixUp-system/Fixup-shortform.git <브랜치>` |
 | 개발 서버 | `npx next dev -p 3111` (이 회차에 쓴 포트). `.env.local` 의 `SHOTFORM_DEV_USER` 가 **로그인을 건너뛰고 운영자 신원**을 준다 — 관리자·비용 화면을 그대로 볼 수 있다 |
@@ -332,7 +332,7 @@ const cuts = live?.cuts || project?.cuts || [];     // 폴링 || 진입 라우�
 |---|---|
 | 라이브 | **`dpl_2kCoUbmPrcnSPTppHCWFU8Tk6s74`** · 슬러그 `…-p1dcm62o1-fix-up1` · **2026-09-11 14:43:52 KST** · target=production · Ready |
 | 코드 | **`d187bab`** (09-11 것 **코드 18커밋** 전부) |
-| 푸시 | `fixup`·`origin` **둘 다 `d187bab`** |
+| 푸시 | `fixup`·`origin` **둘 다** 올렸다(배포 시점 `d187bab` · 지금은 문서 커밋까지 `f6c3e83`) |
 | 그 앞 | `dpl_9pvbSfsuMTkk8yYAyEU2yLvtMacC`(09-10 15:27 · `67fb29f`) |
 
 **라이브 실측**(배포 직후):
