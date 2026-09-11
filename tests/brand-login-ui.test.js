@@ -77,6 +77,50 @@ describe("로그인 브랜드 — 화면에 고정되고, 메인으로 가는 �
   });
 });
 
+// ★★★ 2026-09-10 — 가입 뒤에 무엇이 남았는지 세 걸음으로 보여 준다(형제 제품 MCS 의
+//   온보딩을 **우리 흐름으로** 옮긴 것). 그쪽 가운데 칸은 "이메일 인증"인데 우리는
+//   **운영자 승인**이다 — 우리는 메일을 안 쓰고(매직링크 2026-08-06 폐지), 가입 라우트는
+//   이메일 인증이 켜져 있으면 그것을 **설정 오류로 보고 500** 을 낸다.
+describe("가입 절차 세 걸음", () => {
+  // ⚠️ 이 파일의 `login` 은 **주석까지 든 날 것**이다(위 "옛 이름" 판이 주석도 봐야 해서).
+  //   아래 "없어야 한다" 판들은 주석의 낱말에 걸린다 — 실제로 이 절을 쓰면서 밟았다.
+  //   그래서 여기서만 주석을 걷은 사본을 쓴다(auth-ui.test.js 와 같은 방식).
+  const body = login.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+  it("★★★ 세 걸음이 있고, 가운데는 **운영자 승인**이다", () => {
+    expect(body, "절차 목록이 없다").toMatch(/login-steps/);
+    for (const w of ["가입 신청", "운영자 승인", "이용 시작"]) {
+      expect(body, `"${w}" 걸음이 없다`).toContain(w);
+    }
+    // 그쪽 문구를 그대로 옮기면 우리 제품에서 거짓말이 된다.
+    expect(body, "이메일 인증을 절차로 적었다 — 우리는 그것을 설정 오류로 본다")
+      .not.toMatch(/이메일 인증/);
+  });
+
+  it("★★★ 강조는 **지금 선 걸음 하나**다 — 탭에 따라 자리가 옮겨간다", () => {
+    // 로그인 탭이면 마지막 걸음, 가입 탭이면 첫 걸음.
+    expect(body, "현재 걸음을 탭에서 끌어오지 않는다").toMatch(/isSignup\s*\?\s*0\s*:\s*2/);
+    expect(body, "현재 걸음에 클래스를 안 준다").toMatch(/login-step\$\{\s*here\s*\?/);
+  });
+
+  it("★★ 지난 걸음에 **완료 표시를 달지 않는다** — 승인을 받았는지 이 화면은 모른다", () => {
+    expect(body, "완료 표시가 있다").not.toMatch(/done|✓/i);
+  });
+
+  it("★★★ 액센트를 빌려 쓰지 않는다 — 그 색은 사이드바 스테퍼의 것이다", () => {
+    const at = css.indexOf(".login-step.on");
+    expect(at, ".login-step.on 규칙이 없다").toBeGreaterThan(-1);
+    const block = css.slice(at, at + 300);
+    expect(block, "로그인 절차가 액센트를 쓴다").not.toMatch(/var\(--accent/);
+    expect(block, "지금 걸음이 먹색으로 안 채워진다").toMatch(/background:\s*var\(--ink\)/);
+  });
+
+  it("★★ 번호가 원문자가 아니다 — 판이 원문자를 막는다", () => {
+    expect(body, "원문자를 썼다").not.toMatch(/[①②③④⑤⑥⑦⑧⑨]/);
+    expect(body, "번호를 안 그린다").toMatch(/login-step-no/);
+  });
+});
+
 describe("사이드바 — 준비 중 항목", () => {
   it("설정은 두지 않는다 — 누를 수 없는 줄이다", () => {
     expect(sidebar).not.toMatch(/설정/);

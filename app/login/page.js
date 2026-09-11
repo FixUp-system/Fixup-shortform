@@ -78,6 +78,29 @@ export default function LoginPage() {
           : "이메일과 비밀번호를 넣어 주세요."}
       </p>
 
+      {/* ★★ 2026-09-10 — **가입 뒤에 무엇이 남았는지** 세 걸음으로 보여 준다.
+          형제 제품 MCS 의 온보딩(가입 신청 → 이메일 인증 → 이용)을 **우리 흐름으로** 옮긴
+          것이다. 가운데 칸을 그대로 쓰면 거짓말이 된다 — 우리는 이메일 인증을 안 쓰고
+          (매직링크를 2026-08-06 에 걷어냈다), 가입 라우트는 그 설정이 켜져 있으면
+          **설정 오류로 보고 500 을 낸다**. 우리의 가운데 칸은 **운영자 승인**이다.
+          ★ 강조는 **지금 탭이 선 걸음 하나**뿐이다. 지난 걸음에 완료 표시를 달지 않는다 —
+            로그인 탭에 선 사람이 승인을 받았는지 이 화면은 모른다(승인 대기자도 로그인한다).
+          ★ 번호는 **숫자 글리프**다. 원문자는 판이 막는다(design-system 의 글리프 판).
+          ★ 색은 액센트가 아니라 먹색이다 — 이 저장소는 액센트를 **사이드바 스테퍼 하나**에만
+            허락한다("앱에서 가장 강한 색은 지금 몇 단계인가를 가리킨다"). 로그인 화면이
+            그것을 빌려 쓰면 그 규칙이 흐려진다. */}
+      <ol className="login-steps login-head">
+        {["가입 신청", "운영자 승인", "이용 시작"].map((label, i) => {
+          const here = (isSignup ? 0 : 2) === i;
+          return (
+            <li key={label} className={`login-step${here ? " on" : ""}`} aria-current={here ? "step" : undefined}>
+              <span className="login-step-no">{i + 1}</span>
+              {label}
+            </li>
+          );
+        })}
+      </ol>
+
       <section className="panel login-card">
         <div className="login-tabs">
           <button
