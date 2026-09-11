@@ -17,6 +17,7 @@
 //   이 저장소의 규칙(같은 값을 두 군데 두지 않는다)을 그대로 지킨다. 라우트가 자기
 //   판정을 손으로 적으면 그 순간 두 벌이 되고, 한쪽이 조용히 낡는다.
 import { describe, it, expect, beforeEach } from "vitest";
+import { readFileSync } from "node:fs";
 import { createProject, updateProject } from "../lib/projects.js";
 import { runWithActor } from "../lib/actor.js";
 import { resetMemoryStore } from "../lib/store/memory.js";
@@ -158,5 +159,39 @@ describe("진입 라우트가 판정을 싣는다", () => {
     const doc = await readEntry(p.id);
     // 없던 칸이 빈 배열로 생기면 "컷이 0개다"와 "아직 단계에 안 왔다"가 뭉개진다.
     expect(doc.cuts === undefined || doc.cuts.length === 0, "없던 cuts 가 생겼다").toBe(true);
+  });
+});
+
+// ── 2단계 — 화면이 서버 판정만 본다 (보험을 걷는다) ─────────────────────────────
+//
+// ★★★ 보험을 걷을 수 있는 **전제**가 있다: 두 문이 **다** 판정을 실어 보낼 것.
+//   진입은 1단계에서 실었고 폴링은 09-11 에 이미 싣고 있다. 그 전제를 먼저 잰다 —
+//   전제가 깨진 채 보험만 걷으면 배지가 통째로 사라진다.
+//
+// ⚠️ 이 저장소의 화면 계약은 **소스 문자열**로 잰다. 그래서 주석을 걷은 사본을 봐야
+//   한다 — 주석에 남은 낱말에 판이 걸려 조용히 통과한 적이 있다(CLAUDE.md 함정).
+describe("2단계 — ⑤영상 화면이 서버 판정만 본다", () => {
+  const read = (p) => readFileSync(p, "utf8");
+  const strip = (t) =>
+    t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+  const VIDEO_PAGE = "app/reel/[id]/video/page.js";
+  const ENTRY_ROUTE = "app/api/reel/[id]/route.js";
+  const POLL_ROUTE = "app/api/reel/[id]/status/route.js";
+
+  it("★★★ 전제 — 두 문이 **다** stale 을 싣는다", () => {
+    expect(strip(read(ENTRY_ROUTE)), "진입 라우트가 판정을 안 싣는다").toMatch(/stale:\s*isReelClipStale\(/);
+    expect(strip(read(POLL_ROUTE)), "폴링 라우트가 판정을 안 싣는다").toMatch(/stale:\s*isReelClipStale\(/);
+  });
+
+  it("★★★ 화면이 배지를 c.stale 로 그린다", () => {
+    expect(strip(read(VIDEO_PAGE)), "화면이 서버 판정을 안 본다").toMatch(/c\.stale\s*&&/);
+  });
+
+  it("★★★ 보험이 걷혔다 — 화면이 각인을 직접 재지 않는다", () => {
+    // 이 한 줄이 각인을 붙잡고 있던 마지막 소비자다. 걷혀야 3단계(각인 제거)가 안전하다.
+    const c = strip(read(VIDEO_PAGE));
+    expect(c, "화면이 아직 isReelClipStale 을 부른다 — 3단계로 가면 안 된다").not.toMatch(/isReelClipStale\s*\(/);
+    expect(c, "쓰지 않는 import 가 남았다").not.toMatch(/import\s*\{[^}]*isReelClipStale/);
   });
 });

@@ -17,7 +17,6 @@ import { planReelBake, canBakeReel, isReelOneShotStale, reelSheetUrl, reelWholeP
 //   한다(단계별 흐름의 화면 다섯이 이미 이것을 본다). 화면이 스스로 재면 그 사본이
 //   조용히 갈린다.
 import { generationState } from "../../../../lib/progress";
-import { isReelClipStale } from "../../../../lib/reel/steps";
 import { startPolling } from "../../../../lib/poll";
 import { REEL_STEPS, reelStepHref } from "../../../../lib/reel/steps";
 import ReelBack from "../../../../components/ReelBack";
@@ -290,7 +289,15 @@ export default function ReelVideoPage() {
               {gen.kind === "running" && !c.video?.url && (
                 <div className="frame-busy"><span className="spinner" aria-hidden="true" /></div>
               )}
-              {(c.stale ?? isReelClipStale(c)) && c.video?.url && (
+              {/* ★★★ 2026-09-11 — **판정은 서버가 한다.** 옛 모양은
+                    `c.stale ?? isReelClipStale(c)` 였다 — 서버 판정이 없을 때 화면이
+                    각인(video.of)을 직접 재는 보험이었다. 두 문(진입·폴링)이 이제 **다**
+                    stale 을 실으므로 보험이 돌 자리가 없고, 그 보험이 각인을 붙잡고 있던
+                    마지막 소비자였다. 되살리지 마라 — 되살리는 순간 폴링 응답에서 각인을
+                    뺄 수 없게 된다(한 편 9.5MB → 2.5MB 가 막힌다).
+                    ⚠️ 되살려도 **화면은 멀쩡해 보인다.** 판이 대신 잡는다:
+                    tests/reel-stale-on-entry.test.js 「2단계」 */}
+              {c.stale && c.video?.url && (
                 <span className="tag warn">다시 만들어야 해요</span>
               )}
             </div>
