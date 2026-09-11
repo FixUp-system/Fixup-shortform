@@ -11,7 +11,7 @@ import { useState } from "react";
 import { NAME_MAX } from "../../lib/display-name.js";
 // ★ 비밀번호 규칙도 **라우트와 같은 자리**에서 온다(lib/password.js). 화면이 먼저 막고
 //   라우트가 다시 막는다 — 둘이 다른 수를 보면 "화면은 통과인데 서버가 거절"이 난다.
-import { passwordProblem } from "../../lib/password.js";
+import { passwordProblem, PASSWORD_MISMATCH } from "../../lib/password.js";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
@@ -29,6 +29,8 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
 
   const isSignup = tab === "signup";
+  // ★ 적는 도중에 알리는 값. 확인 칸이 비어 있으면 잰 적 없는 것으로 둔다.
+  const mismatch = isSignup && confirm.length > 0 && password !== confirm;
 
   async function submit(e) {
     e.preventDefault();
@@ -139,6 +141,25 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={submit}>
+          {/* ★★★ 2026-09-11 사장님 지시 — 칸 순서는 **이름 → 이메일 → 비밀번호 → 확인**이다.
+              (옛 주석은 "이름은 비밀번호 아래다: 눈이 익은 두 칸을 먼저" 였다. 뒤집혔으니
+               그 문장을 근거로 되돌리지 마라.)
+              ★ 이름은 **가입일 때만** 뜬다. 로그인 탭에서는 첫 칸이 이메일이다.
+              ★ 이름은 필수다(2026-09-10 지시). 화면의 `required` 는 브라우저가 지키는 예의이고
+                진짜 문지기는 라우트다 — app/api/auth/signup/route.js 의 400. */}
+          {isSignup && (
+            <input
+              type="text"
+              required
+              autoComplete="name"
+              maxLength={NAME_MAX}
+              className="sent-input sent-input--lg"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="이름"
+              aria-label="이름"
+            />
+          )}
           <input
             type="email"
             required
@@ -159,42 +180,27 @@ export default function LoginPage() {
             placeholder="비밀번호"
             aria-label="비밀번호"
           />
-          {/* ★ 비밀번호 확인 — 가입일 때만. 자리는 비밀번호 **바로 아래**다(두 칸이 붙어
-              있어야 "같은 것을 두 번 적는다"로 읽힌다). */}
+          {/* ★★★ 2026-09-11 사장님 지시 — "비밀번호가 일치하지 않으면 사용자가 인지할 수
+              있도록". 제출해 봐야 아는 것이 아니라 **적는 도중에** 알린다:
+              · 칸 테두리가 경고색이 된다(.sent-input--bad)
+              · 칸 바로 아래에 한 줄이 뜬다
+              ★ 빈 칸에는 안 띄운다 — 두 글자 적자마자 "다르다"고 하면 아직 다 안 적은 사람을
+                꾸짖는 꼴이다. 확인 칸에 무언가 적힌 뒤부터 잰다.
+              ★ 문구는 lib/password.js 하나에서 온다 — 제출을 막을 때도 같은 말을 쓴다. */}
           {isSignup && (
             <input
               type="password"
               required
               autoComplete="new-password"
-              className="sent-input sent-input--lg"
+              className={`sent-input sent-input--lg${mismatch ? " sent-input--bad" : ""}`}
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               placeholder="비밀번호 확인"
               aria-label="비밀번호 확인"
+              aria-invalid={mismatch || undefined}
             />
           )}
-          {/* ★★ 2026-09-10 저녁 — 이름은 **필수**다(사장님 지시: "이름 선택으로 두지 말고
-              그냥 필수값으로 적용해줘"). 같은 날 오전에 넣을 때는 선택이었다 — "가입 문턱을
-              올리지 않는다"는 판단이었는데 사장님이 뒤집었다. 그 옛 판단을 근거로 다시
-              선택으로 되돌리지 마라.
-              ★ 화면의 `required` 는 **문지기가 아니다** — fetch 로 직접 부르면 그냥 지나간다.
-                진짜 판정은 라우트가 한다(app/api/auth/signup/route.js 의 400).
-                이 저장소의 규율 그대로다: "판정만 하고 강제하지 않으면 안 된다"(CLAUDE.md).
-              ★ 자리는 비밀번호 **아래**다: 눈이 익은 두 칸을 먼저 만나고, 새로 생긴
-                칸이 마지막에 온다. */}
-          {isSignup && (
-            <input
-              type="text"
-              required
-              autoComplete="name"
-              maxLength={NAME_MAX}
-              className="sent-input sent-input--lg"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="이름"
-              aria-label="이름"
-            />
-          )}
+          {mismatch && <p className="login-field-warn warn" role="alert">{PASSWORD_MISMATCH}</p>}
           <button type="submit" className="cta cta--block" disabled={busy}>
             {busy ? "확인 중…" : isSignup ? "가입하기" : "로그인"}
           </button>

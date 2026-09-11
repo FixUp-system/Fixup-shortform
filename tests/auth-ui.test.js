@@ -153,3 +153,40 @@ describe("로그인 화면 시각", () => {
     expect(login).toMatch(/data\.error/);
   });
 });
+
+
+// ★★★ 2026-09-11 사장님 지시 셋 — 순서 · 입력칸 디자인 · 불일치 즉시 알림.
+describe("가입 폼", () => {
+  const at = (label) => login.indexOf('aria-label=' + JSON.stringify(label));
+
+  it("★★★ 칸 순서는 이름 → 이메일 → 비밀번호 → 확인 이다", () => {
+    const order = ["이름", "이메일", "비밀번호", "비밀번호 확인"].map(at);
+    expect(order.every((i) => i > -1), "칸 하나가 없다").toBe(true);
+    for (let i = 1; i < order.length; i++) {
+      expect(order[i], `${i}번째 칸이 앞 칸보다 먼저 나온다`).toBeGreaterThan(order[i - 1]);
+    }
+  });
+
+  it("★★★ 불일치를 **적는 도중에** 알린다 — 제출해 봐야 아는 것이 아니다", () => {
+    // 확인 칸이 비어 있을 때는 안 잰다(아직 다 안 적은 사람을 꾸짖지 않는다).
+    expect(login, "도중 판정이 없다").toMatch(/confirm\.length > 0 && password !== confirm/);
+    expect(login, "칸이 경고 모양으로 안 바뀐다").toMatch(/sent-input--bad/);
+    expect(login, "칸 아래 알림 줄이 없다").toMatch(/login-field-warn[^]*role="alert"/);
+    expect(login, "보조기술에 안 알린다").toMatch(/aria-invalid/);
+  });
+
+  it("★★ 불일치 문구를 손으로 적지 않는다 — 제출 때와 같은 말이어야 한다", () => {
+    expect(login, "문구를 한 자리에서 안 가져온다").toMatch(/PASSWORD_MISMATCH/);
+    expect(login, "문구를 화면에 또 적었다").not.toMatch(/서로 달라요/);
+  });
+
+  it("★★★ 입력칸이 **채운 면이 아니라 테두리**다 — 흰 카드 위에서 회색 덩어리가 먼저 보였다", () => {
+    expect(css).toMatch(/\.sent-input--lg \{[^}]*background:\s*transparent/);
+    // 경고색은 새로 만들지 않고 이 저장소의 한 색(--warn)을 쓴다.
+    expect(css).toMatch(/\.sent-input--bad \{[^}]*border-color:\s*var\(--warn\)/);
+  });
+
+  it("★ 기본형은 그대로 채운 면이다 — 브리핑·StylePicker 가 쓴다", () => {
+    expect(css).toMatch(/\n\.sent-input \{[^}]*background:\s*var\(--deep\)/);
+  });
+});
