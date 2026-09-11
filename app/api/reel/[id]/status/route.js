@@ -1,7 +1,6 @@
 import { withUser } from "../../../../../lib/auth/require-user.js";
-import { getProject } from "../../../../../lib/projects.js";
+import { getReelStatus } from "../../../../../lib/projects.js";
 import { collectReelOneShot } from "../../../../../lib/reel/pipeline.js";
-import { reelOf } from "../../../../../lib/reel/doc.js";
 import { isReelClipStale } from "../../../../../lib/reel/steps.js";
 // ★ 멈춘 경과는 **서버가 잰다.** 브라우저가 자기 시계로 빼면 PC 시계가 빠른 사장님에게는
 //   시작하자마자 "멈췄어요"가 뜬다(lib/progress.js 의 stalledFor 머리말).
@@ -41,12 +40,16 @@ export const GET = withUser(async (_req, { params }, user) => {
     console.error("reel 수거 실패:", e);
   });
 
-  const project = await getProject(id, user.id);
+  // ★★★ 2026-09-11 — **통짜를 안 읽는다.** 2초마다 불리는 자리인데 문서 전체가 실측
+  //   44.5KB 이고, 그 중 안 쓰는 칸이 절반이다(scenario 9.1KB · material 6.7KB).
+  //   좁은 셀렉터가 status·reel·progress·cuts 만 가져온다. **응답 모양은 그대로다.**
+  const project = await getReelStatus(id, user.id);
   if (!project || project.kind !== "reel") {
     return Response.json({ error: "프로젝트를 찾을 수 없어요" }, { status: 404 });
   }
 
-  const reel = reelOf(project);
+  // ★ 좁은 셀렉터가 `reel` 을 그대로 준다 — reelOf(doc) 를 또 부를 통짜가 없다.
+  const reel = project.reel || {};
   const cuts = (project.cuts || []).map((c) => ({
     idx: c.idx,
     image: c.image || null,

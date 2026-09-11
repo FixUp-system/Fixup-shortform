@@ -1,6 +1,6 @@
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { collectAdRender } from "../../../../../lib/ad/pipeline.js";
-import { loadAd } from "../route.js";
+import { getAdStatus } from "../../../../../lib/projects.js";
 
 // ★ 2026-09-03 — **배포 기본 상한에 잘리던 자리다.** collectAdRender 가 fal 에 다녀온다
 //   상한이 없으면 함수가 조용히 끊기고, 그때 fal 은 계속 만들어 과금하는데 우리 문서에는
@@ -36,7 +36,10 @@ export const GET = withUser(async (_req, { params }, user) => {
     console.error("광고 수거 실패:", e);
   });
 
-  const project = await loadAd(id, user.id);
+  // ★★★ 2026-09-11 — **통짜를 안 읽는다.** 2초마다 불리는 자리다(위 POLL 머리말).
+  //   `loadAd` 는 문서 전체(실측 16.8KB)를 준다 — 아래 응답이 쓰는 것은 네 칸뿐이라
+  //   좁은 셀렉터로 바꿨다. **응답 모양은 한 글자도 안 바뀐다**(화면이 그것을 읽는다).
+  const project = await getAdStatus(id, user.id);
   if (!project) return Response.json({ error: "찾을 수 없어요" }, { status: 404 });
   return Response.json({
     status: project.status,

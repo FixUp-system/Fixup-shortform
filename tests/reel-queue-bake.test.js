@@ -255,6 +255,9 @@ describe("배선", () => {
   it("★ 상태 라우트가 수거를 먼저 한다 — 순서가 바뀌면 방금 끝난 영상을 한 박자 늦게 본다", () => {
     const src = readFileSync("app/api/reel/[id]/status/route.js", "utf8");
     expect(src, "수거를 안 부른다").toMatch(/collectReelOneShot/);
-    expect(src.indexOf("collectReelOneShot")).toBeLessThan(src.indexOf("getProject(id"));
+    // ★ 2026-09-11 — 읽는 함수가 `getProject`(통짜) 에서 `getReelStatus`(좁은 셀렉터)로
+    //   바뀌었다. 교훈은 그대로다: **수거가 먼저**여야 방금 끝난 영상을 그 자리에서 본다.
+    expect(src, "아직 통짜를 읽는다 — 2초마다 44.5KB 가 나간다").not.toMatch(/getProject\(/);
+    expect(src.indexOf("collectReelOneShot")).toBeLessThan(src.indexOf("getReelStatus(id"));
   });
 });

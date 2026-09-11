@@ -182,9 +182,24 @@ describe("굽기가 도는 동안 박동한다", () => {
     });
     expect(doc.progress, "접수할 때 한 번 찍어야 한다").toBeTruthy();
     const first = doc.progress.at;
+
+    // ★★★ 2026-09-11 — **매번 쓰지 않는다.** 이 갱신은 낙관적 락이라 통짜를 읽고 통짜를
+    //   쓴다(실측 44.5KB + 44.5KB). 2초마다 하면 굽는 10분 동안 그것만 27MB 다.
+    //   화면이 보는 것은 "마지막 박동이 STALL_MS(2분) 안인가" 하나뿐이라
+    //   HEARTBEAT_MS(30초)마다 한 번이면 충분하다.
+    //   ★ 그래서 **방금 뛴 직후에는 안 뛰는 것이 맞다** — 문서는 이미 싱싱하다.
     await new Promise((r) => setTimeout(r, 5));
     await collectReelOneShot("pid", "uid", { ...deps, collectClip: async () => ({ done: false }) });
-    expect(doc.progress.at, "수거 시도가 진척을 안 갱신했다").toBeGreaterThan(first);
+    expect(doc.progress.at, "방금 뛴 직후인데 또 썼다 — 통짜 왕복이 2초마다 돈다").toBe(first);
+    expect(doc.reel.job, "아직인데 접수증이 지워졌다").toBeTruthy();
+
+    // ★ 그리고 **낡으면 반드시 뛴다** — 이게 없으면 정상으로 굽는 편이 2분 뒤 화면에서
+    //   "멈췄어요"가 된다(lib/progress.js 의 STALL_MS). 묶는 것과 멎는 것은 다르다.
+    const { HEARTBEAT_MS } = await import("../lib/progress.js");
+    doc.progress = { ...doc.progress, at: first - HEARTBEAT_MS - 1 };
+    await collectReelOneShot("pid", "uid", { ...deps, collectClip: async () => ({ done: false }) });
+    expect(doc.progress.at, "박동이 낡았는데 안 뛰었다 — 멀쩡한 편이 멈춤으로 보인다")
+      .toBeGreaterThan(first - HEARTBEAT_MS - 1);
     expect(doc.reel.job, "아직인데 접수증이 지워졌다").toBeTruthy();
   });
 });
