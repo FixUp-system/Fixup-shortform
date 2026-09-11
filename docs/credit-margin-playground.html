@@ -97,7 +97,7 @@
     <div class="slider"><div class="lbl"><span>사용자 수</span><b id="lblUsers"></b></div><input type="range" id="users" min="1" max="3000" step="1"></div>
     <div class="slider"><div class="lbl"><span>1인당 월 크레딧</span><b id="lblCr"></b></div><input type="range" id="crPerUser" min="20" max="3000" step="10"></div>
     <div class="row"><label>"다시" 누수 배수<small>원장 실측: reel 1.3× · 광고 1.0×. 재생성 청구 뒤엔 1.1 안팎으로</small></label><input type="number" id="leak" step="0.05" min="1" max="3" style="border-color:var(--warn)"></div>
-    <div class="row"><label>실패 환불 비율 (%)<small>실측 광고 20%. fal 은 거절에 0원이라 원가는 안 나감</small></label><input type="number" id="refundPct" step="1" min="0" max="80"></div>
+    <div class="row"><label>원가 나간 실패 비율 (%)<small>환불 자체는 중립(fal 거절 0원·손님이 다시 씀). 원가를 치른 뒤 실패한 몫만 — 원장상 드묾</small></label><input type="number" id="refundPct" step="1" min="0" max="50" style="border-color:var(--warn)"></div>
   </fieldset>
 
   <details open>
@@ -155,27 +155,28 @@ const SKUS = [
 const DEFAULTS = {
   usdPerCr:0.06, fx:1400, feePct:10, fixed:63000,
   mode:"price", krwPerCr:120, targetMargin:30,
-  users:100, crPerUser:150, leak:1.1, refundPct:20,
+  users:100, crPerUser:150, leak:1.1, refundPct:3,
 };
 const PRESETS = {
-  "원가 확인 (₩84)":      { krwPerCr:85,  leak:1.3, users:100 },
-  "보수 (₩100)":          { krwPerCr:100, leak:1.1, users:100 },
-  "추천 (₩120)":          { krwPerCr:120, leak:1.1, users:100 },
-  "여유 (₩150)":          { krwPerCr:150, leak:1.1, users:100 },
-  "와디즈 300명":         { krwPerCr:120, leak:1.1, users:300, crPerUser:400 },
+  "원가만 (₩95)":         { krwPerCr:95,  leak:1.1, users:100 },
+  "얇음 (₩120)":          { krwPerCr:120, leak:1.1, users:100 },
+  "얼리버드 (₩135)":      { krwPerCr:135, leak:1.1, users:100 },
+  "추천 (₩150)":          { krwPerCr:150, leak:1.1, users:100 },
+  "와디즈 300명":         { krwPerCr:150, leak:1.1, users:300, crPerUser:400 },
 };
 
 const state = { ...DEFAULTS, cost: Object.fromEntries(SKUS.map(s => [s.key, s.cost])) };
 
 // ── 계산 ───────────────────────────────────────────────────────────────────
-// 크레딧 1개의 원가(₩) = $/cr × 환율 × 누수배수. 환불은 매출을 깎지만 원가는 안 나간다(fal 거절 0원).
-const crCostKrw = () => state.usdPerCr * state.fx * state.leak;
+// 크레딧 1개의 원가(₩) = $/cr × 환율 × 누수배수 × (1 + 원가 나간 실패 비율).
+// ★ 환불은 매출을 깎지 않는다 — fal 거절은 0원이고 환불된 크레딧은 손님이 다시 쓴다. 손실은
+//   "원가를 치른 뒤 실패한 몫"뿐이라 원가 쪽에 얹는다(이전 판은 매출에서 20%를 빼 마진을 과소평가했다).
+const crCostKrw = () => state.usdPerCr * state.fx * state.leak * (1 + state.refundPct / 100);
 const fee = () => state.feePct / 100;
-const refund = () => state.refundPct / 100;
-// 판매가 p 일 때 크레딧 1개의 순이익(₩): p×(1−수수료)×(1−환불) − 원가
-const unitProfit = (p) => p * (1 - fee()) * (1 - refund()) - crCostKrw();
-// 순마진(매출 대비) m 을 내려면 필요한 판매가: p×(1−f)(1−r) − c = m×p → p = c / ((1−f)(1−r) − m)
-const priceForMargin = (m) => { const d = (1 - fee()) * (1 - refund()) - m; return d > 0.005 ? crCostKrw() / d : Infinity; };
+// 판매가 p 일 때 크레딧 1개의 순이익(₩): p×(1−수수료) − 원가
+const unitProfit = (p) => p * (1 - fee()) - crCostKrw();
+// 순마진(매출 대비) m 을 내려면 필요한 판매가: p×(1−f) − c = m×p → p = c / ((1−f) − m)
+const priceForMargin = (m) => { const d = (1 - fee()) - m; return d > 0.005 ? crCostKrw() / d : Infinity; };
 const effectivePrice = () => state.mode === "price" ? state.krwPerCr : priceForMargin(state.targetMargin / 100);
 const monthlyProfit = (users, p) => users * state.crPerUser * unitProfit(p) - state.fixed;
 const breakeven = (p) => { const u = unitProfit(p); return u <= 0 ? Infinity : Math.ceil(state.fixed / (state.crPerUser * u)); };
@@ -189,17 +190,17 @@ function renderCards() {
   const p = effectivePrice(), u = unitProfit(p);
   const rev = state.users * state.crPerUser * p;
   const cost = state.users * state.crPerUser * crCostKrw();
-  const feeKrw = rev * fee(), refundKrw = rev * (1 - fee()) * refund();
+  const feeKrw = rev * fee();
   const net = monthlyProfit(state.users, p);
   const margin = rev > 0 ? net / rev : 0;
   const be = breakeven(p);
   document.getElementById("cards").innerHTML = `
     <div class="card"><div class="k">크레딧당 판매가</div><div class="v">${fmtKrw(p)}</div><div class="s">${state.mode === "margin" ? "목표 순마진 " + state.targetMargin + "% 에 필요한 값" : "크레딧당 원가 " + fmtKrw(crCostKrw()) + " (누수 ×" + state.leak + ")"}</div></div>
     <div class="card"><div class="k">월 매출</div><div class="v">${fmtKrw(rev)}</div><div class="s">${state.users.toLocaleString()}명 × ${state.crPerUser}cr</div></div>
-    <div class="card"><div class="k">월 원가 + 수수료 + 환불</div><div class="v">${fmtKrw(cost + feeKrw + refundKrw)}</div><div class="s">원가 ${fmtKrw(cost)} · 수수료 ${fmtKrw(feeKrw)} · 환불 ${fmtKrw(refundKrw)}</div></div>
+    <div class="card"><div class="k">월 원가 + 수수료</div><div class="v">${fmtKrw(cost + feeKrw)}</div><div class="s">원가 ${fmtKrw(cost)}(누수·실패 포함) · 수수료 ${fmtKrw(feeKrw)}</div></div>
     <div class="card"><div class="k">월 순이익 (고정비 뺀 뒤)</div><div class="v ${cls(margin)}">${fmtKrw(net)}</div><div class="s">순마진 ${fmtPct(margin)} · 고정비 ${fmtKrw(state.fixed)}</div></div>
     <div class="card"><div class="k">손익분기 사용자 수</div><div class="v ${be === Infinity ? "neg" : ""}">${be === Infinity ? "불가" : be.toLocaleString() + "명"}</div><div class="s">${be === Infinity ? "이 판매가로는 크레딧당 손해" : "이 사용량 기준"}</div></div>
-    <div class="card"><div class="k">크레딧 1개당 남는 돈</div><div class="v ${u > 0 ? "pos" : "neg"}">${fmtKrw(u)}</div><div class="s">판매가 − 수수료 − 환불 − 원가</div></div>`;
+    <div class="card"><div class="k">크레딧 1개당 남는 돈</div><div class="v ${u > 0 ? "pos" : "neg"}">${fmtKrw(u)}</div><div class="s">판매가 − 수수료 − 원가(누수·실패 포함)</div></div>`;
 }
 
 function renderSku() {
@@ -207,16 +208,16 @@ function renderSku() {
   const tb = document.querySelector("#skuOut tbody");
   tb.innerHTML = SKUS.map(s => {
     const sell = s.credits * p;
-    const cost = state.cost[s.key] * state.fx * state.leak;
+    const cost = state.cost[s.key] * state.fx * state.leak * (1 + state.refundPct / 100);
     const f = sell * fee();
     const left = sell - f - cost;
     const m = sell > 0 ? left / sell : 0;
     const w = Math.max(0, Math.min(100, m * 100 / 0.6 * 100 / 100 * (60 / 60)));  // 0~60% → 0~100px
     return `<tr><td>${s.name}${s.est ? ' <span class="pill">추정</span>' : ""}</td><td class="n">${s.credits}</td><td class="n">${fmtKrw(sell)}</td><td class="n">${fmtKrw(cost)}</td><td class="n">${fmtKrw(f)}</td><td class="n ${cls(m)}">${fmtKrw(left)}</td><td class="n ${cls(m)}">${fmtPct(m)}</td><td><div class="bar"><i class="${m > 0.15 ? "" : m > 0 ? "warn" : "stop"}" style="width:${Math.max(0, Math.min(100, m / 0.6 * 100))}%"></i></div></td></tr>`;
   }).join("");
-  const worst = SKUS.map(s => (s.credits * p * (1 - fee()) - state.cost[s.key] * state.fx * state.leak) / (s.credits * p)).sort((a, b) => a - b)[0];
+  const worst = SKUS.map(s => (s.credits * p * (1 - fee()) - state.cost[s.key] * state.fx * state.leak * (1 + state.refundPct / 100)) / (s.credits * p)).sort((a, b) => a - b)[0];
   document.getElementById("skuNote").textContent =
-    `이 표는 환불을 안 뺀 "한 편" 기준입니다(환불은 총이익 카드에서 뺍니다). 가장 마진이 얇은 SKU 순마진 ${fmtPct(worst)} — ` +
+    `"한 편" 기준, 누수·실패를 원가에 얹은 값입니다. 가장 마진이 얇은 SKU 순마진 ${fmtPct(worst)} — ` +
     (worst < 0 ? "판매가가 원가를 밑도는 SKU 가 있습니다." : worst < 0.15 ? "누수·환불을 감안하면 여유가 거의 없습니다." : "누수·환불을 감안해도 남습니다.");
 }
 
@@ -261,11 +262,11 @@ function updatePrompt() {
   const rev = state.users * state.crPerUser * p, margin = rev ? net / rev : 0;
   const parts = [];
   parts.push(`크레딧당 판매가 ${fmtKrw(p)}${state.mode === "margin" ? ` (목표 순마진 ${state.targetMargin}% 로 역산)` : ""}, 크레딧당 원가 $${state.usdPerCr} × 환율 ${state.fx} × 누수 ${state.leak} = ${fmtKrw(crCostKrw())}.`);
-  parts.push(`와디즈 수수료 ${state.feePct}%, 실패 환불 ${state.refundPct}%, 월 고정비 ${fmtKrw(state.fixed)}.`);
+  parts.push(`와디즈 수수료 ${state.feePct}%, 원가 나간 실패 ${state.refundPct}%, 월 고정비 ${fmtKrw(state.fixed)}.`);
   parts.push(`사용자 ${state.users.toLocaleString()}명이 월 ${state.crPerUser}cr 씩 쓰면 매출 ${fmtKrw(rev)}, 순이익 ${fmtKrw(net)} (순마진 ${fmtPct(margin)}). 손익분기 ${be === Infinity ? "없음(크레딧당 손해)" : be.toLocaleString() + "명"}.`);
   const changed = SKUS.filter(s => Math.abs(state.cost[s.key] - s.cost) > 1e-9);
   if (changed.length) parts.push("원가를 바꾼 SKU: " + changed.map(s => `${s.name} $${state.cost[s.key]}`).join(", ") + ".");
-  const worst = SKUS.map(s => ({ n: s.name, m: (s.credits * p * (1 - fee()) - state.cost[s.key] * state.fx * state.leak) / (s.credits * p) })).sort((a, b) => a.m - b.m)[0];
+  const worst = SKUS.map(s => ({ n: s.name, m: (s.credits * p * (1 - fee()) - state.cost[s.key] * state.fx * state.leak * (1 + state.refundPct / 100)) / (s.credits * p) })).sort((a, b) => a.m - b.m)[0];
   parts.push(`가장 얇은 SKU 는 ${worst.n} (한 편 순마진 ${fmtPct(worst.m)}).`);
   document.getElementById("prompt").textContent = parts.join("\n");
 }
@@ -304,7 +305,7 @@ function markPreset(name) { presetsEl.querySelectorAll("button").forEach(b => b.
 
 $("copy").onclick = async () => { try { await navigator.clipboard.writeText($("prompt").textContent); $("copy").textContent = "복사됨!"; setTimeout(() => $("copy").textContent = "복사", 1200); } catch { $("copy").textContent = "복사 실패"; } };
 
-applyPreset("추천 (₩120)");
+applyPreset("추천 (₩150)");
 </script>
 </body>
 </html>
