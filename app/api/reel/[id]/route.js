@@ -6,6 +6,9 @@ import { collectReelOneShot } from "../../../../lib/reel/pipeline.js";
 import { normalizeSubtitle } from "../../../../lib/subtitles.js";
 // 자막 **글자**를 고치는 규칙 — 라우트가 문서를 직접 주무르지 않는다(두 벌이 된다).
 import { putSaid } from "../../../../lib/reel/narration.js";
+// 낡음 판정 — 폴링 라우트(status/route.js)와 **같은 함수**다. 라우트마다 손으로 적으면
+// 두 벌이 되고, 한쪽이 조용히 낡는다(이 저장소의 「값이 사는 곳」 규칙).
+import { isReelClipStale } from "../../../../lib/reel/steps.js";
 
 // ★ 2026-09-03 — **배포 기본 상한에 잘리던 자리다.** 보는 문도 수거한다(collectReelOneShot)
 //   상한이 없으면 함수가 조용히 끊기고, 그때 fal 은 계속 만들어 과금하는데 우리 문서에는
@@ -57,7 +60,18 @@ export const GET = withUser(async (_req, { params }, user) => {
       project = viewed?.doc || project;
     }
   }
-  return Response.json({ ...project, mine: viewed.mine, editable: viewed.editable });
+  // ★★★ 2026-09-11 — **낡음 판정을 서버가 실어 보낸다**(`cuts[].stale`).
+  //   폴링 라우트는 이미 이 칸을 싣는다. 여기까지 맞춰 두면 **두 문이 같은 말을 한다** —
+  //   그래야 ⑤영상 화면이 각인을 직접 재는 보험(`?? isReelClipStale(c)`)을 걷을 수 있고,
+  //   그 보험이 걷혀야 폴링 응답에서 각인을 뺄 수 있다(한 편 9.5MB → 2.5MB).
+  //   ⚠️ **지금은 더하기만 한다** — 각인(`image.of`·`video.of`)은 그대로 둔다.
+  //     보관함 상세(app/archive/[id]/page.js)와 ③그림 화면이 이 문에서 각인을 읽는다.
+  //   ★ 없던 `cuts` 를 만들어 내지 않는다 — 빈 배열로 채우면 "컷이 0개"와 "아직 시나리오
+  //     전"이 뭉개진다.
+  const withStale = project.cuts
+    ? { cuts: project.cuts.map((c) => ({ ...c, stale: isReelClipStale(c) })) }
+    : {};
+  return Response.json({ ...project, ...withStale, mine: viewed.mine, editable: viewed.editable });
 }, { guest: true });
 
 // reel 문서에 **자막 설정을 저장하는 문**(2026-08-25).
