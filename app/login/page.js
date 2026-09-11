@@ -141,74 +141,66 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={submit}>
-          {/* ★★★ 2026-09-11 사장님 지시 — 폼 구조를 형제 제품 MCS 형으로 바꿨다.
-              그쪽은 칸마다 `<Label>` 이 **위에** 붙고 **자리표시자가 없다**
-              (`<div className="space-y-1.5"><Label/><Input/></div>`).
-              우리는 반대로 자리표시자만 있고 라벨이 없었다 — 적기 시작하면 그 칸이 무엇이었는지
-              사라지는 모양이다(자리표시자는 글자를 넣는 순간 지워진다).
-              ★ 그래서 `aria-label` 을 뗐다. 보이는 라벨이 있으면 그것이 **그 칸의 이름**이 되고,
-                `aria-label` 을 함께 두면 같은 말이 두 벌이 된다(게다가 보조기술은 aria 쪽을
-                읽어 화면과 갈릴 수 있다). 판도 이제 `htmlFor`/`id` 로 잰다.
-              ★ 칸 순서는 **이름 → 이메일 → 비밀번호 → 확인**이다(2026-09-11 지시).
-                이름은 가입 탭에만 뜨므로 로그인 탭의 첫 칸은 이메일이다. */}
+          {/* ★★★ 2026-09-11 사장님 지시 — 칸 순서는 **이름 → 이메일 → 비밀번호 → 확인**이다.
+              (옛 주석은 "이름은 비밀번호 아래다: 눈이 익은 두 칸을 먼저" 였다. 뒤집혔으니
+               그 문장을 근거로 되돌리지 마라.)
+              ★ 이름은 **가입일 때만** 뜬다. 로그인 탭에서는 첫 칸이 이메일이다.
+              ★ 이름은 필수다(2026-09-10 지시). 화면의 `required` 는 브라우저가 지키는 예의이고
+                진짜 문지기는 라우트다 — app/api/auth/signup/route.js 의 400. */}
           {isSignup && (
-            <div className="login-field">
-              <label className="login-label" htmlFor="name">이름</label>
-              <input
-                id="name"
-                type="text"
-                required
-                autoComplete="name"
-                maxLength={NAME_MAX}
-                className="sent-input sent-input--lg"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
-          )}
-          <div className="login-field">
-            <label className="login-label" htmlFor="email">이메일</label>
             <input
-              id="email"
-              type="email"
+              type="text"
               required
-              autoComplete="email"
+              autoComplete="name"
+              maxLength={NAME_MAX}
               className="sent-input sent-input--lg"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="이름"
+              aria-label="이름"
             />
-          </div>
-          <div className="login-field">
-            <label className="login-label" htmlFor="password">비밀번호</label>
+          )}
+          <input
+            type="email"
+            required
+            autoComplete="email"
+            className="sent-input sent-input--lg"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            aria-label="이메일"
+          />
+          <input
+            type="password"
+            required
+            autoComplete={isSignup ? "new-password" : "current-password"}
+            className="sent-input sent-input--lg"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="비밀번호"
+            aria-label="비밀번호"
+          />
+          {/* ★★★ 2026-09-11 사장님 지시 — "비밀번호가 일치하지 않으면 사용자가 인지할 수
+              있도록". 제출해 봐야 아는 것이 아니라 **적는 도중에** 알린다:
+              · 칸 테두리가 경고색이 된다(.sent-input--bad)
+              · 칸 바로 아래에 한 줄이 뜬다
+              ★ 빈 칸에는 안 띄운다 — 두 글자 적자마자 "다르다"고 하면 아직 다 안 적은 사람을
+                꾸짖는 꼴이다. 확인 칸에 무언가 적힌 뒤부터 잰다.
+              ★ 문구는 lib/password.js 하나에서 온다 — 제출을 막을 때도 같은 말을 쓴다. */}
+          {isSignup && (
             <input
-              id="password"
               type="password"
               required
-              autoComplete={isSignup ? "new-password" : "current-password"}
-              className="sent-input sent-input--lg"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="new-password"
+              className={`sent-input sent-input--lg${mismatch ? " sent-input--bad" : ""}`}
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              placeholder="비밀번호 확인"
+              aria-label="비밀번호 확인"
+              aria-invalid={mismatch || undefined}
             />
-          </div>
-          {/* ★★★ 불일치는 **적는 도중에** 알린다(2026-09-11 지시). 칸 테두리가 경고색이 되고
-              바로 아래 한 줄이 뜬다. 확인 칸이 비어 있으면 안 잰다 — 두 글자 적자마자
-              꾸짖지 않는다. 문구는 lib/password.js 하나에서 온다(제출을 막을 때와 같은 말). */}
-          {isSignup && (
-            <div className="login-field">
-              <label className="login-label" htmlFor="confirm">비밀번호 확인</label>
-              <input
-                id="confirm"
-                type="password"
-                required
-                autoComplete="new-password"
-                className={`sent-input sent-input--lg${mismatch ? " sent-input--bad" : ""}`}
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                aria-invalid={mismatch || undefined}
-              />
-              {mismatch && <p className="login-field-warn warn" role="alert">{PASSWORD_MISMATCH}</p>}
-            </div>
           )}
+          {mismatch && <p className="login-field-warn warn" role="alert">{PASSWORD_MISMATCH}</p>}
           <button type="submit" className="cta cta--block" disabled={busy}>
             {busy ? "확인 중…" : isSignup ? "가입하기" : "로그인"}
           </button>
