@@ -42,9 +42,8 @@
 >   `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` 에서 세션을 열어라.
 >   메인 저장소(main)에서 열면 09-02 판을 읽는다.
 > · **왜 그렇게 했나(회차 서사)** → `C:\Users\fixup\obsidian_jaechan\sources\` 의
->   `shotform-webhook-collect-and-function-storage-2026-09-10.md`(가장 최신 · 수거·웹훅·함수 저장량)
->   ⚠️ **09-11 치는 아직 없다** — 로그인/MCS 맞추기·법률 문서·fal 보관 차단·
->   폴링 좁히기·얼굴 격자 회차의 **상태는 `OUTSTANDING.md` 에 다 있고 서사만 비어 있다.**
+>   `shotform-mcs-login-legal-and-poll-narrowing-2026-09-11.md`(가장 최신 · MCS 맞추기·법률 문서·폴링 좁히기·얼굴 격자)
+>   ← `shotform-webhook-collect-and-function-storage-2026-09-10.md`(수거·웹훅·함수 저장량)
 >   ← `shotform-credit-teardown-and-static-showcase-2026-09-10`(같은 날 앞부분)
 >   ← `shotform-face-pad-and-dark-stage-2026-09-09`
 >   ← **`shotform-egress-outage-and-migration-2026-09-07`**(egress 402 사고 · 새 프로젝트로 이사)

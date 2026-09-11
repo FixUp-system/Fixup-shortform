@@ -248,6 +248,24 @@ const cuts = live?.cuts || project?.cuts || [];     // 폴링 || 진입 라우�
   · `ReelProjectContext` — 진입 라우트로 reel 화면 전부에 문서를 공급한다
   ★ 칸을 **더하는** 것은 소비자에게 안전하다(모르는 칸은 무시된다). 위험은 두 모양뿐이다.
 
+★★★ **09-11 추가 확인 — 자매 라우트가 같은 레버를 "하지 마라"고 못 박아 뒀다(모순이 아니다).**
+`app/api/projects/[id]/cuts/status/route.js`(그리고 `clips/status`·`voice/status`) 주석이
+*"더 줄이려고 각인(image.of·video.of)을 떼면 안 된다 — isImageStale·isClipStale 이 그것으로
+낡음을 판정한다"* 고 적고 있다. **이것을 보고 "기각된 방향"으로 읽으면 틀린다.**
+차이는 하나다 — **판정이 어디서 도는가**:
+| | 판정하는 곳 | 각인을 빼면 |
+|---|---|---|
+| 단계별 흐름 `projects/[id]/*/status` | **화면**(`isImageStale` 을 클라이언트가 부른다) | 🔴 판정 불가 → 경고가 사라진다 |
+| reel 폴링 `reel/[id]/status` | **서버**(이미 `stale: isReelClipStale(c)` 를 싣는다) | ✅ 판정은 살아 있다 |
+즉 reel 쪽은 **레버를 당길 준비가 이미 절반 돼 있다.** 남은 절반이 진입 라우트와 화면이다.
+
+★ **소비자 재확인(09-11 실측, 코드로 확인함)** — 위 표의 "두 모양" 위험에 걸리는 화면은 없다:
+· `app/reel/[id]/images/page.js:126` 이 `c.image?.of` 를 읽지만 **`project?.cuts` 에서 받는다**
+  (`useReelProject` = 진입 라우트). 폴링을 안 본다 → **안전**.
+· `app/archive/[id]/page.js:178` 도 `doc.cuts` (진입) → **안전**.
+· 폴링을 보는 화면은 `app/reel/[id]/video/page.js` **하나뿐**이고, 그 자리가 바로 고칠 곳이다
+  (108행 `live?.cuts || project?.cuts` · 293행 `c.stale ?? isReelClipStale(c)`).
+
 **더 큰 정리(선택지로 남김)**: 두 응답의 컷 모양을 **똑같이** 맞추고, 각인이 필요한
 보관함 상세는 별도 칸으로 받는다. 구조적으로 깨끗하지만 건드리는 화면이 는다.
 
