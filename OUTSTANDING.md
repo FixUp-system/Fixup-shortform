@@ -189,7 +189,7 @@
 | 워크트리 | `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` |
 | 브랜치 | `feat/reel-cut-r2v` (09-03 저녁). ★ 수는 **적지 않는다** — 이 문서를 고치는 커밋이 그 수를 또 바꾼다. **세라**: `git log -1 --format='%h %s'` · `git rev-list --count fixup/main..HEAD` |
 | 테스트 | ✅ **09-11 재실측 전체 초록** — `npx vitest run` = **6,118 통과 · 0 실패 · 10 skipped** / 파일 **364 통과 · 2 skipped**(366) · **exit 0**(cuts 레버 3단계 뒤 재실측 · +18). <br>그 앞: 09-10 저녁 6,020 · 오후 5,929 · 오전 5,878. ⚠️ 09-11 에 80개가 늘었다 — 로그인 화면·법률 문서·fal 머리말·폴링 좁히기의 새 판들이다 |
-| 배포 | ✅ **프로덕션 라이브 `dpl_2kCoUbmPrcnSPTppHCWFU8Tk6s74`**(슬러그 `…-p1dcm62o1-fix-up1` · **2026-09-11 14:43:52 KST** · target=production · Ready · 코드 **`d187bab`**). 배포 직후 `vercel inspect` 로 **별칭이 이 판을 가리키는 것까지** 확인했다(09-10 에 한 판 낡은 것을 적었던 자리라 매번 확인한다). 라이브 실측: `/home`·`/login`·`/archive` **200** · 크론 **401** · 웹훅 GET **405** · **`/legal/terms`·`/legal/privacy` 200**(초안 띠 있음). 자세한 것은 아래 「✅ 09-11 14:43 배포 완료」 절. <br>**그 앞**: `dpl_9pvb…`(09-10 15:27 · `67fb29f`) · `16nbazqod`(09-10 14:1x · `0f3115a`) · `9s729yvsd`(09-10 00:45 · `8bb4858`) |
+| 배포 | ✅ **프로덕션 라이브 `dpl_CKBghfj7giFcCSfxiEGMQsA5FwYm`**(슬러그 `…-5vpjd1h41-fix-up1` · **2026-09-11 15:24:16 KST** · production · Ready · 코드 **`c3fd891`** · ⚡**함수 리전 `icn1` 서울**). 배포 직후 `vercel inspect` 로 별칭이 이 판을 가리키는 것과 함수 5개가 전부 `[icn1]` 인 것을 확인했다. 라이브 실측: `/home`·`/login`·`/archive`·`/legal/*` **200** · 크론 **401** · 웹훅 GET **405**. 데이터 왕복이 **약 5배** 빨라졌다(아래 「⚡ 함수를 서울로」 절). <br>**그 앞**: `dpl_2kCoUb…`(09-11 14:43 · `d187bab` · iad1 · ★롤백 대상) · `dpl_9pvb…`(09-10 15:27 · `67fb29f`) |
 | 배포(그 앞) | `dpl_5twijBmQk7sfYTZbQqMKT3HzVdpn`(별칭 `...-8xu0l4lc3` · 09-07 17:43 · 코드 `d826317`). 09-07 문서는 이 판을 몰랐다 — 오후 커밋까지 배포된 것이 안 적혀 있었다. ⚠️ 배포에 git meta 가 없다(git 없는 폴더에서 올린다) — **어느 코드인지는 `shotform-deploy-clean` 과 파일 대조로만 안다** |
 | 배포(그 앞) | **`6f4ehup0a`**(09-07 11:46 · 코드 `165df59` · `dpl_2Vw2h6T1FoR3DBBw877nhPWQZ1NH`). target=production · status=Ready · 09-07 12:5x 실측 `/login` 200 · `/api/me` 401(로그인 벽, 정상) · `/api/projects` 200(46건) · 🔴 `/api/renders/<옛 id>.mp4` **404**(아래 09-07 절 ③) · 그 앞 판은 `i7d0rc266`(09-04 · `0b2f341`) · ★ **확인법**: `npx vercel inspect fixup-shortform-service.vercel.app` 이 그 배포를 가리키는지 본다 — 이번엔 CSS 가 안 바뀌어 번들 해시로는 못 쟀다 |
 | ★ 정식 도메인 | **`https://fixup-shortform-service.vercel.app`** 다. `vercel deploy` 가 찍어 주는 `...-ju8okg74p-fix-up1.vercel.app` 쪽은 **Deployment Protection(SSO)에 걸려 전부 302** 라 검증에 쓰면 안 된다 — 09-02 에 한 번 속았다 |
@@ -357,6 +357,38 @@ const cuts = live?.cuts || project?.cuts || [];     // 폴링 || 진입 라우�
   🚩 셋은 상용화 배포 때 한 번에 — 그때까지 링크를 외부에 공유하지 마라.
 · **얼굴 격자(32.8%)는 유료 검증 전이다.** 거절이 나면 `maxCell` 부터 의심해라.
 
+
+
+### ⚡ 09-11 15:24 — **함수를 서울로 옮겼다 · 실측 5배** (`c3fd891` · **배포 완료**)
+
+`vercel.json` 에 `"regions": ["icn1"]` **한 줄**. 그전에는 그 줄이 없어 기본값
+**iad1(미국 동부)** 에서 돌았고, Supabase 는 **서울**이라 DB 질의마다 태평양을 왕복했다.
+
+| 라우트 | 전 (iad1) | 후 (icn1) | |
+|---|---|---|---|
+| `/api/projects` | 1.169~1.485초 (중앙 **~1.39**) | 0.253~0.277초 (웜) | **약 5배** |
+| `/api/reel/<id>` | 0.764~1.219초 (중앙 **~1.10**) | 0.202~0.228초 | **약 5배** |
+| `/home`(서버 렌더) | 0.53초 | **0.18초** | 약 3배 |
+각 8회씩 같은 방식으로 쟀다. 변경 후 첫 3회는 0.47~0.53(콜드스타트)이고 그 뒤 0.26 대로 앉는다.
+
+**증거**: `X-Vercel-Id` 가 `icn1::iad1::…` → **`icn1::icn1::…`** 로 바뀌었다.
+`vercel inspect` 에서 함수 **5개 전부 `[icn1]`**.
+
+| | |
+|---|---|
+| 라이브 | **`dpl_CKBghfj7giFcCSfxiEGMQsA5FwYm`** · 슬러그 `…-5vpjd1h41-fix-up1` · **09-11 15:24:16** · Ready |
+| 그 앞 | `dpl_2kCoUb…`(09-11 14:43 · `d187bab` · iad1) ← **롤백하려면 이 판** |
+
+**배포 뒤 라이브 실측(회귀 0)**: `/home`·`/login`·`/archive`·`/legal/terms`·`/legal/privacy`
+**200** · 크론 **401** · 웹훅 GET **405** · 편 `de1cd655` 에서 컷 5개 전부 `stale` 실림 ·
+낡음 판정 1개 · `image.of` 5/5 보존(cuts 레버가 그대로 산다).
+
+★ **되돌리기**: `vercel.json` 의 그 줄을 지우고 재배포. 급하면 대시보드에서 `dpl_2kCoUb…` 로 롤백.
+⚠️ **남는 성질** — 이제 함수가 서울에만 있다. 해외 이용자는 한국까지 와야 하므로 **그쪽이
+  조금 느려진다.** 지금 이용자가 국내라 맞는 선택이고, 해외가 늘면 **Pro 로 올려 다중 리전**을
+  봐야 한다(Hobby 는 한 곳만).
+★ 이것으로 「상용화 전 점검」의 속도 항목은 **닫혔다**. 남은 넷(크레딧 스위치·손님 보관함·
+  사업자 정보·재생성 요금)은 그대로다.
 
 ### 🚦 09-11 — **상용화 전 점검**(라이브 실측 · 사장님 요청)
 
