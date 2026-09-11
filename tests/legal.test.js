@@ -10,7 +10,7 @@
 //   즉 **"반쯤 채운 문서"라는 상태가 제품에 존재하지 않는다.**
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
-import { COMPANY, legalReady, missingCompanyFields } from "../lib/legal/company.js";
+import { COMPANY, legalReady, companyFilled, missingCompanyFields } from "../lib/legal/company.js";
 import { TERMS, PRIVACY, DOCUMENTS } from "../lib/legal/documents.js";
 import { fillCompany, renderDocument } from "../lib/legal/render.js";
 
@@ -18,19 +18,42 @@ const page = readFileSync("app/legal/[doc]/page.js", "utf8");
 const login = readFileSync("app/login/page.js", "utf8");
 
 describe("법률 문서 — 덜 채운 채로 나가지 않는다", () => {
-  it("★★★ 회사 정보가 덜 차면 legalReady 가 false 다", () => {
+  it("★★★ 회사 정보가 덜 차면 그릴 수 없다", () => {
     // 이 판은 값이 차 있든 비어 있든 **둘 다 옳게** 동작해야 한다.
-    const missing = missingCompanyFields();
-    expect(legalReady()).toBe(missing.length === 0);
+    expect(companyFilled()).toBe(missingCompanyFields().length === 0);
   });
 
-  it("★★★ 화면이 legalReady 를 보고 그릴지 정한다 — 안 보면 빈칸이 렌더된다", () => {
-    expect(page, "화면이 준비 여부를 안 본다").toMatch(/legalReady\(\)/);
+  // ★★★ 2026-09-11 — 사장님 지시로 값을 **임의로 채웠다**("초안으로, 최종 상용화 전에 입력").
+  //   그 상태에서 가장 위험한 것은 **0 으로만 된 사업자등록번호가 진짜처럼 공개되는 것**이다
+  //   (허위 사업자 정보 표시). 그래서 "채워졌다"와 "공개해도 된다"를 **갈라 둔다.**
+  it("★★★ 초안이면 채워져 있어도 공개 가능이 아니다", () => {
+    if (COMPANY.draft === true) {
+      expect(companyFilled(), "초안 값조차 덜 채워져 있다").toBe(true);
+      expect(legalReady(), "초안인데 공개 가능으로 읽힌다").toBe(false);
+    } else {
+      expect(legalReady()).toBe(companyFilled());
+    }
+  });
+
+  it("★★★ 초안이면 화면이 **초안 띠**를 세운다 — 진짜처럼 보이면 안 된다", () => {
+    expect(page, "초안 여부를 안 본다").toMatch(/COMPANY\.draft/);
+    expect(page, "초안 띠가 없다").toMatch(/legal-draft/);
+  });
+
+  it("★★ 초안 값이 **실제로 존재할 수 없는 모양**이다 — 진짜와 헷갈리면 안 된다", () => {
+    if (COMPANY.draft !== true) return;
+    expect(COMPANY.bizNo, "초안 사업자등록번호가 진짜처럼 생겼다").toMatch(/^0[0-9-]*0$/);
+    expect(COMPANY.email, "초안 문의 주소가 진짜 도메인이다").toMatch(/@example\.com$/);
+    expect(COMPANY.privacyOfficer.email).toMatch(/@example\.com$/);
+  });
+
+  it("★★★ 화면이 **채워졌는지**를 보고 그릴지 정한다 — 안 보면 빈칸이 렌더된다", () => {
+    expect(page, "화면이 준비 여부를 안 본다").toMatch(/companyFilled\(\)/);
   });
 
   it("★★★ 빈 값을 글자로 메우지 않는다 — 던진다", () => {
     // "(미기재)" 같은 것으로 메우면 그 문서는 **틀린 채로 게시된다**.
-    if (legalReady()) {
+    if (companyFilled()) {
       expect(() => fillCompany("{name}")).not.toThrow();
     } else {
       expect(() => fillCompany("{name}")).toThrow(/비어 있어요/);
@@ -101,8 +124,8 @@ describe("문서 본문 — 사실과 맞는가", () => {
     expect(raw).toBeTruthy();
   });
 
-  it("★ 준비가 끝났으면 실제로 그려진다 — 자리가 하나라도 비면 던진다", () => {
-    if (!legalReady()) return;
+  it("★ 채워졌으면 실제로 그려진다 — 자리가 하나라도 비면 던진다", () => {
+    if (!companyFilled()) return;
     for (const d of DOCUMENTS) {
       const out = renderDocument(d);
       const joined = out.sections.map((s) => s.body.join(" ")).join(" ");

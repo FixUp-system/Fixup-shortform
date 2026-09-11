@@ -2363,6 +2363,18 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
    읽는 화면이라 기둥을 좁힌다. 본문 기둥(1160)을 그대로 쓰면 한 줄이 너무 길어 눈이 줄을
    잃는다. 680 은 한글 본문에서 한 줄 40~45자 안팎이 되는 폭이다. */
 .legal { max-width: 680px; margin-inline: auto; padding-bottom: 40px; }
+/* 초안 띠 — 문서보다 **먼저** 읽혀야 하므로 제목 위에 선다.
+   색은 이 저장소의 한 경고색(--warn)이다. 새 색을 만들면 위험 신호가 두 벌이 된다. */
+.legal-draft {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--warn);
+  border-radius: var(--r-ctl);
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: 14px;
+  line-height: 1.7;
+}
 .legal-sec { margin-top: 28px; }
 .legal-h { font-size: 16px; font-weight: 700; margin: 0 0 8px; }
 .legal-p { margin: 0 0 8px; line-height: 1.8; font-size: 14px; color: var(--ink-soft); }

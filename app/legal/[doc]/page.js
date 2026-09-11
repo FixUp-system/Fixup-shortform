@@ -9,7 +9,7 @@
 //   막는다 — 못 채웠으면 안 보여 주는 것이 맞다.
 import { notFound } from "next/navigation";
 import { DOCUMENTS } from "../../../lib/legal/documents.js";
-import { COMPANY, legalReady } from "../../../lib/legal/company.js";
+import { COMPANY, companyFilled } from "../../../lib/legal/company.js";
 import { renderDocument } from "../../../lib/legal/render.js";
 
 export function generateStaticParams() {
@@ -21,7 +21,7 @@ export default async function LegalPage({ params }) {
   const found = DOCUMENTS.find((d) => d.id === id);
   if (!found) notFound();
 
-  if (!legalReady()) {
+  if (!companyFilled()) {
     // ★ 무엇이 비었는지는 **적지 않는다** — 공개 화면이라 운영 정보를 흘릴 자리가 아니다.
     //   운영자는 tests/legal.test.js 가 빨개지는 것으로 안다.
     return (
@@ -35,6 +35,17 @@ export default async function LegalPage({ params }) {
   const doc = renderDocument(found);
   return (
     <article className="legal">
+      {/* ★★★ 초안 띠 — 2026-09-11. 지금 사업자 정보는 **0 으로만 된 등록번호와 example.com**
+          이다(사장님 지시로 임의 작성). 그것이 진짜처럼 보이면 **허위 사업자 정보를 표시하는
+          것**이 되므로, 문서 맨 위에서 먼저 말한다.
+          ★ `COMPANY.draft` 를 false 로 내리는 순간 이 띠는 사라진다 — 띠를 지우는 것이
+            아니라 **값을 진짜로 바꾸는 것**이 이 자리의 할 일이다. */}
+      {COMPANY.draft && (
+        <p className="legal-draft" role="status">
+          이 문서는 <strong>초안</strong>입니다. 아래 사업자 정보는 실제 값이 아니며,
+          정식 공개 전에 교체됩니다.
+        </p>
+      )}
       <h1 className="pgtitle">{doc.title}</h1>
       <p className="pgsub">시행일 {COMPANY.effectiveOn}</p>
       {doc.sections.map((s) => (
