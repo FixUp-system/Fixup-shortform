@@ -85,8 +85,9 @@ describe("로그인 화면 시각", () => {
   });
 
   it("칸 사이 16px · 버튼 앞 28px 도 실측에서 온 값이다", () => {
+    // ★ 2026-09-11 — 라벨이 생겨 입력끼리 형제가 아니게 됐다. 16px 는 **래퍼끼리** 물린다.
     expect(css).toMatch(
-      /\.login-card \.sent-input--lg \+ \.sent-input--lg \{[^}]*margin-top:\s*16px/
+      /\.login-card \.login-field \+ \.login-field \{[^}]*margin-top:\s*16px/
     );
     expect(css).toMatch(/\.cta--block \{[^}]*margin-top:\s*28px/);
   });
@@ -157,10 +158,11 @@ describe("로그인 화면 시각", () => {
 
 // ★★★ 2026-09-11 사장님 지시 셋 — 순서 · 입력칸 디자인 · 불일치 즉시 알림.
 describe("가입 폼", () => {
-  const at = (label) => login.indexOf('aria-label=' + JSON.stringify(label));
+  // ★ 2026-09-11 — 칸마다 보이는 라벨이 붙으면서 `aria-label` 을 뗐다. 자리는 `id` 로 잰다.
+  const at = (id) => login.indexOf('id=' + JSON.stringify(id));
 
   it("★★★ 칸 순서는 이름 → 이메일 → 비밀번호 → 확인 이다", () => {
-    const order = ["이름", "이메일", "비밀번호", "비밀번호 확인"].map(at);
+    const order = ["name", "email", "password", "confirm"].map(at);
     expect(order.every((i) => i > -1), "칸 하나가 없다").toBe(true);
     for (let i = 1; i < order.length; i++) {
       expect(order[i], `${i}번째 칸이 앞 칸보다 먼저 나온다`).toBeGreaterThan(order[i - 1]);
@@ -184,6 +186,17 @@ describe("가입 폼", () => {
     expect(css).toMatch(/\.sent-input--lg \{[^}]*background:\s*transparent/);
     // 경고색은 새로 만들지 않고 이 저장소의 한 색(--warn)을 쓴다.
     expect(css).toMatch(/\.sent-input--bad \{[^}]*border-color:\s*var\(--warn\)/);
+  });
+
+  it("★★★ 칸마다 **보이는 라벨**이 있고 자리표시자로 대신하지 않는다", () => {
+    // 자리표시자는 글자를 넣는 순간 지워진다 — 적다 보면 그 칸이 무엇이었는지 사라진다.
+    for (const [id, text] of [["name", "이름"], ["email", "이메일"], ["password", "비밀번호"], ["confirm", "비밀번호 확인"]]) {
+      expect(login, `${text} 라벨이 없다`).toMatch(
+        new RegExp('htmlFor="' + id + '">' + text + "<")
+      );
+    }
+    expect(login, "자리표시자가 남아 라벨과 두 벌이다").not.toMatch(/placeholder=/);
+    expect(login, "보이는 라벨이 있는데 aria-label 도 달았다").not.toMatch(/aria-label=/);
   });
 
   it("★ 기본형은 그대로 채운 면이다 — 브리핑·StylePicker 가 쓴다", () => {

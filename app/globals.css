@@ -2265,8 +2265,22 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
 .sent-input--bad:focus-visible { outline-color: var(--warn); }
 /* 칸 **바로 아래** 한 줄. 카드 안이라 폭은 칸과 같고, 다음 칸과 붙지 않게 살짝 띄운다. */
 .login-field-warn { margin: 6px 2px 0; font-size: 12px; }
-/* 칸 사이 — 기본형의 10px 를 이 화면에서만 넓힌다 */
-.login-card .sent-input--lg + .sent-input--lg { margin-top: 16px; }
+/* 칸 사이 — 기본형의 10px 를 이 화면에서만 넓힌다.
+   ★★ 2026-09-11 — 칸마다 **라벨이 생기면서** 입력끼리 더 이상 형제가 아니다(각자 래퍼 안에
+     있다). 그래서 16px 를 **래퍼끼리** 물린다. 옛 선택자(`.sent-input--lg + .sent-input--lg`)를
+     그대로 두면 아무것도 안 잡는 죽은 규칙이 되므로 이 줄이 그 자리를 이어받는다.
+     값 16px 는 2026-08-06 실측에서 온 것이라 그대로다. */
+.login-card .login-field + .login-field { margin-top: 16px; }
+/* 라벨과 칸 사이 — MCS 의 `space-y-1.5`(6px)와 같은 값.
+   ★ 12px/600 은 우리 사다리 안의 값이다(글자 12·14·16·18·30 · 굵기 400·600·700).
+     MCS 라벨은 13px 인데 그 수는 우리 사다리에 없다 — 가장 가까운 12 로 접었다. */
+.login-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
 
 /* 폭을 채우는 큰 버튼. .cta 의 색·반경·패딩 규칙은 그대로 물려받는다.
    line-height 를 죄는 이유: .cta 패딩(12px)은 공유 자산이라 못 건드리는데,
