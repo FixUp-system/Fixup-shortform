@@ -186,6 +186,20 @@ describe("가입 폼", () => {
     expect(css).toMatch(/\.sent-input--bad \{[^}]*border-color:\s*var\(--warn\)/);
   });
 
+  it("★★★ 칸이 MCS Input 의 세 성질을 갖는다 — 그림자·포커스 링·전환", () => {
+    // ① shadow-sm: 테두리만 있으면 납작하다. 값은 토큰이 쥔다(제자리에 손으로 안 적는다).
+    expect(css, "칸이 카드 위로 안 뜬다").toMatch(/\.sent-input--lg \{[^}]*box-shadow:\s*var\(--lift\)/);
+    expect(css, "--lift 토큰이 없다").toMatch(/--lift:\s*0 1px 2px/);
+    // ② 포커스는 **브랜드색 1px 링**이다(기본형은 2px 검정).
+    expect(css, "포커스 링이 없다").toMatch(/\.sent-input--lg:focus-visible \{[^}]*outline:\s*1px solid var\(--btn\)/);
+    // ★ 액센트를 직접 쓰면 디자인 판이 빨개진다 — 같은 값의 --btn 으로 우회한다.
+    expect(css, "액센트를 직접 썼다 — 판이 막는 자리다").not.toMatch(
+      /\.sent-input--lg:focus-visible \{[^}]*var\(--accent/
+    );
+    // ③ 전환 — 포커스가 툭 바뀌지 않는다.
+    expect(css, "전환이 없다").toMatch(/\.sent-input--lg \{[^}]*transition:/);
+  });
+
   it("★ 기본형은 그대로 채운 면이다 — 브리핑·StylePicker 가 쓴다", () => {
     expect(css).toMatch(/\n\.sent-input \{[^}]*background:\s*var\(--deep\)/);
   });

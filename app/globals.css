@@ -152,6 +152,13 @@
      ⚠️ 이 둘은 **쓰는 자리와 함께** 들어왔다(.panel · .dlg). 토큰만 두면 아무 일도 안
        한다 — 이 저장소는 그것을 판으로도 막는다(무대 색 토큰 판과 같은 성질). */
   --ring: 0 0 0 1px var(--line);
+  /* ★ 2026-09-11 — 셋째 단. MCS 의 입력칸이 `shadow-sm` 을 달고 있다(Tailwind 기본값
+     `0 1px 2px rgb(0 0 0 / .05)`). 테두리만 있는 칸은 종이에 그린 선처럼 납작한데,
+     이 한 겹이 칸을 카드 **위에** 올려 놓는다. 세 단의 역할이 다르다:
+       --ring     1px 테두리      (카드가 면을 가진다)
+       --lift     살짝 뜬다       (입력칸이 카드 위에 놓인다)
+       --elevate  떠 있다         (모달이 화면 위에 뜬다) */
+  --lift: 0 1px 2px rgba(0, 0, 0, .05);
   --elevate: 0 4px 24px rgba(0, 0, 0, .05);
 }
 
@@ -2257,6 +2264,23 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
        2026-08-06 실측으로 52px 다 · 판이 그 수를 못 박는다) · 반경 12px(우리는 8/16/999) ·
        글자 13px(우리는 12·14·16·18·30). 바꿀 수 있는 것은 **면**이라 면만 가져왔다. */
   background: transparent;
+  /* ★★ 2026-09-11 — MCS Input 의 `shadow-sm`. 테두리만 있으면 납작한데 이 한 겹이
+     칸을 카드 위에 올린다. */
+  box-shadow: var(--lift);
+  /* MCS 의 `transition-colors` — 포커스가 툭 바뀌지 않고 스며든다.
+     ★ 움직임을 줄여 달라고 한 화면에서는 전역 규칙이 이 전환을 끈다(파일 위 prefers-reduced-motion). */
+  transition: border-color .15s ease, outline-color .15s ease;
+}
+/* ★★★ 포커스 — MCS 는 `focus-visible:ring-1 ring-ring`, 즉 **브랜드색 1px 링**이다.
+   우리 기본형은 `2px 검정`이라 훨씬 세게 튄다(로그인 화면에서만 그 성질을 바꾼다).
+   ⚠️ 색은 `--accent` 가 아니라 **`--btn`** 으로 쓴다. 값은 같은 #B0446A 인데, 이 저장소의
+     판이 `var(--accent…)` 를 **`.side-step.on` 하나**로 제한하기 때문이다
+     ("앱에서 가장 강한 색은 지금 몇 단계인가를 가리킨다"). 화면은 한 픽셀도 안 다르다.
+   ★ `outline-offset: 0` — 기본형은 -1px 로 안쪽에 그려 테두리를 덮는데, 1px 링은 덮으면
+     보이지 않는다. 테두리 **바로 바깥**에 얹는다. */
+.sent-input--lg:focus-visible {
+  outline: 1px solid var(--btn);
+  outline-offset: 0;
 }
 /* 두 비밀번호가 다를 때 — 칸 자체가 말한다(2026-09-11 사장님 지시).
    ★ 색은 `--warn` 이다. 이 저장소에는 빨강(destructive) 토큰이 없고, 경고는 한 색으로 통일돼
