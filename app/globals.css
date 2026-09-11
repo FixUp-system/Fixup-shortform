@@ -2267,6 +2267,13 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
   /* ★★ 2026-09-11 — MCS Input 의 `shadow-sm`. 테두리만 있으면 납작한데 이 한 겹이
      칸을 카드 위에 올린다. */
   box-shadow: var(--lift);
+  /* ★★★ 2026-09-11 사장님 캡처 지적 — **"우리는 완전 네모잖아."**
+     기본형이 `--r-ctl`(8px)이라 52px 키의 칸에서는 각져 보인다. MCS 는 `rounded-md`(12px)를
+     쓰는데 우리 사다리에는 12 가 없다(8/16/999). **사다리를 넓히지 않고** 한 단 위인
+     `--r-card`(16px)를 쓴다 — 52px 키에서 16 은 그쪽 인상과 거의 같다.
+     ★ 이름이 `card` 라고 카드 전용인 것이 아니다. 이 저장소의 반경은 **세 단짜리 사다리**이고
+       (tests/design-system.test.js 가 셋만 허락한다) 이 칸은 그 위 단에 선다. */
+  border-radius: var(--r-card);
   /* MCS 의 `transition-colors` — 포커스가 툭 바뀌지 않고 스며든다.
      ★ 움직임을 줄여 달라고 한 화면에서는 전역 규칙이 이 전환을 끈다(파일 위 prefers-reduced-motion). */
   transition: border-color .15s ease, outline-color .15s ease;
@@ -2297,6 +2304,10 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
    물려받은 1.6 이면 25.6 + 24 = 49.6px 라 min-height 48 이 영영 안 걸린다.
    1.2 로 죄면 19.2 + 24 = 43.2 < 48 → 정확히 48px 가 된다. */
 .cta--block {
+  /* ★ 2026-09-11 — 버튼도 칸과 같은 단으로(사장님 캡처). `.cta` 기본형은 `--r-ctl`(8px)이고
+     그것은 앱 전체가 쓴다 — 이 수식자는 **로그인 화면에서만** 쓰이므로(실측: 그 한 자리)
+     여기서만 한 단 올린다. 칸과 버튼의 모서리가 다르면 한 벌로 안 보인다. */
+  border-radius: var(--r-card);
   display: flex;
   width: 100%;
   min-height: 48px;

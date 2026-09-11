@@ -200,6 +200,12 @@ describe("가입 폼", () => {
     expect(css, "전환이 없다").toMatch(/\.sent-input--lg \{[^}]*transition:/);
   });
 
+  it("★★★ 칸과 버튼의 모서리가 **같은 단**이고 각지지 않는다", () => {
+    // 2026-09-11 사장님 캡처: "우리는 완전 네모잖아". 8px 는 52px 키에서 각져 보인다.
+    expect(css, "칸이 아직 각졌다").toMatch(/\.sent-input--lg \{[^}]*border-radius:\s*var\(--r-card\)/);
+    expect(css, "버튼만 모서리가 다르다 — 한 벌로 안 보인다").toMatch(/\.cta--block \{[^}]*border-radius:\s*var\(--r-card\)/);
+  });
+
   it("★ 기본형은 그대로 채운 면이다 — 브리핑·StylePicker 가 쓴다", () => {
     expect(css).toMatch(/\n\.sent-input \{[^}]*background:\s*var\(--deep\)/);
   });
