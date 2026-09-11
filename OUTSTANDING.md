@@ -360,6 +360,23 @@ const cuts = live?.cuts || project?.cuts || [];     // 폴링 || 진입 라우�
 
 
 
+
+### 🔁 09-11 저녁 — **재생성 상한 3회 통일 + reel 청구** (`c23760e` · 미배포 · 미푸시→푸시)
+
+사장님 결정: *"재생성의 상한을 3회로 전부 통일"*. 무료 횟수는 제안대로(시나리오 3·그림 1·컷 1·광고 0).
+| 무엇 | 상한 | 무료 | 이후 | 세는 자리 |
+|---|---|---|---|---|
+| 시나리오 다시 쓰기 | 3 | 3 (전부) | — | `scenario.tries`(첫 생성부터 세서 `MAX_SCENARIO_TRIES = 1+3`) |
+| 스토리보드 다시 그리기 | 3 | 1 | **`sheet` 7**(통짜 판) / `image` 2×컷(컷별) | `reel.imageTries`(`MAX_REEL_IMAGE_TRIES = 1+3`) |
+| reel 컷 다시 굽기 | 3 | 1 | `REGEN_PRICE.clip` (2.0: 12/25/57) | `cut.clip_regen_count`(단계별과 같은 이름) |
+| 광고 다시 굽기 | 3 | 0 (정가 재청구) | 정가 | **새 칸 `ad_bake_count`** — `videos` 는 갈아끼워져 길이로 못 센다 |
+★ 판 `tests/regen-cap-unified.test.js` 가 셋의 상한이 같은 수인지, reel 이 `chargeRegen` 을 부르는지,
+  광고가 3회에 400 인지 **실제 라우트를 불러** 잰다. `lib/reel/doc.js` 는 import 를 안 두는 파일이라
+  `1 + 3` 을 다시 적었다 — 갈리면 그 판이 먼저 빨개진다.
+★ 회차는 **시도 횟수**다 — 실패해 환불돼도 되돌리지 않는다(컷·그림·광고 같다).
+⚠️ **라이브에서 안 봤다**(미배포). 특히 `ad_bake_count` 는 옛 광고 문서에 없으니 0 으로 시작한다(의도).
+남은 것: 크레딧당 ₩ 결정 · 환불 문구 · 가입 500→60(`SIGNUP_GRANT` 한 줄) · `SHOTFORM_NO_CREDITS` 끄기.
+
 ### 🪙 09-11 — **크레딧 설계 초안**(사장님 결정 대기 · 코드 변경 0)
 
 제안서 → https://claude.ai/code/artifact/e19038ef-ab74-43a3-91b6-df5ee2c294fc
