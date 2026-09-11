@@ -2359,6 +2359,19 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
    의 `text-align: center` 로 그냥 가운데 선다 — inline-flex 도 그 정렬을 따른다.
    ★ 쓰는 데가 없어진 규칙은 남기지 않는다. 남기면 다음 사람이 "문이 둘이었나" 하고 찾는다. */
 
+/* ── 법률 문서(약관·처리방침) — 2026-09-11
+   읽는 화면이라 기둥을 좁힌다. 본문 기둥(1160)을 그대로 쓰면 한 줄이 너무 길어 눈이 줄을
+   잃는다. 680 은 한글 본문에서 한 줄 40~45자 안팎이 되는 폭이다. */
+.legal { max-width: 680px; margin-inline: auto; padding-bottom: 40px; }
+.legal-sec { margin-top: 28px; }
+.legal-h { font-size: 16px; font-weight: 700; margin: 0 0 8px; }
+.legal-p { margin: 0 0 8px; line-height: 1.8; font-size: 14px; color: var(--ink-soft); }
+/* 사업자 정보 — 전자상거래법이 표시하라고 정한 블록. 라벨과 값을 두 칸으로 세운다. */
+.legal-biz { border-top: 1px solid var(--line); padding-top: 20px; }
+.legal-dl { display: grid; grid-template-columns: 140px 1fr; gap: 8px 12px; margin: 0; font-size: 14px; }
+.legal-dl dt { color: var(--ink-soft); }
+.legal-dl dd { margin: 0; }
+
 /* ── 마이페이지 */
 .me-panel { margin-bottom: 16px; }
 .me-h { font-size: 16px; font-weight: 600; margin: 0 0 12px; }

@@ -19,10 +19,31 @@ describe("공개 경로", () => {
   //     401 이고, JWKS 를 못 받아도 401 이다(모르면 닫는다).
   //   ★ 그리고 그 문은 **페이로드를 안 믿는다** — "이 편을 걷어라"는 방아쇠로만 쓰고
   //     무엇이 끝났는지는 우리가 fal 에 다시 묻는다. 뚫려도 돈이 안 나간다.
-  it("다섯뿐이다", () => {
+  // ★★★ 2026-09-11 **다섯에서 여섯이 됐다.** 늘린 것은 `/legal` 하나다 —
+  //   이용약관·개인정보처리방침은 **로그인 전에 읽고 동의하는 문서**라 공개가 아니면
+  //   가입 절차 자체가 성립하지 않는다(개인정보보호법·전자상거래법).
+  //   ★ 여기만 **접두사로 연다.** 위 크론 주석이 "접두사로 열지 마라"고 못 박은 것과
+  //     어긋나 보이지만 성질이 다르다: `/api/cron` 아래에는 **앞으로 만들 문**이 생기고
+  //     그것이 비밀 검사를 빠뜨릴 수 있는 반면, `/legal` 아래에는 **정적 문서 화면만** 산다.
+  //     값이 나가는 문도 남의 것을 읽는 문도 없다. 아래 판이 그 성질을 지킨다.
+  it("여섯뿐이다", () => {
     expect([...PUBLIC_PATHS].sort()).toEqual(
-      ["/api/auth/login", "/api/auth/signup", "/api/cron/collect", "/api/fal/webhook", "/login"].sort()
+      ["/api/auth/login", "/api/auth/signup", "/api/cron/collect", "/api/fal/webhook", "/legal", "/login"].sort()
     );
+  });
+
+  it("★★★ 약관·처리방침이 로그인 없이 열린다 — 안 열리면 가입 절차가 성립하지 않는다", () => {
+    expect(isPublicPath("/legal/terms")).toBe(true);
+    expect(isPublicPath("/legal/privacy")).toBe(true);
+  });
+
+  it("★★★ `/legal` 아래에는 **문서 화면 말고 아무것도 두지 않는다**", async () => {
+    // 접두사로 연 자리라, 여기에 라우트를 하나라도 만들면 그것이 통째로 공개가 된다.
+    const { readdirSync, existsSync } = await import("node:fs");
+    if (!existsSync("app/legal")) return;
+    const entries = readdirSync("app/legal");
+    expect(entries, "/legal 아래에 문서 화면 말고 다른 것이 생겼다").toEqual(["[doc]"]);
+    expect(readdirSync("app/legal/[doc]"), "문서 화면 폴더에 라우트가 섞였다").toEqual(["page.js"]);
   });
 
   it("매직링크 콜백은 더 이상 공개가 아니다", () => {
