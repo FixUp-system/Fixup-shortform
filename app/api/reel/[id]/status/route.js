@@ -50,13 +50,28 @@ export const GET = withUser(async (_req, { params }, user) => {
 
   // ★ 좁은 셀렉터가 `reel` 을 그대로 준다 — reelOf(doc) 를 또 부를 통짜가 없다.
   const reel = project.reel || {};
+  // ★★★ 2026-09-11 3단계 — **화면이 실제로 읽는 칸 넷만 싣는다.**
+  //   idx · image.url · video.url · stale (전수 확인: app/reel/[id]/video/page.js).
+  //   뺀 것은 각인(image.of 3,059B · video.of 1,813B)과 연출칸(clip_prompt ~780B)이다.
+  //   컷 하나 5.4KB → 0.2KB, 한 편 10분 굽기 기준 **9.5MB → 2.5MB**.
+  //
+  // ⚠️⚠️ **이 둘은 반드시 함께 빠져야 한다.** 하나만 빼면 방향만 바뀐 채 여전히 틀린다:
+  //   · 둘 다 뺌            → `"" !== ""`  → 언제나 '안 낡음'(배지가 안 뜬다)
+  //   · 각인만 빼고 연출칸 남김 → `"" !== "…"` → 언제나 '낡음'(멀쩡한 컷에 **돈 나가는**
+  //     재생성을 권한다). 실측으로 확인했다 — tests/reel-stale-on-entry.test.js.
+  //   화면이 `c.stale` 만 보므로 지금은 둘 다 안전하지만, **보험을 되살리면 깨진다.**
+  //
+  // ★ `video` 는 **객체로 남긴다**(url 만 담아서). 진척 세기(reelBakeCounts → isCutDone)가
+  //   `c.video` 의 **존재**를 보기 때문이다 — null 로 바꾸면 "다 구웠다"가 0 이 된다.
+  // ★ 각인은 DB 에서 지우는 것이 아니다. 진입 라우트(GET /api/reel/[id])는 그대로 싣고,
+  //   보관함 상세와 ③그림 화면이 거기서 읽는다.
   const cuts = (project.cuts || []).map((c) => ({
     idx: c.idx,
-    image: c.image || null,
-    clip_prompt: c.clip_prompt || "",
-    video: c.video || null,
-    // ★ 판정은 lib/reel/steps.js 의 isReelClipStale 하나다 — 화면의 "다시 만들기" 배지도
-    //   같은 함수를 본다. 손으로 다시 재면 각인이 흔들려 이미 산 클립이 거짓으로 낡는다.
+    image: c.image ? { url: c.image.url ?? null } : null,
+    video: c.video ? { url: c.video.url ?? null } : null,
+    // ★ 판정은 lib/reel/steps.js 의 isReelClipStale 하나다 — 진입 라우트도 같은 함수를
+    //   부른다. 손으로 다시 재면 각인이 흔들려 이미 산 클립이 거짓으로 낡는다.
+    //   ★ 이 칸이 **각인을 대신한다** — 근거(각인)를 보내는 대신 결론만 보낸다.
     stale: isReelClipStale(c),
   }));
 

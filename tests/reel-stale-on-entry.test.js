@@ -195,3 +195,88 @@ describe("2단계 — ⑤영상 화면이 서버 판정만 본다", () => {
     expect(c, "쓰지 않는 import 가 남았다").not.toMatch(/import\s*\{[^}]*isReelClipStale/);
   });
 });
+
+// ── 3단계 — 폴링이 각인을 안 싣는다 (9.5MB → 2.5MB) ──────────────────────────────
+//
+// ★★★ 여기가 실제로 용량을 줄이는 자리다. 앞 두 단계가 **판정을 서버로 옮겨 놨기
+//   때문에만** 안전하다 — 화면은 이제 `c.stale` 만 보고 각인을 직접 재지 않는다.
+//   ⚠️ 2단계를 되돌리면 이 단계가 **조용히 틀린다**(배지가 안 뜬다). 그래서 2단계의
+//     판과 이 판이 같은 파일에 있다 — 하나를 지우려는 사람이 나머지를 보게 된다.
+//
+// ★ 싣는 칸은 **화면이 실제로 읽는 넷**뿐이다: idx · image.url · video.url · stale.
+//   (2026-09-11 전수 확인: app/reel/[id]/video/page.js 가 컷에서 읽는 것이 이 넷이다.)
+import { GET as REEL_STATUS } from "../app/api/reel/[id]/status/route.js";
+import { reelBakeCounts } from "../lib/reel/oneshot.js";
+
+describe("3단계 — 폴링 응답에서 각인이 빠진다", () => {
+  const readStatus = async (id) => {
+    const res = await REEL_STATUS(req(U), ctx(id));
+    expect(res.status, "폴링 라우트가 안 열렸다").toBe(200);
+    return res.json();
+  };
+
+  it("★★★ 각인이 안 온다 — image.of · video.of · imageOf", async () => {
+    const id = await makeReel([FRESH, STALE]);
+    const st = await readStatus(id);
+
+    for (const c of st.cuts) {
+      expect(c.image?.of, `컷 ${c.idx} 에 그림 각인이 실렸다`).toBeUndefined();
+      expect(c.video?.of, `컷 ${c.idx} 에 영상 각인이 실렸다`).toBeUndefined();
+      expect(c.video?.imageOf, `컷 ${c.idx} 에 그림 각인 대조값이 실렸다`).toBeUndefined();
+    }
+  });
+
+  it("★★★ 연출칸(clip_prompt)도 안 온다 — 화면이 안 읽는다", async () => {
+    // ⚠️ 이것을 남겨 두면 방향이 **반대로** 틀린다(위 「각인만 빼고…」 판 참고):
+    //   각인은 없는데 clip_prompt 가 있으면 `"" !== "…"` 라 전부 낡음이 된다.
+    const id = await makeReel([FRESH, STALE]);
+    const st = await readStatus(id);
+    for (const c of st.cuts) {
+      expect(c.clip_prompt, `컷 ${c.idx} 에 연출칸이 실렸다`).toBeUndefined();
+    }
+  });
+
+  it("★★★ 판정은 그대로 온다 — 이것이 각인을 대신한다", async () => {
+    const id = await makeReel([FRESH, STALE]);
+    const st = await readStatus(id);
+
+    expect(st.cuts[0].stale, "안 낡은 컷").toBe(false);
+    expect(st.cuts[1].stale, "낡은 컷 — 배지가 떠야 하는 자리다").toBe(true);
+  });
+
+  it("★★★ 화면이 읽는 칸 넷은 다 온다 — idx · image.url · video.url · stale", async () => {
+    const id = await makeReel([FRESH, STALE]);
+    const st = await readStatus(id);
+
+    const c = st.cuts[1];
+    expect(c.idx).toBe(1);
+    expect(c.image.url).toBe("https://fal/img1.png");
+    expect(c.video.url).toBe("https://fal/cut1.mp4");
+    expect(c.stale).toBe(true);
+  });
+
+  it("★★ 진입 라우트는 각인을 **그대로** 싣는다 — 두 문이 다르다는 것을 못 박는다", async () => {
+    // 같은 이름의 컷이 두 모양이 된다. 이것이 이 회차가 감수한 대가다 —
+    // 화면은 **두 모양 다에 있는 칸만** 써야 한다. 코드로는 못 막고 이 판으로 막는다.
+    const id = await makeReel([FRESH, STALE]);
+    const entry = await readEntry(id);
+    const poll = await readStatus(id);
+
+    expect(entry.cuts[1].video.of, "진입에서 각인이 사라졌다 — 보관함이 죽는다").toBe("커피를 내리는 손");
+    expect(poll.cuts[1].video.of, "폴링에 각인이 남았다").toBeUndefined();
+    expect(entry.cuts[1].stale, "두 문의 판정이 갈렸다").toBe(poll.cuts[1].stale);
+  });
+
+  it("★★★ 좁힌 컷으로도 진척 세기가 같다 — reelBakeCounts 가 폴링 컷을 받는다", async () => {
+    // app/reel/[id]/video/page.js:128 이 `live.cuts` 를 이 함수에 그대로 넘긴다.
+    // isCutDone 이 `c.video` 의 **존재**를 보므로 url 만 남겨도 값이 같아야 한다.
+    const id = await makeReel([FRESH, STALE]);
+    const entry = await readEntry(id);
+    const poll = await readStatus(id);
+
+    const 문서로 = reelBakeCounts(entry, entry.cuts);
+    const 폴링으로 = reelBakeCounts(entry, poll.cuts);
+    expect(폴링으로, "좁힌 컷에서 진척 수가 달라졌다").toEqual(문서로);
+    expect(폴링으로.done, "둘 다 구워진 컷이다").toBe(2);
+  });
+});

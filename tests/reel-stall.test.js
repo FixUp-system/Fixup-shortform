@@ -99,9 +99,27 @@ describe("reel 상태 라우트가 심장박동을 실어 보낸다", () => {
     const body = await (await GET(req(), { params: Promise.resolve({ id }) })).json();
     for (const key of ["status", "error", "cuts"]) expect(body).toHaveProperty(key);
     expect(body.cuts[0]).toHaveProperty("image");
-    expect(body.cuts[0]).toHaveProperty("clip_prompt");
     expect(body.cuts[0]).toHaveProperty("video");
     expect(body.cuts[0]).toHaveProperty("stale");
+  });
+
+  // ★★★ 2026-09-11 — **`clip_prompt` 는 일부러 뺐다.** 위 판에서 한 줄을 지운 것이 아니라
+  //   여기로 옮겨 **반대 방향으로** 못 박는다. 위 판의 뜻("조용히 사라지지 마라")은 그대로
+  //   살아 있고, 이 칸만 **의도된 제거**로 계약이 바뀐 것이다.
+  //
+  //   왜 뺐나: 2초마다 도는 응답에서 컷 하나가 5.4KB 였고 그 90%가 각인·연출칸이다.
+  //   화면(app/reel/[id]/video/page.js)이 컷에서 읽는 것은 **idx·image.url·video.url·stale
+  //   넷뿐**이라 나머지는 전송량만 먹었다(한 편 9.5MB → 2.5MB).
+  //
+  //   ⚠️ 되살리면 **낡음 배지가 거짓 양성**이 된다 — 각인은 없는데 연출칸만 있으면
+  //   `"" !== "…"` 라 멀쩡한 컷까지 "다시 만들어야 해요"가 되고, 그 버튼은 돈이 나간다.
+  //   근거와 반대 방향까지 tests/reel-stale-on-entry.test.js 에 실측으로 고정해 두었다.
+  it("★★★ 연출칸·각인은 **싣지 않는다** — 화면이 안 읽는 칸이다(의도된 제거)", async () => {
+    const body = await (await GET(req(), { params: Promise.resolve({ id }) })).json();
+    const c = body.cuts[0];
+    expect(c, "연출칸이 되살아났다 — 배지가 거짓 양성이 된다").not.toHaveProperty("clip_prompt");
+    expect(c.image?.of, "그림 각인이 되살아났다").toBeUndefined();
+    expect(c.video?.of, "영상 각인이 되살아났다").toBeUndefined();
   });
 
   it("심장박동이 없는 옛 프로젝트는 null 이다 — 0 이 아니다", async () => {
