@@ -5,7 +5,8 @@ import { getProject, updateProject } from "../../../../../lib/projects.js";
 import { generateImage, imageResolutionFor } from "../../../../../lib/imagegen.js";
 import { buildImagePrompt } from "../../../../../lib/cuts.js";
 import { loadCutRefs } from "../../../../../lib/cut-refs.js";
-import { requireVideoCharge, NoCredits } from "../../../../../lib/charges.js";
+import { requireVideoCharge, NoCredits, assertCanAfford, chargeRegen } from "../../../../../lib/charges.js";
+import { regenPrice } from "../../../../../lib/pricing.js";
 import { modelIdForProject, resolutionForProject } from "../../../../../lib/clip-limits.js";
 import { fakeFal } from "../../../../../lib/fake.js";
 import {
@@ -112,9 +113,41 @@ export const POST = withUser(async (req, { params }, user) => {
     }
   }
 
+  // ★★★ 2026-09-11 — **다시 그리기는 값을 받는다**(사장님: "재생성 상한 3회 통일"). 그전에는
+  //   횟수만 막고 청구가 없었다 — 원장 실측 reel 편당 스토리보드 1.7장(설계 1장).
+  //   첫 그리기(imageTries 0)는 정가에 든 것이라 재생성이 아니다. 다시 그리기 n회째의
+  //   회차는 n-1 (첫 다시 그리기는 공짜 — FREE_REGEN_PER_CUT). 상한(3회)은 위 imageTriesLeft
+  //   가 이미 막는다(MAX_REEL_IMAGE_TRIES = 1 + 3).
+  // ★ 단위가 갈래마다 다르다 — plan.mode 가 가른다: 통짜 판(storyboard)은 한 장($0.401 →
+  //   sheet 7), 컷별(percut)은 nano-banana 장당(image 2)이라 대상 컷마다 받는다.
+  const tries = Number(reel.imageTries) || 0;
+  if (!fakeFal() && tries >= 1) {
+    const prior = tries - 1;
+    const model = modelIdForProject(project);
+    const res = resolutionForProject(project);
+    const bill = plan.mode === "storyboard"
+      ? [{ kind: "sheet", idx: 0, price: regenPrice("sheet", prior, model, res) }]
+      : [...targets].map((idx) => ({ kind: "image", idx, price: regenPrice("image", prior, model, res) }));
+    const total = bill.reduce((sum, b) => sum + b.price, 0);
+    if (total > 0) {
+      try {
+        await assertCanAfford(user.id, total);
+      } catch (e) {
+        if (e instanceof NoCredits) return Response.json({ error: e.message }, { status: 402 });
+        throw e;
+      }
+      for (const b of bill) {
+        if (b.price > 0) {
+          await chargeRegen({
+            userId: user.id, projectId: id, kind: b.kind, idx: b.idx, priorCount: prior, model, resolution: res,
+          });
+        }
+      }
+    }
+  }
+
   const aspect_ratio = project.settings?.aspect_ratio || "9:16";
   const resolution = imageResolutionFor(project);
-  const tries = Number(reel.imageTries) || 0;
   // ★ 수명 회차는 시나리오 재작성으로도 안 돌아온다(scenario 라우트가 이 필드는 안
   //   건드린다) — B2 의 총량 방어선이 실제로 총량이려면 이 카운터가 절대 안 줄어야 한다.
   const triesTotal = Number(reel.imageTriesTotal) || 0;

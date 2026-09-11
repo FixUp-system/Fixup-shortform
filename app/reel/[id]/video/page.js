@@ -17,6 +17,8 @@ import { planReelBake, canBakeReel, isReelOneShotStale, reelSheetUrl, reelWholeP
 //   한다(단계별 흐름의 화면 다섯이 이미 이것을 본다). 화면이 스스로 재면 그 사본이
 //   조용히 갈린다.
 import { generationState } from "../../../../lib/progress";
+// 다시 만들기 상한 — 값은 lib/pricing.js 하나가 쥔다(2026-09-11 · 3회 통일). 화면은 세기만 한다.
+import { MAX_REGEN_PER_CUT } from "../../../../lib/pricing";
 import { startPolling } from "../../../../lib/poll";
 import { REEL_STEPS, reelStepHref } from "../../../../lib/reel/steps";
 import ReelBack from "../../../../components/ReelBack";
@@ -299,6 +301,13 @@ export default function ReelVideoPage() {
                     tests/reel-stale-on-entry.test.js 「2단계」 */}
               {c.stale && c.video?.url && (
                 <span className="tag warn">다시 만들어야 해요</span>
+              )}
+              {/* ★ 2026-09-11 — 다시 만든 횟수. 상한(3회)에 닿으면 서버가 400 으로 막는다 —
+                    그 400 을 처음 보는 자리가 이 표시다(단계별 화면과 같은 모양). */}
+              {(c.clip_regen_count || 0) > 0 && (
+                <span className={`tag${(c.clip_regen_count || 0) >= MAX_REGEN_PER_CUT ? " warn" : ""}`}>
+                  다시 만듦 {c.clip_regen_count}/{MAX_REGEN_PER_CUT}
+                </span>
               )}
             </div>
           ))}

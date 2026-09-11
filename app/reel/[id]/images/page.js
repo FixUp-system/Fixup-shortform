@@ -157,7 +157,9 @@ export default function ReelImagesPage() {
       disabled={!canDraw || drawingNow || !scenario?.text}
       onClick={() => draw(hasImages ? cuts.map((c) => c.idx) : null)}
     >
-      {drawingNow ? "그리는 중…" : hasImages ? "다시 만들기" : "그림 만들기"}
+      {/* ★ 2026-09-11 — 남은 다시 그리기 횟수(상한 3회 · 첫 1회 무료, 그 뒤 유료).
+            triesLeft 는 lib/reel/doc.js 의 imageTriesLeft — 서버와 같은 판정이다. */}
+      {drawingNow ? "그리는 중…" : hasImages ? `다시 만들기 (${triesLeft}회 남음)` : "그림 만들기"}
     </button>
   );
 

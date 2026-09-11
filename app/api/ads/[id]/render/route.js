@@ -1,7 +1,8 @@
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { startAdRender } from "../../../../../lib/ad/pipeline.js";
 import { assertCanAfford, NoCredits, alreadyChargedAd } from "../../../../../lib/charges.js";
-import { adVideoPrice } from "../../../../../lib/pricing.js";
+import { adVideoPrice, MAX_REGEN_PER_CUT } from "../../../../../lib/pricing.js";
+import { updateProject } from "../../../../../lib/projects.js";
 import { hasRenderedAdVideo } from "../../../../../lib/ad/attempt.js";
 import { loadAd } from "../route.js";
 import { getStore } from "../../../../../lib/store/index.js";
@@ -46,6 +47,19 @@ export const POST = withUser(async (_req, { params }, user) => {
   //
   // 굽는 도중(청구는 했지만 아직 videos 가 없는) 재시도는 여기서 openNewAttempt==false 라
   // 계속 통과한다 — 그게 옳다(같은 회차를 이어서 굽는 정상 흐름).
+  // ★★★ 2026-09-11 — **다시 굽기 상한 3회**(사장님: "재생성 상한을 3회로 전부 통일").
+  //   광고는 다시 만들 때마다 정가를 다시 받으므로 값은 새지 않았지만 **횟수 상한이 없었다.**
+  //   회차는 프로젝트 문서(ad_bake_count)가 센다 — 첫 굽기는 재생성이 아니라 안 센다.
+  //   videos 는 매번 **갈아끼워지므로**(lib/ad/pipeline.js 의 `videos: [{…}]`) 그 길이로는
+  //   못 센다. 상수는 컷·시나리오·그림과 **같은 것**을 본다(MAX_REGEN_PER_CUT).
+  const rebake = hasRenderedAdVideo(project);
+  if (rebake && (Number(project.ad_bake_count) || 0) >= MAX_REGEN_PER_CUT) {
+    return Response.json(
+      { error: `다시 만들기를 다 썼어요 — 영상 다시 만들기는 ${MAX_REGEN_PER_CUT}회까지예요` },
+      { status: 400 }
+    );
+  }
+
   if (!(await alreadyChargedAd(id)) || hasRenderedAdVideo(project)) {
     try {
       // ★ 모델을 넘긴다 — 안 넘기면 항상 기본 모델 값으로 잔액을 검사하게 되어,
@@ -77,6 +91,12 @@ export const POST = withUser(async (_req, { params }, user) => {
   // 몇 초로 끝나고, 완성은 화면이 두드리는 GET …/status 가 수거한다.
   try {
     await startAdRender(id, user.id);
+    // ★ 접수가 **성공한 뒤에만** 회차를 올린다 — 접수가 던지면(잔액·fal 접수 실패) 회차를
+    //   안 쓴 것이다. 실패한 굽기는 환불되지만(failAndRefund) 회차는 되돌리지 않는다 —
+    //   "다시 만들기 3회"는 시도 횟수이지 성공 횟수가 아니다(컷·그림도 같다).
+    if (rebake) {
+      await updateProject(id, user.id, (p) => ({ ...p, ad_bake_count: (Number(p.ad_bake_count) || 0) + 1 }));
+    }
   } catch (e) {
     // 여기서 실패하면 startAdRender 가 이미 환불하고 문서에 video_error 를 남겼다.
     console.error("광고 접수 실패:", e);

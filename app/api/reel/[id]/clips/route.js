@@ -4,7 +4,9 @@ import { runReelClips, runReelOneShot } from "../../../../../lib/reel/pipeline.j
 import { planReelBake, canBakeReel } from "../../../../../lib/reel/oneshot.js";
 import { putReel, reelOf } from "../../../../../lib/reel/doc.js";
 import { getProject, updateProject } from "../../../../../lib/projects.js";
-import { requireVideoCharge, NoCredits } from "../../../../../lib/charges.js";
+import { requireVideoCharge, NoCredits, assertCanAfford, chargeRegen } from "../../../../../lib/charges.js";
+import { regenPrice, MAX_REGEN_PER_CUT } from "../../../../../lib/pricing.js";
+import { isReelClipStale } from "../../../../../lib/reel/steps.js";
 import { modelIdForProject, resolutionForProject } from "../../../../../lib/clip-limits.js";
 import { fakeFal } from "../../../../../lib/fake.js";
 import { isGenerationLive } from "../../../../../lib/progress.js";
@@ -81,6 +83,61 @@ export const POST = withUser(async (req, { params }, user) => {
     } catch (e) {
       if (e instanceof NoCredits) return Response.json({ error: e.message }, { status: 402 });
       throw e;
+    }
+  }
+
+  // ★★★ 2026-09-11 — **다시 굽기는 값을 받고, 3회에 막는다**(사장님: "재생성 상한 3회 통일").
+  //   그전에는 정가를 한 번 내면 클립 재굽기가 **무제한 0원**이었다 — 원장 실측으로
+  //   삭제된 어느 편이 클립만 $12.14 를 썼다. 단계별 흐름(app/api/projects/[id]/clips/route.js)
+  //   과 **같은 모양**이다: 회차는 프로젝트 문서(clip_regen_count)가 세고, 상한은 청구 앞에서
+  //   보고 막고, 첫 회는 공짜(FREE_REGEN_PER_CUT), 그 뒤는 REGEN_PRICE.
+  // ★ "다시 굽는 컷"의 판정은 파이프라인과 **같은 식**이어야 한다 — runReelClips 는
+  //   `cut.video?.url && !isReelClipStale(cut)` 이면 건너뛴다. 그 반대(굽는 컷) 중 **이미
+  //   영상이 있는 컷**만 재생성이다. 첫 굽기는 재생성이 아니다(정가에 들어 있다).
+  // ★ 통짜(oneshot)는 한 편이 곧 컷 0 이다 — 파이프라인이 건너뛰지 않으므로 영상이 있으면
+  //   무조건 다시 굽는 것이고, 회차도 컷 0 에 센다.
+  if (!fakeFal()) {
+    const cuts = project.cuts || [];
+    const rebaking = plan.mode === "oneshot"
+      ? cuts.slice(0, 1).filter((c) => c?.video?.url)
+      : cuts.filter((c) => c?.video?.url && isReelClipStale(c));
+    if (rebaking.length) {
+      const model = modelIdForProject(project);
+      const resolution = resolutionForProject(project);
+      const over = rebaking.filter((c) => (Number(c.clip_regen_count) || 0) >= MAX_REGEN_PER_CUT);
+      if (over.length) {
+        const which = over.map((c) => c.idx + 1).join("·");
+        return Response.json(
+          { error: `${which}번 컷은 다시 만들기를 다 썼어요 — 영상 다시 만들기는 컷당 ${MAX_REGEN_PER_CUT}회까지예요` },
+          { status: 400 }
+        );
+      }
+      const bill = rebaking.map((c) => {
+        const prior = Number(c.clip_regen_count) || 0;
+        return { idx: c.idx, prior, price: regenPrice("clip", prior, model, resolution) };
+      });
+      const total = bill.reduce((sum, b) => sum + b.price, 0);
+      if (total > 0) {
+        try {
+          await assertCanAfford(user.id, total);
+        } catch (e) {
+          if (e instanceof NoCredits) return Response.json({ error: e.message }, { status: 402 });
+          throw e;
+        }
+      }
+      for (const b of bill) {
+        if (b.price > 0) {
+          await chargeRegen({
+            userId: user.id, projectId: id, kind: "clip", idx: b.idx, priorCount: b.prior, model, resolution,
+          });
+        }
+        await updateProject(id, user.id, (proj) => ({
+          ...proj,
+          cuts: (proj.cuts || []).map((c) =>
+            c.idx === b.idx ? { ...c, clip_regen_count: (Number(c.clip_regen_count) || 0) + 1 } : c
+          ),
+        }));
+      }
     }
   }
 

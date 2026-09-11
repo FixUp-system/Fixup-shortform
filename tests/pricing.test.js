@@ -1,7 +1,7 @@
 // 가격표 — 이 저장소에서 값이 바뀔 것을 전제로 만든 유일한 자리다.
 // 숫자 자체보다 "표 밖에 숫자가 없다"와 "경계에서 어느 쪽으로 떨어지나"를 못 박는다.
 import { describe, it, expect } from "vitest";
-import { VIDEO_PRICE, REGEN_PRICE, FREE_REGEN_PER_CUT, DEFAULT_GRANT, videoPrice, regenPrice, AD_VIDEO_PRICE, adVideoPrice, MAX_SCENARIO_TRIES } from "../lib/pricing.js";
+import { VIDEO_PRICE, REGEN_PRICE, FREE_REGEN_PER_CUT, DEFAULT_GRANT, videoPrice, regenPrice, AD_VIDEO_PRICE, adVideoPrice, MAX_SCENARIO_TRIES, MAX_SCENARIO_REWRITES } from "../lib/pricing.js";
 import { TARGET_CHOICES } from "../lib/script.js";
 import { AD_MODELS, DEFAULT_AD_MODEL, LEGACY_AD_MODEL, DEFAULT_AD_RESOLUTION, adSecondsFor, adResolutionsFor } from "../lib/ad/models.js";
 // ★ lib/pricing.js 는 화면이 import 하는 파일이라 lib/clip-limits.js 를 끌어올 수 없다
@@ -382,6 +382,9 @@ describe("광고 영상 정가", () => {
   });
 
   it("시나리오 다시 쓰기 상한이 있다 — 무료·무제한이면 원가가 샌다", () => {
-    expect(MAX_SCENARIO_TRIES).toBe(20);
+    // ★ 2026-09-11 — 20 → 1+3. tries 는 첫 생성부터 세므로 "다시 쓰기 3회" = 4 다.
+    //   3 이라는 수 자체는 tests/regen-cap-unified.test.js 가 컷·그림과 함께 대조한다.
+    expect(MAX_SCENARIO_TRIES).toBe(1 + MAX_SCENARIO_REWRITES);
+    expect(MAX_SCENARIO_REWRITES).toBe(3);
   });
 });
