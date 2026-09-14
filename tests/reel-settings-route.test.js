@@ -90,6 +90,22 @@ describe("PATCH /api/reel/[id]/settings", () => {
     expect(after.settings.seconds).toBe(15);
   });
 
+  it("★★ 이미 어긋난 문서라도 **무관한 축**은 고쳐진다 — 이 문이 만든 어긋남이 아니다", async () => {
+    // 08-25 이전 reel 문서에는 길이가 모델 상한 위인 것이 있다(2.0 은 15초까지).
+    // 쌍 검사를 모든 요청에 걸면 화풍·비율까지 "길이도 함께 바꿔 주세요"로 막히는데,
+    // 시나리오 확정 뒤에는 길이가 잠겨(409) 그 지시를 따를 수 없다 — 탈출구가 없어진다.
+    const p = await makeReel({
+      settings: { aspect_ratio: "9:16", target_seconds: 30, seconds: 30, i2v_model: "seedance-2.0", resolution: "720p", style: "photo" },
+    });
+    const res = await PATCH(req({ aspect_ratio: "1:1" }), ctx(p.id));
+    expect(res.status, await res.text()).toBe(200);
+    const after = await projects.getProject(p.id, A);
+    expect(after.settings.aspect_ratio).toBe("1:1");
+    // 어긋난 쌍은 **그대로 둔다** — 몰래 고치지도, 막지도 않는다.
+    expect(after.settings.target_seconds).toBe(30);
+    expect(after.settings.i2v_model).toBe("seedance-2.0");
+  });
+
   it("★ 비율은 고쳐진다 — 200 경로도 잰다(ok()·ASPECTS 모양이 어긋나면 전부 400 이 된다)", async () => {
     const p = await makeReel();
     const res = await PATCH(req({ aspect_ratio: "1:1" }), ctx(p.id));

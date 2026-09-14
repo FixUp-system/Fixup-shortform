@@ -119,10 +119,20 @@ export const PATCH = withUser(async (req, { params }, user) => {
   // ★ `??` 가 아니라 `in` 으로 고른다. `??` 는 null 을 저장값으로 되돌려, 몸통이 보낸
   //   `target_seconds: null` 이 검사를 지나 그대로 저장된다 — 길이가 조용히 null 이 되는
   //   그 옛 함정이다(CLAUDE.md "이어서 할 일" 7번). 여기서 재는 것은 **저장될 값**이다.
+  // ★★★ Ruling 9 — 이 검사는 **그 쌍이 바뀌는 요청**에만 건다.
+  //   이 문의 일은 **나쁜 쌍을 만들지 않는 것**이지, 이미 나쁜 문서의 무관한 축을 잠그는
+  //   것이 아니다 — 그 쌍은 이 문이 만든 것이 아니다(08-25 이전 reel 문서에는 길이가
+  //   모델 상한 위이거나 아예 없는 것이 있다).
+  //   ⚠️ 조건 없이 돌리면 **탈출구가 없어진다**: 2.0+30초 문서에 `{ style: "anime" }`
+  //     하나를 보내도 "길이도 함께 바꿔 주세요"로 400 인데, **시나리오 확정 뒤에는 길이가
+  //     잠겨(409) 그 지시를 따를 수 없다.** 고칠 수 없는 것을 고치라고 말하는 화면이 된다.
+  //   ★ Important 1(모델만 내리기)은 그대로 막힌다 — 모델만 보내도 `i2v_model` 이 next 에
+  //     들어오므로 검사가 돈다. 그 판이 깨지면 이 조건이 틀린 것이다.
+  const touchesPair = "i2v_model" in next || "target_seconds" in next;
   const model = "i2v_model" in next ? next.i2v_model : project?.settings?.i2v_model;
   const seconds = "target_seconds" in next ? next.target_seconds : project?.settings?.target_seconds;
   const choices = secondsForModel(model);
-  if (!choices.includes(seconds)) {
+  if (touchesPair && !choices.includes(seconds)) {
     // ⚠️ 길이를 **몰래 함께 내려 저장하지 않는다.** 사장님이 안 보낸 값을 저장이 조용히
     //   바꾸면 화면이 보여 준 것과 저장된 것이 갈린다. 막고, **무엇을 함께 바꿔야 하는지**
     //   말해 준다. 고를 값은 손으로 적지 않고 표에서 뽑아 붙인다.
@@ -136,12 +146,17 @@ export const PATCH = withUser(async (req, { params }, user) => {
       { status: 400 },
     );
   }
-  // ★ **화질에는 같은 쌍 검사를 안 건다**(Ruling 8 의 선택지). 비대칭이 무해해서다:
-  //   모델만 바꿔 저장된 화질이 새 모델 목록 밖이 되어도 resolutionForProject 가 읽는
-  //   자리에서 그 모델의 기본값으로 정규화하고, **정가(requireVideoCharge)도 fal 호출도
-  //   그 정규화된 값을 읽는다**(app/api/reel/[id]/images/route.js). 길이에는 그 자가치유가
-  //   없어서 저장된 값이 그대로 갈래를 가른다 — 그래서 길이만 여기서 막는다.
-  //   (문서에 남는 옛 화질값을 어떻게 할지는 원장에 미뤄 둔 별개 질문이다.)
+  // ★ **화질에는 같은 쌍 검사를 안 건다**(Ruling 8 의 선택지). 돈이 안 갈려서다:
+  //   모델만 바꿔 저장된 화질이 새 모델 목록 밖이 되어도, **정가(requireVideoCharge)와
+  //   fal 호출은 resolutionForProject 를 거친다**(app/api/reel/[id]/images/route.js ·
+  //   clips/route.js) — 거기서 그 모델의 기본값으로 정규화된다.
+  //   ⚠️ **"읽는 자리 전부"는 아니다**: lib/reel/oneshot.js(격자·칸 수)와
+  //     app/api/reel/[id]/scenario/route.js 의 reelSceneCountRule 은 `settings.resolution`
+  //     을 **날것으로** 읽는다. 오늘은 도달 불가다 — 단계별이 여는 두 모델(2.0·2.5)의
+  //     화질 목록이 ["480p","720p"] 로 같아서 모델을 갈아타도 목록 밖이 될 수 없다.
+  //     화질 목록이 갈리는 모델이 단계별에 열리는 날 이 자리를 다시 봐야 한다.
+  //   ★ 길이에는 그 정규화가 아예 없어서 저장된 값이 그대로 갈래를 가른다 — 그래서
+  //     길이만 여기서 막는다. (문서에 남는 옛 화질값은 원장에 미뤄 둔 별개 질문이다.)
 
   // ★ 길이는 이름이 둘이다 — target_seconds(정가·청구)와 seconds(시나리오 생성).
   //   한쪽만 고치면 값이 갈린다(app/api/reel/route.js 의 주석과 같은 이유).
