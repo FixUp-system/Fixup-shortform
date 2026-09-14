@@ -202,7 +202,7 @@ export default function FilmNewPage() {
                     </button>
                   ))}
                 </div>
-                <div className="tray-note">{aspectFor(aspect).note}에 맞는 규격이에요</div>
+                <div className="tray-note">{aspectFor(aspect).fits}</div>
               </div>
             </div>
           </div>

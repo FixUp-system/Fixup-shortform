@@ -18,7 +18,9 @@ import { planReelBake, canBakeReel, isReelOneShotStale, reelSheetUrl, reelWholeP
 //   조용히 갈린다.
 import { generationState } from "../../../../lib/progress";
 // 다시 만들기 상한 — 값은 lib/pricing.js 하나가 쥔다(2026-09-11 · 3회 통일). 화면은 세기만 한다.
-import { MAX_REGEN_PER_CUT } from "../../../../lib/pricing";
+import { MAX_REGEN_PER_CUT, regenPrice, priceLabel } from "../../../../lib/pricing";
+import { modelIdForProject, resolutionForProject } from "../../../../lib/clip-limits";
+import { useMe } from "../../../../components/MeContext";
 import { startPolling } from "../../../../lib/poll";
 import { REEL_STEPS, reelStepHref } from "../../../../lib/reel/steps";
 import ReelBack from "../../../../components/ReelBack";
@@ -168,13 +170,32 @@ export default function ReelVideoPage() {
   //   ★ 생김새도 맞춘다 — ②③④가 전부 `.mini` 다. 여기만 `.cta` 라 다른 종류로 보였다.
   //   ★ "그 줄에 혼자 선다"는 규율은 그대로다: 칸 안에서도 이 버튼 하나뿐이고,
   //     아직 안 만들었을 때의 실행줄에도 이것 하나뿐이다(되돌아가는 링크는 아래 줄이다).
+  // ★★ 2026-09-14 — **다시 만들기 값을 버튼에 적는다**(사장님 지시: 빠진 중요 정보 보완).
+  //   서버(app/api/reel/[id]/clips/route.js)와 **같은 식**이다: 통짜는 컷 0 한 편, 컷별은
+  //   영상이 있고 낡은 컷만 다시 굽고, 컷마다 회차(clip_regen_count)로 regenPrice 를 받는다.
+  //   첫 굽기는 값이 없다 — 정가는 ③이미지에서 이미 받았다(같은 청구 문을 지난다).
+  //   ★ 크레딧 게이트가 꺼져 있거나 내부 계정이면(me.gated 가 false) 값을 안 적는다.
+  const { me, ready: meReady } = useMe();
+  const showCredits = meReady && me?.gated === true;
+  const rebakeTotal = (() => {
+    const redo = oneShot
+      ? cuts.slice(0, 1).filter((c) => c?.video?.url)
+      : cuts.filter((c) => c?.video?.url && c.stale);
+    const model = modelIdForProject(project);
+    const res = resolutionForProject(project);
+    return redo.reduce((sum, c) => sum + regenPrice("clip", Number(c.clip_regen_count) || 0, model, res), 0);
+  })();
   const bakeBtn = (
     /* ★★ 잠그는 것은 **정말로 도는 중일 때**다(gen.kind). `rendering` 으로 잠그면
        얼어붙은 실행에서 status 가 영영 "rendering" 이라 사장님이 다시 만들 문이 없다 —
        서버의 잠금도 같은 임계(심장박동 2분)로 함께 풀린다. */
     <button className="mini" disabled={gen.kind === "running" || !!busy || !ready} onClick={startClips}>
       {/* ★ 화살표를 안 붙인다 — 굽는 버튼이지 다음 화면으로 가는 버튼이 아니다. */}
-      {busy === "clips" ? "시작하는 중…" : doneCount > 0 ? "다시 만들기" : "영상 만들기"}
+      {busy === "clips"
+        ? "시작하는 중…"
+        : doneCount > 0
+          ? `다시 만들기 · ${showCredits && rebakeTotal > 0 ? priceLabel(rebakeTotal) : "무료"}`
+          : "영상 만들기"}
     </button>
   );
 
@@ -214,7 +235,7 @@ export default function ReelVideoPage() {
         <p className="pgsub">
           <span className="spinner" aria-hidden="true" />{" "}
           {oneShot
-            ? "한 편을 통째로 만들고 있어요 — 몇 분 걸려요. 다 되면 여기에 나타나요."
+            ? "영상을 만드는 중이에요 — 몇 분 걸려요. 다 되면 여기에 나타나요."
             : `컷 ${doneCount}/${cuts.length} 만드는 중이에요 — 다 되면 여기에 나타나요.`}
         </p>
       )}
@@ -310,7 +331,10 @@ export default function ReelVideoPage() {
                     그 400 을 처음 보는 자리가 이 표시다(단계별 화면과 같은 모양). */}
               {(c.clip_regen_count || 0) > 0 && (
                 <span className={`tag${(c.clip_regen_count || 0) >= MAX_REGEN_PER_CUT ? " warn" : ""}`}>
-                  다시 만듦 {c.clip_regen_count}/{MAX_REGEN_PER_CUT}
+                  {/* ★ 2026-09-14 — "다시 만듦 1/3" 대신 남은 횟수로 말한다(③이미지와 같은 말투). */}
+                  {(c.clip_regen_count || 0) >= MAX_REGEN_PER_CUT
+                    ? "다시 만들기 끝"
+                    : `다시 만들기 ${MAX_REGEN_PER_CUT - (c.clip_regen_count || 0)}회 남음`}
                 </span>
               )}
             </div>

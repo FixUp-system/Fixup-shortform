@@ -15,8 +15,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { adModel } from "../../../lib/ad/models";
-import { I2V_MODELS, modelIdForProject, resolutionForProject } from "../../../lib/clip-limits";
-import { axesOf, motionAxisFor } from "../../../lib/motion";
+import { modelIdForProject, resolutionForProject } from "../../../lib/clip-limits";
 import { archiveVideoUrl } from "../../../lib/archive/video";
 // 사람이 읽는 값으로 옮기는 자리 — 화풍 라벨과 붙인 레퍼런스(lib/archive/spec.js).
 // 화면 안 삼항식으로 두면 값으로 잴 방법이 없다(옆 파일이 그 이유로 생겼다).
@@ -252,8 +251,9 @@ function ArchiveDetailPageBody() {
   const modelLabel = isFilm
     ? null
     : isAd
-      ? adModel(s.model)?.name || adModel(s.model)?.label
-      : I2V_MODELS.find((m) => m.id === modelId)?.label || modelId;
+      ? adModel(s.model)?.label
+      // ★ 2026-09-14 — 업체 모델명(Kling v3·MiniMax H3)은 안 적는다(사장님 지시). 원클릭만 기본/프로로 적는다.
+      : null;
   const resolution = isAd ? s.resolution : isFilm ? null : resolutionForProject(doc);
   const seconds = isAd ? s.seconds : isFilm ? s.seconds ?? null : s.target_seconds;
   // ★ 화풍은 표(lib/styles.js)의 라벨로 옮긴다 — 그전에는 id 가 그대로 떴다(`vlog`).
@@ -305,121 +305,14 @@ function ArchiveDetailPageBody() {
                 </div>
               )}
 
-              <Row label="사용자 입력">
+              <Row label="내가 적은 내용">
                 {doc.material?.text ? <UserInput text={doc.material.text} /> : null}
               </Row>
             </div>
 
-            {/* 영상을 만든 글 — 광고·reel 은 시나리오 지시문 하나, 단계별은 원고다.
-                ★ **접어 둔다.** 시나리오는 4,000자까지라 펼쳐 두면 위의 짧은 정보(모델·길이)가
-                  저 아래로 밀린다. <details> 를 쓰는 이유: 키보드·스크린리더 동작이 이미
-                  붙어 있다 — useState 로 흉내 내면 그것을 직접 만들어야 하고 대개 빠뜨린다.
-                ★★ 2026-08-21 리뷰 A1 — reel 도 doc.scenario.text 다(lib/ad/scenario.js 의
-                  generateScenario 를 그대로 쓴다, app/api/reel/[id]/scenario/route.js) —
-                  광고와 같은 자리라 조건에 더한다. reel 에는 doc.script 가 아예 없어서
-                  안 더하면 이 화면에 프롬프트 글이 통째로 안 보인다. */}
-            {isAd && doc.scenario?.text && (
-              <details className="lib-fold">
-                <summary>프롬프트 — 영상 모델에 넘긴 글</summary>
-                <p className="script-src">{doc.scenario.text}</p>
-              </details>
-            )}
-
-            {/* ── reel — **프롬프트 둘**이다(2026-08-27). 만드는 방식이 그렇기 때문이다:
-                한 장을 그리고(이미지 생성 프롬프트) 그 한 장을 통째로 넘겨 굽는다(영상 프롬프트). */}
-            {isReel && reelImagePrompt && (
-              <details className="lib-fold">
-                <summary>이미지 생성 프롬프트</summary>
-                <p className="script-src">{reelImagePrompt}</p>
-              </details>
-            )}
-            {isReel && reelHasVideoPrompt && (
-              <details className="lib-fold">
-                <summary>
-                  영상 프롬프트
-                  {/* ★ 컷별 갈래(16초 이상)에서만 개수를 말한다 — 통짜는 한 벌이라
-                      "1개"라고 적으면 없는 단위를 지어내는 것이다. */}
-                  {reelShowsWhole ? "" : ` — 컷 ${reelCutPrompts.length}개`}
-                </summary>
-                {reelShowsWhole ? (
-                  <p className="script-src">{reelWhole}</p>
-                ) : (
-                  <div className="plan-list">
-                    {reelCutPrompts.map((body, i) => (
-                      <div className="plan-row" key={i}>
-                        <span className="num">{i + 1}</span>
-                        <div className="plan-body">
-                          <span className="script-src">{body || "-"}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </details>
-            )}
-            {!isAd && !isReel && doc.script?.text && (
-              <details className="lib-fold">
-                <summary>프롬프트 — 낭독한 원고</summary>
-                <p className="script-src">{doc.script.text}</p>
-              </details>
-            )}
-
-            {/* 장면·컷 — 광고는 shots, 단계별은 cuts. 이름만 다르고 사장님이 보는 것은 같다.
-                ★★ reel 은 여기 안 온다(2026-08-27) — 위의 프롬프트 둘이 그 자리를 대신한다.
-                   컷별 문장·화면·움직임은 **컷마다 따로 굽던 시절**의 표라, 한 장으로 만드는
-                   지금 그것을 보여 주면 만들어진 방식을 잘못 말하게 된다. */}
-            {!isReel && (isAd ? doc.scenario?.shots : doc.cuts)?.length > 0 && (
-              <details className="lib-fold">
-                <summary>장면 {(isAd ? doc.scenario.shots : doc.cuts).length}개 — 컷별 지시</summary>
-                <div className="plan-list">
-                  {(isAd ? doc.scenario.shots : doc.cuts).map((c, i) => (
-                    <div className="plan-row" key={i}>
-                      <span className="num">{i + 1}</span>
-                      <div className="plan-body">
-                        {Number.isFinite(c.seconds) && <span className="badge">{c.seconds}초</span>}
-                        {isAd ? (
-                          <>
-                            <div className="plan-field"><b>역할</b><span>{c.beat || "-"}</span></div>
-                            <div className="plan-field"><b>카메라</b><span>{c.camera || "-"}</span></div>
-                            {c.line && <div className="plan-field"><b>대사</b><span>{c.line}</span></div>}
-                          </>
-                        ) : (
-                          <>
-                            <div className="plan-field"><b>문장</b><span>{c.sentence || "-"}</span></div>
-                            <div className="plan-field"><b>화면</b><span>{c.shows || "-"}</span></div>
-                            {/* 움직임 — ★ 순서가 lib/cuts.js 의 buildClipPrompt 와 같아야 한다:
-                                축이 있으면 축을, 없으면 옛 motion 을, 그것도 없으면 폴백 문구를.
-                                여기가 보여 주는 것은 "이 영상이 어떻게 만들어졌는가"라서,
-                                프롬프트가 안 쓰는 값을 적으면 그 자리에서 거짓말이 된다
-                                (옛 motion 만 그리던 시절이 그랬다 — 축을 가진 컷은 안 쓰는
-                                 값을 보여 주고, 축만 있는 컷은 움직임 줄이 통째로 사라졌다).
-                                이름표는 MOTION_AXES 의 label 에서 온다 — 목록에서 축 한 줄을
-                                빼면 여기서도 함께 사라진다.
-                                ⚠️ 편집 칸을 두지 않는다. 여기는 보는
-                                   자리다 — 그 성격을 바꾸지 않는다. */}
-                            {(() => {
-                              const axes = axesOf(c);
-                              if (axes.length > 0) {
-                                return axes.map((a) => (
-                                  <div className="plan-field" key={a.id}>
-                                    <b>{motionAxisFor(a.id)?.label}</b><span>{a.text}</span>
-                                  </div>
-                                ));
-                              }
-                              return (
-                                <div className="plan-field">
-                                  <b>움직임</b><span>{c.motion || "거의 정지, 아주 느린 카메라 이동"}</span>
-                                </div>
-                              );
-                            })()}
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </details>
-            )}
+            {/* ★★ 2026-09-14 — 프롬프트·컷별 지시 접힘 칸 넷(광고 프롬프트 · reel 이미지/영상 프롬프트 ·
+                단계별 원고 · 장면별 역할/카메라/움직임)을 걷었다(사장님 지시: 사용자에게 불필요한 정보 제거).
+                전부 모델에게 넘긴 영어 지시문이라 손님이 읽을 글이 아니었다. 문서에는 그대로 남는다. */}
           </div>
 
           {/* 완성본 — 아직 없으면 그 자리를 비워 두지 않고 그렇게 말한다 */}

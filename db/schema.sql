@@ -108,6 +108,14 @@ alter table profiles add column if not exists display_name text;
 --   모르는 값을 basic 으로 떨어뜨린다(DB 기본값과 같은 값이다).
 alter table profiles add column if not exists tier text not null default 'basic';
 
+-- 내부 계정 — 크레딧 차감 면제(2026-09-14 사장님 결정). 판정은 lib/charges.js 의 creditsEnabledFor.
+-- ★ 전역 스위치(SHOTFORM_NO_CREDITS)는 **모두**를 끈다 — 와디즈 손님이 들어오면 스위치를 끄고
+--   계정마다 가른다. 면제는 걷지 않는 것이지 원가를 안 적는 것이 아니다(cost_records 는 쌓인다).
+-- ★ 기본값은 **false(걷는 쪽)** 다 — 새로 가입하는 손님이 무료로 새면 안 된다.
+-- ⚠️ 백필은 여기 두지 않는다(이 파일은 몇 번이고 다시 돌린다). 기존 테스트 계정 표시는 배포 때
+--   한 번만: OUTSTANDING.md 의 "크레딧 새 단위 배포 순서" 참고.
+alter table profiles add column if not exists internal boolean not null default false;
+
 -- 업로드는 프로젝트가 생기기 전에 일어나서 역조회할 대상이 없다.
 -- Storage 키에 owner 를 접두어로 넣는 방법도 있으나 URL 형태가 바뀌어
 -- 문서에 박힌 material.photos[].url 이 깨진다 — 이관에서 지킨 불변조건이다.
@@ -238,3 +246,46 @@ $$;
 
 alter table credit_grants  enable row level security;  -- 정책 0개 = 전부 거부(앱은 service_role)
 alter table credit_charges enable row level security;
+
+-- ── 크레딧 코드(2026-09-14) ─────────────────────────────────────────────
+-- 와디즈 서포터에게 메일 머지로 건네는 일회용 코드. 설계: docs/superpowers/specs/2026-09-14-credit-codes-design.md
+create table if not exists credit_codes (
+  code            text primary key,                   -- 정규형 12자(하이픈 없음)
+  amount_credits  integer not null check (amount_credits > 0),
+  batch           text not null,                      -- 한 번 붙여 넣은 묶음 이름
+  meta            jsonb not null default '{}'::jsonb, -- 붙여 넣은 원래 행(CSV 를 다시 뽑는다)
+  created_by      uuid not null,
+  created_at      timestamptz not null default now(),
+  redeemed_by     uuid references auth.users(id) on delete set null,
+  redeemed_at     timestamptz
+);
+create index if not exists credit_codes_batch on credit_codes (batch);
+
+-- 등록 = 코드 잡기 + 충전 행을 **한 트랜잭션**으로. 결과는 ok / used / not_found.
+-- ★ 조건부 update(redeemed_by is null)가 한 번만을 지킨다 — 동시에 둘이 넣어도 한 줄만 잡힌다.
+create or replace function redeem_credit_code(p_code text, p_user uuid, p_reason text)
+returns table (result text, credits integer) language plpgsql as $$
+declare
+  v_amount integer;
+begin
+  update credit_codes c
+     set redeemed_by = p_user, redeemed_at = now()
+   where c.code = p_code and c.redeemed_by is null
+  returning c.amount_credits into v_amount;
+
+  if v_amount is null then
+    if exists (select 1 from credit_codes c where c.code = p_code) then
+      return query select 'used'::text, null::integer;
+    else
+      return query select 'not_found'::text, null::integer;
+    end if;
+    return;
+  end if;
+
+  insert into credit_grants (user_id, amount_credits, reason, granted_by)
+  values (p_user, v_amount, p_reason, p_user);
+  return query select 'ok'::text, v_amount;
+end;
+$$;
+
+alter table credit_codes   enable row level security;

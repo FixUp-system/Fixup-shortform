@@ -5,19 +5,22 @@
 // 주석은 단가가 바뀌어도 안 깨진다. 그래서 여기서 **lib/costs.js 로 원가를 다시 계산해**
 // 대조한다: fal 단가를 고치는 날 이 판이 먼저 깨져서 가격표를 함께 고치게 만든다.
 //
-// ★ 재는 것은 두 방향이다:
-//   ① **밑돌지 않는다** — 밑돌면 팔수록 손해다.
-//   ② **5크레딧 넘게 더 받지 않는다** — 위로도 조인다. 아래만 재면 아무 큰 수나 통과한다.
-//     (표의 관례가 "5의 배수로 올림"이라 정확히 그 폭 안에 들어와야 한다.)
+// ★★ 2026-09-14 새 단위(1크레딧 = 원가 $0.007) — 판정이 "원가를 덮는가"에서
+//   **"원가에 비례하는가"** 로 바뀌었다. 표의 규칙이 "50 단위 **반올림**"이라 크레딧 × $0.007 은
+//   원가보다 조금 낮을 수 있다(최대 25크레딧어치). 마진은 크레딧 수가 아니라 판매가(₩/크레딧)에
+//   붙으므로 그것이 맞는 판정이다. 그래서 재는 것은 **양쪽 ±25크레딧 폭**이다:
+//   아래만 재면 싸게 팔리는 칸을, 위만 재면 아무 큰 수를 못 잡는다.
 //
 // ⚠️ **1회 기준이다.** 다시 만들기(그림·영상·시나리오)는 이 표 밖이다 — reel 에는 지금
 //   재생성 청구가 아예 없다. 그 구멍은 청구 자리에서 막을 일이지 이 판이 잴 일이 아니다.
 import { describe, it, expect } from "vitest";
-import { VIDEO_PRICE, AD_VIDEO_PRICE, videoPrice } from "../lib/pricing.js";
+import { VIDEO_PRICE, AD_VIDEO_PRICE, REGEN_PRICE, videoPrice, adVideoPrice, priceLabel, formatCredits } from "../lib/pricing.js";
 import { estimateCost } from "../lib/costs.js";
 
 // 1크레딧이 대표하는 원가. lib/pricing.js 머리말의 그 값이다.
-const CREDIT_USD = 0.06;
+const CREDIT_USD = 0.007;
+// 50 단위 반올림의 절반 — 이 폭 안에 들어와야 원가 비례다. (+부동소수 여유)
+const HALF_STEP = 25 + 1e-6;
 
 // 클립 엔드포인트 — lib/clip-limits.js 의 CLIP_PROFILES 와 같은 문자열이어야 한다.
 // (여기서 그 파일을 import 하지 않는 이유: 단가는 **접두사**로 걸리므로 모델을 가리키는
@@ -43,7 +46,7 @@ const OTHER_USD = 0.30;
 const oneRunCost = (model, resolution, seconds) =>
   estimateCost(ENDPOINT[model], seconds, resolution) + imageCost(seconds) + OTHER_USD;
 
-describe("정가가 1회 생성 원가를 덮는다", () => {
+describe("정가가 1회 생성 원가에 비례한다", () => {
   for (const [model, byRes] of Object.entries(VIDEO_PRICE)) {
     for (const [res, table] of Object.entries(byRes)) {
       for (const [secStr, credits] of Object.entries(table)) {
@@ -51,12 +54,10 @@ describe("정가가 1회 생성 원가를 덮는다", () => {
         const cost = oneRunCost(model, res, seconds);
         const need = cost / CREDIT_USD;
 
-        it(`${model} ${res} ${seconds}초 — ${credits}크레딧이 $${cost.toFixed(2)} 를 덮는다`, () => {
-          expect(credits, `밑돈다: ${need.toFixed(1)} 크레딧이 필요하다`).toBeGreaterThanOrEqual(need);
-        });
-
-        it(`${model} ${res} ${seconds}초 — 5크레딧 넘게 더 받지 않는다`, () => {
-          expect(credits, `너무 높다: ${need.toFixed(1)} 이면 충분하다`).toBeLessThan(need + 5);
+        it(`${model} ${res} ${seconds}초 — ${credits}크레딧이 원가 $${cost.toFixed(2)} 에 비례한다`, () => {
+          expect(Math.abs(credits - need), `원가로는 ${need.toFixed(1)} 크레딧이다 — 50 단위 반올림 폭(±25)을 벗어났다`)
+            .toBeLessThanOrEqual(HALF_STEP);
+          expect(credits % 50, "50 단위가 아니다").toBe(0);
         });
       }
     }
@@ -70,21 +71,54 @@ describe("정가가 1회 생성 원가를 덮는다", () => {
   });
 });
 
-describe("광고 정가도 원가를 덮는다", () => {
-  // ★ 이 흐름에는 **그림이 없다**(단일 클립 하나) — 그래서 ② 가 안 붙는다.
-  //   위 표와 달리 위쪽은 안 조인다: 기존 값들이 5의 배수로 올린 뒤 그대로 굳었고,
-  //   내리는 것은 값 정책이라 여기서 강제할 일이 아니다.
+describe("광고 정가도 원가에 비례한다", () => {
+  // ★ 이 흐름에는 **그림이 없다**(단일 클립 하나) — 그래서 그림값이 안 붙는다.
+  //   ★ 2026-09-14 새 단위부터는 위 표와 **같은 판정**(±25크레딧 폭)을 건다 — 옛 값들이
+  //   "올림 뒤 굳은" 상태였던 것을 새 단위로 다시 계산하면서 풀었다.
   const AD_OTHER_USD = 0.2;
   for (const [model, bySec] of Object.entries(AD_VIDEO_PRICE)) {
     for (const [secStr, cell] of Object.entries(bySec)) {
       const seconds = Number(secStr);
       const entries = typeof cell === "number" ? [["720p", cell]] : Object.entries(cell);
       for (const [res, credits] of entries) {
-        it(`${model} ${res} ${seconds}초 — ${credits}크레딧이 원가를 덮는다`, () => {
+        it(`${model} ${res} ${seconds}초 — ${credits}크레딧이 원가에 비례한다`, () => {
           const cost = estimateCost(ENDPOINT[model], seconds, res) + AD_OTHER_USD;
-          expect(credits).toBeGreaterThanOrEqual(cost / CREDIT_USD);
+          expect(Math.abs(credits - cost / CREDIT_USD)).toBeLessThanOrEqual(HALF_STEP);
+          expect(credits % 50).toBe(0);
         });
       }
     }
   }
+});
+
+describe("재생성 값도 원가에 비례한다 (컷 하나 = 5초)", () => {
+  // 10 단위 반올림 · 최소 10 — lib/pricing.js REGEN_PRICE 머리말의 규칙.
+  const step10 = (usd) => Math.max(10, Math.round(usd / CREDIT_USD / 10) * 10);
+  for (const [model, byRes] of Object.entries(REGEN_PRICE.clip)) {
+    for (const [res, credits] of Object.entries(byRes)) {
+      it(`클립 ${model} ${res} — ${credits}크레딧`, () => {
+        expect(credits).toBe(step10(estimateCost(ENDPOINT[model], 5, res)));
+      });
+    }
+  }
+  it("스토리보드 한 장 · 이미지 한 장 · 목소리", () => {
+    expect(REGEN_PRICE.sheet).toBe(step10(SHEET));
+    expect(REGEN_PRICE.image).toBe(step10(0.08));
+    expect(REGEN_PRICE.voice).toBe(10); // $0.002 는 계산하면 0 — 유료 구간에서 0 은 "무료"로 읽혀 최소 10
+  });
+});
+
+describe("★ 사장님과 정한 단위 — 1,000크레딧 = 원클릭 기본·프로·단계별 한 편씩", () => {
+  // 와디즈 리워드 문구가 이 약속 위에 서 있다. 가격표를 고쳐 이 합이 깨지면 리워드 설명이 거짓이 된다.
+  it("H3 768P 15초 + 2.5 480p 15초 + reel 2.0 480p 15초 = 1,000", () => {
+    const sum = adVideoPrice(15, "minimax-h3", "768P") + adVideoPrice(15, "seedance-2.5", "480p")
+      + videoPrice(15, "seedance-2.0", "480p");
+    expect(sum).toBe(1000);
+  });
+  it("천 단위 쉼표로 적는다", () => {
+    expect(priceLabel(1550)).toBe("1,550 크레딧");
+    expect(priceLabel(0)).toBe("무료");
+    expect(formatCredits(-12500)).toBe("-12,500");
+    expect(formatCredits(999)).toBe("999");
+  });
 });

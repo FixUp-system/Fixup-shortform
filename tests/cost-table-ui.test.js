@@ -1,9 +1,10 @@
-// 실제 비용 화면 — **내부 테스트 단계에서 모든 사용자가 본다**(2026-08-25 사장님 지시:
-// "지금 비용표 실제 비용이라고 사이드바에 만들어서 모든 사용자가 볼 수 있게").
+// 실제 비용 화면 — 2026-08-25 에는 **모든 사용자가 봤다**(내부 테스트 단계).
+// ★★★ 2026-09-14 뒤집힘 — **운영자 전용**이다(사장님 지시: "실제 비용도 사이드바에서 제거").
+//   와디즈로 손님을 받으면 우리 원가 구조가 그대로 드러난다.
 //
 // ★ 여기서 못 박는 것은 셋이다:
 //   ① 값을 **손으로 안 적는다**(estimateCost 한 자리에서 뽑는다)
-//   ② 사이드바 링크가 **운영자 전용이 아니다**
+//   ② 사이드바 링크가 **운영자에게만** 그려진다(화면은 ADMIN_PATHS 가 잠근다)
 //   ③ 크레딧을 말하지 않는다 — 이 화면은 원가만 말한다(두 장부는 단위부터 다르다)
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
@@ -58,11 +59,19 @@ describe("무엇을 말하는 화면인가", () => {
 });
 
 describe("사이드바", () => {
-  it("★★ 운영자 전용이 아니다 — 모든 사용자가 본다", () => {
+  it("★★★ 운영자 전용이다 — 링크가 isAdmin 판정 안에만 있다 (2026-09-14)", () => {
     const at = sidebar.indexOf('href="/cost-table"');
-    expect(at, "사이드바에 링크가 없다").toBeGreaterThan(-1);
-    // 앞 200자 안에 isAdmin 게이트가 있으면 지시가 통째로 무효가 된다.
-    expect(sidebar.slice(Math.max(0, at - 200), at), "운영자 전용으로 잠겼다").not.toContain("isAdmin");
+    expect(at, "사이드바에 링크가 없다 — 운영자도 못 찾는다").toBeGreaterThan(-1);
+    expect(sidebar.indexOf('href="/cost-table"', at + 1), "링크가 두 벌이다 — 한쪽이 게이트 밖일 수 있다").toBe(-1);
+    // 링크 바로 앞에서 isAdmin 게이트가 열린다 — 손님 판정(!guest)만으로는 일반 사용자에게 보인다.
+    const before = sidebar.slice(Math.max(0, at - 200), at);
+    expect(before, "일반 사용자에게도 원가 표 링크가 보인다").toMatch(/isAdmin\s*&&\s*\(/);
+    expect(before, "옛 손님 판정 게이트가 남았다").not.toMatch(/!guest\s*&&/);
+  });
+
+  it("★★ 화면도 운영자 경로로 잠겨 있다 — 링크만 숨기면 주소로 들어온다", async () => {
+    const { isAdminPath } = await import("../lib/auth/paths.js");
+    expect(isAdminPath("/cost-table")).toBe(true);
   });
 
   it("운영자 전용 [비용 기록](/costs)과 다른 자리다", () => {

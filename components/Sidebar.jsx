@@ -349,6 +349,21 @@ export default function Sidebar() {
       >
         <span className="ic"><Icon name="archive" /></span>보관함
       </Link>
+      {/* ★ [내 계정] 묶음(2026-09-14 사장님 지시: "내 정보로 이동할 수 있는 섹션, 위의 영상 만들기랑 분리해서").
+          마이페이지로 가는 길이 상단바 드롭다운 안에만 있었다. 영상 메뉴와 섞이지 않게 머리말·구분선으로 가른다.
+          ★ 손님(비로그인)에게는 안 그린다 — 눌러도 로그인으로 튕기는 막다른 링크다. 읽기 전(me 없음)에도 안 그린다. */}
+      {me && !guest && (
+        <>
+          <div className="side-sec">내 계정</div>
+          <Link
+            href="/me"
+            className={`side-item${pathname === "/me" ? " on" : ""}`}
+          >
+            <span className="ic"><Icon name="gear" /></span>내 정보
+          </Link>
+        </>
+      )}
+      {isAdmin && <div className="side-sec">운영</div>}
       {/* ★★ 실제 비용 — **모든 사용자**가 본다(2026-08-25 사장님 지시: "지금은 내부 테스트
           단계이니까 사용자들이 확인할 수 있게"). 아래 운영자 전용 [비용 기록]과 **다른
           것**이다: 저기는 실제로 나간 지출 원장이고, 여기는 "한 편에 얼마 드는가" 표다.
@@ -356,18 +371,10 @@ export default function Sidebar() {
       {/* ★ 손님에게는 안 보인다(2026-08-27) — "사용자들이 확인할 수 있게"의 사용자는
           로그인한 사람이다. 게다가 이 자리는 손님에게 열린 목록에 없어서(lib/auth/guest.js)
           눌러도 로그인 화면으로 튕긴다 — 막다른 링크를 그리지 않는다. */}
-      {!guest && (
-        <Link
-          href="/cost-table"
-          className={`side-item${pathname === "/cost-table" ? " on" : ""}`}
-        >
-          <span className="ic"><Icon name="clock" /></span>실제 비용
-        </Link>
-      )}
-      <button className="side-item soon" disabled>
-        <span className="ic"><Icon name="template" /></span>템플릿
-        <span className="soon-tag">준비 중</span>
-      </button>
+      {/* ★★★ 2026-09-14 — **모든 사용자에게서 뺐다**(사장님 지시: "실제 비용도 사이드바에서
+          제거"). 와디즈로 손님을 받으면 우리 원가 구조가 그대로 드러난다. 화면(/cost-table)은
+          운영자 전용으로 잠갔고(lib/auth/paths.js 의 ADMIN_PATHS), 링크는 아래 운영자 자리로 옮겼다. */}
+      {/* ★ 2026-09-14 — 누를 수 없는 [템플릿 · 준비 중]을 걷었다(사장님 지시: 불필요한 정보 제거). */}
       {/* ★ 운영자 전용 두 자리. 못 읽으면 숨기는 쪽으로 떨어진다(fail-closed) —
           링크를 숨겨도 운영자는 주소로 들어갈 수 있고, 진짜 경계는 middleware 의 역할
           게이트다. 사용자 관리로 가는 길이 아예 없어서 주소를 외워야 했다(2026-08-13). */}
@@ -379,12 +386,31 @@ export default function Sidebar() {
           <span className="ic"><Icon name="user" /></span>사용자 관리
         </Link>
       )}
+      {/* 크레딧 코드(2026-09-14) — 와디즈 서포터에게 메일 머지로 건넬 코드를 만든다 */}
+      {isAdmin && (
+        <Link
+          href="/admin/codes"
+          className={`side-item${pathname === "/admin/codes" ? " on" : ""}`}
+        >
+          <span className="ic"><Icon name="check" /></span>크레딧 코드
+        </Link>
+      )}
       {isAdmin && (
         <Link
           href="/costs"
           className={`side-item${pathname === "/costs" ? " on" : ""}`}
         >
           <span className="ic"><Icon name="clock" /></span>비용 기록
+        </Link>
+      )}
+      {/* 원가 표 — 2026-09-14 부터 운영자 전용(위 주석). [비용 기록]은 실제로 나간 지출 원장이고,
+          이것은 "한 편에 얼마 드는가" 표다 — 다른 화면이라 둘 다 둔다. */}
+      {isAdmin && (
+        <Link
+          href="/cost-table"
+          className={`side-item${pathname === "/cost-table" ? " on" : ""}`}
+        >
+          <span className="ic"><Icon name="clock" /></span>실제 비용
         </Link>
       )}
       {/* 크레딧 상자가 없어도 목록을 위로 붙여 둔다 */}

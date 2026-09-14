@@ -1,5 +1,11 @@
 // 보관함 전체 공유 — **읽기만** 연다.
 //
+// ★★★ 2026-09-14 — **전체 공유를 닫았다**(사장님 지시: "전체 보관함 기능 끄고").
+//   와디즈로 손님을 받기 전이다 — 남의 영상·자료·프롬프트가 서로에게 열리면 안 된다.
+//   이제 남의 것을 읽는 사람은 **운영자뿐**이다(문제 영상 관리). 보통 사용자에게 남의 문서는
+//   없는 것과 같다(null → 404). 아래 ①② 는 그 규칙으로 뒤집었고, 운영자 짝을 붙였다.
+//   ③(쓰기 잠김)과 정적 보장은 그대로다 — 문이 운영자에게 열려 있는 한 여전히 필요하다.
+//
 // 내부 팀이라 남이 만든 결과물을 서로 볼 수 있어야 한다. 그런데 이 저장소의 규율은
 // "getProject(id, ownerId) 가 소유자를 필수로 요구한다"이고, 그 덕분에 20곳 넘는
 // 제작 라우트가 **아무도 기억하지 않아도** 잠겨 있다. 그 문에 "검사 건너뛰기" 옵션을
@@ -22,6 +28,7 @@ import {
   listAllProjects,
 } from "../lib/projects.js";
 import { getStore } from "../lib/store/index.js";
+import { runWithActor } from "../lib/actor.js";
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
 import { GET as PROJECTS_GET } from "../app/api/projects/route.js";
 import { GET as PROJECT_GET, PATCH as PROJECT_PATCH, DELETE as PROJECT_DELETE } from "../app/api/projects/[id]/route.js";
@@ -55,10 +62,10 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
 const A = "00000000-0000-4000-8000-0000000000aa"; // 나
 const B = "00000000-0000-4000-8000-0000000000bb"; // 남
 
-const headers = (uid) =>
-  new Headers({ [USER_HEADER]: uid, [STATUS_HEADER]: "approved", [ROLE_HEADER]: "user" });
-const req = (uid) => ({ headers: headers(uid) });
-const urlReq = (uid, url) => new Request(url, { headers: headers(uid) });
+const headers = (uid, role = "user") =>
+  new Headers({ [USER_HEADER]: uid, [STATUS_HEADER]: "approved", [ROLE_HEADER]: role });
+const req = (uid, role) => ({ headers: headers(uid, role) });
+const urlReq = (uid, url, role) => new Request(url, { headers: headers(uid, role) });
 const ctx = (v) => ({ params: Promise.resolve(v) });
 
 const make = (ownerId, text = "자료", extra) =>
@@ -66,17 +73,23 @@ const make = (ownerId, text = "자료", extra) =>
 
 // ── ① 새 문 자체 ────────────────────────────────────────────────────────────
 describe("getProjectForViewing — 보기 전용 문", () => {
-  it("남이 만든 프로젝트를 읽어 준다", async () => {
+  it("★★★ 남이 만든 프로젝트는 null 이다 — 운영자가 아니면 없는 것과 같다 (2026-09-14)", async () => {
     const p = await make(B, "남의 영상");
-    const v = await getProjectForViewing(p.id, A);
-    expect(v?.doc?.id).toBe(p.id);
+    expect(await getProjectForViewing(p.id, A)).toBeNull();
+    expect(
+      await runWithActor({ id: A, role: "user" }, () => getProjectForViewing(p.id, A)),
+      "보통 사용자에게 남의 문서가 열린다"
+    ).toBeNull();
   });
 
-  it("내 것인지 아닌지를 함께 알려준다 — 화면이 쓰기 버튼을 지우는 근거다", async () => {
+  it("★★ 운영자는 남의 것도 읽는다 — 다만 mine:false 다(지우기 근거)", async () => {
     const mine = await make(A);
     const theirs = await make(B);
     expect((await getProjectForViewing(mine.id, A)).mine).toBe(true);
-    expect((await getProjectForViewing(theirs.id, A)).mine).toBe(false);
+    const v = await runWithActor({ id: A, role: "admin" }, () => getProjectForViewing(theirs.id, A));
+    expect(v?.doc?.id).toBe(theirs.id);
+    expect(v.mine).toBe(false);
+    expect(v.editable).toBe(true);
   });
 
   it("없는 것은 null 이다", async () => {
@@ -133,29 +146,51 @@ describe("GET /api/projects — scope 로 갈린다", () => {
     expect(projects.map((p) => p.id)).toEqual([mine.id]);
   });
 
-  it("scope=all 이면 남의 것도 준다", async () => {
+  // ★★★ 2026-09-14 — [전체]는 운영자만. 보통 사용자의 scope=all 은 400 이 아니라 조용히 내 것이다
+  //   (옛 주소 /archive?scope=all 이 오류 화면이 되지 않게).
+  it("★★★ 보통 사용자가 scope=all 을 보내도 내 것만 준다 (2026-09-14)", async () => {
+    const mine = await make(A);
+    await make(B);
+    const res = await PROJECTS_GET(urlReq(A, "http://t/api/projects?scope=all"), {});
+    const { projects } = await res.json();
+    expect(projects.map((p) => p.id), "남의 영상이 목록에 섞였다").toEqual([mine.id]);
+  });
+
+  it("★★ 운영자의 scope=all 은 남의 것도 준다 — mine:false 로", async () => {
     await make(A);
     const theirs = await make(B);
-    const res = await PROJECTS_GET(urlReq(A, "http://t/api/projects?scope=all"), {});
+    const res = await PROJECTS_GET(urlReq(A, "http://t/api/projects?scope=all", "admin"), {});
     const { projects } = await res.json();
     expect(projects.map((p) => p.id)).toContain(theirs.id);
     expect(projects.find((p) => p.id === theirs.id).mine).toBe(false);
   });
 });
 
-describe("GET /api/projects/[id] · /api/ads/[id] — 남의 것도 열어 준다", () => {
-  it("단계별 문서를 읽어 준다", async () => {
+describe("GET /api/projects/[id] · /api/ads/[id] — 남의 것은 404, 운영자만 연다 (2026-09-14)", () => {
+  it("★★★ 보통 사용자에게 남의 단계별 문서는 404 다", async () => {
     const p = await make(B, "남의 단계별");
     const res = await PROJECT_GET(req(A), ctx({ id: p.id }));
+    expect(res.status).toBe(404);
+  });
+
+  it("★★★ 보통 사용자에게 남의 광고 문서는 404 다", async () => {
+    const p = await make(B, "남의 광고", { kind: "ad" });
+    const res = await AD_GET(req(A), ctx({ id: p.id }));
+    expect(res.status).toBe(404);
+  });
+
+  it("★★ 운영자는 남의 단계별 문서를 읽는다 — mine:false", async () => {
+    const p = await make(B, "남의 단계별");
+    const res = await PROJECT_GET(req(A, "admin"), ctx({ id: p.id }));
     expect(res.status ?? 200).toBe(200);
     const doc = await res.json();
     expect(doc.id).toBe(p.id);
     expect(doc.mine).toBe(false);
   });
 
-  it("광고 문서를 읽어 준다", async () => {
+  it("★★ 운영자는 남의 광고 문서를 읽는다 — mine:false", async () => {
     const p = await make(B, "남의 광고", { kind: "ad" });
-    const res = await AD_GET(req(A), ctx({ id: p.id }));
+    const res = await AD_GET(req(A, "admin"), ctx({ id: p.id }));
     expect(res.status ?? 200).toBe(200);
     const doc = await res.json();
     expect(doc.id).toBe(p.id);
@@ -169,12 +204,26 @@ describe("GET /api/projects/[id] · /api/ads/[id] — 남의 것도 열어 준�
   });
 });
 
-describe("GET /api/renders/[name] — 남이 만든 영상도 재생된다", () => {
-  it("남의 완성본을 흘려준다", async () => {
+describe("GET /api/renders/[name] — 남의 영상은 운영자만 재생한다 (2026-09-14)", () => {
+  const seedRender = async () => {
     const p = await make(B, "남의 완성본");
     await updateProject(p.id, B, (d) => ({ ...d, render: { url: `/api/renders/${p.id}.mp4`, ts: 1 } }));
     await getStore().putObject("renders", `${p.id}.mp4`, Buffer.from("mp4-bytes"), "video/mp4");
+    return p;
+  };
+
+  it("★★★ 보통 사용자에게 남의 완성본은 404 다", async () => {
+    const p = await seedRender();
     const res = await RENDER_GET(urlReq(A, `http://t/api/renders/${p.id}.mp4`), ctx({ name: `${p.id}.mp4` }));
+    expect(res.status).toBe(404);
+  });
+
+  it("★★ 운영자에게는 남의 완성본을 흘려준다", async () => {
+    const p = await seedRender();
+    const res = await RENDER_GET(
+      urlReq(A, `http://t/api/renders/${p.id}.mp4`, "admin"),
+      ctx({ name: `${p.id}.mp4` })
+    );
     expect(res.status ?? 200).toBe(200);
   });
 
@@ -185,12 +234,22 @@ describe("GET /api/renders/[name] — 남이 만든 영상도 재생된다", () 
   });
 });
 
-describe("GET /api/uploads/[name] — 남이 올린 사진도 보인다", () => {
-  it("남의 업로드를 흘려준다", async () => {
-    const key = "aaaaaaaa-0000-4000-8000-000000000001.jpg";
+describe("GET /api/uploads/[name] — 남이 올린 사진은 운영자만 본다 (2026-09-14)", () => {
+  const key = "aaaaaaaa-0000-4000-8000-000000000001.jpg";
+  const seedUpload = async () => {
     await getStore().insertUploadOwner(key, B);
     await getStore().putObject("uploads", key, Buffer.from("jpg"), "image/jpeg");
+  };
+
+  it("★★★ 보통 사용자에게 남의 업로드는 404 다", async () => {
+    await seedUpload();
     const res = await UPLOAD_GET(req(A), ctx({ name: key }));
+    expect(res.status).toBe(404);
+  });
+
+  it("★★ 운영자에게는 남의 업로드를 흘려준다", async () => {
+    await seedUpload();
+    const res = await UPLOAD_GET(req(A, "admin"), ctx({ name: key }));
     expect(res.status ?? 200).toBe(200);
   });
 

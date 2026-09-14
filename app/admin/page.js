@@ -2,13 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 // 기본값은 가격표에서 온다 — 운영자가 매번 고르는 값이라도 출처는 한 곳이다.
-import { DEFAULT_GRANT } from "../../lib/pricing";
+import { DEFAULT_GRANT, formatCredits } from "../../lib/pricing";
 // ★ 2026-09-11 — 안내 문구의 "N자 이상"을 손으로 적지 않는다. 라우트가 막는 값과 같아야 한다.
 import { PASSWORD_MIN } from "../../lib/password";
 // 등급 표와 판정은 lib/tiers.js 한 벌이다 — 화면이 등급 이름을 복사하면 서버와 갈린다.
 import { TIERS, tierOf } from "../../lib/tiers";
 // 표시명 규칙 한 벌 — /me·원장과 같은 값을 써야 한다(이름이 없으면 이메일 앞부분).
 import { displayNameOf } from "../../lib/display-name";
+// 날짜 칸 판정 한 벌 — 비용 기록과 같은 규칙(지역 시각 자정 · 종료일 포함)
+import { inDayRange } from "../../lib/costs-filter";
+import Select from "../../components/Select";
 import { useDialog } from "../../components/DialogProvider";
 import { useMe } from "../../components/MeContext";
 
@@ -41,6 +44,11 @@ export default function AdminPage() {
   // ★ 서버가 아니라 화면에서 거른다: listProfiles 가 이미 500명까지 한 번에 주고,
   //   그 위에서 거르는 것이 왕복 없이 즉시 반응한다. 500을 넘기 시작하면 그때 서버로 옮긴다.
   const [query, setQuery] = useState("");
+  // 상태로 좁히기 — "" = 전체. ★ statusFilter 인 이유: 승인·차단을 쓰는 setStatus(id, status) 가 이미 있다.
+  const [statusFilter, setStatusFilter] = useState("");
+  // 가입일 기간 — "YYYY-MM-DD", 빈 값은 조건 없음(2026-09-14 사장님 요청).
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [openId, setOpenId] = useState(null);
   const [ledger, setLedger] = useState(null);   // null = 불러오는 중
 
@@ -139,6 +147,24 @@ export default function AdminPage() {
       setErr(body.error || "등급을 바꾸지 못했어요");
     }
     await load();
+    setBusy("");
+  }
+
+  // 내부 계정(크레딧 차감 면제, 2026-09-14) — 등급과 **같은 문**(PATCH)을 쓴다.
+  // ★ 참/거짓만 보낸다. 서버도 그 밖의 값은 400 으로 막는다(손님이 무료로 새지 않게).
+  async function setInternal(id, internal) {
+    setBusy(id);
+    setErr("");
+    const r = await fetch(`/api/admin/users/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ internal: internal === true }),
+    });
+    if (!r.ok) {
+      const body = await r.json().catch(() => ({}));
+      setErr(body.error || "내부 계정 표시를 바꾸지 못했어요");
+    }
+    await load();   // 열어 둔 창(panelUser)도 목록에서 id 로 다시 뽑으므로 함께 새 값이 된다
     setBusy("");
   }
 
@@ -255,12 +281,23 @@ export default function AdminPage() {
   const q = query.trim().toLowerCase();
   const found = (users || []).filter(
     (u) =>
-      !q ||
-      displayNameOf(u).toLowerCase().includes(q) ||
-      u.email?.toLowerCase().includes(q) ||
-      u.id?.toLowerCase().includes(q)
+      (!statusFilter || u.status === statusFilter) &&
+      inDayRange(u.created_at, from, to) &&
+      (!q ||
+        displayNameOf(u).toLowerCase().includes(q) ||
+        u.email?.toLowerCase().includes(q) ||
+        u.id?.toLowerCase().includes(q))
   );
+  // 요약 타일의 수 — 좁히기와 무관한 **전체** 기준이다(승인 대기가 몇 명 쌓였는지를 먼저 본다).
+  const countOf = (s) => (users || []).filter((u) => u.status === s).length;
+  const STATUS_PICKS = [
+    ["", "전체"],
+    ["pending", "승인 대기"],
+    ["approved", "승인됨"],
+    ["blocked", "차단됨"],
+  ];
 
+  // ★ 구성은 비용 기록(/costs)과 같다(2026-09-14 사장님 지시) — 카드 안의 좁히기 줄 · 요약 타일 · 표.
   return (
     <>
       <h1 className="pgtitle">사용자 관리</h1>
@@ -270,15 +307,69 @@ export default function AdminPage() {
       </p>
 
       {users !== null && (
-        <div className="admin-tools">
-          <input
-            className="sent-input admin-search"
-            type="search"
-            placeholder="이메일이나 id 로 찾기"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </div>
+        <>
+          <div className="panel cost-filters">
+            <label>
+              <small>시작일</small>
+              <input className="field" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+            </label>
+            <label>
+              <small>종료일</small>
+              {/* ★ 그 날을 **포함한다**(가입일 기준) — 자정으로 자르면 고른 하루가 통째로 빠진다. */}
+              <input className="field" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+            </label>
+            <label>
+              <small>찾기</small>
+              <input
+                className="field cost-filter-q"
+                type="search"
+                placeholder="이름·이메일·id"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </label>
+            <label>
+              <small>상태</small>
+              <span className="seg" role="group" aria-label="상태">
+                {STATUS_PICKS.map(([s, label]) => (
+                  <button
+                    type="button"
+                    key={s || "all"}
+                    className="seg-btn"
+                    aria-pressed={statusFilter === s}
+                    onClick={() => setStatusFilter(s)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </span>
+            </label>
+            {(query || statusFilter || from || to) && (
+              <button type="button" className="mini" onClick={() => { setQuery(""); setStatusFilter(""); setFrom(""); setTo(""); }}>
+                조건 지우기
+              </button>
+            )}
+          </div>
+
+          <div className="cost-summary">
+            <div className="cost-tile">
+              <small>전체</small>
+              <b>{users.length}명</b>
+            </div>
+            <div className="cost-tile">
+              <small>승인 대기</small>
+              <b>{countOf("pending")}명</b>
+            </div>
+            <div className="cost-tile">
+              <small>승인됨</small>
+              <b>{countOf("approved")}명</b>
+            </div>
+            <div className="cost-tile">
+              <small>차단됨</small>
+              <b>{countOf("blocked")}명</b>
+            </div>
+          </div>
+        </>
       )}
 
       {err && <p className="pgsub warn">{err}</p>}
@@ -286,7 +377,7 @@ export default function AdminPage() {
       {users === null ? (
         <p className="pgsub">불러오는 중…</p>
       ) : found.length === 0 ? (
-        <p className="pgsub">{query ? "찾는 사용자가 없어요." : "사용자가 없어요."}</p>
+        <p className="pgsub">{query || statusFilter || from || to ? "찾는 사용자가 없어요." : "사용자가 없어요."}</p>
       ) : (
         <div className="cost-table-wrap">
           <table className="cost-table">
@@ -319,8 +410,7 @@ export default function AdminPage() {
                       ★ 내 줄은 잠근다 — 마지막 운영자가 자기를 내리면 아무도 못 들어온다.
                         서버도 같은 것을 막는다(가림막이 아니라 잠금이다). */}
                   <td>
-                    <select
-                      className="dlg-input tier-pick"
+                    <Select
                       value={u.role === "admin" ? "admin" : "user"}
                       disabled={busy === u.id || u.self === true}
                       onChange={(e) => setRole(u.id, e.target.value)}
@@ -329,7 +419,7 @@ export default function AdminPage() {
                     >
                       <option value="user">사용자</option>
                       <option value="admin">운영자</option>
-                    </select>
+                    </Select>
                   </td>
                   {/* 등급 — 드롭다운으로 고른다(2026-08-20 사장님 지시). 칩을 나열하면
                       등급이 늘 때 줄이 넘치고, 지금 무엇인지도 한눈에 안 들어온다.
@@ -337,8 +427,7 @@ export default function AdminPage() {
                       ★ 지금 등급 판정은 lib/tiers.js 의 tierOf 하나다(컬럼이 없던 시절
                         계정은 값이 없고, 그때도 기본 등급으로 읽힌다). */}
                   <td>
-                    <select
-                      className="dlg-input tier-pick"
+                    <Select
                       value={tierOf(u)}
                       disabled={busy === u.id}
                       onChange={(e) => setTier(u.id, e.target.value)}
@@ -347,13 +436,16 @@ export default function AdminPage() {
                       {TIERS.map((t) => (
                         <option key={t.id} value={t.id}>{t.label}</option>
                       ))}
-                    </select>
+                    </Select>
                   </td>
                   {/* 언제 들어온 사람인지 — 승인 대기가 쌓였을 때 먼저 볼 줄을 고르는 근거다.
                       날짜 규칙은 마이페이지·크레딧 내역과 같다(ymd: 사장님 시계). */}
                   <td className="mono">{u.created_at ? ymd(u.created_at) : "—"}</td>
+                  {/* ★ 내부 계정은 잔액이 아니라 "내부"를 적는다 — 차감이 없어 잔액이 뜻이 없다. */}
                   <td>
-                    <span className="st-badge">{u.balance ?? 0}</span>
+                    {u.internal === true
+                      ? <span className="st-badge st-submitted" title="내부 계정 — 크레딧을 걷지 않아요">내부</span>
+                      : <span className="st-badge">{formatCredits(u.balance ?? 0)}</span>}
                   </td>
                   {/* ★★ 줄에는 **여는 버튼 하나**만 둔다(2026-08-20 사장님 지시). 그전에는
                       줄마다 버튼이 다섯이라 가로가 좁고, 어느 줄의 버튼인지 눈으로 좇아야
@@ -393,7 +485,24 @@ export default function AdminPage() {
             <h2 className="dlg-title">{displayNameOf(panelUser)}</h2>
             <p className="dlg-body">
               {panelUser.email} · {STATUS_LABEL[panelUser.status] || panelUser.status} ·
-              {" "}{panelUser.role} · 잔액 {panelUser.balance ?? 0} 크레딧
+              {" "}{panelUser.role} · 잔액 {formatCredits(panelUser.balance ?? 0)} 크레딧
+            </p>
+
+            {/* 내부 계정 — 켜면 이 계정은 크레딧 없이 만든다(원가는 그대로 기록된다).
+                와디즈 손님 계정에 켜면 그대로 우리 돈이 나가니, 테스트 계정에만 켠다. */}
+            <p className="dlg-body">
+              {panelUser.internal === true
+                ? "내부 계정이에요 — 크레딧을 걷지 않아요."
+                : "손님 계정이에요 — 영상을 만들 때 크레딧을 걷어요."}
+              {" "}
+              <button
+                type="button"
+                className="mini"
+                disabled={busy === panelUser.id}
+                onClick={() => setInternal(panelUser.id, panelUser.internal !== true)}
+              >
+                {panelUser.internal === true ? "손님 계정으로 바꾸기" : "내부 계정으로 표시"}
+              </button>
             </p>
 
             {/* ★★ 크레딧 넣기 — **여기서 끝난다**(2026-08-20). 그전에는 prompt 를 두 번

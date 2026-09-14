@@ -92,26 +92,28 @@ describe("값이 세 표에서 같은가 — 갈리면 조용히 손해가 난�
     }
   });
 
-  // ★ 크레딧이 원가보다 적으면 팔수록 손해다. 1크레딧 ≈ $0.06 이 이 저장소의 환산이고,
-  //   가격표는 그보다 **올려** 잡는다(5크레딧 단위 올림).
-  it("크레딧 정가가 원가보다 낮지 않다 — 팔수록 손해인 칸이 없다", () => {
-    const CREDIT_USD = 0.06;
+  // ★ 크레딧이 원가와 어긋나면 모델마다 크레딧당 원가가 갈린다. 2026-09-14 새 단위부터
+  //   1크레딧 = 원가 $0.007, 50 단위 **반올림**이라 판정은 **±25크레딧 폭**이다
+  //   (tests/pricing-covers-cost.test.js 와 같은 판정). 원가 = 클립 + LLM $0.20.
+  it("크레딧 정가가 원가에 비례한다 — ±25크레딧 반올림 폭 안이다", () => {
+    const CREDIT_USD = 0.007;
+    const AD_OTHER_USD = 0.2;
     for (const m of AD_MODELS) {
       for (const sec of m.seconds) {
         for (const res of [...m.resolutions, ...(m.adminResolutions || [])]) {
           // ★ 부동소수 오차를 반올림으로 걷는다 — 1.04×15 가 15.600000000000001 이 된다.
-          const costUsd = Math.round(m.perSecUsd[res] * sec * 1e6) / 1e6;
+          const costUsd = Math.round((m.perSecUsd[res] * sec + AD_OTHER_USD) * 1e6) / 1e6;
           const credits = adVideoPrice(sec, m.id, res);
-          expect(credits * CREDIT_USD, `${m.id} ${sec}초 ${res} 가 원가($${costUsd.toFixed(2)})보다 싸다`)
-            .toBeGreaterThanOrEqual(costUsd);
+          expect(Math.abs(credits - costUsd / CREDIT_USD), `${m.id} ${sec}초 ${res} 가 원가($${costUsd.toFixed(2)})에 비례하지 않는다`)
+            .toBeLessThanOrEqual(25 + 1e-6);
         }
       }
     }
   });
 
   it("H3 값이 실제로 이 숫자다 — fal 공시 단가에서 계산한 그대로", () => {
-    expect(AD_VIDEO_PRICE[H3][15]["2K"]).toBe(40); // $0.13 × 15 = $1.95  // +LLM $0.20 (2026-08-28)
-    expect(AD_VIDEO_PRICE[H3][15]["4K"]).toBe(45); // $0.16 × 15 = $2.40  // +LLM $0.20
+    expect(AD_VIDEO_PRICE[H3][15]["2K"]).toBe(300); // ($0.13 × 15 = $1.95 + LLM $0.20) ÷ $0.007 ≈ 307
+    expect(AD_VIDEO_PRICE[H3][15]["4K"]).toBe(350); // ($0.16 × 15 = $2.40 + LLM $0.20) ÷ $0.007 ≈ 371
   });
 
   // ★★ 이 목록에 없으면 그 모델이 **fal 이 아닌 것으로 판정돼** 가짜 모드에서 진짜
@@ -133,9 +135,9 @@ describe("2.5 의 1080p — 관리자 전용", () => {
   });
 
   it("값은 정확히 표기된다 — 관리자가 만들어도 청구·기록이 똑같이 돈다", () => {
-    // $1.04/s × 15 = $15.60 · × 30 = $31.20
-    expect(adVideoPrice(15, "seedance-2.5", "1080p")).toBe(265);
-    expect(adVideoPrice(30, "seedance-2.5", "1080p")).toBe(525);
+    // $1.04/s × 15 = $15.60 · × 30 = $31.20 (+LLM $0.20, ÷ $0.007)
+    expect(adVideoPrice(15, "seedance-2.5", "1080p")).toBe(2250);
+    expect(adVideoPrice(30, "seedance-2.5", "1080p")).toBe(4500);
     expect(estimateCost("bytedance/seedance-2.5/reference-to-video", 15, "1080p")).toBeCloseTo(15.6, 4);
   });
 });

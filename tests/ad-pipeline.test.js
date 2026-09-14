@@ -55,7 +55,7 @@ describe("광고 파이프라인", () => {
 
   it("성공하면 videos 에 한 개가 남고 done 이 된다", async () => {
     const p = await makeAd();
-    await getStore().insertGrant({ user_id: U, amount_credits: 200, reason: "t" });
+    await getStore().insertGrant({ user_id: U, amount_credits: 2000, reason: "t" });
     await runWithActor(U, () => runScenarioStep(p.id, U, { generateScenario: async () => scenario }));
     await runWithActor(U, () =>
       runAdRenderPipeline(p.id, U, {
@@ -66,12 +66,12 @@ describe("광고 파이프라인", () => {
     const back = await getProject(p.id, U);
     expect(back.videos.length).toBe(1);
     expect(back.status).toBe("done");
-    expect(await balanceFor(U)).toBe(200 - AD_VIDEO_PRICE["seedance-2.0"][15]["720p"]);
+    expect(await balanceFor(U)).toBe(2000 - AD_VIDEO_PRICE["seedance-2.0"][15]["720p"]);
   });
 
   it("★ 실패하면 환불하고 scenario 로 되돌린다", async () => {
     const p = await makeAd();
-    await getStore().insertGrant({ user_id: U, amount_credits: 200, reason: "t" });
+    await getStore().insertGrant({ user_id: U, amount_credits: 2000, reason: "t" });
     await runWithActor(U, () => runScenarioStep(p.id, U, { generateScenario: async () => scenario }));
     await expect(
       runWithActor(U, () =>
@@ -83,16 +83,16 @@ describe("광고 파이프라인", () => {
     const back = await getProject(p.id, U);
     expect(back.status).toBe("scenario");
     expect(back.video_error).toBeTruthy();
-    expect(await balanceFor(U)).toBe(200);   // 못 준 것은 안 받는다
+    expect(await balanceFor(U)).toBe(2000);   // 못 준 것은 안 받는다
   });
 
   it("시나리오가 없으면 굽지 않는다", async () => {
     const p = await makeAd();
-    await getStore().insertGrant({ user_id: U, amount_credits: 200, reason: "t" });
+    await getStore().insertGrant({ user_id: U, amount_credits: 2000, reason: "t" });
     await expect(
       runWithActor(U, () => runAdRenderPipeline(p.id, U, { generateAdVideo: async () => ({ url: "x", seconds: 15 }) }))
     ).rejects.toThrow();
-    expect(await balanceFor(U)).toBe(200);
+    expect(await balanceFor(U)).toBe(2000);
   });
 
   // ★ 매출 누수 회귀(Task 17) — 첫 생성은 65 크레딧을 받는데, 성공한 뒤 [다시 만들기]는
@@ -101,7 +101,7 @@ describe("광고 파이프라인", () => {
   // 이 테스트는 고치기 전에는 두 번째 balanceFor 단정에서 실패해야 한다(RED).
   it("★ 성공해서 done 이 된 뒤 다시 구우면 정가를 또 받는다", async () => {
     const p = await makeAd();
-    await getStore().insertGrant({ user_id: U, amount_credits: 200, reason: "t" });
+    await getStore().insertGrant({ user_id: U, amount_credits: 2000, reason: "t" });
     await runWithActor(U, () => runScenarioStep(p.id, U, { generateScenario: async () => scenario }));
     const deps = {
       generateAdVideo: async () => ({ url: "https://fal.example/v.mp4", seconds: 15 }),
@@ -109,7 +109,7 @@ describe("광고 파이프라인", () => {
     };
     await runWithActor(U, () => runAdRenderPipeline(p.id, U, deps));
     expect((await getProject(p.id, U)).status).toBe("done");
-    expect(await balanceFor(U)).toBe(200 - AD_VIDEO_PRICE["seedance-2.0"][15]["720p"]);
+    expect(await balanceFor(U)).toBe(2000 - AD_VIDEO_PRICE["seedance-2.0"][15]["720p"]);
 
     // [다시 만들기] — 시나리오는 그대로고 영상만 새로 굽는다. fal 원가는 또 나간다.
     await runWithActor(U, () => runAdRenderPipeline(p.id, U, deps));
@@ -117,7 +117,7 @@ describe("광고 파이프라인", () => {
     expect(back.status).toBe("done");
     expect(back.videos.length).toBe(1); // 최신 한 편으로 덮어쓴다 — 회차 목록이 아니다
     // ★ 핵심 단정 — 정가를 또 받아 잔액이 두 번째로 준다
-    expect(await balanceFor(U)).toBe(200 - AD_VIDEO_PRICE["seedance-2.0"][15]["720p"] * 2);
+    expect(await balanceFor(U)).toBe(2000 - AD_VIDEO_PRICE["seedance-2.0"][15]["720p"] * 2);
   });
 
   // ★ Task 23 — fal 큐 폴링 도중 서버가 재시작되면 그 폴링 루프 자체가 사라진다.
@@ -127,7 +127,7 @@ describe("광고 파이프라인", () => {
   //   pipeline.js 쪽만 잰다(generate.js 의 실제 큐 흐름은 tests/ad-generate.test.js 몫).
   it("★ request_id 를 문서에 저장한다 — 폴링 도중 재시작돼도 이어붙일 단서가 남는다", async () => {
     const p = await makeAd();
-    await getStore().insertGrant({ user_id: U, amount_credits: 200, reason: "t" });
+    await getStore().insertGrant({ user_id: U, amount_credits: 2000, reason: "t" });
     await runWithActor(U, () => runScenarioStep(p.id, U, { generateScenario: async () => scenario }));
     await runWithActor(U, () =>
       runAdRenderPipeline(p.id, U, {
@@ -172,7 +172,7 @@ describe("광고 파이프라인", () => {
   //   runAdRenderPipeline 안에서 chargeAd 를 두 번 부르게 만들지 않았는지 확인한다.
   it("한 번의 굽기 안에서는 여전히 한 번만 받는다", async () => {
     const p = await makeAd();
-    await getStore().insertGrant({ user_id: U, amount_credits: 200, reason: "t" });
+    await getStore().insertGrant({ user_id: U, amount_credits: 2000, reason: "t" });
     await runWithActor(U, () => runScenarioStep(p.id, U, { generateScenario: async () => scenario }));
     await runWithActor(U, () =>
       runAdRenderPipeline(p.id, U, {
@@ -180,7 +180,7 @@ describe("광고 파이프라인", () => {
         storeVideo: async (url) => url,
       })
     );
-    expect(await balanceFor(U)).toBe(200 - AD_VIDEO_PRICE["seedance-2.0"][15]["720p"]);
+    expect(await balanceFor(U)).toBe(2000 - AD_VIDEO_PRICE["seedance-2.0"][15]["720p"]);
   });
 });
 
@@ -207,7 +207,7 @@ describe("광고 파이프라인 — storeVideoDefault", () => {
 
   it("★ 완성본을 프로젝트 id 이름으로 renders 버킷에 올리고 그 URL 을 돌려준다", async () => {
     const p = await makeAd();
-    await getStore().insertGrant({ user_id: U, amount_credits: 200, reason: "t" });
+    await getStore().insertGrant({ user_id: U, amount_credits: 2000, reason: "t" });
     await runWithActor(U, () => runScenarioStep(p.id, U, { generateScenario: async () => scenario }));
 
     const bytes = new Uint8Array([1, 2, 3, 4]);
@@ -239,7 +239,7 @@ describe("광고 파이프라인 — storeVideoDefault", () => {
 
   it("완성본을 못 내려받으면(res.ok===false) 던진다", async () => {
     const p = await makeAd();
-    await getStore().insertGrant({ user_id: U, amount_credits: 200, reason: "t" });
+    await getStore().insertGrant({ user_id: U, amount_credits: 2000, reason: "t" });
     await runWithActor(U, () => runScenarioStep(p.id, U, { generateScenario: async () => scenario }));
 
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 500 })));

@@ -114,15 +114,15 @@ describe("모델별 정가", () => {
   });
 
   it("클립 재생성도 모델을 탄다", () => {
-    expect(regenPrice("clip", 1, "seedance-2.0")).toBe(25);
-    expect(regenPrice("clip", 1, "kling-v3")).toBe(8);
-    expect(regenPrice("clip", 1)).toBe(8);
+    expect(regenPrice("clip", 1, "seedance-2.0")).toBe(220);
+    expect(regenPrice("clip", 1, "kling-v3")).toBe(60);
+    expect(regenPrice("clip", 1)).toBe(60);
   });
 
   it("이미지·목소리는 모델과 무관하다", () => {
     for (const m of ["seedance-2.0", "kling-v3", undefined]) {
-      expect(regenPrice("image", 1, m)).toBe(2);
-      expect(regenPrice("voice", 1, m)).toBe(1);
+      expect(regenPrice("image", 1, m)).toBe(10);
+      expect(regenPrice("voice", 1, m)).toBe(10);
     }
   });
 
@@ -187,10 +187,10 @@ describe("해상도별 가격", () => {
   });
 
   it("재생성도 해상도를 탄다", () => {
-    expect(regenPrice("clip", 1, "seedance-2.0")).toBe(25);
-    expect(regenPrice("clip", 1, "seedance-2.0", "1080p")).toBe(57);
-    expect(regenPrice("clip", 1, "seedance-2.0", "480p")).toBe(12);
-    expect(regenPrice("clip", 1, "kling-v3", "1080p")).toBe(8);
+    expect(regenPrice("clip", 1, "seedance-2.0")).toBe(220);
+    expect(regenPrice("clip", 1, "seedance-2.0", "1080p")).toBe(490);
+    expect(regenPrice("clip", 1, "seedance-2.0", "480p")).toBe(100);
+    expect(regenPrice("clip", 1, "kling-v3", "1080p")).toBe(60);
   });
 
   // ★ 두 표가 갈린 상태에서도 **화면은 떠야 한다.** regenPrice 는 ⑤영상 화면이 부르는
@@ -308,10 +308,10 @@ describe("광고 영상 정가", () => {
     }
   });
 
-  it("2.0/15초/720p = 80 · 2.5/15초/720p = 120 · 2.5/30초/720p = 240 — 원가 계산에서 뽑은 값", () => {
-    expect(cellPrice("seedance-2.0", 15, "720p")).toBe(80);
-    expect(cellPrice("seedance-2.5", 15, "720p")).toBe(120);
-    expect(cellPrice("seedance-2.5", 30, "720p")).toBe(240);
+  it("2.0/15초/720p = 700 · 2.5/15초/720p = 1000 · 2.5/30초/720p = 2000 — 원가 계산에서 뽑은 값", () => {
+    expect(cellPrice("seedance-2.0", 15, "720p")).toBe(700);
+    expect(cellPrice("seedance-2.5", 15, "720p")).toBe(1000);
+    expect(cellPrice("seedance-2.5", 30, "720p")).toBe(2000);
   });
 
 
@@ -336,13 +336,13 @@ describe("광고 영상 정가", () => {
   });
 
   it("adVideoPrice(seconds, modelId, resolution) 가 모델·길이·해상도 조합대로 값을 낸다", () => {
-    expect(adVideoPrice(15, "seedance-2.0", "720p")).toBe(80);
-    expect(adVideoPrice(15, "seedance-2.0", "1080p")).toBe(175);
-    // ★ 2026-08-27 — 35 → 40. 원가($2.02 + LLM $0.20)를 35 크레딧($2.10)이 밑돌았다.
-    expect(adVideoPrice(15, "seedance-2.0", "480p")).toBe(40);
-    expect(adVideoPrice(15, "seedance-2.5", "720p")).toBe(120);
-    expect(adVideoPrice(30, "seedance-2.5", "720p")).toBe(240);
-    expect(adVideoPrice(30, "seedance-2.5", "480p")).toBe(110);
+    // ★ 2026-09-14 새 단위(1크레딧 = 원가 $0.007) — 값이 전부 새로 계산됐다.
+    expect(adVideoPrice(15, "seedance-2.0", "720p")).toBe(700);
+    expect(adVideoPrice(15, "seedance-2.0", "1080p")).toBe(1500);
+    expect(adVideoPrice(15, "seedance-2.0", "480p")).toBe(300);
+    expect(adVideoPrice(15, "seedance-2.5", "720p")).toBe(1000);
+    expect(adVideoPrice(30, "seedance-2.5", "720p")).toBe(2000);
+    expect(adVideoPrice(30, "seedance-2.5", "480p")).toBe(900);
   });
 
   // ③ 옛 문서 보호 — settings.model·settings.resolution 이 없는 옛 광고 문서는

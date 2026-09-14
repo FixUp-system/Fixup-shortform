@@ -11,13 +11,24 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 
+// ★ 2026-09-14 — 보관함 상세(app/archive/[id]/page.js)는 "우리말 라벨" 목록에서 뺐다.
+//   컷별 지시 표(역할·카메라…)가 통째로 사라져(사장님 지시: 불필요한 정보 제거) 채울 칸이 없다.
+//   "비트가 없다"는 그대로 잰다 — 표가 돌아올 때 옛 라벨로 돌아오면 안 된다.
 const FILES = [
   "app/create/[id]/scenario/page.js",
   "app/ads/[id]/page.js",
-  "app/archive/[id]/page.js",
 ];
+const NO_LABEL_FILES = ["app/archive/[id]/page.js"];
 
 describe("장면 라벨 — 내부 용어를 화면에 두지 않는다", () => {
+  for (const f of NO_LABEL_FILES) {
+    const raw = readFileSync(f, "utf8");
+    const code = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+    it(`★ ${f} — 화면에 "비트"가 없다(장면 표는 2026-09-14 에 걷었다)`, () => {
+      expect(code).not.toContain("비트");
+    });
+  }
+
   for (const f of FILES) {
     const raw = readFileSync(f, "utf8");
     // ⚠️ 주석은 걷어내고 판정한다 — 걷어낸 낱말을 주석에 적으면 계약이 통과해 버린다

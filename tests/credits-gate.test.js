@@ -190,7 +190,7 @@ describe("시작 게이트 — 자동 관통", () => {
     const p = await makeProject();
     expect((await autoPOST(autoReq(A), ctx(p.id))).status).toBe(402);
     expect((await projects.getProject(p.id, A)).auto?.state).not.toBe("running");
-    await grantTo(A, 500);
+    await grantTo(A, 5000);
     expect((await autoPOST(autoReq(A), ctx(p.id))).status).toBe(202);
   });
 });
@@ -253,7 +253,7 @@ describe("시작 게이트 — 단계별", () => {
     expect((await voicePOST(post("http://localhost/v"), ctx(p.id))).status).toBe(200);
     expect(pipelineMock.run).not.toHaveBeenCalled();
 
-    // 정가는 이 문이 받는다 — 모자라면 402(Seedance 30초 = 160 크레딧)
+    // 정가는 이 문이 받는다 — 모자라면 402(Seedance 30초 = 1400 크레딧)
     await grantTo(A, VIDEO_PRICE["seedance-2.0"]["720p"][30] - 1);
     expect((await imagesPOST(post("http://localhost/i"), ctx(p.id))).status).toBe(402);
     expect(pipelineMock.run).not.toHaveBeenCalled();
@@ -264,7 +264,7 @@ describe("시작 게이트 — 단계별", () => {
   });
 
   it("정가가 있으면 목소리·클립 시작이 200 이다", async () => {
-    await grantTo(A, 500);
+    await grantTo(A, 5000);
     const p = await projectWithAudio({ audio: null });
     expect((await voicePOST(post("http://localhost/v", { voiceLabel: "밝은 여성" }), ctx(p.id))).status).toBe(200);
     const q = await projectWithAudio({ image: { url: "i0" } });

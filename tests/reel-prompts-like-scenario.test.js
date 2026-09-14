@@ -41,12 +41,14 @@ describe("②시나리오와 같은 형식", () => {
     }
   });
 
-  // ★★ 번역은 **곁들이는 값**이다 — 원문이 먼저 서고, 없으면 그 줄을 아예 안 그린다
-  //   (옛 문서는 번역이 없다 — 사장님 결정: 앞으로 만드는 것에만).
-  it("★★ 지문 컴포넌트가 원문을 먼저 그리고, 번역은 있을 때만 그린다", () => {
+  // ★★ 2026-09-14 — **뒤집힌 판이다.** "원문이 먼저, 번역은 곁들임"이었는데 사장님 지시
+  //   (사용자에게 불필요한 정보 제거)로 **번역만** 보인다. 번역이 없는 옛 문서는 원문으로
+  //   떨어진다(빈 자리를 남기지 않는다). 두 화면이 같은 컴포넌트라 여기서도 같은 뜻으로 잰다 —
+  //   자세한 판은 tests/prompt-translation.test.js 의 "화면" 묶음이다.
+  it("★★ 지문 컴포넌트가 번역이 있으면 번역만, 없으면 원문을 그린다", () => {
     const src = readFileSync("components/PromptWithKo.jsx", "utf8");
-    expect(src, "원문을 안 그린다").toMatch(/<p className=\{className\}>\{body\}<\/p>/);
-    expect(src, "번역이 없어도 빈 상자를 그린다").toMatch(/\{trans && \(/);
+    expect(src, "번역 우선 폴백이 아니다").toMatch(/<p className=\{className\}>\{trans \|\| body\}<\/p>/);
+    expect(src, "영어 원문을 번역 옆에 곁들인다").not.toContain("prompt-ko");
   });
 });
 

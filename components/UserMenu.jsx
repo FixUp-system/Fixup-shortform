@@ -14,6 +14,8 @@ import Icon from "./Icon";
 // 예전에는 여기서 한 번, 사이드바에서 또 한 번 GET /api/me 를 불렀고, 마이페이지에서 이름을
 // 바꿔도 이 버튼은 옛 이름을 그대로 들고 있었다(새로고침해야 반영).
 import { useMe } from "./MeContext";
+import { formatCredits } from "../lib/pricing";
+import { CREDITS_TAB_HREF, ME_TAB_EVENT } from "../lib/me-tab";
 
 // 사이드바에 있던 것을 그대로 옮겼다(새로 쓰지 않는다).
 async function handleLogout(router) {
@@ -81,8 +83,17 @@ export default function UserMenu({ initialGuest = false }) {
 
   return (
     <div className="um" ref={box}>
-      {/* ★ 크레딧 잔액은 2026-09-10 에 걷었다(사장님 지시) — 상용화를 앞두고 비용 정책을
-          새로 정할 예정이라, 낡은 정책이 화면에 남아 있으면 그것이 곧 약속처럼 읽힌다. */}
+      {/* ★★ 잔액 — 로그인했으면 **늘** 보인다(2026-09-14 결정 뒤집힘, 사장님: "상단바 잔액이 없는데?").
+          그 전에는 크레딧을 걷지 않는 동안(gated:false) 숨겼다(08-14 결정). 와디즈 서포터는 걷지 않는 동안에도
+          받은 크레딧이 들어왔는지 봐야 한다 — 마이페이지 크레딧 절을 늘 그리기로 한 것과 같은 방향이다.
+          내부 계정(차감 면제)은 잔액 뒤에 그 사실을 붙인다.
+          ★ 누르면 마이페이지 [크레딧] 탭. 이미 /me 에 있으면 Next 가 다시 그리지 않아 탭이 안 바뀌므로
+            신호를 함께 보낸다(lib/me-tab.js). */}
+      {me && (
+        <Link href={CREDITS_TAB_HREF} className="um-credit" onClick={() => window.dispatchEvent(new Event(ME_TAB_EVENT))}>
+          <b>{formatCredits(me.balance)}</b> 크레딧{me.internal === true && " · 내부"}
+        </Link>
+      )}
       <button
         className="um-btn"
         onClick={() => setOpen((v) => !v)}

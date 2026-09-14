@@ -8,7 +8,7 @@ import { withUser } from "../../../lib/auth/require-user.js";
 import { getStore } from "../../../lib/store/index.js";
 import { balanceFor } from "../../../lib/charges.js";
 import { fakeFal } from "../../../lib/fake.js";
-import { creditsEnabled } from "../../../lib/charges.js";
+import { creditsEnabled, creditsEnabledFor } from "../../../lib/charges.js";
 import { tierOf } from "../../../lib/tiers.js";
 import { displayNameOf, NAME_MAX } from "../../../lib/display-name.js";
 
@@ -30,7 +30,10 @@ export const GET = withUser(async (_req, _ctx, user) => {
     balance: await balanceFor(user.id),
     // ★ gated 는 "잔액 부족"이 아니라 "크레딧 게이트가 켜져 있음"이다(/api/credits 와 같은 규칙).
     // 실모드면 잔액과 무관하게 늘 true 이고, 잔액 판정은 화면이 gated && balance < 가격 으로 한다.
-    gated: !fakeFal() && creditsEnabled(),
+    // ★ 2026-09-14 — 계정마다 가른다(내부 계정 면제). /api/credits 와 같은 판정이다.
+    gated: !fakeFal() && await creditsEnabledFor(user.id),
+    // 내부 계정인가 — 원장 값 그대로(전역 스위치와 무관). 상단바가 "내부 계정" 표시에 쓴다.
+    internal: creditsEnabled() && profile.internal === true,
     // ★ 원문 role 을 그대로 흘리지 않는다 — 화면이 쓸 판정 하나만 준다.
     // 사이드바가 이걸 보고 운영자 전용 링크(비용 기록)를 그릴지 정한다.
     isAdmin: user.role === "admin",

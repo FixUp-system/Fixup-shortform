@@ -22,11 +22,13 @@ import {
 import { reelSheetUrl, storyboardGridFor } from "../../../../lib/reel/oneshot";
 // 보드 주소에 싣는 **내용 지문** — 서버와 같은 함수를 쓴다(두 벌이면 캐시가 안 맞는다).
 import { boardKey } from "../../../../lib/reel/board-key";
-import PromptWithKo from "../../../../components/PromptWithKo";
 // ★ 칸에 실리는 지문 한 줄 — **지문을 만드는 쪽과 같은 함수**다(lib/reel/panels.js).
 //   화면에서 다시 조립하면 실제로 나간 글과 갈린다.
-import { panelBody, panelSay, buildStoryboardPrompt } from "../../../../lib/reel/panels";
+import { panelSay } from "../../../../lib/reel/panels";
 import { aspectFor } from "../../../../lib/aspects";
+import { regenPrice, priceLabel, videoPrice } from "../../../../lib/pricing";
+import { modelIdForProject, resolutionForProject } from "../../../../lib/clip-limits";
+import { useMe } from "../../../../components/MeContext";
 
 export default function ReelImagesPage() {
   const { id } = useParams();
@@ -95,10 +97,19 @@ export default function ReelImagesPage() {
   //      회차 상한을 다 썼으면 안 부른다(canDraw — 서버와 같은 판정).
   //   ③ 실패는 조용히 넘긴다 — 사유는 아래 오류줄이 이미 말하고, 자동으로 또 시도하면
   //      같은 사유로 돈이 계속 나간다. 다시 하는 것은 사장님의 버튼 몫이다.
+  // ★★★ 2026-09-14 — **②의 [이미지 생성 →]을 눌러 온 때만** 자동으로 그린다(사장님 결정 a).
+  //   첫 그리기가 영상 정가를 걷는 문이라, 사이드바나 주소로 그냥 들어온 손님에게서 값이 나가면
+  //   안 된다. 그 버튼만 주소에 start=1 을 싣는다 — 누른 것이 곧 동의다. 그 밖에는 아래 [그림 만들기]
+  //   (값이 적혀 있다)를 눌러야 한다.
+  //   ★ 주소창 값은 한 번 읽고 지운다 — 새로고침으로 다시 신호가 가지 않게(autoImaged 도 함께 막는다).
+  //   ★ useSearchParams 대신 window 를 읽는다 — 이 화면에 Suspense 경계를 새로 두지 않으려고.
   const autoRef = useRef(false);
   useEffect(() => {
     if (autoRef.current) return;
     if (!project) return;
+    const startAsked = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("start") === "1";
+    if (!startAsked) return;
+    window.history.replaceState(null, "", window.location.pathname);
     if (!scenario?.text) return;
     if (reel.autoImaged) return;
     if (hasImages || sheetUrl) return;
@@ -127,9 +138,7 @@ export default function ReelImagesPage() {
   // ★ 한국어 번역은 **판 단위로 하나**다(2026-09-03) — 컷마다 같은 글을 저장하지 않는다.
   //   옛 문서에는 없다(사장님 결정: 앞으로 만드는 것에만) → 그때는 화면이 그 줄을 안 그린다.
   //   ★ 미리보기(아직 안 그린 상태)에는 번역이 없다 — 저장된 지문이 있을 때만 짝이 맞는다.
-  const savedPromptKo = savedPrompt ? (reel?.image_prompt_ko || "") : "";
   // 사장님 요청이 실린 지문인가 — 라우트가 note 를 받아 그릴 때 남긴다.
-  const imageEdited = !!reel?.image_edited && !!savedPrompt;
   // 보드 주소가 바뀌면(컷을 고쳤다) 다시 "오는 중"으로 되돌린다.
   useEffect(() => { setBoardReady(false); }, [boardHref]);
 
@@ -137,12 +146,6 @@ export default function ReelImagesPage() {
     resolution: project?.settings?.resolution,
     aspect: project?.settings?.aspect_ratio,
   });
-  const photoCount = project?.material?.photos?.length || 0;
-  const fullPrompt =
-    savedPrompt ||
-    (previewGrid && cuts.length
-      ? buildStoryboardPrompt(project, cuts, previewGrid, "", new Array(photoCount).fill({}))
-      : "");
 
   const promptsStep = REEL_STEPS.find((s) => s.key === "prompts");
 
@@ -151,6 +154,28 @@ export default function ReelImagesPage() {
   // ★ hasImages 일 때는 **명시로 전부**를 보낸다(all idx) — only 를 안 주면 라우트는
   //   "안 그려진 컷만"(초안 채우기)으로 읽는다(app/api/reel/[id]/images/route.js 의 wanted
   //   판정). null 을 그대로 보내면 [전부 다시 만들기]가 실은 아무 것도 새로 안 그린다.
+  // ★★ 2026-09-14 — **다시 그리기 값을 버튼에 적는다**(사장님 지시: 빠진 중요 정보 보완).
+  //   서버(app/api/reel/[id]/images/route.js)는 다시 그리기 둘째 회부터 값을 받는데 화면은
+  //   남은 횟수만 말했다. 계산은 라우트와 **같은 식**이다: 회차 = imageTries - 1, 전부 다시
+  //   그리기면 격자가 서는 한 판(sheet), 안 서면 컷마다 한 장(image).
+  //   ★ 크레딧 게이트가 꺼져 있거나 내부 계정이면(me.gated 가 false) 값을 안 적는다.
+  const { me, ready: meReady } = useMe();
+  const showCredits = meReady && me?.gated === true;
+  // 첫 그리기면 영상 정가가 여기서 나간다(라우트의 requireVideoCharge) — 버튼에 그 값을 적는다.
+  const firstCharge = !hasImages && !(Number(reel.imageTriesTotal) > 0);
+  const listPrice = project
+    ? videoPrice(project.settings?.target_seconds, modelIdForProject(project), resolutionForProject(project))
+    : 0;
+  const regenTotal = (() => {
+    if (!hasImages) return 0;
+    const prior = (Number(reel.imageTries) || 0) - 1;
+    if (prior < 0) return 0;
+    const model = modelIdForProject(project);
+    const res = resolutionForProject(project);
+    return previewGrid
+      ? regenPrice("sheet", prior, model, res)
+      : cuts.length * regenPrice("image", prior, model, res);
+  })();
   const drawBtn = (
     <button
       className="mini"
@@ -159,7 +184,13 @@ export default function ReelImagesPage() {
     >
       {/* ★ 2026-09-11 — 남은 다시 그리기 횟수(상한 3회 · 첫 1회 무료, 그 뒤 유료).
             triesLeft 는 lib/reel/doc.js 의 imageTriesLeft — 서버와 같은 판정이다. */}
-      {drawingNow ? "그리는 중…" : hasImages ? `다시 만들기 (${triesLeft}회 남음)` : "그림 만들기"}
+      {drawingNow
+        ? "그리는 중…"
+        : hasImages
+          ? `다시 만들기 · ${showCredits && regenTotal > 0 ? priceLabel(regenTotal) : "무료"} (${triesLeft}회 남음)`
+          : firstCharge && showCredits && listPrice > 0
+            ? `그림 만들기 · ${priceLabel(listPrice)}`
+            : "그림 만들기"}
     </button>
   );
 
@@ -317,9 +348,7 @@ export default function ReelImagesPage() {
                 {/* 아직 안 적힌 칸은 그렇게 말한다 — 빈 줄을 남기면 덜 만들어진 것처럼 보인다. */}
                 {/* ★ 마우스를 올리면 전체가 뜬다(title) — 스크롤이 번거로울 때의 지름길이다.
                     잘린 글을 **볼 길이 둘**인 셈이고, 어느 쪽도 이 화면을 떠나지 않는다. */}
-                <p className="panel-body" title={panelBody(c)}>
-                  {panelBody(c) || "아직 적힌 내용이 없어요"}
-                </p>
+                {/* ★ 2026-09-14 — 영어 지문 줄(panelBody)을 걷었다(사장님 지시: 불필요한 정보 제거). 대사 줄만 남긴다. */}
                 {/* ★ 내려받기는 카드 안 **오른쪽 아래**다(2026-08-27 사장님 지시).
                     `?dl=1` 이 붙어야 파일 이름이 버킷 키(uuid)가 아니라 사람이 읽는 이름으로
                     저장된다(app/api/uploads). fal 주소는 다른 출처라 그 파라미터를 모르고
@@ -355,35 +384,9 @@ export default function ReelImagesPage() {
           받는 자리라 뜻이 다르다. 자리도 그래서 다르다 — 지문 절의 머리에 선다.
           ★ 받는 것은 같은 보드 한 장이다(컷 그림을 모아 그린다) — "스토리보드 포함".
           ★ 자리: **컷 카드 아래 · 라인 위**(사장님 지시 3차). 라인은 지문 절이 갖는다. */}
-      {fullPrompt && (
-        <div className="prompt-head">
-          <a
-            className="mini"
-            href={`${boardHref}${boardHref.includes("?") ? "&" : "?"}download=1`}
-            download
-          >
-            전체 내려받기
-          </a>
-        </div>
-      )}
-
-      {fullPrompt && (
-        <details className="lib-fold" open>
-          <summary>
-            이미지 생성 지문 전체
-            {savedPrompt ? "" : " (미리보기 — 아직 안 그렸어요)"}
-            {/* ★★ 2026-09-03 사장님 지시 — 사장님 요청이 반영된 지문이면 **여기서 말한다**.
-                그전에는 고쳐 달라고 적어 다시 그려도 지문이 그대로인지 바뀐 것인지
-                화면 어디에도 표시가 없었다. */}
-            {imageEdited && <span className="badge ai">수정됨</span>}
-          </summary>
-          {/* ★★ 2026-09-03 사장님 지시(2차) — 이 절은 **지문 → 번역 → (아래) 수정 요청**
-              셋으로만 둔다. 같은 날 오전에 여기 넣었던 [전체 내려받기]는 뺐다 —
-              받는 자리는 보드 아래 버튼 하나로 모은다(같은 한 장을 두 자리에서 받으면
-              무엇이 다른지 묻게 된다). */}
-          <PromptWithKo text={fullPrompt} ko={savedPromptKo} />
-        </details>
-      )}
+      {/* ★★ 2026-09-14 — [전체 내려받기]와 기본으로 펼쳐진 **이미지 생성 지문 전체**(영어)를 걷었다
+          (사장님 지시: 사용자에게 불필요한 정보 제거). 받는 자리는 보드 옆 [보드 내려받기] 하나다 —
+          두 버튼이 같은 한 장을 받았다. 지문은 문서에 그대로 남는다(굽기·수정 요청은 그대로 돈다). */}
 
       {/* ★★ 이미지 수정 요청 — **전체 한 장 단위**다(2026-08-25 사장님 결정).
           스토리보드가 한 장이라 그 단위가 맞다 — 칸 하나만 다시 만들면 그것만 컷별로

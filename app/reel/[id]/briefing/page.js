@@ -11,7 +11,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useReelProject } from "../layout";
 import { REEL_STEPS, reelStepHref } from "../../../../lib/reel/steps";
-import { AD_FORMATS, AD_MOODS, AD_LANGS } from "../../../../lib/ad/options";
+import { AD_MOODS, AD_LANGS } from "../../../../lib/ad/options";
+import { REEL_CONCEPTS, normalizeReelConcept } from "../../../../lib/reel/concepts";
 import { STYLE_PRESETS } from "../../../../lib/styles";
 import { aspectFor } from "../../../../lib/aspects";
 
@@ -31,7 +32,10 @@ export default function ReelBriefingPage() {
   // ★ 라벨과 값을 한 자리에 모은다 — 화면이 칩만 늘어놓으면
   //   "story" 가 컨셉인지 분위기인지 사장님이 알 수 없다.
   const facts = [
-    ["컨셉", labelOf(AD_FORMATS, s.format)],
+    // ★★ 2026-09-14 — **틀린 값이 떴다.** 단계별은 고른 컨셉을 settings.concept 에 적고, format 에는
+    //   광고 옵션 정규화가 채운 기본값이 남는다(app/api/reel/route.js). format 을 읽으니 무엇을 골랐든
+    //   광고 포맷 이름이 나왔다. 옛 문서(concept 없음)는 normalizeReelConcept 가 옛 format 을 옮겨 읽는다.
+    ["컨셉", labelOf(REEL_CONCEPTS, normalizeReelConcept(s.concept ?? s.format))],
     ["분위기", labelOf(AD_MOODS, s.mood)],
     ["화풍", labelOf(STYLE_PRESETS, s.style)],
     ["언어", labelOf(AD_LANGS, s.narration_lang)],

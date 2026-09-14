@@ -6,25 +6,14 @@
 //   ③이미지 지문). 화면마다 마크업을 따로 두면 한쪽만 고쳐지는 날이 온다(ProjectCards 가
 //   홈·보관함에 하나로 선 이유와 같다).
 //
-// ★★★ **원문이 먼저다.** 모델에게 실제로 나가는 것은 영어 원문이고, 번역은 곁들이는
-//   값이다. 순서를 뒤집으면 사장님이 한국어를 고치면 반영될 것이라 기대하게 된다 —
-//   고치는 자리는 따로 있다(각 화면의 수정 요청 칸).
-// ★ 번역이 없으면 **그 줄을 아예 안 그린다** — 옛 문서는 번역이 없고(사장님 결정:
-//   "앞으로 생성되는 문서에만"), 빈 상자를 두면 "번역이 실패했나"로 읽힌다.
+// ★★★ 2026-09-14 — **한국어만 보인다**(사장님 지시: 사용자에게 불필요한 정보 제거).
+//   그전에는 영어 원문을 먼저, 번역을 곁들여 보였다. 손님은 한국어만 읽고 고치는 칸도
+//   한국어라, 영어 원문은 읽을 수도 쓸 수도 없는 글이었다. 원문은 문서에 그대로 남는다 —
+//   모델에게 나가는 것은 여전히 원문이다.
+// ★ 번역이 없는 옛 문서는 **원문으로 떨어진다** — 빈 자리를 두면 "시나리오가 사라졌나"로 읽힌다.
 export default function PromptWithKo({ text, ko, className = "script-src" }) {
   const body = typeof text === "string" ? text : "";
   const trans = typeof ko === "string" ? ko.trim() : "";
-  if (!body) return null;
-  return (
-    <>
-      <p className={className}>{body}</p>
-      {trans && (
-        <div className="prompt-ko">
-          {/* ★ 라벨을 단다 — 라벨이 없으면 두 문단이 이어진 한 글로 읽힌다. */}
-          <span className="prompt-ko-label">한국어</span>
-          <p className={className}>{trans}</p>
-        </div>
-      )}
-    </>
-  );
+  if (!body && !trans) return null;
+  return <p className={className}>{trans || body}</p>;
 }

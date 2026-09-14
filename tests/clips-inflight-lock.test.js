@@ -62,7 +62,7 @@ describe("돌고 있는 생성 위에 다시 만들기를 막는다", () => {
   const grant = (n) => getStore().insertGrant({ user_id: A, amount_credits: n, reason: "충전", granted_by: ADMIN });
 
   it("박동이 살아 있으면 거절한다 — 값도 받지 않는다", async () => {
-    await grant(500);
+    await grant(5000);
     const p = await projectMidRun({ at: Date.now(), phase: "video", done: 0, total: 1 });
     const before = await getStore().sumCharges(A);
 
@@ -76,7 +76,7 @@ describe("돌고 있는 생성 위에 다시 만들기를 막는다", () => {
   });
 
   it("박동이 임계만큼 멎었으면 통과시킨다 — 정말 죽은 실행에서 갇히지 않는다", async () => {
-    await grant(500);
+    await grant(5000);
     const p = await projectMidRun({ at: Date.now() - STALL_MS - 1, phase: "video", done: 0, total: 1 });
 
     const res = await POST(req(), ctx(p.id));
@@ -85,7 +85,7 @@ describe("돌고 있는 생성 위에 다시 만들기를 막는다", () => {
   });
 
   it("앞 단계의 박동은 막지 않는다 — 영상은 아직 시작한 적이 없다", async () => {
-    await grant(500);
+    await grant(5000);
     const p = await projectMidRun({ at: Date.now(), phase: "images", done: 1, total: 1 });
 
     const res = await POST(req(), ctx(p.id));
@@ -94,7 +94,7 @@ describe("돌고 있는 생성 위에 다시 만들기를 막는다", () => {
   });
 
   it("박동이 아예 없으면 통과시킨다 — 옛 프로젝트다", async () => {
-    await grant(500);
+    await grant(5000);
     const p = await projectMidRun(undefined);
 
     const res = await POST(req(), ctx(p.id));

@@ -25,6 +25,9 @@ import { speechLangOf } from "../../../../lib/subtitle-langs";
 // ★ 실패를 사장님 말로 옮기는 자리는 lib/failure.js 하나다 — 화면이 문구를 손으로 적으면
 //   그 화면만 다른 말을 하게 된다(2026-09-02: 504 가 "시나리오를 만들지 못했어요" 로 뭉개졌다).
 import { failureFromResponse } from "../../../../lib/failure";
+import { videoPrice, priceLabel } from "../../../../lib/pricing";
+import { modelIdForProject, resolutionForProject } from "../../../../lib/clip-limits";
+import { useMe } from "../../../../components/MeContext";
 
 export default function ReelScenarioPage() {
   const { id } = useParams();
@@ -69,33 +72,17 @@ export default function ReelScenarioPage() {
     setBusy(false);
   }
 
-  // ★★ 시나리오가 **처음** 만들어진 직후 이미지를 한 번 만든다(2026-08-25 사장님 결정).
-  //
-  // ⚠️ 시나리오 자동 생성과 성질이 다르다 — 이미지는 **돈이 나간다**(스토리보드 한 장 $0.401).
-  //   그래서 "화면을 열 때마다"가 아니라 **한 번뿐**이다. 되돌아와도 다시 안 돈다.
-  // ★ 한 번을 어떻게 보장하나: 문서에 `reel.autoImaged` 를 남긴다. ref 로만 막으면
-  //   새로고침 한 번에 그 기억이 사라져 또 나간다(ref 는 브라우저 안에서만 산다).
-  // ★ 이미 그림이 있으면 안 만든다 — 사장님이 이미 만들었거나 앞서 자동으로 만든 것이다.
-  const autoImageRef = useRef(false);
-  useEffect(() => {
-    if (autoImageRef.current) return;
-    if (!project || busy) return;
-    if (!scenario?.text) return;                       // 시나리오가 아직 없다
-    if (project?.reel?.autoImaged) return;             // 이미 한 번 돌았다
-    if ((project.cuts || []).some((c) => c?.image?.url)) return; // 그림이 이미 있다
-    autoImageRef.current = true;
-    (async () => {
-      // 실패해도 조용히 넘어간다 — ③이미지 생성 화면에 버튼이 있고 거기서 사유가 보인다.
-      //   여기서 오류를 띄우면 시나리오를 보러 온 사장님에게 이미지 이야기를 하게 된다.
-      await fetch(`/api/reel/${id}/images`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ auto: true }),
-      }).catch(() => {});
-      await reload(id).catch(() => {});
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project, scenario?.text, busy]);
+  // ★★★ 2026-09-14 — **시나리오를 만들자마자 이미지를 자동으로 사던 것을 걷었다**(사장님 결정 a).
+  //   그 이미지 요청이 **영상 정가**(예: 720p 15초 750 크레딧)를 걷는 첫 문이라, 손님은 "시나리오를
+  //   무료로 만들어 봤는데" 확인 한 번 없이 크레딧이 빠졌다(크레딧을 끈 내부 QA 동안에는 안 드러났다).
+  //   이제 [이미지 생성 →]을 **눌러야** ③이 그리기 시작하고, 그 버튼 옆에서 값을 먼저 말한다.
+  const { me, ready: meReady } = useMe();
+  const showCredits = meReady && me?.gated === true;
+  const hasImages = (project?.cuts || []).some((c) => c?.image?.url);
+  // 정가를 아직 안 낸 프로젝트인가 — 그림을 한 번도 안 그렸으면 ③의 첫 그리기가 정가를 걷는다
+  //   (app/api/reel/[id]/images/route.js 의 requireVideoCharge). imageTriesTotal 은 절대 안 줄어드는 회차다.
+  const firstCharge = !hasImages && !(Number(project?.reel?.imageTriesTotal) > 0);
+  const listPrice = project ? videoPrice(project.settings?.target_seconds, modelIdForProject(project), resolutionForProject(project)) : 0;
 
   // ★★ **누르지 않아도 만들어진다**(2026-08-25 사장님 지시).
   //   ①입력에서 [시작하기]를 누르면 프로젝트만 만들고 이 화면으로 온다 —
@@ -172,10 +159,9 @@ export default function ReelScenarioPage() {
             만들면 없는 기능이 있는 것처럼 읽힌다. */}
       {!busy && narration && (
         <div className="narration-one">
-          <p className="pgsub">
-            내레이션 · {narration.text.length}
-            {narrationCap ? `/${narrationCap}` : ""}자
-          </p>
+          {/* ★ 2026-09-14 — 글자 수(57/82자)를 걷었다. 이 칸은 직접 못 고치는 읽는 글이라
+              카운터가 할 일이 없었다(사장님 지시: 불필요한 정보 제거). */}
+          <p className="pgsub">내레이션</p>
           <p className="script-src">{narration.text}</p>
         </div>
       )}
@@ -224,7 +210,11 @@ export default function ReelScenarioPage() {
             {/* ★ 이름은 **가서 무엇이 되는가**로 적는다(2026-08-27 사장님 지시) — 다음 화면에서
                 이미지가 만들어진다. 단계 이름("그림")을 빌리면 그 화면이 무엇을 하는
                 자리인지는 말하지 않는다. */}
-            <Link className="cta" href={reelStepHref(imagesStep, id)}>이미지 생성 →</Link>
+            {showCredits && firstCharge && listPrice > 0 && (
+              <span className="hint">여기서 영상 값 {priceLabel(listPrice)}이 나가요 — 되돌릴 수 없어요</span>
+            )}
+            {/* ★ 그림이 없으면 ③이 **도착하자마자 그리도록** 신호(start=1)를 싣는다 — 누른 것이 곧 동의다. */}
+            <Link className="cta" href={`${reelStepHref(imagesStep, id)}${hasImages ? "" : "?start=1"}`}>이미지 생성 →</Link>
           </div>
         )}
       </div>

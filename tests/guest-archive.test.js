@@ -145,14 +145,21 @@ describe("손님이 보는 목록", () => {
   });
   afterEach(() => { delete process.env.SHOTFORM_PUBLIC_ARCHIVE; });
 
-  it("★ 신원 없이도 전체가 보이고, 내 것은 하나도 없다", async () => {
+  // ★★★ 2026-09-14 뒤집힘 — 손님에게 전체를 보여 주던 것을 닫았다(전체 공유 닫기 — 와디즈
+  //   손님을 받기 전). 손님에게는 내 것이 없으니 **빈 목록**이다. 문(200·guest 표시)은 그대로다 —
+  //   화면이 그 표시로 "로그인하면 내 영상이 모여요"를 그린다.
+  it("★ 신원 없이 부르면 빈 목록이다 — 남의 영상이 하나도 안 나간다 (2026-09-14)", async () => {
     const res = await GET(new Request("http://x/api/projects"), {});
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.guest, "손님이라고 말해 주지 않는다").toBe(true);
-    expect(body.projects.length).toBe(1);
-    // mine 이 참이면 화면이 지우기·이어서 작업하기를 그린다.
-    expect(body.projects[0].mine).toBe(false);
+    expect(body.projects, "손님에게 남의 영상이 나간다").toEqual([]);
+  });
+
+  it("★ scope=all 을 붙여도 손님은 빈 목록이다", async () => {
+    const res = await GET(new Request("http://x/api/projects?scope=all"), {});
+    const body = await res.json();
+    expect(body.projects).toEqual([]);
   });
 
   it("스위치가 꺼져 있으면 신원 없이는 못 읽는다", async () => {

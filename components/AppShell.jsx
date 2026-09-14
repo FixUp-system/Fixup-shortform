@@ -53,9 +53,10 @@ export default function AppShell({ children }) {
     <MeProvider>
       <div className="belt">
         <span className="belt-side" />
-        <span className="belt-mid">
-          <b>BETA</b> 시험 서비스 — 대본부터 완성까지 자동으로 만듭니다
-        </span>
+        {/* ★ 2026-09-14 — BETA 문구를 걷었다(사장님 지시: 사용자에게 불필요한 정보 제거).
+            돈을 받는 서비스에 "시험 서비스"가 늘 떠 있었다. 가운데 칸은 남긴다 — 계정 묶음의
+            자리(우측 정렬)가 이 칸을 기준으로 잡혀 있다. */}
+        <span className="belt-mid" />
         <span className="belt-side belt-right">
           <UserMenu />
         </span>

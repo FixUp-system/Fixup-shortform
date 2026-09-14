@@ -57,12 +57,21 @@ describe("프로젝트 라우트 인증", () => {
     expect(res.status).toBe(200);
   });
 
-  // ★ 2026-08-18 뒤집힘 — 읽기는 남에게도 열린다(보관함 전체 공유, 내부 팀).
-  //   그래도 **읽기뿐이다**: 아래 "변이 라우트" 묶음이 그대로 404 여야 한다.
-  //   내 것이 아니라는 사실은 mine:false 로 실려 나가고, 화면은 그것으로 쓰기 버튼을 지운다.
-  it("남도 읽는다 — 다만 mine:false 로 온다", async () => {
+  // ★ 2026-08-18 — 읽기는 남에게도 열렸었다(보관함 전체 공유, 내부 팀).
+  // ★★★ 2026-09-14 뒤집힘 — 전체 공유를 닫았다(와디즈 손님을 받기 전). 남의 것은 **404** 이고,
+  //   운영자만 읽는다(mine:false 로). 아래 "변이 라우트" 묶음은 그대로 404 여야 한다.
+  it("★★★ 남은 못 읽는다 — 404 다 (2026-09-14)", async () => {
     const p = await make(A);
     const res = await getProjectRoute(reqAs(B), ctx(p.id));
+    expect(res.status).toBe(404);
+  });
+
+  it("★★ 운영자는 남의 것을 읽는다 — 다만 mine:false 로 온다", async () => {
+    const p = await make(A);
+    const adminReq = new Request("http://localhost/api/projects/x", {
+      headers: { ...headersFor(B), [ROLE_HEADER]: "admin" },
+    });
+    const res = await getProjectRoute(adminReq, ctx(p.id));
     expect(res.status).toBe(200);
     expect((await res.json()).mine).toBe(false);
   });

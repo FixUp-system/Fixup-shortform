@@ -13,7 +13,6 @@ import { priceLabel, adVideoPrice } from "../../../lib/pricing";
 // 이 프로젝트가 어느 모델로 만들어지는지 — 사장님이 값을 치르기 전에 알아야 한다.
 // adModel 은 모르는/없는 id 도 기본 모델로 안전하게 떨어진다(옛 문서 보호).
 import { adModel } from "../../../lib/ad/models";
-import { prettyPrompt } from "../../../lib/ad/prompt-view";
 // 지나온 단계를 다시 볼 수 있는가 — 사이드바와 **같은 판정**을 쓴다(두 벌이면 갈린다).
 import { adViewStep } from "../../../lib/ad/steps";
 // 큐 대기 상한 — 서버(lib/ad/generate.js)와 같은 계산을 여기서도 부른다(Task 23).
@@ -388,7 +387,8 @@ export default function AdDetailPage() {
     <>
       <h1 className="pgtitle">원클릭 영상</h1>
       {/* 이 영상이 어느 모델로 만들어지는지 — 유료 버튼([이대로 만들기])을 누르기 전에 알아야 한다 */}
-      <p className="pgsub">{model.label} 모델 · {model.hint}</p>
+      {/* ★ 2026-09-14 — 모델 설명(hint: 해상도 목록·"네이티브 오디오·멀티샷")을 걷고 **이 영상에서 고른 값만** 적는다(사장님 지시). */}
+      <p className="pgsub">{model.label} · {settings?.seconds || 15}초{settings?.resolution ? ` · ${settings.resolution}` : ""}</p>
       {err && <p className="pgsub warn">{err}</p>}
       {/* 배경에서 굽다 실패한 것 — 위치를 status 마다 가르지 않는다. 사장님이 못 보면 안 된다. */}
       {/* ★★ 2026-08-31 — **사장님 말로 옮겨서** 보인다. 그전에는 fal 원문 영어가 그대로
@@ -466,7 +466,8 @@ export default function AdDetailPage() {
               끊는다: prettyPrompt 가 단 머리말과 장면 시간 앞에 줄을 넣고,
               `direction-lines`(white-space: pre-line)가 그 줄을 살린다.
               ⚠️ 원문을 바꾸지 않는다 — 공백을 줄바꿈으로 바꿀 뿐이다. */}
-          <p className="script-src direction-lines">{prettyPrompt(scenario?.text)}</p>
+          {/* ★ 2026-09-14 — 영상 프롬프트 영어 원문을 화면에서 걷었다(사장님 지시: 불필요한 정보 제거).
+              판단에 필요한 것은 아래 이야기·장면·대사 목록이 준다. 원문은 문서에 그대로 남는다. */}
 
           {/* 편집 머리 — [수정하기]는 **고칠 수 있는 것 전부보다 위**에 있어야 손이 먼저 닿는다.
               ★ 2026-08-21 — 전역 값(인물·무대…)도 고칠 수 있게 되면서 이 자리가 장면 목록
@@ -493,11 +494,7 @@ export default function AdDetailPage() {
             </div>
           </div>
           {editing && (
-            <p className="pgsub">
-              고치고 싶은 곳을 눌러 바로 고치세요. <b>인물·무대·옷차림</b> 같은 영상 전체 값도
-              고칠 수 있어요 — 고친 것은 그대로 지키고 나머지를 거기에 맞춰 다시 씁니다.
-              장면 길이(초)는 전체 길이에 맞춰져 있어 고칠 수 없어요.
-            </p>
+            <p className="pgsub">고치고 싶은 곳을 눌러 바로 고치세요.</p>
           )}
 
           {/* ★★★ **영상 전체에 걸리는 값들** — 보여 주고(2026-08-21), 고칠 수 있게 한다.
@@ -585,7 +582,7 @@ export default function AdDetailPage() {
             )}
             {editing && (
               <div className="fwd">
-                <span className="hint">고친 장면은 그대로 지키고 나머지를 다시 씁니다 — 무료예요</span>
+                <span className="hint">고친 장면은 그대로 두고 나머지를 다시 써요</span>
                 <button className="cta" disabled={busy} onClick={rewriteWithEdits}>
                   {busy ? "쓰는 중…" : "고친 대로 다시 쓰기 →"} <span className="cr">무료</span>
                 </button>
@@ -634,7 +631,7 @@ export default function AdDetailPage() {
 
       {view === "done" && video && (
         <section className="panel panel--narrow">
-          <h2>완성했어요 <span className="badge vlm">완성</span></h2>
+          <h2>완성했어요</h2>
           <div className="preview-pane done-preview">
             <div className="preview-frame">
               <video className="preview-video" controls src={video.url} />

@@ -7,8 +7,6 @@ import { withUser } from "../../../../lib/auth/require-user.js";
 // 이름 규약은 순수 모듈에, 실제로 줄이는 일은 서버 모듈에 — 카드도 앞엣것을 읽는다.
 import { thumbKeyFor } from "../../../../lib/thumb-url.js";
 import { makeThumb, THUMB_TYPE } from "../../../../lib/thumbs.js";
-// 손님 보관함 스위치 — 캐시 문을 여기에 묶는다(아래 thumbCacheControl 주석).
-import { guestArchiveOn } from "../../../../lib/auth/guest.js";
 
 const MIME = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" };
 const BUCKET = "uploads";
@@ -31,9 +29,11 @@ const BUCKET = "uploads";
 //   남의 사본을 내주고, `Vary` 를 붙이면 캐시가 사실상 안 먹는다. 그래서 Vary 를 안 단다.
 // ★ 원본(`?t=1` 없음)은 스위치와 무관하게 `private` 다 — 랜딩이 쓰는 것은 작은 판뿐이라
 //   여는 이득이 없고, 여는 범위는 좁을수록 좋다.
+// ★★★ 2026-09-14 — **스위치와 무관하게 `private` 로 되돌렸다.** 소유자 대조가 되살아나
+//   이 응답은 사람마다 다르다 — 엣지가 쥐면 로그인·소유자 벽을 안 지나고 남에게 나간다.
+//   (위 설명의 "이미 누구나 받을 수 있으니"라는 전제가 이제 참이 아니다.)
 function thumbCacheControl() {
-  const shared = guestArchiveOn() ? "public" : "private";
-  return `${shared}, max-age=31536000, immutable`;
+  return "private, max-age=31536000, immutable";
 }
 
 // 없는 파일의 404 — **잠깐만** 엣지가 쥔다.
@@ -43,15 +43,13 @@ function thumbCacheControl() {
 // ★★ 그런데 **오래 쥐면 안 된다.** 그 파일들은 되찾을 대상이고(옛 Supabase 에 531MB 가
 //   잠겨 있다), 404 가 캐시에 박히면 되살아난 사진이 그만큼 가려진다. 그래서 분 단위다.
 // ★ 손님 보관함이 꺼져 있으면 캐시 지시를 아예 안 단다 — 로그인 벽 뒤의 응답이다.
+// ★ 2026-09-14 — 이제 이 404 에 닿는 것은 **주인(또는 운영자)** 뿐이다(소유자 대조가 앞에 있다).
+//   공유 캐시에 올리면 같은 주소의 되살아난 파일이 주인에게도 가려지므로 지시를 달지 않는다.
 function notFound() {
-  return new Response("파일을 찾을 수 없어요", {
-    status: 404,
-    headers: guestArchiveOn() ? { "Cache-Control": "public, max-age=300" } : {},
-  });
+  return new Response("파일을 찾을 수 없어요", { status: 404 });
 }
 
-// user 는 이제 안 쓴다 — withUser 는 그대로 둔다(로그인 자체는 여전히 문이다).
-export const GET = withUser(async (req, { params }) => {
+export const GET = withUser(async (req, { params }, user) => {
   const { name } = await params;
   // 경로 조작 방지 — 버킷 키에 슬래시나 상위 경로가 들어가면 안 된다
   if (!/^[a-z0-9-]+\.(jpg|png|webp)$/.test(name)) {
@@ -62,6 +60,12 @@ export const GET = withUser(async (req, { params }) => {
   //   남아 있어야 아무 이름이나 찍어 보는 길(존재 확인)이 막힌다. 로그인은 지난다.
   const owner = await getStore().findUploadOwner(name);
   if (!owner) {
+    return new Response("파일을 찾을 수 없어요", { status: 404 });
+  }
+  // ★★★ 2026-09-14 — **소유자 대조를 되살렸다**(전체 공유 닫기, 사장님 지시).
+  //   이용자가 올린 사진은 남의 것이다 — 올린 사람과 운영자만 받는다. 손님은 받을 수 없다.
+  //   주인이 아니면 "없음"과 같은 404 다(존재 여부를 안 흘린다).
+  if (owner !== user?.id && user?.role !== "admin") {
     return new Response("파일을 찾을 수 없어요", { status: 404 });
   }
   // ★ ?t=1 이면 **카드용 작은 판**을 준다 (2026-09-07).

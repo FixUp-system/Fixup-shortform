@@ -200,11 +200,9 @@ export default function ReelPromptsPage() {
           <section key={i} className="panel">
             <h3>컷 {i + 1}</h3>
             {c.image?.url && <img className="thumb-media" src={c.image.url} alt={`컷 ${i + 1}`} />}
-            <AutoTextarea
-              className="field"
-              defaultValue={c.clip_prompt || ""}
-              onBlur={(e) => { if (e.target.value.trim() !== (c.clip_prompt || "")) save(i, e.target.value); }}
-            />
+            {/* ★★ 2026-09-14 — 컷마다 **영어 지시문을 직접 고치던 칸**을 걷었다(사장님 지시: 영어 원문만
+                숨기기). 손님은 영어 지시문을 읽고 고칠 사람이 아니다 — 고치는 길은 아래 한국어 요청 칸
+                (전체)과 이 컷의 [다시 쓰기]다. 지시문은 문서에 그대로 남고 굽기는 그것을 읽는다. */}
             <button type="button" className="tag" disabled={!!saving} onClick={() => rewrite(i)}>
               {saving === `rewrite-${i}` ? "다시 쓰는 중…" : "다시 쓰기"}
             </button>

@@ -46,10 +46,11 @@ describe("남의 영상을 열 수 있는가 — editable", () => {
     expect(v.mine, "mine 이 참이면 지우기 버튼까지 그려진다").toBe(false);
   });
 
-  it("★★ 보통 사용자는 남의 것을 못 고친다", async () => {
+  // ★★★ 2026-09-14 — 전체 공유 닫기(와디즈 손님을 받기 전). 예전에는 남도 mine:false·editable:false
+  //   로 **읽기는** 했다. 이제 남의 문서는 **없는 것과 같다**(null → 라우트 404). 운영자만 연다.
+  it("★★★ 보통 사용자는 남의 것을 아예 못 연다 — null 이다 (2026-09-14)", async () => {
     const v = await runWithActor({ id: OTHER, role: "user" }, () => getProjectForViewing(P, OTHER));
-    expect(v.editable).toBe(false);
-    expect(v.mine).toBe(false);
+    expect(v, "남의 문서가 보통 사용자에게 열린다").toBeNull();
   });
 
   it("★ 소유자는 둘 다 참이다 — 예전 화면이 안 바뀐다", async () => {
@@ -57,14 +58,19 @@ describe("남의 영상을 열 수 있는가 — editable", () => {
     expect(v).toMatchObject({ mine: true, editable: true });
   });
 
-  it("★★ **모를 때는 안 넓힌다** — 컨텍스트 없이 부르면 운영자가 아니다", async () => {
+  it("★★ **모를 때는 안 넓힌다** — 컨텍스트 없이 부르면 운영자가 아니라서 남의 것은 null 이다", async () => {
     const v = await getProjectForViewing(P, OTHER);
-    expect(v.editable).toBe(false);
+    expect(v).toBeNull();
   });
 
-  it("★ 문자열 actor 는 역할이 아니다 — 스크립트가 조용히 운영자가 되지 않는다", async () => {
+  it("★ 문자열 actor 는 역할이 아니다 — 스크립트가 조용히 운영자가 되어 남의 것을 열지 않는다", async () => {
     const v = await runWithActor("admin", () => getProjectForViewing(P, OTHER));
-    expect(v.editable).toBe(false);
+    expect(v).toBeNull();
+  });
+
+  it("★ 손님(viewerId null)도 남의 것은 null 이다", async () => {
+    const v = await getProjectForViewing(P, null);
+    expect(v).toBeNull();
   });
 });
 
