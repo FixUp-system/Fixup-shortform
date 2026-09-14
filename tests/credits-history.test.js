@@ -136,3 +136,41 @@ describe("크레딧 내역", () => {
     expect(has_more).toBe(false);
   });
 });
+// 마이페이지 [크레딧] 탭(2026-09-14 사장님 지시) — "450/1000" 요약과 [전체 | 충전 | 사용] 좁히기.
+describe("크레딧 내역 — 요약 합계와 좁히기", () => {
+  beforeEach(() => resetMemoryStore());
+
+  it("총 충전(granted)과 사용(used)을 함께 준다 — 보유 = 총 충전 − 사용", async () => {
+    await grant(A, 500);
+    await grant(A, 500);
+    const p = await createProject({ ownerId: A, settings: { target_seconds: 30 }, material: { text: "가", photos: [] } });
+    const paid = await chargeVideo({ userId: A, projectId: p.id, seconds: 30 });
+
+    const b = await body();
+    expect(b.granted).toBe(1000);
+    expect(b.used).toBe(paid);
+    expect(b.balance).toBe(1000 - paid);
+  });
+
+  it("?source=grant 는 충전만, ?source=charge 는 사용(환불 포함)만 준다", async () => {
+    await grant(A, 500);
+    const p = await createProject({ ownerId: A, settings: { target_seconds: 30 }, material: { text: "가", photos: [] } });
+    await chargeVideo({ userId: A, projectId: p.id, seconds: 30 });
+    await refundVideo({ userId: A, projectId: p.id });
+
+    const g = await bodyQ("source=grant");
+    expect(g.rows.map((r) => r.kind)).toEqual(["grant"]);
+    const c = await bodyQ("source=charge");
+    expect(c.rows.length).toBe(2);
+    expect(c.rows.every((r) => r.kind !== "grant")).toBe(true);
+    // 합계는 좁히기와 무관하게 전체 기준이다
+    expect(c.granted).toBe(500);
+  });
+
+  it("모르는 source 는 조건 없음이다", async () => {
+    await grant(A, 500);
+    const p = await createProject({ ownerId: A, settings: { target_seconds: 30 }, material: { text: "가", photos: [] } });
+    await chargeVideo({ userId: A, projectId: p.id, seconds: 30 });
+    expect((await bodyQ("source=zzz")).rows.length).toBe(2);
+  });
+});

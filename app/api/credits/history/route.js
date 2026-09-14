@@ -11,5 +11,7 @@ import { readLedger, ledgerLimit } from "../../../../lib/ledger-read.js";
 export const GET = withUser(async (req, _ctx, user) => {
   const url = new URL(req.url || "http://localhost/api/credits/history");
   const before = Number(url.searchParams.get("before")) || undefined;
-  return Response.json(await readLedger(user.id, { limit: ledgerLimit(url.searchParams.get("limit")), before }));
+  // source — grant(충전) · charge(사용). 모르는 값은 readLedger 가 조건 없음으로 읽는다.
+  const source = url.searchParams.get("source") || undefined;
+  return Response.json(await readLedger(user.id, { limit: ledgerLimit(url.searchParams.get("limit")), before, source }));
 });
