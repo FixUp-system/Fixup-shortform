@@ -246,3 +246,46 @@ $$;
 
 alter table credit_grants  enable row level security;  -- 정책 0개 = 전부 거부(앱은 service_role)
 alter table credit_charges enable row level security;
+
+-- ── 크레딧 코드(2026-09-14) ─────────────────────────────────────────────
+-- 와디즈 서포터에게 메일 머지로 건네는 일회용 코드. 설계: docs/superpowers/specs/2026-09-14-credit-codes-design.md
+create table if not exists credit_codes (
+  code            text primary key,                   -- 정규형 12자(하이픈 없음)
+  amount_credits  integer not null check (amount_credits > 0),
+  batch           text not null,                      -- 한 번 붙여 넣은 묶음 이름
+  meta            jsonb not null default '{}'::jsonb, -- 붙여 넣은 원래 행(CSV 를 다시 뽑는다)
+  created_by      uuid not null,
+  created_at      timestamptz not null default now(),
+  redeemed_by     uuid references auth.users(id) on delete set null,
+  redeemed_at     timestamptz
+);
+create index if not exists credit_codes_batch on credit_codes (batch);
+
+-- 등록 = 코드 잡기 + 충전 행을 **한 트랜잭션**으로. 결과는 ok / used / not_found.
+-- ★ 조건부 update(redeemed_by is null)가 한 번만을 지킨다 — 동시에 둘이 넣어도 한 줄만 잡힌다.
+create or replace function redeem_credit_code(p_code text, p_user uuid, p_reason text)
+returns table (result text, credits integer) language plpgsql as $$
+declare
+  v_amount integer;
+begin
+  update credit_codes c
+     set redeemed_by = p_user, redeemed_at = now()
+   where c.code = p_code and c.redeemed_by is null
+  returning c.amount_credits into v_amount;
+
+  if v_amount is null then
+    if exists (select 1 from credit_codes c where c.code = p_code) then
+      return query select 'used'::text, null::integer;
+    else
+      return query select 'not_found'::text, null::integer;
+    end if;
+    return;
+  end if;
+
+  insert into credit_grants (user_id, amount_credits, reason, granted_by)
+  values (p_user, v_amount, p_reason, p_user);
+  return query select 'ok'::text, v_amount;
+end;
+$$;
+
+alter table credit_codes   enable row level security;
