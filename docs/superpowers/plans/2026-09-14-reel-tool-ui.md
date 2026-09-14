@@ -92,14 +92,16 @@ describe("lockedAxes — 축마다 잠기는 때가 다르다", () => {
     }
   });
 
-  it("★ 시나리오를 확정하면 비율·길이가 잠긴다 — 컷 구조가 그 값에서 나왔다", () => {
+  it("★★ 시나리오를 확정하면 비율·길이·모델·화질이 **함께** 잠긴다", () => {
+    // ★ Ruling 5 — 넷 다 시나리오 컷 수를 정하는 입력이고(reelSceneCountRule),
+    //   청구(④이미지)보다 이른 시점이라 돈 구멍도 여기서 닫힌다.
     const l = lockedAxes(p({ scenario: { text: "A 15-second commercial." } }));
-    expect(l.aspect_ratio.locked).toBe(true);
-    expect(l.aspect_ratio.reason).toBe("시나리오를 확정해서 잠겼어요");
-    expect(l.target_seconds.locked).toBe(true);
-    // 그림·클립은 아직 없으므로 나머지는 열려 있다
+    for (const k of ["aspect_ratio", "target_seconds", "i2v_model", "resolution"]) {
+      expect(l[k].locked, `${k} 가 안 잠겼다`).toBe(true);
+      expect(l[k].reason).toBe("시나리오를 확정해서 잠겼어요");
+    }
+    // 화풍은 그림에만 들어가므로 아직 열려 있다
     expect(l.style.locked).toBe(false);
-    expect(l.i2v_model.locked).toBe(false);
   });
 
   it("★ 첫 그림을 그리면 화풍이 잠긴다", () => {
@@ -112,14 +114,13 @@ describe("lockedAxes — 축마다 잠기는 때가 다르다", () => {
     expect(l.i2v_model.locked, "클립이 없는데 모델이 잠겼다").toBe(false);
   });
 
-  it("★★ 첫 클립을 구우면 모델·화질이 잠긴다 — 여기서부터 돈이 크게 나간다", () => {
+  it("★★ 클립까지 구운 뒤에도 모델·화질의 사유는 **시나리오**다 — 늦은 사유를 되살리지 마라", () => {
     const l = lockedAxes(p({
       scenario: { text: "t" },
       cuts: [cut({ image: { url: "a" }, video: { url: "v" } })],
     }));
-    expect(l.i2v_model.locked).toBe(true);
-    expect(l.i2v_model.reason).toBe("첫 컷을 만들어 잠겼어요");
-    expect(l.resolution.locked).toBe(true);
+    expect(l.i2v_model.reason).toBe("시나리오를 확정해서 잠겼어요");
+    expect(l.resolution.reason).toBe("시나리오를 확정해서 잠겼어요");
   });
 
   it("문서가 없거나 이상해도 던지지 않는다 — 화면이 죽으면 안 된다", () => {
@@ -159,16 +160,17 @@ export function lockedAxes(project) {
   const cuts = Array.isArray(project?.cuts) ? project.cuts : [];
   const scenarioDone = !!project?.scenario?.text;
   const drawn = cuts.some((c) => !!c?.image?.url);
-  const baked = cuts.some((c) => !!c?.video?.url);
 
   const byScenario = lock(scenarioDone, "시나리오를 확정해서 잠겼어요");
-  const byClip = lock(baked, "첫 컷을 만들어 잠겼어요");
   return {
     aspect_ratio: byScenario,
     target_seconds: byScenario,
     style: lock(drawn, "첫 그림을 그려서 잠겼어요"),
-    i2v_model: byClip,
-    resolution: byClip,
+    // ★★★ 모델·화질도 **시나리오 확정**이다(Ruling 5). 둘 다 컷 수 규칙의 입력이고,
+    //   청구(④이미지)가 그 값으로 걷는데 재청구 때는 값을 다시 안 본다 — 늦게 잠그면
+    //   비싼 클립을 싼 값에 받는 창이 생긴다.
+    i2v_model: byScenario,
+    resolution: byScenario,
   };
 }
 
