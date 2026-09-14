@@ -186,7 +186,11 @@ export default function ReelVideoPage() {
           **무엇을 해야 하는지**만 필요했다. 제목 옆이 그 자리다(③이미지의 "수정됨"과 같은 결). */}
       <h2>
         영상
-        {oneShotStale && cuts[0]?.video?.url && <span className="tag warn">다시 만들어주세요</span>}
+        {/* ★★★ 2026-09-14 밤 — `cuts[0]?.video?.url` 조건을 뗐다. 영상이 나오기 **전**의
+            낡음은 아래 86px 칸 안의 태그("다시 만들어야 해요")가 말하고 있었는데, 그 칸을
+            `.sheet-view` 로 바꾸면서 그 자리가 없어졌다. 같은 말을 두 곳에서 하던 것을
+            **여기 하나로** 모은다 — 굽기 전이든 후든 낡았으면 제목 옆에서 말한다. */}
+        {oneShotStale && <span className="tag warn">다시 만들어주세요</span>}
       </h2>
       {/* ★★ 통짜 갈래에서는 아무 말도 안 한다(2026-08-25 사장님 지시 — "스토리보드 한 장으로
           N컷" 문구 삭제). 스토리보드 한 장을 통째로 넘긴다는 것은 **안쪽 사정**이지
@@ -251,23 +255,23 @@ export default function ReelVideoPage() {
           굽기 전·굽는 중에만 남긴다 — 그때는 보여 줄 것이 스토리보드뿐이라 이 칸이 유일하다.
           ★ 컷별 갈래의 썸네일은 그대로 둔다 — 그것은 중복이 아니라 **고르는 자리**다. */}
       {oneShot ? (
-        !cuts[0]?.video?.url && (
-          <div className="uploads">
-            <div className="up photo-mark">
-              {sheetUrl ? (
-                <img className="thumb-media" src={sheetUrl} alt="스토리보드" />
-              ) : (
-                <div className="thumb-media" />
-              )}
-              {/* ★ 덮개다(absolute) — 스토리보드를 지우지 않고 그 위에서 돈다.
-                  무엇을 굽는 중인지 옛 그림으로 알 수 있다. */}
-              {/* ★ 실제로 돌고 있을 때만 돈다 — 멈춘 뒤에도 도는 표시가 남아 있으면
-                  그 표시 자체가 거짓말이 된다(gen.kind). */}
-              {gen.kind === "running" && (
-                <div className="frame-busy"><span className="spinner" aria-hidden="true" /></div>
-              )}
-              {oneShotStale && <span className="tag warn">다시 만들어야 해요</span>}
-            </div>
+        !cuts[0]?.video?.url && sheetUrl && (
+          /* ★★★ 2026-09-14 밤 — 여기는 `.up`(86×86 · cover)이었다. 스토리보드 한 장이
+             그 안에 들어가 칸 하나가 ~28px 이라 무엇이 그려졌는지 알 수 없었고 가장자리도
+             잘렸다(사장님 지적 · 2026-08-28 에 이미 적어 둔 건). ③·④가 쓰는 `.sheet-view`
+             를 그대로 쓴다 — 비율을 강제하지 않고 68vh 까지 키운다(CSS 주석이 처음부터
+             "④·⑤에서 쓰는 기본 크기"라고 적고 있었다. ⑤에만 안 왔던 것이다).
+             ★ **돈이 나가는 버튼 바로 앞에서 보는 마지막 그림이다** — 여기서 작으면
+               굽고 나서야 잘못을 안다(로고 누락을 86px 썸네일로 겨우 알아챈 적이 있다). */
+          <div className="sheet-view">
+            <img src={sheetUrl} alt="스토리보드" />
+            {/* ★ 덮개다(absolute) — 스토리보드를 지우지 않고 그 위에서 돈다.
+                무엇을 굽는 중인지 옛 그림으로 알 수 있다.
+                ★ 실제로 돌고 있을 때만 돈다 — 멈춘 뒤에도 도는 표시가 남아 있으면
+                그 표시 자체가 거짓말이 된다(gen.kind). */}
+            {gen.kind === "running" && (
+              <div className="frame-busy"><span className="spinner" aria-hidden="true" /></div>
+            )}
           </div>
         )
       ) : cuts.length > 0 && (
