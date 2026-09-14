@@ -13,7 +13,7 @@ import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "./lib/auth/headers.js";
 // PUBLIC_PATHS(로그인 경계)·matchesSegment(세그먼트 경계 비교)의 유일한 출처.
 // components/AppShell.jsx의 BARE_PATHS(사이드바 경계)도 같은 파일을 본다 — 왜 둘로 나뉘는지는
 // lib/auth/paths.js 주석 참고. 여기서 합치면 안 된다.
-import { matchesSegment, isPublicPath, isAdminPath } from "./lib/auth/paths.js";
+import { matchesSegment, isPublicPath, isAdminPath, safeNext } from "./lib/auth/paths.js";
 // 손님(비로그인) 읽기 — **보관함만**, **GET 만**, **env 로 켤 때만**이다.
 import { isGuestRequest } from "./lib/auth/guest.js";
 
@@ -119,7 +119,15 @@ export async function middleware(req) {
       return copyCookies(cookieRes, NextResponse.json({ error: "로그인이 필요해요" }, { status: 401 }));
     }
     const to = req.nextUrl.clone();
+    // ★★ 2026-09-14 — **원래 가려던 자리를 싣는다.** 그전에는 주소만 /login 으로 바꿔서,
+    //   손님이 [만들러 가기]를 눌러 로그인까지 마쳐도 만들기 화면이 아니라 첫 화면으로
+    //   돌아왔다(사장님 지적). 로그인 화면이 이 값을 읽어 그리로 되돌린다.
+    //   ★ 원래 쿼리는 next 안에 통째로 들어가므로 바깥 쿼리는 비운다 — 안 비우면
+    //     /login 주소에 남의 파라미터가 그대로 붙어 다닌다.
+    const back = safeNext(pathname + req.nextUrl.search);
     to.pathname = "/login";
+    to.search = "";
+    if (back) to.searchParams.set("next", back);
     return copyCookies(cookieRes, NextResponse.redirect(to));
   }
 

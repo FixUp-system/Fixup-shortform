@@ -13,6 +13,7 @@ import { NAME_MAX } from "../../lib/display-name.js";
 //   라우트가 다시 막는다 — 둘이 다른 수를 보면 "화면은 통과인데 서버가 거절"이 난다.
 import { passwordProblem, PASSWORD_MISMATCH } from "../../lib/password.js";
 import { useRouter } from "next/navigation";
+import { safeNext } from "../../lib/auth/paths.js";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -58,9 +59,16 @@ export default function LoginPage() {
         setError(data.error || "다시 시도해 주세요");
         return;
       }
-      // 세션 쿠키가 섰다. 어디로 갈지는 middleware 가 정한다(승인 전이면 /pending).
+      // 세션 쿠키가 섰다. **원래 가려던 자리가 있으면 그리로** 되돌린다(2026-09-14) —
+      // 손님이 [시작하기]를 눌러 온 경우 그 값이 `?next=/ads/new` 로 실려 있다.
+      // 없으면 `/`(=랜딩)로 간다. 승인 전 계정은 middleware 가 어디로 가든 /pending 으로
+      // 돌려세우므로 여기서 그 갈래를 또 만들지 않는다.
+      // ★ 주소창 값은 믿지 않는다 — safeNext 가 우리 안의 경로만 통과시킨다(open redirect).
+      // ★ 훅(useSearchParams) 대신 여기서 읽는다: 이 화면은 미리 그려지는데 그 훅을 쓰면
+      //   Suspense 경계를 요구해 빌드가 깨진다. 이 자리는 눌렀을 때만 도는 코드다.
+      const back = safeNext(new URLSearchParams(window.location.search).get("next"));
       // refresh 를 함께 부르는 이유: 서버 컴포넌트가 새 세션으로 다시 그려져야 한다.
-      router.replace("/");
+      router.replace(back || "/");
       router.refresh();
     } catch {
       setError("연결에 문제가 있어요 — 잠시 후 다시 시도해 주세요");
