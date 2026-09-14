@@ -70,16 +70,18 @@ describe("사이드바 — 광고 하위 단계는 이동이 아니라 표시다
   });
 
   // ★ 2026-08-21 에 **셋이 됐다** — 한 번에 굽는 영상의 단계 목록(FilmStepList)이 더해졌다.
-  //   ★ 2026-08-25 에 **넷이 됐다** — reel 의 단계 목록(ReelStepList)이 레이아웃 본문에서
-  //   이리로 옮겨왔다(app/reel/[id]/layout.js). 숫자만 바뀜다 — 재는 뜻은 그대로다.
-  //   재는 뜻은 그대로다: 새 CSS 를 만들지 않고 있는 것을 그대로 쓰는가.
-  it("기존 side-steps·side-step 클래스를 그대로 재사용한다 — 네 목록(단계별 6·광고 4·한번에 5·reel 6) 모두에서 쓰인다", () => {
+  //   ★ 2026-08-25 에 **넷이 됐다** — reel 의 단계 목록이 레이아웃 본문에서 이리로 옮겨왔다.
+  //   ★★ 2026-09-14 에 **다시 셋이 됐다** — reel 화면이 설정 패널 + 누적 작업대로 바뀌면서
+  //     그 목록을 작업대(components/reel/StepStack.jsx)가 말하게 됐고, 사이드바에서 걷혔다.
+  //     작업대는 자기 클래스(rs-*)를 쓰므로 여기 세는 수에 안 들어온다.
+  //   숫자만 바뀐다 — 재는 뜻은 그대로다: 새 CSS 를 만들지 않고 있는 것을 그대로 쓰는가.
+  it("기존 side-steps·side-step 클래스를 그대로 재사용한다 — 세 목록(단계별 6·광고 4·한번에 5) 모두에서 쓰인다", () => {
     // 새 CSS를 만들면 안 되므로, 컨테이너 클래스가 기존 것과 똑같이 나와야 한다.
     const containerMatches = src.match(/className="side-steps"/g) || [];
-    expect(containerMatches.length, "side-steps 컨테이너가 네 곳에서 재사용되지 않는다").toBe(4);
+    expect(containerMatches.length, "side-steps 컨테이너가 세 곳에서 재사용되지 않는다").toBe(3);
     // 항목 클래스도 템플릿으로 'side-step'을 재사용하는지 — 새 클래스 이름을 발명하지 않았는지.
     const itemMatches = src.match(/`side-step\$\{/g) || [];
-    expect(itemMatches.length, "side-step 항목 클래스가 네 곳에서 재사용되지 않는다").toBe(4);
+    expect(itemMatches.length, "side-step 항목 클래스가 세 곳에서 재사용되지 않는다").toBe(3);
   });
 
   it("사이드바가 발명한 새 CSS 클래스 이름이 없다 — ad- 접두사 클래스를 스스로 만들지 않았다", () => {

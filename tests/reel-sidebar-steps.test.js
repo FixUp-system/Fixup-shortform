@@ -1,5 +1,10 @@
 // **단계별도 사이드바에서 단계가 보이고, 도는 단계가 깜박인다** (2026-09-01 사장님 지시).
 //
+// ⚠️ **2026-09-14 — 아래 서사는 앞쪽 절(순수 함수 판)에만 아직 맞는다.** 사이드바 쪽은
+//   뒤집혔다: reel 단계 목록이 작업대(components/reel/StepStack.jsx)로 갔고 사이드바에서
+//   걷혔다. 이 머리말을 지우지 않는 이유는, 그때 무엇을 왜 만들었는지가 여기밖에 없어서다
+//   — 되살릴 일이 생기면 **작업대에** 붙인다. 자세한 것은 아래 describe 위 주석에 있다.
+//
 // ★★★ 실측(로컬 브라우저): `/ads/new` 는 사이드바에 ①입력~④완성이 잠긴 채로 보이는데,
 //   `/reel/new` 는 **아무것도 안 보였다**. 코드가 그렇게 적혀 있었다 —
 //   `if (!project || project.id !== id) return null;`
@@ -71,28 +76,35 @@ describe("지금 도는 단계는 어디인가", () => {
   });
 });
 
-describe("사이드바가 그 둘을 쓴다", () => {
+// ★★★ 2026-09-14 — 이 아래 셋은 **뒤집혔다.** 위의 순수 함수 판(runningReelStepKey)은
+//   그대로다 — 판정은 여전히 lib/reel/steps.js 하나가 안다.
+//   바뀐 것은 **그것을 누가 화면에 그리는가**다: reel 화면이 설정 패널 + 누적 작업대로
+//   바뀌면서 사이드바의 reel 단계 목록이 같은 말을 두 번 하는 자리가 됐고, 그래서 걷었다.
+//
+// ⚠️⚠️ **잃은 신호 둘을 여기 적어 둔다**(고치라는 요구가 아직 없어 판으로는 안 건다):
+//   ① `/reel/new` 에서 단계가 안 보인다. 그 화면은 단계 레이아웃 **밖**이라 작업대가 없고,
+//      사이드바 목록이 있던 자리였다(2026-09-01 사장님 지시가 그것이었다).
+//   ② "만드는 중…" 깜박임이 reel 에서 사라졌다. 작업대에는 그 표시가 없어
+//      `runningReelStepKey` 는 지금 **앱 코드 소비자가 0** 이다(순수 함수와 판만 남았다).
+//   되살릴 자리는 사이드바가 아니라 작업대다 — 되돌리려면 거기에 붙인다.
+describe("사이드바는 그 둘을 더 쓰지 않는다 — 작업대가 말할 자리다", () => {
   const src = readFileSync("components/Sidebar.jsx", "utf8");
-  const at = src.indexOf("function ReelStepList");
-  const block = src.slice(at, src.indexOf("\n}", src.indexOf("side-steps", at)) + 2);
 
-  it("★★★ 새로 만드는 자리에서도 단계를 보여 준다", () => {
-    expect(at, "ReelStepList 가 없다 — 이 판이 낡았다").toBeGreaterThan(-1);
-    expect(block, "프로젝트가 없으면 무조건 안 그린다 — /reel/new 에서 아무것도 안 보인다")
-      .toMatch(/"new"/);
+  it("★★★ reel 단계 목록을 그리던 부품이 없다", () => {
+    // 날 것에서 잰다 — 주석에 남은 이름도 위반이다(없는 것을 grep 하게 만든다).
+    expect(src, "ReelStepList 가 남아 있다").not.toMatch(/ReelStepList/);
   });
 
-  it("★★★ 도는 단계에 표시를 붙인다 — 원클릭과 같은 모양", () => {
-    expect(block).toMatch(/runningReelStepKey\(/);
-    expect(block, "깜박임 클래스가 없다").toMatch(/" running"/);
-    expect(block, '"만드는 중…" 글자가 없다 — 색·모션만으로는 못 읽는 사람이 있다')
-      .toMatch(/running-tag/);
+  it("★★★ 도는 단계 판정을 사이드바가 부르지 않는다 — 부르면 그릴 자리가 또 생긴다", () => {
+    expect(src, "runningReelStepKey 가 남아 있다").not.toMatch(/runningReelStepKey/);
   });
 
-  it("★ 그 모양의 CSS 는 이미 있다 — 새로 만들지 않는다", () => {
+  it("★ 그 모양의 CSS 는 **지우지 않는다** — 광고·film·옛 단계별 스테퍼가 아직 쓴다", () => {
     const css = readFileSync("app/globals.css", "utf8");
     expect(css).toMatch(/\.side-step\.running/);
     expect(css).toMatch(/\.side-step\.running \.running-tag/);
+    // 소비자를 세고 지운다 — 지금 광고 스테퍼가 이 클래스를 실제로 붙인다.
+    expect(src, "이 CSS 의 소비자가 0 이 됐다면 그때 지워라").toMatch(/running-tag/);
   });
 });
 

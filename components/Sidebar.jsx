@@ -19,11 +19,11 @@ import {
 } from "../lib/film/steps";
 // 공유본은 루트(app/layout.js)에서 온다 — 여기서 자기 fetch 를 만들지 않는다.
 import { useFilmProject } from "./FilmProjectContext";
-// reel — 표·주소·열림 판정은 lib/reel/steps.js 하나가 쥔다(레이아웃 가드와 같은 표다).
-import {
-  REEL_STEPS, reelStepHref, reelStepFromPathname, currentReelStepKey, isReelStepReachable,
-  runningReelStepKey,
-} from "../lib/reel/steps";
+// ★★ 2026-09-14 — reel 의 단계 표(lib/reel/steps.js)는 여기서 더 읽지 않는다.
+//   단계를 말하는 것은 **작업대**이고(components/reel/StepStack.jsx), 그 파일이 같은 표를
+//   읽는다. 표가 두 자리에서 읽히는 것 자체는 문제가 아니지만, **같은 목록을 두 번 그리는
+//   것**은 문제다 — 한쪽만 고쳐지는 날이 온다. 아래 [단계별 영상] 링크가 쓰는
+//   useReelProject·makeReelHref 는 단계 목록과 상관이 없어 그대로 남는다.
 // reel 공유본도 루트에서 온다(components/ReelProjectContext) — film 과 같은 자리다.
 import { useReelProject } from "./ReelProjectContext";
 // 이어서 할 자리를 정하는 순수 함수 — 판정은 lib/reel/steps.js 가 한다.
@@ -192,68 +192,12 @@ function FilmStepList({ pathname }) {
   );
 }
 
-// reel(컷마다 말하는 영상)의 단계 목록 — 위 셋과 **같은 자리·같은 모양**이다.
-//
-// ★★ 2026-08-25 사장님 지시로 app/reel/[id]/layout.js 본문에서 여기로 옮겼다. film 이
-//   2026-08-21 에 같은 길을 갔고 원인도 같았다 — 배치가 아니라 **공급자 위치**다.
-//   ReelProjectProvider 가 레이아웃 안에 있어 사이드바가 읽을 수 없었고, 그래서 본문에
-//   사이드바용 클래스(side-steps)를 써서 그렸다. 지금은 app/layout.js(루트)에 있다.
-//
-// ★ 판정은 새로 만들지 않는다 — 레이아웃 가드가 쓰는 lib/reel/steps.js 를 그대로 읽는다.
-//   손으로 적으면 사이드바가 여는 문과 가드가 닫는 문이 갈린다.
-function ReelStepList({ pathname }) {
-  const { project } = useReelProject();
-  const parts = (pathname || "").split("/").filter(Boolean);
-  const id = parts[1];
-  // ★★★ 2026-09-01 사장님 지시 — **새로 만드는 자리에서도 단계를 보여 준다.**
-  //   그전에는 프로젝트가 없으면 통째로 안 그려서, 사이드바에서 [단계별 영상] 을 눌러
-  //   들어온 사람은 이 흐름이 몇 단계인지조차 볼 수 없었다(원클릭은 보였다).
-  //   ★ 옛 주석의 걱정("빈 목록이 깜빡이는 것보다 없는 편이 낫다")은 `/reel/<id>` 를
-  //     **읽는 동안**의 이야기다. `/reel/new` 는 영영 프로젝트가 없는 자리라 깜빡일 것이
-  //     없다 — 그래서 그 자리에서만 잠긴 목록을 보여 주고, 읽는 중에는 예전처럼 안 그린다.
-  const fresh = id === "new";
-  const ready = !!project && project.id === id;
-  if (!ready && !fresh) return null;
-
-  const here = ready ? currentReelStepKey(project) : null;
-  const step = reelStepFromPathname(pathname);
-  // ★★ 지금 도는 단계 — 판정은 lib/reel/steps.js 하나다(원클릭이 busyStep·status 를
-  //   합치는 것과 같은 자리). 문서에서 읽으므로 새로고침하거나 다른 탭에서 들어와도 보인다.
-  const running = ready ? runningReelStepKey(project) : null;
-  return (
-    <div className="side-steps">
-      {REEL_STEPS.map((s, i) => {
-        const open = ready && isReelStepReachable(s.key, project);
-        // 새로 만드는 자리에서는 ①입력에 불이 켜진다 — 지금 하고 있는 일이 그것이다.
-        const active = fresh ? i === 0 : step?.key === s.key;
-        // ★ 지나옴은 **지금 단계가 아니면서 열려 있는** 것이다 — 옮기기 전 판정 그대로다.
-        const passed = !active && open && s.key !== here;
-        const isRunning = running === s.key;
-        const cls = `side-step${active ? " on" : ""}${passed ? " passed" : ""}${isRunning ? " running" : ""}`;
-        const inner = (
-          <>
-            <i>{passed ? <><Icon name="check" size={12} /><span className="sr-only">완료</span></> : s.no}</i>
-            {s.label}
-            {/* 글자도 함께 둔다 — 색·모션만으로는 못 읽는 사람이 있다(AdStepList 와 같은 규율). */}
-            {isRunning && <em className="running-tag">만드는 중…</em>}
-          </>
-        );
-        return open ? (
-          <Link
-            key={s.key}
-            href={reelStepHref(s, id)}
-            className={cls}
-            aria-current={active ? "step" : undefined}
-          >
-            {inner}
-          </Link>
-        ) : (
-          <span key={s.key} className={`${cls} locked`} aria-disabled="true">{inner}</span>
-        );
-      })}
-    </div>
-  );
-}
+// ★★ 2026-09-14 — reel 의 단계 목록을 그리던 부품이 여기 있었다. **작업대**가 그 말을
+//   하게 돼서(components/reel/StepStack.jsx) 걷어냈다 — 끝난 단계가 접혀 쌓이고 지금
+//   단계만 펼쳐지는 그 틀이 "몇 단계인지·어디까지 왔는지"를 이미 말한다.
+//   같은 말이 두 곳에 있으면 언젠가 한쪽만 고쳐진다.
+//   ★ 걷은 것은 **reel 하나**다. 광고(AdStepList)·film(FilmStepList)·옛 단계별(StepList)은
+//     그대로다 — 그쪽은 작업대가 없어 사이드바 말고는 단계를 말할 자리가 없다.
 
 // ★★ 사이드바에 내보낼 흐름 — **표 하나가 쉠다**(2026-08-25 사장님 결정).
 //
@@ -310,11 +254,11 @@ export default function Sidebar() {
   // 사이드바에 없으면 주소를 직접 쳐야만 열렸다(film 이 자기 읽는 문을 빠뜨렸을 때와
   // 같은 사고 — "카드는 있는데 눌러도 아무것도 안 열린다"). film 과 같은 결로 둔다:
   // ★ 새로 시작은 언제나 /reel/new 다.
-  // ★★ 2026-08-25 — **단계 목록은 이제 여기 있다**(ReelStepList). 그러려고 공급자를
-  //   app/layout.js(루트)까지 끌어올렸다 — film 이 먼저 치른 값이다. 옛 주석은 "진입
-  //   링크 하나 때문에 치를 값이 아니다"였는데, 사장님이 목록을 사이드바로 옮기라고
-  //   했으므로 값을 치렀다. 진입 링크가 여전히 /reel/new 로 고정인 것은 별개다 —
-  //   "작업 중인 프로젝트로" 되돌리는 것은 지금 요구가 아니다(보관함으로 열린다).
+  // ★★ 2026-08-25 에 단계 목록이 레이아웃 본문에서 여기로 왔었고, 그러려고 공급자를
+  //   app/layout.js(루트)까지 끌어올렸다 — film 이 먼저 치른 값이다.
+  //   ★★ 2026-09-14 — 그 목록은 **작업대**로 갔다(components/reel/StepStack.jsx).
+  //     공급자를 루트로 올린 값은 그대로 남는다: 아래 진입 링크가 **작업 중이던 자리로**
+  //     되돌아가려면 여기서 프로젝트를 읽어야 한다(makeReelHref).
   const inReel = pathname.startsWith("/reel");
   // ★★ **작업 중이던 자리로 되돌아간다**(2026-08-25 사장님 지적).
   //   전에는 /reel/new 고정이라 시나리오까지 만들어 놓고 눌러도 새 프로젝트 화면으로 갔다
@@ -344,8 +288,14 @@ export default function Sidebar() {
           )}
         </>
       )}
+      {/* ★ 부제는 제목과 **세로로 쌓인다**(.side-item-text). `.side-item` 이 가로 flex 라
+          부제를 직계 자식으로 두면 아이콘·제목·부제가 한 줄에 나란히 선다. */}
       <Link href={makeVideoAdHref} className={`side-item${inAds ? " on" : ""}`}>
-        <span className="ic"><Icon name="ad" /></span>원클릭 영상
+        <span className="ic"><Icon name="ad" /></span>
+        <span className="side-item-text">
+          원클릭 영상
+          <span className="side-item-sub">손쉽게 한 번에</span>
+        </span>
       </Link>
       {inAds && <AdStepList adProject={adProject} view={adView} busyStep={adBusyStep} />}
       {inAds && adProject?.id && (
@@ -374,9 +324,15 @@ export default function Sidebar() {
       {SIDEBAR_FLOWS.reel && (
         <>
           <Link href={reelHref} className={`side-item${inReel ? " on" : ""}`}>
-            <span className="ic"><Icon name="home" /></span>단계별 영상
+            <span className="ic"><Icon name="home" /></span>
+            <span className="side-item-text">
+              단계별 영상
+              <span className="side-item-sub">보면서 고쳐요</span>
+            </span>
           </Link>
-          {inReel && <ReelStepList pathname={pathname} />}
+          {/* ★★ 2026-09-14 — 여기서 단계 목록을 그렸다. 이제 **작업대**가 그 말을 한다
+              (components/reel/StepStack.jsx). 같은 말이 두 곳에 있으면 언젠가 한쪽만
+              고쳐진다. 광고·film·옛 단계별 스테퍼는 그대로다. */}
           {/* ★★ 2026-08-25 사장님 지적: "새로 만들 수가 없어."
               같은 날 위 [영상 만들기]를 **작업 중이던 자리로 되돌아가게** 고치면서,
               새로 시작할 길이 화면에서 통째로 사라졌다 — 주소(/reel/new)를 직접 쳐야만

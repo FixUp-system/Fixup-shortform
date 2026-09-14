@@ -325,6 +325,16 @@ aside.side {
 .side-item.soon { color: var(--ink-soft); cursor: default; }
 .side-item.soon:hover { background: transparent; }
 .side-item .ic { display: inline-flex; flex: none; opacity: 0.85; }
+/* ★★ 2026-09-14 — 두 항목(원클릭 영상·단계별 영상)에 "무엇을 해 주는가" 한 줄이 붙었다.
+   제목과 부제를 한 칸에 **세로로 쌓는다**: `.side-item` 이 `display:flex; align-items:center`
+   라, 부제를 그 직계 자식으로 그냥 두면 `display:block` 이 안 먹고 아이콘·제목·부제가
+   **한 줄에 나란히** 선다. 아이콘은 이 칸의 왼쪽에 그대로 남아 두 줄 높이의 가운데에 선다. */
+.side-item-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+/* ★ 흐린 글자는 --ink-soft 다. --ink-faint 라는 토큰은 :root 에 **없다** — 쓰면 색이
+   상속값으로 떨어져 부제가 본문과 같은 색이 된다(판은 초록인데 화면만 틀리는 종류다).
+   ★ 굵기를 400 으로 못 박는다. `.side-item.on { font-weight: 600 }` 이 **상속으로**
+   부제까지 굵게 만드는데, 이 규칙은 그 span 을 직접 겨누므로 상속을 이긴다. */
+.side-item-sub { display: block; font-size: 12px; font-weight: 400; color: var(--ink-soft); }
 /* 칩 안의 [관리자] 표시 — 2026-09-01 사장님 지적으로 생겼다.
    그전에는 `.soon-tag` 가 `.side-item .soon-tag` 로만 정의돼 있어 사이드바 밖에서는
    규칙이 **0** 이었다. 그래서 해상도 칩이 **"1080p관리자"** 로 글자가 그대로 이어 붙었다
