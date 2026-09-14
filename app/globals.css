@@ -3367,52 +3367,69 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
      덧붙이는 자리라, 경계가 없으면 **남이 뒤에 붙인 hex 가 내 판을 빨갛게** 만들고
      메시지는 엉뚱하게 "hex 를 적었다"를 가리킨다. 새 규칙은 이 표식 **위**에 넣어라. */
 
-/* ── 누적 작업대 — 끝난 단계는 접혀 쌓인다 (2026-09-14) ──────────────────
-   단계 여섯이 한 화면에 줄로 쌓이고, 지금 단계 자리에만 그 단계 페이지가 들어온다.
+/* ── 걸음 띠 — 단계 여섯이 화면 위에 한 줄로 선다 (2026-09-14 밤) ─────────
+   여기는 원래 **누적 작업대**(끝난 단계가 접혀 쌓이는 모양)였다. 사장님 지적으로
+   걷었다: 펼친 줄이 곧 주소라 ③처럼 긴 단계를 열면 ④⑤⑥ 줄이 그 내용 **아래로
+   밀려나**, 다음 단계로 가려면 지금 단계를 끝까지 스크롤해야 했다.
+   ★★ 띠는 **위에 붙는다**(sticky). 그런데 앱 껍데기의 상단 벨트(.belt)가 이미
+     `top: 0`·높이 42px 로 붙어 있다 — `top: 0` 으로 두면 띠가 그 **밑으로 숨는다.**
+     그래서 42px 다. 벨트 높이가 바뀌면 이 수도 함께 바뀐다.
+     z-index 도 벨트(30)보다 낮게 둔다 — 높으면 띠가 벨트를 덮고 지나간다.
    ★ 지금 단계 강조는 --ink 계열이다. 앱층에서 액센트는 사이드바 스테퍼의 몫이라
      tests/design-system.test.js 가 그 색을 여기 못 쓰게 막는다.
    ★ 흐린 글자는 --ink-soft 다. --ink-faint 라는 토큰은 :root 에 **없다** —
-     쓰면 오류 없이 상속색으로 그려져 "회색으로 적었는데 검게 나오는" 자리가 된다. */
-.rs-stack { display: flex; flex-direction: column; gap: 10px; }
-.rs-card { background: var(--surface); border-radius: var(--r-card);
-  box-shadow: var(--ring), var(--lift); overflow: hidden; }
-/* ★★ 펼친 단계는 **카드가 아니다** — 단계 페이지가 스스로 카드를 그린다
-   (app/reel/[id]/<단계>/page.js 여섯이 전부 `<section className="panel panel--wide">`).
-   여기서 또 면을 깔면 카드 안에 카드가 앉아 테두리가 두 겹이 된다.
-   ⚠️⚠️ 경로에 **글로브(별표)를 적지 마라.** `[id]/` 뒤에 별표를 쓰면 그 별표와 다음
-   빗금이 `*` `/` 가 되어 **주석이 거기서 닫힌다.** 그러면 남은 한국어가 통째로 CSS 본문에
-   흘러나와 **바로 아래 규칙의 선택자에 붙고, 그 규칙이 통째로 죽는다**(선택자가 유효하지
-   않으므로 파서가 버린다). 2026-09-14 에 실제로 그랬다 — 이 `.rs-card.is-open` 규칙이
-   첫 커밋부터 **한 번도 적용된 적이 없었다.** 판(tests/reel-step-stack-ui.test.js 의
-   「주석이 선택자로 새지 않는다」)이 이제 그것을 잡는다. */
-.rs-card.is-open { background: none; border-radius: 0; box-shadow: none; overflow: visible; }
-.rs-card.is-open .rs-hd { padding: 0 2px 8px; }
-.rs-card.is-open .rs-no { background: var(--ink); color: var(--bg); box-shadow: none; }
+     쓰면 오류 없이 상속색으로 그려져 "회색으로 적었는데 검게 나오는" 자리가 된다.
+   ⚠️⚠️ 주석에 **글로브(별표)를 적지 마라.** 별표와 다음 빗금이 주석을 조기 종료시켜
+     남은 한국어가 다음 선택자로 새고 **그 규칙이 통째로 죽는다**(2026-09-14 실측). */
+.rs-strip {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  position: sticky; top: 42px; z-index: 2;
+  background: var(--bg); padding: 10px 0; margin-bottom: 4px;
+}
+/* 줄 하나하나는 알약이다 — 눌러서 가는 자리라 면을 얕게 깔고 글자를 그대로 쓴다. */
+.rs-step {
+  display: flex; align-items: baseline; gap: 7px; min-width: 0;
+  padding: 7px 12px; border-radius: var(--r-pill);
+  background: var(--surface); box-shadow: var(--ring);
+  color: inherit; text-decoration: none;
+}
+/* ★★★ 2026-09-14 밤 사장님 지시 — **밑줄을 안 그린다.** 여기 있던
+   `a.rs-step:hover .rs-lab { text-decoration: underline }` 은 옛 쌓기 머리줄의 관용구를
+   그대로 가져온 것이었는데, 줄이 **알약**이 되면서 안 맞게 됐다: 면과 테두리가 이미
+   "눌러도 된다"를 말하는데 그 위에 밑줄까지 뜨면 같은 자리가 버튼과 링크 글씨 둘로 읽힌다.
+   ★ 대신 **면이 살짝 바뀐다** — 밑줄만 지우고 끝내면 손을 올려도 아무 반응이 없어
+     눌러도 되는 자리인지 모른다.
+   ★★ 지금 서 있는 줄은 `:not(.is-now)` 로 **비켜 간다.** 색을 뒤집어 둔 자리라 손이
+     지나갈 때마다 또 바뀌면 "지금 여기"라는 신호가 흔들린다. 캐스케이드로 겨루지 않고
+     조건을 선택자에 넣는다(아래 흐림 규칙과 같은 관용구 — 이 파일은 여러 세션이 끝에
+     덧붙이는 자리라 규칙 순서를 믿으면 안 된다). */
+a.rs-step:not(.is-now):hover { background: var(--surface2); }
+/* 지금 서 있는 단계 — 색을 뒤집어 **하나만** 도드라지게 한다. */
+.rs-step.is-now { background: var(--ink); color: var(--bg); box-shadow: none; }
+.rs-step.is-now .rs-no { color: inherit; }
 /* 아직 못 여는 단계도 **지우지 않는다** — 앞으로 무엇이 남았는지가 보여야 한다.
-   ★★★ `:not(.is-open)` 은 장식이 아니다. `is-open` 과 `is-todo` 는 화면이 **따로**
-   붙이므로 둘이 같이 설 수 있다(주소가 아직 못 여는 단계를 가리키는 순간. 지금 단계는
-   주소를 먼저 본다). 그러면 **펼쳐진 단계 페이지가 통째로 55% 로 흐려진다** —
-   레이아웃 가드가 되돌리기 전 한 프레임이라도 그렇게 보이면 안 된다.
-   ⚠️ 처음에는 `.rs-card.is-open { opacity: 1 }` 로 되돌리려 했는데 **효력이 없었다**:
-   둘 다 클래스 둘이라 **특이도가 같고**(0,2,0) 동률이면 나중에 온 쪽이 이겨서, 소스상
-   뒤에 있는 이 규칙이 그대로 이겼다(2026-09-14 재검토 — 빌드 산출물에서도 확인됐다).
-   그래서 **겨루게 두지 않는다** — 조건을 선택자에 넣어 애초에 안 걸리게 한다.
-   이 모양은 **규칙 순서에 안 기댄다**(이 파일은 여러 세션이 끝에 덧붙이는 자리다). */
-.rs-card.is-todo:not(.is-open) { opacity: .55; }
-.rs-hd { display: flex; align-items: center; gap: 10px; padding: 12px 14px;
-  font-size: 14px; color: inherit; text-decoration: none; }
-a.rs-hd:hover .rs-lab { text-decoration: underline; }
-.rs-no { flex: none; width: 20px; height: 20px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 12px; color: var(--ink-soft); box-shadow: var(--ring); }
-.rs-lab { font-weight: 600; }
-/* 요약은 줄 끝에서 잘린다 — 길어져서 머리줄이 두 줄이 되면 쌓인 리듬이 무너진다. */
-.rs-sum { margin-left: auto; min-width: 0; font-size: 12px; color: var(--ink-soft);
+   ★★★ `:not(.is-now)` 은 장식이 아니다. `is-now` 와 `is-todo` 는 화면이 **따로**
+   붙이므로 둘이 같이 설 수 있다(주소가 아직 못 여는 단계를 가리키는 순간. 지금
+   단계는 주소를 먼저 본다). 그러면 **지금 서 있는 줄이 통째로 55% 로 흐려진다.**
+   특이도가 같으면(0,2,0) 동률이라 소스 순서로 이기는데, 이 파일은 여러 세션이 끝에
+   덧붙이는 자리라 **규칙 순서에 기대면 안 된다** — 조건을 선택자에 넣어 애초에
+   안 걸리게 한다(2026-09-14 에 캐스케이드로 한 번 데었다). */
+.rs-step.is-todo:not(.is-now) { opacity: .55; box-shadow: none; background: none; }
+.rs-no { flex: none; font-size: 12px; color: var(--ink-soft); }
+.rs-lab { font-weight: 600; font-size: 14px; }
+/* 요약은 줄 끝에서 잘린다.
+   ★★★ 2026-09-14 밤 실측 — 폭 상한이 없으면 ①입력의 요약(사장님이 쓴 글 40자)이
+     알약을 통째로 늘려 **띠가 두 줄이 된다.** 쌓기 시절에는 줄이 화면 폭을 다 썼으니
+     안 보이던 문제다. 띠에서 먼저인 것은 **단계 이름**이고 요약은 곁들이라, 요약이
+     이름을 밀어내면 순서가 뒤집힌다. 상한·자르기·말줄임 셋이 한 벌이다 —
+     상한만 주고 안 자르면 넘쳐서 옆 알약을 덮는다. */
+.rs-sum { min-width: 0; max-width: 11ch; font-size: 12px; color: var(--ink-soft);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* ── 누적 작업대 끝 ──────────────────────────────────────────────────────
-   ★ 이 표식도 **판의 경계**다(설정 패널과 같은 관용구) —
-     tests/reel-step-stack-ui.test.js 가 여기까지만 잘라서 hex·액센트를 잰다.
-     새 규칙은 이 표식 **위**에 넣어라. */
+/* ── 걸음 띠 끝 ─────────────────────────────────────────────────────────
+   ★ 이 표식은 장식이 아니라 **판의 경계**다 — tests/reel-step-strip-ui.test.js 가
+     `.rs-strip` 부터 여기까지만 잘라서 hex·액센트를 잰다. 이 파일은 여러 세션이 끝에
+     덧붙이는 자리라, 경계가 없으면 **남이 뒤에 붙인 hex 가 내 판을 빨갛게** 만들고
+     메시지는 엉뚱한 곳을 가리킨다. 새 규칙은 이 표식 **위**에 넣어라. */
 
 /* ── 단계별 작업 화면의 배치 — 왼쪽 설정, 오른쪽 작업대 (2026-09-14) ─────────
    설정 패널은 ①~⑥ 내내 서 있고, 오른쪽 칸에만 작업대가 들어온다.
@@ -3424,7 +3441,7 @@ a.rs-hd:hover .rs-lab { text-decoration: underline; }
      작업대는 단계가 쌓일수록 길어지므로, 그대로 두면 화면 왼쪽이 빈 흰 기둥이 된다.
    ★ 이 블록은 **자리만 잡는다** — 색도 글자 크기도 한 줄 없다. 면과 글자는 설정
      패널과 작업대가 각자 자기 블록에서 정한다. */
-.rw-grid { display: grid; grid-template-columns: 300px minmax(0, 1fr);
+.rw-grid { display: grid; grid-template-columns: 340px minmax(0, 1fr);
   gap: var(--sp-5); align-items: start; }
 .rw-work { min-width: 0; }
 /* 좁은 화면에서는 위아래로 쌓는다 — 300px 칸을 그대로 두면 작업대가 남은 폭에 눌려
@@ -3437,25 +3454,16 @@ a.rs-hd:hover .rs-lab { text-decoration: underline; }
      **화면 폭 − 307px** 이다(앱 껍데기의 사이드바+여백. 같은 실측에서 .rw-grid 의
      x = 264 · 폭 = 635). 격자는 거기서 `300px + gap 24px` 를 또 뗀다 —
      즉 **작업대 = 화면 폭 − 631**.
-   ★ 그래서 작업대에 최소 ~570px 를 주려면 화면이 **1200px** 이어야 한다
-     (1200 − 631 = 569). 화면 폭으로 거는 한 그 307 만큼을 얹어 잡아야 한다.
-     이 수는 tests/reel-workbench-layout.test.js 의 「좁은 화면 경계」 판이 잡는다. */
-@media (max-width: 1200px) {
+   ★★★ 2026-09-14 밤 — 패널을 **300 → 340px** 로 넓혔다(사장님 요청). 화풍 칩이 한 줄
+     덜 접힌다. **넓히면 경계도 같이 올라간다** — 떼는 수가 631 에서 **671**(307 + 340 +
+     간격 24)이 되므로, 작업대 바닥 570 을 지키려면 경계가 **1240** 이어야 한다
+     (1241 − 671 = 570). 경계를 안 올리면 1201px 화면에서 작업대가 **530px** 로 눌린다.
+     ⚠️ **패널 폭을 또 바꾸면 이 경계도 함께 바꿔라.** 잊어도 판이 잡는다 —
+     tests/reel-workbench-layout.test.js 의 「좁은 화면 경계」 판이 패널 폭과 간격을
+     **CSS 에서 읽어** 작업대를 계산한다(그 판에 손으로 남은 수는 껍데기 307 하나뿐이다). */
+@media (max-width: 1240px) {
   .rw-grid { grid-template-columns: minmax(0, 1fr); }
 }
-/* ★★★ 2026-09-14 Ruling 13 — 펼친 줄에서는 머리줄의 **라벨만** 감춘다.
-   단계 페이지 여섯이 저마다 자기 제목(h2)을 그리는데, 작업대도 펼친 줄에 번호와
-   라벨을 그린다. 그 둘이 붙어 서면 **같은 말이 위아래로 두 번** 뜬다.
-   ★ 번호는 남긴다 — 그것까지 지우면 펼친 줄이 몇 번째인지가 화면에서 사라진다.
-   ★ 감추는 것은 펼친 줄 하나다. 접힌 줄의 라벨은 그 줄의 유일한 이름이라, 함께
-     감추면 빈 동그라미만 쌓인다.
-   ★ 단계 페이지 쪽은 손대지 않는다 — 제목을 그쪽에서 지우면 그 화면을 따로 여는
-     길에서도 제목이 사라진다.
-   ★ 이 규칙이 작업대 블록이 아니라 여기 있는 이유: 이 파일은 여러 세션이 **끝에
-     덧붙이는** 자리라, 남의 블록을 비집고 들어가면 그 블록의 판이 자르는 경계가
-     흔들린다. 특이도가 0,3,0 이라 `.rs-lab`(0,1,0)을 순서와 무관하게 이긴다 —
-     규칙 순서에 안 기댄다. */
-.rs-card.is-open .rs-lab { display: none; }
 /* ── 작업 화면 배치 끝 ──────────────────────────────────────────────────
    ★ 이 표식도 **판의 경계**다 — tests/reel-workbench-layout.test.js 가 여기까지만
      잘라서 hex·액센트를 잰다. 새 규칙은 이 표식 **위**에 넣어라. */

@@ -169,17 +169,15 @@ function tracks(value) {
 const GRID = { tag: "div", classes: ["rw-grid"] };
 const PANEL = { tag: "aside", classes: ["rp-panel"] };
 const WORK = { tag: "div", classes: ["rw-work"] };
-const STACK = { tag: "div", classes: ["rs-stack"] };
-const OPEN_CARD = { tag: "section", classes: ["rs-card", "is-open"] };
-const SHUT_CARD = { tag: "section", classes: ["rs-card"] };
-const OPEN_HEAD = { tag: "div", classes: ["rs-hd"] };
-const SHUT_HEAD = { tag: "a", classes: ["rs-hd"] };
+const STRIP = { tag: "div", classes: ["rs-strip"] };
+const NOW_STEP = { tag: "a", classes: ["rs-step", "is-now"] };
+const OTHER_STEP = { tag: "a", classes: ["rs-step"] };
 const LAB = { tag: "span", classes: ["rs-lab"] };
 const NO = { tag: "span", classes: ["rs-no"] };
 
-const 펼친라벨 = [GRID, WORK, STACK, OPEN_CARD, OPEN_HEAD, LAB];
-const 펼친번호 = [GRID, WORK, STACK, OPEN_CARD, OPEN_HEAD, NO];
-const 접힌라벨 = [GRID, WORK, STACK, SHUT_CARD, SHUT_HEAD, LAB];
+const 지금라벨 = [GRID, WORK, STRIP, NOW_STEP, LAB];
+const 다른라벨 = [GRID, WORK, STRIP, OTHER_STEP, LAB];
+const 지금번호 = [GRID, WORK, STRIP, NOW_STEP, NO];
 
 describe("단계별 작업 화면 배치", () => {
   it("★★★ 라우팅 가드는 그대로다 — 이번 작업은 껍데기뿐이다", () => {
@@ -253,14 +251,36 @@ describe("배치는 **그려진 결과**로 잰다", () => {
     expect(rule?.at.join(" "), "좁은 화면 규칙이 아니라 기본 규칙이 이겼다").toMatch(/max-width/);
   });
 
+  // ★ 토큰을 값으로 푼다 — gap 이 `var(--sp-5)` 라 글자 그대로는 못 센다.
+  //   ⚠️ 동적 RegExp(템플릿 문자열)를 쓰지 마라 — 템플릿 안에서 역슬래시가 한 겹 먹혀
+  //     `([\d.]+)` 가 `([d.]+)` 가 된다(2026-09-14 밤에 실제로 그랬다. CLAUDE.md 의
+  //     같은 함정과 한 뿌리다). 그래서 토큰은 이름을 **찾아서 그 뒤만** 읽는다.
+  const px = (v) => {
+    const txt = String(v ?? "").trim();
+    const t = /^var\((--[\w-]+)\)$/.exec(txt);
+    if (!t) return Number(/^([\d.]+)px$/.exec(txt)?.[1] ?? NaN);
+    const at = css.indexOf(t[1] + ":");
+    if (at < 0) return NaN;
+    return Number(/^\s*([\d.]+)px/.exec(css.slice(at + t[1].length + 1))?.[1] ?? NaN);
+  };
+
   it("★★★ 두 칸이 서는 가장 좁은 화면에서도 작업대가 570px 은 된다 — 900px 에서는 311px 였다", () => {
     // 실측(2026-09-14, 브라우저): innerWidth = 942 → .rw-grid 의 계산된
     // grid-template-columns 가 `300px 310.667px`. 경계(900)는 넘었는데 **본문이 설정
     // 패널보다 좁다** — 배치가 사실상 뒤집혀 있었다.
-    // 격자가 받는 폭은 화면 폭 − 307(앱 껍데기의 사이드바+여백. 같은 실측에서
-    // .rw-grid 의 x = 264 · 폭 = 635)이고, 거기서 300 + gap 24 를 또 뗀다
-    // → 작업대 = 화면 폭 − 631. 경계를 **화면 폭**으로 거는 한 그 307 을 얹어 잡아야 한다.
-    // ★ 글자로 `900` 을 찾지 않는다 — 이 파일에는 다른 @media 의 900 도 있다.
+    //
+    // ★★★ 2026-09-14 밤 — 이 판은 원래 `작업대 = 화면폭 − 631` 로 셌다. 그 **631 안에
+    //   설정 패널 폭 300 이 들어 있었다** — 즉 패널 폭이 CSS 와 이 판 두 곳에 살았다.
+    //   그래서 패널을 넓히면 판은 낡은 300 으로 계산해 **초록인 채 작업대가 눌린다.**
+    //   지금은 패널 폭도 간격도 **CSS 에서 읽는다.** 손으로 남은 수는 껍데기 하나뿐이다.
+    const 껍데기 = 307; // 앱 사이드바+여백. 이것만 브라우저 실측값이다(.rw-grid 의 x=264·폭=635).
+    const cols = winning("grid-template-columns", [GRID], 넓은폭);
+    const 패널폭 = px(tracks(cols.val)[0]);
+    expect(패널폭, `설정 패널 칸이 고정 px 가 아니다: ${tracks(cols.val)[0]}`).toBeGreaterThan(0);
+    const 간격 = px(winning("gap", [GRID], 넓은폭)?.val);
+    expect(간격, "격자의 간격을 못 읽었다 — 토큰 이름이 바뀌었나").toBeGreaterThan(0);
+
+    // ★ 글자로 경계 수를 찾지 않는다 — 이 파일에는 다른 @media 의 수도 있다.
     //   .rw-grid 를 **한 칸으로 만드는** 규칙을 파서로 골라 그 폭을 읽는다.
     const 한칸으로 = RULES.filter((r) =>
       r.sel.split(",").map((s) => s.trim()).includes(".rw-grid")
@@ -272,12 +292,10 @@ describe("배치는 **그려진 결과**로 잰다", () => {
     // ★ 바닥을 수로 고정하지 않는다 — 경계 수를 다시 적으면 같은 값이 CSS 와 판 두 곳에
     //   산다. 재는 것은 경계가 아니라 그 경계가 낳는 **작업대 폭**이다.
     //   max-width 는 그 수를 포함하므로 두 칸이 서는 가장 좁은 화면은 **경계+1** 이다.
-    //   ⚠ 1100 같은 느슨한 바닥을 두면 경계를 1100 으로 낮춰도 초록인데,
-    //   그때 작업대는 470px 다 — 이번에 잡은 311px 과 같은 종류의 실패다.
-    const 작업대 = Number(max[1]) + 1 - 631;
+    const 작업대 = Number(max[1]) + 1 - (껍데기 + 패널폭 + 간격);
     expect(
       작업대,
-      `경계가 ${max[1]}px 라 두 칸이 서는 가장 좁은 화면(${Number(max[1]) + 1}px)에서 작업대가 ${작업대}px 다`,
+      `패널 ${패널폭}px · 간격 ${간격}px · 경계 ${max[1]}px → 두 칸이 서는 가장 좁은 화면(${Number(max[1]) + 1}px)에서 작업대가 ${작업대}px 다`,
     ).toBeGreaterThanOrEqual(570);
   });
 
@@ -305,12 +323,15 @@ describe("배치는 **그려진 결과**로 잰다", () => {
 });
 
 // ────────────────────────────────────────────────────────────────────────
-// Ruling 13 — 제목이 두 번 뜨는 것.
-// 단계 페이지 여섯이 저마다 `<h2>단계 이름</h2>` 을 그리는데 작업대도 펼친 줄에
-// 머리줄(번호 + 라벨)을 그린다. 펼친 줄에서는 **라벨만** 감추고 번호는 남긴다.
-// (단계 페이지는 손대지 않는다 — 이번 범위 밖이다.)
+// 걸음 띠 — 줄의 이름은 **언제나 보인다.**
+//
+// 쌓기 시절에는 펼친 줄의 라벨을 감췄다(Ruling 13) — 단계 페이지의 h2 와 같은 말이
+// 위아래로 **바싹 붙어** 두 번 떴기 때문이다. 띠에서는 그 중복이 사라진다: 띠는
+// 화면 위에 선 길잡이고 h2 는 지금 보고 있는 화면의 제목이라, 탭 이름과 문서 제목이
+// 같은 것과 같은 관계다. 그래서 이제는 **감추면 안 된다** — 감추는 순간 띠에서
+// 그 줄이 어디를 가리키는지가 사라진다. 옛 규칙이 되살아나면 이 판이 잡는다.
 // ────────────────────────────────────────────────────────────────────────
-describe("Ruling 13 — 펼친 줄에서 같은 말이 두 번 뜨지 않는다", () => {
+describe("걸음 띠 — 줄의 이름은 언제나 보인다", () => {
   it("★★★ 못 재는 선택자가 뼈대를 건드리지 않는다 — 못 재는 것을 통과로 세지 않는다", () => {
     // 형제 결합자(`+`·`~`)는 이 엔진이 못 잰다. 우리 뼈대의 이름을 달고 나타나면
     // 아래 승부 계산이 조용히 틀리므로, 그 자리에서 멈춘다.
@@ -321,28 +342,25 @@ describe("Ruling 13 — 펼친 줄에서 같은 말이 두 번 뜨지 않는다"
     expect(못재는것, "이 판의 엔진이 못 재는 선택자가 생겼다 — 엔진을 늘려라").toEqual([]);
   });
 
-  it("★★★ 펼친 줄의 라벨은 **안 보인다** — h2 와 같은 말이 두 번이다", () => {
-    const w = winning("display", 펼친라벨, 1200);
-    expect(w, "펼친 줄 라벨의 display 를 정하는 규칙이 없다").toBeTruthy();
-    expect(w.val, `라벨이 아직 보인다 (이긴 규칙: ${w.sel})`).toBe("none");
+  it("★★★ 지금 서 있는 줄의 라벨이 보인다 — 옛 「펼친 줄 감추기」가 되살아나면 안 된다", () => {
+    const w = winning("display", 지금라벨, 1200);
+    // display 를 정하는 규칙이 아예 없는 것이 정상이다(기본값 inline).
+    expect(w?.val ?? "inline", `지금 줄의 라벨을 감췄다 (이긴 규칙: ${w?.sel})`).not.toBe("none");
   });
 
-  it("★★★ 번호는 그대로 남는다 — 라벨과 함께 지우면 줄이 어디를 가리키는지 사라진다", () => {
-    const w = winning("display", 펼친번호, 1200);
-    expect(w, "펼친 줄 번호의 display 를 정하는 규칙이 없다").toBeTruthy();
-    expect(w.val, `번호까지 감췄다 (이긴 규칙: ${w.sel})`).not.toBe("none");
+  it("★★★ 다른 줄의 라벨도 보인다 — 그것이 그 줄의 유일한 이름이다", () => {
+    const w = winning("display", 다른라벨, 1200);
+    expect(w?.val ?? "inline", `다른 줄의 라벨을 감췄다 (이긴 규칙: ${w?.sel})`).not.toBe("none");
   });
 
-  it("★★★ 접힌 줄의 라벨은 그대로 보인다 — 감추는 것은 펼친 줄 하나다", () => {
-    const w = winning("display", 접힌라벨, 1200);
-    // 접힌 줄에는 display 를 정하는 규칙이 아예 없는 것이 정상이다(기본값 inline).
-    expect(w?.val ?? "inline", `접힌 줄 라벨까지 감췄다 (이긴 규칙: ${w?.sel})`).not.toBe("none");
+  it("★★★ 번호도 그대로 남는다 — 라벨과 함께 지우면 줄이 어디를 가리키는지 사라진다", () => {
+    const w = winning("display", 지금번호, 1200);
+    expect(w?.val ?? "inline", `번호까지 감췄다 (이긴 규칙: ${w?.sel})`).not.toBe("none");
   });
 
   it("★★ 단계 페이지 여섯은 손대지 않았다 — 제목은 그대로 그 페이지의 것이다", () => {
     // ★ briefing 이 빠져 있었다(2026-09-14 검토). ①입력 화면은 `<h2>{stepLabel}</h2>` 로
-    //   **라벨 글자 그대로**를 그린다 — Ruling 13 이 겨냥한 중복이 가장 선명한 화면인데
-    //   판 밖에 있었다. 여섯 단계 전부를 센다.
+    //   **라벨 글자 그대로**를 그린다. 여섯 단계 전부를 센다.
     const 단계들 = ["briefing", "scenario", "images", "prompts", "video", "done"];
     for (const s of 단계들) {
       const page = readFileSync(`app/reel/[id]/${s}/page.js`, "utf8");
