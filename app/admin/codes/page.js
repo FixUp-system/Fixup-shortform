@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import { formatCredits } from "../../../lib/pricing";
 import { displayNameOf } from "../../../lib/display-name";
 import { parsePasted, toCsv, formatCode, MAX_CODE_ROWS } from "../../../lib/credit-codes";
+import Select from "../../../components/Select";
 import { useDialog } from "../../../components/DialogProvider";
 
 // 리워드 열을 안 고르면 모든 행이 같은 크레딧이다 — 그 칸의 열쇠.
@@ -218,20 +219,16 @@ export default function CreditCodesPage() {
           <>
             <label>
               <small>리워드 열</small>
-              <span className="cost-select">
-                <select className="field" value={col} onChange={(e) => setRewardCol(e.target.value)}>
-                  <option value={ALL}>없음 — 모두 같은 크레딧</option>
-                  {parsed.headers.map((h) => <option key={h} value={h}>{h}</option>)}
-                </select>
-              </span>
+              <Select value={col} onChange={(e) => setRewardCol(e.target.value)}>
+                <option value={ALL}>없음 — 모두 같은 크레딧</option>
+                {parsed.headers.map((h) => <option key={h} value={h}>{h}</option>)}
+              </Select>
             </label>
             <label>
               <small>보관할 식별 열</small>
-              <span className="cost-select">
-                <select className="field" value={keepCol} onChange={(e) => setKeepPick(e.target.value)}>
-                  {parsed.headers.map((h) => <option key={h} value={h}>{h}</option>)}
-                </select>
-              </span>
+              <Select value={keepCol} onChange={(e) => setKeepPick(e.target.value)}>
+                {parsed.headers.map((h) => <option key={h} value={h}>{h}</option>)}
+              </Select>
             </label>
           </>
         )}
@@ -295,12 +292,10 @@ export default function CreditCodesPage() {
           <div className="panel cost-filters">
             <label>
               <small>묶음</small>
-              <span className="cost-select">
-                <select className="field" value={shown} onChange={(e) => setShown(e.target.value)}>
-                  <option value={ALL}>전체 묶음</option>
-                  {batches.map((b) => <option key={b} value={b}>{b}</option>)}
-                </select>
-              </span>
+              <Select value={shown} onChange={(e) => setShown(e.target.value)}>
+                <option value={ALL}>전체 묶음</option>
+                {batches.map((b) => <option key={b} value={b}>{b}</option>)}
+              </Select>
             </label>
             <button
               className="mini"

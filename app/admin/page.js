@@ -11,6 +11,7 @@ import { TIERS, tierOf } from "../../lib/tiers";
 import { displayNameOf } from "../../lib/display-name";
 // 날짜 칸 판정 한 벌 — 비용 기록과 같은 규칙(지역 시각 자정 · 종료일 포함)
 import { inDayRange } from "../../lib/costs-filter";
+import Select from "../../components/Select";
 import { useDialog } from "../../components/DialogProvider";
 import { useMe } from "../../components/MeContext";
 
@@ -409,8 +410,7 @@ export default function AdminPage() {
                       ★ 내 줄은 잠근다 — 마지막 운영자가 자기를 내리면 아무도 못 들어온다.
                         서버도 같은 것을 막는다(가림막이 아니라 잠금이다). */}
                   <td>
-                    <select
-                      className="dlg-input tier-pick"
+                    <Select
                       value={u.role === "admin" ? "admin" : "user"}
                       disabled={busy === u.id || u.self === true}
                       onChange={(e) => setRole(u.id, e.target.value)}
@@ -419,7 +419,7 @@ export default function AdminPage() {
                     >
                       <option value="user">사용자</option>
                       <option value="admin">운영자</option>
-                    </select>
+                    </Select>
                   </td>
                   {/* 등급 — 드롭다운으로 고른다(2026-08-20 사장님 지시). 칩을 나열하면
                       등급이 늘 때 줄이 넘치고, 지금 무엇인지도 한눈에 안 들어온다.
@@ -427,8 +427,7 @@ export default function AdminPage() {
                       ★ 지금 등급 판정은 lib/tiers.js 의 tierOf 하나다(컬럼이 없던 시절
                         계정은 값이 없고, 그때도 기본 등급으로 읽힌다). */}
                   <td>
-                    <select
-                      className="dlg-input tier-pick"
+                    <Select
                       value={tierOf(u)}
                       disabled={busy === u.id}
                       onChange={(e) => setTier(u.id, e.target.value)}
@@ -437,7 +436,7 @@ export default function AdminPage() {
                       {TIERS.map((t) => (
                         <option key={t.id} value={t.id}>{t.label}</option>
                       ))}
-                    </select>
+                    </Select>
                   </td>
                   {/* 언제 들어온 사람인지 — 승인 대기가 쌓였을 때 먼저 볼 줄을 고르는 근거다.
                       날짜 규칙은 마이페이지·크레딧 내역과 같다(ymd: 사장님 시계). */}

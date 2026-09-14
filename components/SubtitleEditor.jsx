@@ -34,6 +34,7 @@ import {
   SUBTITLE_LINE_HEIGHT,
 } from "../lib/subtitles";
 import { aspectFor } from "../lib/aspects";
+import Select from "./Select";
 
 // 화면이 쥘 초기값. settings.subtitle 이 있으면 그것이 진실이고, 없는 옛 프로젝트는
 // 옛 위치를 이어받는다. 되돌리기·범위 판정은 늘 lib 의 normalizeSubtitle 을 지난다.
@@ -256,8 +257,8 @@ export default function SubtitleEditor({
               <span className="sub-label">위치</span>
               {/* 고른 값은 pos 에서 거꾸로 판정한다 — 끌어서 옮기면 어느 자리와도 안 맞으므로
                   "직접 옮김"으로 떨어진다(그때 목록을 비우면 화면이 거짓말을 한다). */}
-              <div className="sub-select-wrap">
-                <select
+              <Select
+                  wrapClassName="sub-select-wrap"
                   className="sub-select"
                   aria-label="자막 위치"
                   value={POSITION_PRESETS.find((p) => samePos(sub.pos, p.pos))?.id || CUSTOM_POS}
@@ -271,8 +272,7 @@ export default function SubtitleEditor({
                     <option key={p.id} value={p.id}>{p.label}</option>
                   ))}
                   <option value={CUSTOM_POS} disabled>직접 옮김</option>
-                </select>
-              </div>
+              </Select>
             </div>
             {lang === "ko" ? (
               <div className="sub-row">
@@ -280,8 +280,8 @@ export default function SubtitleEditor({
                 {/* ★ 고른 글꼴을 **그 글꼴로** 보여 준다 — 이름만 보고 고르면 "부드럽게"가 어떤
                     글씨인지 모른 채 고르게 된다. 이름(label)·글꼴 이름(cssFamily) 둘 다 lib 에서
                     온다. 브라우저용 이름이라야 한다(ffmpeg 의 family 가 아니다). */}
-                <div className="sub-select-wrap">
-                  <select
+                <Select
+                    wrapClassName="sub-select-wrap"
                     className="sub-select face"
                     aria-label="자막 글꼴"
                     style={{ fontFamily: font.cssFamily }}
@@ -294,8 +294,7 @@ export default function SubtitleEditor({
                         {f.label}
                       </option>
                     ))}
-                  </select>
-                </div>
+                </Select>
               </div>
             ) : null /* 고를 것이 없으면 그 줄이 아예 없는 것이 자연스럽다 — 한국어 밖에서는
                 글꼴을 lib 이 언어로 정하므로(subtitleFontFor) 고르게 두면 고른 것과 다른

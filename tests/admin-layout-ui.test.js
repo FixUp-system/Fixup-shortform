@@ -39,16 +39,10 @@ describe("사용자 관리(/admin) — 비용 기록과 같은 구성", () => {
 describe("크레딧 코드(/admin/codes) — 탭", () => {
   const src = strip(readFileSync("app/admin/codes/page.js", "utf8"));
 
-  // 2026-09-14 사장님 지적 — 묶음 드롭다운이 브라우저 기본 모양이었다. 자막 조절판(.sub-select)과 같은 방식:
-  // 기본 화살표를 끄고 감싼 칸의 ::after 삼각형으로 그린다.
-  it("드롭다운은 전부 감싼 칸(cost-select) 안에 있고 기본 화살표를 끈다", () => {
-    const selects = src.match(/<select\b/g) || [];
-    const wrapped = src.match(/<span className="cost-select">\s*<select\b/g) || [];
-    expect(selects.length).toBeGreaterThanOrEqual(3);
-    expect(wrapped).toHaveLength(selects.length);
-    const css = readFileSync("app/globals.css", "utf8");
-    expect(css).toMatch(/\.cost-select select\.field \{[^}]*appearance:\s*none/);
-    expect(css).toMatch(/\.cost-select::after \{/);
+  // 2026-09-14 사장님 지적 — 묶음 드롭다운이 브라우저 기본 모양이었다. 이제 드롭다운은 앱 전체가
+  // components/Select.jsx 한 벌이다(tests/select-unified-ui.test.js 가 전체를 잰다).
+  it("드롭다운 셋(리워드 열·식별 열·묶음)이 공용 Select 를 쓴다", () => {
+    expect((src.match(/<Select\b/g) || []).length).toBeGreaterThanOrEqual(3);
   });
 
   it("[코드 만들기 | 현황] 세그먼트로 갈아 끼운다", () => {
