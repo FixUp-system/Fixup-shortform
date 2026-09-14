@@ -95,8 +95,9 @@ export default function CostsPage() {
         <p className="pgsub warn">{err}</p>
       ) : (
         <>
-          {/* ★ 좁히는 자리 — 날짜·사람·흐름. 판정은 lib/costs-filter.js 하나가 한다. */}
-          <div className="cost-filters">
+          {/* ★ 좁히는 자리 — 날짜·사람·흐름. 판정은 lib/costs-filter.js 하나가 한다.
+              ★ 카드(.panel) 안에 둔다(2026-09-14 사장님 지시) — 아래 요약 타일과 영역이 갈린다. */}
+          <div className="panel cost-filters">
             <label>
               <small>시작일</small>
               <input className="field" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />

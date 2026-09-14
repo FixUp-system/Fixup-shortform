@@ -923,16 +923,20 @@ a.side-item { text-decoration: none; }
 }
 .cost-filters label { display: block; }
 .cost-filters small { color: var(--ink-soft); font-size: 12px; display: block; margin-bottom: 6px; }
-/* 날짜·검색 칸 — 고르기 칸(.sub-select)과 같은 키·같은 테두리다. */
+/* 날짜·검색 칸 — 옆의 종류 세그먼트(.seg)와 같은 키·같은 테두리다.
+   ★★ 2026-09-14 — `var(--ctl-h)` 였는데 그 토큰은 **자막 조절판(.sub-editor) 안에서만** 정의된다.
+      여기서는 값이 없어 칸이 20px 로 쪼그라들고, 32px 세그먼트와 밑선을 맞추느라 라벨 높이가 갈렸다.
+      :root 에 있는 사다리(--ctl-sm = .seg 의 키)를 쓴다.
+   ★ 줄이 카드(.panel) 안에 서므로 칸 바탕은 카드와 같은 surface 가 아니라 한 단 깊은 deep 이다. */
 .cost-filters input.field {
   width: auto;
-  height: var(--ctl-h);
+  height: var(--ctl-sm);
   min-width: 150px;
   padding: 0 12px;
   font-size: 14px;
   line-height: normal;
   border: 1px solid var(--line);
-  background: var(--surface);
+  background: var(--deep);
 }
 .cost-filter-q { min-width: 200px; }
 /* 고르기 칸은 이 줄에서만 좁게 — 기본 폭(--ctl-w 234px)은 이 줄에 과하다. */
