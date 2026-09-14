@@ -90,22 +90,33 @@ describe("배선 — 세 자리가 같은 함수를 쓴다", () => {
   });
 });
 
-describe("화면 — 옛 문서에는 안 그린다", () => {
-  it("★★★ 번역이 없으면 그 줄을 아예 안 그린다", () => {
-    const src = readFileSync("components/PromptWithKo.jsx", "utf8");
-    expect(src).toMatch(/\{trans && \(/);
+// ★★★ 2026-09-14 — **뒤집힌 판이다.** 그전에는 "원문을 먼저, 번역은 있을 때만 곁들인다"를
+//   못 박았다. 사장님 지시(사용자에게 불필요한 정보 제거)로 화면은 **번역만** 보인다 — 손님은
+//   영어 원문을 읽지도 고치지도 않는다(고치는 칸도 한국어다). 번역이 없는 옛 문서는 **원문으로
+//   떨어진다** — 빈 자리를 두면 "시나리오가 사라졌나"로 읽힌다.
+//   ★ 위 ①(원문은 안 건드린다)은 그대로다 — 모델에게 나가는 것도, 각인이 무는 것도 원문이다.
+describe("화면 — 번역이 있으면 번역만, 없으면 원문으로 떨어진다", () => {
+  const src = strip(readFileSync("components/PromptWithKo.jsx", "utf8"));
+
+  it("★★★ 한 문단만 그린다 — 번역이 있으면 번역, 없으면 원문", () => {
+    expect(src, "번역 우선 폴백이 아니다").toMatch(/\{trans \|\| body\}/);
+    expect(src.match(/<p /g) || [], "원문·번역을 두 문단으로 나란히 그린다").toHaveLength(1);
   });
 
-  it("★★ 원문이 없으면 아무것도 안 그린다 — 빈 상자를 남기지 않는다", () => {
-    const src = readFileSync("components/PromptWithKo.jsx", "utf8");
-    expect(src).toMatch(/if \(!body\) return null/);
+  it("★★ 영어 원문을 번역 옆에 곁들이지 않는다 — '한국어' 라벨 상자가 없다", () => {
+    expect(src).not.toContain("prompt-ko");
+    expect(src).not.toMatch(/\{body\}<\/p>/);
   });
 
-  it("★★ 세 화면이 그 컴포넌트를 쓴다", () => {
+  it("★★ 둘 다 비었을 때만 아무것도 안 그린다 — 원문만 없어도 번역은 보인다", () => {
+    expect(src).toMatch(/if \(!body && !trans\) return null/);
+  });
+
+  // ★ 2026-09-14 — ③이미지는 지문 전체 칸을 걷어 이 컴포넌트를 더는 그리지 않는다(세 화면 → 두 화면).
+  it("★★ ②시나리오·④영상 프롬프트 두 화면이 그 컴포넌트를 쓴다", () => {
     for (const p of [
       "app/reel/[id]/scenario/page.js",
       "app/reel/[id]/prompts/page.js",
-      "app/reel/[id]/images/page.js",
     ]) {
       expect(strip(readFileSync(p, "utf8")), `${p} 가 안 쓴다`).toMatch(/<PromptWithKo/);
     }

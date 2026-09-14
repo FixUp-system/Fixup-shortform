@@ -69,16 +69,18 @@ describe("건드리면 안 되는 경우", () => {
   });
 });
 
-describe("화면이 실제로 이 함수를 쓴다", () => {
-  const src = readFileSync("app/ads/[id]/page.js", "utf8");
+// ★★ 2026-09-14 — **뒤집힌 판이다.** 그전에는 광고 시나리오 화면이 이 함수로 영어 프롬프트
+//   원문을 그리는 것을 못 박았다. 사장님 지시(사용자에게 불필요한 정보 제거)로 그 문단을 걷었다 —
+//   손님은 영어 지시문을 읽지도 고치지도 않고, 판단에 쓰는 것은 이야기·장면·대사 목록이다.
+//   ★ 함수 자체(위 묶음)는 순수 함수라 그대로 잰다 — 원문을 다시 보일 날이 오면 이 함수가 선다.
+describe("화면 — 광고 시나리오에 영어 프롬프트 원문을 그리지 않는다", () => {
+  // 주석은 걷어내고 판정한다 — 걷은 이유를 적은 주석이 단정에 걸리면 안 된다.
+  const src = readFileSync("app/ads/[id]/page.js", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1");
 
-  it("프롬프트를 prettyPrompt 로 그린다", () => {
-    expect(src).toContain("prettyPrompt(scenario?.text)");
-  });
-
-  // ★ 줄바꿈을 넣어도 CSS 가 안 살리면 화면에서는 그대로 한 줄이다(둘이 짝이다).
-  it("줄바꿈을 살리는 클래스를 함께 준다", () => {
-    expect(src).toContain('className="script-src direction-lines"');
-    expect(readFileSync("app/globals.css", "utf8")).toMatch(/\.direction-lines\s*\{[^}]*pre-line/);
+  it("★ prettyPrompt(scenario?.text) 를 그리지 않는다", () => {
+    expect(src, "영어 프롬프트 원문이 화면에 돌아왔다").not.toMatch(/\{prettyPrompt\(/);
+    expect(src).not.toContain('className="script-src direction-lines"');
   });
 });

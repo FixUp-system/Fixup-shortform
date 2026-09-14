@@ -172,10 +172,9 @@ export default function ReelScenarioPage() {
             만들면 없는 기능이 있는 것처럼 읽힌다. */}
       {!busy && narration && (
         <div className="narration-one">
-          <p className="pgsub">
-            내레이션 · {narration.text.length}
-            {narrationCap ? `/${narrationCap}` : ""}자
-          </p>
+          {/* ★ 2026-09-14 — 글자 수(57/82자)를 걷었다. 이 칸은 직접 못 고치는 읽는 글이라
+              카운터가 할 일이 없었다(사장님 지시: 불필요한 정보 제거). */}
+          <p className="pgsub">내레이션</p>
           <p className="script-src">{narration.text}</p>
         </div>
       )}

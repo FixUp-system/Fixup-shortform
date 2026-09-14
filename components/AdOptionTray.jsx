@@ -55,7 +55,8 @@ export default function AdOptionTray({ value, onChange, showCredits = true, admi
                         </button>
                       ))}
                     </div>
-                    <div className="tray-note">{AD_FORMATS.find((f) => f.id === format)?.beat}</div>
+                    {/* ★ beat(LLM 지문)가 아니라 보이는 한 줄(note)을 그린다 — 2026-09-14 */}
+                    <div className="tray-note">{AD_FORMATS.find((f) => f.id === format)?.note}</div>
                   </div>
                 </div>
 

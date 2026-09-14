@@ -403,10 +403,7 @@ export default function Sidebar() {
       {/* ★★★ 2026-09-14 — **모든 사용자에게서 뺐다**(사장님 지시: "실제 비용도 사이드바에서
           제거"). 와디즈로 손님을 받으면 우리 원가 구조가 그대로 드러난다. 화면(/cost-table)은
           운영자 전용으로 잠갔고(lib/auth/paths.js 의 ADMIN_PATHS), 링크는 아래 운영자 자리로 옮겼다. */}
-      <button className="side-item soon" disabled>
-        <span className="ic"><Icon name="template" /></span>템플릿
-        <span className="soon-tag">준비 중</span>
-      </button>
+      {/* ★ 2026-09-14 — 누를 수 없는 [템플릿 · 준비 중]을 걷었다(사장님 지시: 불필요한 정보 제거). */}
       {/* ★ 운영자 전용 두 자리. 못 읽으면 숨기는 쪽으로 떨어진다(fail-closed) —
           링크를 숨겨도 운영자는 주소로 들어갈 수 있고, 진짜 경계는 middleware 의 역할
           게이트다. 사용자 관리로 가는 길이 아예 없어서 주소를 외워야 했다(2026-08-13). */}

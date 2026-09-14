@@ -269,7 +269,8 @@ export default function ReelNewPage() {
                 {/* ★ [알아서]는 구성이 없으므로 설명(desc)을 대신 보여 준다 —
                     빈 줄로 남기면 고르면 안 되는 칩처럼 읽힌다. */}
                 <div className="tray-note">
-                  {(() => { const c = REEL_CONCEPTS.find((x) => x.id === concept); return c?.beat || c?.desc || ""; })()}
+                  {/* ★ beat(LLM 지문)가 아니라 보이는 한 줄(note)을 그린다 — 2026-09-14 */}
+                  {(() => { const c = REEL_CONCEPTS.find((x) => x.id === concept); return c?.note || c?.desc || ""; })()}
                 </div>
               </div>
             </div>

@@ -164,10 +164,9 @@ export default function MePage() {
   return (
     <>
       <h1 className="pgtitle">내 정보</h1>
-      <p className="pgsub">이름과 비밀번호를 여기서 바꿀 수 있어요.</p>
 
+      {/* ★ 2026-09-14 — 제목 아래 설명 줄과 같은 이름의 소제목을 걷었다(같은 말이 세 번이었다). */}
       <section className="panel me-panel">
-        <h2 className="me-h">내 정보</h2>
         {loadErr && (
           <p className="pgsub">
             {loadErr}{" "}
