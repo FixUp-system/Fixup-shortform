@@ -253,7 +253,7 @@ describe("배치는 **그려진 결과**로 잰다", () => {
     expect(rule?.at.join(" "), "좁은 화면 규칙이 아니라 기본 규칙이 이겼다").toMatch(/max-width/);
   });
 
-  it("★★★ 좁은 화면 경계는 1100px 이상이다 — 900px 에서는 작업대가 설정 패널보다 좁았다", () => {
+  it("★★★ 두 칸이 서는 가장 좁은 화면에서도 작업대가 570px 은 된다 — 900px 에서는 311px 였다", () => {
     // 실측(2026-09-14, 브라우저): innerWidth = 942 → .rw-grid 의 계산된
     // grid-template-columns 가 `300px 310.667px`. 경계(900)는 넘었는데 **본문이 설정
     // 패널보다 좁다** — 배치가 사실상 뒤집혀 있었다.
@@ -269,10 +269,16 @@ describe("배치는 **그려진 결과**로 잰다", () => {
     const 조건 = 한칸으로[0].at.join(" ");
     const max = 조건.match(/max-width:\s*(\d+)px/);
     expect(max, `한 칸 규칙이 @media max-width 안에 없다: ${조건 || "(조건 없음)"}`).toBeTruthy();
+    // ★ 바닥을 수로 고정하지 않는다 — 경계 수를 다시 적으면 같은 값이 CSS 와 판 두 곳에
+    //   산다. 재는 것은 경계가 아니라 그 경계가 낳는 **작업대 폭**이다.
+    //   max-width 는 그 수를 포함하므로 두 칸이 서는 가장 좁은 화면은 **경계+1** 이다.
+    //   ⚠ 1100 같은 느슨한 바닥을 두면 경계를 1100 으로 낮춰도 초록인데,
+    //   그때 작업대는 470px 다 — 이번에 잡은 311px 과 같은 종류의 실패다.
+    const 작업대 = Number(max[1]) + 1 - 631;
     expect(
-      Number(max[1]),
-      `경계가 ${max[1]}px 다 — 작업대(화면 폭 − 631)가 설정 패널 300px 보다 좁아진다`,
-    ).toBeGreaterThanOrEqual(1100);
+      작업대,
+      `경계가 ${max[1]}px 라 두 칸이 서는 가장 좁은 화면(${Number(max[1]) + 1}px)에서 작업대가 ${작업대}px 다`,
+    ).toBeGreaterThanOrEqual(570);
   });
 
   it("★★★ 가로 스크롤을 만들지 않는다 — 늘어나는 칸의 최소폭이 0 이다", () => {
@@ -285,7 +291,7 @@ describe("배치는 **그려진 결과**로 잰다", () => {
       expect(위험, `${width}px: 최소폭이 내용 크기인 칸이 있다 — minmax(0, …) 로 감싸라`).toEqual([]);
     }
     // 격자 칸 안의 아이는 한 번 더 잠근다 — 칸이 안 늘어나도 아이가 밀고 나올 수 있다.
-    const mw = winning("min-width", [GRID, WORK], 1200);
+    const mw = winning("min-width", [GRID, WORK], 넓은폭);
     expect(mw, ".rw-work 의 최소폭을 정하는 규칙이 없다").toBeTruthy();
     expect(mw.val, "작업대 칸의 최소폭이 0 이 아니다").toBe("0");
   });
