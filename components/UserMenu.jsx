@@ -91,7 +91,7 @@ export default function UserMenu({ initialGuest = false }) {
             신호를 함께 보낸다(lib/me-tab.js). */}
       {me && (
         <Link href={CREDITS_TAB_HREF} className="um-credit" onClick={() => window.dispatchEvent(new Event(ME_TAB_EVENT))}>
-          크레딧 <b>{formatCredits(me.balance)}</b>{me.internal === true && " · 내부"}
+          <b>{formatCredits(me.balance)}</b> 크레딧{me.internal === true && " · 내부"}
         </Link>
       )}
       <button

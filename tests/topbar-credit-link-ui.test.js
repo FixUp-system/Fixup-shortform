@@ -17,6 +17,12 @@ describe("상단바 잔액이 크레딧 탭으로 간다", () => {
     expect(readFileSync("lib/me-tab.js", "utf8")).not.toMatch(/^\s*import\s/m);
   });
 
+  // 2026-09-14 사장님: "상단 크레딧을 940 크레딧으로" — 숫자가 앞, 단위가 뒤.
+  it("잔액은 'N 크레딧' 순서다", () => {
+    expect(menu).toMatch(/<b>\{formatCredits\(me\.balance\)\}<\/b> 크레딧/);
+    expect(menu).not.toMatch(/크레딧 <b>\{formatCredits/);
+  });
+
   it("잔액이 그 주소로 가는 링크다", () => {
     expect(menu).toMatch(/<Link\s+href=\{CREDITS_TAB_HREF\}[^>]*className="um-credit"/);
   });
