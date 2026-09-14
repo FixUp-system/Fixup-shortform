@@ -94,6 +94,38 @@ function Row({ label, children }) {
   );
 }
 
+// 사용자가 적어 넣은 글 — **길면 여섯 줄에서 자른다** (2026-09-14 사장님 지시:
+// "사용자 프롬프트가 길면 너무 늘어져서").
+//
+// 이 자리는 옆의 프롬프트 절들과 사정이 다르다. 그쪽은 통째로 접어 두면 되지만(궁금할 때
+// 여는 글), 사용자 입력은 **무엇을 적었는지 한눈에 확인하는 자리**라 첫 몇 줄은 보여야 한다.
+// 그래서 자르되 펼칠 수 있게 둔다.
+//
+// ★ `<details>` 를 쓰는 이유는 옆과 같다 — 키보드·스크린리더 동작이 이미 붙어 있다.
+//   다만 여는 단추가 **글 아래**에 서야 하므로 CSS 로 순서를 뒤집는다(.input-fold).
+// ★ 여는 말·접는 말은 CSS `content` 가 아니라 **JSX 에 둔다** — 화면에 나오는 글자는
+//   소스에서 검색되는 자리에 있어야 한다(이 저장소는 그렇게 말이 새는 것을 여러 번 겪었다).
+// ★ 짧은 글은 접는 장치를 아예 안 그린다. 두 줄짜리 입력에 [전체 보기]가 붙으면
+//   없는 분량을 있는 것처럼 말한다.
+const INPUT_FOLD_AT = 200;
+
+function UserInput({ text }) {
+  if (text.length <= INPUT_FOLD_AT) return <span className="script-src">{text}</span>;
+  return (
+    <details className="input-fold">
+      {/* ★★ 미리보기가 **여는 줄 안**에 있다. `<details>` 는 닫히면 본문을 아예 안 그리므로
+          (실측: 미리보기가 통째로 사라졌다) 잘린 앞부분은 summary 가 들고 있어야 한다.
+          펼치면 그 미리보기는 감추고 아래 전문이 대신 선다 — 같은 글이 두 번 보이지 않게. */}
+      <summary>
+        <span className="script-src input-preview">{text}</span>
+        <span className="fold-more">전체 보기 — {text.length.toLocaleString()}자</span>
+        <span className="fold-less">접기</span>
+      </summary>
+      <p className="script-src">{text}</p>
+    </details>
+  );
+}
+
 function ArchiveDetailPageBody() {
   // ★ 어디서 왔는지 주소가 말해 준다(2026-08-19). [보관함으로]가 **두 곳**이라 값을
   //   한 자리에서 판다 — 두 번 적으면 언젠가 한쪽만 고쳐져 갈린다.
@@ -274,9 +306,7 @@ function ArchiveDetailPageBody() {
               )}
 
               <Row label="사용자 입력">
-                {doc.material?.text ? (
-                  <span className="script-src">{doc.material.text}</span>
-                ) : null}
+                {doc.material?.text ? <UserInput text={doc.material.text} /> : null}
               </Row>
             </div>
 

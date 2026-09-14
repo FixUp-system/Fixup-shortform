@@ -235,6 +235,11 @@ export default async function HomePage() {
         </div>
       </div>
 
+      {/* ★★ 2026-09-14 — 아래 절들을 한 겹으로 묶는다. [맨 위로] 버튼이 **이 묶음 안에서**
+          sticky 로 떠 있어야 두 갈래 절부터 마무리까지 따라온다 — 벽 안에 두었더니 벽을
+          지나는 순간 같이 사라져 페이지 맨 아래에서는 보이지 않았다(사장님 지적).
+          ★ 히어로·도해는 이 묶음 **밖**이다 — 맨 위에서 "맨 위로"는 할 말이 없다. */}
+      <div className="land-below">
       {/* ★★ 어두운 면은 **여기 하나뿐이다.** 랜딩에서 가장 할 말이 많은 절이라 바탕을 갈아
           시선을 끊는다 — 색으로 소리치는 자리를 하나로 몰아 둔 것이다. */}
       <section className="land-two" id="two">
@@ -297,6 +302,17 @@ export default async function HomePage() {
           </Link>
         </div>
       </section>
+
+      {/* ★★ 맨 위로 (2026-09-10 사장님 지시 · 09-14 자리 옮김). **자바스크립트를 안 쓴다** —
+          이 화면은 서버가 통째로 그려 내려주는 자리라(첫 방문 7.5초 → 1.6초), 스크롤을
+          감지하려고 "use client" 를 들이면 그 최적화가 깨진다. 자리는 CSS 의 sticky 가
+          잡는다: 위 묶음(.land-below) 안에서만 떠 있어 히어로에서는 안 보인다. */}
+      <a href="#top" className="stage-top" aria-label="맨 위로">
+        <svg width="16" height="10" viewBox="0 0 16 10" fill="none" aria-hidden="true">
+          <path d="M1 9l7-7 7 7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </a>
+      </div>
     </section>
   );
 }

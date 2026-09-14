@@ -1042,6 +1042,41 @@ a.side-item { text-decoration: none; }
 /* 접었다 펴는 자리 — 긴 글(시나리오·원고·컷 목록)이 여기 들어간다 */
 .lib-fold { border-top: 1px solid var(--line); padding: 12px 0; }
 
+/* ★★ 사용자 입력 — **여섯 줄에서 자르고 펼친다** (2026-09-14 사장님 지시: "사용자
+   프롬프트가 길면 너무 늘어져서"). 실측으로 1,500자짜리 입력이 화면 세 배 높이를 차지해,
+   정작 옆에 있는 완성 영상이 화면 밖으로 밀려 있었다.
+   ★ 여는 단추가 **글 아래**에 선다 — `<details>` 는 summary 가 첫 자식이어야 하므로
+     세로 흐름으로 두고 순서만 뒤집는다(order). 마크업 순서는 그대로라 스크린리더도
+     "펼치기"를 글 다음에 만난다.
+   ★ 액센트를 안 쓴다 — 앱층에서 가장 강한 색은 사이드바 스테퍼의 몫이다(판이 잡는다). */
+.input-fold { display: flex; flex-direction: column; }
+/* 잘린 앞부분 — **여는 줄 안**에 산다(닫힌 <details> 는 본문을 안 그린다). */
+.input-fold .input-preview {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+  line-clamp: 6;
+  overflow: hidden;
+  margin-top: 0;
+}
+/* 펼치면 미리보기는 물러나고 아래 전문이 선다 — 같은 글이 두 번 보이지 않게. */
+.input-fold[open] .input-preview { display: none; }
+.input-fold > summary {
+  width: fit-content;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--ink-soft);
+  list-style: none;
+}
+.input-fold > summary > .fold-more,
+.input-fold > summary > .fold-less { display: block; margin-top: 8px; }
+.input-fold > summary::-webkit-details-marker { display: none; }
+.input-fold > summary:hover { color: var(--ink); }
+.input-fold > summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.input-fold > summary > .fold-less { display: none; }
+.input-fold[open] > summary > .fold-more { display: none; }
+.input-fold[open] > summary > .fold-less { display: block; }
+
 /* ★★ 2026-09-03 사장님 지시 — ③이미지의 지문 절 머리줄.
    순서가 **라인 → [전체 내려받기] → 지문 전체**다. 그래서 라인을 이 줄이 갖고,
    바로 아래 <details> 는 제 라인을 내려놓는다(--tight) — 안 그러면 줄이 둘이 된다.
@@ -2993,11 +3028,11 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
   place-items: center;
   width: 44px; height: 44px;
   margin-left: auto;
-  /* ★ **화면 오른쪽 끝**으로 뺀다(2026-09-10 사장님 지시). 벽(.stage-band)은 기둥이라
-     max-width 1400px 에 묶여 있어, 그냥 두면 넓은 모니터에서 버튼이 화면이 아니라
-     **글 칸의 오른쪽**에 선다(실측 2560px 화면에서 양옆에 580px 씩 남는다).
-     `50% - 50vw` 가 기둥 밖 화면 끝까지 밀어내고, +20px 로 가장자리에서 띄운다. */
-  margin-right: calc(50% - 50vw + 20px);
+  /* ★ **화면 오른쪽 끝**에 선다(2026-09-10 사장님 지시).
+     ★ 2026-09-14 — 버튼이 벽(기둥 1400px) 밖으로 나와 **화면 폭을 그대로 쓰는 묶음**
+       (.land-below) 안에 있으므로, 기둥 밖으로 밀어내던 `50% - 50vw` 계산이 필요 없어졌다.
+       그 식을 그대로 두면 이번에는 화면 **밖으로** 밀려난다. */
+  margin-right: 20px;
   border-radius: 50%;
   color: var(--on-media); text-decoration: none;
   background: rgba(0, 0, 0, .62);
@@ -3065,9 +3100,14 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
 }
 
 /* 도해 — 세 칸: 적는 자리 · 두 갈래 · 모이는 결과 */
+/* ★ 세 칸의 **높이를 맞춘다**(09-14 사장님 지시). 가운데만 짧아 가운데 정렬로 떠 있으면
+   도해가 한 덩어리로 안 읽힌다 — 늘여서 맞추고, 가운데의 두 갈래는 각자 절반을 나눠 갖되
+   글은 칸 안에서 세로 가운데에 둔다(빈 자리가 위아래로 갈리지 않게).
+   ★ 오른쪽 결과는 비율(9:16)로 높이를 정하고 있었는데, 늘이면 높이가 먼저 정해지므로
+     비율은 물러나고 그림이 잘려 맞춰진다(object-fit: cover). */
 .home .land-diagram {
   display: grid; grid-template-columns: 284px minmax(0, 1fr) 272px;
-  gap: clamp(14px, 2.4vw, 30px); align-items: center;
+  gap: clamp(14px, 2.4vw, 30px); align-items: stretch;
   margin-top: clamp(32px, 5vw, 56px);
 }
 .home .land-panel {
@@ -3101,6 +3141,7 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
   position: relative; background: var(--surface); border-radius: var(--r-card);
   padding: 15px 16px 16px; box-shadow: var(--ring), var(--lift);
   display: flex; flex-direction: column; gap: 9px;
+  flex: 1; justify-content: center;
 }
 .home .land-branch--pick { box-shadow: 0 0 0 1px var(--accent), var(--lift); }
 .home .land-branch::before {
@@ -3232,6 +3273,8 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
 }
 
 /* 만든 영상 머리 · 마무리 */
+/* ★ [맨 위로] 가 이 묶음 안에서 sticky 로 뜬다 — 두 갈래 절부터 페이지 끝까지 따라온다. */
+.home .land-below { position: relative; }
 .home .land-made-head { padding-top: clamp(56px, 8vw, 104px); }
 .home .land-final { padding-block: clamp(56px, 8vw, 104px); text-align: center; }
 .home .land-final .land-wrap { display: flex; flex-direction: column; align-items: center; }

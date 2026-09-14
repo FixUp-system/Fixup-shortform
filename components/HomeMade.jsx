@@ -5,6 +5,8 @@
 //   (app/home/page.js 머리말 ③). 그래서 이 부품은 이제 **벽 하나만** 그린다 —
 //   껍데기(브랜드·신원·주 버튼)도 화면이 직접 그리므로 `nav` prop 도 없어졌다.
 //   ★ 도해의 결과 자리에 걸린 한 편은 여기서 뺀다 — 고르는 자리는 lib/landing.js 다.
+//   ★ 2026-09-14 — [맨 위로] 버튼도 **화면 쪽으로 옮겼다.** 벽 안에 있으면 벽을 지나는
+//     순간 같이 사라져서, 페이지 맨 아래(마무리 절)에서는 보이지 않았다(사장님 지적).
 //
 // ★★★ **클라이언트 부품이 아니다.** 2026-09-10 에 서버로 내렸다(사장님 지시: "파일 자체를
 //   올린다던가 하는 방식으로 해결할 수 없을까?"). 그전에는 이랬다:
@@ -70,15 +72,6 @@ export default function HomeMade() {
           </svg>
         </Link>
       </div>
-      {/* ★★ 맨 위로 (2026-09-10 사장님 지시). **자바스크립트를 안 쓴다** — 이 화면은
-          서버가 통째로 그려 내려주는 자리라(첫 방문 7.5초 → 1.6초), 스크롤을 감지하려고
-          "use client" 를 들이면 그 최적화가 깨진다. 자리는 CSS 의 sticky 가 잡는다:
-          벽 안에서만 떠 있어 히어로에서는 안 보인다(app/globals.css 의 .stage-top). */}
-      <a href="#top" className="stage-top" aria-label="맨 위로">
-        <svg width="16" height="10" viewBox="0 0 16 10" fill="none" aria-hidden="true">
-          <path d="M1 9l7-7 7 7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </a>
     </div>
   );
 }

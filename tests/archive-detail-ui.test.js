@@ -27,8 +27,24 @@ describe("보관함 상세 — 세부는 접었다 편다", () => {
   });
 
   it("★ 설정(모델·길이·화질)은 접지 않는다 — 늘 보이는 요약이다", () => {
-    const first = src.indexOf("<details");
-    expect(src.slice(0, first), "설정이 접히는 자리 안으로 들어갔다").toMatch(/모델/);
+    // ★★ 2026-09-14 — 이 판은 원래 **소스 순서**로 쟀다("첫 <details 앞에 '모델' 이 있는가").
+    //   파일 위쪽에 접는 부품을 하나 더 만든 날(사용자 입력을 여섯 줄에서 자르는 부품)
+    //   뜻과 아무 상관없이 빨개졌다 — 칩은 그대로 펼쳐져 있는데도.
+    //   그래서 지금은 **칩이 접힌 자리 안에 있는가**를 직접 센다: 칩 앞에서 열린 <details>
+    //   가 전부 닫혀 있으면 칩은 접힌 자리 밖이다.
+    // ★ 주석을 걷고 센다 — 설명에 적힌 `<details>` 한 낱말이 열린 것으로 세어져
+    //   이 판을 한 번 거짓으로 빨갛게 만들었다(같은 날 두 번째다).
+    const code = src
+      .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, "")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "");
+    const at = code.indexOf('className="spec-chips"');
+    expect(at, "설정 칩이 없다").toBeGreaterThan(-1);
+    const before = code.slice(0, at);
+    const opened = (before.match(/<details/g) || []).length;
+    const closed = (before.match(/<\/details>/g) || []).length;
+    expect(opened - closed, "설정 칩이 접히는 자리 안으로 들어갔다").toBe(0);
+    expect(code.slice(at, at + 600), "칩에 모델이 없다").toMatch(/모델/);
   });
 });
 

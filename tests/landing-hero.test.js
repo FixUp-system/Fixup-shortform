@@ -25,6 +25,10 @@ const rule = (sel) => {
   const i = css.indexOf(sel + " {");
   return i < 0 ? "" : css.slice(i, css.indexOf("}", i));
 };
+// ★★ 2026-09-14 — 규칙 안의 **주석을 걷은** 판. CSS 규칙에도 설명을 적는데, 그것을 코드로
+//   세면 "설명에 적힌 옛 계산식"이 단정을 통과시킨다. 실제로 이 파일에서 한 번 겪었다:
+//   `50vw` 를 걷어낸 커밋에서 판이 초록이었고, 통과시킨 것은 **그 사실을 적은 주석**이었다.
+const ruleCode = (sel) => rule(sel).replace(/\/\*[\s\S]*?\*\//g, "");
 
 describe("랜딩 — 화면을 채우던 덮개는 걷었다 (2026-09-14)", () => {
   it("★★★ 덮개를 그리는 코드가 **없다**", () => {
@@ -109,9 +113,22 @@ describe("랜딩 — 두 갈래 절 (2026-09-14 사장님 지시)", () => {
 
 describe("랜딩 — 맨 위로 돌아가는 버튼", () => {
   it("★★★ 버튼이 있고 **맨 위를 가리킨다**", () => {
-    expect(jsx, "맨 위로 버튼이 없다").toMatch(/stage-top/);
-    expect(jsx, '맨 위 자리(#top)를 안 가리킨다').toMatch(/href="#top"/);
+    // ★ 2026-09-14 — 버튼이 **벽 부품에서 화면으로** 옮겨 왔다. 벽 안에 있으면 벽을
+    //   지나는 순간 같이 사라져 페이지 맨 아래에서는 안 보였다(사장님 지적).
+    expect(page, "맨 위로 버튼이 없다").toMatch(/stage-top/);
+    expect(page, '맨 위 자리(#top)를 안 가리킨다').toMatch(/href="#top"/);
     expect(page, '가리킬 자리(id="top")가 없다').toMatch(/id="top"/);
+    expect(jsxCode, "벽 부품에 아직 남아 있다 — 두 벌이 된다").not.toMatch(/stage-top/);
+  });
+
+  it("★★★ 아래 절들을 감싼 묶음 **안에서** 뜬다 — 히어로에서는 안 보인다", () => {
+    // sticky 는 부모 상자 안에서만 붙어 있는다. 그래서 "어디까지 따라오는가"는
+    // 이 묶음이 어디서 시작해 어디서 끝나는가와 같은 말이다.
+    expect(pageCode, "아래 절 묶음이 없다").toMatch(/className="land-below"/);
+    const below = pageCode.indexOf('className="land-below"');
+    expect(pageCode.indexOf('className="land-diagram"'), "도해가 묶음 안에 들어갔다 — 맨 위에서도 뜬다")
+      .toBeLessThan(below);
+    expect(pageCode.indexOf('className="stage-top"'), "버튼이 묶음 밖에 있다").toBeGreaterThan(below);
   });
 
   it("★★★ **자바스크립트를 안 쓴다** — 이 화면은 09-10 에 클라이언트 부품을 0으로 만들었다", () => {
@@ -123,15 +140,16 @@ describe("랜딩 — 맨 위로 돌아가는 버튼", () => {
     }
   });
 
-  it("★★ **오른쪽**에 서고, 벽을 볼 때만 보인다", () => {
-    const top = rule(".home .stage-top");
+  it("★★ **화면 오른쪽 끝**에 선다", () => {
+    const top = ruleCode(".home .stage-top");
     expect(top, ".home .stage-top 규칙이 없다").toBeTruthy();
-    // sticky 라 벽(.stage-band) 안에서만 떠 있다 — 위쪽 절들에서는 안 보인다(JS 없이).
-    expect(top, "sticky 가 아니다 — 도해에서도 떠 있게 된다").toMatch(/position:\s*sticky/);
+    // sticky 라 자기를 감싼 묶음 안에서만 떠 있다 — 히어로·도해에서는 안 보인다(JS 없이).
+    expect(top, "sticky 가 아니다 — 맨 위에서도 떠 있게 된다").toMatch(/position:\s*sticky/);
     expect(top, "오른쪽으로 안 붙는다").toMatch(/margin-left:\s*auto/);
-    // ★ 벽은 기둥(max-width 1400px)이라, 그냥 두면 넓은 모니터에서 **글 칸의 오른쪽**에
-    //   선다. 화면 끝까지 빼내야 한다(사장님 지시 "우측 끝").
-    expect(top, "화면 끝까지 안 나간다 — 넓은 모니터에서 안쪽에 선다").toMatch(/50vw/);
+    // ★ 2026-09-14 — 버튼이 벽(기둥 1400px) 밖으로 나와 **화면 폭을 쓰는 묶음**
+    //   (.land-below) 안에 있다. 기둥 밖으로 밀어내던 `50% - 50vw` 를 그대로 두면
+    //   이번에는 화면 **밖으로** 나간다.
+    expect(top, "기둥 시절 계산이 남았다 — 지금 부모는 화면 폭이다").not.toMatch(/50vw/);
   });
 });
 
