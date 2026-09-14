@@ -23,6 +23,17 @@ describe("승인 대기·마이페이지가 입력칸을 쓴다", () => {
     const src = strip(read("app/pending/page.js"));
     expect(src).toMatch(/<CreditCodeForm[^>]*pending/);
   });
+  // ★ 2026-09-14 사장님 지시: "사용자는 마이페이지에서 크레딧 정보를 보고 크레딧을 등록할 수 있어야 한다".
+  //   그 전에는 크레딧을 걷지 않는 동안(gated:false — 전역 스위치·내부 계정) 크레딧 절을 **통째로** 숨겨서,
+  //   와디즈 서포터가 받은 코드를 넣을 자리가 승인 대기 화면 말고는 없었다.
+  //   이제 절은 늘 있고, 걷지 않는 동안에는 그 사실을 한 줄로 말한다(상단바 잔액은 그대로 gated 뒤다).
+  it("/me — 크레딧 절은 gated 로 통째로 숨지 않고, 걷지 않는 동안에는 그렇다고 말한다", () => {
+    const src = strip(read("app/me/page.js"));
+    expect(src).not.toMatch(/me\?\.gated\s*!==\s*false\s*&&\s*\(/);
+    expect(src).toMatch(/me\?\.gated\s*===\s*false\s*&&/);
+    expect(src).toMatch(/크레딧이 차감되지 않아요/);
+  });
+
   it("/me — 크레딧 내역 절 안에서, 등록 뒤 잔액·내역을 다시 읽는다", () => {
     const src = strip(read("app/me/page.js"));
     const at = src.indexOf("<CreditCodeForm");

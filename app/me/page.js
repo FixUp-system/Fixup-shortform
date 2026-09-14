@@ -247,13 +247,17 @@ export default function MePage() {
         {pwMsg && <p className="pgsub">{pwMsg}</p>}
       </section>
 
-      {/* ★ 크레딧을 끈 동안(내부 QA)에는 이 묶음을 통째로 안 그린다 — 안 쓰는 값을
-          계속 말하면 혼란만 준다. 기록은 DB 에 그대로 쌓인다(사용자 결정): 나중에
-          얼마 썼는지 운영자 화면(/admin·/costs)에서 볼 수 있다. */}
-      {me?.gated !== false && (
+      {/* ★★ 2026-09-14 — **늘 그린다**(사장님 지시: "사용자는 마이페이지에서 크레딧 정보를 보고 등록할 수
+          있어야 한다"). 그 전에는 크레딧을 걷지 않는 동안(gated:false — 전역 스위치·내부 계정) 이 묶음을
+          통째로 숨겨서, 와디즈 서포터가 받은 코드를 넣을 자리가 없었다.
+          ★ 걷지 않는 동안에는 그 사실을 한 줄로 말한다 — 잔액만 보이면 "쓰면 줄어드는 줄" 안다.
+          상단바 잔액은 여전히 gated 뒤다(components/UserMenu.jsx). */}
       <section className="panel me-panel">
         <h2 className="me-h">크레딧 내역</h2>
         <p className="pgsub">지금 {me ? <b>{formatCredits(me.balance)}</b> : "…"} 크레딧이 남았어요.</p>
+        {me?.gated === false && (
+          <p className="pgsub">지금은 영상을 만들어도 크레딧이 차감되지 않아요.</p>
+        )}
         {/* 크레딧 코드(와디즈 리워드) — 등록 뒤 상단바 잔액과 내역을 함께 다시 읽는다 */}
         <CreditCodeForm onRedeemed={() => { load(); loadLedger(); }} />
         {ledgerErr && <p className="pgsub warn">{ledgerErr}</p>}
@@ -293,7 +297,6 @@ export default function MePage() {
           </button>
         )}
       </section>
-      )}
 
 
     </>
