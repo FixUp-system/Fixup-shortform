@@ -885,13 +885,25 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
 a.side-item { text-decoration: none; }
 
 /* ── 비용 기록 */
-.cost-summary { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
-.cost-tile {
+/* 요약 — **카드 하나** 안에 칸을 나란히 둔다(2026-09-14 사장님 지시: "여백 두지 말고 한 컴포넌트 안에 담아
+   길이를 맞춰"). 예전에는 타일마다 따로 뜬 카드라 줄 끝에 빈 자리가 남고 위 좁히기 카드와 폭이 안 맞았다.
+   칸은 남은 폭을 **똑같이 나눠** 카드 끝까지 채우고, 칸 사이는 가는 선으로 가른다.
+   비용 기록·크레딧 코드 현황·사용자 관리가 이 한 벌을 쓴다. */
+.cost-summary {
+  display: flex;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
   background: var(--surface);
   border-radius: var(--r-card);
-  padding: 14px 20px;
-  min-width: 110px;
+  box-shadow: var(--ring);
+  overflow: hidden;
 }
+.cost-tile {
+  flex: 1 1 140px;
+  min-width: 0;
+  padding: 14px 20px;
+}
+.cost-tile + .cost-tile { border-left: 1px solid var(--line); }
 .cost-tile small { color: var(--ink-soft); font-size: 12px; display: block; }
 .cost-tile b {
   font-size: 30px;
@@ -900,12 +912,9 @@ a.side-item { text-decoration: none; }
   font-variant-numeric: tabular-nums;
 }
 
-/* 흐름별 합계 줄 — 광고와 영상 만들기를 갈라 본다(2026-08-27). 위 줄(오늘·범위·횟수)과
-   같은 타일을 쓰되 조금 작게 둔다: 위가 "얼마 썼나", 아래가 "무엇에 썼나"다. */
-.cost-summary--flow { margin-top: -8px; }
-.cost-summary--flow .cost-tile { padding: 10px 16px; min-width: 96px; }
-.cost-summary--flow .cost-tile b { font-size: 18px; display: block; }
-/* ★ 건수는 **아랫줄**이다(2026-08-27 사장님 지적: "$6.08 38건 이런식으로 붙어 있어").
+/* 흐름별 합계(광고·영상 만들기를 갈라 본다, 2026-08-27)는 2026-09-14 부터 **같은 줄의 같은 칸**이다 —
+   둘째 줄로 내리면 첫 줄 끝에 빈 자리가 남았다.
+   ★ 건수는 **아랫줄**이다(2026-08-27 사장님 지적: "$6.08 38건 이런식으로 붙어 있어").
    금액 옆에 붙이면 "6.0838" 처럼 한 수로 읽힌다. */
 .cost-tile-sub { color: var(--ink-soft); font-size: 12px; display: block; margin-top: 2px; }
 
@@ -943,6 +952,32 @@ a.side-item { text-decoration: none; }
   border-radius: var(--r-ctl);
   color: var(--ink);
   font-family: inherit;
+}
+/* 드롭다운 — 브라우저 기본 화살표를 끄고 감싼 칸의 삼각형으로 그린다(자막 조절판 .sub-select 와 같은 방식).
+   2026-09-14 사장님 지적: 크레딧 코드의 묶음 드롭다운이 기본 모양이라 옆 칸들과 따로 놀았다. */
+.cost-select { position: relative; display: inline-block; }
+.cost-select select.field {
+  appearance: none;
+  -webkit-appearance: none;
+  min-width: 180px;
+  padding-right: 34px;
+  cursor: pointer;
+}
+.cost-select select.field:hover { border-color: var(--ink-soft); }
+.cost-select select.field:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.cost-select option { background: var(--surface); color: var(--ink); }
+.cost-select::after {
+  content: "";
+  position: absolute;
+  right: 13px;
+  top: 50%;
+  width: 0;
+  height: 0;
+  margin-top: -2px;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid var(--ink-soft);
+  pointer-events: none;
 }
 /* 여러 줄 칸 — 한 줄을 통째로 쓴다(크레딧 코드의 붙여 넣기 칸).
    ★ `.field` 를 달지 않는다 — textarea.field 는 **자라는 칸(AutoTextarea) 전용**이라 안에서 스크롤하지

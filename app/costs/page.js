@@ -182,21 +182,16 @@ export default function CostsPage() {
               <small>생성 횟수</small>
               <b>{records ? shown.length : "–"}회</b>
             </div>
+            {/* ★★ 흐름별 합계 — "둘을 구분해서 한 페이지에서"의 값이다. 안 쓴 흐름은 칸을 안 만든다(sumByFlow).
+                ★ 2026-09-14 — 둘째 줄에서 **같은 줄**로 올렸다(사장님: "두 줄이라 생성 횟수 옆 여백이 많다"). */}
+            {byFlow.length > 1 && byFlow.map((f) => (
+              <div className="cost-tile" key={f.flow}>
+                <small>{f.label}</small>
+                <b>${f.usd.toFixed(2)}</b>
+                <span className="cost-tile-sub">{f.count}건</span>
+              </div>
+            ))}
           </div>
-
-          {/* ★★ 흐름별 합계 — "둘을 구분해서 한 페이지에서"의 값이다.
-              안 쓴 흐름은 칸을 안 만든다(sumByFlow). */}
-          {byFlow.length > 1 && (
-            <div className="cost-summary cost-summary--flow">
-              {byFlow.map((f) => (
-                <div className="cost-tile" key={f.flow}>
-                  <small>{f.label}</small>
-                  <b>${f.usd.toFixed(2)}</b>
-                  <span className="cost-tile-sub">{f.count}건</span>
-                </div>
-              ))}
-            </div>
-          )}
         </>
       )}
 

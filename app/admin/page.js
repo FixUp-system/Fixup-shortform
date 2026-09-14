@@ -9,6 +9,8 @@ import { PASSWORD_MIN } from "../../lib/password";
 import { TIERS, tierOf } from "../../lib/tiers";
 // 표시명 규칙 한 벌 — /me·원장과 같은 값을 써야 한다(이름이 없으면 이메일 앞부분).
 import { displayNameOf } from "../../lib/display-name";
+// 날짜 칸 판정 한 벌 — 비용 기록과 같은 규칙(지역 시각 자정 · 종료일 포함)
+import { inDayRange } from "../../lib/costs-filter";
 import { useDialog } from "../../components/DialogProvider";
 import { useMe } from "../../components/MeContext";
 
@@ -43,6 +45,9 @@ export default function AdminPage() {
   const [query, setQuery] = useState("");
   // 상태로 좁히기 — "" = 전체. ★ statusFilter 인 이유: 승인·차단을 쓰는 setStatus(id, status) 가 이미 있다.
   const [statusFilter, setStatusFilter] = useState("");
+  // 가입일 기간 — "YYYY-MM-DD", 빈 값은 조건 없음(2026-09-14 사장님 요청).
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [openId, setOpenId] = useState(null);
   const [ledger, setLedger] = useState(null);   // null = 불러오는 중
 
@@ -276,6 +281,7 @@ export default function AdminPage() {
   const found = (users || []).filter(
     (u) =>
       (!statusFilter || u.status === statusFilter) &&
+      inDayRange(u.created_at, from, to) &&
       (!q ||
         displayNameOf(u).toLowerCase().includes(q) ||
         u.email?.toLowerCase().includes(q) ||
@@ -303,6 +309,15 @@ export default function AdminPage() {
         <>
           <div className="panel cost-filters">
             <label>
+              <small>시작일</small>
+              <input className="field" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+            </label>
+            <label>
+              <small>종료일</small>
+              {/* ★ 그 날을 **포함한다**(가입일 기준) — 자정으로 자르면 고른 하루가 통째로 빠진다. */}
+              <input className="field" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+            </label>
+            <label>
               <small>찾기</small>
               <input
                 className="field cost-filter-q"
@@ -328,8 +343,8 @@ export default function AdminPage() {
                 ))}
               </span>
             </label>
-            {(query || statusFilter) && (
-              <button type="button" className="mini" onClick={() => { setQuery(""); setStatusFilter(""); }}>
+            {(query || statusFilter || from || to) && (
+              <button type="button" className="mini" onClick={() => { setQuery(""); setStatusFilter(""); setFrom(""); setTo(""); }}>
                 조건 지우기
               </button>
             )}
@@ -361,7 +376,7 @@ export default function AdminPage() {
       {users === null ? (
         <p className="pgsub">불러오는 중…</p>
       ) : found.length === 0 ? (
-        <p className="pgsub">{query || statusFilter ? "찾는 사용자가 없어요." : "사용자가 없어요."}</p>
+        <p className="pgsub">{query || statusFilter || from || to ? "찾는 사용자가 없어요." : "사용자가 없어요."}</p>
       ) : (
         <div className="cost-table-wrap">
           <table className="cost-table">

@@ -25,6 +25,14 @@ describe("비용 기록 — 좁히기 줄", () => {
     expect(css).toMatch(/\.cost-filters input\.field,\s*\.cost-filters select\.field \{[^}]*height:\s*var\(--ctl-sm\)/);
   });
 
+  // 2026-09-14 사장님 지시: "두 줄로 비용이 나오고 생성 횟수 옆 여백이 많으니 한 줄로".
+  it("요약 타일은 한 줄이다 — 흐름별 합계를 따로 된 둘째 줄로 내리지 않는다", () => {
+    expect(page.match(/className="cost-summary/g)).toHaveLength(1);
+    expect(page).not.toMatch(/cost-summary--flow/);
+    expect(css).not.toMatch(/cost-summary--flow/);
+    expect(page).toMatch(/byFlow\.map/);
+  });
+
   it("좁히기 줄이 카드 안에 있다 — 아래 요약 타일과 영역이 갈린다", () => {
     expect(page).toMatch(/className="panel cost-filters"/);
   });

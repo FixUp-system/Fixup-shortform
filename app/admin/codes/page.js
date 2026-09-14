@@ -218,16 +218,20 @@ export default function CreditCodesPage() {
           <>
             <label>
               <small>리워드 열</small>
-              <select className="field" value={col} onChange={(e) => setRewardCol(e.target.value)}>
-                <option value={ALL}>없음 — 모두 같은 크레딧</option>
-                {parsed.headers.map((h) => <option key={h} value={h}>{h}</option>)}
-              </select>
+              <span className="cost-select">
+                <select className="field" value={col} onChange={(e) => setRewardCol(e.target.value)}>
+                  <option value={ALL}>없음 — 모두 같은 크레딧</option>
+                  {parsed.headers.map((h) => <option key={h} value={h}>{h}</option>)}
+                </select>
+              </span>
             </label>
             <label>
               <small>보관할 식별 열</small>
-              <select className="field" value={keepCol} onChange={(e) => setKeepPick(e.target.value)}>
-                {parsed.headers.map((h) => <option key={h} value={h}>{h}</option>)}
-              </select>
+              <span className="cost-select">
+                <select className="field" value={keepCol} onChange={(e) => setKeepPick(e.target.value)}>
+                  {parsed.headers.map((h) => <option key={h} value={h}>{h}</option>)}
+                </select>
+              </span>
             </label>
           </>
         )}
@@ -291,10 +295,12 @@ export default function CreditCodesPage() {
           <div className="panel cost-filters">
             <label>
               <small>묶음</small>
-              <select className="field" value={shown} onChange={(e) => setShown(e.target.value)}>
-                <option value={ALL}>전체 묶음</option>
-                {batches.map((b) => <option key={b} value={b}>{b}</option>)}
-              </select>
+              <span className="cost-select">
+                <select className="field" value={shown} onChange={(e) => setShown(e.target.value)}>
+                  <option value={ALL}>전체 묶음</option>
+                  {batches.map((b) => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </span>
             </label>
             <button
               className="mini"
