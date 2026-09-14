@@ -33,6 +33,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 // 프로젝트 공유본 — 루트가 들고 사이드바가 읽는다. 여기서는 **놓는다**(아래 useEffect).
 import { useReelProject } from "../../../components/ReelProjectContext";
+import { ReelStepPreview } from "../../../components/reel/StepStack";
 import AutoTextarea from "../../../components/AutoTextarea";
 // 주소는 단계 표 한 벌이 만든다 — 화면이 `/reel/<id>/scenario` 를 손으로 적으면 두 벌이 된다.
 import { REEL_STEPS, reelStepHref } from "../../../lib/reel/steps";
@@ -212,6 +213,12 @@ export default function ReelNewPage() {
 
   return (
     <>
+      {/* ★★★ 2026-09-15 — 앞으로 걸을 여섯 줄을 **여기서도** 보여 준다. 이 화면은
+          app/reel/[id]/layout.js 의 **형제**라 걸음 띠가 안 붙는다 — 2026-09-14 에
+          사이드바의 단계 목록을 걷으면서 이 화면의 단계가 통째로 사라졌고, 옆의
+          /ads/new 는 여전히 ①~④를 보여 줘 대비가 선명했다(사장님이 프로덕션에서 발견).
+          ★ 눌리지 않는다 — 아직 영상이 없다. 시작하면 그때부터 띠가 눌리는 띠가 된다. */}
+      <ReelStepPreview />
       {/* ★ 2026-08-25 사장님 지시 — "컷마다 말하는 영상"은 **안쪽 사정**(클립이 직접
           말한다는 구현 방식)을 제목으로 쓴 것이었다. 사이드바 메뉴 이름과 맞춘다. */}
       <h1 className="pgtitle">단계별 영상 만들기</h1>

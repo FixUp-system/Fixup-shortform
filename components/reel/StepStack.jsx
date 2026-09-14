@@ -55,6 +55,47 @@ export function stepSummary(key, project) {
   return "";
 }
 
+// 알약의 **이름 조각** — 번호와 라벨. 띠와 미리보기가 **나눠 쓴다.**
+// ★ 두 출구가 각자 그리면 모양이 두 벌이 되고, 언젠가 한쪽만 고쳐진다.
+// ★ 요약(rs-sum)은 여기 없다 — 미리보기에는 셀 것이 없고(아직 영상이 없다),
+//   띠에서만 조건이 붙기 때문이다. 조건을 여기로 들이면 미리보기가 그 조건을
+//   알아야 해서 "아직 시작 안 했다"가 다시 판정으로 새어 든다.
+function Pill({ step }) {
+  return (
+    <>
+      <span className="rs-no">{step.no}</span>
+      <span className="rs-lab">{step.label}</span>
+    </>
+  );
+}
+
+// 미리보기 — **아직 영상이 없는 화면**(`/reel/new`)이 쓰는 출구.
+//
+// ★★★ 2026-09-15 — `/reel/new` 는 `app/reel/[id]/layout.js` 의 **형제**라 띠가 애초에
+//   안 붙는다. 2026-09-14 에 사이드바의 단계 목록을 걷으면서 그 화면의 단계가 통째로
+//   사라졌고(사장님이 프로덕션에서 발견), `/ads/new` 는 여전히 ①~④를 보여 줘 대비가
+//   선명했다. 사이드바로 되돌리지 않는다(Ruling 20) — 단계는 띠가 말한다.
+//
+// ★★★ **"아직 시작 안 했다"를 판정으로 유도하지 않는다.** 앞 세션이 브라우저로 재서
+//   적어 둔 함정 셋이 전부 그 유도에서 나왔다:
+//   ⓐ `isReelStepReachable("scenario", null)` 이 **true** 라 ②가 안 잠긴다
+//   ⓑ `reelStepHref(step, undefined)` 가 `/reel/undefined/…` 라는 깨진 링크를 그린다
+//   ⓒ `reelStepFromPathname("/reel/new")` 가 undefined 로 떨어져 `currentReelStepKey(null)`
+//      이 **"scenario"** 를 주므로 ①이 아니라 **②**가 도드라진다
+//   그래서 이 출구는 그 셋을 **하나도 부르지 않는다.** 첫 줄이 지금이고 나머지는 잠김 —
+//   그것이 이 화면의 사실이지 계산할 것이 아니다.
+export function ReelStepPreview() {
+  return (
+    <div className="rs-strip">
+      {REEL_STEPS.map((step, i) => (
+        <span key={step.key} className={`rs-step${i === 0 ? " is-now" : " is-todo"}`}>
+          <Pill step={step} />
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export default function StepStack({ children }) {
   const pathname = usePathname();
   const { project } = useReelProject();
@@ -74,8 +115,7 @@ export default function StepStack({ children }) {
           const reachable = isReelStepReachable(step.key, project);
           const head = (
             <>
-              <span className="rs-no">{step.no}</span>
-              <span className="rs-lab">{step.label}</span>
+              <Pill step={step} />
               {/* ★★ 요약은 **갈 수 있는 단계**에만 붙인다. 아직 못 여는 줄에 「컷 0/3」이
                   서면 "아직 못 연다"가 "0개 만들었다"로 읽혀, 진행이 멎은 것처럼 보인다.
                   ★ 지금 단계에도 안 붙인다 — 그 단계 화면이 바로 아래에서 같은 것을
