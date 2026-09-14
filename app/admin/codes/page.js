@@ -52,6 +52,10 @@ export default function CreditCodesPage() {
   const [batch, setBatch] = useState("");
   const [pasted, setPasted] = useState("");
   const [rewardCol, setRewardCol] = useState(ALL);
+  // ★ DB 에 남길 식별 열(발송번호 등). 와디즈 명단의 이름·연락처·배송지는 **저장하지 않는다** —
+  //   서포터 정보는 리워드 발송 목적으로만 쓴다(09-14 와디즈 답변). 전체 행 CSV 는 방금 붙여 넣은
+  //   원본으로 이 브라우저에서만 만든다.
+  const [keepPick, setKeepPick] = useState(null);
   const [amounts, setAmounts] = useState({});
   const [made, setMade] = useState(null);     // 방금 만든 { batch, codes }
   const [codes, setCodes] = useState(null);   // 전체 목록, null = 불러오는 중
@@ -62,6 +66,10 @@ export default function CreditCodesPage() {
   const parsed = useMemo(() => parsePasted(pasted), [pasted]);
   // 붙여 넣은 표가 바뀌어 고른 열이 사라지면 "전부 같은 크레딧"으로 되돌린다.
   const col = parsed.headers.includes(rewardCol) ? rewardCol : ALL;
+  // 안 골랐으면 "발송번호"가 든 머리글, 없으면 첫 열.
+  const keepCol = parsed.headers.includes(keepPick)
+    ? keepPick
+    : parsed.headers.find((h) => h.includes("발송번호")) ?? parsed.headers[0] ?? ALL;
   const rewardValues = useMemo(
     () => (col === ALL ? [ALL] : [...new Set(parsed.rows.map((r) => r[col]))]),
     [parsed, col]
@@ -88,7 +96,11 @@ export default function CreditCodesPage() {
     if (missing.length) {
       return setErr(col === ALL ? "크레딧을 양의 정수로 적어 주세요" : `크레딧을 안 적은 리워드: ${missing.map((v) => v || "(빈칸)").join(", ")}`);
     }
-    const rows = parsed.rows.map((r) => ({ credits: toCredits(amounts[col === ALL ? ALL : r[col]]), meta: r }));
+    const rows = parsed.rows.map((r) => {
+      const meta = { [keepCol]: r[keepCol] };
+      if (col !== ALL) meta[col] = r[col];
+      return { credits: toCredits(amounts[col === ALL ? ALL : r[col]]), meta };
+    });
     const total = rows.reduce((s, r) => s + r.credits, 0);
     const ok = await confirm({
       title: `코드 ${rows.length.toLocaleString()}개를 만들까요?`,
@@ -105,7 +117,11 @@ export default function CreditCodesPage() {
       });
       const body = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(body.error || "코드를 만들지 못했어요");
-      setMade({ batch: batch.trim(), codes: body.codes });
+      // 라우트는 보낸 순서 그대로 코드를 돌려준다 — 전체 행과 i 로 짝짓는다(이 화면의 메모리에만 있다).
+      setMade({
+        batch: batch.trim(),
+        codes: body.codes.map((c, i) => ({ ...c, meta: parsed.rows[i] })),
+      });
       setPasted("");
       await load();
     } catch (e) {
@@ -204,7 +220,20 @@ export default function CreditCodesPage() {
                   <option key={h} value={h}>리워드 열: {h}</option>
                 ))}
               </select>
+              <select
+                className="dlg-input tier-pick"
+                value={keepCol}
+                onChange={(e) => setKeepPick(e.target.value)}
+                aria-label="보관할 식별 열"
+              >
+                {parsed.headers.map((h) => (
+                  <option key={h} value={h}>보관할 식별 열: {h}</option>
+                ))}
+              </select>
             </div>
+            <p className="pgsub">
+              DB 에는 식별 열과 리워드 열만 남아요. 이름·연락처 같은 나머지 열은 아래 [CSV 내려받기] 파일에만 들어가요.
+            </p>
             {rewardValues.map((v) => (
               <label className="me-row" key={`amt-${v}`}>
                 <span className="pgsub">
@@ -228,7 +257,10 @@ export default function CreditCodesPage() {
         </div>
         {made && (
           <div className="me-row">
-            <p className="pgsub">「{made.batch}」 코드 {made.codes.length.toLocaleString()}개를 만들었어요.</p>
+            <p className="pgsub">
+              「{made.batch}」 코드 {made.codes.length.toLocaleString()}개를 만들었어요.
+              메일 머지용 전체 열 CSV 는 <b>지금만</b> 받을 수 있어요 — 화면을 떠나기 전에 내려받으세요.
+            </p>
             <button className="mini" onClick={() => download(made.batch, codesCsv(made.codes))}>
               CSV 내려받기
             </button>

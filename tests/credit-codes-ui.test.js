@@ -48,6 +48,12 @@ describe("운영자 화면(/admin/codes)", () => {
     expect(src).toMatch(/toCsv\(/);
     expect(src).toMatch(/formatCode\(/);
   });
+  // ★ 개인정보 — 와디즈 명단에는 이름·연락처·배송지가 있다. DB 에는 식별 열과 리워드만 남기고,
+  //   메일 머지용 전체 행 CSV 는 붙여 넣은 원본으로 브라우저에서만 만든다(서버로 안 보낸다).
+  it("서버에 붙여 넣은 행을 통째로 보내지 않는다", () => {
+    expect(src).not.toMatch(/meta:\s*r\s*[,}]/);
+    expect(src).toMatch(/keepCol/);
+  });
   it("지우기는 확인을 받는다", () => {
     expect(src).toMatch(/await confirm\(/);
   });

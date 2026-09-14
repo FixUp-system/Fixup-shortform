@@ -44,7 +44,7 @@
 | `code text primary key` | 12자 · 헷갈리는 글자(0 O 1 I L) 뺀 31자 알파벳 · 보일 때 `XXXX-XXXX-XXXX` |
 | `amount_credits integer not null check (> 0)` | |
 | `batch text not null` | 한 번 붙여 넣은 묶음 이름(예: "와디즈 1차 09-30") |
-| `meta jsonb not null default '{}'` | 붙여 넣은 원래 행 — 나중에도 CSV 를 다시 뽑는다 |
+| `meta jsonb not null default '{}'` | **식별 열(발송번호 등) + 리워드 열만.** ★ 구현 중 정정: 처음엔 붙여 넣은 행 전체였는데 이름·연락처·배송지를 우리 DB 에 쌓게 된다(와디즈: 발송 목적 외 보관 금지). 전체 열 CSV 는 만든 직후 **브라우저에서만** 받는다 |
 | `created_by uuid not null` · `created_at` | |
 | `redeemed_by uuid null references auth.users` · `redeemed_at` | 한 번만 — 조건부 갱신이 지킨다 |
 

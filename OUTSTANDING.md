@@ -1,5 +1,26 @@
 # 이어서 할 일 — `feat/credit-unit` (2026-09-14 기준 · **스무째 갱신**)
 
+> 🎟 **`feat/credit-codes` — 크레딧 코드(와디즈 리워드 전달)** · 09-14 저녁 · 워크트리 `C:\Users\fixup\shotform-saas\.claude\worktrees\credit-codes`
+> `feat/credit-unit` 에서 **따로 뺐다**(사장님: 거기서 프론트 작업 중). 이 배너는 이 브랜치에만 있다.
+>
+> | | |
+> |---|---|
+> | 브랜치 · 거리 | `feat/credit-unit` 대비 **0 뒤 / 6 앞**(이 문서 커밋 포함) · 원격 없음(푸시 안 함) |
+> | 테스트 | `npx vitest run` **6,238 통과 · 0 실패 · 10 skipped** · `npx next build` 성공(`/admin/codes` 포함) |
+> | 설계 · 계획 | `docs/superpowers/specs/2026-09-14-credit-codes-design.md` · `docs/superpowers/plans/2026-09-14-credit-codes.md` |
+> | node_modules | `credit-unit` 의 것을 **정션**으로 물었다 — 그 폴더를 지우면 여기도 죽는다 |
+>
+> **무엇**: `/admin/codes`(엑셀 표 붙여 넣기 → 리워드별 크레딧 → 행마다 고유 12자 코드 → CSV 머지용 내려받기 · 목록 · 안 쓴 코드 지우기 · 코드 넣은 승인 대기 계정 [승인]) ·
+> `/pending`·`/me` 코드 등록칸 · `POST /api/credits/redeem`(승인 대기 허용 — `withUser({pending:true})`, 차단 403) · 새 표 `credit_codes` + SQL 함수 `redeem_credit_code`(코드 잡기+충전 한 트랜잭션).
+> 사장님 결정: 자동 승인 X · 유효기간 X · 메일은 머지(우리가 안 보냄) · 승인 대기 중 등록 O · 리워드 구성 미정(그래서 크레딧 양은 행마다 자유).
+>
+> 🔴 **배포 전**: `db/schema.sql` 을 라이브에 **통째로** 올린다(새 표·새 함수). 안 올리면 코드 화면·등록만 500, 나머지는 산다.
+> ⚠️ **합칠 때 충돌 후보**: `app/me/page.js`(입력칸 2줄+import) · `components/Sidebar.jsx`(운영자 링크 한 블록) — `feat/credit-unit` 프론트 작업과 겹칠 수 있다.
+> ★ **구현 중 정정**: 처음 설계는 붙여 넣은 행 전체를 `meta` 로 저장했다 → 이름·연락처·배송지가 우리 DB 에 쌓인다. **식별 열+리워드 열만** 남기고, 전체 열 CSV 는 만든 직후 브라우저에서만 받게 바꿨다(그래서 나중에 "CSV 다시 받기"에는 이메일이 없다 — 발송번호로 와디즈 엑셀과 맞춘다).
+> **알면서 안 한 것**: 시도 횟수 제한(31^12 추측 불가로 판단) · 내역에 "코드 충전" 별도 라벨(지금은 "충전") · 관리자 사용자 목록의 "코드 등록함" 표시(`app/admin/page.js` 충돌 회피 — 같은 정보가 `/admin/codes` 에 있다).
+> **검증 안 된 것**: ① Supabase 쪽 4함수·SQL 함수는 **라이브 DB 에 한 번도 안 돌렸다**(메모리 판 + 소스 판만) — 스키마 올린 뒤 코드 1개 발급→등록→중복 409 로 관통할 것 ·
+> ② 화면을 **브라우저로 안 봤다**(새 표가 라이브에 없어 dev 가 운영 DB 에 붙으면 목록이 500) · ③ 와디즈 실제 엑셀을 붙여 넣어 본 적 없다(열 이름·따옴표 칸 모양 미확인).
+
 > 🧭 **최신 갈래가 바뀌었다 — `feat/credit-unit`** (워크트리 `C:\Users\fixup\shotform-saas\.claude\worktrees\credit-unit`).
 > `feat/reel-cut-r2v`(step-gate)의 09-14 랜딩 커밋까지 **합쳐 넣었다**(`5a72113`) — 이 갈래가 두 줄기를 다 가진다.
 > **다음 세션은 이 폴더에서 연다.** step-gate 에서 열면 크레딧·보관함·화면 정리 작업이 없다.
