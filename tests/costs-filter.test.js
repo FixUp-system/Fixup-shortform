@@ -8,7 +8,7 @@
 //   인프라가 없다. 경계값(그 날 23:59:59 가 들어오는가)은 여기서만 잴 수 있다.
 import { describe, it, expect, beforeEach } from "vitest";
 import {
-  filterRecords, actorOptions, sumCost, sumByFlow, flowOf, flowLabel, FLOWS, inDayRange,
+  filterRecords, actorOptions, sumCost, sumByFlow, flowOf, flowLabel, FLOWS, inDayRange, dayBounds,
 } from "../lib/costs-filter.js";
 import { memoryStore, resetMemoryStore } from "../lib/store/memory.js";
 import { listRecords } from "../lib/costs.js";
@@ -230,5 +230,23 @@ describe("inDayRange — 날짜 한 칸 판정", () => {
   it("시각을 모르면 날짜를 골랐을 때만 뺀다", () => {
     expect(inDayRange(null, "", "")).toBe(true);
     expect(inDayRange(null, "2026-09-14", "")).toBe(false);
+  });
+});
+
+// 크레딧 내역(마이페이지) 날짜 좁히기 — 경계를 **브라우저 시각**으로 ms 로 바꿔 서버에 보낸다.
+// 서버(Vercel)는 UTC 라 "YYYY-MM-DD" 를 서버에서 자르면 한국 오전 기록이 하루 밀린다.
+describe("dayBounds — 날짜 칸 → [start, end] ms", () => {
+  it("빈 값은 null", () => {
+    expect(dayBounds("", "")).toEqual({ start: null, end: null });
+  });
+  it("시작은 그 날 자정, 끝은 그 날 23:59:59.999", () => {
+    const { start, end } = dayBounds("2026-09-14", "2026-09-14");
+    expect(start).toBe(new Date(2026, 8, 14).getTime());
+    expect(end).toBe(new Date(2026, 8, 15).getTime() - 1);
+  });
+  it("inDayRange 와 같은 규칙이다", () => {
+    const { start, end } = dayBounds("2026-09-01", "2026-09-14");
+    const ts = new Date(2026, 8, 14, 23, 0).getTime();
+    expect(ts >= start && ts <= end).toBe(inDayRange(ts, "2026-09-01", "2026-09-14"));
   });
 });

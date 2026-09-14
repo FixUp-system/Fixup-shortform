@@ -45,6 +45,11 @@ describe("크레딧 코드(/admin/codes) — 탭", () => {
     expect((src.match(/<Select\b/g) || []).length).toBeGreaterThanOrEqual(3);
   });
 
+  // 2026-09-14 사장님 지시 — 탭 이름 옆 개수("현황 2")를 뺀다. 개수는 현황 탭의 요약 카드가 말한다.
+  it("탭 이름에 개수를 붙이지 않는다", () => {
+    expect(src).not.toMatch(/현황\{codes/);
+  });
+
   it("[코드 만들기 | 현황] 세그먼트로 갈아 끼운다", () => {
     expect(src).toMatch(/aria-label="보기"/);
     expect(src).toMatch(/aria-pressed=\{tab === "create"\}/);

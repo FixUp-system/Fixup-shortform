@@ -13,6 +13,8 @@ import { ledgerLabel } from "../../lib/ledger";
 import { formatCredits } from "../../lib/pricing";
 import { useMe } from "../../components/MeContext";
 import CreditCodeForm from "../../components/CreditCodeForm";
+// 날짜 칸 → ms 경계 한 벌(비용 기록·사용자 관리와 같은 규칙)
+import { dayBounds } from "../../lib/costs-filter";
 
 // 그 사람의 시계로 본 날짜. Intl 로 돌리면 기기 설정에 따라 "2026. 8. 13." 처럼 나와
 // 열 폭이 흔들린다 — 자리수를 고정한다.
@@ -44,6 +46,10 @@ export default function MePage() {
   const [ledgerBusy, setLedgerBusy] = useState(false);
   // 내역 좁히기 — "" 전체 · "grant" 충전 · "charge" 사용. ★ 서버가 거른다(받은 20줄 안에서 거르면 틀린다).
   const [ledgerSource, setLedgerSource] = useState("");
+  // 날짜 좁히기 — "YYYY-MM-DD"(비면 조건 없음). ★ 경계는 **이 브라우저의 시계**로 ms 로 바꿔 보낸다(dayBounds) —
+  //   서버는 UTC 라 날짜 문자열을 서버에서 자르면 한국 오전 기록이 하루 밀린다.
+  const [ledgerFrom, setLedgerFrom] = useState("");
+  const [ledgerTo, setLedgerTo] = useState("");
   // 요약 합계 — { balance, granted, used }. 내역 응답 **한 번**에서 셋을 같이 받는다:
   //   잔액은 공유본(me.balance)에도 있지만, 따로 받은 두 값을 섞으면 "보유 + 사용 ≠ 총 충전"인 순간이 생긴다.
   //   null 은 아직 모름 — 모르는 동안에는 숫자를 안 그린다(잘못된 한 프레임을 만들지 않는다).
@@ -63,12 +69,17 @@ export default function MePage() {
 
   // before 를 주면 그 시각보다 앞선 것만 온다 — 이어 받는 동안 새 줄이 생겨도
   // 이미 본 줄이 다시 나오거나 건너뛰지 않는다(번호 커서였다면 밀린다).
-  async function loadLedger(before, source = ledgerSource) {
+  // over — 방금 바꾼 조건. setState 는 다음 그리기에야 반영되므로 새 값을 직접 넘긴다.
+  async function loadLedger(before, over = {}) {
+    const { source, from, to } = { source: ledgerSource, from: ledgerFrom, to: ledgerTo, ...over };
     setLedgerBusy(true);
     try {
       const params = new URLSearchParams();
       if (before) params.set("before", String(before));
       if (source) params.set("source", source);
+      const { start, end } = dayBounds(from, to);
+      if (start !== null) params.set("from_ts", String(start));
+      if (end !== null) params.set("to_ts", String(end));
       const q = params.toString() ? `?${params}` : "";
       const res = await fetch(`/api/credits/history${q}`);
       if (!res.ok) throw new Error();
@@ -89,8 +100,22 @@ export default function MePage() {
   function pickSource(next) {
     setLedgerSource(next);
     setLedger(null);
-    loadLedger(undefined, next);
+    loadLedger(undefined, { source: next });
   }
+  function pickDates(from, to) {
+    setLedgerFrom(from);
+    setLedgerTo(to);
+    setLedger(null);
+    loadLedger(undefined, { from, to });
+  }
+  const ledgerNarrowed = !!(ledgerSource || ledgerFrom || ledgerTo);
+
+  // 크레딧이 줄지 않는 계정인가 — 왜 안 주는지를 가른다(2026-09-14 사장님: "차감 안 함이 뭘 의미하는 거야?").
+  //   · 내부 계정(profiles.internal) — 운영자가 표시한 우리 쪽 계정이라 영상을 만들어도 청구하지 않는다
+  //   · 그 밖(gated:false) — 서비스 전체가 아직 크레딧을 걷지 않는 동안(SHOTFORM_NO_CREDITS)
+  const freeNote = me?.gated === false
+    ? (me?.internal ? "내부 계정이라 크레딧을 써도 줄지 않아요" : "지금은 크레딧을 걷지 않는 기간이라 써도 줄지 않아요")
+    : "";
 
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -207,8 +232,11 @@ export default function MePage() {
       </div>
 
       {/* ★ 2026-09-14 — 제목 아래 설명 줄과 같은 이름의 소제목을 걷었다(같은 말이 세 번이었다). */}
+      {/* ★ .me-info — 줄마다 키가 달라(글자 22px · 버튼 48px) 간격이 들쭉날쭉했고, 버튼이 글자 끝에
+          붙어 떠 있었다(2026-09-14 사장님 지적). 줄 키를 하나로 맞추고 값 칸을 이름 입력칸과 같은 폭으로
+          못 박아 [크레딧 관리]·[변경]이 [저장]과 한 세로선에 서게 한다(app/globals.css). */}
       {tab === "info" && (
-      <section className="panel me-panel">
+      <section className="panel me-panel me-info">
         {loadErr && (
           <p className="pgsub">
             {loadErr}{" "}
@@ -245,9 +273,9 @@ export default function MePage() {
           <span className="me-label">크레딧</span>
           <span className="me-value">
             {sums ? <><b>{formatCredits(sums.balance)} / {formatCredits(sums.granted)}</b></> : "…"}
-            {me?.gated === false && " · 차감 안 함"}
+            {me?.internal === true && <span className="me-sub"> · 내부 계정</span>}
           </span>
-          <button type="button" className="mini" onClick={() => switchTab("credits")}>크레딧 관리 →</button>
+          <button type="button" className="mini" onClick={() => switchTab("credits")}>크레딧 관리</button>
         </div>
 
         {/* ★ 비밀번호는 "내 정보" 안에 있다 — 이름·이메일·가입일과 같은 성격(내 계정)이라
@@ -257,9 +285,11 @@ export default function MePage() {
             무엇을 고치는 자리인지 알려 주는 말이 없었다(2026-08-13 사용자 지적).
             [수정] 은 펼치면 감춘다 — 되돌리는 길은 폼 안의 [취소] 하나다. */}
         <div className="me-row">
-          <span className="me-label">비밀번호 관리</span>
+          <span className="me-label">비밀번호</span>
+          {/* 값 칸을 둔다 — 없으면 버튼이 라벨 옆에 붙어 다른 줄의 버튼들과 세로선이 어긋난다 */}
+          <span className="me-value">••••••••</span>
           {!showPw && (
-            <button className="mini" onClick={() => setShowPw(true)}>수정</button>
+            <button className="mini" onClick={() => setShowPw(true)}>변경</button>
           )}
         </div>
         {showPw && (
@@ -320,7 +350,7 @@ export default function MePage() {
           </div>
         </div>
         {me?.gated === false && (
-          <p className="pgsub">지금은 영상을 만들어도 크레딧이 차감되지 않아요.</p>
+          <p className="pgsub">{freeNote}.</p>
         )}
 
         <section className="panel me-panel">
@@ -332,24 +362,45 @@ export default function MePage() {
       <section className="panel me-panel">
         <h2 className="me-h">크레딧 내역</h2>
         <div className="cost-filters">
-          <span className="seg" role="group" aria-label="내역">
-            {[["", "전체"], ["grant", "충전"], ["charge", "사용"]].map(([s, label]) => (
-              <button
-                type="button"
-                key={s || "all"}
-                className="seg-btn"
-                aria-pressed={ledgerSource === s}
-                onClick={() => pickSource(s)}
-              >
-                {label}
-              </button>
-            ))}
-          </span>
+          <label>
+            <small>시작일</small>
+            <input className="field" type="date" value={ledgerFrom} onChange={(e) => pickDates(e.target.value, ledgerTo)} />
+          </label>
+          <label>
+            <small>종료일</small>
+            {/* ★ 그 날을 **포함한다** — 자정으로 자르면 고른 하루가 통째로 빠진다(dayBounds). */}
+            <input className="field" type="date" value={ledgerTo} onChange={(e) => pickDates(ledgerFrom, e.target.value)} />
+          </label>
+          <label>
+            <small>종류</small>
+            <span className="seg" role="group" aria-label="내역">
+              {[["", "전체"], ["grant", "충전"], ["charge", "사용"]].map(([s, label]) => (
+                <button
+                  type="button"
+                  key={s || "all"}
+                  className="seg-btn"
+                  aria-pressed={ledgerSource === s}
+                  onClick={() => pickSource(s)}
+                >
+                  {label}
+                </button>
+              ))}
+            </span>
+          </label>
+          {ledgerNarrowed && (
+            <button
+              type="button"
+              className="mini"
+              onClick={() => { setLedgerSource(""); setLedgerFrom(""); setLedgerTo(""); setLedger(null); loadLedger(undefined, { source: "", from: "", to: "" }); }}
+            >
+              조건 지우기
+            </button>
+          )}
         </div>
         {ledgerErr && <p className="pgsub warn">{ledgerErr}</p>}
         {!ledgerErr && ledger === null && <p className="pgsub">불러오는 중…</p>}
         {!ledgerErr && ledger?.length === 0 && (
-          <p className="pgsub">아직 쓰거나 충전한 내역이 없어요.</p>
+          <p className="pgsub">{ledgerNarrowed ? "고른 조건에 맞는 내역이 없어요." : "아직 쓰거나 충전한 내역이 없어요."}</p>
         )}
         {ledger?.length > 0 && (
           <ul className="ledger">

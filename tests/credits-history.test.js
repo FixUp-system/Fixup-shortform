@@ -174,3 +174,18 @@ describe("크레딧 내역 — 요약 합계와 좁히기", () => {
     expect((await bodyQ("source=zzz")).rows.length).toBe(2);
   });
 });
+
+describe("크레딧 내역 — 시각 범위(from_ts·to_ts)", () => {
+  beforeEach(() => resetMemoryStore());
+
+  it("범위 안의 줄만 준다 — 경계는 포함", async () => {
+    await grant(A, 500);
+    const [row] = (await body()).rows;
+    const ts = row.ts;
+    expect((await bodyQ(`from_ts=${ts}&to_ts=${ts}`)).rows).toHaveLength(1);
+    expect((await bodyQ(`from_ts=${ts + 1}`)).rows).toHaveLength(0);
+    expect((await bodyQ(`to_ts=${ts - 1}`)).rows).toHaveLength(0);
+    // 합계는 범위와 무관하게 전체다
+    expect((await bodyQ(`from_ts=${ts + 1}`)).granted).toBe(500);
+  });
+});

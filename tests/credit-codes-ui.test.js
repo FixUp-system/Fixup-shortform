@@ -31,7 +31,7 @@ describe("승인 대기·마이페이지가 입력칸을 쓴다", () => {
     const src = strip(read("app/me/page.js"));
     expect(src).not.toMatch(/me\?\.gated\s*!==\s*false\s*&&\s*\(/);
     expect(src).toMatch(/me\?\.gated\s*===\s*false\s*&&/);
-    expect(src).toMatch(/크레딧이 차감되지 않아요/);
+    expect(src).toMatch(/써도 줄지 않아요/);
   });
 
   // 2026-09-14 — 마이페이지가 [내 정보 | 크레딧] 탭이 되면서 입력칸은 크레딧 탭의 "코드 등록" 카드로 올라갔다.

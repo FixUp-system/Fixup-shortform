@@ -393,6 +393,21 @@ export default function Sidebar() {
       >
         <span className="ic"><Icon name="archive" /></span>보관함
       </Link>
+      {/* ★ [내 계정] 묶음(2026-09-14 사장님 지시: "내 정보로 이동할 수 있는 섹션, 위의 영상 만들기랑 분리해서").
+          마이페이지로 가는 길이 상단바 드롭다운 안에만 있었다. 영상 메뉴와 섞이지 않게 머리말·구분선으로 가른다.
+          ★ 손님(비로그인)에게는 안 그린다 — 눌러도 로그인으로 튕기는 막다른 링크다. 읽기 전(me 없음)에도 안 그린다. */}
+      {me && !guest && (
+        <>
+          <div className="side-sec">내 계정</div>
+          <Link
+            href="/me"
+            className={`side-item${pathname === "/me" ? " on" : ""}`}
+          >
+            <span className="ic"><Icon name="gear" /></span>내 정보
+          </Link>
+        </>
+      )}
+      {isAdmin && <div className="side-sec">운영</div>}
       {/* ★★ 실제 비용 — **모든 사용자**가 본다(2026-08-25 사장님 지시: "지금은 내부 테스트
           단계이니까 사용자들이 확인할 수 있게"). 아래 운영자 전용 [비용 기록]과 **다른
           것**이다: 저기는 실제로 나간 지출 원장이고, 여기는 "한 편에 얼마 드는가" 표다.

@@ -196,7 +196,7 @@ export default function CreditCodesPage() {
             코드 만들기
           </button>
           <button type="button" className="seg-btn" aria-pressed={tab === "status"} onClick={() => setTab("status")}>
-            현황{codes ? ` ${codes.length.toLocaleString()}` : ""}
+            현황
           </button>
         </span>
       </div>
