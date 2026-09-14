@@ -15,6 +15,7 @@ import Icon from "./Icon";
 // 바꿔도 이 버튼은 옛 이름을 그대로 들고 있었다(새로고침해야 반영).
 import { useMe } from "./MeContext";
 import { formatCredits } from "../lib/pricing";
+import { CREDITS_TAB_HREF, ME_TAB_EVENT } from "../lib/me-tab";
 
 // 사이드바에 있던 것을 그대로 옮겼다(새로 쓰지 않는다).
 async function handleLogout(router) {
@@ -86,8 +87,10 @@ export default function UserMenu({ initialGuest = false }) {
           하나다(/api/me). 화면이 스스로 판정하면 두 벌이 되어 언젠가 어긋난다.
           ★ 2026-09-14 되살림(09-10 에 걷었던 것) — 와디즈에서 크레딧을 팔기로 해서 손님이
             남은 양을 봐야 한다. 내부 계정(차감 면제)은 잔액 대신 그 사실을 적는다. */}
+      {/* ★ 잔액을 누르면 마이페이지 [크레딧] 탭(2026-09-14 사장님 지시). 이미 /me 에 있으면 Next 가 다시
+          그리지 않아 탭이 안 바뀌므로 신호를 함께 보낸다(lib/me-tab.js). */}
       {me && me.gated !== false
-        ? <span className="um-credit">크레딧 <b>{formatCredits(me.balance)}</b></span>
+        ? <Link href={CREDITS_TAB_HREF} className="um-credit" onClick={() => window.dispatchEvent(new Event(ME_TAB_EVENT))}>크레딧 <b>{formatCredits(me.balance)}</b></Link>
         : me?.internal === true && <span className="um-credit">내부 계정</span>}
       <button
         className="um-btn"

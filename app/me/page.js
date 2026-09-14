@@ -15,6 +15,7 @@ import { useMe } from "../../components/MeContext";
 import CreditCodeForm from "../../components/CreditCodeForm";
 // 날짜 칸 → ms 경계 한 벌(비용 기록·사용자 관리와 같은 규칙)
 import { dayBounds } from "../../lib/costs-filter";
+import { ME_TAB_EVENT } from "../../lib/me-tab";
 
 // 그 사람의 시계로 본 날짜. Intl 로 돌리면 기기 설정에 따라 "2026. 8. 13." 처럼 나와
 // 열 폭이 흔들린다 — 자리수를 고정한다.
@@ -61,6 +62,10 @@ export default function MePage() {
   const [tab, setTab] = useState("info");
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("tab") === "credits") setTab("credits");
+    // 이미 이 화면에 있을 때 상단바 잔액을 누르면 다시 그려지지 않는다 — 그쪽이 보내는 신호로 탭을 연다.
+    const openCredits = () => setTab("credits");
+    window.addEventListener(ME_TAB_EVENT, openCredits);
+    return () => window.removeEventListener(ME_TAB_EVENT, openCredits);
   }, []);
   function switchTab(next) {
     setTab(next);

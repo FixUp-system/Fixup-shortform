@@ -234,7 +234,8 @@ describe("상단 계정 바", () => {
     // 데이터가 있어야 하는 것만 가린다.
     // 2026-08-14: 크레딧을 끈 동안 감추려고 gated 조건이 사이에 붙었다.
     // 계약은 그대로다 — me 가 있어야 그리고, 없으면 안 그린다.
-    expect(menu).toMatch(/me\s*&&[^<]*<span className="um-credit"/);
+    // 2026-09-14 — 잔액은 크레딧 탭으로 가는 <Link> 가 됐다(tests/topbar-credit-link-ui.test.js).
+    expect(menu).toMatch(/me\s*&&[^<]*<(span|Link)[^>]*className="um-credit"/);
     expect(menu).toMatch(/me\?\.name\s*\|\|/);
   });
 
