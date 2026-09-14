@@ -5,8 +5,9 @@
 >
 > | | |
 > |---|---|
-> | 브랜치 · 거리 | `feat/credit-unit` 대비 **0 뒤 / 7 앞**(이 문서 커밋 포함) · 원격 없음(푸시 안 함) |
-> | 테스트 | `npx vitest run` **6,238 통과 · 0 실패 · 10 skipped** · `npx next build` 성공(`/admin/codes` 포함) |
+> | 브랜치 · 거리 | `feat/credit-unit` 대비 **0 뒤 / 15 앞**(이 문서 커밋 포함) · 원격 없음(푸시 안 함) |
+> | 테스트 | `npx vitest run` **6,260 통과 · 0 실패 · 10 skipped** · `npx next build` 는 **첫 구현 때만** 성공 — 그 뒤 화면 수정은 dev 서버(:3130) 컴파일 + esbuild 문법 검사로 갈음(돌고 있는 dev 를 안 죽이려고) |
+> | 로컬 서버 | `http://localhost:3130` — `credit-unit` 의 `.claude/launch.json` 에 `credit-codes-dev`(FAKE=fal · NO_CREDITS=0 · 운영 DB) |
 > | 설계 · 계획 | `docs/superpowers/specs/2026-09-14-credit-codes-design.md` · `docs/superpowers/plans/2026-09-14-credit-codes.md` |
 > | node_modules | `credit-unit` 의 것을 **정션**으로 물었다 — 그 폴더를 지우면 여기도 죽는다 |
 >
@@ -19,10 +20,17 @@
 >   장부 행 사유 `크레딧 코드 5DP9-EVZ4-UVGB`·granted_by 본인 · 쓴 코드 삭제 used · 안 쓴 코드 deleted→not_found · **동시 등록 2건 → ok·used** ·
 >   anon 키 읽기 `[]`(행이 있는데도) · anon 으로 실제 코드 rpc → not_found(RLS 가 막아 못 잡는다).
 >   남은 흔적: 계정 `fixup7@test.com`(테스트 운영자) 장부 +10·+10·**−20 정정** = 원래 500 · `credit_codes` 에 묶음 「관통 검증 09-14」 쓴 코드 2줄(감사용으로 둔다).
-> ⚠️ **합칠 때 충돌 후보**: `app/me/page.js`(입력칸 2줄+import) · `components/Sidebar.jsx`(운영자 링크 한 블록) — `feat/credit-unit` 프론트 작업과 겹칠 수 있다.
+> 🎨 **같은 날 저녁 — 운영자 화면 정리(사장님 지시 연속 · 크레딧 코드와 무관한 것도 이 브랜치에 같이 쌓였다)**:
+>   · `/costs`: 좁히기 칸 20px 버그(없는 토큰 `--ctl-h`) → `--ctl-sm` · 좁히기 줄 카드화 · 요약을 **카드 하나·한 줄**(흐름별 합계를 같은 줄로)
+>   · `/admin`: 같은 구성(시작일·종료일·찾기·상태 카드 줄 + 요약 타일) · **가입일 기간 필터**(`lib/costs-filter.js` 의 `inDayRange` 한 벌을 `/costs` 와 공유)
+>   · `/admin/codes`: 같은 구성 + **[코드 만들기 | 현황] 탭**
+>   · **드롭다운 한 벌** `components/Select.jsx`(.dd/.dd-input) — 세 벌(.cost-select · 없는 토큰 `--ctl` 로 16px 가 된 .tier-pick · .sub-select)을 합쳤다. 화면에 `<select>` 를 직접 쓰면 `tests/select-unified-ui.test.js` 가 막는다
+>   · `/me`: 크레딧 절을 **늘 그린다**(gated:false 여도) — 걷지 않는 동안엔 "크레딧이 차감되지 않아요" 한 줄. 프로덕션 스위치(`SHOTFORM_NO_CREDITS=1`) 때문에 입력칸이 숨던 제약이 풀렸다. 상단바 잔액은 그대로 gated 뒤
+>   ⚠️ 자막 조절판(SubtitleEditor) 드롭다운은 **브라우저로 못 봤다**(⑥완성까지 간 프로젝트가 필요) — esbuild 문법 통과 + 판 그린만
+> ⚠️ **합칠 때 충돌 후보**(`feat/credit-unit` 프론트 작업과): `app/globals.css` · `app/admin/page.js` · `app/costs/page.js` · `app/me/page.js` · `components/Sidebar.jsx` · `components/SubtitleEditor.jsx` · `lib/costs-filter.js`.
 > ★ **구현 중 정정**: 처음 설계는 붙여 넣은 행 전체를 `meta` 로 저장했다 → 이름·연락처·배송지가 우리 DB 에 쌓인다. **식별 열+리워드 열만** 남기고, 전체 열 CSV 는 만든 직후 브라우저에서만 받게 바꿨다(그래서 나중에 "CSV 다시 받기"에는 이메일이 없다 — 발송번호로 와디즈 엑셀과 맞춘다).
 > **알면서 안 한 것**: 시도 횟수 제한(31^12 추측 불가로 판단) · 내역에 "코드 충전" 별도 라벨(지금은 "충전") · 관리자 사용자 목록의 "코드 등록함" 표시(`app/admin/page.js` 충돌 회피 — 같은 정보가 `/admin/codes` 에 있다).
-> **검증 안 된 것**: ~~① Supabase 쪽 관통~~ → 위에서 완료 · ② 화면을 **브라우저로 안 봤다**(새 표가 라이브에 없어 dev 가 운영 DB 에 붙으면 목록이 500) · ③ 와디즈 실제 엑셀을 붙여 넣어 본 적 없다(열 이름·따옴표 칸 모양 미확인).
+> **검증 안 된 것**: ~~① Supabase 쪽 관통~~ → 위에서 완료 · ~~② 화면~~ → 로컬 :3130 에서 봤다(`/admin/codes`·`/admin`·`/costs`·`/me`·`/pending`) — 단 **[코드 만들기]를 화면에서 실제로 누른 적은 없다**(가짜 명단 붙여 넣기까지) · ③ 와디즈 실제 엑셀을 붙여 넣어 본 적 없다(열 이름·따옴표 칸 모양 미확인).
 
 > 🧭 **최신 갈래가 바뀌었다 — `feat/credit-unit`** (워크트리 `C:\Users\fixup\shotform-saas\.claude\worktrees\credit-unit`).
 > `feat/reel-cut-r2v`(step-gate)의 09-14 랜딩 커밋까지 **합쳐 넣었다**(`5a72113`) — 이 갈래가 두 줄기를 다 가진다.
