@@ -3,8 +3,15 @@
 //
 // ★★ 잠금은 lib/reel/locks.js 하나가 판정한다. 여기서 scenario.text 나 cuts[].image.url 을
 //   다시 읽지 마라 — 그 순간 판정이 두 벌이 되고, 한쪽만 고쳐지는 날이 온다.
-// ★★ 목록(비율·길이·화풍)과 가격은 **표에서 온다.** 화면에 숫자를 적으면 값이 갈린다.
+// ★★ 목록(비율·길이·화풍)은 **표에서 온다.** 화면에 이름이나 숫자를 적으면 값이 갈린다.
 // ★ 잠긴 축도 **값은 보여 준다** — 무엇으로 만들었는지가 화면에서 사라지면 안 된다.
+//
+// ★★★ 값·크레딧은 여기서 **한 글자도 말하지 않는다**(2026-09-14 Ruling 10).
+//   값·크레딧 문구는 ⑤영상에서만 말한다(사장님 규칙) — 여기서 말하면 같은 값이 두 곳에서
+//   갈린다. 게다가 이 패널은 ①~⑥ 어느 단계에서나 서 있어서, 정가 줄을 달면 "돈이 나가는
+//   자리는 ⑤ 하나"라는 신호가 통째로 흐려진다. 그래서 lib/pricing.js 를 **import 하지도
+//   않는다** — 부르지 않더라도 import 가 있으면 다음 사람이 그 줄을 되살리기 쉽다.
+//   판: tests/reel-settings-panel-ui.test.js · tests/reel-ui.test.js 의 「값을 말하지 않는다」.
 //
 // ★★★ 이번 패널이 그리는 축은 **셋**이다(비율·길이·화풍). 모델·화질은 범위 밖이라
 //   여기서 안 그린다 — 잠금 표(lockedAxes)에는 다섯이 다 있지만, 그린 축만 사유를 말한다.
@@ -14,7 +21,6 @@ import { lockedAxes } from "../../lib/reel/locks.js";
 import { ASPECTS } from "../../lib/aspects.js";
 import { STYLE_PRESETS } from "../../lib/styles.js";
 import { secondsForModel } from "../../lib/clip-limits.js";
-import { videoPrice } from "../../lib/pricing.js";
 
 export default function SettingsPanel() {
   const { project, reload } = useReelProject();
@@ -26,7 +32,6 @@ export default function SettingsPanel() {
 
   const s = project.settings || {};
   const locks = lockedAxes(project);
-  const price = videoPrice(s.target_seconds, s.i2v_model, s.resolution);
 
   // ★★ 길이 칸은 **저장된 모델**이 정한다(lib/clip-limits.js 의 secondsForModel).
   //   TARGET_CHOICES(15·30·45·60)를 그대로 그리면 seedance-2.0 프로젝트에 30·45·60 칸이
@@ -101,9 +106,6 @@ export default function SettingsPanel() {
           <p className="rp-why">{reasons.join(" · ")}</p>
         )}
         {error && <p className="rp-err">{error}</p>}
-      </div>
-      <div className="rp-foot">
-        <span className="rp-price">{price} 크레딧</span>
       </div>
     </aside>
   );

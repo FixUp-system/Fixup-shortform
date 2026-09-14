@@ -43,9 +43,18 @@ describe("설정 패널", () => {
       .toMatch(/JSON\.stringify\(\s*\{\s*\[axis\]:\s*value\s*\}\s*\)/);
   });
 
-  it("★★ 정가는 가격표가 낸다 — 화면이 계산하지 않는다", () => {
-    expect(code, "videoPrice 를 안 쓴다").toMatch(/videoPrice\s*\(/);
-    expect(code, "화면에 크레딧 숫자를 손으로 적었다").not.toMatch(/\b\d{2,3}\s*크레딧/);
+  // ★★★ 2026-09-14 Ruling 10 — **뒤집혔다.** 여기에는 "정가는 가격표가 낸다"(videoPrice 를
+  //   쓰라)는 단정이 있었다. 사장님 규칙은 그 반대다 — 값·크레딧 문구는 ⑤영상에서만 말한다
+  //   (docs/superpowers/specs/2026-09-08-light-theme-mcs-design.md · tests/reel-ui.test.js).
+  //   이 패널은 ①~⑥ 어느 단계에서나 서 있어서, 정가 줄을 달면 "돈이 나가는 자리는 ⑤ 하나"가
+  //   통째로 흐려진다. 남겨 두면 판이 지시와 정반대인 문구를 강제한다.
+  it("★★★ 값을 말하지 않는다 — 값·크레딧은 ⑤영상에서만 말한다", () => {
+    // ★ 주석을 걷고 잰다 — 왜 뺐는지는 주석에 남아야 하고(그러려면 "크레딧"이라는 말을
+    //   써야 한다), 그 글자가 단정에 걸리면 안 된다. tests/reel-ui.test.js 의 같은 관용구다.
+    //   ⚠️ `code` 는 이 파일 머리에서 이미 주석을 걷은 것이다.
+    expect(code, "가격표를 다시 끌어왔다").not.toContain("videoPrice");
+    expect(code, "가격 문구 만들기를 다시 끌어왔다").not.toContain("priceLabel");
+    expect(code, "화면이 아직 값을 말한다").not.toContain("크레딧");
   });
 
   it("★★ 잠긴 축은 **값이 계속 보인다** — 무엇으로 만들었는지가 사라지면 안 된다", () => {

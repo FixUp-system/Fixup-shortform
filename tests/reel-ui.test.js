@@ -116,18 +116,28 @@ describe("화질 고르기", () => {
   //   ⚠️ **판정은 그대로다** — 화질이 정가를 바꾸는 것 자체는 변함이 없고, 청구는 서버가
   //     settings.resolution 을 읽어 한다(tests/reel-routes.test.js 가 그것을 잰다).
   //     문구만 뺀 것이지 값이 바뀐 것이 아니므로, 그 자리를 여기서 다시 강제하지 않는다.
-  it("★ 값을 말하지 않는다 — 값은 ⑤영상에서만 말한다", () => {
-    // ★ 주석을 걷고 잰다 — 왜 뺐는지는 주석에 남아야 하고(그러려면 "크레딧"이라는
-    //   말을 써야 한다), 그 글자가 단정에 걸리면 안 된다. 이 저장소가 반복해 밟은
-    //   "시험이 주석을 재는" 함정이다.
-    const code = nw
-      .split("\n").filter((l) => !l.trim().startsWith("//")).join("\n")
-      .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
-      .replace(/\/\*[\s\S]*?\*\//g, "");
-    expect(code).not.toContain("priceLabel");
-    expect(code).not.toContain("videoPrice");
-    expect(code, "화면이 아직 값을 말한다").not.toContain("크레딧");
-  });
+  // ★★★ 2026-09-14 — 그물이 **한 파일만** 훑어 새 부품(설정 패널)이 값을 말해도 안 잡혔다.
+  //   화면이 늘면 여기 더한다. 목록으로 돌리는 이유는 CLAUDE.md 가 경고하는 그 패턴이다 —
+  //   "화면을 새로 더하면 어디에도 안 걸린다"(setInterval 그물이 같은 값을 치렀다).
+  //   ⚠️ ⑤영상(app/reel/[id]/video/page.js)은 **값을 말하는 유일한 자리**라 안 넣는다.
+  const NO_PRICE = [
+    ["새 영상 화면", "app/reel/new/page.js"],
+    ["설정 패널", "components/reel/SettingsPanel.jsx"],
+  ];
+  for (const [name, path] of NO_PRICE) {
+    it(`★ ${name} 은 값을 말하지 않는다 — 값은 ⑤영상에서만 말한다`, () => {
+      // ★ 주석을 걷고 잰다 — 왜 뺐는지는 주석에 남아야 하고(그러려면 "크레딧"이라는
+      //   말을 써야 한다), 그 글자가 단정에 걸리면 안 된다. 이 저장소가 반복해 밟은
+      //   "시험이 주석을 재는" 함정이다.
+      const code = read(path)
+        .split("\n").filter((l) => !l.trim().startsWith("//")).join("\n")
+        .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
+        .replace(/\/\*[\s\S]*?\*\//g, "");
+      expect(code).not.toContain("priceLabel");
+      expect(code).not.toContain("videoPrice");
+      expect(code, "화면이 아직 값을 말한다").not.toContain("크레딧");
+    });
+  }
 
   it("광고 가격표를 쓰지 않는다", () => {
     expect(nw).not.toContain("adVideoPrice");

@@ -3348,5 +3348,6 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
 /* 서버가 거절한 이유. 잠김 안내(--ink-soft)와 색을 나눈다 — 하나는 "지금은 이렇다"이고
    다른 하나는 "방금 누른 것이 안 됐다"라서, 같은 색이면 무엇이 새 소식인지 안 보인다. */
 .rp-err { margin: 0; font-size: 12px; color: var(--warn); }
-.rp-foot { margin-top: auto; padding: 12px 14px; border-top: 1px solid var(--line); }
-.rp-price { font-size: 14px; font-weight: 600; }
+/* ★★★ 2026-09-14 Ruling 10 — 여기 있던 .rp-foot/.rp-price(정가 줄)를 **지웠다.**
+   값·크레딧 문구는 ⑤영상에서만 말한다(사장님 규칙). 쓰는 자리가 없어진 규칙은 다음
+   사람에게 "여기에 값을 달아도 된다"고 거짓말을 하므로 함께 지운다. 값은 git 이력에 있다. */
