@@ -62,6 +62,8 @@ export default function CreditCodesPage() {
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
   const [shown, setShown] = useState(ALL);    // 목록에서 볼 묶음
+  // 탭 — "create"(코드 만들기) | "status"(현황). 2026-09-14 사장님 지시로 한 화면을 둘로 나눴다.
+  const [tab, setTab] = useState("create");
 
   const parsed = useMemo(() => parsePasted(pasted), [pasted]);
   // 붙여 넣은 표가 바뀌어 고른 열이 사라지면 "전부 같은 크레딧"으로 되돌린다.
@@ -186,9 +188,22 @@ export default function CreditCodesPage() {
         CSV 로 내려받아 메일 머지에 쓰세요. 코드는 한 번만 쓸 수 있고 기한은 없어요.
       </p>
 
+      {/* ── 탭 — 비용 기록의 [종류]와 같은 세그먼트다(같은 일에 두 벌을 만들지 않는다) ── */}
+      <div className="cost-filters">
+        <span className="seg" role="group" aria-label="보기">
+          <button type="button" className="seg-btn" aria-pressed={tab === "create"} onClick={() => setTab("create")}>
+            코드 만들기
+          </button>
+          <button type="button" className="seg-btn" aria-pressed={tab === "status"} onClick={() => setTab("status")}>
+            현황{codes ? ` ${codes.length.toLocaleString()}` : ""}
+          </button>
+        </span>
+      </div>
+
       {err && <p className="pgsub warn">{err}</p>}
 
       {/* ── 만들기 ── */}
+      {tab === "create" && (
       <div className="panel cost-filters">
         <label>
           <small>묶음 이름</small>
@@ -263,8 +278,10 @@ export default function CreditCodesPage() {
           </>
         )}
       </div>
+      )}
 
-      {codes === null ? (
+      {/* ── 현황 ── */}
+      {tab === "status" && (codes === null ? (
         <p className="pgsub">불러오는 중…</p>
       ) : codes.length === 0 ? (
         <p className="pgsub">아직 만든 코드가 없어요.</p>
@@ -354,7 +371,7 @@ export default function CreditCodesPage() {
             </table>
           </div>
         </>
-      )}
+      ))}
     </>
   );
 }

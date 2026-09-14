@@ -41,6 +41,8 @@ export default function AdminPage() {
   // ★ 서버가 아니라 화면에서 거른다: listProfiles 가 이미 500명까지 한 번에 주고,
   //   그 위에서 거르는 것이 왕복 없이 즉시 반응한다. 500을 넘기 시작하면 그때 서버로 옮긴다.
   const [query, setQuery] = useState("");
+  // 상태로 좁히기 — "" = 전체. ★ statusFilter 인 이유: 승인·차단을 쓰는 setStatus(id, status) 가 이미 있다.
+  const [statusFilter, setStatusFilter] = useState("");
   const [openId, setOpenId] = useState(null);
   const [ledger, setLedger] = useState(null);   // null = 불러오는 중
 
@@ -273,12 +275,22 @@ export default function AdminPage() {
   const q = query.trim().toLowerCase();
   const found = (users || []).filter(
     (u) =>
-      !q ||
-      displayNameOf(u).toLowerCase().includes(q) ||
-      u.email?.toLowerCase().includes(q) ||
-      u.id?.toLowerCase().includes(q)
+      (!statusFilter || u.status === statusFilter) &&
+      (!q ||
+        displayNameOf(u).toLowerCase().includes(q) ||
+        u.email?.toLowerCase().includes(q) ||
+        u.id?.toLowerCase().includes(q))
   );
+  // 요약 타일의 수 — 좁히기와 무관한 **전체** 기준이다(승인 대기가 몇 명 쌓였는지를 먼저 본다).
+  const countOf = (s) => (users || []).filter((u) => u.status === s).length;
+  const STATUS_PICKS = [
+    ["", "전체"],
+    ["pending", "승인 대기"],
+    ["approved", "승인됨"],
+    ["blocked", "차단됨"],
+  ];
 
+  // ★ 구성은 비용 기록(/costs)과 같다(2026-09-14 사장님 지시) — 카드 안의 좁히기 줄 · 요약 타일 · 표.
   return (
     <>
       <h1 className="pgtitle">사용자 관리</h1>
@@ -288,15 +300,60 @@ export default function AdminPage() {
       </p>
 
       {users !== null && (
-        <div className="admin-tools">
-          <input
-            className="sent-input admin-search"
-            type="search"
-            placeholder="이메일이나 id 로 찾기"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </div>
+        <>
+          <div className="panel cost-filters">
+            <label>
+              <small>찾기</small>
+              <input
+                className="field cost-filter-q"
+                type="search"
+                placeholder="이름·이메일·id"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </label>
+            <label>
+              <small>상태</small>
+              <span className="seg" role="group" aria-label="상태">
+                {STATUS_PICKS.map(([s, label]) => (
+                  <button
+                    type="button"
+                    key={s || "all"}
+                    className="seg-btn"
+                    aria-pressed={statusFilter === s}
+                    onClick={() => setStatusFilter(s)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </span>
+            </label>
+            {(query || statusFilter) && (
+              <button type="button" className="mini" onClick={() => { setQuery(""); setStatusFilter(""); }}>
+                조건 지우기
+              </button>
+            )}
+          </div>
+
+          <div className="cost-summary">
+            <div className="cost-tile">
+              <small>전체</small>
+              <b>{users.length}명</b>
+            </div>
+            <div className="cost-tile">
+              <small>승인 대기</small>
+              <b>{countOf("pending")}명</b>
+            </div>
+            <div className="cost-tile">
+              <small>승인됨</small>
+              <b>{countOf("approved")}명</b>
+            </div>
+            <div className="cost-tile">
+              <small>차단됨</small>
+              <b>{countOf("blocked")}명</b>
+            </div>
+          </div>
+        </>
       )}
 
       {err && <p className="pgsub warn">{err}</p>}
@@ -304,7 +361,7 @@ export default function AdminPage() {
       {users === null ? (
         <p className="pgsub">불러오는 중…</p>
       ) : found.length === 0 ? (
-        <p className="pgsub">{query ? "찾는 사용자가 없어요." : "사용자가 없어요."}</p>
+        <p className="pgsub">{query || statusFilter ? "찾는 사용자가 없어요." : "사용자가 없어요."}</p>
       ) : (
         <div className="cost-table-wrap">
           <table className="cost-table">
