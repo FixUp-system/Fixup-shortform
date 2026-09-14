@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 // 기본값은 가격표에서 온다 — 운영자가 매번 고르는 값이라도 출처는 한 곳이다.
-import { DEFAULT_GRANT } from "../../lib/pricing";
+import { DEFAULT_GRANT, formatCredits } from "../../lib/pricing";
 // ★ 2026-09-11 — 안내 문구의 "N자 이상"을 손으로 적지 않는다. 라우트가 막는 값과 같아야 한다.
 import { PASSWORD_MIN } from "../../lib/password";
 // 등급 표와 판정은 lib/tiers.js 한 벌이다 — 화면이 등급 이름을 복사하면 서버와 갈린다.
@@ -139,6 +139,24 @@ export default function AdminPage() {
       setErr(body.error || "등급을 바꾸지 못했어요");
     }
     await load();
+    setBusy("");
+  }
+
+  // 내부 계정(크레딧 차감 면제, 2026-09-14) — 등급과 **같은 문**(PATCH)을 쓴다.
+  // ★ 참/거짓만 보낸다. 서버도 그 밖의 값은 400 으로 막는다(손님이 무료로 새지 않게).
+  async function setInternal(id, internal) {
+    setBusy(id);
+    setErr("");
+    const r = await fetch(`/api/admin/users/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ internal: internal === true }),
+    });
+    if (!r.ok) {
+      const body = await r.json().catch(() => ({}));
+      setErr(body.error || "내부 계정 표시를 바꾸지 못했어요");
+    }
+    await load();   // 열어 둔 창(panelUser)도 목록에서 id 로 다시 뽑으므로 함께 새 값이 된다
     setBusy("");
   }
 
@@ -352,8 +370,11 @@ export default function AdminPage() {
                   {/* 언제 들어온 사람인지 — 승인 대기가 쌓였을 때 먼저 볼 줄을 고르는 근거다.
                       날짜 규칙은 마이페이지·크레딧 내역과 같다(ymd: 사장님 시계). */}
                   <td className="mono">{u.created_at ? ymd(u.created_at) : "—"}</td>
+                  {/* ★ 내부 계정은 잔액이 아니라 "내부"를 적는다 — 차감이 없어 잔액이 뜻이 없다. */}
                   <td>
-                    <span className="st-badge">{u.balance ?? 0}</span>
+                    {u.internal === true
+                      ? <span className="st-badge st-submitted" title="내부 계정 — 크레딧을 걷지 않아요">내부</span>
+                      : <span className="st-badge">{formatCredits(u.balance ?? 0)}</span>}
                   </td>
                   {/* ★★ 줄에는 **여는 버튼 하나**만 둔다(2026-08-20 사장님 지시). 그전에는
                       줄마다 버튼이 다섯이라 가로가 좁고, 어느 줄의 버튼인지 눈으로 좇아야
@@ -393,7 +414,24 @@ export default function AdminPage() {
             <h2 className="dlg-title">{displayNameOf(panelUser)}</h2>
             <p className="dlg-body">
               {panelUser.email} · {STATUS_LABEL[panelUser.status] || panelUser.status} ·
-              {" "}{panelUser.role} · 잔액 {panelUser.balance ?? 0} 크레딧
+              {" "}{panelUser.role} · 잔액 {formatCredits(panelUser.balance ?? 0)} 크레딧
+            </p>
+
+            {/* 내부 계정 — 켜면 이 계정은 크레딧 없이 만든다(원가는 그대로 기록된다).
+                와디즈 손님 계정에 켜면 그대로 우리 돈이 나가니, 테스트 계정에만 켠다. */}
+            <p className="dlg-body">
+              {panelUser.internal === true
+                ? "내부 계정이에요 — 크레딧을 걷지 않아요."
+                : "손님 계정이에요 — 영상을 만들 때 크레딧을 걷어요."}
+              {" "}
+              <button
+                type="button"
+                className="mini"
+                disabled={busy === panelUser.id}
+                onClick={() => setInternal(panelUser.id, panelUser.internal !== true)}
+              >
+                {panelUser.internal === true ? "손님 계정으로 바꾸기" : "내부 계정으로 표시"}
+              </button>
             </p>
 
             {/* ★★ 크레딧 넣기 — **여기서 끝난다**(2026-08-20). 그전에는 prompt 를 두 번

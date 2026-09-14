@@ -108,6 +108,14 @@ alter table profiles add column if not exists display_name text;
 --   모르는 값을 basic 으로 떨어뜨린다(DB 기본값과 같은 값이다).
 alter table profiles add column if not exists tier text not null default 'basic';
 
+-- 내부 계정 — 크레딧 차감 면제(2026-09-14 사장님 결정). 판정은 lib/charges.js 의 creditsEnabledFor.
+-- ★ 전역 스위치(SHOTFORM_NO_CREDITS)는 **모두**를 끈다 — 와디즈 손님이 들어오면 스위치를 끄고
+--   계정마다 가른다. 면제는 걷지 않는 것이지 원가를 안 적는 것이 아니다(cost_records 는 쌓인다).
+-- ★ 기본값은 **false(걷는 쪽)** 다 — 새로 가입하는 손님이 무료로 새면 안 된다.
+-- ⚠️ 백필은 여기 두지 않는다(이 파일은 몇 번이고 다시 돌린다). 기존 테스트 계정 표시는 배포 때
+--   한 번만: OUTSTANDING.md 의 "크레딧 새 단위 배포 순서" 참고.
+alter table profiles add column if not exists internal boolean not null default false;
+
 -- 업로드는 프로젝트가 생기기 전에 일어나서 역조회할 대상이 없다.
 -- Storage 키에 owner 를 접두어로 넣는 방법도 있으나 URL 형태가 바뀌어
 -- 문서에 박힌 material.photos[].url 이 깨진다 — 이관에서 지킨 불변조건이다.
