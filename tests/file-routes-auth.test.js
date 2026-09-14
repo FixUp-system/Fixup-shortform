@@ -7,8 +7,8 @@ import { GET as getRender } from "../app/api/renders/[name]/route.js";
 
 const A = "11111111-1111-1111-1111-111111111111";
 const B = "22222222-2222-2222-2222-222222222222";
-const as = (id) => new Request("http://localhost/x", {
-  headers: { [USER_HEADER]: id, [STATUS_HEADER]: "approved", [ROLE_HEADER]: "user" },
+const as = (id, role = "user") => new Request("http://localhost/x", {
+  headers: { [USER_HEADER]: id, [STATUS_HEADER]: "approved", [ROLE_HEADER]: role },
 });
 
 // 렌더 라우트는 파일명이 곧 프로젝트 id 라 프로젝트 판정을 lib/projects.js 가 한다 —
@@ -17,9 +17,9 @@ const as = (id) => new Request("http://localhost/x", {
 // 이유와 같다 — 없으면 getObject 실패가 먼저 404 를 내서, 라우트가 프로젝트를 아예
 // 안 읽어도 통과하는 "지키는 척하는 테스트"가 된다.
 //
-// ★ 2026-08-18 — **읽기는 소유자를 안 따진다**(보관함 전체 공유, 내부 팀). 남은 자물쇠는
-// 둘이다: 로그인(withUser)과 "그 프로젝트가 실제로 있는가". 쓰는 문은 그대로 잠겨 있고,
-// 그 보장은 tests/archive-shared.test.js 가 정적으로도 지킨다.
+// ★ 2026-08-18 — 읽기는 소유자를 안 따졌다(보관함 전체 공유, 내부 팀).
+// ★★★ 2026-09-14 뒤집힘 — **다시 따진다**(전체 공유 닫기 — 와디즈 손님을 받기 전).
+//   남의 사진·영상은 **주인과 운영자만** 받는다. 남에게는 "없음"과 같은 404 다.
 async function putRenderObject(projectId, content = "video-bytes") {
   await memoryStore.putObject("renders", `${projectId}.mp4`, Buffer.from(content), "video/mp4");
 }
@@ -34,14 +34,19 @@ describe("업로드 소유자", () => {
     expect(res.status).toBe(200);
   });
 
-  // ★ 2026-08-18 뒤집힘 — 남이 올린 사진도 열린다(보관함 전체 공유, 내부 팀).
-  //   상세 화면이 남의 영상을 보여주려면 그 재료 사진도 보여야 한다.
-  //   대신 아래 "주인 기록이 없는 파일"은 그대로 막혀 있다 — 그 검사가 이름을 찍어 보는
-  //   길(존재 확인)을 막는 유일한 자물쇠다.
-  it("남이 올린 사진도 열린다 — 읽기만 연다", async () => {
+  // ★★★ 2026-09-14 — 남이 올린 사진은 다시 닫혔다(전체 공유 닫기 — 와디즈 손님을 받기 전).
+  //   이용자가 올린 사진은 남의 것이다. 주인 기록이 없는 파일과 **같은 404** 라 존재도 안 흘린다.
+  it("★★★ 남이 올린 사진은 404 다 (2026-09-14)", async () => {
     await memoryStore.putObject("uploads", "aaa.jpg", Buffer.from("x"), "image/jpeg");
     await memoryStore.insertUploadOwner("aaa.jpg", A);
     const res = await getUpload(as(B), { params: Promise.resolve({ name: "aaa.jpg" }) });
+    expect(res.status).toBe(404);
+  });
+
+  it("★★ 운영자는 남이 올린 사진도 받는다 — 문제 영상 관리", async () => {
+    await memoryStore.putObject("uploads", "aaa.jpg", Buffer.from("x"), "image/jpeg");
+    await memoryStore.insertUploadOwner("aaa.jpg", A);
+    const res = await getUpload(as(B, "admin"), { params: Promise.resolve({ name: "aaa.jpg" }) });
     expect(res.status).toBe(200);
   });
 
@@ -63,12 +68,19 @@ describe("완성본 내려받기", () => {
     expect(Buffer.from(await res.arrayBuffer()).toString()).toBe("진짜-영상-바이트");
   });
 
-  // ★ 2026-08-18 뒤집힘 — 남이 만든 영상도 재생된다(보관함 전체 공유). 다만 **로그인은
-  //   지난다**: 주소를 아는 아무나에게 여는 것이 아니다.
-  it("남이 만든 영상도 200 이다 — 읽기만 연다", async () => {
+  // ★★★ 2026-09-14 — 남이 만든 영상은 다시 닫혔다(전체 공유 닫기 — 와디즈 손님을 받기 전).
+  //   객체가 실제로 있어도 404 다 — 없어서 난 404 로 통과하는 "지키는 척"이 아니다.
+  it("★★★ 남이 만든 영상은 객체가 있어도 404 다 (2026-09-14)", async () => {
     const p = await createProject({ settings: {}, material: { text: "가", photos: [] }, ownerId: A });
     await putRenderObject(p.id, "진짜-영상-바이트");
     const res = await getRender(as(B), { params: Promise.resolve({ name: `${p.id}.mp4` }) });
+    expect(res.status).toBe(404);
+  });
+
+  it("★★ 운영자는 남이 만든 영상도 받는다", async () => {
+    const p = await createProject({ settings: {}, material: { text: "가", photos: [] }, ownerId: A });
+    await putRenderObject(p.id, "진짜-영상-바이트");
+    const res = await getRender(as(B, "admin"), { params: Promise.resolve({ name: `${p.id}.mp4` }) });
     expect(res.status).toBe(200);
   });
 
@@ -107,10 +119,11 @@ describe("원본(-raw) 내려받기", () => {
     expect(Buffer.from(await res.arrayBuffer()).toString()).toBe("원본-바이트");
   });
 
-  it("남의 원본도 완성본과 같은 문을 지난다 — 읽기는 열려 있다", async () => {
+  it("★★ 남의 원본도 완성본과 같은 문을 지난다 — 남에게는 404, 운영자에게는 200 (2026-09-14)", async () => {
     const p = await seed(A);
-    const res = await getRender(as(B), { params: Promise.resolve({ name: `${p.id}-raw.mp4` }) });
-    expect(res.status).toBe(200);
+    const name = `${p.id}-raw.mp4`;
+    expect((await getRender(as(B), { params: Promise.resolve({ name }) })).status).toBe(404);
+    expect((await getRender(as(B, "admin"), { params: Promise.resolve({ name }) })).status).toBe(200);
   });
 
   it("-raw 를 흉내 낸 이름은 여전히 400 이다", async () => {
@@ -180,13 +193,15 @@ describe("완성본 캐시", () => {
     expect(Buffer.from(await res.arrayBuffer()).toString()).toBe("새로-만든-영상");
   });
 
-  it("남이 봐도 캐시는 똑같이 먹는다 — ETag 가 맞으면 304", async () => {
+  // ★★ 2026-09-14 — ETag 가 맞아도 남에게는 304 가 아니라 404 다. 304 를 주면 "그 영상이 있고
+  //   아직 안 바뀌었다"를 흘린다 — 소유자 대조가 캐시 판정보다 앞이어야 한다.
+  it("★★ 남에게는 ETag 가 맞아도 404 다 — 캐시 판정이 소유자 대조를 앞지르지 않는다 (2026-09-14)", async () => {
     const p = await seedRendered(A, 1755000000000);
     const res = await getRender(
       withEtag(B, '"1755000000000"'),
       { params: Promise.resolve({ name: `${p.id}.mp4` }) }
     );
-    expect(res.status).toBe(304);
+    expect(res.status).toBe(404);
   });
 });
 

@@ -400,14 +400,9 @@ export default function Sidebar() {
       {/* ★ 손님에게는 안 보인다(2026-08-27) — "사용자들이 확인할 수 있게"의 사용자는
           로그인한 사람이다. 게다가 이 자리는 손님에게 열린 목록에 없어서(lib/auth/guest.js)
           눌러도 로그인 화면으로 튕긴다 — 막다른 링크를 그리지 않는다. */}
-      {!guest && (
-        <Link
-          href="/cost-table"
-          className={`side-item${pathname === "/cost-table" ? " on" : ""}`}
-        >
-          <span className="ic"><Icon name="clock" /></span>실제 비용
-        </Link>
-      )}
+      {/* ★★★ 2026-09-14 — **모든 사용자에게서 뺐다**(사장님 지시: "실제 비용도 사이드바에서
+          제거"). 와디즈로 손님을 받으면 우리 원가 구조가 그대로 드러난다. 화면(/cost-table)은
+          운영자 전용으로 잠갔고(lib/auth/paths.js 의 ADMIN_PATHS), 링크는 아래 운영자 자리로 옮겼다. */}
       <button className="side-item soon" disabled>
         <span className="ic"><Icon name="template" /></span>템플릿
         <span className="soon-tag">준비 중</span>
@@ -429,6 +424,16 @@ export default function Sidebar() {
           className={`side-item${pathname === "/costs" ? " on" : ""}`}
         >
           <span className="ic"><Icon name="clock" /></span>비용 기록
+        </Link>
+      )}
+      {/* 원가 표 — 2026-09-14 부터 운영자 전용(위 주석). [비용 기록]은 실제로 나간 지출 원장이고,
+          이것은 "한 편에 얼마 드는가" 표다 — 다른 화면이라 둘 다 둔다. */}
+      {isAdmin && (
+        <Link
+          href="/cost-table"
+          className={`side-item${pathname === "/cost-table" ? " on" : ""}`}
+        >
+          <span className="ic"><Icon name="clock" /></span>실제 비용
         </Link>
       )}
       {/* 크레딧 상자가 없어도 목록을 위로 붙여 둔다 */}

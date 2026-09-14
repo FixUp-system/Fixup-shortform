@@ -41,8 +41,21 @@ describe("범위 고르기 — 한 상자로 묶는다", () => {
     expect(page, "정리 버튼이 사라졌다").toContain("정리");
   });
 
-  it("★ 손님 안내는 그대로다 — 고를 것이 없는 사람에게는 상자를 안 그린다", () => {
-    expect(page).toMatch(/로그인 없이 전체 결과물을 보고 있어요/);
+  // ★★★ 2026-09-14 — 전체 공유 닫기(와디즈 손님을 받기 전). 손님에게는 전체가 아니라 빈 목록이라
+  //   안내도 "로그인하면 내 영상이 모인다"로 바뀌었다.
+  it("★ 손님 안내 — 고를 것이 없는 사람에게는 상자를 안 그리고, 로그인하라고 말한다 (2026-09-14)", () => {
+    expect(page).toMatch(/로그인하면 내가 만든 영상이 여기 모여요/);
+    expect(page, "손님에게 전체를 보여 준다는 옛 안내가 남았다").not.toMatch(/로그인 없이 전체 결과물/);
+  });
+
+  it("★★★ 상자는 운영자에게만 그린다 — 일반 사용자에게는 고를 범위가 없다 (2026-09-14)", () => {
+    const at = page.indexOf('className="seg"');
+    expect(page.slice(Math.max(0, at - 120), at), "seg 상자가 isAdmin 판정 밖에 있다").toMatch(/isAdmin\s*&&\s*\(/);
+  });
+
+  it("★★ 부르는 범위도 운영자만 넓힌다 — 옛 주소 ?scope=all 로 와도 내 영상이다", () => {
+    expect(page).toMatch(/viewScope\s*=\s*isAdmin\s*\?\s*scope\s*:\s*["']mine["']/);
+    expect(page).toMatch(/loadProjects\(fetch,\s*viewScope\)/);
   });
 });
 

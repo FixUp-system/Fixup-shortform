@@ -17,12 +17,17 @@ import { MAX_MATERIAL_TEXT } from "../../../lib/material.js";
 // ★ 손님(비로그인)도 읽는다 — 보관함 레퍼런스 체크용이다(lib/auth/guest.js).
 //   손님에게는 **내 것이라는 개념이 없다**: scope 를 무엇으로 주든 [전체]로 답한다
 //   (listProjects 는 소유자를 요구해서 그대로 넘기면 던진다).
+// ★★★ 2026-09-14 — **전체 공유를 닫았다**(사장님 지시: "전체 보관함 기능 끄고").
+//   [전체]는 이제 **운영자만** 받는다(문제 영상 관리). 일반 사용자가 scope=all 을 보내도
+//   조용히 내 것으로 답한다 — 400 으로 막으면 옛 주소(/archive?scope=all)가 오류 화면이 된다.
+//   손님에게는 내 것이 없으니 **빈 목록**이다(전에는 전체였다).
 export const GET = withUser(async (req, _ctx, user) => {
   const scope = new URL(req.url).searchParams.get("scope");
-  // ★ 손님이라는 사실을 **화면에 말해 준다** — 안 말하면 화면이 "내 영상" 칸을 누른 채
-  //   전체 목록을 보여 주게 된다(고를 수 없는 자리를 고른 것처럼 그린다).
-  if (!user) return Response.json({ projects: await listAllProjects(null), guest: true });
-  const projects = scope === "all" ? await listAllProjects(user.id) : await listProjects(user.id);
+  // ★ 손님이라는 사실을 **화면에 말해 준다** — 화면이 "로그인하면 내 영상이 보여요"를 그린다.
+  if (!user) return Response.json({ projects: [], guest: true });
+  const projects = scope === "all" && user.role === "admin"
+    ? await listAllProjects(user.id)
+    : await listProjects(user.id);
   return Response.json({ projects });
 }, { guest: true });
 
