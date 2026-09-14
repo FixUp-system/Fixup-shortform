@@ -9,6 +9,9 @@
 //   ③ 잠긴 축은 **값이 같아도 409** 다 — 그래서 몸통에는 **바뀐 축 하나만** 실어야 한다.
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
+// ★★★ Ruling 11 — 이 갈래 하나만은 **함수를 실제로 돌려** 잰다. 요구가 "코드가 그렇게
+//   생겼나"가 아니라 **"값이 화면에 남나"**라서, 모양만 재면 갈래가 죽어도 초록일 수 있다.
+import { withSavedValue } from "../components/reel/SettingsPanel.jsx";
 
 const src = readFileSync("components/reel/SettingsPanel.jsx", "utf8");
 const css = readFileSync("app/globals.css", "utf8");
@@ -62,6 +65,15 @@ describe("설정 패널", () => {
     expect(code, "잠긴 이유를 안 보여 준다").toMatch(/\.reason/);
   });
 
+  it("★★★ 세 축 **모두** 표 밖 저장값 갈래를 지나고, 그 칩은 못 누른다", () => {
+    // 한 축만 빠뜨려도 그 축에서 값이 사라진다 — 축마다 따로 못 박는다.
+    expect(code, "비율이 그 갈래를 안 지난다").toMatch(/withSavedValue\(\s*ASPECTS/);
+    expect(code, "길이가 그 갈래를 안 지난다").toMatch(/withSavedValue\(\s*secondsForModel/);
+    expect(code, "화풍이 그 갈래를 안 지난다").toMatch(/withSavedValue\(\s*STYLE_PRESETS/);
+    expect(code, "표 밖 값을 누를 수 있다 — 서버는 400 이라 거짓말이 된다")
+      .toMatch(/disabled=\{[^}]*it\.off/);
+  });
+
   it("★★ 잠긴 이유는 **한 번만** 보인다 — 네 축이 같은 문구를 쓴다", () => {
     // 비율·길이·모델·화질은 전부 "시나리오를 확정해서 잠겼어요"다(lib/reel/locks.js).
     // 축마다 그 줄을 그리면 사장님 화면에 같은 말이 줄줄이 선다.
@@ -87,10 +99,63 @@ describe("설정 패널", () => {
   it("규칙: 색·치수는 토큰이다", () => {
     const at = css.indexOf(".rp-panel");
     expect(at, ".rp-panel 규칙이 없다").toBeGreaterThan(-1);
-    const rules = css.slice(at);
+    // ★★ **끝 표식까지만** 자른다. app/globals.css 는 여러 세션이 끝에 덧붙이는 파일이라,
+    //   파일 끝까지 재면 **남이 뒤에 붙인 hex 가 이 판을 빨갛게** 만들고 메시지는 엉뚱하게
+    //   "hex 를 적었다"로 내 블록을 가리킨다(남의 작업을 망치는 자리다).
+    const rest = css.slice(at);
+    const end = rest.indexOf("/* ──");
+    expect(end, "블록 끝 표식이 없다 — 경계가 없으면 남의 CSS 까지 재게 된다").toBeGreaterThan(-1);
+    const rules = rest.slice(0, end);
     expect(rules, "hex 를 적었다").not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
     // 고른 칩은 --ink 바탕이다 — 앱층에서 액센트는 사이드바 스테퍼의 몫이고,
     // tests/design-system.test.js 가 그것을 판으로 막는다.
     expect(rules, "앱층에서 액센트를 썼다").not.toMatch(/var\(--accent/);
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────
+// Ruling 11 — **표 밖 저장값은 비활성 칩으로 남는다.**
+//
+// 왜 여기만 함수를 돌리나: 요구가 "값이 화면에서 사라지지 않는다"라서, 소스 모양만 재면
+// 갈래가 조용히 죽어도 초록일 수 있다. 실재하는 문서로 판을 세운다 —
+// app/api/reel/[id]/settings/route.js 의 Ruling 9 주석이 그런 문서의 존재를 단언한다
+// ("08-25 이전 reel 문서에는 길이가 모델 상한 위이거나 아예 없는 것이 있다").
+// 지금 secondsForModel("seedance-2.0") 은 [15] 하나다.
+// ────────────────────────────────────────────────────────────────────────
+describe("표 밖 저장값 (Ruling 11)", () => {
+  const 초 = (v) => `${v}초`;
+  const 길이표 = [{ id: 15, text: "15초" }];
+
+  it("★★★ 2.0 + 30초 옛 문서 — 30초가 칩으로 남고 · 못 누르고 · 골라진 것으로 보인다", () => {
+    const items = withSavedValue(길이표, 30, 초);
+    const saved = items.find((it) => it.id === 30);
+    expect(saved, "저장값이 화면에서 사라졌다 — 30초짜리가 15초처럼 읽힌다").toBeTruthy();
+    expect(saved.text, "라벨이 저장값이 아니다").toBe("30초");
+    expect(saved.off, "누를 수 있다 — 서버는 400 이라 고르게 두면 거짓말이다").toBe(true);
+    // 선택 표시는 화면이 `it.id === value` 로 붙인다. 그 값이 그대로 있어야 `on` 이 된다.
+    expect(saved.id, "id 가 저장값과 다르면 선택 표시가 안 붙는다").toBe(30);
+    expect(items[0], "표의 값을 밀어냈다").toEqual(길이표[0]);
+  });
+
+  it("표 밖 화풍·비율도 같은 규칙이다 — 축을 안 가린다", () => {
+    const 화풍표 = [{ id: "photo", text: "실사" }];
+    const 지워진화풍 = withSavedValue(화풍표, "claymation", String).find((it) => it.id === "claymation");
+    expect(지워진화풍.text, "모르는 화풍은 그 id 를 그대로 보여 준다").toBe("claymation");
+    expect(지워진화풍.off).toBe(true);
+
+    const 비율표 = [{ id: "9:16", text: "세로 9:16" }];
+    const 옛비율 = withSavedValue(비율표, "3:2", String).find((it) => it.id === "3:2");
+    expect(옛비율.text).toBe("3:2");
+    expect(옛비율.off).toBe(true);
+  });
+
+  it("표 안의 값은 칩을 안 늘린다 — 같은 값이 두 번 서면 안 된다", () => {
+    expect(withSavedValue(길이표, 15, 초)).toHaveLength(1);
+  });
+
+  it("값이 아예 없으면 **지어내지 않는다**", () => {
+    for (const 빈값 of [undefined, null, ""]) {
+      expect(withSavedValue(길이표, 빈값, String), `${String(빈값)} 에서 칩을 지어냈다`).toHaveLength(1);
+    }
   });
 });

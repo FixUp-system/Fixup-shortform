@@ -22,6 +22,25 @@ import { ASPECTS } from "../../lib/aspects.js";
 import { STYLE_PRESETS } from "../../lib/styles.js";
 import { secondsForModel } from "../../lib/clip-limits.js";
 
+// ★★★ 표에 없는 저장값도 보여 준다 — 잠긴 축에서 값이 사라지면 무엇으로 만들었는지가
+//   화면에서 지워진다(옛 문서에 실재).
+//
+// 실재의 근거: app/api/reel/[id]/settings/route.js 의 Ruling 9 주석 —
+// *"08-25 이전 reel 문서에는 길이가 모델 상한 위이거나 아예 없는 것이 있다."*
+// 지금 secondsForModel("seedance-2.0") 은 [15] 하나라, 30초로 만든 옛 문서는 어떤 칩도
+// 골라진 상태가 아니게 된다 — 회색 「15초」 칸 하나만 서고 **15초짜리처럼 읽힌다.**
+// 같은 구멍이 표에서 사라진 옛 화풍·비율에도 난다.
+//
+// ⚠️ 그 칩은 **누를 수 없다.** 서버가 어차피 400 이라(목록 밖 값), 고를 수 있게 두면
+//   거짓말이 된다. 보여 주기만 하고 고르기는 막는 것이 이 칩의 전부다.
+// ★ 라벨은 표에 없으니 **저장값 자체**로 만든다(fmt) — "30초" · "3:2" · 모르는 화풍 id.
+// ★ 값이 아예 없으면(undefined·null·"") 붙이지 않는다 — 없는 값을 지어내지 않는다.
+export function withSavedValue(items, value, fmt) {
+  if (value === undefined || value === null || value === "") return items;
+  if (items.some((it) => it.id === value)) return items;
+  return [...items, { id: value, text: fmt(value), off: true }];
+}
+
 export default function SettingsPanel() {
   const { project, reload } = useReelProject();
   const [busy, setBusy] = useState(false);
@@ -36,10 +55,21 @@ export default function SettingsPanel() {
   // ★★ 길이 칸은 **저장된 모델**이 정한다(lib/clip-limits.js 의 secondsForModel).
   //   TARGET_CHOICES(15·30·45·60)를 그대로 그리면 seedance-2.0 프로젝트에 30·45·60 칸이
   //   서는데, 눌러 봐야 설정 라우트가 400 으로 막는다 — 화면과 서버가 같은 표를 봐야 한다.
+  //
+  // ★ 세 축 모두 withSavedValue 를 지난다 — 표 밖의 저장값은 **비활성 칩**으로 남는다.
   const fields = [
-    { axis: "aspect_ratio", label: "비율", value: s.aspect_ratio, items: ASPECTS.map((a) => ({ id: a.id, text: `${a.label} ${a.id}` })) },
-    { axis: "target_seconds", label: "길이", value: s.target_seconds, items: secondsForModel(s.i2v_model).map((n) => ({ id: n, text: `${n}초` })) },
-    { axis: "style", label: "화풍", value: s.style, items: STYLE_PRESETS.map((p) => ({ id: p.id, text: p.label })) },
+    {
+      axis: "aspect_ratio", label: "비율", value: s.aspect_ratio,
+      items: withSavedValue(ASPECTS.map((a) => ({ id: a.id, text: `${a.label} ${a.id}` })), s.aspect_ratio, (v) => String(v)),
+    },
+    {
+      axis: "target_seconds", label: "길이", value: s.target_seconds,
+      items: withSavedValue(secondsForModel(s.i2v_model).map((n) => ({ id: n, text: `${n}초` })), s.target_seconds, (v) => `${v}초`),
+    },
+    {
+      axis: "style", label: "화풍", value: s.style,
+      items: withSavedValue(STYLE_PRESETS.map((p) => ({ id: p.id, text: p.label })), s.style, (v) => String(v)),
+    },
   ];
 
   // ★★ 잠긴 이유는 **한 번만** 말한다. 비율·길이·모델·화질은 전부 같은 문구
@@ -87,7 +117,8 @@ export default function SettingsPanel() {
             key={it.id}
             type="button"
             className={`rp-chip${it.id === value ? " on" : ""}`}
-            disabled={locks[axis].locked || busy}
+            // ★ `it.off` 는 표 밖의 저장값이다 — 골라진 것으로 보이되 **늘 못 누른다**.
+            disabled={locks[axis].locked || busy || it.off}
             onClick={() => change(axis, it.id)}
           >
             {it.text}
