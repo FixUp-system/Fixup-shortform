@@ -46,10 +46,10 @@ export const PATCH = withUser(async (req, { params }, user) => {
     }
   }
 
-  // ── ② 값 검증. **모델이 맨 먼저다.**
-  // ★ 길이도 화질도 모델에 딸려 있다(secondsForModel · isResolutionFor). 모르는 모델이
-  //   길이·화질과 함께 오면, 모델을 나중에 보는 순서에서는 "그 길이는 안 돼요"라고
-  //   엉뚱하게 답한다 — 사장님이 멀쩡한 칩을 고치러 간다. 잘못된 뿌리를 먼저 말한다.
+  // ── ② 값 검증(축 하나로 판정되는 것). **모델이 맨 먼저다.**
+  // ★ 화질은 모델에 딸려 있고(isResolutionFor), 길이는 아래 「결과 쌍」이 따로 본다.
+  //   모르는 모델이 화질·길이와 함께 오면, 모델을 나중에 보는 순서에서는 "그 화질은
+  //   안 돼요"라고 엉뚱하게 답한다 — 사장님이 멀쩡한 칩을 고치러 간다. 뿌리를 먼저 말한다.
   // ★ 목록을 손으로 다시 적지 않는다 — 잠금 표에서 모델만 앞으로 뽑아낸다.
   const order = ["i2v_model", ...axes.filter((a) => a !== "i2v_model")];
   for (const axis of order) {
@@ -79,36 +79,14 @@ export const PATCH = withUser(async (req, { params }, user) => {
         return Response.json({ error: "이 모델은 프로 등급부터 쓸 수 있어요" }, { status: 403 });
       }
     }
-    // ★★★ 길이·화질은 **모델에 딸려 있다** — 한 요청에 모델과 함께 오면 **새 모델**
-    //   기준으로 재야 한다. 저장된 옛 모델로 재면 두 쪽으로 틀린다: 갈아타면서 함께 보낸
-    //   값이 "그 모델엔 없다"로 잘못 거절되거나(둘 다 유효한데 400), 반대로 새 모델이
-    //   안 여는 값이 통과한다. 뒤엣것은 값을 치른 뒤에야 드러난다.
-    // ★ 모델은 위에서 이미 검증됐다(order 가 i2v_model 을 맨 앞에 둔다) — 여기 오는
-    //   nextModel 은 이 사장님이 실제로 쓸 수 있는 모델이다.
-    const nextModel = "i2v_model" in body ? body.i2v_model : project?.settings?.i2v_model;
-    if (axis === "target_seconds") {
-      // ★★★ Ruling 6 — 길이는 **그 모델이 한 번에 만들 수 있는 것** 안에서만 고른다.
-      //   생성 라우트(app/api/reel/route.js)가 이미 secondsForModel 로 막는데 여기만
-      //   TARGET_CHOICES(15·30·45·60)를 보면, 만들 때는 못 하는 일이 고칠 때는 된다.
-      //   ⚠️ 그게 왜 돈 문제인가: target_seconds 가 모델 상한을 넘으면
-      //   sceneMinSecondsFor 의 통짜 판정(`seconds <= maxSecondsFor`)이 거짓이 되어
-      //   **통짜(r2v) 대신 컷별 갈래**로 떨어진다 — 15초짜리에 컷별로 48초를 굽고
-      //   40크레딧만 청구하던 그 구멍이다(OUTSTANDING.md).
-      // ★ 검사를 **한 겹**으로 둔다(TARGET_CHOICES 를 함께 보지 않는다). 이유는
-      //   secondsForModel 이 이미 SELECTABLE_SECONDS 를 모델 상한으로 거른 결과라
-      //   언제나 그 부분집합이고, 무엇보다 **생성 라우트와 같은 문 하나**여야 하기
-      //   때문이다 — 두 겹이면 어느 날 한쪽만 고쳐지고 그때 두 문이 갈린다.
-      const choices = secondsForModel(nextModel);
-      if (!choices.includes(value)) {
-        return Response.json(
-          { error: `그 모델이 한 번에 만들 수 있는 길이가 아니에요 — ${choices.join("·")}초 중에서 골라 주세요` },
-          { status: 400 },
-        );
-      }
-    }
     if (axis === "resolution") {
+      // ★★ 화질은 **모델에 딸려 있다** — 한 요청에 모델과 함께 오면 **새 모델** 기준으로
+      //   재야 한다. 저장된 옛 모델로 재면, 갈아타면서 함께 보낸 화질이 "그 모델엔 없다"로
+      //   잘못 거절되거나(둘 다 유효한데 400) 새 모델이 안 여는 화질이 통과한다.
+      // ★ 모델은 위에서 이미 검증됐다(order 가 i2v_model 을 맨 앞에 둔다).
       // ★ isResolutionFor 는 project.settings.i2v_model 만 읽으므로(lib/clip-limits.js),
       //   실제 문서가 아니어도 그 모양만 흉내 내면 같은 판정을 쓴다 — 만들 때와 같은 관용구다.
+      const nextModel = "i2v_model" in body ? body.i2v_model : project?.settings?.i2v_model;
       if (!isResolutionFor(value, { settings: { i2v_model: nextModel } })) {
         return Response.json({ error: "그 모델에서 못 쓰는 화질이에요" }, { status: 400 });
       }
@@ -119,6 +97,51 @@ export const PATCH = withUser(async (req, { params }, user) => {
   if (Object.keys(next).length === 0) {
     return Response.json({ error: "고칠 값이 없어요" }, { status: 400 });
   }
+
+  // ★★★ Ruling 6 + 8 — 길이는 **그 모델이 한 번에 만들 수 있는 것** 안이어야 하고,
+  //   그 검사는 **들어온 필드가 아니라 「결과 쌍」**에 건다.
+  //
+  //   ① 왜 길이를 모델에 매는가(Ruling 6): 생성 라우트(app/api/reel/route.js)가 이미
+  //      secondsForModel 로 막는다. 고치는 문만 TARGET_CHOICES(15·30·45·60)를 보면
+  //      만들 때는 못 하는 일이 고칠 때는 된다.
+  //   ② 왜 「쌍」인가(Ruling 8): 들어온 필드만 재면 **반대 방향**이 열린다 —
+  //      `{ i2v_model: "seedance-2.0" }` 하나만 보내면 그 요청은 target_seconds 를 한 번도
+  //      안 보고 지나가, 2.5·30초 문서가 **2.0 + 30초**로 저장된다.
+  //      ★ 도달 가능성이 높다: 모델과 길이는 **둘 다 시나리오 확정에서** 잠기므로 모델을
+  //        고칠 수 있는 창이 곧 길이가 열려 있는 창이고, 화면은 **바뀐 축만** 보낸다.
+  //   ⚠️ 왜 돈 문제인가: lib/reel/oneshot.js 가 저장된 길이를 새 모델 상한과 재서
+  //      (`seconds <= oneShotMaxFor(project)`) 넘으면 **통짜(r2v) 대신 컷별 갈래**로
+  //      떨어진다 — 15초짜리에 컷별로 48초를 굽고 40크레딧만 청구하던 그 구멍이다.
+  //
+  // ★ 검사를 **한 겹**으로 둔다(TARGET_CHOICES 를 함께 보지 않는다). secondsForModel 이
+  //   이미 SELECTABLE_SECONDS 를 모델 상한으로 거른 결과라 언제나 그 부분집합이고,
+  //   무엇보다 **생성 라우트와 같은 문 하나**여야 한다 — 두 겹이면 한쪽만 고쳐진다.
+  // ★ `??` 가 아니라 `in` 으로 고른다. `??` 는 null 을 저장값으로 되돌려, 몸통이 보낸
+  //   `target_seconds: null` 이 검사를 지나 그대로 저장된다 — 길이가 조용히 null 이 되는
+  //   그 옛 함정이다(CLAUDE.md "이어서 할 일" 7번). 여기서 재는 것은 **저장될 값**이다.
+  const model = "i2v_model" in next ? next.i2v_model : project?.settings?.i2v_model;
+  const seconds = "target_seconds" in next ? next.target_seconds : project?.settings?.target_seconds;
+  const choices = secondsForModel(model);
+  if (!choices.includes(seconds)) {
+    // ⚠️ 길이를 **몰래 함께 내려 저장하지 않는다.** 사장님이 안 보낸 값을 저장이 조용히
+    //   바꾸면 화면이 보여 준 것과 저장된 것이 갈린다. 막고, **무엇을 함께 바꿔야 하는지**
+    //   말해 준다. 고를 값은 손으로 적지 않고 표에서 뽑아 붙인다.
+    const list = `${choices.join("·")}초`;
+    return Response.json(
+      {
+        error: "target_seconds" in next
+          ? `그 모델이 한 번에 만들 수 있는 길이가 아니에요 — ${list} 중에서 골라 주세요`
+          : `그 모델은 ${choices[choices.length - 1]}초까지예요 — 길이도 함께 바꿔 주세요(${list})`,
+      },
+      { status: 400 },
+    );
+  }
+  // ★ **화질에는 같은 쌍 검사를 안 건다**(Ruling 8 의 선택지). 비대칭이 무해해서다:
+  //   모델만 바꿔 저장된 화질이 새 모델 목록 밖이 되어도 resolutionForProject 가 읽는
+  //   자리에서 그 모델의 기본값으로 정규화하고, **정가(requireVideoCharge)도 fal 호출도
+  //   그 정규화된 값을 읽는다**(app/api/reel/[id]/images/route.js). 길이에는 그 자가치유가
+  //   없어서 저장된 값이 그대로 갈래를 가른다 — 그래서 길이만 여기서 막는다.
+  //   (문서에 남는 옛 화질값을 어떻게 할지는 원장에 미뤄 둔 별개 질문이다.)
 
   // ★ 길이는 이름이 둘이다 — target_seconds(정가·청구)와 seconds(시나리오 생성).
   //   한쪽만 고치면 값이 갈린다(app/api/reel/route.js 의 주석과 같은 이유).

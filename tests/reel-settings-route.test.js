@@ -62,6 +62,42 @@ describe("PATCH /api/reel/[id]/settings", () => {
     expect(after.settings.target_seconds).toBe(30);
   });
 
+  it("★★★ 모델만 내려도 400 이다 — 길이가 새 모델 상한 위에 남으면 컷별 갈래로 샌다", async () => {
+    // 반대 방향의 같은 구멍. `{ i2v_model: "seedance-2.0" }` 하나면 그 요청은
+    // target_seconds 를 한 번도 안 본다 — 2.5·30초 문서가 2.0 + 30초로 저장되고,
+    // lib/reel/oneshot.js 가 저장된 길이를 새 모델 상한과 재서 mode:"percut" 으로 떨어진다.
+    const p = await makeReel({
+      settings: { aspect_ratio: "9:16", target_seconds: 30, seconds: 30, i2v_model: "seedance-2.5", resolution: "720p", style: "photo" },
+    });
+    const res = await PATCH(req({ i2v_model: "seedance-2.0" }), ctx(p.id));
+    expect(res.status).toBe(400);
+    // 막고, 무엇을 함께 바꿔야 하는지 말해 준다 — 길이를 몰래 함께 내려 저장하지 않는다.
+    expect((await res.json()).error).toContain("길이도 함께");
+    const after = await projects.getProject(p.id, A);
+    expect(after.settings.i2v_model, "막았는데 모델이 바뀌었다").toBe("seedance-2.5");
+    expect(after.settings.target_seconds, "길이를 몰래 내렸다").toBe(30);
+  });
+
+  it("★ 모델과 길이를 함께 내리면 통과한다 — 막는 것은 어긋난 쌍뿐이다", async () => {
+    const p = await makeReel({
+      settings: { aspect_ratio: "9:16", target_seconds: 30, seconds: 30, i2v_model: "seedance-2.5", resolution: "720p", style: "photo" },
+    });
+    const res = await PATCH(req({ i2v_model: "seedance-2.0", target_seconds: 15 }), ctx(p.id));
+    expect(res.status, await res.text()).toBe(200);
+    const after = await projects.getProject(p.id, A);
+    expect(after.settings.i2v_model).toBe("seedance-2.0");
+    expect(after.settings.target_seconds).toBe(15);
+    expect(after.settings.seconds).toBe(15);
+  });
+
+  it("★ 비율은 고쳐진다 — 200 경로도 잰다(ok()·ASPECTS 모양이 어긋나면 전부 400 이 된다)", async () => {
+    const p = await makeReel();
+    const res = await PATCH(req({ aspect_ratio: "1:1" }), ctx(p.id));
+    expect(res.status, await res.text()).toBe(200);
+    const after = await projects.getProject(p.id, A);
+    expect(after.settings.aspect_ratio).toBe("1:1");
+  });
+
   it("★★ 잠긴 축은 409 다 — 화면이 아니라 여기가 문지기다", async () => {
     const p = await makeReel();
     await projects.updateProject(p.id, A, (d) => ({ ...d, scenario: { text: "확정된 시나리오" } }));
@@ -70,6 +106,14 @@ describe("PATCH /api/reel/[id]/settings", () => {
     expect((await res.json()).error).toContain("시나리오를 확정해서");
     const after = await projects.getProject(p.id, A);
     expect(after.settings.target_seconds, "막았는데 저장됐다").toBe(15);
+  });
+
+  it("★ 잠긴 축은 **값이 같아도** 409 다 — 몸통에 실려 있기만 하면 막는다", async () => {
+    const p = await makeReel();
+    await projects.updateProject(p.id, A, (d) => ({ ...d, scenario: { text: "확정된 시나리오" } }));
+    const res = await PATCH(req({ target_seconds: 15 }), ctx(p.id)); // 저장값과 같은 값
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toContain("시나리오를 확정해서");
   });
 
   it("모르는 값은 400 이다 — 목록 밖 비율·길이·화질", async () => {
