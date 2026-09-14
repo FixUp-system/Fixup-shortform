@@ -56,8 +56,8 @@ describe("reel 단계 목록은 사이드바에 없다 — 작업대가 말한�
     expect(code, "[단계별 영상] 라벨이 사라졌다").toContain("단계별 영상");
     expect(code, "무엇을 해 주는지 말하는 한 줄이 없다").toContain("보면서 고쳐요");
     // 그리고 **다른 흐름의 스테퍼**는 사이드바에 그대로 있다 — 걷은 것은 reel 하나다.
-    expect(code, "옆의 스테퍼까지 데려갔다").toContain("side-steps");
-    expect(code, "옆의 스테퍼까지 데려갔다").toContain("locked");
+    expect(code, "옆의 스테퍼까지 데려갔다 — side-steps 를 그리는 자리가 없다").toContain("side-steps");
+    expect(code, "옆의 스테퍼까지 데려갔다 — 잠긴 단계(locked) 표시가 없다").toContain("locked");
   });
 
   it("★ 레이아웃 본문에도 단계 목록이 없다 — 사이드바용 클래스를 본문에 쓰면 깨진다", () => {

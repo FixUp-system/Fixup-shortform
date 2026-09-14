@@ -30,7 +30,7 @@ export { useReelProject };
 //   유일한 소비자일 줄 알았는데, 보관함 상세(app/archive/[id]/page.js)가 "이어서
 //   작업하기" 링크를 만들려고 같은 판정을 또 필요로 했다 — 그래서 `lib/reel/steps.js`
 //   (film 이 `currentFilmStepKey` 를 두는 자리와 같다)로 옮겼다. 여기서는 import 해서
-//   쓴다. 이제 사이드바(ReelStepList)도 같은 표를 읽는다.
+//   쓴다. 이제 작업대(components/reel/StepStack.jsx)도 같은 표를 읽는다.
 
 function Inner({ children }) {
   const { id } = useParams();

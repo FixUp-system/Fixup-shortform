@@ -89,6 +89,14 @@ describe("지금 도는 단계는 어디인가", () => {
 //   되살릴 자리는 사이드바가 아니라 작업대다 — 되돌리려면 거기에 붙인다.
 describe("사이드바는 그 둘을 더 쓰지 않는다 — 작업대가 말할 자리다", () => {
   const src = readFileSync("components/Sidebar.jsx", "utf8");
+  // ★ 재는 자리가 두 벌이다(tests/sidebar-reel-steps-removed.test.js 와 같은 규율).
+  //   · "없다"는 **날 것(src)** 에서 — 주석에 남은 부품 이름도 위반이다.
+  //   · "있다"는 **주석을 걷고(code)** — 날 것에서 재면 코드를 지워도 주석 한 줄이
+  //     판을 초록으로 만든다.
+  const code = src
+    .split("\n").filter((l) => !l.trim().startsWith("//")).join("\n")
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "");
 
   it("★★★ reel 단계 목록을 그리던 부품이 없다", () => {
     // 날 것에서 잰다 — 주석에 남은 이름도 위반이다(없는 것을 grep 하게 만든다).
@@ -104,7 +112,7 @@ describe("사이드바는 그 둘을 더 쓰지 않는다 — 작업대가 말�
     expect(css).toMatch(/\.side-step\.running/);
     expect(css).toMatch(/\.side-step\.running \.running-tag/);
     // 소비자를 세고 지운다 — 지금 광고 스테퍼가 이 클래스를 실제로 붙인다.
-    expect(src, "이 CSS 의 소비자가 0 이 됐다면 그때 지워라").toMatch(/running-tag/);
+    expect(code, "이 CSS 의 소비자가 0 이 됐다면 그때 지워라").toMatch(/running-tag/);
   });
 });
 

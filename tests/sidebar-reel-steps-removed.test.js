@@ -40,8 +40,14 @@ describe("부제 한 줄이 실제로 두 줄로 선다", () => {
   it("★★★ 세로로 쌓는 칸 안에 있다 — .side-item 은 가로 flex 다", () => {
     // `.side-item { display:flex; align-items:center }` 라, 부제를 그 직계 자식으로
     // 그냥 넣으면 `display:block` 이 안 먹고 **아이콘·제목·부제가 한 줄에 나란히** 선다.
-    const pairs = code.match(/side-item-text[\s\S]*?side-item-sub/g) || [];
-    expect(pairs.length, "쌓는 칸 없이 부제만 있다 — 한 줄에 나란히 선다").toBe(2);
+    // ★ **닫는 태그까지 묶어** 진짜 중첩을 잰다. 순서만 재던 옛 판은
+    //   `side-item-text` 다음에 `side-item-sub` 가 나오기만 하면 됐다 — 부제를
+    //   `.side-item-text` **밖 형제**로 빼도 그대로 2 라서, 막으려던 바로 그 모양
+    //   (아이콘·제목·부제가 한 줄)을 못 잡았다. 이제는 형제로 빼면 0 이 된다.
+    const pairs = code.match(
+      /side-item-text">[^<]*<span className="side-item-sub">[^<]*<\/span>\s*<\/span>/g
+    ) || [];
+    expect(pairs.length, "부제가 쌓는 칸 **안**에 없다 — 한 줄에 나란히 선다").toBe(2);
 
     const col = css.match(/\.side-item-text\s*\{[^}]*\}/);
     expect(col, ".side-item-text 규칙이 없다").not.toBeNull();
