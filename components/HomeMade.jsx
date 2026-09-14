@@ -49,8 +49,12 @@ export default function HomeMade() {
           없어 그냥 제 높이로 선다 — 자르는 자리는 장수가 늘면 저절로 일한다. */}
       <div className="stage-cut">
         <div className="stage-wall">
+          {/* ★★ 2026-09-14 — 타일의 **상세 링크와 재생 표시를 걷었다.** 같은 날 전체 보관함을
+              닫아(lib/projects.js 의 getProjectForViewing) 남의 영상 상세는 운영자만 연다 —
+              손님·일반 사용자가 누르면 "찾을 수 없어요"가 떴다(첫 화면의 막다른 길).
+              아무 일도 안 하는 재생 버튼은 없는 것보다 나쁘다. */}
           {WALL.map((t) => (
-            <Link key={t.file} href={`/archive/${t.id}`} className="stage-tile">
+            <div key={t.file} className="stage-tile">
               <img
                 src={`/showcase/${t.file}`}
                 alt="만든 영상"
@@ -58,10 +62,7 @@ export default function HomeMade() {
                 height={t.h}
                 loading="lazy"
               />
-              <span className="stage-play" aria-hidden="true">
-                <svg width="9" height="11" viewBox="0 0 9 11" fill="currentColor"><path d="M0 0l9 5.5L0 11z" /></svg>
-              </span>
-            </Link>
+            </div>
           ))}
         </div>
         {/* 2026-08-27 사장님 지시("기본으로 보관함 바로 확인")를 첫 화면이 바뀌어도 잇는 문. */}

@@ -24,7 +24,7 @@ import { PROMPT_NOTE_MAX } from "../lib/styles.js";
 // (게이트 자체는 tests/credits-gate.test.js 가 잰다.)
 const grant = () =>
   getStore().insertGrant({
-    user_id: OWNER, amount_credits: 500, reason: "충전",
+    user_id: OWNER, amount_credits: 5000, reason: "충전",
     granted_by: "00000000-0000-4000-8000-0000000000ad",
   });
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";

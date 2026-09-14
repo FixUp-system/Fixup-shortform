@@ -11,5 +11,15 @@ import { readLedger, ledgerLimit } from "../../../../lib/ledger-read.js";
 export const GET = withUser(async (req, _ctx, user) => {
   const url = new URL(req.url || "http://localhost/api/credits/history");
   const before = Number(url.searchParams.get("before")) || undefined;
-  return Response.json(await readLedger(user.id, { limit: ledgerLimit(url.searchParams.get("limit")), before }));
+  // source — grant(충전) · charge(사용). 모르는 값은 readLedger 가 조건 없음으로 읽는다.
+  const source = url.searchParams.get("source") || undefined;
+  // from_ts·to_ts — 브라우저가 날짜 칸을 ms 로 바꿔 보낸다. ★ 빈 값을 Number("")=0 으로 읽으면 to_ts=0 이
+  //   전부를 지우므로, 값이 있을 때만 숫자로 읽는다.
+  const ts = (k) => {
+    const v = url.searchParams.get(k);
+    return v ? Number(v) : undefined;
+  };
+  return Response.json(await readLedger(user.id, {
+    limit: ledgerLimit(url.searchParams.get("limit")), before, source, fromTs: ts("from_ts"), toTs: ts("to_ts"),
+  }));
 });

@@ -70,11 +70,14 @@ describe("공개 경로", () => {
 
 // 운영자 경로도 보안 경계다 — 여기 없는 화면은 middleware 가 안 막는다.
 describe("운영자 전용 경로", () => {
-  it("둘뿐이다 — 원장(/costs)과 백오피스(/admin)", () => {
-    expect([...ADMIN_PATHS].sort()).toEqual(["/admin", "/costs"].sort());
+  // ★ 2026-09-14 — 원가 표(/cost-table)가 더해졌다. 와디즈 손님을 받기 전에 우리 원가 구조를
+  //   닫는다(사장님 지시: "실제 비용도 사이드바에서 제거").
+  it("셋이다 — 원장(/costs)·백오피스(/admin)·원가 표(/cost-table)", () => {
+    expect([...ADMIN_PATHS].sort()).toEqual(["/admin", "/cost-table", "/costs"].sort());
   });
 
   it("운영자 화면과 그 하위 경로를 맞힌다", () => {
+    expect(isAdminPath("/cost-table")).toBe(true);
     expect(isAdminPath("/costs")).toBe(true);
     expect(isAdminPath("/admin")).toBe(true);
     expect(isAdminPath("/admin/users/abc")).toBe(true);

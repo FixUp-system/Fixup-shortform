@@ -42,10 +42,15 @@ const ALLOWED_ROLE = new Set(["user", "admin"]);
 export const PATCH = withUser(async (req, { params }, user) => {
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
-  const { status, role, tier } = body || {};
+  const { status, role, tier, internal } = body || {};
 
-  if (status === undefined && role === undefined && tier === undefined) {
-    return Response.json({ error: "status·role·tier 중 하나는 있어야 해요" }, { status: 400 });
+  if (status === undefined && role === undefined && tier === undefined && internal === undefined) {
+    return Response.json({ error: "status·role·tier·internal 중 하나는 있어야 해요" }, { status: 400 });
+  }
+  // ★ 내부 계정(크레딧 차감 면제, 2026-09-14) — **참/거짓만** 받는다. "false" 문자열이나 1 을
+  //   받아 두면 DB·코드가 참으로 읽어 손님 계정이 무료로 샐 수 있다.
+  if (internal !== undefined && typeof internal !== "boolean") {
+    return Response.json({ error: "internal 은 true·false 중 하나예요" }, { status: 400 });
   }
   if (status !== undefined && !ALLOWED_STATUS.has(status)) {
     return Response.json({ error: "status 는 approved·blocked·pending 중 하나예요" }, { status: 400 });
@@ -102,6 +107,8 @@ export const PATCH = withUser(async (req, { params }, user) => {
     //   거기 두면 이중 쓰기를 지켜야 하는 자리가 하나 더 늘고, 갈리면 "화면은 pro 인데
     //   서버는 basic"이 된다.
     ...(tier !== undefined ? { tier } : {}),
+    // ★ 내부 계정도 등급과 같은 이유로 **원장에만** 쓴다 — 게이트가 아니라 청구가 읽는 값이다.
+    ...(internal !== undefined ? { internal } : {}),
   });
 
   // ★ 게이트·원장이 둘 다 성공한 **뒤에** 준다. 앞에 두면 게이트 실패로 502 를 돌려주면서

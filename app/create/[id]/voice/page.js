@@ -14,7 +14,7 @@ import BackButton from "../../../../components/BackButton";
 import { VOICES } from "../../../../lib/voices";
 import { isAudioStale, isReachable } from "../../../../lib/steps";
 // 상한과 정가는 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다).
-import { MAX_REGEN_PER_CUT, priceLabel, regenPrice, videoPrice } from "../../../../lib/pricing";
+import { MAX_REGEN_PER_CUT, priceLabel, regenPrice, videoPrice, formatCredits } from "../../../../lib/pricing";
 import { modelIdForProject, projectSpeaks, resolutionForProject } from "../../../../lib/clip-limits";
 // 폴링과 판정은 화면이 다시 적지 않는다 — 복붙본이 조금씩 갈려 ④이미지가 images_error 를
 // 영영 못 보던 버그가 났다(2026-08-14). 한 벌에서 온다.
@@ -346,10 +346,10 @@ export default function VoiceStepPage() {
                   에는 적지 않는다: 또 받는 것처럼 읽힌다. charged 는 서버가 장부에서 판정한다. */}
               <span className="hint">
                 컷 {cuts.length}개를 골라주신 목소리로 읽어요
-                {showCredits && !project.charged && ` · 여기서 영상 정가 ${price} 크레딧이 나가요`}
+                {showCredits && !project.charged && ` · 여기서 영상 정가 ${formatCredits(price)} 크레딧이 나가요`}
               </span>
               <button className="cta" disabled={busy} onClick={start}>
-                {busy ? "읽는 중…" : !showCredits || project.charged ? "목소리 만들기" : `목소리 만들기 · ${price} 크레딧`}
+                {busy ? "읽는 중…" : !showCredits || project.charged ? "목소리 만들기" : `목소리 만들기 · ${formatCredits(price)} 크레딧`}
               </button>
             </>
           ) : (

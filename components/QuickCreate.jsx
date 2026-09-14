@@ -9,7 +9,7 @@ import Icon from "./Icon";
 import { STYLE_PRESETS } from "../lib/styles";
 // 정가는 가격표 한 곳에서 온다. lib/pricing.js 는 import 0 개의 순수 모듈이라
 // 화면에서 불러도 안전하다(lib/charges.js 는 스토어를 끌고 오므로 안 된다).
-import { videoPrice } from "../lib/pricing";
+import { videoPrice, formatCredits } from "../lib/pricing";
 import { DEFAULT_I2V_MODEL, defaultResolutionForModel } from "../lib/clip-limits";
 import { STEPS, stepHref, currentStepKey } from "../lib/steps";
 import { lastConfirmIndex, clearConfirms, restoreConfirm } from "../lib/quick-create-state";
@@ -191,7 +191,7 @@ export default function QuickCreate() {
           text:
             `정리했어요 — ${data.summary || "요청하신 내용"}\n` +
             `(${data.target_seconds}초 · ${data.aspect_ratio} · ${styleLabel(data.style)} · ${data.voice_label})\n` +
-            `이 영상은 ${videoPrice(data.target_seconds, DEFAULT_I2V_MODEL, defaultResolutionForModel(DEFAULT_I2V_MODEL))} 크레딧이에요.\n` +
+            `이 영상은 ${formatCredits(videoPrice(data.target_seconds, DEFAULT_I2V_MODEL, defaultResolutionForModel(DEFAULT_I2V_MODEL)))} 크레딧이에요.\n` +
             `아래 버튼을 누르면 완성까지 자동으로 만들어요. 바꾸고 싶은 게 있으면 그냥 이어서 말씀해 주세요.`,
           confirm: true,
           params: data,
@@ -295,11 +295,11 @@ export default function QuickCreate() {
                         onClick={() => confirmGenerate(i)}
                         disabled={busy || noCredits(m)}
                       >
-                        🎬 영상 만들기 · {price(m)} 크레딧
+                        🎬 영상 만들기 · {formatCredits(price(m))} 크레딧
                       </button>
                       {noCredits(m) && (
                         <small>
-                          크레딧이 모자라요 — 이 영상은 {price(m)} 크레딧인데 {credits.balance} 남았어요.
+                          크레딧이 모자라요 — 이 영상은 {formatCredits(price(m))} 크레딧인데 {formatCredits(credits.balance)} 남았어요.
                           운영자에게 문의해 주세요
                         </small>
                       )}

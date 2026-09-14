@@ -16,17 +16,8 @@ const read = (p) => strip(readFileSync(p, "utf8"));
 const cuts = read("lib/cuts.js");
 const archive = read("app/archive/[id]/page.js");
 
-// 보관함의 움직임 블록만 떼어낸다 — 같은 파일의 **광고 가지**가 `<b>카메라</b>` 를
-// 손으로 적고 있는데(광고 shot 의 별개 필드 c.camera 다) 파일 전체에서 축 이름을 찾으면
-// 그 자리가 걸린다. 재는 것은 "단계별 컷의 움직임을 무엇으로 그리는가" 하나다.
-function motionBlockOf(src, why) {
-  const m = src.match(/const axes = axesOf\(\s*c\s*\)[\s\S]*?^\s*\}\)\(\)\}/m);
-  expect(m, why).toBeTruthy();
-  return m[0];
-}
-
 // ★ ②대본 화면을 재던 묶음은 지웠다(2026-08-16) — 그 화면이 원고와 함께 사라졌다.
-// 단계별 흐름에서 컷의 움직임을 그리는 화면은 지금 **보관함 상세 하나뿐이다**(아래 묶음).
+// 단계별 흐름에서 컷의 움직임을 그리던 마지막 화면(보관함 상세)도 2026-09-14 에 그 표를 걷었다(아래 묶음).
 // 남긴 것은 화면이 아니라 **라우트**를 재는 것 하나다 — 축 이름이 두 벌이 되지 않게 하는 그물이라
 // 화면과 생멸을 같이 하지 않는다.
 describe("컷 수정 라우트 — 움직임 세 축", () => {
@@ -45,54 +36,23 @@ describe("컷 수정 라우트 — 움직임 세 축", () => {
 
 });
 
-// 보관함 상세 — **일곱째 자리**다(최종 리뷰 I-1).
-// 계획이 화면을 "②대본" 하나로 잡아서 아무도 여기를 지목하지 않았다. 돈이 새지는 않지만
-// (읽기 전용 화면이다) 만들어지는 것과 다른 값을 보여 준다: 클립 프롬프트는 축으로
-// 만들어지는데 화면은 프롬프트가 **안 쓰는** 옛 motion 을 "움직임"으로 적었고,
-// 축만 있고 motion 이 없는 컷에서는 움직임 줄이 **통째로 사라졌다**.
-describe("보관함 상세 — 움직임 세 축", () => {
-  it("화면이 lib/motion 을 직접 import 한다 — 축 목록이 두 벌이 되지 않는다", () => {
-    expect(archive).toMatch(/import\s*\{[^}]*\baxesOf\b[^}]*\}\s*from\s*["'][^"']*lib\/motion["']/);
-    expect(archive).toMatch(/import\s*\{[^}]*\bmotionAxisFor\b[^}]*\}\s*from\s*["'][^"']*lib\/motion["']/);
-  });
-
-  it("축을 axesOf 로 받아 하나씩 그린다", () => {
-    expect(archive).toMatch(/axesOf\(\s*c\s*\)/);
-    expect(archive).toMatch(/axesOf\(\s*c\s*\)[\s\S]{0,400}?\.map\(/);
-  });
-
-  it("이름표는 MOTION_AXES 의 label 에서 온다 — 화면이 축 이름을 손으로 적지 않는다", () => {
-    expect(archive).toMatch(/motionAxisFor\([\s\S]{0,40}?\)[\s\S]{0,20}?\.label/);
-    const block = motionBlockOf(archive, "보관함의 축 렌더 블록을 못 찾았다");
+// 보관함 상세 — **일곱째 자리**였다(최종 리뷰 I-1).
+// 클립 프롬프트는 축으로 만들어지는데 화면은 옛 motion 을 "움직임"으로 적어서, 축을
+// axesOf 로 받아 MOTION_AXES 의 label 로 그리게 못 박았었다.
+// ★★ 2026-09-14 — **그 표를 통째로 걷었다**(사장님 지시: 사용자에게 불필요한 정보 제거).
+//   컷별 지시(문장·화면·움직임)는 모델에게 넘긴 글이라 손님이 읽을 것이 아니었다.
+//   묶음을 조용히 지우지 않고 **돌아오지 않는가**만 잰다 — 돌아온다면 위 어긋남(옛 motion 을
+//   적는 것)부터 다시 막아야 한다. axesOf·buildClipPrompt 자체는 lib 테스트가 잰다.
+describe("보관함 상세 — 움직임 표가 없다 (2026-09-14)", () => {
+  it("컷의 움직임(축·옛 motion·폴백)을 그리지 않는다", () => {
+    expect(archive, "축 렌더가 돌아왔다").not.toMatch(/axesOf\(\s*c\s*\)/);
+    expect(archive, "옛 motion 을 그린다").not.toMatch(/c\.motion/);
+    expect(archive).not.toContain("거의 정지");
+    expect(archive).not.toMatch(/<b>움직임<\/b>/);
     for (const a of MOTION_AXES) {
-      expect(block, `축 이름("${a.label}")을 보관함에 박았다 — MOTION_AXES 의 label 을 써라`)
+      expect(archive, `축 이름("${a.label}")이 보관함에 돌아왔다`)
         .not.toMatch(new RegExp(`>\\s*${a.label}\\s*<`));
-      expect(block, `축 id("${a.id}")를 보관함에 박았다 — axesOf 가 주는 id 를 써라`)
-        .not.toMatch(new RegExp(`["'\`]${a.id}["'\`]`));
     }
-  });
-
-  it("★ 보관함은 보는 화면이다 — 축에 편집 칸을 두지 않는다", () => {
-    // 고치는 자리는 ②대본이다. 여기에 편집 칸을 두면 "값이 나가는 문 앞에 서지 않게 한다"는
-    // 이 화면의 존재 이유가 흐려지고, 저장 경로도 여기엔 없다.
-    const block = motionBlockOf(archive, "보관함의 축 렌더 블록을 못 찾았다");
-    expect(block, "보관함 축에 편집 칸을 뒀다").not.toMatch(/contentEditable/);
-    expect(block, "보관함 축에 저장 호출을 뒀다").not.toMatch(/saveCut|fetch\(/);
-  });
-
-  it("★ 순서가 buildClipPrompt 와 같다 — 축 → 옛 motion → 폴백", () => {
-    expect(archive).toMatch(/axes\.length\s*[>!]/);
-    expect(archive).toMatch(/c\.motion\s*\|\|\s*["']거의 정지/);
-    const iAxes = archive.search(/const axes = axesOf\(\s*c\s*\)/);
-    const iLen = archive.search(/axes\.length\s*[>!]/);
-    const iMotion = archive.search(/c\.motion\s*\|\|\s*["']거의 정지/);
-    expect(iAxes).toBeGreaterThan(-1);
-    expect(iLen, "축 판정이 axesOf 뒤여야 한다").toBeGreaterThan(iAxes);
-    expect(iMotion, "옛 motion 이 축 판정보다 앞에 있다 — 축이 영영 안 보인다")
-      .toBeGreaterThan(iLen);
-    // ★ 옛 motion 만 조건부로 그리던 자리가 남아 있으면 안 된다 — 그 모양이면 축을 가진
-    //   컷에서 프롬프트가 안 쓰는 값이 "움직임"으로 나오고, motion 이 없으면 줄이 사라진다.
-    expect(archive, "옛 motion 만 보고 움직임 줄을 그린다").not.toMatch(/\{\s*c\.motion\s*&&/);
   });
 });
 

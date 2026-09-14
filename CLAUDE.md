@@ -36,11 +36,11 @@
 > 옛 문장은 "의도적 미커밋이다(주석에 '커밋하지 않는다')" 였는데 **둘 다 사실이 아니다**:
 > 파일은 추적되고 있고 그런 주석도 없다. 이 두 벌 상태가 위 함정의 원인이었다.
 >
-> ★ **이어서 하는 세션이 읽을 두 장**(2026-09-11 13:2x 갱신):
+> ★ **이어서 하는 세션이 읽을 두 장**(2026-09-14 저녁 갱신):
 > · **상태와 남은 일** → 이 저장소의 `OUTSTANDING.md` — **여기부터 읽어라.**
->   ⚠️ **브랜치 `feat/reel-cut-r2v` 에만 최신이다** — 워크트리
->   `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate` 에서 세션을 열어라.
->   메인 저장소(main)에서 열면 09-02 판을 읽는다.
+>   ⚠️ **브랜치 `feat/credit-unit` 에만 최신이다**(09-14 에 `feat/reel-cut-r2v` 를 합쳐 넣었다) — 워크트리
+>   `C:\Users\fixup\shotform-saas\.claude\worktrees\credit-unit` 에서 세션을 열어라.
+>   step-gate(`feat/reel-cut-r2v`)에서 열면 크레딧 새 단위·보관함 닫기·화면 정리가 없고, 메인(main)은 09-02 판이다.
 > · **왜 그렇게 했나(회차 서사)** → `C:\Users\fixup\obsidian_jaechan\sources\` 의
 >   `shotform-mcs-login-legal-and-poll-narrowing-2026-09-11.md`(가장 최신 · MCS 맞추기·법률 문서·폴링 좁히기·얼굴 격자)
 >   ← `shotform-webhook-collect-and-function-storage-2026-09-10.md`(수거·웹훅·함수 저장량)

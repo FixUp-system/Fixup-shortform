@@ -13,7 +13,8 @@ const src = readFileSync("app/admin/page.js", "utf8").replace(/\/\/[^\n]*/g, "")
 //     가로가 좁고, 어느 줄의 버튼인지 눈으로 좇아야 했다.
 describe("등급은 드롭다운이다", () => {
   it("★ select 로 고른다 — 칩을 나열하지 않는다", () => {
-    expect(src).toMatch(/<select[^>]*onChange=\{[^}]*setTier/);
+    // 드롭다운은 components/Select.jsx 한 벌이다(2026-09-14 통일) — 화면은 <Select> 를 부른다.
+    expect(src).toMatch(/<Select[^>]*onChange=\{[^}]*setTier/);
   });
 
   it("★ 보기는 표에서 나온다 — 화면에 등급 이름을 복사하지 않는다", () => {
@@ -26,7 +27,7 @@ describe("등급은 드롭다운이다", () => {
   });
 
   it("★ 바꾸는 동안 잠긴다 — 두 번 누르면 요청이 둘 나간다", () => {
-    expect(src).toMatch(/<select[\s\S]{0,200}disabled=\{/);
+    expect(src).toMatch(/<Select[\s\S]{0,200}disabled=\{/);
   });
 });
 

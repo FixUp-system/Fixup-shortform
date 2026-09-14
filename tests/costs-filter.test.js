@@ -8,7 +8,7 @@
 //   인프라가 없다. 경계값(그 날 23:59:59 가 들어오는가)은 여기서만 잴 수 있다.
 import { describe, it, expect, beforeEach } from "vitest";
 import {
-  filterRecords, actorOptions, sumCost, sumByFlow, flowOf, flowLabel, FLOWS,
+  filterRecords, actorOptions, sumCost, sumByFlow, flowOf, flowLabel, FLOWS, inDayRange, dayBounds,
 } from "../lib/costs-filter.js";
 import { memoryStore, resetMemoryStore } from "../lib/store/memory.js";
 import { listRecords } from "../lib/costs.js";
@@ -205,5 +205,48 @@ describe("원장이 흐름과 이름을 싣는다", () => {
     await memoryStore.insertCost({ request_id: "6", ts: 6, endpoint: "e", actor: U, est_cost_usd: 1 });
     const [row] = await listRecords();
     expect(row.actor_name).toBe("boss");
+  });
+});
+
+// 사용자 관리(/admin)가 가입일로 좁힐 때도 **같은 날짜 규칙**을 쓴다(2026-09-14 사장님 요청).
+// 화면이 날짜 경계를 다시 적으면 한쪽만 "그 날 포함"을 잊는다.
+describe("inDayRange — 날짜 한 칸 판정", () => {
+  const at = (y, m, d, h = 0, mi = 0) => new Date(y, m - 1, d, h, mi).getTime();
+
+  it("빈 값은 조건 없음이다", () => {
+    expect(inDayRange(at(2026, 9, 14), "", "")).toBe(true);
+  });
+  it("시작일 자정부터 들어온다", () => {
+    expect(inDayRange(at(2026, 9, 14, 0, 0), "2026-09-14", "")).toBe(true);
+    expect(inDayRange(at(2026, 9, 13, 23, 59), "2026-09-14", "")).toBe(false);
+  });
+  it("종료일은 그 날을 포함한다", () => {
+    expect(inDayRange(at(2026, 9, 14, 23, 59), "", "2026-09-14")).toBe(true);
+    expect(inDayRange(at(2026, 9, 15, 0, 0), "", "2026-09-14")).toBe(false);
+  });
+  it("ISO 문자열도 받는다 — 프로필의 created_at 은 문자열이다", () => {
+    expect(inDayRange(new Date(2026, 8, 14, 10).toISOString(), "2026-09-14", "2026-09-14")).toBe(true);
+  });
+  it("시각을 모르면 날짜를 골랐을 때만 뺀다", () => {
+    expect(inDayRange(null, "", "")).toBe(true);
+    expect(inDayRange(null, "2026-09-14", "")).toBe(false);
+  });
+});
+
+// 크레딧 내역(마이페이지) 날짜 좁히기 — 경계를 **브라우저 시각**으로 ms 로 바꿔 서버에 보낸다.
+// 서버(Vercel)는 UTC 라 "YYYY-MM-DD" 를 서버에서 자르면 한국 오전 기록이 하루 밀린다.
+describe("dayBounds — 날짜 칸 → [start, end] ms", () => {
+  it("빈 값은 null", () => {
+    expect(dayBounds("", "")).toEqual({ start: null, end: null });
+  });
+  it("시작은 그 날 자정, 끝은 그 날 23:59:59.999", () => {
+    const { start, end } = dayBounds("2026-09-14", "2026-09-14");
+    expect(start).toBe(new Date(2026, 8, 14).getTime());
+    expect(end).toBe(new Date(2026, 8, 15).getTime() - 1);
+  });
+  it("inDayRange 와 같은 규칙이다", () => {
+    const { start, end } = dayBounds("2026-09-01", "2026-09-14");
+    const ts = new Date(2026, 8, 14, 23, 0).getTime();
+    expect(ts >= start && ts <= end).toBe(inDayRange(ts, "2026-09-01", "2026-09-14"));
   });
 });

@@ -91,13 +91,21 @@ describe("보여 주는 것은 컷별 [그림 · 지문] 이다", () => {
   //   "이 그림이 내가 말한 그 장면인가"를 이 화면에서 판정할 수 없었다(원본을 따로 열어야
   //   했다). 카드는 그림을 카드 폭만큼 키우고 지문을 **바로 아래** 붙인다 — 눈이 좌우로
   //   왕복하지 않고, 컷 여럿이 한 화면에 들어온다.
-  it("컷마다 카드 하나 — 그림과 지문이 한 덩어리다", () => {
+  // ★★ 2026-09-14 — 카드의 **영어 지문 줄(panelBody)을 걷었다**(사장님 지시: 사용자에게 불필요한
+  //   정보 제거). 모델에게 하는 말이라 손님이 읽을 글이 아니었다. 카드는 [그림 · 번호 · 대사]다.
+  //   ★ panelBody 함수 자체는 굽기 지문이 계속 쓴다(lib/reel/panels.js) — 화면에서만 뺐다.
+  it("컷마다 카드 하나 — 그림 아래 대사가 붙는다", () => {
     expect(src).toContain("panel-cards");
     expect(src).toContain("panel-thumb");
-    expect(src).toContain("panel-body");
-    // 지문이 그림 **아래**여야 한다 — 위에 두면 그림을 보기 전에 글부터 읽는다.
+    // 대사가 그림 **아래**여야 한다 — 위에 두면 그림을 보기 전에 글부터 읽는다.
     const at = src.indexOf("panel-thumb");
-    expect(src.indexOf("panel-body"), "지문이 그림보다 위에 있다").toBeGreaterThan(at);
+    expect(src.indexOf("panel-say"), "대사가 그림보다 위에 있다").toBeGreaterThan(at);
+  });
+
+  it("★ 카드에 영어 지문 줄이 없다 — panel-body·panelBody(c) 를 그리지 않는다 (2026-09-14)", () => {
+    expect(src, "영어 지문 줄이 돌아왔다").not.toContain("panel-body");
+    expect(src).not.toMatch(/panelBody\(c\)/);
+    expect(src, "빈 지문 안내가 남았다").not.toContain("아직 적힌 내용이 없어요");
   });
 
   // ★ 한때 카드를 가리키면 위 스토리보드의 그 칸에 윤곽을 켰다(2026-08-27) —
@@ -123,11 +131,14 @@ describe("보여 주는 것은 컷별 [그림 · 지문] 이다", () => {
     expect(css).toMatch(/repeat\(auto-fill, 150px\)/);
   });
 
-  it("(3) 대사가 지문보다 **먼저** 온다 — 그것이 잡혀야 장면이 잡힌다", () => {
+  // ★ 2026-09-14 — 지문 줄이 사라져 "지문보다 먼저"는 뜻을 잃었다. 남는 계약은 **대사가 카드에 있다**.
+  it("(3) 대사가 카드에 남는다 — 그것이 잡혀야 장면이 잡힌다", () => {
     expect(src).toContain("panelSay");
+    const cards = src.indexOf("panel-cards");
     const say = src.indexOf("panel-say");
     expect(say, "대사 줄이 없다").toBeGreaterThan(-1);
-    expect(src.indexOf("panel-body"), "지문이 대사보다 앞에 있다").toBeGreaterThan(say);
+    expect(say, "대사 줄이 카드 밖에 있다").toBeGreaterThan(cards);
+    expect(say).toBeLessThan(src.indexOf("</ul>", cards));
   });
 
   it("★ 말 없는 컷에는 그 줄이 아예 없다 — 빈 줄을 남기지 않는다", () => {
@@ -137,6 +148,8 @@ describe("보여 주는 것은 컷별 [그림 · 지문] 이다", () => {
   // ★★ 2026-08-27 — 세 줄에서 **자르지 않고 창으로 묶는다**(사장님 지적: "짤려서 …
   //   확인할 수 있었으면"). 옛 방식(-webkit-line-clamp)은 넘치는 글을 아예 안 그려서
   //   그 칸에서는 볼 길이 없었다. 이제 세 줄 높이의 창이고 안에서 스크롤된다.
+  // ⚠️ 2026-09-14 — 화면에서 panel-body 를 걷어 이 CSS 규칙은 지금 쓰는 곳이 0 이다(죽은 규칙).
+  //   CSS 를 걷는 날 이 판도 함께 걷는다.
   it("지문은 세 줄 높이로 묶이되 **읽을 수 있다**", () => {
     const css = readFileSync("app/globals.css", "utf8");
     const at = css.indexOf(".panel-body {");
@@ -148,9 +161,8 @@ describe("보여 주는 것은 컷별 [그림 · 지문] 이다", () => {
     expect(rule).toContain("overscroll-behavior: contain");
   });
 
-  it("★ 마우스를 올리면 전체가 뜬다 — 스크롤이 번거로울 때의 지름길", () => {
-    expect(src).toMatch(/title=\{panelBody\(c\)\}/);
-  });
+  // (옛 판 "마우스를 올리면 전체가 뜬다(title={panelBody(c)})" 는 2026-09-14 지문 줄 제거로
+  //  뜻을 잃어 걷어냈다 — 없다는 것은 위 "카드에 영어 지문 줄이 없다" 판이 잰다.)
 
   it("카드는 누를 것도 초점도 없는 자리다", () => {
     const at = src.indexOf("panel-cards");
@@ -196,21 +208,22 @@ describe("②시나리오의 다음 버튼", () => {
 // ★★ 2026-08-27 (셋째 지시) — 컷별 줄만 보여 주니 **그것이 지문의 전부처럼** 읽혔다.
 //   사장님: "이미지 생성 프롬프트가 내용이 훨씬 긴데 기본적으로 들어가는 내용도 포함시켜줘".
 //   실제 지문에는 판형·인물 유지·화풍·글자 금지·첨부 사진 설명이 함께 나간다.
-describe("지문 전체를 볼 수 있다", () => {
-  it("접힌 자리에 지문 전체가 있다", () => {
-    expect(src).toContain("이미지 생성 지문 전체");
-    expect(src).toContain("lib-fold");
+// ★★ 2026-09-14 — **뒤집힌 판이다.** 위 지시로 기본 펼침의 "이미지 생성 지문 전체"(영어) 칸과
+//   그 머리의 [전체 내려받기]를 두었는데, 사장님 지시(사용자에게 불필요한 정보 제거)로 둘 다 걷었다.
+//   손님은 영어 지문을 읽지도 고치지도 않는다(수정 요청은 한국어 칸이 받는다). [전체 내려받기]는
+//   보드 옆 [보드 내려받기]와 **같은 한 장**을 받았다 — 받는 자리는 하나로 모은다.
+//   ★ 지문은 문서에 그대로 남고 굽기·수정 요청도 그대로 돈다 — 바뀐 것은 이 화면뿐이다.
+describe("지문 전체 칸이 없다 (2026-09-14)", () => {
+  it("★ '이미지 생성 지문 전체' 접힘 칸이 없다", () => {
+    expect(src, "지문 전체 칸이 돌아왔다").not.toContain("이미지 생성 지문 전체");
+    expect(src).not.toContain("lib-fold");
+    expect(src, "지문을 이 화면에서 그린다").not.toMatch(/<PromptWithKo/);
   });
 
-  it("★ 그린 뒤에는 **각인된 그 글**을 보여 준다 — 다시 조립하면 실제와 갈린다", () => {
-    expect(src).toMatch(/c\.image\?\.of/);
-    // 저장된 것이 먼저이고, 미리보기는 그것이 없을 때만이다.
-    expect(src).toMatch(/savedPrompt \|\|/);
-  });
-
-  it("아직 안 그렸으면 같은 함수로 미리보기를 만든다", () => {
-    expect(src).toContain("buildStoryboardPrompt");
-    expect(src).toContain("미리보기");
+  it("★ [전체 내려받기]가 없다 — 받는 자리는 [보드 내려받기] 하나다", () => {
+    expect(src, "[전체 내려받기]가 돌아왔다").not.toContain("전체 내려받기");
+    expect(src).not.toContain("prompt-head");
+    expect(src).toContain("보드 내려받기");
   });
 });
 

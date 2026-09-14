@@ -10,7 +10,7 @@ import { resetMemoryStore } from "../lib/store/memory.js";
 import { getStore } from "../lib/store/index.js";
 import { createProject, getProject, updateProject } from "../lib/projects.js";
 import { chargeVideo } from "../lib/charges.js";
-import { REGEN_PRICE, MAX_REGEN_PER_CUT } from "../lib/pricing.js";
+import { VIDEO_PRICE, REGEN_PRICE, MAX_REGEN_PER_CUT } from "../lib/pricing.js";
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
 
 vi.mock("../lib/pipeline.js", async (orig) => ({
@@ -57,7 +57,7 @@ describe("낡은 클립을 다시 만들면 값을 받는다", () => {
   const grant = (n) => getStore().insertGrant({ user_id: A, amount_credits: n, reason: "충전", granted_by: ADMIN });
 
   it("컷당 첫 회는 그대로 공짜다 — 컷별 [다시 만들기]와 같은 규칙", async () => {
-    await grant(500);
+    await grant(5000);
     const p = await projectWithStaleClip(0);
     await chargeVideo({ userId: A, projectId: p.id, seconds: 30, model: "kling-v3" });
     const before = await getStore().sumCharges(A);
@@ -70,7 +70,7 @@ describe("낡은 클립을 다시 만들면 값을 받는다", () => {
   });
 
   it("둘째 회부터 컷별 재생성과 같은 값을 받는다", async () => {
-    await grant(500);
+    await grant(5000);
     const p = await projectWithStaleClip(1);
     await chargeVideo({ userId: A, projectId: p.id, seconds: 30, model: "kling-v3" });
     const before = await getStore().sumCharges(A);
@@ -80,9 +80,9 @@ describe("낡은 클립을 다시 만들면 값을 받는다", () => {
   });
 
   // ★ 일괄 버튼도 화질을 타야 한다 — 컷별 [다시 만들기]와 같은 값이어야 하는데,
-  // 여기만 해상도를 안 넘기면 480p 클립을 720p 값(25)에 다시 만들 수 있다.
+  // 여기만 해상도를 안 넘기면 480p 클립을 720p 값(220)에 다시 만들 수 있다.
   it("480p 프로젝트는 480p 재생성 값을 받는다", async () => {
-    await grant(500);
+    await grant(5000);
     const p = await projectWithStaleClip(1, { i2v_model: "seedance-2.0", resolution: "480p" });
     await chargeVideo({
       userId: A, projectId: p.id, seconds: 30, model: "seedance-2.0", resolution: "480p",
@@ -94,7 +94,7 @@ describe("낡은 클립을 다시 만들면 값을 받는다", () => {
   });
 
   it("상한을 넘기지 못한다 — 컷별과 같은 3회다", async () => {
-    await grant(500);
+    await grant(5000);
     const p = await projectWithStaleClip(MAX_REGEN_PER_CUT);
     await chargeVideo({ userId: A, projectId: p.id, seconds: 30, model: "kling-v3" });
 
@@ -104,10 +104,11 @@ describe("낡은 클립을 다시 만들면 값을 받는다", () => {
   });
 
   it("크레딧이 모자라면 만들지 않는다", async () => {
-    await grant(60);   // 정가 50 을 내고 나면 10 남는다 — 재생성 8 은 되지만…
+    const regen = REGEN_PRICE.clip["kling-v3"]["720p"];
+    await grant(VIDEO_PRICE["kling-v3"]["720p"][30] + regen + 10);   // 정가를 내고 나면 재생성값 + 10 남는다 — 재생성은 되지만…
     const p = await projectWithStaleClip(1);
     await chargeVideo({ userId: A, projectId: p.id, seconds: 30, model: "kling-v3" });
-    await getStore().insertGrant({ user_id: A, amount_credits: -8, reason: "회수", granted_by: ADMIN });
+    await getStore().insertGrant({ user_id: A, amount_credits: -regen, reason: "회수", granted_by: ADMIN });
 
     const res = await POST(req(), ctx(p.id));
     expect(res.status).toBe(402);
@@ -115,7 +116,7 @@ describe("낡은 클립을 다시 만들면 값을 받는다", () => {
 
   // 처음 만드는 컷(클립이 아예 없는 컷)은 정가에 포함이다 — 여기서 또 받으면 이중 청구다.
   it("아직 안 만든 컷은 공짜다 — 정가에 포함이다", async () => {
-    await grant(500);
+    await grant(5000);
     const p = await createProject({
       ownerId: A,
       settings: { target_seconds: 30, i2v_model: "kling-v3" },

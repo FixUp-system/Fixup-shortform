@@ -2,28 +2,38 @@
 //
 // ① 세부 프롬프트(시나리오 지시문·원고·장면 목록)는 **접었다 편다.** 그 글이 길어서
 //    (광고 시나리오는 4,000자까지다) 펼쳐 두면 설정 같은 짧은 정보가 저 아래로 밀린다.
+//    ⚠️ 2026-09-14 — ①은 뒤집혔다: 접힘 칸 자체를 걷었다(아래 묶음 참고).
 // ② 겉 테두리를 넓힌다 — 정보가 많은 화면이라 960px 상자 안에서 글이 답답하다.
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 
 const src = readFileSync("app/archive/[id]/page.js", "utf8");
 const css = readFileSync("app/globals.css", "utf8");
+// 주석은 걷어내고 판정한다 — 걷은 이유를 적은 주석이 단정에 걸리면 안 된다.
+const code = src
+  .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/(^|[^:])\/\/.*$/gm, "$1");
 
-describe("보관함 상세 — 세부는 접었다 편다", () => {
-  it("★ 접기·펴기가 있다 — 브라우저가 주는 것을 쓴다(상태를 새로 만들지 않는다)", () => {
-    // <details>/<summary> 는 키보드·스크린리더 동작이 이미 붙어 있다. useState 로 흉내 내면
-    // 그 동작을 직접 만들어야 하고 대개 빠뜨린다.
-    expect(src, "토글이 없다").toMatch(/<details/);
-    expect(src).toMatch(/<summary/);
+// ★★ 2026-09-14 — **뒤집힌 판이다.** ①(세부 프롬프트는 접었다 편다)을 못 박았었는데, 사장님 지시
+//   (사용자에게 불필요한 정보 제거)로 접힘 칸 넷(광고 프롬프트 · reel 이미지/영상 프롬프트 ·
+//   단계별 원고 · 장면별 컷 지시)을 통째로 걷었다. 전부 모델에게 넘긴 영어 지시문이라 손님이
+//   읽을 글이 아니었다. 문서에는 그대로 남는다 — 화면에서만 뺐다.
+describe("보관함 상세 — 프롬프트 접힘 칸이 없다", () => {
+  // ★ 2026-09-15 병합 — main 쪽이 **손님이 적은 입력**을 여섯 줄에서 접는 부품(`<details className="input-fold">`)을
+  //   만들었다. 이 판이 막으려던 것은 모델에게 넘긴 **프롬프트 접힘 칸**이지 손님 글 접기가 아니다 —
+  //   그래서 input-fold 하나만 허용하고 그 밖의 <details> 는 여전히 막는다.
+  it("★ 프롬프트 접힘 칸(<details>·lib-fold)이 없다 — 손님 입력 접기(input-fold)만 예외", () => {
+    const folds = code.match(/<details\b[^>]*>/g) || [];
+    expect(folds.filter((d) => !/className="input-fold"/.test(d)), "프롬프트 접힘 칸이 돌아왔다").toEqual([]);
+    expect(code).not.toContain("lib-fold");
   });
 
-  it("긴 글이 그 안에 들어간다 — 시나리오·원고·장면 목록", () => {
-    const first = src.indexOf("<details");
-    expect(first).toBeGreaterThan(-1);
-    const rest = src.slice(first);
-    for (const key of ["scenario", "script", "plan-list"]) {
-      expect(rest, `${key} 가 접히는 자리 밖에 있다`).toContain(key);
-    }
+  it("★ 모델에 넘긴 글(시나리오·원고·컷별 지시)을 그리지 않는다", () => {
+    expect(code, "광고/reel 시나리오 원문을 그린다").not.toMatch(/\{doc\.scenario\.text\}/);
+    expect(code, "단계별 원고를 그린다").not.toMatch(/\{doc\.script\.text\}/);
+    expect(code, "컷별 지시 표가 돌아왔다").not.toContain("컷별 지시");
+    expect(code).not.toContain("plan-list");
   });
 
   it("★ 설정(모델·길이·화질)은 접지 않는다 — 늘 보이는 요약이다", () => {
@@ -66,21 +76,29 @@ describe("보관함 상세 — 말과 표시를 다듬는다", () => {
   const page = readFileSync("app/archive/[id]/page.js", "utf8");
   const adModels = readFileSync("lib/ad/models.js", "utf8");
 
-  it("'사장님이 준 것' 이 아니라 '사용자 입력' 이다", () => {
-    expect(page).not.toContain("사장님이 준 것");
-    expect(page).toContain("사용자 입력");
+  // ★ 2026-09-14 — '사용자 입력' → '내가 적은 내용'(사장님 지시: 손님이 읽는 말로).
+  //   '사용자 입력'은 만드는 쪽이 부르는 이름이었다.
+  it("'사장님이 준 것'·'사용자 입력' 이 아니라 '내가 적은 내용' 이다", () => {
+    expect(code).not.toContain("사장님이 준 것");
+    expect(code).not.toContain("사용자 입력");
+    expect(code).toContain('label="내가 적은 내용"');
   });
 
-  it("'시나리오' 가 아니라 '프롬프트' 다 — 모델에 넘긴 글이라는 뜻이 더 곧다", () => {
-    expect(page, "아직 시나리오라고 부른다").not.toMatch(/<summary>시나리오/);
-    expect(page).toMatch(/<summary>프롬프트/);
-  });
+  // (옛 판 "'시나리오' 가 아니라 '프롬프트' 다" 는 2026-09-14 접힘 칸 제거로 뜻을 잃어 걷어냈다 —
+  //  칸이 없다는 것은 위 "프롬프트 접힘 칸이 없다" 묶음이 잰다.)
 
-  it("★ 모델을 'Seedance 2.0' 형식으로 적는다 — id('seedance-2.0')도 라벨('2.0')도 아니다", () => {
-    // 단계별은 I2V_MODELS 에 이미 그 이름이 있다(label: "Seedance 2.0").
-    expect(page, "단계별이 모델 id 를 그대로 쓴다").toMatch(/I2V_MODELS/);
-    // 광고 표의 label 은 칩에 쓰는 짧은 이름("2.0")이라 그대로 쓰면 안 된다.
-    expect(adModels, "광고 표에 전체 이름(name)이 없다").toMatch(/name:\s*"Seedance 2\.[05]"/);
+  // ★★ 2026-09-14 — **뒤집힌 판이다.** 그전에는 모델을 'Seedance 2.0' 같은 전체 이름으로 적게
+  //   못 박았다. 사장님 지시로 업체 모델명은 안 적는다 — 원클릭(광고)만 표의 label(기본/프로)을
+  //   적고, 단계별·reel 은 모델 칩 자체가 없다.
+  it("★ 모델 칩은 광고만, 표의 label 로 — 업체 이름(name·I2V_MODELS 라벨)을 안 적는다", () => {
+    const at = code.indexOf("const modelLabel");
+    expect(at, "modelLabel 을 못 찾았다").toBeGreaterThan(-1);
+    const expr = code.slice(at, code.indexOf(";", at));
+    expect(expr).toMatch(/adModel\(s\.model\)\?\.label/);
+    expect(expr, "광고에 업체 전체 이름(name)을 쓴다").not.toMatch(/\.name\b/);
+    expect(expr, "단계별이 영상 모델 라벨(Kling v3 등)을 적는다").not.toContain("I2V_MODELS");
+    expect(adModels, "광고 표의 label 이 기본/프로가 아니다").toMatch(/label:\s*"기본"/);
+    expect(adModels).toMatch(/label:\s*"프로"/);
   });
 
   it("★ 아래 버튼 셋의 치수가 같다 — .mini(12px)와 .cta(16px)가 섞여 있었다", () => {

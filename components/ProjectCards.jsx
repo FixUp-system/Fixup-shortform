@@ -164,11 +164,19 @@ export default function ProjectCards({ projects, limit, onDeleted, selecting, se
         if (scope === "all") q.set("scope", "all");
         q.set("kind", p.kind || "step");
         const href = `/archive/${p.id}?${q}`;
+        // ★★ 2026-09-14 — **단계별(reel) 카드가 영어 `scenario` 를 달고 있었다.** reel 문서는 최상위
+        //   status 가 시나리오를 쓴 뒤 "scenario" 에 머물고(완성은 reel.status 에만 적힌다), 단계별
+        //   표(STATUS_LABEL)에는 그 키가 없어 영어 원문이 그대로 나갔다 — 완성한 뒤에도.
+        //   완성본 주소(video_url)가 있으면 완성이고, 아니면 광고 표로 읽는다(draft·scenario 가 같은 뜻).
+        // ★ 어느 표에도 없는 값은 **영어 원문 대신** "진행 중"이다(사장님 지시: 불필요한 정보 제거).
+        const isReel = p.kind === "reel";
         const label = isAd
-          ? (AD_STATUS_LABEL[p.status] || p.status)
+          ? (AD_STATUS_LABEL[p.status] || "진행 중")
           : isFilm
-            ? (FILM_STATUS_LABEL[p.status] || p.status)
-            : (STATUS_LABEL[p.status] || p.status);
+            ? (FILM_STATUS_LABEL[p.status] || "진행 중")
+            : isReel
+              ? (p.video_url ? "완성" : AD_STATUS_LABEL[p.status] || "진행 중")
+              : (STATUS_LABEL[p.status] || "진행 중");
         return (
           <li key={p.id}>
             <Link

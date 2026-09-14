@@ -59,6 +59,10 @@ function ArchiveBody() {
   //   그리면 누를 수 없는 자리를 누른 것처럼 보인다(라우트는 늘 전체로 답한다).
   const [guest, setGuest] = useState(false);
   const [scope, setScope] = useState(() => (params.get("scope") === "all" ? "all" : "mine"));
+  // ★★★ 2026-09-14 — **[전체]는 운영자만**(사장님 지시: "전체 보관함 기능 끄고"). 일반 사용자는
+  //   옛 주소(?scope=all)로 와도 내 영상을 본다 — 서버(app/api/projects/route.js)도 같은 판정이다.
+  //   ★ 등급을 모르는 동안(ready 전)에는 넓히지 않는다 — 내 영상부터 부른다.
+  const viewScope = isAdmin ? scope : "mine";
 
   // 정리는 몰아서 하는 일이다 — 하나씩 지우면 스무 편을 치우는 데 스무 번을 묻는다.
   // 평소에는 카드가 프로젝트로 들어가는 문이고, [정리] 를 누른 동안에만 고르는 자리가 된다.
@@ -73,7 +77,7 @@ function ArchiveBody() {
     let alive = true;
     setProjects(null);
     setErr("");
-    loadProjects(fetch, scope).then(({ projects, err, guest }) => {
+    loadProjects(fetch, viewScope).then(({ projects, err, guest }) => {
       if (!alive) return;
       setProjects(projects);
       setErr(err);
@@ -85,7 +89,7 @@ function ArchiveBody() {
     return () => {
       alive = false;
     };
-  }, [scope]);
+  }, [viewScope]);
 
   function toggle(id) {
     setSelected((s) => {
@@ -144,7 +148,7 @@ function ArchiveBody() {
   }
 
   const count = projects?.length || 0;
-  const isAll = scope === "all";
+  const isAll = viewScope === "all";
 
   // 범위를 바꿀 때는 고르던 것을 버린다 — 남긴 채 넘어가면 [전체]에서 고른 카드가
   // 선택에 남는다(운영자가 아니면 그 지우기가 404 다).
@@ -191,7 +195,7 @@ function ArchiveBody() {
                 ★ 손님에게는 이 두 칸과 [정리]를 안 그린다(2026-08-27) — 고를 것도 지울
                   것도 없다. 대신 무엇을 보고 있는지 한 줄로 말한다. */}
             {guest ? (
-              <span className="hint">로그인 없이 전체 결과물을 보고 있어요 — 보기 전용이에요.</span>
+              <span className="hint">로그인하면 내가 만든 영상이 여기 모여요.</span>
             ) : (
               <>
             {/* ★★★ 2026-09-01 사장님 지시 — **한 상자로 묶는다.** 그전에는 셋이 똑같은
@@ -199,6 +203,8 @@ function ArchiveBody() {
                 안 드러났다. 앞의 둘은 고르는 것이고 [정리]는 하는 것이다.
                 ★ 판정은 그대로 `aria-pressed` 다 — 보이는 상태와 스크린리더가 읽는 상태가
                   갈릴 수 없게(app/globals.css 의 그 규율을 그대로 지킨다). */}
+            {/* ★ 2026-09-14 — 운영자에게만 그린다(전체 공유 닫기). 일반 사용자에게는 고를 범위가 없다. */}
+            {isAdmin && (
             <div className="seg" role="group" aria-label="보는 범위">
               <button
                 className="seg-btn"
@@ -215,6 +221,7 @@ function ArchiveBody() {
                 전체
               </button>
             </div>
+            )}
             {/* ★★★ 2026-09-01 사장님 지적 — **사라지지 않는다.** 그전에는 조건부 렌더라
                 [전체] 로 바꾸거나 영상이 0편이면 통째로 없어져 옆 토글까지 자리가 흔들렸다.
                 사라지면 "없어졌나?" 로 읽히지만 **흐리게 있으면 "지금은 못 쓴다"** 로 읽힌다.
@@ -255,7 +262,7 @@ function ArchiveBody() {
         {selecting
           ? "지울 영상을 눌러서 고르세요."
           : isAll
-            ? "팀이 만든 영상을 모두 볼 수 있어요. 남이 만든 것은 보기만 됩니다."
+            ? "운영자 화면 — 모든 사용자가 만든 영상을 봐요."
             : "지금까지 만든 영상이 여기 모입니다. 눌러서 이어서 작업할 수 있어요."}
       </p>
 
@@ -268,7 +275,7 @@ function ArchiveBody() {
       )}
       {projects && projects.length > 0 && (
         <ProjectCards
-          scope={scope}
+          scope={viewScope}
           canDeleteAny={isAdmin}
           projects={projects}
           selecting={selecting}
