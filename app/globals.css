@@ -3369,7 +3369,11 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
 /* ★★ 펼친 단계는 **카드가 아니다** — 단계 페이지가 스스로 카드를 그린다
    (app/reel/[id]/*/page.js 여섯이 전부 `<section className="panel panel--wide">`).
    여기서 또 면을 깔면 카드 안에 카드가 앉아 테두리가 두 겹이 된다. */
-.rs-card.is-open { background: none; border-radius: 0; box-shadow: none; overflow: visible; }
+/* ★ opacity: 1 은 장식이 아니다 — `is-open` 과 `is-todo` 는 **따로** 붙어서 둘이 같이
+   설 수 있다(주소가 아직 못 여는 단계를 가리키는 순간. 지금 단계는 주소를 먼저 본다).
+   그때 아래 .is-todo 가 살아남으면 **펼쳐진 단계 페이지가 통째로 흐려진다** —
+   레이아웃 가드가 되돌리기 전 한 프레임이라도 그렇게 보이면 안 된다. */
+.rs-card.is-open { background: none; border-radius: 0; box-shadow: none; overflow: visible; opacity: 1; }
 .rs-card.is-open .rs-hd { padding: 0 2px 8px; }
 .rs-card.is-open .rs-no { background: var(--ink); color: var(--bg); box-shadow: none; }
 /* 아직 못 여는 단계도 **지우지 않는다** — 앞으로 무엇이 남았는지가 보여야 한다. */

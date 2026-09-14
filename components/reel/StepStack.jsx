@@ -63,7 +63,10 @@ export default function StepStack({ children }) {
           <>
             <span className="rs-no">{step.no}</span>
             <span className="rs-lab">{step.label}</span>
-            {!open && <span className="rs-sum">{stepSummary(step.key, project)}</span>}
+            {/* ★★ 요약은 **갈 수 있는 단계**에만 붙인다. 아직 못 여는 줄에 「컷 0/3」이
+                서면 "아직 못 연다"가 "0개 만들었다"로 읽혀, 진행이 멎은 것처럼 보인다.
+                흐린 줄은 앞으로 남은 것만 말한다. */}
+            {!open && reachable && <span className="rs-sum">{stepSummary(step.key, project)}</span>}
           </>
         );
         return (
