@@ -95,7 +95,6 @@
      여기 두는 이유는 하나다: 이 저장소가 `:root` 밖 hex 를 금지한다. 값은 사장님이 준
      캡처에서 픽셀로 잰 것이고, 밝은 벌을 안 따르는 화면은 랜딩 하나뿐이다.
      ⚠️ 앱층(작업 화면)에서 이 토큰을 쓰지 마라 — 그 순간 밝은 벌이 두 벌이 된다. */
-  --stage-bg: #000000;
   --stage-ink: #F7F7F7;
   --stage-chrome: #C8C8C8;
   --stage-panel: #0D0D0F;
@@ -2452,6 +2451,10 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
   border: 0;
   background: transparent;
   color: var(--ink);
+  /* ★ 2026-09-14 — 손님에게는 이 버튼이 **링크**다(계정이 없으니 [로그인] 하나를 그린다).
+     그래서 밑줄이 그어졌다 — 옆의 [시작하기] 와 같은 급의 버튼인데 혼자 글 링크로 보였다.
+     로그인한 사람에게는 button 이라 원래 밑줄이 없다: 한 줄로 둘을 맞춘다. */
+  text-decoration: none;
   font-size: 12px;
   font-weight: 600;
   border-radius: var(--r-ctl);
@@ -2852,107 +2855,59 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
      깔아(opacity) 판을 낮춘다. 흐림띠는 그라디언트이고, 불투명 띠는 껍데기를 막대로
      만든다. 둘 다 프로토타입에 없던 것이다. */
 .home {
-  background: var(--stage-bg);
-  color: var(--stage-ink);
-  /* ★ 위 [맨 위로] 버튼을 화면 끝까지 빼내므로 가로로 삐져나갈 수 있다. `clip` 은
+  /* ★★★ 2026-09-14 — 랜딩이 **밝은 벌로 돌아왔다.** 09-09 밤에 화면 전체를 검게 칠했던
+     것은 "덮개(사진 한 장)가 첫 화면"이라는 틀 때문이었는데, 09-14 에 그 틀을 제품 도해로
+     바꾸면서 이유가 사라졌다. 어두운 면은 이제 두 갈래 절(.land-two) 하나뿐이다.
+     ★ 그 절의 색은 `:root` 의 무대 토큰을 그대로 쓴다 — 랜딩만을 위한 색 벌을 또 만들지
+       않는다(09-09 에 그렇게 만든 토큰 하나는 소비자가 0 이 되어 이 회차에 지웠다). */
+  background: var(--bg);
+  color: var(--ink);
+  /* ★ [맨 위로] 버튼을 화면 끝까지 빼내므로 가로로 삐져나갈 수 있다. `clip` 은
      `hidden` 과 달리 **스크롤 컨테이너를 만들지 않아** sticky 가 그대로 산다. */
   overflow-x: clip;
 }
-/* ★ 눈썹(.eyebrow)은 2026-09-10 에 화면에서 걷었다 — 세 걸음이 01·02·03 으로 이미
-   순서라고 말해서 이름표가 필요 없었다. 색 규칙도 함께 걷는다(죽은 선택자를 안 남긴다). */
 
-/* 기둥 — 덮개만 화면을 가득 채우고, **읽는 절들은 프로토타입의 기둥으로 돌아온다**.
+/* 기둥 — 읽는 절과 벽이 같은 기둥에 선다.
    ★ 2560px 화면 실측: 기둥 없이 두면 4단 벽의 타일 하나가 600px 을 넘어 "벽"이 아니라
-     "큰 사진 넷"이 된다. 프로토타입이 1400px 로 묶어 둔 이유가 그것이었다.
-   ★ 덮개를 여기서 빼는 것은 사장님 지시다 — 히어로는 화면 상단에 가득 차야 한다. */
+     "큰 사진 넷"이 된다. 프로토타입이 1400px 로 묶어 둔 이유가 그것이었다. */
+.home .land-wrap,
 .home .stage-band {
   max-width: var(--stage-col);
   margin-inline: auto;
   padding-inline: var(--stage-gap);
 }
 
-/* ★★ 덮개 — 화면 상단을 **가득** 채운다. 여기가 이번 회차의 요구 그 자체다.
-   ★ 높이를 vh 로 잡되 위아래를 clamp 로 막는다. 낮은 노트북에서 껍데기와 그림이 겹쳐
-     찌그러지고, 큰 모니터에서는 첫 화면이 통째로 사진 한 장이 되어 아래가 안 보인다.
-   ★ 덮개만은 비율을 CSS 가 정한다(벽은 반대다 — 그림이 정한다). 화면 폭을 채워야 하는
-     자리라 어떤 비율이 와도 잘라 맞춰야 한다. */
-.home .stage-cover {
-  position: relative;
-  /* ★★★ 2026-09-10 — 첫 화면을 **꽉 채운다**(사장님 지시). 그전에는
-     `clamp(420px, 76vh, 880px)` 라 큰 모니터에서 880px 에 멈춰 위아래가 남았다.
-     ★ `vh` 를 먼저 적고 `dvh` 로 덮는다 — 모바일의 `100vh` 는 **주소창이 접힌** 높이라
-       주소창이 보이는 동안 히어로가 화면보다 커져 아래가 잘린다. `dvh` 는 지금 보이는
-       높이를 따른다. `dvh` 를 모르는 옛 브라우저는 앞 줄(`vh`)에 머문다. */
-  height: 100vh;
-  height: 100dvh;
-  overflow: hidden;
-  background: var(--stage-panel);
-}
-
-/* ★★ 아래에 **더 있다**고 말하는 표시.
-   히어로가 화면을 꽉 채우면서 영상 벽이 통째로 화면 밖으로 밀렸다 — 이 표시가 없으면
-   손님은 첫 화면이 전부인 줄 알고 나간다. 사장님 요구 둘("꽉 채워라"·"만든 영상을
-   확인할 수 있게")이 서로 당기는 자리라, 그 둘을 잇는 것이 이 한 조각이다.
-   ★ 사진 위에 서므로 **벌을 안 탄다**(--on-media · --stage-glass — 껍데기 버튼과 같은 결).
-   ★ z-index 2 — 덮개 전체를 덮는 재생 링크(z-index 1) 위에 서야 눌린다. */
-.home .stage-down {
-  position: absolute; left: 50%; bottom: 24px; z-index: 2;
-  display: grid; place-items: center;
-  width: 40px; height: 40px; border-radius: 50%;
-  color: var(--on-media); text-decoration: none;
-  background: rgba(0, 0, 0, .42);
-  box-shadow: inset 0 0 0 1px var(--stage-glass);
-  animation: stage-down-hint 2.4s ease-in-out infinite;
-}
-.home .stage-down:hover { background: rgba(0, 0, 0, .58); }
-/* ★ 이 저장소는 스스로 도는 움직임을 아껴 쓴다. 여기 하나를 두는 이유는 그것이
-   "아래에 더 있다"를 말하는 **유일한 장치**라서다 — 대신 끄는 길을 연다(아래 media). */
-@keyframes stage-down-hint {
-  0%, 100% { transform: translateX(-50%) translateY(0); }
-  50%      { transform: translateX(-50%) translateY(5px); }
-}
-.home .stage-down { transform: translateX(-50%); }
-@media (prefers-reduced-motion: reduce) {
-  .home .stage-down { animation: none; }
-}
-/* ★ 그림을 눌러 깐다. 껍데기 글자가 흰색이라 밝은 사진 위에서 읽히려면 판이 낮아야
-   하는데, 흐림띠(그라디언트)도 불투명 띠도 이 저장소·이 디자인에서는 못 쓴다.
-   그림 자체의 불투명도를 낮추면 뒤의 `--stage-panel` 이 비쳐 **고르게** 어두워진다. */
-.home .stage-cover-img {
-  width: 100%; height: 100%; object-fit: cover; display: block;
-  opacity: .62;
-}
-
-/* ★★ 껍데기 — 사이드바가 그리던 브랜드와 띠가 그리던 신원 영역이 덮개 **위로** 올라온다
-   (2026-09-09 밤 사장님 지시). 주 버튼도 여기 선다. */
+/* ★★ 껍데기 — 09-14 부터 **화면 맨 위에 따라다니는 띠**다(덮개 위에 얹혀 있던 자리에서
+   내려왔다). 바탕이 화면 끝까지 이어지되 글은 기둥에 맞아야 하므로, 여백을 `max()` 로
+   준다 — 좁은 화면에서는 기본 여백, 넓은 화면에서는 기둥 밖까지. */
 .home .stage-nav {
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  z-index: 2;
+  position: sticky;
+  top: 0;
+  z-index: 30;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-4);
-  /* 껍데기도 같은 기둥에 선다 — 브랜드가 아래 벽의 왼쪽 끝과 맞는다. */
-  max-width: var(--stage-col);
-  margin-inline: auto;
-  padding: var(--sp-4) var(--stage-gap) 0;
+  padding: var(--sp-3) max(var(--stage-gap), calc(50% - var(--stage-col) / 2));
+  background: var(--bg);
+  box-shadow: inset 0 -1px 0 var(--line);
 }
 .home .stage-brand {
   display: inline-flex; align-items: center;
   font-size: 18px; font-weight: 700; letter-spacing: -0.01em;
-  color: var(--on-media); text-decoration: none;
+  color: var(--ink); text-decoration: none;
 }
-.home .stage-nav-right { display: flex; align-items: center; gap: var(--sp-3); }
+.home .stage-nav-right { display: flex; align-items: center; gap: var(--sp-4); }
+.home .land-navlink { font-size: 14px; color: var(--ink-soft); text-decoration: none; }
+.home .land-navlink:hover { color: var(--ink); }
 
 /* ★★★ 두 버튼을 **한 급으로** 맞춘다 (2026-09-10 사장님: "로그인 만들러가기 버튼 사이즈가
    비율이 너무 안맞아"). 안 맞을 수밖에 없었다 — 둘은 원래 **다른 자리의 버튼**이다:
-     .cta    = 앱 화면의 주 실행 버튼 — 높이 40px · 글자 16px · 모서리 8px · **margin-top 20px**
+     .cta    = 앱 화면의 주 실행 버튼 — 높이 40px · 글자 16px · **margin-top 20px**
      .um-btn = 상단 띠의 작은 신원 버튼 — 높이 ≈22px · 글자 12px
-   높이가 거의 두 배였고, 게다가 `.cta` 의 `margin-top` 이 그 줄에서 버튼을 아래로 밀어
-   **세로 정렬까지 어긋나** 있었다(랜딩에서는 위아래 여백을 껍데기가 준다).
    ★ 랜딩 껍데기에서는 둘이 **짝**이다 — 같은 높이·같은 모서리·같은 글자 크기로 두고,
-     주 버튼임은 **색**이 말한다(채운 버튼 vs 비친 버튼). 크기로 소리치지 않는다. */
+     주 버튼임은 **색**이 말한다(채운 버튼 vs 글자 버튼). 크기로 소리치지 않는다.
+   ★ 09-14 — 띠가 밝아져서 신원 버튼의 어두운 되돌림은 걷었다(앱층 모양 그대로 쓴다). */
 .home .stage-nav .cta,
 .home .stage-nav .um-btn {
   height: var(--ctl-md);
@@ -2962,30 +2917,24 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
   font-weight: 600;
   margin-top: 0;
 }
-/* 신원 영역은 앱층과 **같은 부품**(UserMenu)이라 밝은 벌 색을 들고 온다. 사진 위에서만
-   되돌린다 — 뿌리를 적었으니 앱층 상단바에는 안 샌다. */
-.home .stage-nav .um-btn {
-  color: var(--on-media);
-  background: rgba(0, 0, 0, .42);
-  box-shadow: inset 0 0 0 1px var(--stage-glass);
-  border-radius: var(--r-pill);
-}
-.home .stage-nav .um-btn:hover { background: rgba(0, 0, 0, .58); }
 
-/* ★★ 2026-09-10 — 덮개의 재생 링크·표시(.stage-cover-play/.stage-bigplay) 규칙을
-   **지웠다**(사장님 지시로 화면에서 걷었다). 쓰는 자리가 없는 규칙은 다음 사람에게
-   거짓말을 한다. 값은 git 이력에 있다. */
+/* ★★ 2026-09-14 — **덮개 규칙을 통째로 지웠다**(.stage-cover · .stage-cover-img ·
+   .stage-down 과 그 움직임). 화면을 가득 채우던 히어로가 제품 도해로 바뀌어 쓰는 자리가
+   0 이 됐다 — 쓰는 자리가 없는 규칙은 다음 사람에게 거짓말을 한다. 값은 git 이력에 있다.
+   그 앞 09-10 에는 같은 이유로 덮개의 재생 링크·표시를 지웠다. */
 
 
 
 /* 벽 — **비율을 안 정한다.** 타일 높이는 그림이 정한다. 숏폼은 9:16 이 많고 메인에 걸 것은
    16:9 라 섞이는데, 한 비율로 못 박으면 그림이 잘리거나 늘어난다.
    ★ 다단(column)이라 타일이 컨테이너 **안에서만** 흐른다 — 밖으로 삐져나가지 않는다. */
-.home .stage-wall { column-count: 4; column-gap: var(--sp-3); padding-top: var(--sp-4); }
+/* ★ 간격은 **실측값 6px** 이다(사다리 값이 아니다). 시안의 벽이 이 간격이고, 벌어지면
+   "붙어서 깔린 벽"이 아니라 "사진 여러 장"으로 읽힌다 — 09-14 사장님이 그 그림을 가리켰다. */
+.home .stage-wall { column-count: 4; column-gap: 6px; padding-top: var(--sp-4); }
 .home .stage-tile {
   position: relative; display: block; width: 100%;
   break-inside: avoid; -webkit-column-break-inside: avoid;
-  margin: 0 0 var(--sp-3); border-radius: var(--r-ctl); overflow: hidden;
+  margin: 0 0 6px; border-radius: var(--r-ctl); overflow: hidden;
   background: var(--stage-panel); text-decoration: none;
   transition: transform .3s cubic-bezier(.2, .7, .2, 1);
 }
@@ -3002,9 +2951,21 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
 }
 
 /* ★★ 벽을 **한 선에서 자른다.** 비율이 제각각이라 열마다 바닥이 들쭉날쭉한데, 잘라 버리면
-   그 아래가 곧은 한 줄이 된다 — 어질러 보이지 않으면서 "더 있다"도 전해진다.
-   ★ 흐려지게 하지 않는다(그라디언트 금지). 자른 선 위에 문이 서서 "더 있다"를 말한다. */
+   그 아래가 곧은 한 줄이 된다 — 어질러 보이지 않으면서 "더 있다"도 전해진다. */
 .home .stage-cut { position: relative; max-height: clamp(560px, 64vw, 1040px); overflow: hidden; }
+
+/* ★★★ 2026-09-14 — **아래 자락을 흐리게 지운다**(사장님 지시: "하단 부분 흐리게").
+   그전에는 곧은 선에서 그냥 잘렸는데, 그 선이 눈에 띄어 "더 있다"가 아니라 "잘렸다"로
+   읽혔다. 자락이 바탕색으로 잦아들면 벽이 이어지다 사라지는 것으로 보인다.
+   ⚠️ 이 저장소는 **그라디언트를 금지**한다(tests/design-system.test.js). 이 한 자리만
+     예외로 뚫었다 — 규칙을 연 것이 아니라 자리를 하나 허용한 것이고, 판이 그 자리를
+     이름으로 못 박는다. 다른 데서 쓰고 싶으면 여기가 아니라 그 판을 먼저 고쳐라.
+   ★ 누름을 막지 않는다(pointer-events) — 아래 타일과 [더 보러가기]가 그대로 눌린다. */
+.home .stage-cut::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 240px;
+  background: linear-gradient(to top, var(--bg) 34%, transparent);
+  pointer-events: none;
+}
 .home .stage-more {
   position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 1;
   display: inline-flex; align-items: center; gap: 8px;
@@ -3044,6 +3005,253 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
   transition: transform .25s cubic-bezier(.2, .7, .2, 1);
 }
 .home .stage-top:hover { transform: translateY(-2px); background: rgba(0, 0, 0, .78); }
+
+/* ── 09-14 랜딩: 제품 도해 ────────────────────────────────────────────────
+   시안 둘 중 사장님이 고른 쪽(입력 → 두 갈래 → 같은 영상)을 옮긴 것이다.
+   ★ 색은 전부 토큰이다 — 이 저장소는 `:root` 밖 hex 를 금지한다.
+   ★ **그라디언트를 쓰지 않는다**(저장소 규칙). 시안의 흐림띠 둘은 여기서 불투명 면으로
+     바꿨다 — 벽 아래는 원래대로 한 선에서 그냥 잘린다.
+   ⚠️ 2026-09-10 에 지웠던 `.stage-steps` 와 **이름이 다르다**(.land-step*). 그때 지운 것은
+     소재·시나리오·영상 생성 세 걸음이고, 이것은 09-14 시안의 다른 세 걸음이다. */
+
+.home .land-head {
+  padding-top: clamp(36px, 6vw, 84px);
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+}
+.home .land-head .display { margin-bottom: 14px; }
+.home .land-slate {
+  display: flex; align-items: center; gap: 10px; margin: 0 0 16px;
+  font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.home .land-slate b { color: var(--accent); font-weight: 600; }
+.home .land-slate span { width: 26px; height: 1px; background: var(--line); }
+.home .land-lede {
+  margin: 0; font-size: 16px; line-height: 1.8; color: var(--ink-soft);
+  max-width: 50ch; text-wrap: balance;
+}
+.home .land-h2 {
+  margin: 0 0 16px; font-size: 30px; line-height: 1.24;
+  letter-spacing: -0.015em; font-weight: 700; text-wrap: balance;
+}
+
+/* 걸음 띠 — **번호가 정보다.** 01·02·03 이 실제 순서라서 단다(장식이 아니다). */
+.home .land-steps {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+  margin-top: clamp(28px, 4vw, 44px); align-items: stretch;
+}
+.home .land-step {
+  position: relative; display: flex; gap: 14px; align-items: center;
+  padding: 16px 18px; border-radius: var(--r-card);
+  background: var(--surface); box-shadow: var(--ring), var(--lift);
+}
+.home .land-step::after {
+  content: "›"; position: absolute; right: -12px; top: 50%; transform: translateY(-50%);
+  font-size: 18px; color: var(--ink-soft); line-height: 1;
+}
+.home .land-step:last-child::after { content: none; }
+.home .land-ic {
+  width: 42px; height: 42px; flex: none; border-radius: var(--r-ctl);
+  display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent);
+}
+.home .land-step-tx em {
+  display: block; font-style: normal; font-size: 12px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--ink-soft);
+}
+/* ★ 줄 끝에 낱말 하나만 떨어지지 않게 — "고치며"가 혼자 내려가던 자리다. */
+.home .land-step-tx strong {
+  display: block; font-size: 16px; font-weight: 600; line-height: 1.45; text-wrap: balance;
+}
+
+/* 도해 — 세 칸: 적는 자리 · 두 갈래 · 모이는 결과 */
+.home .land-diagram {
+  display: grid; grid-template-columns: 284px minmax(0, 1fr) 272px;
+  gap: clamp(14px, 2.4vw, 30px); align-items: center;
+  margin-top: clamp(32px, 5vw, 56px);
+}
+.home .land-panel {
+  background: var(--surface); border-radius: var(--r-card); padding: 20px 18px;
+  box-shadow: var(--ring), var(--lift);
+  display: flex; flex-direction: column; gap: 16px;
+}
+.home .land-field-set { display: flex; flex-direction: column; gap: 7px; }
+.home .land-label { font-size: 12px; color: var(--ink-soft); font-weight: 600; }
+.home .land-field {
+  background: var(--surface); border-radius: var(--r-ctl); padding: 10px 12px;
+  font-size: 14px; line-height: 1.6; color: var(--ink);
+  box-shadow: var(--ring), var(--lift);
+}
+.home .land-field--ta { position: relative; min-height: 88px; padding-bottom: 26px; }
+.home .land-count { position: absolute; right: 10px; bottom: 7px; font-size: 12px; color: var(--ink-soft); }
+.home .land-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.home .land-chip {
+  font-size: 12px; padding: 5px 11px; border-radius: var(--r-pill);
+  background: var(--surface); color: var(--ink-soft); box-shadow: var(--ring);
+}
+.home .land-chip--on { background: var(--accent); color: var(--btn-ink); font-weight: 600; box-shadow: none; }
+
+/* 두 갈래 — 입력에서 뻗어 나가는 선이 구조를 말한다 */
+.home .land-fork { position: relative; display: flex; flex-direction: column; gap: 16px; padding-left: 22px; }
+.home .land-fork::before {
+  content: ""; position: absolute; left: 0; top: 26%; bottom: 26%;
+  border-left: 1px dashed var(--line);
+}
+.home .land-branch {
+  position: relative; background: var(--surface); border-radius: var(--r-card);
+  padding: 15px 16px 16px; box-shadow: var(--ring), var(--lift);
+  display: flex; flex-direction: column; gap: 9px;
+}
+.home .land-branch--pick { box-shadow: 0 0 0 1px var(--accent), var(--lift); }
+.home .land-branch::before {
+  content: ""; position: absolute; left: -22px; top: 50%; width: 22px;
+  border-top: 1px dashed var(--line);
+}
+.home .land-bhead { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; }
+.home .land-btag { font-size: 12px; font-weight: 600; letter-spacing: .1em; color: var(--ink-soft); }
+.home .land-branch--pick .land-btag { color: var(--accent); }
+.home .land-bhead strong { font-size: 14px; font-weight: 600; line-height: 1.4; }
+.home .land-branch p { margin: 0; font-size: 12px; color: var(--ink-soft); line-height: 1.6; }
+.home .land-trail { display: flex; align-items: stretch; gap: 7px; flex-wrap: wrap; }
+.home .land-node {
+  flex: 1; min-width: 76px; border-radius: var(--r-ctl); background: var(--surface2);
+  padding: 8px 9px; display: flex; flex-direction: column; gap: 4px; box-shadow: var(--ring);
+}
+.home .land-node em { font-style: normal; font-size: 12px; color: var(--ink); line-height: 1.35; }
+.home .land-node b {
+  align-self: flex-start; font-size: 12px; font-weight: 600; letter-spacing: .04em;
+  color: var(--accent); background: var(--accent-soft); padding: 2px 5px; border-radius: var(--r-ctl);
+}
+.home .land-node--plain b { color: var(--ink-soft); background: transparent; padding: 0; }
+.home .land-node--fin { background: var(--accent-soft); box-shadow: 0 0 0 1px var(--accent); }
+.home .land-node--fin em { color: var(--accent); font-weight: 600; }
+.home .land-arw { align-self: center; flex: none; font-size: 12px; color: var(--ink-soft); }
+
+/* 모이는 결과 — 표지 한 장 위에 자막과 재생 표시가 얹힌 **그림**이다(누르는 것이 아니다).
+   ★ 비율은 여기서 정한다(벽은 반대다 — 그림이 정한다). 세로 한 칸으로 고정해야 도해의
+     오른쪽 칸이 흔들리지 않는다. */
+.home .land-out {
+  position: relative; width: 100%; max-width: 340px; margin-inline: auto;
+  aspect-ratio: 9 / 16; border-radius: var(--r-card); overflow: hidden;
+  background: var(--stage-panel); box-shadow: var(--elevate);
+}
+.home .land-out img { width: 100%; height: 100%; max-width: 100%; object-fit: cover; display: block; }
+/* ★ 자막은 **아래**에 선다(09-14 사장님 지시). 가운데 두면 사람 얼굴을 덮는다 —
+   우리가 실제로 태우는 자리도 화면 아래다. 재생 표시 줄 위에 얹는다. */
+.home .land-burn {
+  position: absolute; left: 0; right: 0; bottom: 52px; margin: 0; padding-inline: 18px;
+  text-align: center; font-weight: 600; color: var(--on-media);
+  font-size: 18px; line-height: 1.3;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, .6);
+}
+/* ★ 시안은 여기에 흐림띠(그라디언트)를 깔았다 — 이 저장소에서는 못 쓴다. 불투명 면으로
+   바꾸되 아래 끝에만 얹어 그림을 덜 가린다. */
+.home .land-scrub {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 12px;
+  display: flex; align-items: center; gap: 10px; background: rgba(0, 0, 0, .48);
+}
+.home .land-pb {
+  width: 0; height: 0; flex: none;
+  border-left: 10px solid var(--on-media);
+  border-top: 7px solid transparent; border-bottom: 7px solid transparent;
+}
+.home .land-track { position: relative; flex: 1; height: 3px; border-radius: var(--r-pill); background: var(--stage-glass); }
+.home .land-track i { position: absolute; inset: 0 56% 0 0; border-radius: var(--r-pill); background: var(--on-media); }
+.home .land-time { font-size: 12px; letter-spacing: .04em; color: var(--on-media); }
+
+/* 규격 — **고르는** 것이지 셋이 한 번에 나오는 것이 아니다 */
+.home .land-fits {
+  margin-top: clamp(30px, 4vw, 46px);
+  display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center;
+}
+.home .land-fits-t { margin: 0; font-size: 14px; color: var(--ink-soft); }
+.home .land-fitrow { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.home .land-fit {
+  display: flex; align-items: center; gap: 9px;
+  background: var(--surface); border-radius: var(--r-ctl); padding: 9px 16px;
+  font-size: 14px; box-shadow: var(--ring), var(--lift);
+}
+.home .land-fit b { font-size: 12px; font-weight: 600; color: var(--accent); }
+
+/* ★★ 어두운 면은 **이 절 하나뿐이다.** 할 말이 가장 많은 자리라 바탕을 갈아 시선을 끊는다. */
+.home .land-two {
+  margin-top: clamp(56px, 8vw, 104px);
+  padding-block: clamp(56px, 8vw, 104px);
+  background: var(--stage-dark); color: var(--stage-ink);
+}
+.home .land-two .land-slate { color: var(--stage-chrome); }
+.home .land-two .land-slate span { background: var(--stage-glass); }
+.home .land-two .land-h2 { color: var(--stage-ink); }
+.home .land-two .land-lede { color: var(--stage-chrome); }
+
+/* ★ 두 카드는 **같은 크기**다(09-14 사장님 지시). 늘여서 맞추고 마지막 줄을 바닥에 붙인다 —
+   한쪽만 길면 그쪽이 정답처럼 읽힌다. */
+.home .land-paths {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  margin-top: 38px; align-items: stretch;
+}
+.home .land-path {
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 24px 24px 26px; border-radius: var(--r-card);
+  background: rgba(255, 255, 255, .05);
+  box-shadow: inset 0 0 0 1px var(--stage-glass);
+}
+.home .land-path--deep { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+/* ★ 뱃지는 **알약**이다(09-14 사장님: "뱃지가 잘 안 보인다"). 글자만으로는 제목에 묻혔다.
+   둘의 색은 다르되 **무게는 같다** — 한쪽만 강조하면 다른 길이 없는 것처럼 읽힌다. */
+.home .land-ptag {
+  align-self: flex-start; padding: 5px 12px; border-radius: var(--r-pill);
+  font-size: 12px; font-weight: 600; letter-spacing: .1em; line-height: 1;
+  background: var(--stage-ink); color: var(--stage-dark);
+}
+.home .land-path--deep .land-ptag { background: var(--accent); color: var(--btn-ink); }
+.home .land-path-h { margin: 0; font-size: 18px; font-weight: 600; color: var(--stage-ink); }
+.home .land-plist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.home .land-plist li { display: flex; gap: 9px; font-size: 14px; line-height: 1.65; color: var(--stage-chrome); }
+.home .land-plist li::before {
+  content: ""; flex: none; width: 5px; height: 5px; margin-top: 9px;
+  border-radius: 50%; background: var(--stage-glass);
+}
+.home .land-path--deep .land-plist li::before { background: var(--accent); }
+.home .land-plist li b { color: var(--stage-ink); font-weight: 600; }
+.home .land-pwhen {
+  margin: auto 0 0; padding-top: 15px; border-top: 1px solid var(--stage-glass);
+  font-size: 14px; color: var(--stage-chrome);
+}
+.home .land-pwhen b { color: var(--stage-ink); font-weight: 600; }
+.home .land-editbox {
+  margin-top: 6px; padding: 15px; border-radius: var(--r-ctl);
+  display: flex; flex-direction: column; gap: 11px;
+  background: rgba(0, 0, 0, .45); box-shadow: inset 0 0 0 1px var(--stage-glass);
+}
+.home .land-editlbl { font-size: 12px; letter-spacing: .12em; color: var(--stage-chrome); }
+.home .land-typed { margin: 0; font-size: 16px; line-height: 1.6; color: var(--stage-ink); }
+.home .land-send {
+  align-self: flex-end; padding: 7px 15px; border-radius: var(--r-pill);
+  font-size: 14px; background: var(--accent); color: var(--btn-ink);
+}
+
+/* 만든 영상 머리 · 마무리 */
+.home .land-made-head { padding-top: clamp(56px, 8vw, 104px); }
+.home .land-final { padding-block: clamp(56px, 8vw, 104px); text-align: center; }
+.home .land-final .land-wrap { display: flex; flex-direction: column; align-items: center; }
+.home .land-cta-big { height: auto; padding: 14px 30px; border-radius: var(--r-pill); font-size: 16px; margin-top: 24px; }
+
+@media (max-width: 1040px) {
+  .home .land-diagram { grid-template-columns: 1fr; gap: 28px; }
+  .home .land-panel { width: 100%; max-width: 460px; margin-inline: auto; }
+  .home .land-fork { width: 100%; max-width: 620px; margin-inline: auto; padding-left: 0; }
+  .home .land-fork::before, .home .land-branch::before { display: none; }
+  .home .land-out { max-width: 300px; }
+  .home .land-paths { grid-template-columns: 1fr; }
+}
+@media (max-width: 700px) {
+  .home .land-steps { grid-template-columns: 1fr; gap: 12px; }
+  .home .land-step::after { content: "⌄"; right: 50%; top: auto; bottom: -14px; transform: translateX(50%); }
+  .home .land-trail { flex-direction: column; align-items: stretch; }
+  .home .land-arw { align-self: center; transform: rotate(90deg); }
+  .home .land-navlink { display: none; }
+}
 
 /* ★★ 2026-09-10 — 만드는 법 세 걸음(.stage-steps/.stage-step/.stage-n)의 규칙을
    **지웠다**(사장님 지시로 화면에서 그 절을 걷었다). 쓰는 자리가 없는 규칙은 다음 사람에게

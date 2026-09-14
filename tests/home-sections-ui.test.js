@@ -1,9 +1,13 @@
-// home 은 **화면을 가득 채우는 어두운 무대**다(2026-09-09 저녁 사장님 확정). 이력:
+// home 은 **제품 도해로 여는 밝은 랜딩**이다(2026-09-14 사장님이 시안 둘 중 골랐다). 이력:
 //   · 08-28 "만드는 방식을 고르는" 도해 두 장
 //   · 09-08 결과물로 여는 밝은 화면
 //   · 09-09 아침 손님에게 열고 결과물을 맨 위로
 //   · 09-09 저녁 어두운 무대 + 히어로 자리 + 비율 섞인 벽
-//   · 09-09 밤 **덮개가 화면을 가득 채우고 껍데기가 그 위에 얹힌다**  ← 지금
+//   · 09-09 밤 덮개가 화면을 가득 채우고 껍데기가 그 위에 얹힌다
+//   · 09-14 **제품 도해**(입력 → 두 갈래 → 같은 영상) + 밝은 벌  ← 지금
+//
+// ★★★ 09-14 에 **덮개가 사라졌다.** 그래서 이 파일에서 덮개를 지키던 단정 셋이 바뀌었다 —
+//   자세한 뒤집힘(머리글·걸음 띠·밝은 벌)은 tests/landing-hero.test.js 가 적는다.
 //
 // ★★★ 이 회차에 고친 것은 색이 아니라 **틀**이다. 색 토큰은 프로토타입과 이미 같았는데
 //   (#000000 · #F7F7F7 · #C8C8C8 · #0D0D0F · #1C1C20 · 버튼 #B0446A) 화면이 딴판이었다 —
@@ -27,8 +31,9 @@ import { readFileSync, statSync } from "node:fs";
 const src = readFileSync("app/home/page.js", "utf8");
 const made = readFileSync("components/HomeMade.jsx", "utf8");
 const shell = readFileSync("components/AppShell.jsx", "utf8");
+const css = readFileSync("app/globals.css", "utf8");
 
-describe("home — 화면을 채우는 어두운 무대", () => {
+describe("home — 제품 도해로 여는 랜딩", () => {
   it("★ 굽힌 목록에서 그린다 — 부르지 않는다", () => {
     // ★ 이 판은 원래 "목록을 부르는가"였다. 2026-09-10 에 **부르지 않는 것이 계약**이 됐다
     //   (표지를 파일로 구워 넣었다 — 이유는 tests/showcase-static.test.js 머리말).
@@ -61,45 +66,38 @@ describe("home — 화면을 채우는 어두운 무대", () => {
     expect(made, "굽힌 자리에서 안 읽는다").toMatch(/\/showcase\//);
   });
 
-  it("★★ 덮개가 화면을 채우고 그 위에 껍데기가 얹힌다", () => {
-    // 프로토타입과 갈린 자리가 정확히 여기다(위 머리글 참고).
-    expect(made, "덮개가 없다").toMatch(/className="stage-cover"/);
-    expect(src, "덮개 위에 얹을 껍데기가 없다").toMatch(/className="stage-nav"/);
-    // ★ 껍데기는 **덮개 안으로** 들어가야 한다 — 서버가 신원을 읽어 만들고
-    //   덮개 부품이 그 안에 꽂는다. 그래서 prop 으로 건네고 거기서 받는다(둘 다 서버다).
-    expect(src, "껍데기를 덮개에 안 건넨다").toMatch(/<HomeMade[^>]*\bnav=\{/);
-    expect(made, "덮개가 껍데기를 안 받는다").toMatch(/function HomeMade\(\s*\{[^}]*\bnav\b/);
+  it("★★ 껍데기가 **화면 맨 위에 따라다닌다** — 덮개 위에 얹혀 있던 자리에서 내려왔다", () => {
+    // 09-14 전에는 껍데기가 덮개(꽉 찬 사진) **안에** 꽂혀 있어서, 화면이 신원을 읽어
+    // 만든 것을 부품에 prop 으로 건넸다. 덮개가 사라져 그 배달도 사라졌다 —
+    // 이제 화면이 자기 자리에 직접 그린다.
+    expect(src, "껍데기가 없다").toMatch(/className="stage-nav"/);
+    expect(src, "벽 부품에 아직 껍데기를 건넨다").not.toMatch(/<HomeMade[^>]*\bnav=\{/);
+    expect(made, "벽 부품이 아직 껍데기를 받는다").not.toMatch(/function HomeMade\(\s*\{[^}]*\bnav\b/);
+    const navRule = css.slice(css.indexOf(".home .stage-nav {"));
+    expect(navRule.slice(0, navRule.indexOf("}")), "껍데기가 따라다니지 않는다")
+      .toMatch(/position:\s*sticky/);
   });
 
-  it("★★ 덮개는 완성본이 없어도 그려진다 — 껍데기가 같이 사라지면 안 된다", () => {
-    // 옛 코드는 목록이 비면 **부품 전체**가 null 이었다. 껍데기가 덮개 안으로 들어온
-    // 지금 그대로 두면 브랜드와 로그인 문이 통째로 증발한다.
-    // 그래서 감추는 것은 **벽**이고, 덮개는 늘 선다.
-    expect(made, "표지가 없으면 부품 전체가 사라진다").not.toMatch(
-      /return\s*\(?\s*(SHOWCASE|WALL|COVER)[\w.]*\s*(\.length\s*>\s*0\s*)?&&/
-    );
-    expect(made, "벽을 조건부로 감추지 않는다").toMatch(
-      /WALL\.length\s*>\s*0\s*&&\s*\(?\s*<div className="stage-band"/
-    );
-    // ★ 덮개 **그림**은 없을 수 있다(굽힌 표지가 0장인 저장소에서 받아 갈 수도 있다).
-    //   그때도 껍데기는 서야 하므로 그림만 조건부다.
-    expect(made, "덮개 그림이 무조건 그려진다 — 표지가 0장이면 깨진 칸이 뜬다")
-      .toMatch(/\{COVER\s*&&/);
+  it("★★ 표지가 없으면 **벽만** 사라진다 — 화면은 그대로 선다", () => {
+    // 껍데기(브랜드·신원·주 버튼)가 화면으로 올라온 뒤라 부품이 통째로 null 이어도
+    // 안전하다. 굽힌 표지가 0장인 저장소에서 받아 가도 랜딩은 서야 한다.
+    expect(made, "빈 목록에서 벽이 안 빠진다").toMatch(/WALL\.length\s*===\s*0/);
+    expect(src, "화면이 표지 없이도 서는지 알 수 없다 — 도해의 결과를 조건부로 안 건다")
+      .toMatch(/\{OUT\s*&&/);
   });
 
-  it("★★ 머리글을 걷었다 — 덮개가 말한다", () => {
-    // 2026-09-09 저녁 사장님 지시: "상단에 소재만 적으면 부터 있는 문구 다 제거".
-    // 큰 글자와 리드를 빼면 첫 화면에서 **결과물이 유일한 주인공**이 된다.
-    expect(src, "전시층 제목이 남아 있다").not.toMatch(/className="display"/);
-    expect(src, "리드 문장이 남아 있다").not.toMatch(/className="lede"/);
-    expect(src, "옛 머리글 문구가 남아 있다").not.toMatch(/소재만 적으면|한 편이 나옵니다/);
-  });
+  // ★★ 2026-09-14 — "머리글을 걷었다" 판을 **지웠다.** 09-09 저녁 지시("상단 문구 다 제거")가
+  //   시안 검토에서 뒤집혔다 — 첫 화면이 사진 한 장이면 무엇을 만들어 주는 곳인지가 안 보인다.
+  //   머리글이 **있어야 한다**는 새 계약은 tests/landing-hero.test.js 가 못 박는다.
+  //   ★ 옛 문구(“소재만 적으면…”)가 돌아오면 안 되는 것은 그대로다 — 그 자리도 그쪽에 없다.
 
   it("★★ 주 버튼은 '시작하기'이고 문이 신원에 따라 갈린다", () => {
     // ★★ 이름만 세면 안 된다 — 버튼 글자의 삼항과 다른 주소가 대신 통과시킨다
     //   (2026-09-09 변이 검증에서 실제로 겪었다). 문 자체를 한 덩어리로 잰다.
+    // ★ 2026-09-14 — 손님 쪽 문에 **돌아올 자리**가 실렸다(`?next=/ads/new`).
+    //   로그인만 시켜 놓고 첫 화면으로 되돌리던 것을 고친 자리다(tests/login-next.test.js).
     expect(src, "주 버튼의 문이 신원을 안 본다").toMatch(
-      /href=\{signedIn\s*\?\s*"\/ads\/new"\s*:\s*"\/login"\}/
+      /href=\{signedIn\s*\?\s*"\/ads\/new"\s*:\s*"\/login\?next=\/ads\/new"\}/
     );
     expect(src, "주 버튼이 없다").toMatch(/<[a-zA-Z][\w-]*\s[^>]*className="cta"/);
     // 사장님 지시: "무료로 시작하기를 시작하기 버튼으로".
@@ -112,7 +110,9 @@ describe("home — 화면을 채우는 어두운 무대", () => {
     // 신원 영역은 UserMenu 하나가 손님(로그인 문)과 들어온 사람(메뉴)을 다 그린다 —
     // 여기서 갈래를 또 만들면 판정이 두 벌이 된다.
     expect(src, "브랜드 글자가 껍데기에 없다").toMatch(/className="stage-brand"[\s\S]{0,120}shortform/);
-    expect(src, "신원 영역을 안 얹었다").toMatch(/<UserMenu\s*\/>/);
+    // ★ 2026-09-14 — 서버가 아는 신원을 **넘긴다**(첫 그림 깜빡임 제거).
+    //   판정이 두 벌이 된 것이 아니다 — `/api/me` 가 답하기 전까지만 쓰는 첫 값이다.
+    expect(src, "신원 영역을 안 얹었다").toMatch(/<UserMenu\s+initialGuest=\{!signedIn\}\s*\/>/);
   });
 
   it("★★★ 랜딩에서는 앱 틀(사이드바·띠)을 걷는다", () => {
