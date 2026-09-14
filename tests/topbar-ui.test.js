@@ -23,7 +23,18 @@ function body(src, fnName) {
       "그러지 않으면 아래 단정들이 엉뚱한 곳을 읽고 거짓으로 빨개진다."
     );
   }
-  const open = src.indexOf("{", at);
+  // ★★ 2026-09-14 — 본문 중괄호는 **인자 목록을 지나서** 찾아야 한다. 그냥 다음 `{` 를
+  //   집으면 인자 분해(`function UserMenu({ initialGuest = false })`)의 중괄호를 본문으로
+  //   착각해, 본문 대신 인자 문자열을 읽고 **아래 단정들이 전부 거짓으로 빨개진다**
+  //   (실제로 그렇게 한 번 빨개졌다 — 부품에 prop 하나가 생긴 날이다).
+  const paren = src.indexOf("(", at);
+  let pdepth = 0;
+  let afterParams = -1;
+  for (let i = paren; i < src.length; i++) {
+    if (src[i] === "(") pdepth++;
+    else if (src[i] === ")" && --pdepth === 0) { afterParams = i; break; }
+  }
+  const open = src.indexOf("{", afterParams);
   let depth = 0;
   for (let i = open; i < src.length; i++) {
     if (src[i] === "{") depth++;

@@ -167,14 +167,39 @@ describe("경계선 — 자막 무대는 벌을 안 탄다", () => {
 });
 
 describe("형태", () => {
-  it("그라디언트를 쓰지 않는다", () => {
+  // ★★★ 2026-09-14 — 예외가 **하나** 생겼다(사장님 지시: "하단 부분 흐리게").
+  //   랜딩 벽은 아래를 한 선에서 자르는데 그 선이 "더 있다"가 아니라 "잘렸다"로 읽혔다.
+  //   흐림 자락은 **그 자리 하나**에서만 쓴다 — 규칙을 연 것이 아니라 자리를 뚫은 것이다.
+  //   ⚠️ 새 자리가 필요하면 여기에 **이름을 더하는 것**이 절차다. 목록에 없는 자리에서
+  //     그라디언트를 쓰면 이 판이 잡는다(그것이 이 판의 값어치다).
+  const GRADIENT_OK = [".home .stage-cut::after"];
+
+  it("그라디언트는 허락한 자리에서만 쓴다", () => {
     const offenders = [];
+    // CSS 는 **규칙 단위**로 본다 — 어느 자리가 쓰는지까지 알아야 예외를 셀 수 있다.
+    for (const { selector, body } of cssRules()) {
+      if (!/(linear|radial|conic)-gradient/.test(body)) continue;
+      if (GRADIENT_OK.includes(selector)) continue;
+      offenders.push(`globals.css: ${selector}`);
+    }
+    // 나머지 파일(화면·부품)에서는 자리를 가릴 것 없이 전부 막는다.
     for (const { path, text } of readAll()) {
+      if (path.endsWith("globals.css")) continue;
       for (const m of text.matchAll(/(linear|radial|conic)-gradient/g)) {
         offenders.push(`${path}: ${m[0]}`);
       }
     }
     expect(offenders).toEqual([]);
+  });
+
+  it("★★ 허락한 자리는 **실제로 그 그라디언트를 쓴다** — 죽은 예외를 남기지 않는다", () => {
+    // 쓰는 자리가 없어진 예외는 다음 사람에게 "여기는 써도 된다"고 거짓말을 한다.
+    for (const sel of GRADIENT_OK) {
+      const rule = cssRules().find((r) => r.selector === sel);
+      expect(rule, `${sel} 규칙이 없다 — 예외 목록에서 빼라`).toBeTruthy();
+      expect(rule.body, `${sel} 가 그라디언트를 안 쓴다 — 예외 목록에서 빼라`)
+        .toMatch(/(linear|radial|conic)-gradient/);
+    }
   });
 
   it("border-radius는 토큰 세 개와 50%만 쓴다", () => {

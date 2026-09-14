@@ -26,12 +26,25 @@ async function handleLogout(router) {
   router.push("/login");
 }
 
-export default function UserMenu() {
+// ★★★ 2026-09-14 — `initialGuest` 는 **서버가 이미 아는 답**이다.
+//
+// 이 부품은 브라우저에서 `/api/me` 를 불러 손님인지 가른다. 그래서 그 답이 오기 전
+// 첫 그림에는 늘 계정 버튼("내 계정")이 찍혔고, 손님에게는 그것이 **없는 계정을 가진 것처럼**
+// 보였다가 [로그인] 으로 바뀌었다(2026-09-14 랜딩에서 실측 — 손님이 처음 닿는 화면이라
+// 그 깜빡임이 그대로 보인다).
+//
+// 랜딩은 **서버 컴포넌트**라 요청 헤더로 신원을 이미 안다(app/home/page.js). 그 값을
+// 내려 주면 첫 그림부터 맞는 버튼이 선다 — 판정을 두 벌로 만드는 것이 아니라,
+// **같은 판정의 답을 먼저 아는 쪽이 알려 주는 것**이다.
+//   · 답이 오기 전(`!ready`)에만 쓴다 — 온 뒤에는 `/api/me` 가 유일한 진실이다
+//     (다른 탭에서 로그인·로그아웃하면 이 값이 낡는다)
+//   · 안 넘기면 옛 동작 그대로다(기본 false) — 앱 틀의 상단바는 손대지 않았다
+export default function UserMenu({ initialGuest = false }) {
   const router = useRouter();
   // 공유본이 진입 때 한 번 읽는다. 실패하면 여기서는 조용히 넘긴다(값이 null 로 남을 뿐) —
   // 상단 띠가 오류로 시끄러워질 자리가 아니다. 다만 **묶음을 통째로 숨기지는 않는다**
   // (아래 주석 참고). 마이페이지가 이름을 저장한 뒤 공유본을 다시 읽으면 이 버튼도 함께 바뀐다.
-  const { me, guest } = useMe();
+  const { me, guest, ready } = useMe();
   const [open, setOpen] = useState(false);
   const box = useRef(null);
 
@@ -56,7 +69,7 @@ export default function UserMenu() {
   //   상세 기능을 쓰려면 로그인·회원가입). 계정 메뉴(마이페이지·로그아웃)를 그리면
   //   있지도 않은 계정을 가진 것처럼 읽힌다.
   //   ★ 가입도 그 화면에 있다(app/login/page.js 의 탭) — 문을 둘로 만들지 않는다.
-  if (guest) {
+  if (guest || (initialGuest && !ready)) {
     return (
       <div className="um">
         <Link href="/login" className="um-btn">

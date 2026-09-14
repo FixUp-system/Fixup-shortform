@@ -223,7 +223,9 @@ describe("손님에게 보이는 상단바", () => {
   const src = readFileSync("components/UserMenu.jsx", "utf8");
 
   it("로그인 버튼 하나만 그린다 — 없는 계정의 메뉴를 그리지 않는다", () => {
-    const at = src.indexOf("if (guest)");
+    // ★ 2026-09-14 — 조건이 하나 늘었다(`if (guest || (initialGuest && !ready))`).
+    //   서버가 아는 신원을 첫 그림에 쓰는 값이다 — 갈래 자체는 그대로이므로 여는 말만 문다.
+    const at = src.indexOf("if (guest");
     expect(at, "손님 갈래가 없다").toBeGreaterThan(-1);
     // ★ 그 갈래**만** 자른다 — 넉넉히 잘랐더니 뒤따르는 로그인 사용자용 코드(크레딧·
     //   로그아웃)까지 들어와 거짓 경보가 났다(2026-08-27).
