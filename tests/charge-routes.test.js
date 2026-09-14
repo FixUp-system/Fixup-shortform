@@ -99,18 +99,18 @@ describe("자동 관통 청구", () => {
   afterEach(restoreFake);
 
   it("정가를 받고 시작한다", async () => {
-    await grant(500);
+    await grant(5000);
     const p = await makeProject(30);
     expect((await autoPOST(autoReq(), ctx(p.id))).status).toBe(202);
-    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["kling-v3"]["720p"][30]);
+    expect(await balanceFor(A)).toBe(5000 - VIDEO_PRICE["kling-v3"]["720p"][30]);
     expect(runAutoPipeline).toHaveBeenCalledTimes(1);
   });
 
   it("길이가 길면 더 받는다", async () => {
-    await grant(500);
+    await grant(5000);
     const p = await makeProject(60);
     await autoPOST(autoReq(), ctx(p.id));
-    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["kling-v3"]["720p"][60]);
+    expect(await balanceFor(A)).toBe(5000 - VIDEO_PRICE["kling-v3"]["720p"][60]);
   });
 
   it("모자라면 402 이고 청구도 시작도 없다", async () => {
@@ -122,12 +122,12 @@ describe("자동 관통 청구", () => {
   });
 
   it("두 번 눌러도 한 번만 받는다", async () => {
-    await grant(500);
+    await grant(5000);
     const p = await makeProject(30);
     await autoPOST(autoReq(), ctx(p.id));
     // 두 번째는 멱등 가드에 걸려 409 — 그 전에 청구가 또 일어나면 안 된다
     expect((await autoPOST(autoReq(), ctx(p.id))).status).toBe(409);
-    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["kling-v3"]["720p"][30]);
+    expect(await balanceFor(A)).toBe(5000 - VIDEO_PRICE["kling-v3"]["720p"][30]);
   });
 
   it("가짜 모드는 청구하지 않는다", async () => {
@@ -140,22 +140,22 @@ describe("자동 관통 청구", () => {
   // 청구가 멱등 가드보다 앞이면, 환불 이력이 있는 완성 프로젝트에서 **새 회차를 받고 나서**
   // 409 를 준다 — 돈만 받고 아무것도 안 하는 응답이다. 선판정이 그 창을 닫는다.
   it("이미 완성한 프로젝트는 청구 없이 409 다", async () => {
-    await grant(500);
+    await grant(5000);
     const p = await makeProject(30);
     await projects.updateProject(p.id, A, (proj) => ({ ...proj, render: { url: "/r.mp4" } }));
     expect((await autoPOST(autoReq(), ctx(p.id))).status).toBe(409);
-    expect(await balanceFor(A)).toBe(500);
+    expect(await balanceFor(A)).toBe(5000);
     expect(runAutoPipeline).not.toHaveBeenCalled();
   });
 
   it("이미 만드는 중인 프로젝트는 청구 없이 409 다", async () => {
-    await grant(500);
+    await grant(5000);
     const p = await makeProject(30);
     await projects.updateProject(p.id, A, (proj) => ({
       ...proj, auto: { stage: "voice", state: "running", error: null },
     }));
     expect((await autoPOST(autoReq(), ctx(p.id))).status).toBe(409);
-    expect(await balanceFor(A)).toBe(500);
+    expect(await balanceFor(A)).toBe(5000);
     expect(runAutoPipeline).not.toHaveBeenCalled();
   });
 });
@@ -165,7 +165,7 @@ describe("단계별 청구 — 정가는 그림에서 한 번", () => {
   afterEach(restoreFake);
 
   it("자동 관통으로 이미 산 프로젝트는 이미지에서 또 받지 않는다", async () => {
-    await grant(500);
+    await grant(5000);
     const p = await makeProject(30);
     await autoPOST(autoReq(), ctx(p.id));
     const after = await balanceFor(A);
@@ -179,21 +179,21 @@ describe("단계별 청구 — 정가는 그림에서 한 번", () => {
   });
 
   it("단계별로 온 사장님도 같은 정가를 낸다", async () => {
-    await grant(500);
+    await grant(5000);
     const p = await withCuts(30);
     expect((await imagesPOST(post(), ctx(p.id))).status).toBe(200);
-    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["kling-v3"]["720p"][30]);
+    expect(await balanceFor(A)).toBe(5000 - VIDEO_PRICE["kling-v3"]["720p"][30]);
   });
 
   it("이미지를 두 번 시작해도 한 번만 받는다 — 두 번째는 409 다", async () => {
-    await grant(500);
+    await grant(5000);
     const p = await withCuts(30);
     await imagesPOST(post(), ctx(p.id));
     await projects.updateProject(p.id, A, (proj) => ({
       ...proj, cuts: proj.cuts.map((c) => ({ ...c, image: { url: "i0" } })),
     }));
     expect((await imagesPOST(post(), ctx(p.id))).status).toBe(409);
-    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["kling-v3"]["720p"][30]);
+    expect(await balanceFor(A)).toBe(5000 - VIDEO_PRICE["kling-v3"]["720p"][30]);
   });
 
   it("모자라면 402 이고 청구도 시작도 없다", async () => {
@@ -205,7 +205,7 @@ describe("단계별 청구 — 정가는 그림에서 한 번", () => {
   });
 
   it("이미 산 프로젝트는 목소리·클립에서 또 받지 않는다 — 영상 정가에 포함이다", async () => {
-    await grant(500);
+    await grant(5000);
     const p = await withCuts(30, { audio: null });
     await chargeVideo({ userId: A, projectId: p.id, seconds: 30 });
     const q = await withCuts(30, { image: { url: "i0" } });
@@ -221,14 +221,14 @@ describe("단계별 청구 — 정가는 그림에서 한 번", () => {
   // /clips 에 문이 없으면 순지불 0 크레딧으로 완성본이 나온다.
   // `balance < 0` 그물은 잔액이 음수가 아니라 못 잡는다.
   it("환불된 프로젝트로 클립을 부르면 정가를 다시 받는다", async () => {
-    await grant(500);
+    await grant(5000);
     const p = await withCuts(30, { image: { url: "i0" } });
     await chargeVideo({ userId: A, projectId: p.id, seconds: 30 });
     await refundVideo({ userId: A, projectId: p.id });
-    expect(await balanceFor(A)).toBe(500);          // 되돌려받았다
+    expect(await balanceFor(A)).toBe(5000);          // 되돌려받았다
 
     expect((await clipsPOST(post(), ctx(p.id))).status).toBe(200);
-    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["kling-v3"]["720p"][30]);
+    expect(await balanceFor(A)).toBe(5000 - VIDEO_PRICE["kling-v3"]["720p"][30]);
   });
 
   it("환불된 프로젝트인데 잔액이 없으면 클립·목소리가 402 다", async () => {
@@ -287,19 +287,19 @@ describe("재생성 청구 — 컷당 첫 회는 공짜", () => {
     const price = kind === "clip" ? REGEN_PRICE.clip["kling-v3"]["720p"] : REGEN_PRICE[kind];
 
     it(`${name} 재생성 — 정상(청구 살아 있는) 프로젝트는 첫 회가 공짜 그대로다`, async () => {
-      const { p, base } = await paidCuts(500, { [field]: 0 });
+      const { p, base } = await paidCuts(5000, { [field]: 0 });
       expect((await route(post(), idxCtx(p.id, 0))).status).toBe(200);
       expect(await balanceFor(A)).toBe(base);
     });
 
     it(`${name} 재생성 — 둘째부터 정가를 받는다`, async () => {
-      const { p, base } = await paidCuts(500, { [field]: 1 });
+      const { p, base } = await paidCuts(5000, { [field]: 1 });
       expect((await route(post(), idxCtx(p.id, 0))).status).toBe(200);
       expect(await balanceFor(A)).toBe(base - price);
     });
 
     it(`${name} 재생성 — 회차가 오르면 또 받는다(같은 컷이라도)`, async () => {
-      const { p, base } = await paidCuts(500, { [field]: 1 });
+      const { p, base } = await paidCuts(5000, { [field]: 1 });
       await route(post(), idxCtx(p.id, 0));
       await projects.updateProject(p.id, A, (proj) => ({
         ...proj, cuts: proj.cuts.map((c) => ({ ...c, [field]: 2 })),
@@ -318,7 +318,7 @@ describe("재생성 청구 — 컷당 첫 회는 공짜", () => {
 
     // 상한이 청구 뒤에 있으면 4회째가 **값을 받고 나서** 400 이 된다 — 내고 아무것도 못 받는다.
     it(`${name} 재생성 — 상한(3회)에 닿으면 청구 없이 400 이다`, async () => {
-      const { p, base } = await paidCuts(500, { [field]: MAX_REGEN_PER_CUT });
+      const { p, base } = await paidCuts(5000, { [field]: MAX_REGEN_PER_CUT });
       const res = await route(post(), idxCtx(p.id, 0));
       expect(res.status).toBe(400);
       expect((await res.json()).error).toMatch(/3회까지/);
@@ -329,14 +329,14 @@ describe("재생성 청구 — 컷당 첫 회는 공짜", () => {
     // 카운터는 시도 **전**에 오른다 — 되돌리지 않으면 재시도가 다음 회차 값을 또 낸다.
     // 자동 관통이 실패를 환불하는 것과 같은 정책이어야 한다.
     it(`${name} 재생성 — 실패하면 받은 값을 되돌린다`, async () => {
-      const { p, base } = await paidCuts(500, { [field]: 1 });
+      const { p, base } = await paidCuts(5000, { [field]: 1 });
       pipelineMock.regen.mockRejectedValueOnce(new Error("만들지 못했어요"));
       expect((await route(post(), idxCtx(p.id, 0))).status).toBe(400);
       expect(await balanceFor(A)).toBe(base);
     });
 
     it(`${name} 재생성 — 실패해도 그 회차를 두 번 되돌리지는 않는다`, async () => {
-      const { p, base } = await paidCuts(500, { [field]: 1 });
+      const { p, base } = await paidCuts(5000, { [field]: 1 });
       pipelineMock.regen.mockRejectedValue(new Error("만들지 못했어요"));
       await route(post(), idxCtx(p.id, 0));
       await route(post(), idxCtx(p.id, 0));   // 같은 회차 재시도 — 청구도 환불도 한 번씩이다
@@ -349,29 +349,29 @@ describe("재생성 청구 — 컷당 첫 회는 공짜", () => {
     // 실패 → 환불(잔액 복구) → 그림·컷은 남음 → 컷별 재생성(첫 회 무료) → /render(0원).
     // 잔액이 양수라 `balance < 0` 그물에도 안 걸린다.
     it(`${name} 재생성 — 환불된 프로젝트면 정가를 다시 받는다`, async () => {
-      await grant(500);
+      await grant(5000);
       const p = await withCuts(30, { [field]: 0, image: { url: "i0" } });
       await chargeVideo({ userId: A, projectId: p.id, seconds: 30 });
       await refundVideo({ userId: A, projectId: p.id });
-      expect(await balanceFor(A)).toBe(500);          // 되돌려받았다
+      expect(await balanceFor(A)).toBe(5000);          // 되돌려받았다
 
       expect((await route(post(), idxCtx(p.id, 0))).status).toBe(200);
-      expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["kling-v3"]["720p"][30]);   // 첫 회는 여전히 공짜다
+      expect(await balanceFor(A)).toBe(5000 - VIDEO_PRICE["kling-v3"]["720p"][30]);   // 첫 회는 여전히 공짜다
     });
 
     // ★ 게이트를 블록 맨 앞에 두면 이 조합에서만 옛 결함이 되살아난다 —
     // 정가를 받고 나서 상한으로 400. 드문 것과 없는 것은 다르다.
     it(`${name} 재생성 — 환불된 프로젝트라도 상한에 닿았으면 청구 없이 400 이다`, async () => {
-      await grant(500);
+      await grant(5000);
       const p = await withCuts(30, { [field]: MAX_REGEN_PER_CUT, image: { url: "i0" } });
       await chargeVideo({ userId: A, projectId: p.id, seconds: 30 });
       await refundVideo({ userId: A, projectId: p.id });
-      expect(await balanceFor(A)).toBe(500);
+      expect(await balanceFor(A)).toBe(5000);
 
       const res = await route(post(), idxCtx(p.id, 0));
       expect(res.status).toBe(400);
       expect((await res.json()).error).toMatch(/3회까지/);
-      expect(await balanceFor(A)).toBe(500);      // 정가도 회차 값도 안 나갔다
+      expect(await balanceFor(A)).toBe(5000);      // 정가도 회차 값도 안 나갔다
       expect(pipelineMock.regen).not.toHaveBeenCalled();
     });
 
@@ -434,40 +434,40 @@ describe("화질이 청구액까지 관통한다", () => {
 
   for (const [name, call, cut] of gates) {
     it(`${name} — 480p 프로젝트는 480p 정가를 낸다`, async () => {
-      await grant(500);
+      await grant(5000);
       const p = await pickedCuts({ resolution: "480p" }, cut);
       await call(p.id);
-      // 720p 값(160)으로 걷히면 편당 200 크레딧을 우리가 떠안는다
-      expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["seedance-2.0"]["480p"][30]);
+      // 720p 값(1400)으로 걷히면 편당 700 크레딧이 어긋난다
+      expect(await balanceFor(A)).toBe(5000 - VIDEO_PRICE["seedance-2.0"]["480p"][30]);
     });
   }
 
   it("480p 프로젝트는 480p 정가를 낸다 — 싼 쪽도 그대로 관통한다", async () => {
-    await grant(500);
+    await grant(5000);
     const p = await pickedCuts({ resolution: "480p" }, { image: { url: "i0" } });
     expect((await clipsPOST(post(), ctx(p.id))).status).toBe(200);
-    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["seedance-2.0"]["480p"][30]);
+    expect(await balanceFor(A)).toBe(5000 - VIDEO_PRICE["seedance-2.0"]["480p"][30]);
   });
 
   // 저장값이 목록 밖이면 resolutionForProject 가 기본값(720p)으로 떨어뜨린다 —
   // 옛 해상도가 남아 있어도 표를 못 찾아 이상한 값이 걷히지 않는다.
   it("모르는 화질이 저장돼 있어도 기본값(720p) 정가다", async () => {
-    await grant(500);
+    await grant(5000);
     const p = await pickedCuts({ resolution: "2160p" }, { image: { url: "i0" } });
     await clipsPOST(post(), ctx(p.id));
-    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["seedance-2.0"]["720p"][30]);
+    expect(await balanceFor(A)).toBe(5000 - VIDEO_PRICE["seedance-2.0"]["720p"][30]);
   });
 
   // Kling 에는 resolution 파라미터가 아예 없다 — 문서에 값이 남아 있어도 값이 안 바뀐다.
   it("해상도를 안 받는 모델은 저장값이 있어도 그 모델 값 그대로다", async () => {
-    await grant(500);
+    await grant(5000);
     const p = await pickedCuts({ model: "kling-v3", resolution: "480p" }, { image: { url: "i0" } });
     await clipsPOST(post(), ctx(p.id));
-    expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["kling-v3"]["720p"][30]);
+    expect(await balanceFor(A)).toBe(5000 - VIDEO_PRICE["kling-v3"]["720p"][30]);
   });
 
   it("클립 재생성도 480p 값이다", async () => {
-    await grant(500);
+    await grant(5000);
     const p = await pickedCuts({ resolution: "480p" }, { clip_regen_count: 1, image: { url: "i0" } });
     await chargeVideo({
       userId: A, projectId: p.id, seconds: 30, model: "seedance-2.0", resolution: "480p",
@@ -485,10 +485,10 @@ describe("화질이 청구액까지 관통한다", () => {
   ];
   for (const [name, route, field, price] of regens) {
     it(`${name} 재생성 — 값은 그대로지만 환불된 480p 프로젝트의 정가는 480p 다`, async () => {
-      await grant(500);
+      await grant(5000);
       const p = await pickedCuts({ resolution: "480p" }, { [field]: 1, image: { url: "i0" } });
       expect((await route(post(), idxCtx(p.id, 0))).status).toBe(200);
-      expect(await balanceFor(A)).toBe(500 - VIDEO_PRICE["seedance-2.0"]["480p"][30] - price);
+      expect(await balanceFor(A)).toBe(5000 - VIDEO_PRICE["seedance-2.0"]["480p"][30] - price);
     });
   }
 });

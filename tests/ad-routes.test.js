@@ -148,9 +148,9 @@ describe("광고 라우트 — 문서", () => {
 
     // ② 정가가 모델·길이마다 다르다 — 화면(app/ads/[id]/page.js)이 읽는 값과 같은 함수다.
     it("모델·길이 조합마다 정가가 다르다", () => {
-      expect(adVideoPrice(15, "seedance-2.0", "720p")).toBe(80);
-      expect(adVideoPrice(15, "seedance-2.5")).toBe(120);
-      expect(adVideoPrice(30, "seedance-2.5")).toBe(240);
+      expect(adVideoPrice(15, "seedance-2.0", "720p")).toBe(700);
+      expect(adVideoPrice(15, "seedance-2.5")).toBe(1000);
+      expect(adVideoPrice(30, "seedance-2.5")).toBe(2000);
     });
 
     // PATCH — 모델을 바꿀 수 있고, 바꾸면 길이도 그 모델 기준으로 다시 본다.
@@ -563,7 +563,7 @@ describe("광고 라우트 — 굽기", () => {
   it("잔액이 있으면 202 로 시작한다", async () => {
     process.env.SHOTFORM_FAKE = "fal";
     const { getStore } = await import("../lib/store/index.js");
-    await getStore().insertGrant({ user_id: U, amount_credits: 200, reason: "t" });
+    await getStore().insertGrant({ user_id: U, amount_credits: 1000, reason: "t" });
     const { POST: render } = await import("../app/api/ads/[id]/render/route.js");
     const made = await withScenario();
     const res = await render(new Request("http://x", { method: "POST", headers: H }), {
@@ -577,8 +577,8 @@ describe("광고 라우트 — 굽기", () => {
   it("★ 2.5 는 정가가 더 높다 — 2.0 이면 통과할 잔액도 2.5 면 402", async () => {
     const { getStore } = await import("../lib/store/index.js");
     const { AD_VIDEO_PRICE } = await import("../lib/pricing.js");
-    // 2.0/15초(65) 는 넉넉히 내는 잔액이지만 2.5/30초(240) 에는 못 미친다
-    await getStore().insertGrant({ user_id: U, amount_credits: 100, reason: "t" });
+    // 2.0/15초/720p(700) 는 넉넉히 내는 잔액이지만 2.5/30초(2000) 에는 못 미친다
+    await getStore().insertGrant({ user_id: U, amount_credits: 1000, reason: "t" });
     const { POST: render } = await import("../app/api/ads/[id]/render/route.js");
     const made = await withScenario25();
     const res = await render(new Request("http://x", { method: "POST", headers: H }), {
@@ -586,8 +586,8 @@ describe("광고 라우트 — 굽기", () => {
     });
     expect(res.status).toBe(402);
     // 대조 — 2.0/15초/720p 정가라면 이 잔액으로 충분했다는 것을 같이 남긴다
-    expect(100).toBeGreaterThan(AD_VIDEO_PRICE["seedance-2.0"][15]["720p"]);
-    expect(100).toBeLessThan(AD_VIDEO_PRICE["seedance-2.5"][30]["720p"]);
+    expect(1000).toBeGreaterThan(AD_VIDEO_PRICE["seedance-2.0"][15]["720p"]);
+    expect(1000).toBeLessThan(AD_VIDEO_PRICE["seedance-2.5"][30]["720p"]);
   });
 
   it("2.5·30초도 정가만큼 잔액이 있으면 202 로 시작한다", async () => {
@@ -608,16 +608,16 @@ describe("광고 라우트 — 굽기", () => {
   it("★ 2K 는 정가가 더 높다 — 768P 면 통과할 잔액도 2K 면 402", async () => {
     const { getStore } = await import("../lib/store/index.js");
     const { AD_VIDEO_PRICE } = await import("../lib/pricing.js");
-    // 기본(H3)·15초·768P(20) 는 넉넉히 내는 잔액이지만 2K(40) 에는 못 미친다
-    await getStore().insertGrant({ user_id: U, amount_credits: 30, reason: "t" });
+    // 기본(H3)·15초·768P(150) 는 넉넉히 내는 잔액이지만 2K(300) 에는 못 미친다
+    await getStore().insertGrant({ user_id: U, amount_credits: 200, reason: "t" });
     const { POST: render } = await import("../app/api/ads/[id]/render/route.js");
     const made = await withScenario2K();
     const res = await render(new Request("http://x", { method: "POST", headers: H }), {
       params: Promise.resolve({ id: made.id }),
     });
     expect(res.status).toBe(402);
-    expect(30).toBeGreaterThan(AD_VIDEO_PRICE["minimax-h3"][15]["768P"]);
-    expect(30).toBeLessThan(AD_VIDEO_PRICE["minimax-h3"][15]["2K"]);
+    expect(200).toBeGreaterThan(AD_VIDEO_PRICE["minimax-h3"][15]["768P"]);
+    expect(200).toBeLessThan(AD_VIDEO_PRICE["minimax-h3"][15]["2K"]);
   });
 
   it("2K 도 정가만큼 잔액이 있으면 202 로 시작한다", async () => {

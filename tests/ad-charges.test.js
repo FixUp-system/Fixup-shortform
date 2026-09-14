@@ -25,32 +25,32 @@ describe("광고 청구", () => {
   beforeEach(() => resetMemoryStore());
 
   it("정가를 받고 잔액이 그만큼 준다 — 모델을 안 주면 기본 모델(standard)·720p 값이다", async () => {
-    await grant(200);
+    await grant(1000);
     const paid = await chargeAd({ userId: U, projectId: P, seconds: 15 });
     expect(paid.credits).toBe(DEFAULT_PRICE_15);
-    expect(await balanceFor(U)).toBe(200 - DEFAULT_PRICE_15);
+    expect(await balanceFor(U)).toBe(1000 - DEFAULT_PRICE_15);
   });
 
   it("이미 산 회차가 살아 있으면 또 받지 않는다", async () => {
-    await grant(300);
+    await grant(1500);
     await chargeAd({ userId: U, projectId: P, seconds: 15 });
     const again = await chargeAd({ userId: U, projectId: P, seconds: 15 });
     expect(again.credits).toBe(0);
-    expect(await balanceFor(U)).toBe(300 - DEFAULT_PRICE_15);
+    expect(await balanceFor(U)).toBe(1500 - DEFAULT_PRICE_15);
   });
 
   it("환불은 지우지 않고 음수 행이다", async () => {
-    await grant(200);
+    await grant(1000);
     await chargeAd({ userId: U, projectId: P, seconds: 15 });
     await refundAd({ projectId: P });
-    expect(await balanceFor(U)).toBe(200);
+    expect(await balanceFor(U)).toBe(1000);
     expect(await alreadyChargedAd(P)).toBe(false);
     const rows = await getStore().listCharges(U);
     expect(rows.some((r) => Number(r.credits) < 0)).toBe(true);
   });
 
   it("환불 뒤 다시 만들면 새 회차라 또 받는다", async () => {
-    await grant(300);
+    await grant(1500);
     await chargeAd({ userId: U, projectId: P, seconds: 15 });
     await refundAd({ projectId: P });
     const paid = await chargeAd({ userId: U, projectId: P, seconds: 15 });
@@ -58,15 +58,15 @@ describe("광고 청구", () => {
   });
 
   it("두 번 불러도 환불은 한 번만 돈다", async () => {
-    await grant(200);
+    await grant(1000);
     await chargeAd({ userId: U, projectId: P, seconds: 15 });
     await refundAd({ projectId: P });
     await refundAd({ projectId: P });
-    expect(await balanceFor(U)).toBe(200);
+    expect(await balanceFor(U)).toBe(1000);
   });
 
   it("★ 기존 video 장부와 키가 안 겹친다", async () => {
-    await grant(300);
+    await grant(1500);
     await chargeVideo({ userId: U, projectId: P, seconds: 15 });   // 기존 경로
     const paid = await chargeAd({ userId: U, projectId: P, seconds: 15 }); // 광고 경로
     // 같은 프로젝트 id 라도 서로를 "이미 샀다"로 보지 않는다
@@ -84,56 +84,56 @@ describe("광고 청구", () => {
   // 청구가 0 이었다). openNewAttempt:true 는 "이미 영상을 낸 회차"를 뜻하고, 그때는
   // 살아 있는 청구가 있어도 새 회차를 열어 다시 받아야 한다.
   it("★ openNewAttempt 면 살아 있는 청구가 있어도 새 회차로 또 받는다", async () => {
-    await grant(400);
+    await grant(2000);
     const first = await chargeAd({ userId: U, projectId: P, seconds: 15 });
     expect(first.credits).toBe(DEFAULT_PRICE_15);
     const again = await chargeAd({ userId: U, projectId: P, seconds: 15, openNewAttempt: true });
     expect(again.credits).toBe(DEFAULT_PRICE_15);
-    expect(await balanceFor(U)).toBe(400 - DEFAULT_PRICE_15 * 2);
+    expect(await balanceFor(U)).toBe(2000 - DEFAULT_PRICE_15 * 2);
     // 새 회차 키가 열렸다 — 첫 청구를 덮어쓴 것이 아니다
     expect(adKey(P, 2)).toBe(`ad:${P}:2`);
     expect(await getStore().findCharge(adKey(P, 2))).toBeTruthy();
   });
 
   it("openNewAttempt 가 없으면(기본값 false) 지금까지처럼 또 받지 않는다", async () => {
-    await grant(300);
+    await grant(1500);
     await chargeAd({ userId: U, projectId: P, seconds: 15 });
     const again = await chargeAd({ userId: U, projectId: P, seconds: 15 });
     expect(again.credits).toBe(0);
-    expect(await balanceFor(U)).toBe(300 - DEFAULT_PRICE_15);
+    expect(await balanceFor(U)).toBe(1500 - DEFAULT_PRICE_15);
   });
 
   // ── Task 21 — chargeAd 가 모델을 안다 ────────────────────────────────
   describe("모델별 청구", () => {
     it("★ 모델·길이 조합대로 정가가 다르게 청구된다 — 2.5/30초/720p가 가장 비싸다", async () => {
-      await grant(1000);
+      await grant(5000);
       const paid = await chargeAd({ userId: U, projectId: P, seconds: 30, model: "seedance-2.5", resolution: "720p" });
       expect(paid.credits).toBe(AD_VIDEO_PRICE["seedance-2.5"][30]["720p"]);
-      expect(await balanceFor(U)).toBe(1000 - AD_VIDEO_PRICE["seedance-2.5"][30]["720p"]);
+      expect(await balanceFor(U)).toBe(5000 - AD_VIDEO_PRICE["seedance-2.5"][30]["720p"]);
     });
 
     
     // ③ 옛 문서 보호 — model·resolution 을 안 넘기면(옛 광고 프로젝트) 기본 모델
     // (standard)·720p 값으로 청구된다.
     it("★ model·resolution 을 안 넘기면(옛 문서) 기본 모델(standard)·720p 값으로 청구된다", async () => {
-      await grant(200);
+      await grant(1000);
       const paid = await chargeAd({ userId: U, projectId: P, seconds: 15 });
       expect(paid.credits).toBe(DEFAULT_PRICE_15);
     });
 
     // ④ 모르는 모델이 조용히 싼 값(기본)으로 새면 그 차액이 그대로 우리 돈이다.
     it("★ 값이 있는데 모르는 모델이면 청구가 조용히 싼 값으로 안 새고 던진다", async () => {
-      await grant(1000);
+      await grant(5000);
       await expect(
         chargeAd({ userId: U, projectId: P, seconds: 15, model: "seedance-3.0-오타" })
       ).rejects.toThrow(/모르는 광고 모델/);
       // 던졌으니 아무것도 받지 않았다 — 잔액이 그대로다
-      expect(await balanceFor(U)).toBe(1000);
+      expect(await balanceFor(U)).toBe(5000);
     });
 
     // ── Task 24 — 해상도가 청구에 반영된다 ─────────────────────────────
     it("★ 같은 모델·길이라도 해상도가 다르면 청구액이 다르다 — 1080p 가 720p 보다 비싸다", async () => {
-      await grant(1000);
+      await grant(5000);
       const paid720 = await chargeAd({
         userId: U, projectId: P, seconds: 15, model: "seedance-2.0", resolution: "720p",
       });
@@ -148,7 +148,7 @@ describe("광고 청구", () => {
     });
 
     it("★ resolution 을 안 넘기면(옛 호출부) 720p 값으로 청구된다", async () => {
-      await grant(1000);
+      await grant(5000);
       const paid = await chargeAd({ userId: U, projectId: P, seconds: 15, model: "seedance-2.0" });
       expect(paid.credits).toBe(AD_VIDEO_PRICE["seedance-2.0"][15]["720p"]);
     });
@@ -158,29 +158,29 @@ describe("광고 청구", () => {
     //     가격도 있다**. 여기서 재는 것은 "표에 없는 값이 들어오면 던지는가"이므로
     //     어느 모델도 안 받는 값(H3 의 2K 를 Seedance 에)으로 바꾼다.
     it("★ 값이 있는데 그 모델이 안 받는 해상도면 청구가 조용히 안 새고 던진다", async () => {
-      await grant(1000);
+      await grant(5000);
       await expect(
         chargeAd({ userId: U, projectId: P, seconds: 15, model: "seedance-2.5", resolution: "2K" })
       ).rejects.toThrow(/그 해상도를 지원하지 않아요/);
-      expect(await balanceFor(U)).toBe(1000);
+      expect(await balanceFor(U)).toBe(5000);
     });
 
     it("★ 관리자 전용 해상도(2.5 1080p)는 가격이 있고 그 값으로 청구된다 — 기록이 비면 안 된다", async () => {
-      await grant(1000);
+      await grant(5000);
       const paid = await chargeAd({ userId: U, projectId: P, seconds: 15, model: "seedance-2.5", resolution: "1080p" });
       expect(paid.credits).toBe(AD_VIDEO_PRICE["seedance-2.5"][15]["1080p"]);
-      expect(await balanceFor(U)).toBe(1000 - paid.credits);
+      expect(await balanceFor(U)).toBe(5000 - paid.credits);
     });
 
     // adVideoPrice(seconds, modelId, resolution) 을 라우트가 부르는 것과 같은 조합 — 화면
     // (app/ads/[id]/page.js)이 읽는 값과 같은 함수다.
     it("모델·길이·해상도 조합마다 정가가 다르다", () => {
       // 해상도를 생략하면 기본(720p) 값이다 — fast 티어가 사라져 65 라는 칸도 없다
-      expect(adVideoPrice(15, "seedance-2.0")).toBe(80);
-      expect(adVideoPrice(15, "seedance-2.0", "720p")).toBe(80);
-      expect(adVideoPrice(15, "seedance-2.0", "1080p")).toBe(175);
-      expect(adVideoPrice(15, "seedance-2.5", "720p")).toBe(120);
-      expect(adVideoPrice(30, "seedance-2.5", "720p")).toBe(240);
+      expect(adVideoPrice(15, "seedance-2.0")).toBe(700);
+      expect(adVideoPrice(15, "seedance-2.0", "720p")).toBe(700);
+      expect(adVideoPrice(15, "seedance-2.0", "1080p")).toBe(1500);
+      expect(adVideoPrice(15, "seedance-2.5", "720p")).toBe(1000);
+      expect(adVideoPrice(30, "seedance-2.5", "720p")).toBe(2000);
     });
   });
 });

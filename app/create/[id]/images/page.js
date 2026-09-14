@@ -16,7 +16,7 @@ import { isImageStale, isReachable } from "../../../../lib/steps";
 //   이 사슬에는 `fs` 가 없다(tests/prompt-editing-ui.test.js 가 그 그물을 친다).
 import { buildImagePrompt, promptBodyOf } from "../../../../lib/cuts";
 // 상한과 값은 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다).
-import { MAX_REGEN_PER_CUT, priceLabel, regenPrice, videoPrice } from "../../../../lib/pricing";
+import { MAX_REGEN_PER_CUT, priceLabel, regenPrice, videoPrice, formatCredits } from "../../../../lib/pricing";
 import { modelIdForProject, resolutionForProject } from "../../../../lib/clip-limits";
 // 폴링 한 벌·판정 한 벌·오류 필드 표 한 벌. 화면은 그리기만 한다 —
 // 같은 판정을 화면마다 손으로 적었을 때 조용히 갈렸고, 그 어긋남이 이 화면이
@@ -494,7 +494,7 @@ export default function ImagesStepPage() {
                         ? "이미지 만들기"
                         : !showCredits
                           ? "이미지 만들기"
-                          : `이미지 만들기 · ${videoPrice(project.settings?.target_seconds, modelIdForProject(project), resolutionForProject(project))} 크레딧`}
+                          : `이미지 만들기 · ${formatCredits(videoPrice(project.settings?.target_seconds, modelIdForProject(project), resolutionForProject(project)))} 크레딧`}
                   </button>
                 </>
               ) : (

@@ -20,7 +20,7 @@ import { runWithActor } from "../lib/actor.js";
 import { chargeVideo } from "../lib/charges.js";
 import {
   REGEN_PRICE, FREE_REGEN_PER_CUT, MAX_REGEN_PER_CUT, MAX_SCENARIO_TRIES, MAX_SCENARIO_REWRITES,
-  regenPrice,
+  regenPrice, videoPrice,
 } from "../lib/pricing.js";
 import { MAX_REEL_IMAGE_TRIES } from "../lib/reel/doc.js";
 import { modelIdForProject, resolutionForProject } from "../lib/clip-limits.js";
@@ -149,7 +149,7 @@ describe("reel 컷 다시 굽기", () => {
   it("★★ 잔액이 모자라면 402 — 회차도 안 오른다", async () => {
     resetMemoryStore();
     await memoryStore.insertProfile({ id: U, email: "c@x.kr", status: "approved", role: "user", tier: "pro" });
-    await grant(200);                                    // 정가(60초 720p)만 겨우
+    await grant(videoPrice(60, "seedance-2.0", "720p")); // 정가(60초 720p)만 겨우
     const id = await makeReel({ cuts: [CUT(0, true)], regenCount: 1 });
     const res = await CLIPS(req(), ctx(id));
     expect(res.status).toBe(402);
