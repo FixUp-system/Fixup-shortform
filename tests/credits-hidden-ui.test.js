@@ -10,8 +10,8 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 
 // 크레딧을 말하는 화면 전부. 새 화면이 크레딧을 적으면 여기 추가해야 한다.
+// ★ components/UserMenu.jsx 는 2026-09-14 에 뺐다 — 상단바 잔액은 늘 보인다(아래 판).
 const SCREENS = [
-  "components/UserMenu.jsx",
   "components/QuickCreate.jsx",
   "app/create/page.js",
   "app/create/[id]/voice/page.js",
@@ -32,12 +32,15 @@ describe("크레딧을 끄면 화면에서도 사라진다", () => {
     });
   }
 
-  it("★ 상단바 잔액이 gated 뒤에 있다 — 가장 눈에 띄는 자리다", () => {
+  // ★★ 2026-09-14 결정 뒤집힘(사장님: "상단바 잔액이 없는데?") — 상단바 잔액은 이제 **로그인한 사람에게 늘 보인다.**
+  //   크레딧을 걷지 않는 동안에도 와디즈 서포터는 받은 크레딧이 들어왔는지 봐야 하고, 잔액을 누르면 마이페이지
+  //   [크레딧] 탭으로 간다. 마이페이지 크레딧 절을 늘 그리기로 한 것과 같은 방향이다.
+  //   "왜 안 줄어드는지"는 마이페이지 크레딧 탭이 말한다(freeNote).
+  it("★ 상단바 잔액은 gated 로 숨지 않는다 — 로그인했으면 늘 보인다", () => {
     const src = read("components/UserMenu.jsx");
-    const at = src.indexOf("um-credit");
+    const at = src.indexOf('className="um-credit"');
     expect(at).toBeGreaterThan(-1);
-    // 그 줄(또는 바로 앞)에 gated 판정이 걸려 있어야 한다
-    expect(src.slice(Math.max(0, at - 200), at), "잔액이 조건 없이 그려진다").toMatch(/gated/);
+    expect(src.slice(Math.max(0, at - 300), at), "잔액이 다시 gated 뒤로 들어갔다").not.toMatch(/gated\s*!==\s*false/);
   });
 
   it("★ 운영자 화면(/admin)은 그대로 둔다 — QA 중 이상을 봐야 한다", () => {

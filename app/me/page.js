@@ -273,11 +273,12 @@ export default function MePage() {
           <span className="me-label">가입일</span>
           <span className="me-value">{me?.created_at ? me.created_at.slice(0, 10) : "…"}</span>
         </div>
-        {/* 크레딧 한 줄 — "보유 / 총 충전"(2026-09-14 사장님 선택). 자세한 것은 [크레딧] 탭에 있다. */}
+        {/* 크레딧 한 줄 — **남은 크레딧만**(2026-09-14 사장님: "213/1424 말고 잔여 크레딧만").
+            총 충전·사용은 [크레딧] 탭의 요약 카드가 말한다. */}
         <div className="me-row">
-          <span className="me-label">크레딧</span>
+          <span className="me-label">남은 크레딧</span>
           <span className="me-value">
-            {sums ? <><b>{formatCredits(sums.balance)} / {formatCredits(sums.granted)}</b></> : "…"}
+            {sums ? <b>{formatCredits(sums.balance)}</b> : "…"}
             {me?.internal === true && <span className="me-sub"> · 내부 계정</span>}
           </span>
           <button type="button" className="mini" onClick={() => switchTab("credits")}>크레딧 관리</button>

@@ -19,9 +19,11 @@ describe("마이페이지 — 탭", () => {
     expect(src).not.toMatch(/useSearchParams/);
   });
 
-  it("내 정보 탭에 보유/총 충전 한 줄과 크레딧 탭으로 가는 버튼이 있다", () => {
+  // 2026-09-14 사장님: "213/1424 이런 식 말고 그냥 잔여 크레딧만" — 총 충전은 크레딧 탭의 요약 카드가 말한다.
+  it("내 정보 탭에 남은 크레딧 한 줄과 크레딧 탭으로 가는 버튼이 있다", () => {
     const info = src.slice(src.indexOf('tab === "info" && ('), src.indexOf('tab === "credits" && ('));
-    expect(info).toMatch(/formatCredits\(sums\.balance\)\} \/ \{formatCredits\(sums\.granted\)/);
+    expect(info).toMatch(/formatCredits\(sums\.balance\)/);
+    expect(info).not.toMatch(/sums\.granted/);
     expect(info).toMatch(/크레딧 관리/);
     expect(info).toMatch(/내부 계정/);
   });

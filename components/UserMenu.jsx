@@ -83,15 +83,17 @@ export default function UserMenu({ initialGuest = false }) {
 
   return (
     <div className="um" ref={box}>
-      {/* ★ 크레딧을 끈 동안(내부 QA)에는 안 보여준다 — 판정은 서버가 내려 준 gated
-          하나다(/api/me). 화면이 스스로 판정하면 두 벌이 되어 언젠가 어긋난다.
-          ★ 2026-09-14 되살림(09-10 에 걷었던 것) — 와디즈에서 크레딧을 팔기로 해서 손님이
-            남은 양을 봐야 한다. 내부 계정(차감 면제)은 잔액 대신 그 사실을 적는다. */}
-      {/* ★ 잔액을 누르면 마이페이지 [크레딧] 탭(2026-09-14 사장님 지시). 이미 /me 에 있으면 Next 가 다시
-          그리지 않아 탭이 안 바뀌므로 신호를 함께 보낸다(lib/me-tab.js). */}
-      {me && me.gated !== false
-        ? <Link href={CREDITS_TAB_HREF} className="um-credit" onClick={() => window.dispatchEvent(new Event(ME_TAB_EVENT))}>크레딧 <b>{formatCredits(me.balance)}</b></Link>
-        : me?.internal === true && <span className="um-credit">내부 계정</span>}
+      {/* ★★ 잔액 — 로그인했으면 **늘** 보인다(2026-09-14 결정 뒤집힘, 사장님: "상단바 잔액이 없는데?").
+          그 전에는 크레딧을 걷지 않는 동안(gated:false) 숨겼다(08-14 결정). 와디즈 서포터는 걷지 않는 동안에도
+          받은 크레딧이 들어왔는지 봐야 한다 — 마이페이지 크레딧 절을 늘 그리기로 한 것과 같은 방향이다.
+          내부 계정(차감 면제)은 잔액 뒤에 그 사실을 붙인다.
+          ★ 누르면 마이페이지 [크레딧] 탭. 이미 /me 에 있으면 Next 가 다시 그리지 않아 탭이 안 바뀌므로
+            신호를 함께 보낸다(lib/me-tab.js). */}
+      {me && (
+        <Link href={CREDITS_TAB_HREF} className="um-credit" onClick={() => window.dispatchEvent(new Event(ME_TAB_EVENT))}>
+          크레딧 <b>{formatCredits(me.balance)}</b>{me.internal === true && " · 내부"}
+        </Link>
+      )}
       <button
         className="um-btn"
         onClick={() => setOpen((v) => !v)}
