@@ -3367,17 +3367,28 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
 .rs-card { background: var(--surface); border-radius: var(--r-card);
   box-shadow: var(--ring), var(--lift); overflow: hidden; }
 /* ★★ 펼친 단계는 **카드가 아니다** — 단계 페이지가 스스로 카드를 그린다
-   (app/reel/[id]/*/page.js 여섯이 전부 `<section className="panel panel--wide">`).
-   여기서 또 면을 깔면 카드 안에 카드가 앉아 테두리가 두 겹이 된다. */
-/* ★ opacity: 1 은 장식이 아니다 — `is-open` 과 `is-todo` 는 **따로** 붙어서 둘이 같이
-   설 수 있다(주소가 아직 못 여는 단계를 가리키는 순간. 지금 단계는 주소를 먼저 본다).
-   그때 아래 .is-todo 가 살아남으면 **펼쳐진 단계 페이지가 통째로 흐려진다** —
-   레이아웃 가드가 되돌리기 전 한 프레임이라도 그렇게 보이면 안 된다. */
-.rs-card.is-open { background: none; border-radius: 0; box-shadow: none; overflow: visible; opacity: 1; }
+   (app/reel/[id]/<단계>/page.js 여섯이 전부 `<section className="panel panel--wide">`).
+   여기서 또 면을 깔면 카드 안에 카드가 앉아 테두리가 두 겹이 된다.
+   ⚠️⚠️ 경로에 **글로브(별표)를 적지 마라.** `[id]/` 뒤에 별표를 쓰면 그 별표와 다음
+   빗금이 `*` `/` 가 되어 **주석이 거기서 닫힌다.** 그러면 남은 한국어가 통째로 CSS 본문에
+   흘러나와 **바로 아래 규칙의 선택자에 붙고, 그 규칙이 통째로 죽는다**(선택자가 유효하지
+   않으므로 파서가 버린다). 2026-09-14 에 실제로 그랬다 — 이 `.rs-card.is-open` 규칙이
+   첫 커밋부터 **한 번도 적용된 적이 없었다.** 판(tests/reel-step-stack-ui.test.js 의
+   「주석이 선택자로 새지 않는다」)이 이제 그것을 잡는다. */
+.rs-card.is-open { background: none; border-radius: 0; box-shadow: none; overflow: visible; }
 .rs-card.is-open .rs-hd { padding: 0 2px 8px; }
 .rs-card.is-open .rs-no { background: var(--ink); color: var(--bg); box-shadow: none; }
-/* 아직 못 여는 단계도 **지우지 않는다** — 앞으로 무엇이 남았는지가 보여야 한다. */
-.rs-card.is-todo { opacity: .55; }
+/* 아직 못 여는 단계도 **지우지 않는다** — 앞으로 무엇이 남았는지가 보여야 한다.
+   ★★★ `:not(.is-open)` 은 장식이 아니다. `is-open` 과 `is-todo` 는 화면이 **따로**
+   붙이므로 둘이 같이 설 수 있다(주소가 아직 못 여는 단계를 가리키는 순간. 지금 단계는
+   주소를 먼저 본다). 그러면 **펼쳐진 단계 페이지가 통째로 55% 로 흐려진다** —
+   레이아웃 가드가 되돌리기 전 한 프레임이라도 그렇게 보이면 안 된다.
+   ⚠️ 처음에는 `.rs-card.is-open { opacity: 1 }` 로 되돌리려 했는데 **효력이 없었다**:
+   둘 다 클래스 둘이라 **특이도가 같고**(0,2,0) 동률이면 나중에 온 쪽이 이겨서, 소스상
+   뒤에 있는 이 규칙이 그대로 이겼다(2026-09-14 재검토 — 빌드 산출물에서도 확인됐다).
+   그래서 **겨루게 두지 않는다** — 조건을 선택자에 넣어 애초에 안 걸리게 한다.
+   이 모양은 **규칙 순서에 안 기댄다**(이 파일은 여러 세션이 끝에 덧붙이는 자리다). */
+.rs-card.is-todo:not(.is-open) { opacity: .55; }
 .rs-hd { display: flex; align-items: center; gap: 10px; padding: 12px 14px;
   font-size: 14px; color: inherit; text-decoration: none; }
 a.rs-hd:hover .rs-lab { text-decoration: underline; }

@@ -15,6 +15,22 @@ const code = src
   .replace(/\/\*[\s\S]*?\*\//g, "")
   .replace(/^\s*\/\/.*$/gm, "");
 
+// ★★★ 내 CSS 블록을 **파서처럼** 읽는다(주석을 먼저 걷고 규칙으로 쪼갠다).
+//   날 것 소스에서 글자를 찾으면 **주석 안의 글자**에도 맞아서, 규칙이 죽어 있어도
+//   초록이 된다 — 2026-09-14 에 실제로 그랬다(§주석 누수).
+function blockRules() {
+  const at = css.indexOf(".rs-stack");
+  if (at < 0) return [];
+  const rest = css.slice(at);
+  const end = rest.indexOf("/* ──");
+  if (end < 0) return [];
+  const body = rest.slice(0, end).replace(/\/\*[\s\S]*?\*\//g, "");
+  return [...body.matchAll(/([^{}]+)\{([^}]*)\}/g)].map((m) => ({
+    sel: m[1].trim().replace(/\s+/g, " "),
+    body: m[2],
+  }));
+}
+
 describe("누적 작업대", () => {
   it("★★★ 단계 표를 **하나만** 본다 — 목록을 손으로 적지 않는다", () => {
     expect(code, "REEL_STEPS 를 안 읽는다").toMatch(/REEL_STEPS/);
@@ -83,22 +99,54 @@ describe("누적 작업대", () => {
   });
 
   it("★★ 지금 단계 자리는 카드를 또 그리지 않는다 — 단계 페이지가 스스로 .panel 이다", () => {
-    // app/reel/[id]/*/page.js 여섯이 전부 `<section className="panel panel--wide">` 다.
-    // 여기서 또 면을 깔면 카드 안에 카드가 앉아 테두리가 두 겹이 된다.
-    const at = css.indexOf(".rs-card.is-open");
-    expect(at, ".rs-card.is-open 규칙이 없다").toBeGreaterThan(-1);
-    const rule = css.slice(at, css.indexOf("}", at));
-    expect(rule, "펼친 자리가 그림자를 지우지 않는다").toMatch(/box-shadow:\s*none/);
-    // ★ `is-open` 과 `is-todo` 는 따로 붙어서 **둘이 같이 설 수 있다**(주소가 아직 못
-    //   여는 단계를 가리키는 순간). 그때 .is-todo 의 opacity 가 살아남으면 펼쳐진 단계
-    //   페이지가 통째로 흐려진다 — 가드가 되돌리기 전 한 프레임이라도 그렇게 보인다.
-    expect(rule, "펼친 자리가 흐림을 되돌리지 않는다").toMatch(/opacity:\s*1/);
+    // 단계 페이지 여섯이 전부 `<section className="panel panel--wide">` 다. 여기서 또
+    // 면을 깔면 카드 안에 카드가 앉아 테두리가 두 겹이 된다.
+    // ★ **파서가 보는 규칙**에서 찾는다 — 날 것 소스에서 `css.indexOf(".rs-card.is-open")`
+    //   으로 찾던 시절엔 그 이름이 **주석에만** 있어도 통과했다(그리고 실제로 그랬다).
+    const rule = blockRules().find((r) => r.sel === ".rs-card.is-open");
+    expect(rule, ".rs-card.is-open 규칙이 파서에 안 보인다").toBeTruthy();
+    expect(rule.body, "펼친 자리가 그림자를 지우지 않는다").toMatch(/box-shadow:\s*none/);
+  });
+
+  // ★★★ 2026-09-14 재검토 — 이 자리에 `toMatch(/opacity:\s*1/)` 가 있었다. **선언이
+  //   있는지만 재고 이기는지는 못 쟀다**: `.rs-card.is-open` 과 `.rs-card.is-todo` 는
+  //   둘 다 클래스 둘이라 특이도가 같고(0,2,0), 동률이면 나중에 온 쪽이 이긴다 —
+  //   소스상 뒤인 `.is-todo` 가 그대로 이겨서 고침이 **효력 0 인 채 초록**이었다.
+  //   이 태스크에서 「좁은 조각을 재서 거짓 초록」을 만든 **세 번째**다(링크 갈래 ·
+  //   사진 갈래 · 이번 캐스케이드). 그래서 이제 **승부**를 잰다.
+  it("★★★ 펼친 줄은 흐려지지 않는다 — 선언이 아니라 **이기는지**를 잰다", () => {
+    const rules = blockRules();
+    expect(rules.length, "블록을 못 읽었다 — 표식이나 이름이 바뀌었다").toBeGreaterThan(0);
+
+    // ★★★ 주석이 **선택자로 새지 않는다.** 한국어가 선택자에 있으면 주석이 일찍 닫혔다는
+    //   뜻이고, 그러면 그 뒤 규칙이 유효하지 않은 선택자를 달고 **통째로 죽는다**.
+    //   2026-09-14 실측: 주석 안의 `[id]/` + 별표 + `/page.js` 가 `*` `/` 로 읽혀 주석이
+    //   거기서 닫혔고, `.rs-card.is-open` 이 **첫 커밋부터 한 번도 적용되지 않았다.**
+    //   판이 전부 초록이었던 이유는 단정이 **날 것 소스에서 글자를 찾았기** 때문이다 —
+    //   또 하나의 "좁은 조각을 재서 거짓 초록"이다.
+    for (const r of rules) {
+      expect(r.sel, `주석이 선택자로 샜다 — 이 규칙은 죽는다: ${r.sel.slice(0, 70)}`)
+        .not.toMatch(/[가-힣]/);
+    }
+    // 죽었던 그 규칙이 **실제로 살아 있는지**도 이름으로 못 박는다.
+    expect(rules.map((r) => r.sel), "펼친 줄 규칙이 파서에 안 보인다").toContain(".rs-card.is-open");
+
+    // ★★★ opacity 를 **선언하는 규칙이 하나뿐**이고, 그 선택자가 펼친 줄을 비켜 간다.
+    //   둘이면 캐스케이드로 겨루게 되고, 특이도가 같으면(둘 다 클래스 둘 = 0,2,0) 소스상
+    //   뒤에 온 쪽이 이긴다 — 그래서 `.is-open { opacity: 1 }` 을 얹는 방식은 **효력이
+    //   없었다.** 조건을 선택자에 넣으면 애초에 안 걸리므로 **규칙 순서에 안 기댄다**
+    //   (이 파일은 여러 세션이 끝에 덧붙이는 자리라 순서를 믿으면 안 된다).
+    const dimmers = rules.filter((r) => /opacity:/.test(r.body)).map((r) => r.sel);
+    expect(dimmers, "흐림은 규칙 하나가 쥐고, 그 선택자가 펼친 줄을 비켜 가야 한다")
+      .toEqual([".rs-card.is-todo:not(.is-open)"]);
   });
 
   it("★★ 아직 못 여는 단계에는 요약을 안 붙인다 — 「컷 0/3」이 '멎었다'로 읽힌다", () => {
     // 흐린 줄은 **앞으로 남은 것**만 말한다. 거기에 0 을 달면 "아직 못 연다"가
     // "0개 만들었다"로 읽혀 진행이 멎은 것처럼 보인다.
-    expect(code, "요약이 도달 판정을 안 본다").toMatch(/!open\s*&&\s*reachable\s*&&/);
+    // ★ 링크 판과 같은 관용구 — 낱말이 **어딘가 있다**가 아니라 그 갈래가 **요약을
+    //   감싸는지**까지 묶는다(재검토 제안).
+    expect(code, "요약이 도달 판정을 안 본다").toMatch(/!open\s*&&\s*reachable\s*&&[\s\S]{0,60}?rs-sum/);
   });
 });
 
