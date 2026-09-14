@@ -12,6 +12,7 @@ import { NAME_MAX } from "../../lib/display-name";
 import { ledgerLabel } from "../../lib/ledger";
 import { formatCredits } from "../../lib/pricing";
 import { useMe } from "../../components/MeContext";
+import CreditCodeForm from "../../components/CreditCodeForm";
 
 // 그 사람의 시계로 본 날짜. Intl 로 돌리면 기기 설정에 따라 "2026. 8. 13." 처럼 나와
 // 열 폭이 흔들린다 — 자리수를 고정한다.
@@ -253,6 +254,8 @@ export default function MePage() {
       <section className="panel me-panel">
         <h2 className="me-h">크레딧 내역</h2>
         <p className="pgsub">지금 {me ? <b>{formatCredits(me.balance)}</b> : "…"} 크레딧이 남았어요.</p>
+        {/* 크레딧 코드(와디즈 리워드) — 등록 뒤 상단바 잔액과 내역을 함께 다시 읽는다 */}
+        <CreditCodeForm onRedeemed={() => { load(); loadLedger(); }} />
         {ledgerErr && <p className="pgsub warn">{ledgerErr}</p>}
         {!ledgerErr && ledger === null && <p className="pgsub">불러오는 중…</p>}
         {!ledgerErr && ledger?.length === 0 && (

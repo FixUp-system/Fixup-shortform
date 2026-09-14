@@ -415,6 +415,15 @@ export default function Sidebar() {
           <span className="ic"><Icon name="user" /></span>사용자 관리
         </Link>
       )}
+      {/* 크레딧 코드(2026-09-14) — 와디즈 서포터에게 메일 머지로 건넬 코드를 만든다 */}
+      {isAdmin && (
+        <Link
+          href="/admin/codes"
+          className={`side-item${pathname === "/admin/codes" ? " on" : ""}`}
+        >
+          <span className="ic"><Icon name="check" /></span>크레딧 코드
+        </Link>
+      )}
       {isAdmin && (
         <Link
           href="/costs"
