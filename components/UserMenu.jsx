@@ -14,6 +14,7 @@ import Icon from "./Icon";
 // 예전에는 여기서 한 번, 사이드바에서 또 한 번 GET /api/me 를 불렀고, 마이페이지에서 이름을
 // 바꿔도 이 버튼은 옛 이름을 그대로 들고 있었다(새로고침해야 반영).
 import { useMe } from "./MeContext";
+import { formatCredits } from "../lib/pricing";
 
 // 사이드바에 있던 것을 그대로 옮겼다(새로 쓰지 않는다).
 async function handleLogout(router) {
@@ -68,8 +69,13 @@ export default function UserMenu() {
 
   return (
     <div className="um" ref={box}>
-      {/* ★ 크레딧 잔액은 2026-09-10 에 걷었다(사장님 지시) — 상용화를 앞두고 비용 정책을
-          새로 정할 예정이라, 낡은 정책이 화면에 남아 있으면 그것이 곧 약속처럼 읽힌다. */}
+      {/* ★ 크레딧을 끈 동안(내부 QA)에는 안 보여준다 — 판정은 서버가 내려 준 gated
+          하나다(/api/me). 화면이 스스로 판정하면 두 벌이 되어 언젠가 어긋난다.
+          ★ 2026-09-14 되살림(09-10 에 걷었던 것) — 와디즈에서 크레딧을 팔기로 해서 손님이
+            남은 양을 봐야 한다. 내부 계정(차감 면제)은 잔액 대신 그 사실을 적는다. */}
+      {me && me.gated !== false
+        ? <span className="um-credit">크레딧 <b>{formatCredits(me.balance)}</b></span>
+        : me?.internal === true && <span className="um-credit">내부 계정</span>}
       <button
         className="um-btn"
         onClick={() => setOpen((v) => !v)}
