@@ -17,6 +17,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useReelProject } from "../../../components/ReelProjectContext";
+import SettingsPanel from "../../../components/reel/SettingsPanel";
+import StepStack from "../../../components/reel/StepStack";
 import {
   REEL_STEPS, reelStepHref, isReelStepReachable, currentReelStepKey, reelStepFromPathname,
 } from "../../../lib/reel/steps";
@@ -62,15 +64,21 @@ function Inner({ children }) {
   }
   if (!project || project.id !== id) return <p className="pgsub">불러오는 중…</p>;
 
+  // ★ 여기는 **배치만** 한다. 설정 패널도 작업대도 공유본에서 프로젝트를 직접 읽으므로
+  //   값을 내려 주지 않는다 — 넘겨주기 시작하면 같은 값을 읽는 길이 두 벌이 된다.
+  //
+  // ★ 흐름 이름은 사이드바가 말한다 — 여기 또 쓰면 제목이 두 겹이고, 정작 어느 단계인지는
+  //   단계 페이지의 h2 가 말한다(2026-08-25).
+  // ★ 단계 목록은 **사이드바**가 그린다(components/Sidebar.jsx 의 ReelStepList) —
+  //   단계별 흐름·광고·film 과 같은 자리다. 작업대(StepStack)가 쌓아 보여 주는 것은
+  //   목록이 아니라 **지나온 작업**이라 역할이 겹치지 않는다.
   return (
-    <>
-      {/* ★ 흐름 이름은 사이드바가 말한다 — 여기 또 쓰면 제목이 두 겹이고,
-          정작 어느 단계인지는 아래 h2 가 말한다(2026-08-25). */}
-      {/* ★ 단계 목록은 **사이드바**가 그린다(components/Sidebar.jsx 의 ReelStepList) —
-          단계별 흐름·광고·film 과 같은 자리다. 여기서 그리면 사이드바용 클래스를 본문에
-          쓰게 돼 모양이 깨진다(2026-08-25 사장님 지시로 옮겼다). */}
-      {children}
-    </>
+    <div className="rw-grid">
+      <SettingsPanel />
+      <div className="rw-work">
+        <StepStack>{children}</StepStack>
+      </div>
+    </div>
   );
 }
 
