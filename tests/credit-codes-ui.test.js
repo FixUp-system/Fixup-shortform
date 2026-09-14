@@ -54,6 +54,13 @@ describe("운영자 화면(/admin/codes)", () => {
     expect(src).not.toMatch(/meta:\s*r\s*[,}]/);
     expect(src).toMatch(/keepCol/);
   });
+  // ★ 비용 기록(/costs)과 같은 구성(2026-09-14 사장님 지시) — 카드 안의 좁히기 줄 · 요약 타일 · 표.
+  it("비용 기록과 같은 틀을 쓴다 — 카드 줄·요약 타일", () => {
+    expect(src.match(/className="panel cost-filters"/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(src).toMatch(/className="cost-summary"/);
+    expect(src).toMatch(/className="cost-tile"/);
+    expect(src).not.toMatch(/me-form|me-row|me-label|tier-pick/);
+  });
   it("지우기는 확인을 받는다", () => {
     expect(src).toMatch(/await confirm\(/);
   });

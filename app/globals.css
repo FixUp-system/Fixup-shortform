@@ -928,7 +928,10 @@ a.side-item { text-decoration: none; }
       여기서는 값이 없어 칸이 20px 로 쪼그라들고, 32px 세그먼트와 밑선을 맞추느라 라벨 높이가 갈렸다.
       :root 에 있는 사다리(--ctl-sm = .seg 의 키)를 쓴다.
    ★ 줄이 카드(.panel) 안에 서므로 칸 바탕은 카드와 같은 surface 가 아니라 한 단 깊은 deep 이다. */
-.cost-filters input.field {
+/* ★ 고르기 칸(select)도 같은 규칙이다 — 크레딧 코드 화면(/admin/codes)이 같은 줄에 세운다.
+     select 는 input.field 기본 규칙을 못 받으므로 모서리·글자색·서체를 여기서 함께 준다. */
+.cost-filters input.field,
+.cost-filters select.field {
   width: auto;
   height: var(--ctl-sm);
   min-width: 150px;
@@ -937,7 +940,34 @@ a.side-item { text-decoration: none; }
   line-height: normal;
   border: 1px solid var(--line);
   background: var(--deep);
+  border-radius: var(--r-ctl);
+  color: var(--ink);
+  font-family: inherit;
 }
+/* 여러 줄 칸 — 한 줄을 통째로 쓴다(크레딧 코드의 붙여 넣기 칸).
+   ★ `.field` 를 달지 않는다 — textarea.field 는 **자라는 칸(AutoTextarea) 전용**이라 안에서 스크롤하지
+     않는 것이 규칙이다(tests 가 막는다). 붙여 넣은 표는 수백 줄일 수 있어 스크롤하는 칸이 따로 필요하다. */
+.cost-filters textarea.cost-paste {
+  display: block;
+  width: 100%;
+  min-height: 160px;
+  background: var(--deep);
+  border-radius: var(--r-ctl);
+  color: var(--ink);
+  font-family: inherit;
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  border: 1px solid var(--line);
+  overflow-y: auto;
+  resize: vertical;
+  white-space: pre;
+}
+/* 줄을 통째로 쓰는 칸·안내 문구 */
+.cost-filter-wide { flex-basis: 100%; }
+.cost-filters .pgsub { margin: 0; }
+/* 주 실행 버튼도 이 줄의 키로 선다 — 전역 .cta 의 위 여백(20px)과 큰 키가 밑선을 밀어낸다. */
+.cost-filters .cta { margin: 0; height: var(--ctl-sm); padding: 0 16px; font-size: 14px; }
 .cost-filter-q { min-width: 200px; }
 /* 고르기 칸은 이 줄에서만 좁게 — 기본 폭(--ctl-w 234px)은 이 줄에 과하다. */
 .cost-filter-pick { width: 160px; }

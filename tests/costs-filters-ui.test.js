@@ -16,8 +16,13 @@ const rule = (sel) => {
 
 describe("비용 기록 — 좁히기 줄", () => {
   it("날짜·검색 칸은 :root 에 있는 키를 쓴다 — 세그먼트(.seg)와 같은 --ctl-sm", () => {
-    expect(rule(".cost-filters input.field")).toMatch(/height:\s*var\(--ctl-sm\)/);
+    expect(rule(".cost-filters select.field")).toMatch(/height:\s*var\(--ctl-sm\)/);
     expect(rule(".seg")).toMatch(/height:\s*var\(--ctl-sm\)/);
+  });
+
+  // 크레딧 코드 화면이 같은 줄에 고르기 칸·여러 줄 칸을 세운다 — 칸마다 따로 키를 적지 않는다.
+  it("고르기 칸(select)도 같은 규칙으로 선다", () => {
+    expect(css).toMatch(/\.cost-filters input\.field,\s*\.cost-filters select\.field \{[^}]*height:\s*var\(--ctl-sm\)/);
   });
 
   it("좁히기 줄이 카드 안에 있다 — 아래 요약 타일과 영역이 갈린다", () => {

@@ -173,7 +173,11 @@ export default function CreditCodesPage() {
   const batches = [...new Set((codes || []).map((c) => c.batch))];
   const visible = (codes || []).filter((c) => shown === ALL || c.batch === shown);
   const usedCount = visible.filter((c) => c.redeemed_by).length;
+  const creditTotal = visible.reduce((s, c) => s + (Number(c.amount_credits) || 0), 0);
+  const creditUsed = visible.reduce((s, c) => s + (c.redeemed_by ? Number(c.amount_credits) || 0 : 0), 0);
 
+  // ★ 구성은 비용 기록(/costs)과 같다(2026-09-14 사장님 지시) — 카드 안의 줄(작은 라벨 위 · 32px 칸 아래)
+  //   · 요약 타일 · 표. 틀은 globals.css 의 .cost-filters · .cost-summary · .cost-table 한 벌을 쓴다.
   return (
     <>
       <h1 className="pgtitle">크레딧 코드</h1>
@@ -184,158 +188,173 @@ export default function CreditCodesPage() {
 
       {err && <p className="pgsub warn">{err}</p>}
 
-      <section className="panel me-panel">
-        <h2 className="me-h">코드 만들기</h2>
-        {/* ★ 마이페이지와 같은 틀(.me-form · 라벨 120px · 칸 380px)을 쓴다 — 새 CSS 를 안 더한다.
-            드롭다운에 .tier-pick 을 붙이면 표 안용 작은 키(12px)로 줄어 칸과 높이가 안 맞는다. */}
-        <div className="me-form">
-          <label className="me-row">
-            <span className="me-label">묶음 이름</span>
-            <input
-              className="sent-input"
-              placeholder="예: 와디즈 1차 09-30"
-              value={batch}
-              onChange={(e) => setBatch(e.target.value)}
-            />
-          </label>
+      {/* ── 만들기 ── */}
+      <div className="panel cost-filters">
+        <label>
+          <small>묶음 이름</small>
+          <input
+            className="field cost-filter-q"
+            placeholder="예: 와디즈 1차 09-30"
+            value={batch}
+            onChange={(e) => setBatch(e.target.value)}
+          />
+        </label>
+        {parsed.headers.length > 0 && (
+          <>
+            <label>
+              <small>리워드 열</small>
+              <select className="field" value={col} onChange={(e) => setRewardCol(e.target.value)}>
+                <option value={ALL}>없음 — 모두 같은 크레딧</option>
+                {parsed.headers.map((h) => <option key={h} value={h}>{h}</option>)}
+              </select>
+            </label>
+            <label>
+              <small>보관할 식별 열</small>
+              <select className="field" value={keepCol} onChange={(e) => setKeepPick(e.target.value)}>
+                {parsed.headers.map((h) => <option key={h} value={h}>{h}</option>)}
+              </select>
+            </label>
+          </>
+        )}
+        <label className="cost-filter-wide">
+          <small>
+            붙여 넣은 표
+            {parsed.headers.length > 0 &&
+              ` · ${parsed.rows.length.toLocaleString()}행 · 열 ${parsed.headers.length}개 (${parsed.headers.join(", ")})`}
+          </small>
           <textarea
-            className="sent-input"
-            rows={8}
+            className="cost-paste"
             placeholder={"엑셀에서 복사한 표를 여기에 붙여 넣으세요 (첫 줄은 머리글)"}
             value={pasted}
             onChange={(e) => setPasted(e.target.value)}
-            aria-label="붙여 넣은 표"
           />
-          {parsed.headers.length > 0 && (
-            <>
-              <div className="me-value">
-                {parsed.rows.length.toLocaleString()}행 · 열 {parsed.headers.length}개 ({parsed.headers.join(", ")})
-              </div>
-              <label className="me-row">
-                <span className="me-label">리워드 열</span>
-                <select className="sent-input" value={col} onChange={(e) => setRewardCol(e.target.value)}>
-                  <option value={ALL}>없음 — 모든 행이 같은 크레딧</option>
-                  {parsed.headers.map((h) => <option key={h} value={h}>{h}</option>)}
-                </select>
-              </label>
-              <label className="me-row">
-                <span className="me-label">보관할 식별 열</span>
-                <select className="sent-input" value={keepCol} onChange={(e) => setKeepPick(e.target.value)}>
-                  {parsed.headers.map((h) => <option key={h} value={h}>{h}</option>)}
-                </select>
-              </label>
-              {rewardValues.map((v) => (
-                <label className="me-row" key={`amt-${v}`}>
-                  <span className="me-label">{col === ALL ? "크레딧" : v || "(빈칸)"}</span>
-                  <input
-                    className="sent-input"
-                    inputMode="numeric"
-                    placeholder={col === ALL
-                      ? "예: 1000"
-                      : `크레딧 (${parsed.rows.filter((r) => r[col] === v).length}행)`}
-                    value={amounts[v] ?? ""}
-                    onChange={(e) => setAmounts((a) => ({ ...a, [v]: e.target.value }))}
-                  />
-                </label>
-              ))}
-              <div className="me-value">
-                DB 에는 식별 열과 리워드 열만 남아요. 이름·연락처 같은 나머지 열은 [CSV 내려받기] 파일에만 들어가요.
-              </div>
-            </>
-          )}
-          <button className="cta" disabled={busy === "create" || parsed.rows.length === 0} onClick={create}>
-            {busy === "create" ? "만드는 중…" : "코드 만들기"}
-          </button>
-          {made && (
-            <>
-              <div className="me-value">
-                「{made.batch}」 코드 {made.codes.length.toLocaleString()}개를 만들었어요.
-                메일 머지용 전체 열 CSV 는 <b>지금만</b> 받을 수 있어요 — 화면을 떠나기 전에 내려받으세요.
-              </div>
-              <button className="mini" onClick={() => download(made.batch, codesCsv(made.codes))}>
-                CSV 내려받기
-              </button>
-            </>
-          )}
-        </div>
-      </section>
-
-      <section className="panel me-panel">
-        <h2 className="me-h">만든 코드</h2>
-        {codes === null ? (
-          <p className="pgsub">불러오는 중…</p>
-        ) : codes.length === 0 ? (
-          <p className="pgsub">아직 만든 코드가 없어요.</p>
-        ) : (
+        </label>
+        {parsed.headers.length > 0 && rewardValues.map((v) => (
+          <label key={`amt-${v}`}>
+            <small>
+              {col === ALL ? "크레딧" : `${v || "(빈칸)"} · ${parsed.rows.filter((r) => r[col] === v).length}행`}
+            </small>
+            <input
+              className="field"
+              inputMode="numeric"
+              placeholder="예: 1000"
+              value={amounts[v] ?? ""}
+              onChange={(e) => setAmounts((a) => ({ ...a, [v]: e.target.value }))}
+            />
+          </label>
+        ))}
+        <button className="cta" disabled={busy === "create" || parsed.rows.length === 0} onClick={create}>
+          {busy === "create" ? "만드는 중…" : "코드 만들기"}
+        </button>
+        {parsed.headers.length > 0 && (
+          <p className="pgsub cost-filter-wide">
+            DB 에는 식별 열과 리워드 열만 남아요. 이름·연락처 같은 나머지 열은 [CSV 내려받기] 파일에만 들어가요.
+          </p>
+        )}
+        {made && (
           <>
-            <div className="me-row">
-              <select
-                className="sent-input"
-                value={shown}
-                onChange={(e) => setShown(e.target.value)}
-                aria-label="묶음"
-              >
+            <p className="pgsub">
+              「{made.batch}」 코드 {made.codes.length.toLocaleString()}개를 만들었어요.
+              메일 머지용 전체 열 CSV 는 <b>지금만</b> 받을 수 있어요 — 화면을 떠나기 전에 내려받으세요.
+            </p>
+            <button className="mini" onClick={() => download(made.batch, codesCsv(made.codes))}>
+              CSV 내려받기
+            </button>
+          </>
+        )}
+      </div>
+
+      {codes === null ? (
+        <p className="pgsub">불러오는 중…</p>
+      ) : codes.length === 0 ? (
+        <p className="pgsub">아직 만든 코드가 없어요.</p>
+      ) : (
+        <>
+          {/* ── 좁히기 ── */}
+          <div className="panel cost-filters">
+            <label>
+              <small>묶음</small>
+              <select className="field" value={shown} onChange={(e) => setShown(e.target.value)}>
                 <option value={ALL}>전체 묶음</option>
                 {batches.map((b) => <option key={b} value={b}>{b}</option>)}
               </select>
-              <span className="me-value">
-                {visible.length.toLocaleString()}개 중 {usedCount.toLocaleString()}개 등록됨
-              </span>
-              <button
-                className="mini"
-                onClick={() => download(shown === ALL ? "크레딧 코드 전체" : shown, codesCsv(visible))}
-              >
-                CSV 다시 받기
-              </button>
+            </label>
+            <button
+              className="mini"
+              onClick={() => download(shown === ALL ? "크레딧 코드 전체" : shown, codesCsv(visible))}
+            >
+              CSV 다시 받기
+            </button>
+          </div>
+
+          {/* ── 요약 ── */}
+          <div className="cost-summary">
+            <div className="cost-tile">
+              <small>{shown === ALL ? "전체 코드" : "이 묶음 코드"}</small>
+              <b>{visible.length.toLocaleString()}개</b>
             </div>
-            <div className="cost-table-wrap">
-              <table className="cost-table">
-                <thead>
-                  <tr>
-                    <th>묶음</th>
-                    <th>코드</th>
-                    <th>크레딧</th>
-                    <th>만든 날</th>
-                    <th>등록한 계정</th>
-                    <th></th>
+            <div className="cost-tile">
+              <small>등록됨</small>
+              <b>{usedCount.toLocaleString()}개</b>
+            </div>
+            <div className="cost-tile">
+              <small>안 씀</small>
+              <b>{(visible.length - usedCount).toLocaleString()}개</b>
+            </div>
+            <div className="cost-tile">
+              <small>크레딧 (등록 / 전체)</small>
+              <b>{formatCredits(creditUsed)} / {formatCredits(creditTotal)}</b>
+            </div>
+          </div>
+
+          {/* ── 표 ── */}
+          <div className="cost-table-wrap">
+            <table className="cost-table">
+              <thead>
+                <tr>
+                  <th>묶음</th>
+                  <th>코드</th>
+                  <th>크레딧</th>
+                  <th>만든 날</th>
+                  <th>등록한 계정</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((c) => (
+                  <tr key={c.code}>
+                    <td>{c.batch}</td>
+                    <td className="mono">{formatCode(c.code)}</td>
+                    <td>{formatCredits(c.amount_credits)}</td>
+                    <td className="mono">{ymd(c.created_at)}</td>
+                    <td>
+                      {!c.redeemed_by ? (
+                        <span className="st-badge">안 씀</span>
+                      ) : (
+                        <>
+                          {c.redeemer ? `${displayNameOf(c.redeemer)} · ${c.redeemer.email}` : "지운 계정"}
+                          {" "}
+                          <span className={`st-badge st-${c.redeemer?.status === "approved" ? "done" : "submitted"}`}>
+                            {c.redeemer?.status === "approved" ? "승인됨" : c.redeemer?.status === "blocked" ? "차단됨" : "승인 대기"}
+                          </span>
+                        </>
+                      )}
+                    </td>
+                    <td>
+                      {!c.redeemed_by && (
+                        <button className="mini" disabled={busy === c.code} onClick={() => remove(c)}>지우기</button>
+                      )}
+                      {c.redeemer?.status === "pending" && (
+                        <button className="mini" disabled={busy === c.code} onClick={() => approve(c)}>승인</button>
+                      )}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {visible.map((c) => (
-                    <tr key={c.code}>
-                      <td>{c.batch}</td>
-                      <td className="mono">{formatCode(c.code)}</td>
-                      <td>{formatCredits(c.amount_credits)}</td>
-                      <td className="mono">{ymd(c.created_at)}</td>
-                      <td>
-                        {!c.redeemed_by ? (
-                          <span className="st-badge">안 씀</span>
-                        ) : (
-                          <>
-                            {c.redeemer ? `${displayNameOf(c.redeemer)} · ${c.redeemer.email}` : "지운 계정"}
-                            {" "}
-                            <span className={`st-badge st-${c.redeemer?.status === "approved" ? "done" : "submitted"}`}>
-                              {c.redeemer?.status === "approved" ? "승인됨" : c.redeemer?.status === "blocked" ? "차단됨" : "승인 대기"}
-                            </span>
-                          </>
-                        )}
-                      </td>
-                      <td>
-                        {!c.redeemed_by && (
-                          <button className="mini" disabled={busy === c.code} onClick={() => remove(c)}>지우기</button>
-                        )}
-                        {c.redeemer?.status === "pending" && (
-                          <button className="mini" disabled={busy === c.code} onClick={() => approve(c)}>승인</button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-      </section>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </>
   );
 }
