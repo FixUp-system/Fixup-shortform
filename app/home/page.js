@@ -258,7 +258,7 @@ export default async function HomePage() {
               <span className="land-ptag">원클릭</span>
               <h3 className="land-path-h">적어두면 끝까지 알아서</h3>
               <ul className="land-plist">
-                <li><b>중간에 멈추는 곳이 없습니다.</b> 적고 나면 더 손댈 일이 없어요.</li>
+                <li><b>손쉽게 한 번에 만듭니다.</b> 시나리오만 한 번 보고 나머지는 맡기면 돼요.</li>
                 <li>시나리오 · 화면 · 자막 · 소리까지 한 번에 붙습니다.</li>
                 <li>기다렸다가 완성된 영상만 받아보면 됩니다.</li>
               </ul>

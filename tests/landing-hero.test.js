@@ -109,6 +109,13 @@ describe("랜딩 — 두 갈래 절 (2026-09-14 사장님 지시)", () => {
     expect(rule(".home .land-path--deep .land-ptag"), "단계별 뱃지가 원클릭과 다른 급이다")
       .toMatch(/background:\s*var\(--accent\)/);
   });
+
+  it("★★★ 지키지 못할 약속을 하지 않는다 — 원클릭도 시나리오에서 한 번 멈춘다", () => {
+    // app/ads/[id]/page.js 의 실제 흐름: 입력 → 시나리오 확인 → [영상 만들기] → 완성.
+    // 돈 나가는 버튼 앞이라 그 한 번은 있어야 하는 자리다. 그래서 문구를 사실로 맞춘다.
+    expect(pageCode, "안 멈춘다고 약속한다").not.toMatch(/중간에 멈추는 곳이 없습니다/);
+    expect(pageCode, "손쉬움으로 말하지 않는다").toMatch(/손쉽게/);
+  });
 });
 
 describe("랜딩 — 맨 위로 돌아가는 버튼", () => {
