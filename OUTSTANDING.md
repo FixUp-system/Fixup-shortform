@@ -10,7 +10,8 @@
 > | 브랜치 · HEAD | `feat/credit-unit` · `5a72113`(merge) + 이 문서 커밋 |
 > | 미커밋 | 0 (추적 안 하는 `.claude/launch.json` 하나 — 로컬 dev 설정, 커밋 안 함) |
 > | 미푸시 | **원격에 이 갈래가 없다**(한 번도 푸시 안 함). `origin/feat/reel-cut-r2v` 대비 17 앞 |
-> | `origin/main` 거리 | **0 뒤 / 63 앞**(`fixup/main` 도 63) |
+> | `origin/main` 거리 | **0 뒤 / 65 앞**(`fixup/main` 도 같음 · **09-14 16:0x 대조 커밋까지 포함**. 원래 63 으로 적혔는데 인계 커밋 자신을 안 셌다) |
+> | 대조 | 09-14 16:0x 새 세션이 다시 셌다 — 테스트 **6,177 통과 · 10 skipped / 373+2 파일** 일치 · 미커밋(추적 안 하는 launch.json 1) 일치 · 코드 변경 0 |
 > | 테스트 | `npx vitest run` **6,177 통과 · 0 실패 · 10 skipped / 373 파일 · exit 0** · `npx next build` exit 0 |
 > | 라이브 | `dpl_51jWD9…`(09-14 13:29, step-gate 랜딩까지). **이 갈래의 크레딧·보관함·화면 작업은 미배포** |
 > | 운영 DB | ✅ `profiles.internal` 컬럼 **추가됨**(09-14 사장님이 SQL 실행 · 기본 false). 백필(내부 표시)은 **아직** |
