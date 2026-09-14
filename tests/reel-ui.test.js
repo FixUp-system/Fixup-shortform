@@ -123,6 +123,10 @@ describe("화질 고르기", () => {
   const NO_PRICE = [
     ["새 영상 화면", "app/reel/new/page.js"],
     ["설정 패널", "components/reel/SettingsPanel.jsx"],
+    // ★ 누적 작업대도 ①~⑥ **어느 단계에서나** 서 있다 — 설정 패널과 같은 이유로 넣는다.
+    //   (부품 자체의 판은 tests/reel-step-stack-ui.test.js 에도 있다. 이 목록은 "값을
+    //    말하면 안 되는 자리"의 **명부**라, 새 화면이 여기 없으면 다음 사람이 못 본다.)
+    ["누적 작업대", "components/reel/StepStack.jsx"],
   ];
   for (const [name, path] of NO_PRICE) {
     it(`★ ${name} 은 값을 말하지 않는다 — 값은 ⑤영상에서만 말한다`, () => {

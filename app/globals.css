@@ -3356,3 +3356,35 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
      `.rp-panel` 부터 여기까지만 잘라서 hex·액센트를 잰다. 이 파일은 여러 세션이 끝에
      덧붙이는 자리라, 경계가 없으면 **남이 뒤에 붙인 hex 가 내 판을 빨갛게** 만들고
      메시지는 엉뚱하게 "hex 를 적었다"를 가리킨다. 새 규칙은 이 표식 **위**에 넣어라. */
+
+/* ── 누적 작업대 — 끝난 단계는 접혀 쌓인다 (2026-09-14) ──────────────────
+   단계 여섯이 한 화면에 줄로 쌓이고, 지금 단계 자리에만 그 단계 페이지가 들어온다.
+   ★ 지금 단계 강조는 --ink 계열이다. 앱층에서 액센트는 사이드바 스테퍼의 몫이라
+     tests/design-system.test.js 가 그 색을 여기 못 쓰게 막는다.
+   ★ 흐린 글자는 --ink-soft 다. --ink-faint 라는 토큰은 :root 에 **없다** —
+     쓰면 오류 없이 상속색으로 그려져 "회색으로 적었는데 검게 나오는" 자리가 된다. */
+.rs-stack { display: flex; flex-direction: column; gap: 10px; }
+.rs-card { background: var(--surface); border-radius: var(--r-card);
+  box-shadow: var(--ring), var(--lift); overflow: hidden; }
+/* ★★ 펼친 단계는 **카드가 아니다** — 단계 페이지가 스스로 카드를 그린다
+   (app/reel/[id]/*/page.js 여섯이 전부 `<section className="panel panel--wide">`).
+   여기서 또 면을 깔면 카드 안에 카드가 앉아 테두리가 두 겹이 된다. */
+.rs-card.is-open { background: none; border-radius: 0; box-shadow: none; overflow: visible; }
+.rs-card.is-open .rs-hd { padding: 0 2px 8px; }
+.rs-card.is-open .rs-no { background: var(--ink); color: var(--bg); box-shadow: none; }
+/* 아직 못 여는 단계도 **지우지 않는다** — 앞으로 무엇이 남았는지가 보여야 한다. */
+.rs-card.is-todo { opacity: .55; }
+.rs-hd { display: flex; align-items: center; gap: 10px; padding: 12px 14px;
+  font-size: 14px; color: inherit; text-decoration: none; }
+a.rs-hd:hover .rs-lab { text-decoration: underline; }
+.rs-no { flex: none; width: 20px; height: 20px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: var(--ink-soft); box-shadow: var(--ring); }
+.rs-lab { font-weight: 600; }
+/* 요약은 줄 끝에서 잘린다 — 길어져서 머리줄이 두 줄이 되면 쌓인 리듬이 무너진다. */
+.rs-sum { margin-left: auto; min-width: 0; font-size: 12px; color: var(--ink-soft);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* ── 누적 작업대 끝 ──────────────────────────────────────────────────────
+   ★ 이 표식도 **판의 경계**다(설정 패널과 같은 관용구) —
+     tests/reel-step-stack-ui.test.js 가 여기까지만 잘라서 hex·액센트를 잰다.
+     새 규칙은 이 표식 **위**에 넣어라. */
