@@ -3324,3 +3324,29 @@ select.speed-pick:hover { border-color: var(--ink-soft); }
   margin: 0 0 20px;
 }
 .display em { font-style: normal; color: var(--accent); }
+
+/* ── 단계별 설정 패널 (2026-09-14) ───────────────────────────────────────
+   이 영상이 무엇으로 만들어지는지 늘 보이는 자리. 잠긴 축도 값은 남는다.
+   ★ 고른 칩은 --ink 바탕이다. 앱층에서 액센트는 사이드바 스테퍼의 몫이라
+     tests/design-system.test.js 가 그 색을 여기 못 쓰게 막는다.
+   ★ 흐린 글자는 --ink-soft 다. --ink-faint 라는 토큰은 :root 에 **없다** —
+     쓰면 오류 없이 상속색으로 그려져 "회색으로 적었는데 검게 나오는" 자리가 된다. */
+.rp-panel { display: flex; flex-direction: column; background: var(--surface);
+  border-radius: var(--r-card); box-shadow: var(--ring), var(--lift); overflow: hidden; }
+.rp-head { padding: 12px 14px; border-bottom: 1px solid var(--line); font-size: 14px; font-weight: 600; }
+.rp-body { padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+.rp-field { display: flex; flex-direction: column; gap: 7px; }
+.rp-lab { font-size: 12px; font-weight: 600; color: var(--ink-soft); display: flex; justify-content: space-between; }
+.rp-lockmark { font-size: 12px; font-weight: 400; color: var(--ink-soft); }
+.rp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.rp-chip { font-size: 12px; padding: 5px 11px; border-radius: var(--r-pill); border: 0;
+  background: var(--surface); color: var(--ink-soft); box-shadow: var(--ring); cursor: pointer; }
+.rp-chip.on { background: var(--ink); color: var(--bg); box-shadow: none; font-weight: 600; }
+.rp-chip:disabled { cursor: default; }
+.rp-field.is-locked .rp-chips { opacity: .72; }
+.rp-why { margin: 0; font-size: 12px; color: var(--ink-soft); }
+/* 서버가 거절한 이유. 잠김 안내(--ink-soft)와 색을 나눈다 — 하나는 "지금은 이렇다"이고
+   다른 하나는 "방금 누른 것이 안 됐다"라서, 같은 색이면 무엇이 새 소식인지 안 보인다. */
+.rp-err { margin: 0; font-size: 12px; color: var(--warn); }
+.rp-foot { margin-top: auto; padding: 12px 14px; border-top: 1px solid var(--line); }
+.rp-price { font-size: 14px; font-weight: 600; }
