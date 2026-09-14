@@ -34,10 +34,11 @@ describe("승인 대기·마이페이지가 입력칸을 쓴다", () => {
     expect(src).toMatch(/크레딧이 차감되지 않아요/);
   });
 
-  it("/me — 크레딧 내역 절 안에서, 등록 뒤 잔액·내역을 다시 읽는다", () => {
+  // 2026-09-14 — 마이페이지가 [내 정보 | 크레딧] 탭이 되면서 입력칸은 크레딧 탭의 "코드 등록" 카드로 올라갔다.
+  it("/me — 크레딧 탭 안에서, 등록 뒤 잔액·내역을 다시 읽는다", () => {
     const src = strip(read("app/me/page.js"));
     const at = src.indexOf("<CreditCodeForm");
-    expect(at).toBeGreaterThan(src.indexOf("크레딧 내역"));
+    expect(at).toBeGreaterThan(src.indexOf('tab === "credits" && ('));
     expect(src.slice(at, at + 200)).toMatch(/onRedeemed=\{[^}]*load\(\)/);
   });
 });

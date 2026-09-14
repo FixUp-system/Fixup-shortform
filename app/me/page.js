@@ -42,18 +42,41 @@ export default function MePage() {
   const [ledgerErr, setLedgerErr] = useState("");
   const [ledgerMore, setLedgerMore] = useState(false);
   const [ledgerBusy, setLedgerBusy] = useState(false);
+  // 내역 좁히기 — "" 전체 · "grant" 충전 · "charge" 사용. ★ 서버가 거른다(받은 20줄 안에서 거르면 틀린다).
+  const [ledgerSource, setLedgerSource] = useState("");
+  // 요약 합계 — { balance, granted, used }. 내역 응답 **한 번**에서 셋을 같이 받는다:
+  //   잔액은 공유본(me.balance)에도 있지만, 따로 받은 두 값을 섞으면 "보유 + 사용 ≠ 총 충전"인 순간이 생긴다.
+  //   null 은 아직 모름 — 모르는 동안에는 숫자를 안 그린다(잘못된 한 프레임을 만들지 않는다).
+  const [sums, setSums] = useState(null);
+
+  // 탭 — "info"(내 정보) | "credits"(크레딧). 2026-09-14 사장님 지시.
+  // ★ 주소(?tab=credits)로 연다 — 와디즈 안내 메일·상단바 잔액에서 바로 크레딧 탭으로 온다.
+  //   useSearchParams 를 안 쓰는 이유: 이 화면은 정적으로 구워져서 Suspense 경계가 필요해진다.
+  const [tab, setTab] = useState("info");
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("tab") === "credits") setTab("credits");
+  }, []);
+  function switchTab(next) {
+    setTab(next);
+    window.history.replaceState(null, "", next === "credits" ? "?tab=credits" : window.location.pathname);
+  }
 
   // before 를 주면 그 시각보다 앞선 것만 온다 — 이어 받는 동안 새 줄이 생겨도
   // 이미 본 줄이 다시 나오거나 건너뛰지 않는다(번호 커서였다면 밀린다).
-  async function loadLedger(before) {
+  async function loadLedger(before, source = ledgerSource) {
     setLedgerBusy(true);
     try {
-      const q = before ? `?before=${before}` : "";
+      const params = new URLSearchParams();
+      if (before) params.set("before", String(before));
+      if (source) params.set("source", source);
+      const q = params.toString() ? `?${params}` : "";
       const res = await fetch(`/api/credits/history${q}`);
       if (!res.ok) throw new Error();
       const d = await res.json();
       setLedger((prev) => (before ? [...(prev || []), ...d.rows] : d.rows));
       setLedgerMore(!!d.has_more);
+      setSums({ balance: d.balance, granted: d.granted, used: d.used });
+      setLedgerErr("");
     } catch {
       // 조용히 비우지 않는다 — 빈 목록과 "못 읽었다"가 같아 보이면 사장님이 내역이
       // 없는 줄 안다. 여기는 돈에 관한 화면이라 그 오해가 특히 나쁘다.
@@ -63,6 +86,11 @@ export default function MePage() {
     }
   }
   useEffect(() => { loadLedger(); }, []);
+  function pickSource(next) {
+    setLedgerSource(next);
+    setLedger(null);
+    loadLedger(undefined, next);
+  }
 
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -164,9 +192,22 @@ export default function MePage() {
 
   return (
     <>
-      <h1 className="pgtitle">내 정보</h1>
+      <h1 className="pgtitle">마이페이지</h1>
+
+      {/* ── 탭 — 운영자 화면들과 같은 세그먼트(.seg) ── */}
+      <div className="cost-filters">
+        <span className="seg" role="group" aria-label="마이페이지">
+          <button type="button" className="seg-btn" aria-pressed={tab === "info"} onClick={() => switchTab("info")}>
+            내 정보
+          </button>
+          <button type="button" className="seg-btn" aria-pressed={tab === "credits"} onClick={() => switchTab("credits")}>
+            크레딧
+          </button>
+        </span>
+      </div>
 
       {/* ★ 2026-09-14 — 제목 아래 설명 줄과 같은 이름의 소제목을 걷었다(같은 말이 세 번이었다). */}
+      {tab === "info" && (
       <section className="panel me-panel">
         {loadErr && (
           <p className="pgsub">
@@ -198,6 +239,15 @@ export default function MePage() {
         <div className="me-row">
           <span className="me-label">가입일</span>
           <span className="me-value">{me?.created_at ? me.created_at.slice(0, 10) : "…"}</span>
+        </div>
+        {/* 크레딧 한 줄 — "보유 / 총 충전"(2026-09-14 사장님 선택). 자세한 것은 [크레딧] 탭에 있다. */}
+        <div className="me-row">
+          <span className="me-label">크레딧</span>
+          <span className="me-value">
+            {sums ? <><b>{formatCredits(sums.balance)} / {formatCredits(sums.granted)}</b></> : "…"}
+            {me?.gated === false && " · 차감 안 함"}
+          </span>
+          <button type="button" className="mini" onClick={() => switchTab("credits")}>크레딧 관리 →</button>
         </div>
 
         {/* ★ 비밀번호는 "내 정보" 안에 있다 — 이름·이메일·가입일과 같은 성격(내 계정)이라
@@ -246,20 +296,56 @@ export default function MePage() {
         )}
         {pwMsg && <p className="pgsub">{pwMsg}</p>}
       </section>
+      )}
 
-      {/* ★★ 2026-09-14 — **늘 그린다**(사장님 지시: "사용자는 마이페이지에서 크레딧 정보를 보고 등록할 수
-          있어야 한다"). 그 전에는 크레딧을 걷지 않는 동안(gated:false — 전역 스위치·내부 계정) 이 묶음을
-          통째로 숨겨서, 와디즈 서포터가 받은 코드를 넣을 자리가 없었다.
+      {/* ★★ 크레딧 탭 — gated 와 무관하게 **늘 그린다**(2026-09-14 사장님 지시: "사용자는 마이페이지에서 크레딧
+          정보를 보고 등록할 수 있어야 한다"). 그 전에는 크레딧을 걷지 않는 동안(전역 스위치·내부 계정) 통째로
+          숨겨서, 와디즈 서포터가 받은 코드를 넣을 자리가 없었다.
           ★ 걷지 않는 동안에는 그 사실을 한 줄로 말한다 — 잔액만 보이면 "쓰면 줄어드는 줄" 안다.
           상단바 잔액은 여전히 gated 뒤다(components/UserMenu.jsx). */}
-      <section className="panel me-panel">
-        <h2 className="me-h">크레딧 내역</h2>
-        <p className="pgsub">지금 {me ? <b>{formatCredits(me.balance)}</b> : "…"} 크레딧이 남았어요.</p>
+      {tab === "credits" && (
+      <>
+        <div className="cost-summary">
+          <div className="cost-tile">
+            <small>보유</small>
+            <b>{sums ? formatCredits(sums.balance) : "–"}</b>
+          </div>
+          <div className="cost-tile">
+            <small>총 충전</small>
+            <b>{sums ? formatCredits(sums.granted) : "–"}</b>
+          </div>
+          <div className="cost-tile">
+            <small>사용</small>
+            <b>{sums ? formatCredits(sums.used) : "–"}</b>
+          </div>
+        </div>
         {me?.gated === false && (
           <p className="pgsub">지금은 영상을 만들어도 크레딧이 차감되지 않아요.</p>
         )}
-        {/* 크레딧 코드(와디즈 리워드) — 등록 뒤 상단바 잔액과 내역을 함께 다시 읽는다 */}
-        <CreditCodeForm onRedeemed={() => { load(); loadLedger(); }} />
+
+        <section className="panel me-panel">
+          <h2 className="me-h">크레딧 코드 등록</h2>
+          {/* 와디즈 리워드 코드 — 등록 뒤 상단바 잔액(공유본)과 요약·내역을 함께 다시 읽는다 */}
+          <CreditCodeForm onRedeemed={() => { load(); loadLedger(); }} />
+        </section>
+
+      <section className="panel me-panel">
+        <h2 className="me-h">크레딧 내역</h2>
+        <div className="cost-filters">
+          <span className="seg" role="group" aria-label="내역">
+            {[["", "전체"], ["grant", "충전"], ["charge", "사용"]].map(([s, label]) => (
+              <button
+                type="button"
+                key={s || "all"}
+                className="seg-btn"
+                aria-pressed={ledgerSource === s}
+                onClick={() => pickSource(s)}
+              >
+                {label}
+              </button>
+            ))}
+          </span>
+        </div>
         {ledgerErr && <p className="pgsub warn">{ledgerErr}</p>}
         {!ledgerErr && ledger === null && <p className="pgsub">불러오는 중…</p>}
         {!ledgerErr && ledger?.length === 0 && (
@@ -297,7 +383,8 @@ export default function MePage() {
           </button>
         )}
       </section>
-
+      </>
+      )}
 
     </>
   );
