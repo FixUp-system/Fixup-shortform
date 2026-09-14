@@ -209,14 +209,36 @@ describe("단계별 작업 화면 배치", () => {
   });
 });
 
+// ★ "넓은 화면"을 재는 폭은 **1400** 이다. 좁은 화면 경계가 1200px 로 올라간 뒤로
+//   (Ruling 14, 아래 「좁은 화면 경계」 판) 1200 은 이미 **쌓이는 쪽**이라,
+//   거기서 재면 좁은 갈래를 넓은 갈래라 부르며 재게 된다.
+//   폭이 갈래를 고르지 않는 성질(라벨 감추기·align-items·min-width)은 1200 그대로 둔다.
+const 넓은폭 = 1400;
+
 describe("배치는 **그려진 결과**로 잰다", () => {
   it("★★★ 넓은 화면에서 두 칸이다 — 설정이 왼쪽, 작업대가 오른쪽", () => {
-    const disp = winning("display", [GRID], 1200);
+    const disp = winning("display", [GRID], 넓은폭);
     expect(disp, ".rw-grid 에 display 를 정하는 규칙이 없다").toBeTruthy();
     expect(disp.val, "격자가 아니다").toBe("grid");
-    const cols = winning("grid-template-columns", [GRID], 1200);
+    const cols = winning("grid-template-columns", [GRID], 넓은폭);
     expect(cols, "칸을 정하는 규칙이 없다").toBeTruthy();
     expect(tracks(cols.val).length, `넓은 화면인데 두 칸이 아니다: ${cols.val}`).toBe(2);
+
+    // ★ 순서가 곧 좌우다 — 격자에 order 를 안 주므로 **소스 순서가 그대로 칸 순서**다.
+    //   이 줄이 없으면 <SettingsPanel /> 과 <div className="rw-work"> 를 뒤집어도
+    //   판이 초록이고 화면만 좌우가 바뀐다(2026-09-14 검토 지적).
+    const at = code.indexOf("className=\"rw-grid\"");
+    expect(at, "격자를 안 그린다").toBeGreaterThan(-1);
+    const ret = code.slice(at, code.indexOf(");", at));
+    const iPanel = ret.indexOf("<SettingsPanel");
+    const iWork = ret.indexOf("className=\"rw-work\"");
+    expect(iPanel, "SettingsPanel 을 못 찾았다").toBeGreaterThan(-1);
+    expect(iWork, "rw-work 를 못 찾았다").toBeGreaterThan(-1);
+    expect(iPanel, "설정 패널이 작업대보다 뒤에 있다 — 좌우가 뒤집혔다").toBeLessThan(iWork);
+    // 「order 를 안 준다」는 위 주석의 전제까지 잰다 — order 를 주는 순간 소스 순서는
+    // 좌우를 못 정하고, 바로 위 세 줄이 아무것도 보장하지 않게 된다.
+    expect(winning("order", [GRID, PANEL], 넓은폭), "설정 패널에 order 를 줬다").toBeFalsy();
+    expect(winning("order", [GRID, WORK], 넓은폭), "작업대에 order 를 줬다").toBeFalsy();
   });
 
   it("★★★ 좁은 화면에서는 한 칸으로 쌓인다 — 300px 칸이 화면을 넘기면 안 된다", () => {
@@ -231,11 +253,33 @@ describe("배치는 **그려진 결과**로 잰다", () => {
     expect(rule?.at.join(" "), "좁은 화면 규칙이 아니라 기본 규칙이 이겼다").toMatch(/max-width/);
   });
 
+  it("★★★ 좁은 화면 경계는 1100px 이상이다 — 900px 에서는 작업대가 설정 패널보다 좁았다", () => {
+    // 실측(2026-09-14, 브라우저): innerWidth = 942 → .rw-grid 의 계산된
+    // grid-template-columns 가 `300px 310.667px`. 경계(900)는 넘었는데 **본문이 설정
+    // 패널보다 좁다** — 배치가 사실상 뒤집혀 있었다.
+    // 격자가 받는 폭은 화면 폭 − 307(앱 껍데기의 사이드바+여백. 같은 실측에서
+    // .rw-grid 의 x = 264 · 폭 = 635)이고, 거기서 300 + gap 24 를 또 뗀다
+    // → 작업대 = 화면 폭 − 631. 경계를 **화면 폭**으로 거는 한 그 307 을 얹어 잡아야 한다.
+    // ★ 글자로 `900` 을 찾지 않는다 — 이 파일에는 다른 @media 의 900 도 있다.
+    //   .rw-grid 를 **한 칸으로 만드는** 규칙을 파서로 골라 그 폭을 읽는다.
+    const 한칸으로 = RULES.filter((r) =>
+      r.sel.split(",").map((s) => s.trim()).includes(".rw-grid")
+      && tracks(declOf(r.body, "grid-template-columns")?.val ?? "").length === 1);
+    expect(한칸으로.length, ".rw-grid 를 한 칸으로 만드는 규칙이 하나가 아니다").toBe(1);
+    const 조건 = 한칸으로[0].at.join(" ");
+    const max = 조건.match(/max-width:\s*(\d+)px/);
+    expect(max, `한 칸 규칙이 @media max-width 안에 없다: ${조건 || "(조건 없음)"}`).toBeTruthy();
+    expect(
+      Number(max[1]),
+      `경계가 ${max[1]}px 다 — 작업대(화면 폭 − 631)가 설정 패널 300px 보다 좁아진다`,
+    ).toBeGreaterThanOrEqual(1100);
+  });
+
   it("★★★ 가로 스크롤을 만들지 않는다 — 늘어나는 칸의 최소폭이 0 이다", () => {
     // `1fr` 한 마디짜리 칸은 최소폭이 **내용 크기**다. 작업대 안에 긴 표나 안 접히는
     // 줄이 하나만 들어와도 격자가 그만큼 부풀어 화면 전체가 가로로 밀린다(이 저장소의
     // 단계 페이지에는 표·코드·긴 프롬프트가 실제로 들어 있다).
-    for (const width of [1200, 400]) {
+    for (const width of [넓은폭, 400]) {
       const cols = winning("grid-template-columns", [GRID], width);
       const 위험 = tracks(cols.val).filter((t) => /^[\d.]+fr$/.test(t));
       expect(위험, `${width}px: 최소폭이 내용 크기인 칸이 있다 — minmax(0, …) 로 감싸라`).toEqual([]);
@@ -290,7 +334,10 @@ describe("Ruling 13 — 펼친 줄에서 같은 말이 두 번 뜨지 않는다"
   });
 
   it("★★ 단계 페이지 여섯은 손대지 않았다 — 제목은 그대로 그 페이지의 것이다", () => {
-    const 단계들 = ["scenario", "images", "prompts", "video", "done"];
+    // ★ briefing 이 빠져 있었다(2026-09-14 검토). ①입력 화면은 `<h2>{stepLabel}</h2>` 로
+    //   **라벨 글자 그대로**를 그린다 — Ruling 13 이 겨냥한 중복이 가장 선명한 화면인데
+    //   판 밖에 있었다. 여섯 단계 전부를 센다.
+    const 단계들 = ["briefing", "scenario", "images", "prompts", "video", "done"];
     for (const s of 단계들) {
       const page = readFileSync(`app/reel/[id]/${s}/page.js`, "utf8");
       expect(page, `${s} 화면에서 제목이 사라졌다`).toMatch(/<h2[\s>]/);
