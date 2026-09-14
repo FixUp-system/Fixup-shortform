@@ -186,86 +186,78 @@ export default function CreditCodesPage() {
 
       <section className="panel me-panel">
         <h2 className="me-h">코드 만들기</h2>
-        <div className="me-row">
-          <input
+        {/* ★ 마이페이지와 같은 틀(.me-form · 라벨 120px · 칸 380px)을 쓴다 — 새 CSS 를 안 더한다.
+            드롭다운에 .tier-pick 을 붙이면 표 안용 작은 키(12px)로 줄어 칸과 높이가 안 맞는다. */}
+        <div className="me-form">
+          <label className="me-row">
+            <span className="me-label">묶음 이름</span>
+            <input
+              className="sent-input"
+              placeholder="예: 와디즈 1차 09-30"
+              value={batch}
+              onChange={(e) => setBatch(e.target.value)}
+            />
+          </label>
+          <textarea
             className="sent-input"
-            placeholder="묶음 이름 (예: 와디즈 1차 09-30)"
-            value={batch}
-            onChange={(e) => setBatch(e.target.value)}
-            aria-label="묶음 이름"
+            rows={8}
+            placeholder={"엑셀에서 복사한 표를 여기에 붙여 넣으세요 (첫 줄은 머리글)"}
+            value={pasted}
+            onChange={(e) => setPasted(e.target.value)}
+            aria-label="붙여 넣은 표"
           />
-        </div>
-        <textarea
-          className="sent-input"
-          rows={8}
-          placeholder={"엑셀에서 복사한 표를 여기에 붙여 넣으세요 (첫 줄은 머리글)"}
-          value={pasted}
-          onChange={(e) => setPasted(e.target.value)}
-          aria-label="붙여 넣은 표"
-        />
-        {parsed.headers.length > 0 && (
-          <>
-            <p className="pgsub">
-              {parsed.rows.length.toLocaleString()}행 · 열 {parsed.headers.length}개 ({parsed.headers.join(", ")})
-            </p>
-            <div className="me-row">
-              <select
-                className="dlg-input tier-pick"
-                value={col}
-                onChange={(e) => setRewardCol(e.target.value)}
-                aria-label="리워드 열"
-              >
-                <option value={ALL}>리워드 열 없음 — 모든 행이 같은 크레딧</option>
-                {parsed.headers.map((h) => (
-                  <option key={h} value={h}>리워드 열: {h}</option>
-                ))}
-              </select>
-              <select
-                className="dlg-input tier-pick"
-                value={keepCol}
-                onChange={(e) => setKeepPick(e.target.value)}
-                aria-label="보관할 식별 열"
-              >
-                {parsed.headers.map((h) => (
-                  <option key={h} value={h}>보관할 식별 열: {h}</option>
-                ))}
-              </select>
-            </div>
-            <p className="pgsub">
-              DB 에는 식별 열과 리워드 열만 남아요. 이름·연락처 같은 나머지 열은 아래 [CSV 내려받기] 파일에만 들어가요.
-            </p>
-            {rewardValues.map((v) => (
-              <label className="me-row" key={`amt-${v}`}>
-                <span className="pgsub">
-                  {col === ALL ? "크레딧" : `${v || "(빈칸)"} · ${parsed.rows.filter((r) => r[col] === v).length}행`}
-                </span>
-                <input
-                  className="sent-input"
-                  inputMode="numeric"
-                  placeholder="예: 1000"
-                  value={amounts[v] ?? ""}
-                  onChange={(e) => setAmounts((a) => ({ ...a, [v]: e.target.value }))}
-                />
+          {parsed.headers.length > 0 && (
+            <>
+              <div className="me-value">
+                {parsed.rows.length.toLocaleString()}행 · 열 {parsed.headers.length}개 ({parsed.headers.join(", ")})
+              </div>
+              <label className="me-row">
+                <span className="me-label">리워드 열</span>
+                <select className="sent-input" value={col} onChange={(e) => setRewardCol(e.target.value)}>
+                  <option value={ALL}>없음 — 모든 행이 같은 크레딧</option>
+                  {parsed.headers.map((h) => <option key={h} value={h}>{h}</option>)}
+                </select>
               </label>
-            ))}
-          </>
-        )}
-        <div className="me-row">
+              <label className="me-row">
+                <span className="me-label">보관할 식별 열</span>
+                <select className="sent-input" value={keepCol} onChange={(e) => setKeepPick(e.target.value)}>
+                  {parsed.headers.map((h) => <option key={h} value={h}>{h}</option>)}
+                </select>
+              </label>
+              {rewardValues.map((v) => (
+                <label className="me-row" key={`amt-${v}`}>
+                  <span className="me-label">{col === ALL ? "크레딧" : v || "(빈칸)"}</span>
+                  <input
+                    className="sent-input"
+                    inputMode="numeric"
+                    placeholder={col === ALL
+                      ? "예: 1000"
+                      : `크레딧 (${parsed.rows.filter((r) => r[col] === v).length}행)`}
+                    value={amounts[v] ?? ""}
+                    onChange={(e) => setAmounts((a) => ({ ...a, [v]: e.target.value }))}
+                  />
+                </label>
+              ))}
+              <div className="me-value">
+                DB 에는 식별 열과 리워드 열만 남아요. 이름·연락처 같은 나머지 열은 [CSV 내려받기] 파일에만 들어가요.
+              </div>
+            </>
+          )}
           <button className="cta" disabled={busy === "create" || parsed.rows.length === 0} onClick={create}>
             {busy === "create" ? "만드는 중…" : "코드 만들기"}
           </button>
+          {made && (
+            <>
+              <div className="me-value">
+                「{made.batch}」 코드 {made.codes.length.toLocaleString()}개를 만들었어요.
+                메일 머지용 전체 열 CSV 는 <b>지금만</b> 받을 수 있어요 — 화면을 떠나기 전에 내려받으세요.
+              </div>
+              <button className="mini" onClick={() => download(made.batch, codesCsv(made.codes))}>
+                CSV 내려받기
+              </button>
+            </>
+          )}
         </div>
-        {made && (
-          <div className="me-row">
-            <p className="pgsub">
-              「{made.batch}」 코드 {made.codes.length.toLocaleString()}개를 만들었어요.
-              메일 머지용 전체 열 CSV 는 <b>지금만</b> 받을 수 있어요 — 화면을 떠나기 전에 내려받으세요.
-            </p>
-            <button className="mini" onClick={() => download(made.batch, codesCsv(made.codes))}>
-              CSV 내려받기
-            </button>
-          </div>
-        )}
       </section>
 
       <section className="panel me-panel">
@@ -278,7 +270,7 @@ export default function CreditCodesPage() {
           <>
             <div className="me-row">
               <select
-                className="dlg-input tier-pick"
+                className="sent-input"
                 value={shown}
                 onChange={(e) => setShown(e.target.value)}
                 aria-label="묶음"
@@ -286,7 +278,7 @@ export default function CreditCodesPage() {
                 <option value={ALL}>전체 묶음</option>
                 {batches.map((b) => <option key={b} value={b}>{b}</option>)}
               </select>
-              <span className="pgsub">
+              <span className="me-value">
                 {visible.length.toLocaleString()}개 중 {usedCount.toLocaleString()}개 등록됨
               </span>
               <button
