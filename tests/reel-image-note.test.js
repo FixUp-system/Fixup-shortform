@@ -62,13 +62,19 @@ describe("화면에 수정 폼이 있다", () => {
   });
 });
 
-describe("이미지 자동 생성은 한 번뿐이다", () => {
+describe("이미지는 [이미지 생성 →]을 눌러야 그린다 — 2026-09-14 사장님 결정 a", () => {
+  // ★ 첫 그리기가 영상 정가를 걷는 문이라, 시나리오를 만들자마자 자동으로 사면 동의 없이 값이 나간다.
   const scenario = readFileSync("app/reel/[id]/scenario/page.js", "utf8");
-  // ★ 시나리오가 **처음** 만들어진 직후에만 — 되돌아올 때마다 돌면 볼 때마다 돈이 나간다.
-  it("시나리오를 만든 뒤 이미지 라우트를 부른다", () => {
-    expect(scenario).toMatch(/\/images/);
+  const images = readFileSync("app/reel/[id]/images/page.js", "utf8");
+  it("②시나리오는 이미지 라우트를 스스로 부르지 않는다", () => {
+    expect(scenario).not.toContain("fetch(`/api/reel/${id}/images`");
   });
-  it("자동 생성 여부가 문서에 남는다 — 두 번 안 돈다", () => {
-    expect(scenario).toMatch(/autoImage|imagesAuto|autoImagedRef/);
+  it("[이미지 생성 →]이 start=1 을 싣고, 첫 청구면 값을 먼저 말한다", () => {
+    expect(scenario).toContain("?start=1");
+    expect(scenario).toMatch(/이 나가요 — 되돌릴 수 없어요/);
+  });
+  it("③이미지는 start=1 로 왔을 때만 자동으로 그리고, 한 번만(autoImaged) 돈다", () => {
+    expect(images).toContain('get("start") === "1"');
+    expect(images).toContain("reel.autoImaged");
   });
 });

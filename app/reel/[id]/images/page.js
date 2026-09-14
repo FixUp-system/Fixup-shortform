@@ -26,7 +26,7 @@ import { boardKey } from "../../../../lib/reel/board-key";
 //   화면에서 다시 조립하면 실제로 나간 글과 갈린다.
 import { panelSay } from "../../../../lib/reel/panels";
 import { aspectFor } from "../../../../lib/aspects";
-import { regenPrice, priceLabel } from "../../../../lib/pricing";
+import { regenPrice, priceLabel, videoPrice } from "../../../../lib/pricing";
 import { modelIdForProject, resolutionForProject } from "../../../../lib/clip-limits";
 import { useMe } from "../../../../components/MeContext";
 
@@ -97,10 +97,19 @@ export default function ReelImagesPage() {
   //      회차 상한을 다 썼으면 안 부른다(canDraw — 서버와 같은 판정).
   //   ③ 실패는 조용히 넘긴다 — 사유는 아래 오류줄이 이미 말하고, 자동으로 또 시도하면
   //      같은 사유로 돈이 계속 나간다. 다시 하는 것은 사장님의 버튼 몫이다.
+  // ★★★ 2026-09-14 — **②의 [이미지 생성 →]을 눌러 온 때만** 자동으로 그린다(사장님 결정 a).
+  //   첫 그리기가 영상 정가를 걷는 문이라, 사이드바나 주소로 그냥 들어온 손님에게서 값이 나가면
+  //   안 된다. 그 버튼만 주소에 start=1 을 싣는다 — 누른 것이 곧 동의다. 그 밖에는 아래 [그림 만들기]
+  //   (값이 적혀 있다)를 눌러야 한다.
+  //   ★ 주소창 값은 한 번 읽고 지운다 — 새로고침으로 다시 신호가 가지 않게(autoImaged 도 함께 막는다).
+  //   ★ useSearchParams 대신 window 를 읽는다 — 이 화면에 Suspense 경계를 새로 두지 않으려고.
   const autoRef = useRef(false);
   useEffect(() => {
     if (autoRef.current) return;
     if (!project) return;
+    const startAsked = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("start") === "1";
+    if (!startAsked) return;
+    window.history.replaceState(null, "", window.location.pathname);
     if (!scenario?.text) return;
     if (reel.autoImaged) return;
     if (hasImages || sheetUrl) return;
@@ -152,6 +161,11 @@ export default function ReelImagesPage() {
   //   ★ 크레딧 게이트가 꺼져 있거나 내부 계정이면(me.gated 가 false) 값을 안 적는다.
   const { me, ready: meReady } = useMe();
   const showCredits = meReady && me?.gated === true;
+  // 첫 그리기면 영상 정가가 여기서 나간다(라우트의 requireVideoCharge) — 버튼에 그 값을 적는다.
+  const firstCharge = !hasImages && !(Number(reel.imageTriesTotal) > 0);
+  const listPrice = project
+    ? videoPrice(project.settings?.target_seconds, modelIdForProject(project), resolutionForProject(project))
+    : 0;
   const regenTotal = (() => {
     if (!hasImages) return 0;
     const prior = (Number(reel.imageTries) || 0) - 1;
@@ -174,7 +188,9 @@ export default function ReelImagesPage() {
         ? "그리는 중…"
         : hasImages
           ? `다시 만들기 · ${showCredits && regenTotal > 0 ? priceLabel(regenTotal) : "무료"} (${triesLeft}회 남음)`
-          : "그림 만들기"}
+          : firstCharge && showCredits && listPrice > 0
+            ? `그림 만들기 · ${priceLabel(listPrice)}`
+            : "그림 만들기"}
     </button>
   );
 
