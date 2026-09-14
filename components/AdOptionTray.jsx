@@ -115,7 +115,7 @@ export default function AdOptionTray({ value, onChange, showCredits = true, admi
                         </button>
                       ))}
                     </div>
-                    <div className="tray-note">{aspectFor(aspect).note}에 맞는 규격이에요</div>
+                    <div className="tray-note">{aspectFor(aspect).fits}</div>
                   </div>
                 </div>
 
@@ -140,7 +140,7 @@ export default function AdOptionTray({ value, onChange, showCredits = true, admi
                         </button>
                       ))}
                     </div>
-                    <div className="tray-note">{AD_MODELS.find((m) => m.id === model)?.hint}</div>
+                    {/* ★ 모델 설명 줄은 2026-09-14 에 뺐다(사장님 지시) — 칩 이름으로 충분하다. */}
                   </div>
                 </div>
 

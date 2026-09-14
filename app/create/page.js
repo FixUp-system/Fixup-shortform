@@ -173,9 +173,8 @@ export default function CreatePage() {
                     </button>
                   ))}
                 </div>
-                <div className="tray-note">
-                  {I2V_MODELS.find((m) => m.id === model)?.hint} · 만든 뒤에는 바꿀 수 없어요
-                </div>
+                {/* ★ 모델 설명(hint)은 2026-09-14 에 뺐다(사장님 지시). 바꿀 수 없다는 안내만 남긴다. */}
+                <div className="tray-note">만든 뒤에는 바꿀 수 없어요</div>
               </div>
             </div>
 
@@ -244,7 +243,7 @@ export default function CreatePage() {
                     </button>
                   ))}
                 </div>
-                <div className="tray-note">{aspectFor(aspect).note}에 맞는 규격이에요</div>
+                <div className="tray-note">{aspectFor(aspect).fits}</div>
               </div>
             </div>
 

@@ -333,7 +333,7 @@ export default function ReelNewPage() {
                     </button>
                   ))}
                 </div>
-                <div className="tray-note">{models.find((m) => m.id === model)?.hint}</div>
+                {/* ★ 모델 설명 줄은 2026-09-14 에 뺐다(사장님 지시) — 칩 이름으로 충분하다. */}
               </div>
             </div>
 
@@ -356,7 +356,7 @@ export default function ReelNewPage() {
                 {/* ★ 문구도 광고 화면과 맞춘다(2026-08-25 사장님 지시 — "광고 영상에
                     맞춰서"). 두 흐름이 같은 것을 고르는데 말투가 다르면 사장님이
                     화면마다 다른 사용법을 익혀야 한다. */}
-                <div className="tray-note">{aspectFor(aspect).note}에 맞는 규격이에요</div>
+                <div className="tray-note">{aspectFor(aspect).fits}</div>
               </div>
             </div>
 
