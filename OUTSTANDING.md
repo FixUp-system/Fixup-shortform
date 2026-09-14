@@ -5,6 +5,21 @@
 > 아래 두 배너는 **각 갈래의 기록 그대로**다(위: step-gate 쪽 · 그 아래 🎟: 크레딧 코드 쪽). 배포 결과는 이 배너에 이어 적는다.
 > 충돌 셋: `OUTSTANDING.md` · `app/archive/[id]/page.js`(main 의 `UserInput` 접기 + 크레딧 쪽 문구 "내가 적은 내용" 둘 다 살림) · `tests/archive-detail-ui.test.js`(main 의 판).
 > 사이드바·`globals.css` 는 자동 병합.
+> **의미 충돌 하나**: 크레딧 쪽 판은 보관함 상세에 `<details>` 가 **아예** 없어야 한다고 막았고(프롬프트 접힘 칸 제거), main 쪽은
+> 손님 입력을 접는 `<details className="input-fold">` 를 새로 만들었다 → 판을 "input-fold 만 예외"로 좁혔다.
+>
+> ✅ **09-15 00:47 프로덕션 배포 완료** — `dpl_3QarfpwnwsAvtB7RVeWTSvAznkAX`(슬러그 `…-1gn6t2h9f-fix-up1` · production · READY ·
+> 코드 **`781bf25`** = 병합 커밋). `vercel inspect` 로 `fixup-shortform-service.vercel.app` 가 이 판을 가리키는 것 확인.
+> · 배포 전: 테스트 **6,380 통과 · 0 실패 · 10 skipped** · 커밋 트리만 `git archive` 로 풀어 `npx next build` **exit 0**(빌드 폴더는 지웠다 — `.env.local` 사본이 있었다).
+> · 배포 전 점검: `.env.local.example` diff 0 · `db/schema.sql` diff 는 `profiles.internal` + `credit_codes`/`redeem_credit_code` — **둘 다 이미 라이브에 있다**(09-14 확인).
+>   Vercel `SHOTFORM_NO_CREDITS` **그대로 있음**(그래서 새 크레딧 단위가 올라가도 아직 아무도 차감되지 않는다).
+> · 방식: git 없는 폴더 `C:/Users/fixup/shotform-deploy-0915` 에 `git archive` + `.vercel` 복사 → `npx vercel deploy --prod --yes`(CLI 계정 `jaechanyoon0519-8298`).
+> · 라이브 실측: `/home`·`/login`·`/archive`·`/legal/terms` **200** · 손님 `/me`·`/admin/codes`·`/pending` **307 → /login?next=** · `POST /api/credits/redeem` 손님 **401** · 크론 **401** ·
+>   구워 나간 CSS 에 `.dd-input`·`.side-sec`·`.me-info`·`a.um-credit`·`rs-strip`(main 의 걸음 띠) **있음** · 없앤 `.cost-select`·`.tier-pick` **0**.
+> · ⬜ **로그인해서 눈으로는 못 봤다**(크레딧 탭·코드 등록·드롭다운·걸음 띠).
+> · ⬜ **미푸시**: `fixup/main`·`origin/main` 대비 **127 앞 / 0 뒤**(이 문서 커밋 포함) — 라이브 코드가 원격에 없다.
+> · 🔴 **남은 배포 순서**(크레딧을 실제로 켤 때): ① 기존 계정 내부 표시 백필 → ② Vercel `SHOTFORM_NO_CREDITS` 삭제. ①없이 ②를 하면 내부 계정이 새 단위로 402.
+> · 워크트리: `main` 은 `.claude/worktrees/merge-main` 이 쥐고 있다(node_modules 는 credit-unit 정션). `feat/reel-cut-r2v` 에만 있는 커밋 1(`05270a8`, 문서)은 안 합쳤다.
 
 > 🧭 **09-14 밤 — 단계별 화면을 「걸음 띠」로 바꿨다. 커밋 둘(`287ae5a`·`005982f`).**
 > 이 문서 커밋 포함 **미커밋 0 · 미푸시 `origin/feat/reel-cut-r2v` 35 · `fixup/main` 81 ·
