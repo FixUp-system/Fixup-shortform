@@ -1,7 +1,11 @@
 # 이어서 할 일 — `main` (2026-09-15 · 단계별 화면 B안)
 
 > 🗂️ **09-15 오후 — 보관함 정리 · 「더 보기」 · 좁히기** (열 폴더: `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate`)
-> · ✅ **09-15 15:48 프로덕션 배포** — `dpl_5EMxrn6AArjFmH51yaCuPSTkbE8W`(슬러그 `…-hmu8lg7lk-fix-up1` · Ready · 코드 **`ae49424`**).
+> · ✅ **09-15 16:13 프로덕션 배포** — `dpl_5cAixuMqrcvAWTHoMUvYY1KExR5c`(슬러그 `…-d6av1vdt1-fix-up1` · Ready · 코드 **`40ef961`**).
+>   🐛→✅ **15:39·15:48 배포가 낸 회귀**: 단계별 ①입력 [시작하기]가 **안 눌렸다** — 11:42(`1c5f547`)에 선택지 하나뿐인 길이 줄을
+>   숨겼는데 잠금은 날 `target` 을 봤다(기본 모델 2.0 은 15초 하나). 처방 `pickedSeconds`(`afa66c0`) + 길이 줄은 늘 보인다(`40ef961`, 사장님 지시).
+>   라이브 실측(로그인 크롬): 길이 「15초」 보임 · 자료를 넣으면 버튼 열림. 실제로 눌러 만들지는 않았다.
+> · (앞 판) 09-15 15:48 — `dpl_5EMxrn6AArjFmH51yaCuPSTkbE8W`(슬러그 `…-hmu8lg7lk-fix-up1` · 코드 **`ae49424`**).
 >   `vercel inspect` 로 정식 도메인이 이 판을 가리키는 것 확인 · `/login`·`/archive`·`/home`·`/legal/terms` **200** ·
 >   라이브 `app/archive/page` 번들에 「이 조건으로 찾은 영상이 없어요」·「초기화」·`from_ts` 있음. (15:39 에 `250ee17` 을 한 번 올렸다가 날짜 버그로 다시 올렸다.)
 > · ✅ **푸시** — `fixup`·`origin` 둘 다 `main` = `feat/reel-cut-r2v` = `ae49424`(+ 이 문서 커밋). 미커밋 **0**
