@@ -131,8 +131,15 @@ export default function ReelScenarioPage() {
   );
 
   return (
-    <section className="panel panel--wide">
-      <h2>{stepLabel}</h2>
+    /* ★★★ 2026-09-15 사장님 지시 — 글·그림·고치기를 **각각 카드**로 세운다.
+       그전에는 큰 카드 하나 안에 셋이 다 들어 있어 경계가 없었다.
+       ★ 겉은 카드가 **아니다**(자리만 잡는다) — 카드 안에 카드를 앉히면 테두리가 두 겹이
+         되는 자리다(작업대에서 이미 한 번 겪었다).
+       ⚠️ 이 화면의 판 폭은 2026-08-18 에 **광고 화면과 같게** 맞춰 둔 것이었다
+         ("규격이나 배치도 통일 시켜줘"). 두 칸이 되면서 그 전제가 깨졌다 — 광고는
+         한 칸 880 이고 여기는 두 칸이라 1,180 이다. tests/scene-card-unified.test.js 에
+         그 사정을 적어 뒀다. 광고 화면은 손대지 않았다. */
+    <div className="rv-page">
       {err && <p className="pgsub warn">{err}</p>}
       {/* ★★ 무슨 일이 일어나는지 말하는 자리는 **여기 하나**다(2026-08-27 사장님 지시).
           다시 쓰는 동안에는 **옛 글을 안 보여 준다** — 곧 사라질 글을 읽고 있으면 바뀐
@@ -147,7 +154,8 @@ export default function ReelScenarioPage() {
             없는 것이 있는 것처럼 읽힌다. 그래서 칸 수를 CSS 가 짐작하지 않고 화면이 말한다.
           ★ 고치는 칸과 단계 버튼은 이 격자 **밖**이다 — 아래에서 전체 폭을 쓴다. */}
       <div className={`rv-split${sheetUrl ? " is-two" : ""}`}>
-        <div className="rv-read">
+        <section className="panel rv-read">
+      <h2>{stepLabel}</h2>
       {busy ? (
         <p className="pgsub">
           <span className="spinner" aria-hidden="true" />{" "}
@@ -178,14 +186,16 @@ export default function ReelScenarioPage() {
           <p className="script-src">{narration.text}</p>
         </div>
       )}
-        </div>
+      {lock && <p className="pgsub">{lock.message}</p>}
+        </section>
         {sheetUrl && (
           <div className="sheet-view">
             <img src={sheetUrl} alt="스토리보드" />
           </div>
         )}
       </div>
-      {lock && <p className="pgsub">{lock.message}</p>}
+
+      <section className="panel rv-foot">
 
       {/* ★★ 사장님이 **한국어로** 고쳐 달라고 적는 자리(2026-08-25).
           칸을 직접 고치는 것(edits)과 다른 축이다 — "이 문구를 이렇게 바꿔 줘"를
@@ -238,6 +248,7 @@ export default function ReelScenarioPage() {
           </div>
         )}
       </div>
-    </section>
+      </section>
+    </div>
   );
 }
