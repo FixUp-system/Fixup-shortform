@@ -39,7 +39,7 @@ const { createProject } = await import("../lib/projects.js");
 const { USER_HEADER, STATUS_HEADER, ROLE_HEADER } = await import("../lib/auth/headers.js");
 const { GET } = await import("../app/api/projects/route.js");
 const { loadProjects } = await import("../lib/projects-client.js");
-const { archiveKindOf, cardStatusTag, archiveDateOf, archiveHref } = await import("../lib/archive/spec.js");
+const { archiveKindOf, cardStatusTag, archiveDateOf, archiveHref, pickDateRange } = await import("../lib/archive/spec.js");
 const { dayBounds } = await import("../lib/costs-filter.js");
 
 const strip = (s) => s
@@ -204,6 +204,38 @@ describe("loadProjects — 좁히기를 싣는다", () => {
   });
 });
 
+// ★★★ 2026-09-15 사장님 지적 — "1월을 골랐는데 9월 영상이 나온다. 없으면 없다고 나와야 한다."
+describe("pickDateRange — 날짜 하나를 고르면 그날 하루다", () => {
+  it("★★★ 시작일만 고르면 종료일이 같은 날로 채워진다 — 「그날부터 지금까지」가 아니다", () => {
+    expect(pickDateRange({ from: "", to: "" }, "from", "2026-01-01")).toEqual({ from: "2026-01-01", to: "2026-01-01" });
+  });
+
+  it("★★★ 종료일만 골라도 같다", () => {
+    expect(pickDateRange({ from: "", to: "" }, "to", "2026-03-05")).toEqual({ from: "2026-03-05", to: "2026-03-05" });
+  });
+
+  it("★★ 범위를 넓히는 것은 그대로 받는다", () => {
+    expect(pickDateRange({ from: "2026-09-08", to: "2026-09-08" }, "to", "2026-09-11")).toEqual({ from: "2026-09-08", to: "2026-09-11" });
+    expect(pickDateRange({ from: "2026-09-08", to: "2026-09-11" }, "from", "2026-09-01")).toEqual({ from: "2026-09-01", to: "2026-09-11" });
+  });
+
+  it("★★ 거꾸로 되면 반대쪽을 같은 날로 맞춘다 — 키보드로 연도를 칠 때의 중간값도 여기로 온다", () => {
+    expect(pickDateRange({ from: "2026-09-08", to: "2026-09-11" }, "from", "2026-10-01")).toEqual({ from: "2026-10-01", to: "2026-10-01" });
+    expect(pickDateRange({ from: "2026-09-08", to: "2026-09-11" }, "to", "2026-01-01")).toEqual({ from: "2026-01-01", to: "2026-01-01" });
+  });
+
+  it("★ 칸을 비우면 반대쪽은 그대로 둔다", () => {
+    expect(pickDateRange({ from: "2026-09-08", to: "2026-09-11" }, "from", "")).toEqual({ from: "", to: "2026-09-11" });
+  });
+
+  it("★★★ 날짜 칸이 이 판정을 지난다 — 화면이 범위를 손으로 만들지 않는다", () => {
+    const page = strip(readFileSync("app/archive/page.js", "utf8"));
+    expect(page).toMatch(/pickDateRange\(\{ from, to \}, which, value\)/);
+    expect(page).toMatch(/changeDate\("from", e\.target\.value\)/);
+    expect(page).toMatch(/changeDate\("to", e\.target\.value\)/);
+  });
+});
+
 describe("보관함 주소 — 한 자리에서 싣는다", () => {
   it("★★★ 범위·종류·날짜가 함께 실린다 — 하나를 바꿔도 다른 조건이 안 떨어진다", () => {
     expect(archiveHref({ scope: "all", kind: "ad", from: "2026-09-01", to: "2026-09-15" }))
@@ -235,7 +267,7 @@ describe("화면 — 좁히기 줄과 카드", () => {
     expect(page).toMatch(/archiveKindOf\(params\.get\("kind"\)\)/);
     expect(page).toMatch(/archiveDateOf\(params\.get\("from"\)\)/);
     expect(page).toMatch(/archiveDateOf\(params\.get\("to"\)\)/);
-    for (const name of ["changeScope", "changeKind", "changeDates", "resetFilters"]) {
+    for (const name of ["changeScope", "changeKind", "changeDate", "resetFilters"]) {
       const fn = page.slice(page.indexOf(`function ${name}`));
       expect(fn.slice(0, fn.indexOf("\n  }")), name).toMatch(/router\.replace\(archiveHref\(/);
     }

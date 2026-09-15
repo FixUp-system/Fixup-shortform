@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { loadProjects } from "../../lib/projects-client";
 // 종류 필터 표 · 주소 읽기/쓰기 — 판정은 화면 밖 순수 모듈이 한다(값으로 잴 수 있게).
-import { ARCHIVE_KINDS, archiveKindOf, archiveDateOf, archiveHref } from "../../lib/archive/spec";
+import { ARCHIVE_KINDS, archiveKindOf, archiveDateOf, archiveHref, pickDateRange } from "../../lib/archive/spec";
 // 날짜 칸 → ms 경계. 크레딧 내역·사용자 관리가 쓰는 그 한 벌이다(끝 날짜 포함 · 지역 시각 자정).
 import { dayBounds } from "../../lib/costs-filter";
 import ProjectCards from "../../components/ProjectCards";
@@ -234,12 +234,15 @@ function ArchiveBody() {
     router.replace(archiveHref({ scope, kind: next, from, to }), { scroll: false });
   }
 
-  // 날짜 칸을 바꾼다 — 같은 규율(고르던 것을 버리고 주소를 replace 로 옮긴다).
-  function changeDates(nextFrom, nextTo) {
+  // 날짜 칸 하나를 바꾼다 — 같은 규율(고르던 것을 버리고 주소를 replace 로 옮긴다).
+  // ★ 새 범위는 pickDateRange 가 정한다 — 한 날짜만 고르면 **그날 하루**다(시작일만 두면 "지금까지"가 돼
+  //   1월을 골라도 9월 영상이 나왔다 — 사장님 지적).
+  function changeDate(which, value) {
     stopSelecting();
-    setFrom(nextFrom);
-    setTo(nextTo);
-    router.replace(archiveHref({ scope, kind, from: nextFrom, to: nextTo }), { scroll: false });
+    const next = pickDateRange({ from, to }, which, value);
+    setFrom(next.from);
+    setTo(next.to);
+    router.replace(archiveHref({ scope, kind, ...next }), { scroll: false });
   }
 
   // 좁히기를 모두 푼다 — 크레딧 내역의 [초기화]와 같은 자리다.
@@ -362,12 +365,14 @@ function ArchiveBody() {
         <div className="panel cost-filters">
           <label>
             <small>시작일</small>
-            <input className="field" type="date" value={from} max={to || undefined} onChange={(e) => changeDates(e.target.value, to)} />
+            {/* ★ min·max 를 안 건다 — 한 날짜를 고르면 반대쪽이 같은 날로 채워지므로, 걸면 범위를 넓히러
+                다시 열었을 때 달력이 그 하루에 묶인다. 거꾸로 된 범위는 pickDateRange 가 맞춘다. */}
+            <input className="field" type="date" value={from} onChange={(e) => changeDate("from", e.target.value)} />
           </label>
           <label>
             <small>종료일</small>
             {/* ★ 그 날을 **포함한다** — 자정으로 자르면 고른 하루가 통째로 빠진다(dayBounds). */}
-            <input className="field" type="date" value={to} min={from || undefined} onChange={(e) => changeDates(from, e.target.value)} />
+            <input className="field" type="date" value={to} onChange={(e) => changeDate("to", e.target.value)} />
           </label>
           <label>
             <small>종류</small>
