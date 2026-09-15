@@ -650,6 +650,8 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
      기기가 「가운데점」을 낙독한다. 배지가 한 개도 없는 카드는 없어서(종류·상태가
      항상 붙는다) 점만 덩그러니 남는 일은 없다. */
 .project-meta .when::after { content: "·"; margin-left: 8px; color: var(--ink-soft); font-weight: 400; }
+/* 보관함 「더 보기」 — 목록 끝 가운데. 격자 바로 밑에 붙으면 마지막 줄 카드로 읽힌다. */
+.archive-more { display: flex; justify-content: center; margin-top: 20px; }
 /* 배지는 제 크기를 지킨다 — 없으면 "완성"이 "완/성" 두 줄로 찌그러진다(실측) */
 .project-meta .badge { flex: none; white-space: nowrap; }
 /* .home-start·.home-quick·.home-more·.cta.ghost 는 홈이 빠른 생성 전용이 되면서

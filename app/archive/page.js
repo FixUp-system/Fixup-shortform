@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { loadProjects } from "../../lib/projects-client";
@@ -71,16 +71,56 @@ function ArchiveBody() {
   const [selected, setSelected] = useState(() => new Set());
   const [busy, setBusy] = useState(false);
 
+  // 「더 보기」(2026-09-15 사장님 결정) — 한 쪽(PROJECT_PAGE)씩 받아 **뒤에 붙인다.**
+  //   ★ 번호 페이지가 아니다 — 보던 카드가 자리에 남고, 지워도 뒷장이 안 밀린다
+  //     (크레딧 내역 app/me/page.js 와 같은 모양이다).
+  //   ★ listGen — 범위를 바꾼 뒤 늦게 온 「더 보기」 응답이 새 목록에 붙지 않게 세대를 센다.
+  const [more, setMore] = useState(false);
+  const [moreBusy, setMoreBusy] = useState(false);
+  const listGen = useRef(0);
+  // 커서 — **마지막으로 받은 카드의 created_ts**. 목록이 최신순이라 그보다 앞선 것이 다음 쪽이다.
+  //   ★ 화면 목록의 끝에서 읽지 않는다 — 받은 쪽을 다 지우면 목록이 비어 커서가 사라진다.
+  const cursor = useRef(undefined);
+  const lastTs = (list) => (list.length ? list[list.length - 1].created_ts : cursor.current);
+
+  async function loadMore() {
+    if (!cursor.current || moreBusy) return;
+    const my = listGen.current;
+    setMoreBusy(true);
+    const r = await loadProjects(fetch, viewScope, cursor.current);
+    setMoreBusy(false);
+    if (my !== listGen.current) return;
+    if (r.err) {
+      // 조용히 버튼을 치우지 않는다 — 치우면 목록이 거기서 끝난 줄 안다.
+      setErr(r.err);
+      return;
+    }
+    setErr("");
+    cursor.current = lastTs(r.projects);
+    rememberKinds(r.projects);
+    // ★ 붙이면서 이미 있는 id 는 거른다 — 같은 카드가 두 번 서면 선택·지우기가 꼬인다.
+    setProjects((list) => {
+      const have = new Set((list || []).map((p) => p.id));
+      return [...(list || []), ...r.projects.filter((p) => !have.has(p.id))];
+    });
+    setMore(r.hasMore);
+  }
+
   // 범위를 바꾸면 다시 불러온다. 늦게 온 앞 요청이 뒤 요청을 덮지 않게 alive 로 막는다 —
   // 두 번 빠르게 누르면 [내 영상]을 보는데 [전체] 결과가 얹히는 일이 생긴다.
   useEffect(() => {
     let alive = true;
+    const my = ++listGen.current;
     setProjects(null);
     setErr("");
-    loadProjects(fetch, viewScope).then(({ projects, err, guest }) => {
-      if (!alive) return;
+    setMore(false);
+    cursor.current = undefined;
+    loadProjects(fetch, viewScope).then(({ projects, err, guest, hasMore }) => {
+      if (!alive || my !== listGen.current) return;
+      cursor.current = lastTs(projects);
       setProjects(projects);
       setErr(err);
+      setMore(hasMore);
       // 카드를 누르면 상세가 이 자국을 읽어 **맞는 문 하나만** 두드린다(위 주석 참고).
       rememberKinds(projects);
       // 손님(비로그인)인가 — 라우트가 말해 준다(lib/auth/guest.js). 짐작하지 않는다.
@@ -268,7 +308,8 @@ function ArchiveBody() {
 
       {projects === null && <p className="pgsub">불러오는 중…</p>}
       {err && <p className="pgsub warn">{err}</p>}
-      {projects?.length === 0 && !err && (
+      {/* ★ 뒤에 더 있으면 「없어요」라고 안 한다 — 받은 쪽을 다 지워도 뒤에는 남아 있다. */}
+      {projects?.length === 0 && !err && !more && (
         <p className="pgsub">
           {isAll ? "아직 만들어진 영상이 없어요." : "아직 만든 영상이 없어요. 새로 만들어 보세요."}
         </p>
@@ -283,6 +324,13 @@ function ArchiveBody() {
           onToggleSelect={toggle}
           onDeleted={(id) => setProjects((list) => list.filter((p) => p.id !== id))}
         />
+      )}
+      {more && projects !== null && (
+        <div className="archive-more">
+          <button className="mini" disabled={moreBusy} onClick={loadMore}>
+            {moreBusy ? "불러오는 중…" : "더 보기"}
+          </button>
+        </div>
       )}
     </>
   );

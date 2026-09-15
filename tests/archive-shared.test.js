@@ -369,7 +369,10 @@ describe("보관함 화면 — 전체/내 영상", () => {
 
   it("전체를 고르면 scope 를 실어 다시 부른다", () => {
     expect(page).toMatch(/scope/);
-    expect(strip(readFileSync("lib/projects-client.js", "utf8"))).toMatch(/scope=all/);
+    // ★ 2026-09-15 「더 보기」로 주소를 URLSearchParams 로 조립한다(before 가 함께 실린다).
+    //   실제로 나가는 주소는 tests/archive-pagination.test.js 가 값으로 잰다.
+    expect(strip(readFileSync("lib/projects-client.js", "utf8")))
+      .toMatch(/scope=all|set\(\s*["']scope["']\s*,\s*["']all["']\s*\)/);
   });
 
   it("남의 카드에는 지우기 버튼을 안 그린다", () => {

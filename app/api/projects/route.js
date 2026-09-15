@@ -1,4 +1,4 @@
-import { createProject, listProjects, listAllProjects } from "../../../lib/projects";
+import { createProject, listProjects, listAllProjects, PROJECT_PAGE, projectCursor } from "../../../lib/projects";
 import { isSubtitleLang, DEFAULT_SPEECH_LANG } from "../../../lib/subtitle-langs.js";
 import { isAspect, DEFAULT_ASPECT_ID } from "../../../lib/aspects";
 import { TARGET_CHOICES } from "../../../lib/script";
@@ -21,14 +21,19 @@ import { MAX_MATERIAL_TEXT } from "../../../lib/material.js";
 //   [전체]는 이제 **운영자만** 받는다(문제 영상 관리). 일반 사용자가 scope=all 을 보내도
 //   조용히 내 것으로 답한다 — 400 으로 막으면 옛 주소(/archive?scope=all)가 오류 화면이 된다.
 //   손님에게는 내 것이 없으니 **빈 목록**이다(전에는 전체였다).
+// ★★★ 2026-09-15 — **한 쪽씩 준다**(「더 보기」). 그전에는 store 의 limit(100) 한 번이라
+//   101편째부터 아무 말 없이 안 보였다. before(마지막 카드의 created_ts)로 이어 받는다 —
+//   번호로 끊으면 지우기가 있는 목록이라 뒷장이 밀린다. 다음이 있는지는 한 편 더 읽어 안다.
 export const GET = withUser(async (req, _ctx, user) => {
-  const scope = new URL(req.url).searchParams.get("scope");
+  const url = new URL(req.url);
+  const scope = url.searchParams.get("scope");
   // ★ 손님이라는 사실을 **화면에 말해 준다** — 화면이 "로그인하면 내 영상이 보여요"를 그린다.
-  if (!user) return Response.json({ projects: [], guest: true });
-  const projects = scope === "all" && user.role === "admin"
-    ? await listAllProjects(user.id)
-    : await listProjects(user.id);
-  return Response.json({ projects });
+  if (!user) return Response.json({ projects: [], guest: true, has_more: false });
+  const page = { before: projectCursor(url.searchParams.get("before")), limit: PROJECT_PAGE + 1 };
+  const rows = scope === "all" && user.role === "admin"
+    ? await listAllProjects(user.id, page)
+    : await listProjects(user.id, page);
+  return Response.json({ projects: rows.slice(0, PROJECT_PAGE), has_more: rows.length > PROJECT_PAGE });
 }, { guest: true });
 
 export const POST = withUser(async (req, ctx, user) => {
