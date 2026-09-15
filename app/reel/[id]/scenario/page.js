@@ -139,7 +139,7 @@ export default function ReelScenarioPage() {
          ("규격이나 배치도 통일 시켜줘"). 두 칸이 되면서 그 전제가 깨졌다 — 광고는
          한 칸 880 이고 여기는 두 칸이라 1,180 이다. tests/scene-card-unified.test.js 에
          그 사정을 적어 뒀다. 광고 화면은 손대지 않았다. */
-    <div className="rv-page">
+    <section className="panel panel--wide rv-page">
       {err && <p className="pgsub warn">{err}</p>}
       {/* ★★ 무슨 일이 일어나는지 말하는 자리는 **여기 하나**다(2026-08-27 사장님 지시).
           다시 쓰는 동안에는 **옛 글을 안 보여 준다** — 곧 사라질 글을 읽고 있으면 바뀐
@@ -154,7 +154,7 @@ export default function ReelScenarioPage() {
             없는 것이 있는 것처럼 읽힌다. 그래서 칸 수를 CSS 가 짐작하지 않고 화면이 말한다.
           ★ 고치는 칸과 단계 버튼은 이 격자 **밖**이다 — 아래에서 전체 폭을 쓴다. */}
       <div className={`rv-split${sheetUrl ? " is-two" : ""}`}>
-        <section className="panel rv-read">
+        <div className="rv-read">
       <h2>{stepLabel}</h2>
       {busy ? (
         <p className="pgsub">
@@ -187,7 +187,7 @@ export default function ReelScenarioPage() {
         </div>
       )}
       {lock && <p className="pgsub">{lock.message}</p>}
-        </section>
+        </div>
         {sheetUrl && (
           <div className="sheet-view">
             <img src={sheetUrl} alt="스토리보드" />
@@ -195,7 +195,6 @@ export default function ReelScenarioPage() {
         )}
       </div>
 
-      <section className="panel rv-foot">
 
       {/* ★★ 사장님이 **한국어로** 고쳐 달라고 적는 자리(2026-08-25).
           칸을 직접 고치는 것(edits)과 다른 축이다 — "이 문구를 이렇게 바꿔 줘"를
@@ -248,7 +247,6 @@ export default function ReelScenarioPage() {
           </div>
         )}
       </div>
-      </section>
-    </div>
+    </section>
   );
 }

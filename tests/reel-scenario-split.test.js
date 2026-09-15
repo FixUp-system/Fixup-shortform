@@ -62,6 +62,35 @@ describe("②시나리오 — 글 ↔ 그림", () => {
     expect(r.body, "그림이 카드 안에서 가운데로 안 선다").toMatch(/align-items:\s*center/);
   });
 
+  // ★★★ 2026-09-15 사장님 지적 — 「너무 분할되어 있는 느낌. 3개의 영역을 한 보드 안에」.
+  //   한 번은 셋을 각각 카드로 세웠다가(같은 날 앞선 지시) 보고 나서 되돌린 것이다.
+  //   지금은 **겉이 보드 하나**이고 그 안에 글·그림·고치기가 앉는다.
+  it("★★★ 세 영역이 **한 보드** 안이다 — 글 칸이 제 카드를 따로 갖지 않는다", () => {
+    expect(page, "겉이 보드가 아니다").toMatch(/className="panel[^"]*rv-page"/);
+    // 보드 안에 보드를 또 앉히면 테두리가 두 겹이 된다.
+    expect(page, "글 칸이 제 카드를 갖는다 — 보드가 두 겹이다").not.toMatch(/className="panel rv-read"/);
+    expect(page, "고치기 칸이 제 카드를 갖는다 — 보드가 두 겹이다").not.toMatch(/className="panel rv-foot"/);
+  });
+
+  // ★★★ 사장님 지적 — 「이미지가 보드에 너무 딱 맞는 느낌」. 그림이 테두리에 그대로 닿아
+  //   숨 쉴 자리가 없었다. 액자에 매트를 두르듯 안쪽 여백을 준다.
+  it("★★ 그림은 테두리에 딱 붙지 않는다 — 안쪽 여백이 있다", () => {
+    const r = ruleOf(".rv-split > .sheet-view");
+    expect(r, "격자 안 그림 규칙이 없다").toBeTruthy();
+    expect(r.body, "그림이 테두리에 딱 붙는다").toMatch(/padding:/);
+  });
+
+  // ★★★ 시트 비율은 **칸 수마다 다르다**(실측: 0.56 ~ 3.00). 세로로 긴 시트는 같은 폭에서
+  //   높이가 985px 까지 가서 글보다 커지고, 그러면 그림이 배치를 지배한다.
+  //   그래서 그림 쪽에만 **높이 상한**을 둔다 — 비율은 그대로 두고(강제하면 잘린다) 높이만 막는다.
+  it("★★★ 세로로 긴 시트가 배치를 지배하지 않는다 — 높이 상한이 있다", () => {
+    const r = ruleOf(".rv-split > .sheet-view img");
+    expect(r, "격자 안 그림의 높이 규칙이 없다").toBeTruthy();
+    expect(r.body, "높이 상한이 없다 — 9:16 컷4 시트가 985px 로 선다").toMatch(/max-height:/);
+    // 비율을 강제하면 가로 한 줄짜리(1x3 · 3.00)가 잘린다 — 그 금지는 그대로다.
+    expect(r.body, "비율을 강제했다 — 가로로 긴 시트가 잘린다").not.toMatch(/aspect-ratio/);
+  });
+
   it("★★★ 그림이 없으면 **한 칸**이다 — 빈 칸을 세우지 않는다", () => {
     const base = ruleOf(".rv-split");
     expect(base, ".rv-split 바탕 규칙이 없다").toBeTruthy();
