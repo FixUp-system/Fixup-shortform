@@ -3448,6 +3448,20 @@ a.um-credit:hover { color: var(--ink); background: var(--surface2); }
 .rp-chip:disabled { cursor: default; }
 .rp-field.is-locked .rp-chips { opacity: .72; }
 .rp-why { margin: 0; font-size: 12px; color: var(--ink-soft); }
+/* ★★★ 2026-09-15 — ①입력의 설정을 이 레일로 옮기면서(B안), 그 화면이 쓰던 줄 모양
+   (.tray-row)이 레일 안으로 들어왔다. 밖에서는 **라벨과 칩이 가로로** 서는데 레일은
+   340px 라 그대로 두면 칩이 한두 개씩 끊겨 줄이 다섯 줄이 된다 — 레일 안에서만 세운다.
+   ★ 줄 자체를 다시 쓰지 않은 이유: 각 줄에 붙은 사정(주석)이 많아 옮겨 적는 편이 더 위험하다.
+     그래서 **모양만 여기서 바꾼다.** */
+.rp-panel .tray-row { flex-direction: column; gap: 6px; align-items: stretch; }
+.rp-panel .tray-label { width: auto; }
+.rp-panel .composer-tray { border: 0; padding: 0; gap: 14px; }
+/* 접는 단추 — 칩이 아니라 **글자 단추**다. 고르는 것이 아니라 여는 것이라서. */
+.rp-more {
+  align-self: flex-start; border: 0; background: none; padding: 2px 0;
+  font: inherit; font-size: 12px; color: var(--ink-soft); cursor: pointer;
+}
+.rp-more:hover { color: var(--ink); }
 /* 서버가 거절한 이유. 잠김 안내(--ink-soft)와 색을 나눈다 — 하나는 "지금은 이렇다"이고
    다른 하나는 "방금 누른 것이 안 됐다"라서, 같은 색이면 무엇이 새 소식인지 안 보인다. */
 .rp-err { margin: 0; font-size: 12px; color: var(--warn); }

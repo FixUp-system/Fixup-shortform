@@ -89,6 +89,8 @@ export default function ReelNewPage() {
   }, [setProject]);
 
   const [text, setText] = useState("");
+  // 레일에서 자주 안 바꾸는 줄 다섯을 접는다(2026-09-15).
+  const [more, setMore] = useState(false);
   const [photos, setPhotos] = useState([]); // {id, filename, url}
   const [concept, setConcept] = useState(DEFAULT_REEL_CONCEPT);
   const [mood, setMood] = useState(DEFAULT_AD_OPTIONS.mood);
@@ -225,43 +227,110 @@ export default function ReelNewPage() {
       <p className="pgsub">소재와 사진을 주시면 시나리오부터 함께 만들어요 — 컷 안에서 직접 말해요.</p>
       {err && <p className="pgsub warn">{err}</p>}
 
-      <section className="panel--wide">
-        <div className="composer">
-          <AutoTextarea
-            className="field composer-text"
-            value={text}
-            maxLength={MAX_MATERIAL_TEXT}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="무엇을 만들고 싶으세요? 제품·강조하고 싶은 점·타깃을 자유롭게 적어 주세요"
-          />
-
-          {photos.length > 0 && (
-            <div className="uploads">
-              {photos.map((p) => (
-                <div key={p.id} className="up photo-mark">
-                  <img className="thumb-media" src={p.url} alt={p.filename} />
-                  <button
-                    className="tag"
-                    disabled={locked}
-                    onClick={() => setPhotos((ps) => ps.filter((x) => x.id !== p.id))}
-                  >
-                    ✕ {p.filename.slice(0, 6)}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* ★★ 이미 올려 둔 인물 사진은 **지우지 않는다** — 기본으로 되돌리면 그대로
-              살아나야 한다. 대신 안 실린다고 말한다: 조용히 버리면 "반영이 안 된다"로
-              읽힌다(이 저장소가 사진 누락으로 이미 겪은 종류의 오해다). */}
-          {strandedPeople > 0 && (
-            <p className="warn">
-              인물 사진 {strandedPeople}장은 프로에서 안 실려요 — 얼굴 사진을 쓰시려면 기본으로 바꿔 주세요.
-            </p>
-          )}
-
+      {/* ★★★ 2026-09-15 사장님 결정(B안) — 설정을 **왼쪽 레일**로 옮겼다.
+          첫 화면이 한 번에 31개를 묻고 있었다(여덟 줄) — 무엇이 중요한지 화면이 말해 주지
+          않았다. 참조 셋도 같은 자리에서 4~6개만 보여 주고 나머지는 접는다.
+          ★★ 레일을 고른 이유는 **자리의 연속**이다. ②~⑥에 이미 같은 자리에 「이 영상의
+            설정」 레일이 서 있다. 격자도 **같은 것**(.rw-grid)을 써서 레일의 x 좌표가 한
+            픽셀도 안 움직인다 — 시작하는 순간 그 레일이 그대로 「잠김」을 말하는 레일이 된다.
+          ★ 줄 자체는 **옮기기만** 했다 — 각 줄에 붙은 사정(주석)이 많아 다시 쓰는 것이 더 위험하다. */}
+      <div className="rw-grid">
+        <aside className="rp-panel">
+          <div className="rp-head">이 영상의 설정</div>
+          <div className="rp-body">
           <div className="composer-tray">
+            <div className="tray-row">
+              <span className="tray-label">사이즈</span>
+              <div className="tray-col">
+                <div className="chips">
+                  {ASPECTS.map((a) => (
+                    <button key={a.id} className={`chip${aspect === a.id ? " on" : ""}`}
+                      disabled={locked} onClick={() => setAspect(a.id)}>
+                      {/* ★ 이름만이 아니라 **비율까지** 적는다 — 광고 화면과 같은 모양이다
+                          (2026-08-25 사장님 지적: "라벨 부분이 안맞아"). "세로"만으로는
+                          9:16 인지 4:5 인지 알 수 없다. */}
+                      {a.label} · {a.id}
+                    </button>
+                  ))}
+                </div>
+                {/* ★ 문구도 광고 화면과 맞춘다(2026-08-25 사장님 지시 — "광고 영상에
+                    맞춰서"). 두 흐름이 같은 것을 고르는데 말투가 다르면 사장님이
+                    화면마다 다른 사용법을 익혀야 한다. */}
+                <div className="tray-note">{aspectFor(aspect).fits}</div>
+              </div>
+            </div>
+
+            <div className="tray-row">
+              <span className="tray-label">길이</span>
+              <div className="tray-col">
+                <div className="chips">
+                  {secondsForModel(model).map((s) => (
+                    <button key={s} className={`chip${target === s ? " on" : ""}`}
+                      disabled={locked} onClick={() => setTarget(s)}>
+                      {/* ★ 크레딧 표기를 뗐다(2026-08-25 사장님 지시 — "일단 제거"). */}
+                      {s}초
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="tray-row">
+              <span className="tray-label">화풍</span>
+              <div className="tray-col">
+                <div className="chips">
+                  {AD_STYLES.map((s) => (
+                    <button key={s.id} className={`chip${style === s.id ? " on" : ""}`}
+                      disabled={locked} onClick={() => setStyle(s.id)}>
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="tray-note">{AD_STYLES.find((s) => s.id === style)?.desc}</div>
+              </div>
+            </div>
+
+            {/* ★★★ 자주 안 바꾸는 다섯은 **접는다.** 상태로 여닫는다 — 늘 그려 두고 CSS 로만
+                감추면 첫 화면의 길이가 그대로라 접은 뜻이 없다. */}
+            <button type="button" className="rp-more" onClick={() => setMore((v) => !v)}>
+              {more ? "− 접기" : "+ 더 보기"}
+            </button>
+            {more && (
+              <>
+            <div className="tray-row">
+              <span className="tray-label">화질</span>
+              <div className="tray-col">
+                <div className="chips">
+                  {resolutionsForModel(model).map((r) => (
+                    <button key={r} className={`chip${resolution === r ? " on" : ""}`}
+                      disabled={locked} onClick={() => setResolution(r)}>
+                      {/* ★ 크레딧 표기를 뗐다(2026-08-25 사장님 지시). 길이 칩과 같다.
+                          예전에는 길이를 고른 뒤에만 붙었다(`target &&`) — 그래서
+                          "길이를 선택했을 때 보여"였다. */}
+                      {r}
+                    </button>
+                  ))}
+                </div>
+                {/* ★ 설명 줄이 없다(2026-08-25 사장님 지시 — "화질이 정가를 바꿔요 텍스트
+                    제거해줘"). 값을 말하는 자리는 실제로 돈이 나가는 ⑤영상 하나뿐이다. */}
+              </div>
+            </div>
+
+            <div className="tray-row">
+              <span className="tray-label">모델</span>
+              <div className="tray-col">
+                <div className="chips">
+                  {models.map((m) => (
+                    <button key={m.id} className={`chip${model === m.id ? " on" : ""}`}
+                      disabled={locked} onClick={() => onModelChange(m.id)}>
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+                {/* ★ 모델 설명 줄은 2026-09-14 에 뺐다(사장님 지시) — 칩 이름으로 충분하다. */}
+              </div>
+            </div>
+
             <div className="tray-row">
               <span className="tray-label">컨셉</span>
               <div className="tray-col">
@@ -297,21 +366,6 @@ export default function ReelNewPage() {
             </div>
 
             <div className="tray-row">
-              <span className="tray-label">화풍</span>
-              <div className="tray-col">
-                <div className="chips">
-                  {AD_STYLES.map((s) => (
-                    <button key={s.id} className={`chip${style === s.id ? " on" : ""}`}
-                      disabled={locked} onClick={() => setStyle(s.id)}>
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="tray-note">{AD_STYLES.find((s) => s.id === style)?.desc}</div>
-              </div>
-            </div>
-
-            <div className="tray-row">
               <span className="tray-label">언어</span>
               <div className="tray-col">
                 <div className="chips">
@@ -324,84 +378,51 @@ export default function ReelNewPage() {
                 </div>
               </div>
             </div>
-
-            {/* ★★ 모델 — 광고 화면과 같은 자리·같은 모양이다(2026-08-25 사장님 지시).
-                바꾸면 아래 사이즈·화질·길이가 그 모델이 받는 값으로 되돌아간다.
-                ⚠️ 이 목록은 **가림막이지 잠금이 아니다.** 잠금은 서버가 한다
-                (app/api/reel/route.js) — 광고에서 화면만 거르고 서버는 그대로 받아
-                API 로 뚫렸던 사고가 그 근거다. */}
-            <div className="tray-row">
-              <span className="tray-label">모델</span>
-              <div className="tray-col">
-                <div className="chips">
-                  {models.map((m) => (
-                    <button key={m.id} className={`chip${model === m.id ? " on" : ""}`}
-                      disabled={locked} onClick={() => onModelChange(m.id)}>
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
-                {/* ★ 모델 설명 줄은 2026-09-14 에 뺐다(사장님 지시) — 칩 이름으로 충분하다. */}
-              </div>
-            </div>
-
-            {/* ★ 사이즈(비율) — 2026-08-25 사장님 지시로 생겼다. 화질 앞에 둔다:
-                무엇을 만들지(비율)가 얼마나 곱게 만들지(화질)보다 앞선 결정이다. */}
-            <div className="tray-row">
-              <span className="tray-label">사이즈</span>
-              <div className="tray-col">
-                <div className="chips">
-                  {ASPECTS.map((a) => (
-                    <button key={a.id} className={`chip${aspect === a.id ? " on" : ""}`}
-                      disabled={locked} onClick={() => setAspect(a.id)}>
-                      {/* ★ 이름만이 아니라 **비율까지** 적는다 — 광고 화면과 같은 모양이다
-                          (2026-08-25 사장님 지적: "라벨 부분이 안맞아"). "세로"만으로는
-                          9:16 인지 4:5 인지 알 수 없다. */}
-                      {a.label} · {a.id}
-                    </button>
-                  ))}
-                </div>
-                {/* ★ 문구도 광고 화면과 맞춘다(2026-08-25 사장님 지시 — "광고 영상에
-                    맞춰서"). 두 흐름이 같은 것을 고르는데 말투가 다르면 사장님이
-                    화면마다 다른 사용법을 익혀야 한다. */}
-                <div className="tray-note">{aspectFor(aspect).fits}</div>
-              </div>
-            </div>
-
-            <div className="tray-row">
-              <span className="tray-label">화질</span>
-              <div className="tray-col">
-                <div className="chips">
-                  {resolutionsForModel(model).map((r) => (
-                    <button key={r} className={`chip${resolution === r ? " on" : ""}`}
-                      disabled={locked} onClick={() => setResolution(r)}>
-                      {/* ★ 크레딧 표기를 뗐다(2026-08-25 사장님 지시). 길이 칩과 같다.
-                          예전에는 길이를 고른 뒤에만 붙었다(`target &&`) — 그래서
-                          "길이를 선택했을 때 보여"였다. */}
-                      {r}
-                    </button>
-                  ))}
-                </div>
-                {/* ★ 설명 줄이 없다(2026-08-25 사장님 지시 — "화질이 정가를 바꿔요 텍스트
-                    제거해줘"). 값을 말하는 자리는 실제로 돈이 나가는 ⑤영상 하나뿐이다. */}
-              </div>
-            </div>
-
-            <div className="tray-row">
-              <span className="tray-label">길이</span>
-              <div className="tray-col">
-                <div className="chips">
-                  {secondsForModel(model).map((s) => (
-                    <button key={s} className={`chip${target === s ? " on" : ""}`}
-                      disabled={locked} onClick={() => setTarget(s)}>
-                      {/* ★ 크레딧 표기를 뗐다(2026-08-25 사장님 지시 — "일단 제거"). */}
-                      {s}초
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
+              </>
+            )}
           </div>
+          {/* ★★★ 참조 셋에는 없는, 우리에게만 있는 사정 — 여기서 고른 값 중 다섯은 시작하면
+              잠긴다. 그전에는 ②에 가서야 「잠김」을 처음 봤다(늦다). 고르는 자리에서 말한다.
+              ★ 레일 **본문 안**이다 — 밖에 두면 카드의 안쪽 여백을 못 받아 글자만 삐져나온다. */}
+          <p className="rp-why">사이즈 · 길이 · 화풍 · 모델 · 화질은 시작하면 잠겨요.</p>
+          </div>
+        </aside>
+
+        <div className="rw-work">
+          <div className="composer">
+          <AutoTextarea
+            className="field composer-text"
+            value={text}
+            maxLength={MAX_MATERIAL_TEXT}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="무엇을 만들고 싶으세요? 제품·강조하고 싶은 점·타깃을 자유롭게 적어 주세요"
+          />
+
+          {photos.length > 0 && (
+            <div className="uploads">
+              {photos.map((p) => (
+                <div key={p.id} className="up photo-mark">
+                  <img className="thumb-media" src={p.url} alt={p.filename} />
+                  <button
+                    className="tag"
+                    disabled={locked}
+                    onClick={() => setPhotos((ps) => ps.filter((x) => x.id !== p.id))}
+                  >
+                    ✕ {p.filename.slice(0, 6)}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ★★ 이미 올려 둔 인물 사진은 **지우지 않는다** — 기본으로 되돌리면 그대로
+              살아나야 한다. 대신 안 실린다고 말한다: 조용히 버리면 "반영이 안 된다"로
+              읽힌다(이 저장소가 사진 누락으로 이미 겪은 종류의 오해다). */}
+          {strandedPeople > 0 && (
+            <p className="warn">
+              인물 사진 {strandedPeople}장은 프로에서 안 실려요 — 얼굴 사진을 쓰시려면 기본으로 바꿔 주세요.
+            </p>
+          )}
 
           <div className="composer-bar">
             {/* ★★ 2026-08-31 사장님 지시 — `＋사진` 하나를 **종류별 셋**으로 갈랐다.
@@ -419,8 +440,9 @@ export default function ReelNewPage() {
               {busy === "create" ? "만드는 중…" : uploading ? "사진 올리는 중…" : "시작하기 →"}
             </button>
           </div>
+          </div>
         </div>
-      </section>
+      </div>
     </>
   );
 }
