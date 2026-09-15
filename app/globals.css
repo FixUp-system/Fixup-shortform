@@ -3455,7 +3455,11 @@ a.um-credit:hover { color: var(--ink); background: var(--surface2); }
      그래서 **모양만 여기서 바꾼다.** */
 .rp-panel .tray-row { flex-direction: column; gap: 6px; align-items: stretch; }
 .rp-panel .tray-label { width: auto; }
-.rp-panel .composer-tray { border: 0; padding: 0; gap: 14px; }
+.rp-panel .composer-tray { border: 0; padding: 0; gap: 12px; }
+/* ★ 레일 안의 드롭다운은 **폭을 채운다** — 내용만큼만 두면 줄마다 길이가 달라 들쭉날쭉하고,
+   누를 자리도 좁다(2026-09-15 실측). */
+.rp-panel .dd { width: 100%; }
+.rp-panel .dd-input { width: 100%; }
 /* 접는 단추 — 칩이 아니라 **글자 단추**다. 고르는 것이 아니라 여는 것이라서. */
 .rp-more {
   align-self: flex-start; border: 0; background: none; padding: 2px 0;

@@ -112,6 +112,23 @@ describe("①입력 — 설정은 왼쪽 레일에", () => {
     expect(page, "하나뿐인 줄을 그대로 그린다").toMatch(/secondsForModel\(model\)\.length\s*>\s*1/);
   });
 
+  // ★★★ 2026-09-15 사장님 지적 — 「접고 펼친다고 해도 너무 길어져」. 실측: 펼치면 레일이
+  //   **1,093px** 였다. 접힌 다섯이 전부 칩 줄이라 칩 18개 + 설명이 한꺼번에 펼쳐진다.
+  //   ★ 그 다섯은 **자주 안 바꾸는 값**이다 — 칩은 자주 바꾸고 눈으로 고르는 것에 쓰고,
+  //     이런 것은 **드롭다운**이 제 옷이다. 한 줄짜리 다섯이 되어 절반 아래로 준다.
+  //   ★ 공용 부품(components/Select.jsx)을 쓴다 — 화면이 <select> 를 직접 쓰면 브라우저
+  //     기본 화살표가 나와 "손으로 만든 화면"처럼 보인다(그 부품의 주석).
+  it("★★★ 접힌 다섯은 **드롭다운**이다 — 칩 줄이면 펼쳤을 때 너무 길다", () => {
+    expect(page, "공용 드롭다운을 안 쓴다").toMatch(/import\s+Select\s+from/);
+    // 다섯 줄 전부 — 하나라도 칩으로 남으면 그 줄만 길어진다.
+    const folded = page.slice(page.indexOf("rp-more"));
+    for (const name of ["REEL_CONCEPTS", "AD_MOODS", "AD_LANGS", "models", "resolutionsForModel"]) {
+      const at = folded.indexOf(name);
+      expect(at, `${name} 줄이 접힘 안에 없다`).toBeGreaterThan(-1);
+      expect(folded.slice(at - 200, at + 200), `${name} 이 아직 칩 줄이다`).not.toContain("chips");
+    }
+  });
+
   it("★★ 레일 안에서는 줄이 **세로로** 선다 — 340px 에 라벨과 칩을 나란히 못 둔다", () => {
     const m = /\.rp-panel\s+\.tray-row\s*\{([^}]*)\}/.exec(css);
     expect(m, "레일 안 줄 규칙이 없다").toBeTruthy();

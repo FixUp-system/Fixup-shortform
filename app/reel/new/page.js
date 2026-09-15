@@ -35,6 +35,13 @@ import { useRouter } from "next/navigation";
 import { useReelProject } from "../../../components/ReelProjectContext";
 import { ReelStepPreview } from "../../../components/reel/StepStack";
 import AutoTextarea from "../../../components/AutoTextarea";
+// ★★★ 2026-09-15 — 접힌 다섯 줄은 **드롭다운**이다(사장님 지적: 펼치면 너무 길다).
+//   칩은 자주 바꾸고 눈으로 고르는 것에 쓰고(사이즈·화풍), 자주 안 바꾸는 값은 한 줄로 접는다.
+//   ★ 브라우저 기본 드롭다운을 날것으로 쓰지 않는 이유는 그 부품 주석에 있다(기본 화살표가
+//     브라우저마다 달라 "손으로 만든 화면"처럼 보인다). 판도 그것을 못 박는다
+//     — tests/select-unified-ui.test.js. ⚠️ 그 판은 **주석도 함께 훑는다**: 이 줄에 그
+//     태그 이름을 그대로 적었다가 빨개졌다.
+import Select from "../../../components/Select";
 // 주소는 단계 표 한 벌이 만든다 — 화면이 `/reel/<id>/scenario` 를 손으로 적으면 두 벌이 된다.
 import { REEL_STEPS, reelStepHref } from "../../../lib/reel/steps";
 import { ASPECTS, DEFAULT_ASPECT_ID, aspectFor } from "../../../lib/aspects";
@@ -330,17 +337,13 @@ export default function ReelNewPage() {
             <div className="tray-row">
               <span className="tray-label">화질</span>
               <div className="tray-col">
-                <div className="chips">
+                {/* ★ 크레딧 표기는 없다(2026-08-25 사장님 지시). 값을 말하는 자리는 ⑤영상 하나다. */}
+                <Select value={resolution} disabled={locked} aria-label="화질"
+                  onChange={(e) => setResolution(e.target.value)}>
                   {resolutionsForModel(model).map((r) => (
-                    <button key={r} className={`chip${resolution === r ? " on" : ""}`}
-                      disabled={locked} onClick={() => setResolution(r)}>
-                      {/* ★ 크레딧 표기를 뗐다(2026-08-25 사장님 지시). 길이 칩과 같다.
-                          예전에는 길이를 고른 뒤에만 붙었다(`target &&`) — 그래서
-                          "길이를 선택했을 때 보여"였다. */}
-                      {r}
-                    </button>
+                    <option key={r} value={r}>{r}</option>
                   ))}
-                </div>
+                </Select>
                 {/* ★ 설명 줄이 없다(2026-08-25 사장님 지시 — "화질이 정가를 바꿔요 텍스트
                     제거해줘"). 값을 말하는 자리는 실제로 돈이 나가는 ⑤영상 하나뿐이다. */}
               </div>
@@ -349,14 +352,12 @@ export default function ReelNewPage() {
             <div className="tray-row">
               <span className="tray-label">모델</span>
               <div className="tray-col">
-                <div className="chips">
+                <Select value={model} disabled={locked} aria-label="모델"
+                  onChange={(e) => onModelChange(e.target.value)}>
                   {models.map((m) => (
-                    <button key={m.id} className={`chip${model === m.id ? " on" : ""}`}
-                      disabled={locked} onClick={() => onModelChange(m.id)}>
-                      {m.label}
-                    </button>
+                    <option key={m.id} value={m.id}>{m.label}</option>
                   ))}
-                </div>
+                </Select>
                 {/* ★ 모델 설명 줄은 2026-09-14 에 뺐다(사장님 지시) — 칩 이름으로 충분하다. */}
               </div>
             </div>
@@ -364,14 +365,12 @@ export default function ReelNewPage() {
             <div className="tray-row">
               <span className="tray-label">컨셉</span>
               <div className="tray-col">
-                <div className="chips">
+                <Select value={concept} disabled={locked} aria-label="컨셉"
+                  onChange={(e) => setConcept(e.target.value)}>
                   {REEL_CONCEPTS.map((c) => (
-                    <button key={c.id} className={`chip${concept === c.id ? " on" : ""}`}
-                      disabled={locked} onClick={() => setConcept(c.id)}>
-                      {c.label}
-                    </button>
+                    <option key={c.id} value={c.id}>{c.label}</option>
                   ))}
-                </div>
+                </Select>
                 {/* ★ [알아서]는 구성이 없으므로 설명(desc)을 대신 보여 준다 —
                     빈 줄로 남기면 고르면 안 되는 칩처럼 읽힌다. */}
                 <div className="tray-note">
@@ -384,28 +383,24 @@ export default function ReelNewPage() {
             <div className="tray-row">
               <span className="tray-label">분위기</span>
               <div className="tray-col">
-                <div className="chips">
+                <Select value={mood} disabled={locked} aria-label="분위기"
+                  onChange={(e) => setMood(e.target.value)}>
                   {AD_MOODS.map((m) => (
-                    <button key={m.id} className={`chip${mood === m.id ? " on" : ""}`}
-                      disabled={locked} onClick={() => setMood(m.id)}>
-                      {m.label}
-                    </button>
+                    <option key={m.id} value={m.id}>{m.label}</option>
                   ))}
-                </div>
+                </Select>
               </div>
             </div>
 
             <div className="tray-row">
               <span className="tray-label">언어</span>
               <div className="tray-col">
-                <div className="chips">
+                <Select value={lang} disabled={locked} aria-label="언어"
+                  onChange={(e) => setLang(e.target.value)}>
                   {AD_LANGS.filter((l) => !l.hidden).map((l) => (
-                    <button key={l.id} className={`chip${lang === l.id ? " on" : ""}`}
-                      disabled={locked} onClick={() => setLang(l.id)}>
-                      {l.label}
-                    </button>
+                    <option key={l.id} value={l.id}>{l.label}</option>
                   ))}
-                </div>
+                </Select>
               </div>
             </div>
               </>
