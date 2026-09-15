@@ -355,9 +355,11 @@ function ArchiveBody() {
           모양은 이 제품의 날짜 좁히기(크레딧 내역 · 사용자 관리 · 비용 기록)와 **같은 한 벌**이다 —
           시작일 · 종료일 · 종류 세그먼트 · 좁혔을 때만 [초기화].
           ★ 종류 판정은 aria-pressed 다(범위 토글과 같은 규율 — 보이는 상태와 읽히는 상태가 갈리지 않게).
-          ★ 손님에게는 안 그린다 — 거를 목록이 없다. */}
+          ★ 손님에게는 안 그린다 — 거를 목록이 없다.
+          ★ 카드(.panel) 안에 둔다(2026-09-15 사장님 지시) — 사용자 관리·비용 기록과 같은 모양이다.
+            아래 영상 격자와 영역이 갈린다. */}
       {!guest && (
-        <div className="cost-filters archive-filters">
+        <div className="panel cost-filters">
           <label>
             <small>시작일</small>
             <input className="field" type="date" value={from} max={to || undefined} onChange={(e) => changeDates(e.target.value, to)} />

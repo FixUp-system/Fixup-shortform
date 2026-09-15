@@ -36,8 +36,10 @@ describe("보관함 카드 — 제목도 날짜도 안 단다", () => {
 });
 
 describe("보관함 — 만든 날짜로 좁힌다", () => {
-  it("★★★ 시작일·종료일 칸이 있다 — 다른 화면의 날짜 좁히기와 같은 모양(.cost-filters)", () => {
-    expect(page).toMatch(/className="cost-filters archive-filters"/);
+  // ★ 2026-09-15 사장님 지시 — 사용자 관리처럼 **카드(.panel) 안**에 둔다.
+  it("★★★ 시작일·종료일 칸이 카드 안에 있다 — 사용자 관리·비용 기록과 같은 모양(panel cost-filters)", () => {
+    expect(page).toMatch(/className="panel cost-filters"/);
+    expect(css, "페이지 바탕용 덧칠이 남아 있다 — 카드 안에서는 필요 없다").not.toContain(".archive-filters");
     expect(page).toContain("시작일");
     expect(page).toContain("종료일");
     expect((page.match(/type="date"/g) || []).length).toBe(2);

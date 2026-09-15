@@ -644,10 +644,6 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
 
 /* 보관함 「더 보기」 — 목록 끝 가운데. 격자 바로 밑에 붙으면 마지막 줄 카드로 읽힌다. */
 .archive-more { display: flex; justify-content: center; margin-top: 20px; }
-/* 보관함 좁히기 줄(시작일 · 종료일 · 종류) — 모양은 .cost-filters 한 벌을 그대로 쓴다(크레딧 내역·사용자 관리와 같다).
-   ★ 다른 화면과 달리 카드(.panel) 밖, 페이지 바탕 위에 선다 — 그래서 날짜 칸 바탕을 surface 로 한 단 올린다
-     (deep 을 그대로 두면 바탕과 같은 색이라 칸 경계가 안 보인다). */
-.archive-filters input.field { background: var(--surface); }
 /* .home-start·.home-quick·.home-more·.cta.ghost 는 홈이 빠른 생성 전용이 되면서
    소비자를 잃어 걷어냈다. 홈은 이제 제목·설명·대화창뿐이라 전용 규칙이 필요 없다. */
 
