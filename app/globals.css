@@ -3543,11 +3543,22 @@ a.rs-step:not(.is-now):hover { background: var(--surface2); }
      세션이 끝에 덧붙이는 자리라 규칙 순서를 믿으면 안 된다. */
 .rv-page { display: grid; gap: var(--sp-5); max-width: 880px; }
 .rv-page:has(.rv-split.is-two) { max-width: none; }
-.rv-split { display: grid; gap: var(--sp-5); align-items: start; }
+/* ★★★ 2026-09-15 사장님 선택 — 두 카드는 **같은 높이로** 선다(바닥이 맞는다).
+   실측: 같은 폭 554px 인데 글 522px · 그림 324px 였다. 스토리보드가 16:9 라 그 폭에서는
+   그 높이가 한계다(글 높이에 맞추려면 폭이 928px 필요하다) — 그래서 폭이 아니라
+   **카드 높이**로 맞춘다. `align-items` 를 안 적으면 기본값이 stretch 라 그대로 맞는다. */
+.rv-split { display: grid; gap: var(--sp-5); }
 .rv-split.is-two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 /* 그림은 제 자리에서 위쪽 여백을 스스로 갖고 있다(.sheet-view 의 margin-top) — 격자
-   안에서는 그 여백이 글과 어긋나 보이므로 여기서만 거둔다. */
-.rv-split > .sheet-view { margin-top: 0; }
+   안에서는 그 여백이 글과 어긋나 보이므로 여기서만 거둔다.
+   ★ 늘어난 카드 **가운데**에 선다 — 위로 붙이면 아래가 빈 면으로 읽힌다. 액자 속 그림처럼
+     보여야지, 남는 자리처럼 보이면 안 된다.
+   ★ `width: fit-content` 는 그대로 둔다(제 자리 규칙) — 폭은 그림이 정하고, 가운데 정렬은
+     바깥 auto 여백이 이미 맡고 있다. 여기서 정하는 것은 **세로**뿐이다. */
+.rv-split > .sheet-view {
+  margin-top: 0; align-self: stretch;
+  display: flex; align-items: center; justify-content: center;
+}
 /* 좁은 화면에서는 위아래로 쌓는다 — 두 칸을 그대로 두면 둘 다 못 읽는 폭이 된다.
    경계는 작업 화면이 한 칸으로 접히는 값(1240)과 같다: 그 아래에서는 설정 패널도
    본문 위로 쌓이므로, 여기서만 두 칸을 고집하면 화면이 통째로 좁아진다. */

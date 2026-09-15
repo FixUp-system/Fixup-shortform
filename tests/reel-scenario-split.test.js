@@ -44,6 +44,24 @@ describe("②시나리오 — 글 ↔ 그림", () => {
     expect(감싼것을뺀다, "칸의 최소폭이 내용 크기다 — minmax(0, …) 로 감싸라").not.toMatch(/fr/);
   });
 
+  // ★★★ 2026-09-15 사장님 지적 — 「시나리오랑 이미지 비율이 안 맞아」.
+  //   실측: 같은 폭(554px)인데 글 522px · 그림 324px 였다. 스토리보드가 16:9 라
+  //   그 폭에서는 그 높이가 한계다(글 높이에 맞추려면 폭이 928px 필요).
+  //   그래서 **카드 바닥을 맞추고**(사장님 선택) 그림은 그 안에서 가운데에 선다.
+  it("★★★ 두 카드는 **같은 높이로** 선다 — 바닥이 맞는다", () => {
+    const base = ruleOf(".rv-split");
+    expect(base, ".rv-split 규칙이 없다").toBeTruthy();
+    // `align-items: start` 면 각자 제 높이로 서서 바닥이 어긋난다.
+    expect(base.body, "칸이 각자 제 높이로 선다 — 바닥이 어긋난다").not.toMatch(/align-items:\s*(start|flex-start)/);
+  });
+
+  it("★★ 그림은 늘어난 카드 **가운데**에 선다 — 위로 붙으면 아래가 빈 면으로 읽힌다", () => {
+    const r = ruleOf(".rv-split > .sheet-view");
+    expect(r, "격자 안 그림 규칙이 없다").toBeTruthy();
+    expect(r.body, "그림 카드가 안 늘어난다").toMatch(/align-self:\s*stretch/);
+    expect(r.body, "그림이 카드 안에서 가운데로 안 선다").toMatch(/align-items:\s*center/);
+  });
+
   it("★★★ 그림이 없으면 **한 칸**이다 — 빈 칸을 세우지 않는다", () => {
     const base = ruleOf(".rv-split");
     expect(base, ".rv-split 바탕 규칙이 없다").toBeTruthy();
