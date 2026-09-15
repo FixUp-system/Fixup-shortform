@@ -3701,10 +3701,22 @@ main.work:has(.rw-grid) { max-width: 1600px; }
    ★ 바탕 규칙(.rw-grid 의 align-items: start)은 **건드리지 않는다** — ②~⑥에서는 설정
      패널이 본문 길이를 따라 늘어나면 안 된다(빈 흰 기둥이 된다. 판까지 있는 자리다).
      그래서 이 화면에만 붙는 표식을 따로 둔다.
-   ★ 늘어난 높이는 **적는 칸이 가져간다** — 카드만 늘리면 아래가 빈 면이 된다. */
+   ★ 늘어난 높이는 **적는 칸이 가져간다** — 카드만 늘리면 아래가 빈 면이 된다.
+   ★★★ 2026-09-15 회귀 처방 — **글이 칸보다 길면 이동이 안 됐다**(사장님 지적: 1,000자를 넣으면 방향키로도 앞이 안 보인다).
+     `height: 100%` 로 카드를 레일 높이에 **묶고** 적는 칸을 `flex: 1`(= 1 1 0%)로 두자, 글 길이만큼 자라야 할 칸이
+     카드 안에 **눌려** 132px 에 머물렀고 — textarea.field 는 안에서 스크롤하지 않는 규칙(overflow-y: hidden)이라
+     넘친 글이 스크롤바도 없이 잘렸다(실측 2,810자 → 보이는 높이 132px).
+     ★ 카드는 레일 높이를 **최소**로 채우고 글이 길면 따라 자란다. 적는 칸은 남는 높이는 가져가되
+       **자기 글 높이 아래로는 안 줄어든다**(flex: 1 0 auto — 기준이 AutoTextarea 가 잰 높이다).
+     ★ 레일은 **제 높이에 선다**(align-self: start) — 글이 길어 줄이 높아지면 흰 설정 판이 같이 늘어 빈 기둥이 된다
+       (실측 1,704px 중 1,200px 가 빈 면). 줄 높이 = max(레일, 적는 칸)이라, 글이 짧으면 작업대가 레일 높이까지
+       늘어 **바닥은 여전히 맞는다.**
+     ★ 작업대는 세로 flex 다 — 카드가 늘어난 작업대의 **남는 높이를 flex 로** 가져간다. */
 .rw-grid--even { align-items: stretch; }
-.rw-grid--even .composer { height: 100%; }
-.rw-grid--even .composer textarea.composer-text { flex: 1; }
+.rw-grid--even > .rp-panel { align-self: start; }
+.rw-grid--even > .rw-work { display: flex; flex-direction: column; }
+.rw-grid--even .composer { flex: 1 0 auto; }
+.rw-grid--even .composer textarea.composer-text { flex: 1 0 auto; }
 /* 좁은 화면에서는 위아래로 쌓는다 — 300px 칸을 그대로 두면 작업대가 남은 폭에 눌려
    읽을 수 없고, 더 좁은 폭에서는 그 칸 하나가 화면보다 넓어진다.
    ★★★ 2026-09-14 Ruling 14 — 이 경계는 900px 이었고, **감으로 적은 수였다.**

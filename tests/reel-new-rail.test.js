@@ -84,6 +84,26 @@ describe("①입력 — 설정은 왼쪽 레일에", () => {
     expect(page, "하나뿐인 길이 줄을 아직 숨긴다").not.toMatch(/secondsForModel\(model\)\.length\s*>\s*1/);
   });
 
+  // ★★★ 2026-09-15 회귀 — **글이 칸보다 길면 이동이 안 됐다**(사장님: 1,000자를 넣으면 방향키로도 앞이 안 보인다).
+  //   카드를 레일 높이에 묶고(height: 100%) 적는 칸을 flex: 1(=1 1 0%)로 두자, 자라야 할 칸이 132px 에 눌리고
+  //   textarea.field 의 overflow-y: hidden 때문에 넘친 글이 잘렸다(실측 2,810자 → 132px).
+  it("★★★ 긴 글에서 적는 칸이 눌리지 않는다 — 카드는 최소로만 늘고, 칸은 제 글 높이 아래로 안 준다", () => {
+    expect(css, "카드를 레일 높이에 묶는다 — 긴 글이 잘린다").not.toMatch(/\.rw-grid--even \.composer\s*\{\s*height:\s*100%/);
+    expect(css).toMatch(/\.rw-grid--even > \.rw-work\s*\{\s*display:\s*flex;\s*flex-direction:\s*column;/);
+    expect(css).toMatch(/\.rw-grid--even \.composer\s*\{\s*flex:\s*1 0 auto;/);
+    expect(css, "적는 칸이 줄어들 수 있다(flex-shrink 1)").toMatch(/\.rw-grid--even \.composer textarea\.composer-text\s*\{\s*flex:\s*1 0 auto;/);
+  });
+
+  it("★★ 글이 길어도 설정 레일은 제 높이다 — 흰 판이 빈 기둥으로 늘지 않는다", () => {
+    expect(css).toMatch(/\.rw-grid--even > \.rp-panel\s*\{\s*align-self:\s*start;/);
+  });
+
+  // ★ 이 처방을 넣다가 주석 뒤에 글을 흘려 **다음 규칙이 통째로 무시됐다**(align-items: stretch 가 안 먹음).
+  //   판은 문자열로 재서 그런 CSS 도 초록이다 — 그래서 이 규칙 바로 앞이 주석의 끝인지 본다.
+  it("★ 바닥 맞춤 규칙 바로 앞에 흘린 글이 없다 — 있으면 브라우저가 그 규칙을 버린다", () => {
+    expect(css).toMatch(/\*\/\n\.rw-grid--even \{ align-items: stretch; \}/);
+  });
+
   it("★★★ 두 칸의 **바닥이 맞는다** — 이 화면에서만", () => {
     expect(page, "높이를 맞추는 표식이 없다").toContain("rw-grid--even");
     const m = /\.rw-grid--even\s*\{([^}]*)\}/.exec(css);
