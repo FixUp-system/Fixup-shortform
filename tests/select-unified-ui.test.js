@@ -42,6 +42,21 @@ describe("드롭다운 — 한 벌", () => {
     expect(rule(".dd::after")).toMatch(/border-top:/);
   });
 
+  // ★★★ 2026-09-15 사장님 지시("드롭다운 UI 를 좀 더 개선해줘") — ①입력 레일에 일곱이
+  //   나란히 서면서 **회색 덩어리**로 보였다(옛 바탕 --deep #EFEDE4).
+  //   ★ 바탕을 한 단계 밝히되 **칠은 남긴다** — 흰 카드 위에서 흰 칸은 "적을 수 있는 자리"로
+  //     안 읽힌다. 손을 올리면 흰색으로 밝아져 반응이 보인다.
+  //   ★ 잠긴 값도 **읽혀야 한다** — 0.4 는 너무 흐리다. 이 제품에서 잠긴 설정은 "무엇으로
+  //     만들었나"를 말하는 유일한 자리다(레일의 .rp-field.is-locked 가 .72 를 쓴다).
+  it("★★ 바탕은 카드보다 한 단계만 낮고, 잠겨도 읽힌다", () => {
+    expect(rule(".dd-input"), "바탕이 옛 회색 그대로다").toMatch(/background:\s*var\(--surface2\)/);
+    expect(rule(".dd-input:hover"), "손을 올려도 반응이 없다").toMatch(/background:/);
+    const dis = rule(".dd-input:disabled");
+    const m = /opacity:\s*([\d.]+)/.exec(dis);
+    expect(m, "잠김 흐리기가 없다").toBeTruthy();
+    expect(Number(m[1]), "잠긴 값이 너무 흐려 못 읽는다").toBeGreaterThanOrEqual(0.55);
+  });
+
   it("옛 세 벌의 규칙이 없다 — 주석에 남긴 이름은 경위라 세지 않는다", () => {
     const code = css.replace(/\/\*[\s\S]*?\*\//g, "");
     expect(code).not.toMatch(/\.cost-select/);

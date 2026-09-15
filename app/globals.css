@@ -982,16 +982,23 @@ a.side-item { text-decoration: none; }
   padding: 0 34px 0 12px;
   border: 1px solid var(--line);
   border-radius: var(--r-ctl);
-  background: var(--deep);
+  /* ★★★ 2026-09-15 — 바탕을 --deep(#EFEDE4)에서 한 단계 밝혔다. ①입력 레일에 일곱이
+     나란히 서면서 **회색 덩어리**로 보였다. 다만 **칠은 남긴다** — 흰 카드 위의 흰 칸은
+     "고를 수 있는 자리"로 안 읽힌다. */
+  background: var(--surface2);
   color: var(--ink);
   font-family: inherit;
   font-size: 14px;
   line-height: normal;
   cursor: pointer;
 }
-.dd-input:hover { border-color: var(--ink-soft); }
+/* 손을 올리면 흰색으로 밝아진다 — 테두리만 바뀌면 반응이 잘 안 보인다. */
+.dd-input:hover { border-color: var(--ink-soft); background: var(--surface); }
 .dd-input:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-.dd-input:disabled { opacity: 0.4; cursor: default; }
+/* ★★ 잠긴 값도 **읽혀야 한다** — 이 제품에서 잠긴 설정은 "무엇으로 만들었나"를 말하는
+   유일한 자리다(레일의 .rp-field.is-locked 가 .72 를 쓰는 것과 같은 이유).
+   0.4 는 너무 흐려 값이 안 읽혔다. */
+.dd-input:disabled { opacity: 0.6; cursor: default; }
 /* 목록은 브라우저가 그린다 — 바탕이 밝게 나오는 창이 있어 글자색을 함께 준다 */
 .dd-input option { background: var(--surface); color: var(--ink); }
 .dd::after {
@@ -1006,7 +1013,10 @@ a.side-item { text-decoration: none; }
   border-right: 4px solid transparent;
   border-top: 5px solid var(--ink-soft);
   pointer-events: none;
+  /* 손을 올린 칸의 삼각형도 함께 진해진다 — 칸과 표식이 따로 놀지 않게. */
+  transition: border-top-color .12s ease;
 }
+.dd:hover::after { border-top-color: var(--ink); }
 /* 여러 줄 칸 — 한 줄을 통째로 쓴다(크레딧 코드의 붙여 넣기 칸).
    ★ `.field` 를 달지 않는다 — textarea.field 는 **자라는 칸(AutoTextarea) 전용**이라 안에서 스크롤하지
      않는 것이 규칙이다(tests 가 막는다). 붙여 넣은 표는 수백 줄일 수 있어 스크롤하는 칸이 따로 필요하다. */
