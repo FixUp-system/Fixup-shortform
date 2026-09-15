@@ -17,6 +17,8 @@ import Link from "next/link";
 import { adModel } from "../../../lib/ad/models";
 import { modelIdForProject, resolutionForProject } from "../../../lib/clip-limits";
 import { archiveVideoUrl } from "../../../lib/archive/video";
+// 영상 비율 — 화면이 직접 적지 않는다. 값의 출처는 프로젝트 하나다(lib/aspects.js).
+import { aspectFor } from "../../../lib/aspects";
 // 사람이 읽는 값으로 옮기는 자리 — 화풍 라벨과 붙인 레퍼런스(lib/archive/spec.js).
 // 화면 안 삼항식으로 두면 값으로 잴 방법이 없다(옆 파일이 그 이유로 생겼다).
 import { styleLabelOf, archiveRefs } from "../../../lib/archive/spec";
@@ -266,6 +268,26 @@ function ArchiveDetailPageBody() {
   // ★ 붙인 사진 — 장수가 아니라 그림과 종류를 보여 준다.
   const refs = archiveRefs(doc);
 
+  // ★★★ 2026-09-15 사장님 지적 — **완성본 자리가 비율을 안 따라갔다.**
+  //   칩에는 「비율 16:9」가 떠 있는데 미리보기는 360×220 으로 서 있었다 — `--ar` 을
+  //   안 실어 CSS 기본값(9:16)으로 선 것이다. 완성본이 있었으면 360×640 검은 상자에
+  //   360×202 영상이 뗠 위아래가 438px 비었다.
+  // ★★ 처방은 이미 저장소에 있다 — SubtitleEditor·create/video 가 쓰는 것과 **같은 모양**이다.
+  //   바깥 칸은 `--ar`(가로/세로 숫자)로 폭을 정하고 — min(560, 640×ar) —
+  //   액자는 aspectRatio 로 CSS 에 박힌 9/16 을 덮는다.
+  //   ★ 둘 다 있어야 한다: 액자만 고치면 바깥이 360px 이라 가로 영상이 그 안에서 또 줄고,
+  //     바깥만 고치면 액자가 9:16 이라 상자가 세로로 길게 남는다.
+  //   ★ maxWidth 는 세로가 긴 비율에서 화면을 넘지 않게 하는 못이다(빼는 280 은
+  //     .preview-frame 의 실측값이다 — 2026-08-19 주석 참고).
+  // ★ aspectFor 는 모르는 값·빈 값이면 9:16 으로 떨어진다 — 옵션을 고르기 전의 옛 영상이
+  //   여기서 멈추면 보는 화면이 통째로 죽는다.
+  const aspect = aspectFor(s.aspect_ratio);
+  const previewStyle = { "--ar": aspect.width / aspect.height };
+  const frameStyle = {
+    aspectRatio: `${aspect.width} / ${aspect.height}`,
+    maxWidth: `calc((100vh - 280px) * ${aspect.width} / ${aspect.height})`,
+  };
+
   return (
     <>
       <h1 className="pgtitle">
@@ -324,9 +346,9 @@ function ArchiveDetailPageBody() {
           </div>
 
           {/* 완성본 — 아직 없으면 그 자리를 비워 두지 않고 그렇게 말한다 */}
-          <div className="preview-pane done-preview">
+          <div className="preview-pane done-preview" style={previewStyle}>
             {video ? (
-              <div className="preview-frame">
+              <div className="preview-frame" style={frameStyle}>
                 <video className="preview-video" controls src={video} />
               </div>
             ) : (
