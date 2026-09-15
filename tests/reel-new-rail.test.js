@@ -87,15 +87,35 @@ describe("①입력 — 설정은 왼쪽 레일에", () => {
   // ★★★ 2026-09-15 회귀 — **글이 칸보다 길면 이동이 안 됐다**(사장님: 1,000자를 넣으면 방향키로도 앞이 안 보인다).
   //   카드를 레일 높이에 묶고(height: 100%) 적는 칸을 flex: 1(=1 1 0%)로 두자, 자라야 할 칸이 132px 에 눌리고
   //   textarea.field 의 overflow-y: hidden 때문에 넘친 글이 잘렸다(실측 2,810자 → 132px).
-  it("★★★ 긴 글에서 적는 칸이 눌리지 않는다 — 카드는 최소로만 늘고, 칸은 제 글 높이 아래로 안 준다", () => {
-    expect(css, "카드를 레일 높이에 묶는다 — 긴 글이 잘린다").not.toMatch(/\.rw-grid--even \.composer\s*\{\s*height:\s*100%/);
-    expect(css).toMatch(/\.rw-grid--even > \.rw-work\s*\{\s*display:\s*flex;\s*flex-direction:\s*column;/);
-    expect(css).toMatch(/\.rw-grid--even \.composer\s*\{\s*flex:\s*1 0 auto;/);
-    expect(css, "적는 칸이 줄어들 수 있다(flex-shrink 1)").toMatch(/\.rw-grid--even \.composer textarea\.composer-text\s*\{\s*flex:\s*1 0 auto;/);
+  //   ★★★ 처방은 **칸 안 스크롤**이다(사장님 결정 — 한 번 "글만큼 자라게" 했다가 바꿨다: 자료가 2만 자라
+  //     [시작하기]가 멀어지고 설정이 화면 밖으로 밀리고 바닥 맞추기가 깨졌다).
+  it("★★★ 이 칸만 안에서 굴린다 — 넘친 글이 잘리지 않는다", () => {
+    expect(css).toMatch(/\.rw-grid--even \.composer textarea\.composer-text \{\s*overflow-y:\s*auto;/);
+    expect(css, "끝까지 굴려도 페이지가 따라 움직인다").toMatch(/\.rw-grid--even \.composer textarea\.composer-text \{[^}]*overscroll-behavior:\s*contain;/);
   });
 
-  it("★★ 글이 길어도 설정 레일은 제 높이다 — 흰 판이 빈 기둥으로 늘지 않는다", () => {
-    expect(css).toMatch(/\.rw-grid--even > \.rp-panel\s*\{\s*align-self:\s*start;/);
+  it("★★ 공용 textarea.field 는 여전히 자라는 칸이다 — 예외는 이 화면의 이 칸뿐", () => {
+    const rule = /\ntextarea\.field \{([^}]*)\}/.exec(css);
+    expect(rule?.[1]).toMatch(/overflow-y:\s*hidden/);
+  });
+
+  it("★★★ 넓은 화면 — 줄 높이는 레일이 정하고, 카드·칸은 남는 높이를 나눠 갖는다", () => {
+    const wide = css.slice(css.indexOf("@media (min-width: 1241px)"));
+    const block = wide.slice(0, wide.indexOf("\n}"));
+    expect(block, "작업대 내용이 줄 높이를 밀어 올린다").toMatch(/\.rw-grid--even > \.rw-work \{ contain: size; \}/);
+    expect(block).toMatch(/\.rw-grid--even \.composer \{ flex: 1 1 0; min-height: 0; \}/);
+    // min-height 가 auto 면 AutoTextarea 의 인라인 높이(글 전체)가 최소 크기로 잡혀 다시 늘어난다.
+    expect(block).toMatch(/textarea\.composer-text \{ flex: 1 1 0; min-height: 132px; \}/);
+    expect(css, "옛 처방(글만큼 자람)이 남아 있다").not.toMatch(/\.rw-grid--even \.composer\s*\{\s*flex:\s*1 0 auto/);
+  });
+
+  it("★★ 좁은 화면 — 쌓이므로 contain 을 안 걸고, 상한에서 굴린다", () => {
+    expect(css).toMatch(/@media \(max-width: 1240px\) \{\s*\.rw-grid--even \.composer textarea\.composer-text \{ max-height: min\(60vh, 520px\); \}/);
+  });
+
+  it("★ 막대는 바탕(--deep)에서 보이는 색이다 — --line 은 바탕과 거의 같아 안 보였다", () => {
+    const thumb = /textarea\.composer-text::-webkit-scrollbar-thumb \{ background: ([^;]+); \}/.exec(css);
+    expect(thumb?.[1]).toMatch(/color-mix\(in srgb, var\(--ink-soft\)/);
   });
 
   // ★ 이 처방을 넣다가 주석 뒤에 글을 흘려 **다음 규칙이 통째로 무시됐다**(align-items: stretch 가 안 먹음).
