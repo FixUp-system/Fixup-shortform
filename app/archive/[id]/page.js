@@ -21,7 +21,7 @@ import { archiveVideoUrl } from "../../../lib/archive/video";
 import { aspectFor } from "../../../lib/aspects";
 // 사람이 읽는 값으로 옮기는 자리 — 화풍 라벨과 붙인 레퍼런스(lib/archive/spec.js).
 // 화면 안 삼항식으로 두면 값으로 잴 방법이 없다(옆 파일이 그 이유로 생겼다).
-import { styleLabelOf, archiveRefs } from "../../../lib/archive/spec";
+import { styleLabelOf, archiveRefs, previewRatio } from "../../../lib/archive/spec";
 // 한 번에 굽는 영상의 단계 표 — 주소는 여기서만 만든다(화면이 손으로 적으면 표와 갈린다).
 import { FILM_STEPS, filmStepHref, currentFilmStepKey } from "../../../lib/film/steps";
 import { PICKABLE_FILM_MODES } from "../../../lib/film/mode";
@@ -140,6 +140,8 @@ function ArchiveDetailPageBody() {
   const { id } = useParams();
   const [doc, setDoc] = useState(null);
   const [err, setErr] = useState("");
+  // 완성본 파일의 실제 크기 — 불러온 뒤에 안다(아래 previewRatio). ★ 훅이라 아래 조기 return 들보다 앞에 둔다.
+  const [media, setMedia] = useState({ src: null, width: 0, height: 0 });
 
   useEffect(() => {
     let alive = true;
@@ -282,10 +284,18 @@ function ArchiveDetailPageBody() {
   // ★ aspectFor 는 모르는 값·빈 값이면 9:16 으로 떨어진다 — 옵션을 고르기 전의 옛 영상이
   //   여기서 멈추면 보는 화면이 통째로 죽는다.
   const aspect = aspectFor(s.aspect_ratio);
-  const previewStyle = { "--ar": aspect.width / aspect.height };
+  // ★★ 2026-09-15 사장님 지적 — **영상 아래에 여백 띠가 생겼다.** 액자는 고른 비율(9:16)인데 파일이 몇 픽셀
+  //   어긋나 contain 이 남긴 자리가 액자 바탕색으로 보였다. 파일을 불러오면 액자를 **파일의 비율**로 맞춘다
+  //   (previewRatio). 그 전·실패 때는 고른 비율 그대로다. 주소가 바뀌면 옛 크기를 안 쓴다(src 로 가른다).
+  const ratio = previewRatio(aspect, media.src === video ? media : null);
+  const previewStyle = { "--ar": ratio.width / ratio.height };
+  // ★ 테두리 1px 는 **바깥 링**(box-shadow)으로 바꾼다 — aspect-ratio 가 테두리까지 포함한 상자에 걸려,
+  //   파일 비율에 맞춰도 안쪽이 2px 어긋나 1.5px 띠가 남았다(실측). 링은 자리를 안 먹는다(.panel 과 같은 처방).
   const frameStyle = {
-    aspectRatio: `${aspect.width} / ${aspect.height}`,
-    maxWidth: `calc((100vh - 280px) * ${aspect.width} / ${aspect.height})`,
+    aspectRatio: `${ratio.width} / ${ratio.height}`,
+    maxWidth: `calc((100vh - 280px) * ${ratio.width} / ${ratio.height})`,
+    border: 0,
+    boxShadow: "0 0 0 1px var(--line)",
   };
 
   return (
@@ -349,7 +359,8 @@ function ArchiveDetailPageBody() {
           <div className="preview-pane done-preview" style={previewStyle}>
             {video ? (
               <div className="preview-frame" style={frameStyle}>
-                <video className="preview-video" controls src={video} />
+                <video className="preview-video" controls src={video}
+                  onLoadedMetadata={(e) => setMedia({ src: video, width: e.currentTarget.videoWidth, height: e.currentTarget.videoHeight })} />
               </div>
             ) : (
               // 자리를 비워 두지 않는다 — 글자만 남으면 이 칸이 글자 높이로 쪼그라들어

@@ -22,6 +22,29 @@ const code = src
 
 const css = readFileSync("app/globals.css", "utf8");
 
+// ★★★ 같은 날 뒤이어 사장님 지적 — **영상 아래에 여백 띠가 생긴다.** 액자는 고른 비율(9:16)인데 파일이 몇 픽셀
+//   어긋나(실측 293×520 액자에 291×508 영상) contain 이 남긴 11px 가 액자 바탕색으로 보였다.
+//   영상은 자르지 않고(contain 계약 — tests/subtitle-ui.test.js) **액자를 파일 비율에 맞춘다.**
+describe("보관함 상세 — 액자가 파일의 실제 비율을 따른다", () => {
+  it("★★★ previewRatio — 파일 크기를 알면 그것, 모르면 고른 비율", async () => {
+    const { previewRatio } = await import("../lib/archive/spec.js");
+    const nineSixteen = { width: 1080, height: 1920 };
+    expect(previewRatio(nineSixteen, { width: 720, height: 1256 })).toEqual({ width: 720, height: 1256 });
+    expect(previewRatio(nineSixteen, null)).toEqual({ width: 1080, height: 1920 });
+    expect(previewRatio(nineSixteen, { width: 0, height: 0 })).toEqual({ width: 1080, height: 1920 });
+  });
+
+  it("★★ 영상을 불러오면 크기를 적고, 액자·바깥 칸이 그 비율을 쓴다", () => {
+    expect(code).toMatch(/onLoadedMetadata=\{\(e\) => setMedia\(\{ src: video, width: e\.currentTarget\.videoWidth, height: e\.currentTarget\.videoHeight \}\)\}/);
+    expect(code, "주소가 바뀌어도 옛 크기를 쓴다").toMatch(/previewRatio\(aspect, media\.src === video \? media : null\)/);
+    expect(code).toMatch(/aspectRatio: `\$\{ratio\.width\} \/ \$\{ratio\.height\}`/);
+  });
+
+  it("★ 영상은 여전히 자르지 않는다(contain) — 여백은 액자로 없앤다", () => {
+    expect(css).toMatch(/\.done-preview \.preview-video \{ object-fit: contain; \}/);
+  });
+});
+
 describe("보관함 상세 — 완성본 자리의 비율", () => {
   it("★★★ 비율표를 여기서 다시 적지 않는다 — lib/aspects 하나를 본다", () => {
     expect(code, "aspectFor 를 안 쓴다").toContain("aspectFor");
