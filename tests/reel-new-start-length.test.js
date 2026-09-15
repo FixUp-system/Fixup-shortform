@@ -47,4 +47,15 @@ describe("①입력 화면 — 버튼과 보내는 값이 같은 판정을 쓴�
   it("★★ 서버로도 같은 값을 보낸다 — 버튼은 열렸는데 target_seconds:null 로 400 이 나면 안 된다", () => {
     expect(page).toMatch(/target_seconds: seconds/);
   });
+
+  // ★★ 사장님 지시 — "길이도 그냥 똑같이 보여줘". 선택지가 하나여도 줄을 숨기지 않는다.
+  it("★★★ 길이 줄은 선택지 수와 무관하게 늘 그린다", () => {
+    expect(page, "길이 줄이 아직 선택지 수에 따라 숨는다").not.toMatch(/secondsForModel\(model\)\.length > 1 &&/);
+    expect(page).toMatch(/aria-label="길이"/);
+  });
+
+  it("★★ 보이는 값이 실제로 실리는 값이다 — 안 골랐으면 「길이 선택」", () => {
+    expect(page).toMatch(/<Select value=\{seconds \?\? ""\}[^>]*aria-label="길이"/);
+    expect(page).toMatch(/\{seconds === null && <option value="" disabled>길이 선택<\/option>\}/);
+  });
 });

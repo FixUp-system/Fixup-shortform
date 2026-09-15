@@ -275,22 +275,24 @@ export default function ReelNewPage() {
               </div>
             </div>
 
-            {/* ★ 고를 게 하나뿐이면 **줄을 안 그린다**(2026-09-15) — 누를 수 없는 칩 하나가
-                줄을 차지한다. 모델을 바꿔 선택지가 늘면 다시 나타난다. */}
-            {secondsForModel(model).length > 1 && (
+            {/* ★★ 2026-09-15 사장님 지시 — **길이는 선택지가 하나여도 보인다**("길이도 그냥 똑같이 보여줘").
+                같은 날 오전에는 고를 게 하나뿐이면 줄을 숨겼는데, 그러면 영상이 몇 초로 만들어지는지
+                화면 어디에도 안 보이고 [시작하기] 잠금과도 어긋났다(tests/reel-new-start-length.test.js).
+                ★ 보이는 값은 pickedSeconds(seconds) 다 — 하나뿐이면 그 값이 선택된 채로 보인다.
+                  둘 이상인데 아직 안 골랐으면 「길이 선택」이 보인다(첫 칸이 고른 것처럼 보이면 안 된다). */}
             <div className="tray-row">
               <span className="tray-label">길이</span>
               <div className="tray-col">
                 {/* ★ 크레딧 표기는 없다(2026-08-25 사장님 지시 — "일단 제거"). */}
-                <Select value={target ?? ""} disabled={locked} aria-label="길이"
+                <Select value={seconds ?? ""} disabled={locked} aria-label="길이"
                   onChange={(e) => setTarget(Number(e.target.value))}>
+                  {seconds === null && <option value="" disabled>길이 선택</option>}
                   {secondsForModel(model).map((s) => (
                     <option key={s} value={s}>{s}초</option>
                   ))}
                 </Select>
               </div>
             </div>
-            )}
 
             <div className="tray-row">
               <span className="tray-label">화풍</span>
