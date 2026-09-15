@@ -190,6 +190,16 @@ export default function ProjectCards({ projects, limit, onDeleted, selecting, se
               <span className="project-thumb">
                 <Thumb video={p.video_url} image={p.image_url} alt={p.title || "만든 영상"} />
                 {p.video_url && <span className="thumb-tag">영상</span>}
+                {/* ★★★ 2026-09-15 사장님 결정 — 여기 있던 「제목」은 제목이 아니었다.
+                    `material_text.slice(0, 100)`, 즉 사장님이 적은 원문 앞머리라
+                    비슷한 편끼리는 똑같이 잘려 **구별에 도움이 안 됐다.** 그래서 만든 날짜를 둔다.
+                    ★ 자리는 **썸네일 왼쪽 아래**다 — 배지 줄에 두니 성격이 다른 둘이 한 줄에 서서
+                      이질감이 났다(사장님 지적). 모양은 「영상」 태그와 한 벌이다.
+                    ★ 말을 만드는 일은 lib/archive/spec.js 가 한다(화면은 그리기만).
+                    ★ 모르는 날짜면 빈 태그를 안 그린다 — 검은 점만 떠 있게 된다. */}
+                {madeOnLabel(p.created_ts) && (
+                  <span className="thumb-tag when">{madeOnLabel(p.created_ts)}</span>
+                )}
                 {/* ★ 남이 만든 카드에는 쓰기 버튼을 아예 안 그린다(mine === false) —
                     눌러도 404 인 버튼을 그리면 "왜 안 되지"만 남는다. 목록에 mine 이 없는
                     옛 호출부(홈)는 지금 그대로다.
@@ -217,13 +227,6 @@ export default function ProjectCards({ projects, limit, onDeleted, selecting, se
                 )}
               </span>
               <span className="project-meta">
-                {/* ★★★ 2026-09-15 사장님 결정 — 여기 있던 「제목」은 제목이 아니었다.
-                    `material_text.slice(0, 100)`, 즉 사장님이 적은 원문 앞머리라
-                    비슷한 편끼리는 똑같이 잘려 **구별에 도움이 안 됐다.**
-                    ★ 그렇다고 줄을 비우지는 않는다 — 썸네일이 아직 없는 카드가 많아
-                      비우면 카드를 가를 단서가 배지 둘뿐이 된다.
-                    ★ 말을 만드는 일은 lib/archive/spec.js 가 한다(화면은 그리기만). */}
-                <span className="when">{madeOnLabel(p.created_ts)}</span>
                 {/* ★★★ 2026-09-03 사장님 지시 — **어느 모드로 만든 것인지 카드가 말한다.**
                     그전에는 광고(원클릭)와 film(한 번에)에만 배지가 붙고 **단계별은 아무
                     표시가 없어서**, 배지 없는 카드가 "단계별"인지 "옛 문서라 종류를 모르는

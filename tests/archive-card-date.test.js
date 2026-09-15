@@ -50,7 +50,16 @@ describe("보관함 카드 — 제목 자리", () => {
   it("★★★ 그 자리에 만든 날짜가 온다", () => {
     expect(cards, "madeOnLabel 을 안 쓴다").toContain("madeOnLabel");
     expect(cards, "lib/archive/spec 에서 안 가져온다").toMatch(/from\s+["'][^"']*archive\/spec/);
-    expect(cards, "카드가 날짜를 안 그린다").toMatch(/className="when"/);
+    expect(cards, "카드가 날짜를 안 그린다").toMatch(/className="thumb-tag when"/);
+  });
+
+  // ★★★ 2026-09-15 사장님 결정 — 날짜는 배지 줄이 아니라 **썸네일 왼쪽 아래**다.
+  //   날짜(언제)와 배지(무엇·상태)가 한 줄에 서니 이질감이 났다.
+  it("★★★ 날짜는 썸네일 안에 서고, 배지 줄에는 없다", () => {
+    const thumbAt = cards.indexOf('className="project-thumb"');
+    const metaAt = cards.indexOf('className="project-meta"');
+    const whenAt = cards.indexOf("thumb-tag when");
+    expect(whenAt > thumbAt && whenAt < metaAt, "날짜가 아직 배지 줄에 있다").toBe(true);
   });
 
   it("★★ 날짜를 화면에서 손으로 만들지 않는다 — 자리마다 모양이 갈린다", () => {
@@ -63,25 +72,27 @@ describe("보관함 카드 — 제목 자리", () => {
 });
 
 describe("보관함 카드 CSS — 자리를 옮긴다", () => {
-  it("★ 날짜 줄에 규칙이 있다", () => {
-    expect(css.indexOf(".project-meta .when"), ".project-meta .when 규칙이 없다").toBeGreaterThan(-1);
+  const pick = (sel) => {
+    const at = css.indexOf(`\n${sel} {`);
+    return at < 0 ? "" : css.slice(at, css.indexOf("\n}", at));
+  };
+
+  it("★★ 날짜는 「영상」 태그와 한 벌이고 자리만 아래로 옮긴다", () => {
+    const when = pick(".thumb-tag.when");
+    expect(when, ".thumb-tag.when 규칙이 없다").not.toBe("");
+    expect(when).toMatch(/bottom:\s*8px/);
+    expect(when, "위 자리(top)를 안 풀었다 — 「영상」 태그와 겹친다").toMatch(/top:\s*auto/);
   });
 
-  // ★★ 2026-09-15 사장님 지시 — 날짜 글자는 배지(라벨)와 같고, 줄은 가로 가운데다.
-  it("★★ 날짜 글자가 배지와 같다 — 크기·굵기·자간", () => {
-    const pick = (sel) => {
-      const at = css.indexOf(`\n${sel} {`);
-      return css.slice(at, css.indexOf("\n}", at));
-    };
-    const when = pick(".project-meta .when");
-    const badge = pick(".badge");
-    for (const prop of ["font-size", "font-weight", "letter-spacing"]) {
-      const v = (s) => s.match(new RegExp(`${prop}:\\s*([^;]+);`))?.[1];
-      expect(v(when), `${prop} 가 배지와 다르다`).toBe(v(badge));
-    }
+  it("★★ 날짜는 접히지 않는다 — 좁은 카드에서 「8월 28 / 일」이 됐다", () => {
+    expect(pick(".thumb-tag.when")).toMatch(/white-space:\s*nowrap/);
   });
 
-  it("★★ 날짜 · 배지 줄은 가로 가운데로 선다", () => {
+  it("★ 배지 줄의 옛 날짜 규칙·구분점은 걷었다", () => {
+    expect(css.indexOf(".project-meta .when"), "옛 규칙이 남아 있다").toBe(-1);
+  });
+
+  it("★★ 배지 줄은 가로 가운데로 선다", () => {
     const at = css.indexOf("\n.project-meta {");
     expect(css.slice(at, css.indexOf("}", at))).toMatch(/justify-content:\s*center/);
   });
