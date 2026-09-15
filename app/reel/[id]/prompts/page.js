@@ -126,7 +126,10 @@ export default function ReelPromptsPage() {
   const videoStep = REEL_STEPS.find((s) => s.key === "video");
 
   return (
-    <section className="panel panel--wide">
+    /* ★★★ 2026-09-15 — ②시나리오와 **같은 틀**이다(B안). 왼쪽은 고치는 글, 오른쪽은
+       기계가 내놓은 그림. 두 화면이 같은 일을 하는데 배치가 다르면 손이 화면마다 다시
+       배워야 한다(이 화면이 ②와 "같은 형식"을 지켜 온 이유 — 2026-08-25·08-27 사장님 지시). */
+    <section className={`panel panel--wide rv-page${sheetUrl ? " rv-wide" : ""}`}>
       <h2>영상 프롬프트</h2>
       {/* ★ 이 단계를 따로 둔 이유 — 브리프의 요구대로 사장님 말로 적는다. */}
       {err && <p className="pgsub warn">{err}</p>}
@@ -137,12 +140,11 @@ export default function ReelPromptsPage() {
         /* ── 통짜 갈래 — 스토리보드 한 장 + 프롬프트 하나 ─────────────────
            ★ 컷별 목록을 안 그린다. 이 갈래에는 컷별 프롬프트가 **아예 없다** —
              보여 주면 사장님이 고칠 수 있는 것처럼 보이는데 굽기는 안 읽는다. */
-        <section className="panel">
-          {sheetUrl && (
-            <div className="sheet-view">
-              <img src={sheetUrl} alt="스토리보드" />
-            </div>
-          )}
+        <>
+          {/* ★ 안쪽 카드(<section className="panel">)를 걷었다 — 겉이 이미 카드라
+              보드 안에 보드가 앉아 테두리가 두 겹이었다(②에서 같은 것을 되돌린 자리). */}
+          <div className={`rv-split${sheetUrl ? " is-two" : ""}`}>
+            <div className="rv-read">
 
           {/* ★★ ②시나리오와 **같은 형식**이다(2026-08-25 사장님 지시):
               결과는 읽는 글로 보여 주고(.script-src), 고치는 것은 아래에서 **한국어로
@@ -158,6 +160,13 @@ export default function ReelPromptsPage() {
           ) : (
             <PromptWithKo text={whole} ko={project?.reel?.prompt_ko} />
           )}
+            </div>
+            {sheetUrl && (
+              <div className="sheet-view">
+                <img src={sheetUrl} alt="스토리보드" />
+              </div>
+            )}
+          </div>
 
           {/* ★ 한국어로 고쳐 달라고 적는 자리 — ②·③와 같은 모양이다.
               요청은 makeAll() 이 실어 보낸다(안 실으면 지문이 예전과 글자 그대로다). */}
@@ -182,7 +191,7 @@ export default function ReelPromptsPage() {
               </button>
             </div>
           </div>
-        </section>
+        </>
       ) : saving === "all" ? (
         /* ★ 컷별 갈래도 같은 규칙이다 — 다시 쓰는 동안에는 옛 지문을 안 보여 주고
            이 한 줄만 말한다(②시나리오·위 통짜 갈래와 같은 모양). */

@@ -163,7 +163,13 @@ export default function ReelDonePage() {
   const lang = project?.settings?.subtitle_lang || speechLangOf(project);
 
   return (
-    <section className="panel panel--wide">
+    /* ★★★ 2026-09-15 — 이 화면은 **이미 두 칸**이었다(자막 조절판 ↔ 영상). 새로 짤 것이
+       없고 폭만 모자랐다: 무대가 필요한 폭은 335 + 24 + 560 = **919px** 인데 카드가
+       880 에 갇혀 안쪽이 832px 였다. 2026-09-03 에 "영역을 벗어나고 있고"로 잡힌 그 자리이고,
+       그때는 줄어들 수 있게 해서 넘침만 막았다 — 근본은 폭이었다.
+       ⚠️ `{...}` 로 감싼 JSX 주석을 쓰면 **뿌리가 둘**이 되어 빌드가 깨진다(방금 겪었다).
+          return 의 첫 줄에는 plain JS 주석을 쓴다. */
+    <section className="panel panel--wide rv-wide">
       <h2>완성</h2>
       {err && <p className="pgsub warn">{err}</p>}
       {/* ★ 이 단계(합성)의 오류만 읽는다 — ⑤영상의 실패가 여기 뜨면 안 된다. */}

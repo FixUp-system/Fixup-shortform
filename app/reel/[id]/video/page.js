@@ -200,7 +200,9 @@ export default function ReelVideoPage() {
   );
 
   return (
-    <section className="panel panel--wide">
+    /* ★★★ 2026-09-15 — 겉틀을 ②④와 같은 것으로(B안). 이 화면이 이번 개편의 핵심이다:
+       왼쪽은 **내가 시킨 것**(스토리보드), 오른쪽은 **나온 것**(영상). */
+    <section className={`panel panel--wide rv-page${playing?.video?.url && sheetUrl ? " rv-wide" : ""}`}>
       {/* ★★ 2026-09-03 사장님 지시 — 낡았으면 **제목 옆에서** 말한다.
           그전에는 재생기 아래에 "그림이나 시나리오가 바뀌었어요 — 다시 만들어 주세요"라는
           두 마디가 있었는데, 무엇이 바뀌었는지는 사장님이 방금 한 일이라 이미 알고
@@ -260,23 +262,20 @@ export default function ReelVideoPage() {
       {/* ★ 만들어진 영상은 **여기서 튼다**. 옛 화면은 86px 썸네일뿐이라 ⑥완성까지 가야
           볼 수 있었다. 통짜는 한 편이니 그것을, 컷별은 **고른 컷**을 큰 자리에 튼다.
           ★ 자동재생은 안 건다 — 소리가 있어 화면에 들어서자마자 울린다. */}
-      {playing?.video?.url && (
-        <video
-          className="vid-result vid-result--center"
-          key={playing.video.url}
-          src={playing.video.url}
-          controls
-          playsInline
-          preload="metadata"
-        />
-      )}
 
       {/* ★★ 통짜 갈래에서 **영상이 나온 뒤에는 이 칸을 안 그린다**(2026-08-25 사장님 지시).
           위에 재생기가 서 있는데 그 아래 86px 네모가 같은 것을 한 번 더 보여 주고 있었다.
           굽기 전·굽는 중에만 남긴다 — 그때는 보여 줄 것이 스토리보드뿐이라 이 칸이 유일하다.
           ★ 컷별 갈래의 썸네일은 그대로 둔다 — 그것은 중복이 아니라 **고르는 자리**다. */}
+      {/* ★★★ 2026-09-15 — **2026-08-25 지시를 뒤집는다.** 그때는 "영상이 나온 뒤에는 이
+          칸을 안 그린다"였다 — 재생기 아래 **86px 네모**가 같은 것을 한 번 더 보여 주는
+          중복이었기 때문이다. 지금 그 칸은 86px 가 아니라 **나란히 선 큰 그림**이고, 하는
+          일도 중복이 아니라 **대조**다("내가 그린 대로 나왔나"). 전제가 바뀌어 되살린다.
+          ★ 되돌리려면 tests/reel-video-split.test.js 를 지우고 `!cuts[0]?.video?.url &&` 를
+            되살리면 된다. */}
       {oneShot ? (
-        !cuts[0]?.video?.url && sheetUrl && (
+        <div className={`rv-split${playing?.video?.url && sheetUrl ? " is-two" : ""}`}>
+        {sheetUrl && (
           /* ★★★ 2026-09-14 밤 — 여기는 `.up`(86×86 · cover)이었다. 스토리보드 한 장이
              그 안에 들어가 칸 하나가 ~28px 이라 무엇이 그려졌는지 알 수 없었고 가장자리도
              잘렸다(사장님 지적 · 2026-08-28 에 이미 적어 둔 건). ③·④가 쓰는 `.sheet-view`
@@ -294,7 +293,18 @@ export default function ReelVideoPage() {
               <div className="frame-busy"><span className="spinner" aria-hidden="true" /></div>
             )}
           </div>
-        )
+        )}
+        {playing?.video?.url && (
+          <video
+            className="vid-result"
+            key={playing.video.url}
+            src={playing.video.url}
+            controls
+            playsInline
+            preload="metadata"
+          />
+        )}
+        </div>
       ) : cuts.length > 0 && (
         <div className="uploads">
           {cuts.map((c) => (
