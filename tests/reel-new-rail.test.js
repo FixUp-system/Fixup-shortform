@@ -61,6 +61,30 @@ describe("①입력 — 설정은 왼쪽 레일에", () => {
     expect(page, "잠김 안내가 없다").toMatch(/잠겨요|잠깁니다|잠긴다/);
   });
 
+  // ★★★ 2026-09-15 사장님 지시 — 「이 영상의 설정에 사이즈에 맞춰서 입력 폼도 유지」.
+  //   실측: 레일 355px · 적는 칸 135px 로 바닥이 크게 어긋났다. ②에서 글·그림 카드를
+  //   맞춘 것과 같은 요구다.
+  //   ★ `.rw-grid` 를 통째로 stretch 로 바꾸면 안 된다 — ②~⑥에서는 **설정 패널이 본문
+  //     길이를 따라 늘어나면 안 된다**(빈 흰 기둥이 된다). 거기엔 판까지 있다
+  //     (reel-workbench-layout 의 「왼쪽 설정 패널은 작업대 길이를 따라 늘어나지 않는다」).
+  //     그래서 **이 화면에서만** 여는 표식을 따로 둔다.
+  it("★★★ 두 칸의 **바닥이 맞는다** — 이 화면에서만", () => {
+    expect(page, "높이를 맞추는 표식이 없다").toMatch(/rw-grid[^"`]*rw-grid--even/);
+    const m = /\.rw-grid--even\s*\{([^}]*)\}/.exec(css);
+    expect(m, "그 표식의 규칙이 없다").toBeTruthy();
+    expect(m[1], "바닥을 안 맞춘다").toMatch(/align-items:\s*stretch/);
+    // ②~⑥ 의 바탕 규칙은 그대로 start 여야 한다.
+    const base = /\.rw-grid\s*\{([^}]*)\}/.exec(css);
+    expect(base[1], "바탕 격자가 stretch 가 됐다 — ②~⑥의 설정 패널이 빈 기둥이 된다")
+      .toMatch(/align-items:\s*start/);
+  });
+
+  it("★★ 늘어난 높이는 **적는 칸이 가져간다** — 빈 면을 늘리지 않는다", () => {
+    const m = /\.rw-grid--even[^{]*\.composer-text\s*\{([^}]*)\}/.exec(css);
+    expect(m, "적는 칸이 남는 높이를 안 가져간다 — 카드 아래가 빈 면이 된다").toBeTruthy();
+    expect(m[1], "늘어나지 않는다").toMatch(/flex:\s*1|height:\s*100%/);
+  });
+
   it("★★ 레일 안에서는 줄이 **세로로** 선다 — 340px 에 라벨과 칩을 나란히 못 둔다", () => {
     const m = /\.rp-panel\s+\.tray-row\s*\{([^}]*)\}/.exec(css);
     expect(m, "레일 안 줄 규칙이 없다").toBeTruthy();

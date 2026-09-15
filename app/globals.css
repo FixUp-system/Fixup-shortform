@@ -3641,6 +3641,15 @@ main.work:has(.rw-grid) { max-width: 1600px; }
 .rw-grid { display: grid; grid-template-columns: 340px minmax(0, 1fr);
   gap: var(--sp-5); align-items: start; }
 .rw-work { min-width: 0; }
+/* ★★★ 2026-09-15 사장님 지시 — ①입력에서만 **두 칸의 바닥을 맞춘다**(레일 355px ·
+   적는 칸 135px 로 크게 어긋나 있었다).
+   ★ 바탕 규칙(.rw-grid 의 align-items: start)은 **건드리지 않는다** — ②~⑥에서는 설정
+     패널이 본문 길이를 따라 늘어나면 안 된다(빈 흰 기둥이 된다. 판까지 있는 자리다).
+     그래서 이 화면에만 붙는 표식을 따로 둔다.
+   ★ 늘어난 높이는 **적는 칸이 가져간다** — 카드만 늘리면 아래가 빈 면이 된다. */
+.rw-grid--even { align-items: stretch; }
+.rw-grid--even .composer { height: 100%; }
+.rw-grid--even .composer textarea.composer-text { flex: 1; }
 /* 좁은 화면에서는 위아래로 쌓는다 — 300px 칸을 그대로 두면 작업대가 남은 폭에 눌려
    읽을 수 없고, 더 좁은 폭에서는 그 칸 하나가 화면보다 넓어진다.
    ★★★ 2026-09-14 Ruling 14 — 이 경계는 900px 이었고, **감으로 적은 수였다.**

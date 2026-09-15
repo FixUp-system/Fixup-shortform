@@ -234,7 +234,7 @@ export default function ReelNewPage() {
             설정」 레일이 서 있다. 격자도 **같은 것**(.rw-grid)을 써서 레일의 x 좌표가 한
             픽셀도 안 움직인다 — 시작하는 순간 그 레일이 그대로 「잠김」을 말하는 레일이 된다.
           ★ 줄 자체는 **옮기기만** 했다 — 각 줄에 붙은 사정(주석)이 많아 다시 쓰는 것이 더 위험하다. */}
-      <div className="rw-grid">
+      <div className="rw-grid rw-grid--even">
         <aside className="rp-panel">
           <div className="rp-head">이 영상의 설정</div>
           <div className="rp-body">
