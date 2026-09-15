@@ -139,7 +139,7 @@ export default function ReelScenarioPage() {
          ("규격이나 배치도 통일 시켜줘"). 두 칸이 되면서 그 전제가 깨졌다 — 광고는
          한 칸 880 이고 여기는 두 칸이라 1,180 이다. tests/scene-card-unified.test.js 에
          그 사정을 적어 뒀다. 광고 화면은 손대지 않았다. */
-    <section className="panel panel--wide rv-page">
+    <section className={`panel panel--wide rv-page${sheetUrl ? " rv-wide" : ""}`}>
       {err && <p className="pgsub warn">{err}</p>}
       {/* ★★ 무슨 일이 일어나는지 말하는 자리는 **여기 하나**다(2026-08-27 사장님 지시).
           다시 쓰는 동안에는 **옛 글을 안 보여 준다** — 곧 사라질 글을 읽고 있으면 바뀐

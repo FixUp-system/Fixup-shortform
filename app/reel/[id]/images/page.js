@@ -195,7 +195,10 @@ export default function ReelImagesPage() {
   );
 
   return (
-    <section className="panel panel--wide">
+    /* ★★★ 2026-09-15 — 이 단계는 **폭을 다 쓴다**(rv-wide). ②처럼 두 칸으로 나누지 않는
+       이유: 통짜 갈래에는 컷별 프롬프트가 **없어서**(④ 화면 주석) 여기 있는 것이 전부
+       그림이다 — 나눌 축이 없다. 폭이 늘면 스토리보드 보드도 컷별 그림도 함께 커진다. */
+    <section className="panel panel--wide rv-wide">
       <h2>{stepLabel}</h2>
       {err && <p className="pgsub warn">{err}</p>}
       {/* ★★ **이 단계의 오류만** 읽는다(2026-08-25). 그전에는 reel.error 를 그대로 읽어
