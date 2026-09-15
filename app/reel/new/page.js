@@ -77,13 +77,6 @@ import { MAX_MATERIAL_TEXT } from "../../../lib/material";
 // film(app/film/new/page.js)과 같은 규칙이다.
 const AD_STYLES = STYLE_PRESETS.filter((s) => Object.keys(AD_STYLE_LINES).includes(s.id));
 
-// 레일에서 겉에 세우는 화풍 수. 나머지는 눌러서 편다.
-// ★★ **셋**인 이유는 실측이다 — 340px 레일의 안쪽은 312px 이고, 실사·브이로그·일러스트
-//   (약 192px) + 간격 + 「+6」 칩까지 넣으면 **한 줄**에 들어간다. 넷으로 두면 애니메이션이
-//   더해져 332px 가 되어 **두 줄**이 된다(처음에 넷으로 두고 "한 줄"이라 적었다가 화면에서
-//   틀린 것을 봤다). 레일 폭이 바뀌면 이 수도 다시 재야 한다.
-const STYLE_HEAD = 3;
-
 export default function ReelNewPage() {
   const router = useRouter();
   const { setProject } = useReelProject();
@@ -103,12 +96,6 @@ export default function ReelNewPage() {
   }, [setProject]);
 
   const [text, setText] = useState("");
-  // 레일에서 자주 안 바꾸는 줄 다섯을 접는다(2026-09-15).
-  const [more, setMore] = useState(false);
-  // ★★★ 2026-09-15 — 화풍 아홉이 레일에서 **세 줄**을 먹었다(레일의 34%). 겉에는 **넷만**
-  //   두고 나머지는 눌러서 편다. 사장님이 "폭을 늘리는 건 ①과 ②~⑥ 이 달라 안 맞는다"고
-  //   짚어, 폭이 아니라 **내용**을 줄이는 쪽으로 갔다(레일 420px 은 되돌렸다).
-  const [allStyles, setAllStyles] = useState(false);
   const [photos, setPhotos] = useState([]); // {id, filename, url}
   const [concept, setConcept] = useState(DEFAULT_REEL_CONCEPT);
   const [mood, setMood] = useState(DEFAULT_AD_OPTIONS.mood);
@@ -255,7 +242,7 @@ export default function ReelNewPage() {
       {/* ★★★ 2026-09-15 — 바닥 맞추기는 **접혔을 때만**이다(사장님 지적: "더 보기 했을 때
           입력 폼이 너무 길어져"). 펼치면 레일이 길어지는데, 맞춰 두면 적는 칸이 그대로
           따라가 화면 아래까지 늘어진다. 펼친 뒤에는 레일만 길어지고 폼은 제 높이를 지킨다. */}
-      <div className={`rw-grid${more || allStyles ? "" : " rw-grid--even"}`}>
+      <div className="rw-grid rw-grid--even">
         <aside className="rp-panel">
           <div className="rp-head">이 영상의 설정</div>
           <div className="rp-body">
@@ -303,37 +290,21 @@ export default function ReelNewPage() {
             <div className="tray-row">
               <span className="tray-label">화풍</span>
               <div className="tray-col">
-                <div className="chips">
-                  {/* ★★★ 겉에는 **앞의 넷**만. 다만 **고른 것은 뒤쪽이어도 늘 보인다** —
-                      숨으면 무엇을 골랐는지 화면에서 사라진다(가장 잘 나는 실수다). */}
-                  {(allStyles
-                    ? AD_STYLES
-                    : AD_STYLES.filter((s, i) => i < STYLE_HEAD || s.id === style)
-                  ).map((s) => (
-                    <button key={s.id} className={`chip${style === s.id ? " on" : ""}`}
-                      disabled={locked} onClick={() => setStyle(s.id)}>
-                      {s.label}
-                    </button>
+                {/* ★ 아홉이라 칩으로 두면 두세 줄을 먹는다 — 접지 않고 줄이려면 드롭다운이다. */}
+                <Select value={style} disabled={locked} aria-label="화풍"
+                  onChange={(e) => setStyle(e.target.value)}>
+                  {AD_STYLES.map((s) => (
+                    <option key={s.id} value={s.id}>{s.label}</option>
                   ))}
-                  {/* ★ 남은 수를 적는다 — "더 있다"만 말하면 몇 개인지 몰라 누를지 정하기 어렵다. */}
-                  {!allStyles && AD_STYLES.length > STYLE_HEAD && (
-                    <button type="button" className="chip rp-more-inline"
-                      onClick={() => setAllStyles(true)}>
-                      +{AD_STYLES.filter((s, i) => i >= STYLE_HEAD && s.id !== style).length}
-                    </button>
-                  )}
-                </div>
+                </Select>
                 <div className="tray-note">{AD_STYLES.find((s) => s.id === style)?.desc}</div>
               </div>
             </div>
 
-            {/* ★★★ 자주 안 바꾸는 다섯은 **접는다.** 상태로 여닫는다 — 늘 그려 두고 CSS 로만
-                감추면 첫 화면의 길이가 그대로라 접은 뜻이 없다. */}
-            <button type="button" className="rp-more" onClick={() => setMore((v) => !v)}>
-              {more ? "− 접기" : "+ 더 보기"}
-            </button>
-            {more && (
-              <>
+            {/* ★★★ 2026-09-15 사장님 결정 — **접지 않는다.** 한 번 「+ 더 보기」로 접었다가
+                되돌렸다: "접기를 사용하면 안 되는 게, 사용자가 인지를 못 하고 진행할 수도
+                있는 부분이라서". 여기서 고른 값 중 다섯은 **시작하면 잠긴다** — 접어 두면
+                모른 채 지나가고 나중에 못 바꾼다. 펼친 채로 간략하게가 답이다. */}
             <div className="tray-row">
               <span className="tray-label">화질</span>
               <div className="tray-col">
@@ -403,8 +374,6 @@ export default function ReelNewPage() {
                 </Select>
               </div>
             </div>
-              </>
-            )}
           </div>
           {/* ★★★ 참조 셋에는 없는, 우리에게만 있는 사정 — 여기서 고른 값 중 다섯은 시작하면
               잠긴다. 그전에는 ②에 가서야 「잠김」을 처음 봤다(늦다). 고르는 자리에서 말한다.

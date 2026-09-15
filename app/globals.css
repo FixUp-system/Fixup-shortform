@@ -3453,8 +3453,13 @@ a.um-credit:hover { color: var(--ink); background: var(--surface2); }
    340px 라 그대로 두면 칩이 한두 개씩 끊겨 줄이 다섯 줄이 된다 — 레일 안에서만 세운다.
    ★ 줄 자체를 다시 쓰지 않은 이유: 각 줄에 붙은 사정(주석)이 많아 옮겨 적는 편이 더 위험하다.
      그래서 **모양만 여기서 바꾼다.** */
-.rp-panel .tray-row { flex-direction: column; gap: 6px; align-items: stretch; }
-.rp-panel .tray-label { width: auto; }
+/* ★★★ 2026-09-15 — 레일 안에서는 라벨을 **왼쪽**에 둔다. 한때 세로로 세웠는데(라벨 위·
+   입력 아래) 줄마다 두 줄을 먹어, 접지 않고는 레일이 900px 를 넘었다. 대부분이 드롭다운이
+   되면서 340px 안에 라벨 + 입력이 나란히 들어간다 — 줄 높이가 반이 된다. */
+/* ★ 칩이 두 줄로 접히는 줄(사이즈)에서는 라벨이 **첫 줄**에 붙어야 한다 — 가운데에 두면
+   라벨만 떠 보인다. baseline 이 그 일을 한다. */
+.rp-panel .tray-row { align-items: baseline; gap: 10px; }
+.rp-panel .tray-label { width: 42px; flex: none; }
 .rp-panel .composer-tray { border: 0; padding: 0; gap: 12px; }
 /* ★ 레일 안의 드롭다운은 **폭을 채운다** — 내용만큼만 두면 줄마다 길이가 달라 들쭉날쭉하고,
    누를 자리도 좁다(2026-09-15 실측). */
