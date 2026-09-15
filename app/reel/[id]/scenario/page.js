@@ -16,6 +16,7 @@ import { useParams } from "next/navigation";
 import { useReelProject } from "../layout";
 import { REEL_STEPS, reelStepHref } from "../../../../lib/reel/steps";
 import { scenarioLock } from "../../../../lib/reel/doc";
+import { reelSheetUrl } from "../../../../lib/reel/oneshot";
 // 영어 원문 + 한국어를 한 덩어리로(2026-09-03) — 원문은 안 건드린다.
 import PromptWithKo from "../../../../components/PromptWithKo";
 import ReelBack from "../../../../components/ReelBack";
@@ -41,6 +42,9 @@ export default function ReelScenarioPage() {
   const [note, setNote] = useState("");
 
   const scenario = project?.scenario;
+  // ★ 판독은 lib/reel/oneshot.js 의 reelSheetUrl 하나다 — 화면마다 손으로 찾으면
+  //   ②③④⑤가 서로 다른 주소를 보게 된다.
+  const sheetUrl = reelSheetUrl(project?.cuts || []);
   const lock = scenarioLock(project);
   // ★ 판독은 lib/reel/narration.js 하나다 — 화면이 `scenario.narration.text` 를 손으로 읽으면
   //   지시문·자막과 판정이 갈린다(그 파일 머리말). 옛 문서에서는 null 이다.
@@ -135,6 +139,15 @@ export default function ReelScenarioPage() {
           줄도 모르고, 그 위아래로 도는 표시가 여럿이면 어디를 봐야 할지 알 수 없다.
           ★ 처음 쓰는 것과 다시 쓰는 것은 다른 말이다 — "다시"를 잘못 붙이면 없는 이력을
             지어내는 것이다(lib/progress.js 의 busyLabel 과 같은 결). */}
+      {/* ★★★ 2026-09-15 사장님 결정(B안 1단계) — 글과 **그림을 나란히** 둔다.
+          이 화면에서 실제로 하는 일이 "시나리오를 읽고 고칠지 정하는 것"인데, 판단
+          재료인 스토리보드가 ③에 가 있어 여기서는 글만 보고 정해야 했다.
+          ★ 새로 굽는 것은 없다 — ③이 이미 만든 한 장을 여기서도 보여 줄 뿐이라 0원이다.
+          ★ 그림이 아직 없으면(처음 지나가는 길) **한 칸으로 돌아간다** — 빈 칸을 세우면
+            없는 것이 있는 것처럼 읽힌다. 그래서 칸 수를 CSS 가 짐작하지 않고 화면이 말한다.
+          ★ 고치는 칸과 단계 버튼은 이 격자 **밖**이다 — 아래에서 전체 폭을 쓴다. */}
+      <div className={`rv-split${sheetUrl ? " is-two" : ""}`}>
+        <div className="rv-read">
       {busy ? (
         <p className="pgsub">
           <span className="spinner" aria-hidden="true" />{" "}
@@ -165,6 +178,13 @@ export default function ReelScenarioPage() {
           <p className="script-src">{narration.text}</p>
         </div>
       )}
+        </div>
+        {sheetUrl && (
+          <div className="sheet-view">
+            <img src={sheetUrl} alt="스토리보드" />
+          </div>
+        )}
+      </div>
       {lock && <p className="pgsub">{lock.message}</p>}
 
       {/* ★★ 사장님이 **한국어로** 고쳐 달라고 적는 자리(2026-08-25).

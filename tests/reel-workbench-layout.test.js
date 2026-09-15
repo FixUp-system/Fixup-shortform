@@ -383,9 +383,14 @@ describe("걸음 띠 — 줄의 이름은 언제나 보인다", () => {
   });
 });
 
+// ★★★ 2026-09-15 — 자르는 기준점을 `.rw-grid` 에서 `.rw-grid {` 로 좁혔다.
+//   그 이름이 **다른 규칙의 선택자 안**에도 나타나기 시작했기 때문이다
+//   (`main.work:has(.rw-grid)` — 단계별 화면에서만 기둥을 넓히는 규칙).
+//   그러면 slice 가 엉뚱한 자리에서 시작해 주석 글자를 선택자로 읽고, 메시지는
+//   "주석이 선택자로 샜다"를 가리킨다 — 실제로 한 번 빨개졌다.
 describe("규칙: 색·치수는 토큰이다", () => {
   it("내 블록 안에 hex·없는 토큰·액센트가 없다", () => {
-    const at = css.indexOf(".rw-grid");
+    const at = css.indexOf(".rw-grid {");
     expect(at, ".rw-grid 규칙이 없다").toBeGreaterThan(-1);
     const rest = css.slice(at);
     const end = rest.indexOf("/* ──");
@@ -401,7 +406,7 @@ describe("규칙: 색·치수는 토큰이다", () => {
   it("★★ 주석이 선택자로 새지 않는다 — 새면 바로 아래 규칙이 통째로 죽는다", () => {
     // 2026-09-14 실측: 주석 안의 경로가 `*` `/` 로 읽혀 주석이 일찍 닫혔고,
     // 남은 한국어가 다음 규칙의 선택자에 붙어 그 규칙이 **첫 커밋부터 죽어 있었다.**
-    const at = css.indexOf(".rw-grid");
+    const at = css.indexOf(".rw-grid {");
     const rest = css.slice(at);
     const body = rest.slice(0, rest.indexOf("/* ──")).replace(/\/\*[\s\S]*?\*\//g, "");
     for (const m of body.matchAll(/([^{}]+)\{/g)) {
