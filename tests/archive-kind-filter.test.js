@@ -1,7 +1,7 @@
 // 보관함 정리 — **종류는 필터, 상태는 안 끝난 카드에만** (2026-09-15 사장님 결정).
 //
 // ★★★ 카드에 넷(「영상」 태그 · 날짜 · 종류 배지 · 상태 배지)이 붙어 복잡했다. 성격대로 흩었다:
-//   · 종류 — 위 필터(서버가 거른다) · 날짜 — 묶음 제목(tests/archive-card-date.test.js)
+//   · 종류 — 위 필터(서버가 거른다) · 날짜 — 위 좁히기 줄의 시작일·종료일(서버가 거른다)
 //   · 상태 — 안 끝난 카드의 썸네일 태그 하나 · 「영상」 태그 — "완성"과 같은 말이라 걷었다
 // ★★ **필터는 DB 가 거른다.** 받은 24편 안에서 거르면 「더 보기」 쪽마다 몇 편만 남아
 //   영상이 사라진 것처럼 보인다.
@@ -22,6 +22,8 @@ vi.mock("@supabase/supabase-js", () => ({
         eq: (c, v) => ((state.eq ||= []).push([c, v]), b),
         or: (f) => ((state.or ||= []).push(f), b),
         lt: () => b,
+        gte: (c, v) => ((state.gte ||= []).push([c, v]), b),
+        lte: (c, v) => ((state.lte ||= []).push([c, v]), b),
         order: () => b,
         limit: () => b,
         then: (res, rej) => Promise.resolve({ data: [], error: null }).then(res, rej),
@@ -37,7 +39,8 @@ const { createProject } = await import("../lib/projects.js");
 const { USER_HEADER, STATUS_HEADER, ROLE_HEADER } = await import("../lib/auth/headers.js");
 const { GET } = await import("../app/api/projects/route.js");
 const { loadProjects } = await import("../lib/projects-client.js");
-const { archiveKindOf, cardStatusTag } = await import("../lib/archive/spec.js");
+const { archiveKindOf, cardStatusTag, archiveDateOf, archiveHref } = await import("../lib/archive/spec.js");
+const { dayBounds } = await import("../lib/costs-filter.js");
 
 const strip = (s) => s
   .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, "")
@@ -131,46 +134,121 @@ describe("GET /api/projects?kind= — 서버가 거른다", () => {
   });
 });
 
-describe("loadProjects — kind 를 싣는다", () => {
-  const seen = [];
-  const f = async (url) => { seen.push(url); return { ok: true, json: async () => ({ projects: [] }) }; };
+// ★★★ 2026-09-15 사장님 지시 — **만든 날짜로 좁힌다**(이 제품의 날짜 좁히기와 같은 한 벌).
+describe("날짜 좁히기 — 서버가 거른다", () => {
+  const day = (d, h = 12) => new Date(2026, 8, d, h).getTime(); // 지역 시각 2026-09-d
 
-  it("★★ 종류·커서가 함께 실린다", async () => {
-    seen.length = 0;
-    await loadProjects(f, "mine", 1700000000000, "step");
-    expect(seen[0]).toBe("/api/projects?kind=step&before=1700000000000");
+  beforeEach(async () => {
+    resetMemoryStore();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    // 9/10 오전 1시 · 9/11 낮 · 9/12 밤 11시 59분 · 9/13 자정 직후
+    for (const [i, ts] of [[0, day(10, 1)], [1, day(11)], [2, new Date(2026, 8, 12, 23, 59).getTime()], [3, day(13, 0)]].entries()) {
+      vi.setSystemTime(ts[1]);
+      await createProject({ settings: {}, material: { text: `편${i}`, photos: [] }, ownerId: A });
+    }
+  });
+  afterEach(() => vi.useRealTimers());
+
+  const got = async (from, to) => {
+    const { start, end } = dayBounds(from, to);
+    const qs = new URLSearchParams();
+    if (start !== null) qs.set("from_ts", String(start));
+    if (end !== null) qs.set("to_ts", String(end));
+    const body = await (await GET(as(`?${qs}`), {})).json();
+    return body.projects.length;
+  };
+
+  it("★★★ 끝 날짜는 그 날을 **포함한다** — 9/12 밤 11시 59분에 만든 편도 든다", async () => {
+    expect(await got("2026-09-11", "2026-09-12")).toBe(2);
   });
 
-  it("★ 전체면 안 싣는다 — 주소가 예전 그대로다", async () => {
-    seen.length = 0;
-    await loadProjects(f, "mine", undefined, "all");
-    expect(seen[0]).toBe("/api/projects");
+  it("★★ 시작 날짜는 그 날 자정부터 — 9/10 새벽 1시에 만든 편이 든다", async () => {
+    expect(await got("2026-09-10", "2026-09-10")).toBe(1);
+  });
+
+  it("★ 한쪽만 골라도 된다 · 안 고르면 전부", async () => {
+    expect(await got("2026-09-12", "")).toBe(2);
+    expect(await got("", "2026-09-10")).toBe(1);
+    expect(await got("", "")).toBe(4);
+  });
+
+  it("★★ to_ts 가 빈 값이면 조건이 아니다 — Number(\"\")=0 이 목록을 비우면 안 된다", async () => {
+    const body = await (await GET(as("?from_ts=&to_ts="), {})).json();
+    expect(body.projects).toHaveLength(4);
+  });
+
+  it("★ store(supabase) 가 경계를 created_at 에 건다", async () => {
+    H.calls.length = 0;
+    const { start, end } = dayBounds("2026-09-11", "2026-09-12");
+    await supabaseStore.listProjects("o1", { from: start, to: end });
+    expect(H.calls[0].gte).toEqual([["created_at", new Date(start).toISOString()]]);
+    expect(H.calls[0].lte).toEqual([["created_at", new Date(end).toISOString()]]);
   });
 });
 
-describe("화면 — 필터와 카드", () => {
+describe("loadProjects — 좁히기를 싣는다", () => {
+  const seen = [];
+  const f = async (url) => { seen.push(url); return { ok: true, json: async () => ({ projects: [] }) }; };
+
+  it("★★ 종류·날짜·커서가 함께 실린다", async () => {
+    seen.length = 0;
+    await loadProjects(f, "mine", 1700000000000, { kind: "step", start: 1, end: 2 });
+    expect(seen[0]).toBe("/api/projects?kind=step&from_ts=1&to_ts=2&before=1700000000000");
+  });
+
+  it("★ 좁히기가 없으면 안 싣는다 — 주소가 예전 그대로다", async () => {
+    seen.length = 0;
+    await loadProjects(f, "mine", undefined, { kind: "all", start: null, end: null });
+    await loadProjects(f);
+    expect(seen).toEqual(["/api/projects", "/api/projects"]);
+  });
+});
+
+describe("보관함 주소 — 한 자리에서 싣는다", () => {
+  it("★★★ 범위·종류·날짜가 함께 실린다 — 하나를 바꿔도 다른 조건이 안 떨어진다", () => {
+    expect(archiveHref({ scope: "all", kind: "ad", from: "2026-09-01", to: "2026-09-15" }))
+      .toBe("/archive?scope=all&kind=ad&from=2026-09-01&to=2026-09-15");
+  });
+
+  it("★ 기본값은 안 싣는다", () => {
+    expect(archiveHref({ scope: "mine", kind: "all", from: "", to: "" })).toBe("/archive");
+    expect(archiveHref()).toBe("/archive");
+  });
+
+  it("★ 모양이 틀린 값은 버린다 — 옛 ?kind=film · 이상한 날짜", () => {
+    expect(archiveHref({ kind: "film", from: "9월 1일" })).toBe("/archive");
+    expect(archiveDateOf("2026-9-1")).toBe("");
+    expect(archiveDateOf("2026-09-01")).toBe("2026-09-01");
+  });
+});
+
+describe("화면 — 좁히기 줄과 카드", () => {
   const page = strip(readFileSync("app/archive/page.js", "utf8"));
   const cards = strip(readFileSync("components/ProjectCards.jsx", "utf8"));
 
-  it("★★★ 필터가 aria-pressed 로 고른 칸을 말한다(범위 토글과 같은 규율)", () => {
+  it("★★★ 종류 칸은 aria-pressed 로 고른 칸을 말한다(범위 토글과 같은 규율)", () => {
     expect(page).toMatch(/ARCHIVE_KINDS\.map/);
     expect(page).toMatch(/aria-pressed=\{kind === k\.id\}/);
   });
 
-  it("★★ 첫 필터는 주소가 정하고, 바꾸면 주소를 replace 로 옮긴다", () => {
+  it("★★ 첫 값은 주소가 정하고, 바꾸면 주소를 replace 로 옮긴다 — 주소는 archiveHref 하나가 만든다", () => {
     expect(page).toMatch(/archiveKindOf\(params\.get\("kind"\)\)/);
-    const fn = page.slice(page.indexOf("function changeKind"));
-    expect(fn.slice(0, fn.indexOf("\n  }"))).toMatch(/router\.replace\(/);
+    expect(page).toMatch(/archiveDateOf\(params\.get\("from"\)\)/);
+    expect(page).toMatch(/archiveDateOf\(params\.get\("to"\)\)/);
+    for (const name of ["changeScope", "changeKind", "changeDates", "resetFilters"]) {
+      const fn = page.slice(page.indexOf(`function ${name}`));
+      expect(fn.slice(0, fn.indexOf("\n  }")), name).toMatch(/router\.replace\(archiveHref\(/);
+    }
   });
 
-  it("★★ 첫 쪽과 「더 보기」가 **같은 필터**로 부른다 — 갈리면 다른 종류가 붙는다", () => {
+  it("★★ 첫 쪽과 「더 보기」가 **같은 좁히기**로 부른다 — 갈리면 다른 조건의 편이 붙는다", () => {
     const calls = page.match(/loadProjects\([^)]*\)/g) || [];
     expect(calls.length).toBeGreaterThanOrEqual(2);
-    for (const c of calls) expect(c, c).toMatch(/kind\)$/);
+    for (const c of calls) expect(c, c).toMatch(/\{ kind, start, end \}\)$/);
   });
 
-  it("★★ 필터를 바꾸면 다시 부른다", () => {
-    expect(page).toMatch(/\}, \[viewScope, kind\]\);/);
+  it("★★ 좁히기를 바꾸면 다시 부른다", () => {
+    expect(page).toMatch(/\}, \[viewScope, kind, start, end\]\);/);
   });
 
   it("★★★ 카드에는 「영상」 태그·종류 배지가 없고, 상태 태그는 판정을 지난다", () => {
@@ -180,3 +258,4 @@ describe("화면 — 필터와 카드", () => {
     expect(cards).toMatch(/\{status && <span className="thumb-tag">\{status\}<\/span>\}/);
   });
 });
+

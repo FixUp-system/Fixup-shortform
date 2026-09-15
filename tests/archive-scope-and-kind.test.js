@@ -16,12 +16,16 @@ const strip = (s) => s.replace(/(^|[^:])\/\/.*$/gm, "$1").replace(/\/\*[\s\S]*?\
 describe("보관함 — 보던 탭이 주소에 남는다", () => {
   const src = strip(readFileSync("app/archive/page.js", "utf8"));
 
-  it("★★★ 탭을 바꾸면 주소도 옮긴다 — 안 옮기면 새로고침에 기본값으로 떨어진다", () => {
+  it("★★★ 탭을 바꾸면 주소도 옮긴다 — 안 옮기면 새로고침에 기본값으로 떨어진다", async () => {
     // changeScope 안에서 주소를 고쳐야 한다(함수 끝까지 잘라서 본다).
     const fn = src.slice(src.indexOf("function changeScope"));
     const body = fn.slice(0, fn.indexOf("\n  }") + 4);
     expect(body, "changeScope 가 주소를 안 고친다").toMatch(/router\.(replace|push)\(/);
-    expect(body, "전체 탭이 주소에 안 실린다").toMatch(/scope=all/);
+    // ★ 2026-09-15 — 주소는 archiveHref 하나가 만든다(종류·날짜 좁히기와 함께 싣기 위해).
+    //   고른 탭(next)을 넘기는지 소스로 보고, 전체 탭이 실리는지는 값으로 잰다.
+    expect(body, "고른 탭을 주소에 안 넘긴다").toMatch(/archiveHref\(\{ scope: next/);
+    const { archiveHref } = await import("../lib/archive/spec.js");
+    expect(archiveHref({ scope: "all" }), "전체 탭이 주소에 안 실린다").toMatch(/scope=all/);
   });
 
   it("★★ push 가 아니라 replace 다 — 탭 전환이 뒤로가기에 쌓이면 보관함을 못 빠져나간다", () => {

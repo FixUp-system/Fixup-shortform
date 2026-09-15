@@ -32,10 +32,20 @@ export const GET = withUser(async (req, _ctx, user) => {
   if (!user) return Response.json({ projects: [], guest: true, has_more: false });
   // kind — 보관함 종류 필터(원클릭·단계별). **DB 가 거른다** — 받은 쪽 안에서 거르면
   //   「더 보기」 쪽마다 몇 편만 남는다. 모르는 값은 전체다(lib/archive/spec.js).
+  // from_ts·to_ts — 만든 날짜 좁히기(2026-09-15). 브라우저가 날짜 칸을 ms 경계로 바꿔 보낸다(dayBounds) —
+  //   크레딧 내역 라우트(app/api/credits/history)와 같은 모양이다.
+  //   ★ 빈 값을 Number("")=0 으로 읽으면 to_ts=0 이 목록을 통째로 비우므로, 값이 있을 때만 숫자로 읽는다.
+  const ts = (k) => {
+    const v = url.searchParams.get(k);
+    const n = v ? Number(v) : NaN;
+    return Number.isFinite(n) ? n : undefined;
+  };
   const page = {
     before: projectCursor(url.searchParams.get("before")),
     limit: PROJECT_PAGE + 1,
     kind: archiveKindOf(url.searchParams.get("kind")),
+    from: ts("from_ts"),
+    to: ts("to_ts"),
   };
   const rows = scope === "all" && user.role === "admin"
     ? await listAllProjects(user.id, page)
