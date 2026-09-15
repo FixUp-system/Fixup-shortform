@@ -4,6 +4,8 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { loadProjects } from "../../lib/projects-client";
+// 종류 필터 표 · 날짜 묶기 — 판정은 화면 밖 순수 모듈이 한다(값으로 잴 수 있게).
+import { ARCHIVE_KINDS, archiveKindOf, groupByDay } from "../../lib/archive/spec";
 import ProjectCards from "../../components/ProjectCards";
 import { useDialog } from "../../components/DialogProvider";
 import Icon from "../../components/Icon";
@@ -63,6 +65,10 @@ function ArchiveBody() {
   //   옛 주소(?scope=all)로 와도 내 영상을 본다 — 서버(app/api/projects/route.js)도 같은 판정이다.
   //   ★ 등급을 모르는 동안(ready 전)에는 넓히지 않는다 — 내 영상부터 부른다.
   const viewScope = isAdmin ? scope : "mine";
+  // ★★★ 2026-09-15 사장님 결정 — **종류는 카드 배지가 아니라 위 필터로 좁힌다.**
+  //   첫 값은 주소(?kind=)가 정한다 — 범위(scope)와 같은 이유로, 상세에서 돌아왔을 때 보던 필터가 남아야 한다.
+  //   모르는 값은 전체다(lib/archive/spec.js 의 archiveKindOf).
+  const [kind, setKind] = useState(() => archiveKindOf(params.get("kind")));
 
   // 정리는 몰아서 하는 일이다 — 하나씩 지우면 스무 편을 치우는 데 스무 번을 묻는다.
   // 평소에는 카드가 프로젝트로 들어가는 문이고, [정리] 를 누른 동안에만 고르는 자리가 된다.
@@ -87,7 +93,7 @@ function ArchiveBody() {
     if (!cursor.current || moreBusy) return;
     const my = listGen.current;
     setMoreBusy(true);
-    const r = await loadProjects(fetch, viewScope, cursor.current);
+    const r = await loadProjects(fetch, viewScope, cursor.current, kind);
     setMoreBusy(false);
     if (my !== listGen.current) return;
     if (r.err) {
@@ -115,7 +121,7 @@ function ArchiveBody() {
     setErr("");
     setMore(false);
     cursor.current = undefined;
-    loadProjects(fetch, viewScope).then(({ projects, err, guest, hasMore }) => {
+    loadProjects(fetch, viewScope, undefined, kind).then(({ projects, err, guest, hasMore }) => {
       if (!alive || my !== listGen.current) return;
       cursor.current = lastTs(projects);
       setProjects(projects);
@@ -129,7 +135,7 @@ function ArchiveBody() {
     return () => {
       alive = false;
     };
-  }, [viewScope]);
+  }, [viewScope, kind]);
 
   function toggle(id) {
     setSelected((s) => {
@@ -203,7 +209,18 @@ function ArchiveBody() {
     //   ★ push 가 아니라 replace 다 — 탭 전환은 되돌아갈 자리가 아니라 지금 보는 자리다.
     //     push 로 쌓으면 [뒤로]가 탭 전환을 거슬러 올라가 보관함을 못 빠져나간다.
     //   ★ scroll:false — 탭만 바꾸는데 목록이 맨 위로 튀지 않게.
-    router.replace(next === "all" ? "/archive?scope=all" : "/archive", { scroll: false });
+    //   ★ 보던 종류 필터(kind)도 함께 싣는다 — 탭을 바꿨다고 필터가 풀리면 안 된다.
+    const q = [next === "all" ? "scope=all" : "", kind !== "all" ? `kind=${kind}` : ""].filter(Boolean).join("&");
+    router.replace(q ? `/archive?${q}` : "/archive", { scroll: false });
+  }
+
+  // 종류 필터를 바꾼다 — 범위와 같은 규율이다: 고르던 것을 버리고, 주소를 replace 로 옮긴다.
+  function changeKind(next) {
+    if (next === kind) return;
+    stopSelecting();
+    setKind(next);
+    const q = [scope === "all" ? "scope=all" : "", next !== "all" ? `kind=${next}` : ""].filter(Boolean).join("&");
+    router.replace(q ? `/archive?${q}` : "/archive", { scroll: false });
   }
 
   return (
@@ -306,25 +323,46 @@ function ArchiveBody() {
             : "지금까지 만든 영상이 여기 모입니다. 눌러서 이어서 작업할 수 있어요."}
       </p>
 
+      {/* ★★★ 2026-09-15 사장님 결정 — **종류 필터.** 카드마다 붙던 종류 배지를 걷고 여기서 좁힌다.
+          판정은 aria-pressed 다(범위 토글과 같은 규율 — 보이는 상태와 읽히는 상태가 갈리지 않게).
+          ★ 손님에게는 안 그린다 — 거를 목록이 없다. */}
+      {!guest && (
+        <div className="seg archive-kinds" role="group" aria-label="영상 종류">
+          {ARCHIVE_KINDS.map((k) => (
+            <button key={k.id} className="seg-btn" aria-pressed={kind === k.id} onClick={() => changeKind(k.id)}>
+              {k.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {projects === null && <p className="pgsub">불러오는 중…</p>}
       {err && <p className="pgsub warn">{err}</p>}
       {/* ★ 뒤에 더 있으면 「없어요」라고 안 한다 — 받은 쪽을 다 지워도 뒤에는 남아 있다. */}
       {projects?.length === 0 && !err && !more && (
         <p className="pgsub">
-          {isAll ? "아직 만들어진 영상이 없어요." : "아직 만든 영상이 없어요. 새로 만들어 보세요."}
+          {kind !== "all"
+            ? "이 종류로 만든 영상이 없어요."
+            : isAll ? "아직 만들어진 영상이 없어요." : "아직 만든 영상이 없어요. 새로 만들어 보세요."}
         </p>
       )}
-      {projects && projects.length > 0 && (
-        <ProjectCards
-          scope={viewScope}
-          canDeleteAny={isAdmin}
-          projects={projects}
-          selecting={selecting}
-          selected={selected}
-          onToggleSelect={toggle}
-          onDeleted={(id) => setProjects((list) => list.filter((p) => p.id !== id))}
-        />
-      )}
+      {/* ★★★ 2026-09-15 사장님 결정 — **날짜는 묶음 제목이다.** 카드마다 날짜를 달던 것을 걷었다.
+          묶기는 lib/archive/spec.js 의 groupByDay 가 한다 — 서버가 준 순서(최신순)를 그대로 지킨다.
+          ★ 묶음마다 격자를 따로 그린다 — 카드 부품(ProjectCards)은 한 격자만 안다. */}
+      {projects && projects.length > 0 && groupByDay(projects).map((g) => (
+        <section key={`${g.label}-${g.items[0].id}`} className="archive-day">
+          <h2 className="archive-day-title">{g.label}</h2>
+          <ProjectCards
+            scope={viewScope}
+            canDeleteAny={isAdmin}
+            projects={g.items}
+            selecting={selecting}
+            selected={selected}
+            onToggleSelect={toggle}
+            onDeleted={(id) => setProjects((list) => list.filter((p) => p.id !== id))}
+          />
+        </section>
+      ))}
       {more && projects !== null && (
         <div className="archive-more">
           <button className="mini" disabled={moreBusy} onClick={loadMore}>

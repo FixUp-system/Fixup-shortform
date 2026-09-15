@@ -55,7 +55,8 @@ describe("범위 고르기 — 한 상자로 묶는다", () => {
 
   it("★★ 부르는 범위도 운영자만 넓힌다 — 옛 주소 ?scope=all 로 와도 내 영상이다", () => {
     expect(page).toMatch(/viewScope\s*=\s*isAdmin\s*\?\s*scope\s*:\s*["']mine["']/);
-    expect(page).toMatch(/loadProjects\(fetch,\s*viewScope\)/);
+    // ★ 2026-09-15 — 뒤에 커서·종류 필터가 붙는다(「더 보기」·종류 필터). 범위 자리는 그대로 viewScope 다.
+    expect(page).toMatch(/loadProjects\(fetch,\s*viewScope[,)]/);
   });
 });
 

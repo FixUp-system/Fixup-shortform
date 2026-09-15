@@ -22,12 +22,13 @@ const rule = (sel) => {
 
 describe("지우기는 썸네일 모서리에 선다", () => {
   const thumbAt = cards.indexOf('className="project-thumb"');
-  const metaAt = cards.indexOf('className="project-meta"');
   const delAt = cards.indexOf('className="card-del"');
 
-  it("★★★ 버튼이 썸네일 안에 있고, 글자 줄(project-meta)에는 없다", () => {
-    expect(delAt, "card-del 이 없다").toBeGreaterThan(-1);
-    expect(delAt > thumbAt && delAt < metaAt, "지우기가 아직 날짜·배지 줄에 있다").toBe(true);
+  // ★ 같은 날 뒤이어 카드 아래 글자 줄(project-meta)은 통째로 걷었다 — 지우기는 썸네일 안에만 산다.
+  it("★★★ 버튼이 썸네일 안에 있고, 카드 아래 글자 줄은 없다", () => {
+    expect(delAt, "card-del 이 없다").toBeGreaterThan(thumbAt);
+    expect(thumbAt).toBeGreaterThan(-1);
+    expect(cards, "카드 아래 글자 줄이 남아 있다").not.toContain('className="project-meta"');
   });
 
   it("★★ 글자가 아니라 휴지통 아이콘이다 — 이름은 aria-label 이 말한다", () => {

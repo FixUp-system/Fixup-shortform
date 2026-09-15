@@ -3,15 +3,16 @@
 // ★★★ 거기 있던 "제목"은 제목이 아니었다. `material_text.slice(0, 100)` — 사장님이
 //   적은 원문 앞 100자다. 그래서 비슷한 프로젝트끼리는 앞머리가 똑같이 잘려
 //   (「아래는 이미 확정된 콘티다. 이대로…」) **구별에 아무 도움이 안 됐다.**
-// ★★ 그렇다고 줄을 통째로 비우면 안 된다 — 목록의 썸네일은 대부분 비어 있어서
-//   (아직 안 구운 편) 카드를 가를 단서가 배지 둘(종류·상태)뿐이 된다.
-//   날짜는 목록이 **최신순**이라 그 자리를 설명해 주고, `created_ts` 는 이미 목록에
+// ★★ 날짜는 목록이 **최신순**이라 자리를 설명해 주고, `created_ts` 는 이미 목록에
 //   실려 오므로 추가 조회가 0이다.
+// ★★★ 같은 날 자리가 세 번 바뀌었다 — 배지 줄 옆 → 썸네일 왼쪽 아래 → **날짜 묶음 제목**.
+//   카드마다 날짜를 다니 배지·태그와 섞여 이질감이 났다(사장님 지적). 지금은 보관함 화면이
+//   같은 날끼리 묶고 그 위에 한 번만 적는다(lib/archive/spec.js 의 groupByDay).
 // ★ 판단은 화면 밖에 둔다 — 화면 안 삼항식은 값으로 잴 방법이 없다(이 폴더의 다른
 //   부품들이 전부 같은 이유로 여기 있다).
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { madeOnLabel } from "../lib/archive/spec.js";
+import { madeOnLabel, groupByDay } from "../lib/archive/spec.js";
 
 const strip = (s) => s
   .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, "")
@@ -19,6 +20,7 @@ const strip = (s) => s
   .replace(/^\s*\/\/.*$/gm, "");
 
 const cards = strip(readFileSync("components/ProjectCards.jsx", "utf8"));
+const page = strip(readFileSync("app/archive/page.js", "utf8"));
 const css = readFileSync("app/globals.css", "utf8");
 
 describe("만든 날짜 — 사람이 읽는 말로", () => {
@@ -41,63 +43,63 @@ describe("만든 날짜 — 사람이 읽는 말로", () => {
   });
 });
 
-describe("보관함 카드 — 제목 자리", () => {
-  it("★★★ 원문 앞머리를 더는 안 그린다", () => {
+describe("날짜 묶음 — 같은 날끼리", () => {
+  const at = (m, d, h = 12) => new Date(2020, m - 1, d, h).getTime();
+
+  it("★★★ 이웃한 같은 날을 한 묶음으로 — 순서는 서버가 준 그대로다", () => {
+    const list = [
+      { id: "a", created_ts: at(1, 3, 18) },
+      { id: "b", created_ts: at(1, 3, 9) },
+      { id: "c", created_ts: at(1, 2) },
+    ];
+    expect(groupByDay(list).map((g) => [g.label, g.items.map((p) => p.id)])).toEqual([
+      ["2020년 1월 3일", ["a", "b"]],
+      ["2020년 1월 2일", ["c"]],
+    ]);
+  });
+
+  it("★★ 다시 정렬하지 않는다 — 「더 보기」로 붙인 순서를 화면이 섞으면 안 된다", () => {
+    const list = [{ id: "x", created_ts: at(1, 2) }, { id: "y", created_ts: at(1, 5) }];
+    expect(groupByDay(list).map((g) => g.items[0].id)).toEqual(["x", "y"]);
+  });
+
+  it("★ 날짜를 모르는 편은 「날짜 모름」이다 — 지어내지 않는다", () => {
+    expect(groupByDay([{ id: "z" }])[0].label).toBe("날짜 모름");
+    expect(groupByDay(null)).toEqual([]);
+  });
+});
+
+describe("보관함 — 날짜는 묶음 제목이다", () => {
+  it("★★★ 카드는 제목·날짜를 안 그린다 — 원문 앞머리도, 날짜 태그도 없다", () => {
     expect(cards, "아직 제목 줄을 그린다").not.toMatch(/className="title"/);
     expect(cards, "「제목 없음」이 남아 있다").not.toContain("제목 없음");
+    expect(cards, "카드가 아직 날짜를 단다").not.toMatch(/madeOnLabel|className="[^"]*when/);
   });
 
-  it("★★★ 그 자리에 만든 날짜가 온다", () => {
-    expect(cards, "madeOnLabel 을 안 쓴다").toContain("madeOnLabel");
-    expect(cards, "lib/archive/spec 에서 안 가져온다").toMatch(/from\s+["'][^"']*archive\/spec/);
-    expect(cards, "카드가 날짜를 안 그린다").toMatch(/className="thumb-tag when"/);
-  });
-
-  // ★★★ 2026-09-15 사장님 결정 — 날짜는 배지 줄이 아니라 **썸네일 왼쪽 아래**다.
-  //   날짜(언제)와 배지(무엇·상태)가 한 줄에 서니 이질감이 났다.
-  it("★★★ 날짜는 썸네일 안에 서고, 배지 줄에는 없다", () => {
-    const thumbAt = cards.indexOf('className="project-thumb"');
-    const metaAt = cards.indexOf('className="project-meta"');
-    const whenAt = cards.indexOf("thumb-tag when");
-    expect(whenAt > thumbAt && whenAt < metaAt, "날짜가 아직 배지 줄에 있다").toBe(true);
+  it("★★★ 보관함 화면이 날짜로 묶어 제목을 단다", () => {
+    expect(page).toMatch(/groupByDay\(projects\)/);
+    expect(page).toMatch(/className="archive-day-title"/);
   });
 
   it("★★ 날짜를 화면에서 손으로 만들지 않는다 — 자리마다 모양이 갈린다", () => {
-    expect(cards, "화면이 직접 날짜를 조립한다").not.toMatch(/getMonth\(\)|getFullYear\(\)/);
+    for (const src of [cards, page]) {
+      expect(src, "화면이 직접 날짜를 조립한다").not.toMatch(/getMonth\(\)|getFullYear\(\)/);
+    }
   });
 
   it("★ 그림의 대체 텍스트는 그대로 둔다 — 눈으로 못 보는 사람에게는 글이 더 낫다", () => {
     expect(cards, "alt 가 사라졌다").toMatch(/alt=\{p\.title \|\| "만든 영상"\}/);
   });
-});
 
-describe("보관함 카드 CSS — 자리를 옮긴다", () => {
-  const pick = (sel) => {
-    const at = css.indexOf(`\n${sel} {`);
-    return at < 0 ? "" : css.slice(at, css.indexOf("\n}", at));
-  };
-
-  it("★★ 날짜는 「영상」 태그와 한 벌이고 자리만 아래로 옮긴다", () => {
-    const when = pick(".thumb-tag.when");
-    expect(when, ".thumb-tag.when 규칙이 없다").not.toBe("");
-    expect(when).toMatch(/bottom:\s*8px/);
-    expect(when, "위 자리(top)를 안 풀었다 — 「영상」 태그와 겹친다").toMatch(/top:\s*auto/);
+  it("★ 묶음 제목은 접히지 않는다 — 좁은 폭에서 「8월 28 / 일」이 됐다", () => {
+    const at = css.indexOf("\n.archive-day-title {");
+    expect(at, ".archive-day-title 규칙이 없다").toBeGreaterThan(-1);
+    expect(css.slice(at, css.indexOf("\n}", at))).toMatch(/white-space:\s*nowrap/);
   });
 
-  it("★★ 날짜는 접히지 않는다 — 좁은 카드에서 「8월 28 / 일」이 됐다", () => {
-    expect(pick(".thumb-tag.when")).toMatch(/white-space:\s*nowrap/);
-  });
-
-  it("★ 배지 줄의 옛 날짜 규칙·구분점은 걷었다", () => {
-    expect(css.indexOf(".project-meta .when"), "옛 규칙이 남아 있다").toBe(-1);
-  });
-
-  it("★★ 배지 줄은 가로 가운데로 선다", () => {
-    const at = css.indexOf("\n.project-meta {");
-    expect(css.slice(at, css.indexOf("}", at))).toMatch(/justify-content:\s*center/);
-  });
-
-  it("★★ 옛 제목 규칙은 걷는다 — 아무도 안 쓰는 CSS 가 남으면 다음 사람이 살아 있는 줄 안다", () => {
+  it("★★ 옛 자리의 규칙은 걷었다 — 아무도 안 쓰는 CSS 가 남으면 다음 사람이 살아 있는 줄 안다", () => {
     expect(css.indexOf(".project-meta .title"), "옛 제목 규칙이 남아 있다").toBe(-1);
+    expect(css.indexOf(".project-meta .when"), "배지 줄 날짜 규칙이 남아 있다").toBe(-1);
+    expect(css.indexOf(".thumb-tag.when"), "썸네일 날짜 태그 규칙이 남아 있다").toBe(-1);
   });
 });

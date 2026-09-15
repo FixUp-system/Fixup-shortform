@@ -7,9 +7,8 @@ import { thumbUrl } from "../lib/thumb-url.js";
 import Link from "next/link";
 import { useDialog } from "./DialogProvider";
 import Icon from "./Icon";
-import { FILM_MODES, filmMode } from "../lib/film/mode";
-// 만든 날짜를 사람 말로 — 화면이 직접 조립하면 자리마다 모양이 갈린다.
-import { madeOnLabel } from "../lib/archive/spec";
+// 상태 태그의 말 — 화면이 직접 조립하면 자리마다 모양이 갈린다.
+import { cardStatusTag } from "../lib/archive/spec";
 
 // 홈과 보관함이 같은 카드를 쓴다. 마크업을 두 벌로 두면 한쪽만 고쳐지는 날이 온다.
 
@@ -180,6 +179,8 @@ export default function ProjectCards({ projects, limit, onDeleted, selecting, se
             : isReel
               ? (p.video_url ? "완성" : AD_STATUS_LABEL[p.status] || "진행 중")
               : (STATUS_LABEL[p.status] || "진행 중");
+        // 썸네일 위 상태 태그 — 안 끝난 카드만 말한다(끝났으면 null). 말은 lib/archive/spec.js 가 만든다.
+        const status = cardStatusTag(p, label);
         return (
           <li key={p.id}>
             <Link
@@ -189,16 +190,17 @@ export default function ProjectCards({ projects, limit, onDeleted, selecting, se
             >
               <span className="project-thumb">
                 <Thumb video={p.video_url} image={p.image_url} alt={p.title || "만든 영상"} />
-                {p.video_url && <span className="thumb-tag">영상</span>}
-                {/* ★★★ 2026-09-15 사장님 결정 — 여기 있던 「제목」은 제목이 아니었다.
-                    `material_text.slice(0, 100)`, 즉 사장님이 적은 원문 앞머리라
-                    비슷한 편끼리는 똑같이 잘려 **구별에 도움이 안 됐다.** 그래서 만든 날짜를 둔다.
-                    ★ 자리는 **썸네일 왼쪽 아래**다 — 배지 줄에 두니 성격이 다른 둘이 한 줄에 서서
-                      이질감이 났다(사장님 지적). 모양은 「영상」 태그와 한 벌이다.
-                    ★ 말을 만드는 일은 lib/archive/spec.js 가 한다(화면은 그리기만).
-                    ★ 모르는 날짜면 빈 태그를 안 그린다 — 검은 점만 떠 있게 된다. */}
-                {madeOnLabel(p.created_ts) && (
-                  <span className="thumb-tag when">{madeOnLabel(p.created_ts)}</span>
+                {/* ★★★ 2026-09-15 사장님 결정 — **카드는 썸네일만 남긴다.** 붙어 있던 넷을 성격대로 흩었다
+                    (lib/archive/spec.js 의 머리 주석):
+                    · 「영상」 태그 — "완성"과 같은 말이라 걷었다
+                    · 날짜 — 보관함 화면의 **묶음 제목**이 말한다
+                    · 종류 배지(원클릭·단계별·한 번에) — 보관함 위 **필터**가 좁힌다
+                    · 상태 — **안 끝난 카드에만** 이 태그 하나(완성본은 영상 자체가 보인다)
+                    ★ 원문 앞 100자였던 「제목」은 여전히 안 그린다 — 비슷한 편끼리 앞머리가 같아
+                      구별에 도움이 안 됐다(그 값은 지우기 다이얼로그와 alt 가 쓴다). */}
+                {status && <span className="thumb-tag">{status}</span>}
+                {selecting && (
+                  <span className="card-pick" aria-hidden="true">{selected?.has(p.id) ? "✓" : ""}</span>
                 )}
                 {/* ★ 남이 만든 카드에는 쓰기 버튼을 아예 안 그린다(mine === false) —
                     눌러도 404 인 버튼을 그리면 "왜 안 되지"만 남는다. 목록에 mine 이 없는
@@ -224,29 +226,6 @@ export default function ProjectCards({ projects, limit, onDeleted, selecting, se
                     <Icon name="trash" size={14} />
                     {busyId === p.id && "지우는 중…"}
                   </button>
-                )}
-              </span>
-              <span className="project-meta">
-                {/* ★★★ 2026-09-03 사장님 지시 — **어느 모드로 만든 것인지 카드가 말한다.**
-                    그전에는 광고(원클릭)와 film(한 번에)에만 배지가 붙고 **단계별은 아무
-                    표시가 없어서**, 배지 없는 카드가 "단계별"인지 "옛 문서라 종류를 모르는
-                    것"인지 구별되지 않았다. 이제 셋이 모두 자기 이름을 단다.
-                    ★ 이름은 사이드바·상세와 같은 말이다(원클릭 영상 · 단계별 영상 ·
-                      한 번에 굽는 영상) — 자리마다 다르게 부르면 같은 것을 다른 것으로 읽는다.
-                    ★ 판정 순서가 곧 규칙이다: ad·film 이 아니면 단계별이다(상세 화면
-                      app/archive/[id]/page.js 가 쓰는 것과 같은 갈래). */}
-                {isAd && <span className="badge ai">원클릭</span>}
-                {isFilm && <span className="badge ai">한 번에</span>}
-                {!isAd && !isFilm && <span className="badge ai">단계별</span>}
-                {/* ★ 어느 방식으로 구웠는지 — film 은 한 프로젝트가 두 편을 담는다.
-                    이름은 표(FILM_MODES)에서 가져온다: 손으로 적으면 방식이 늘 때 빠진다.
-                    아직 안 구웠으면 목록이 빈 배열을 주므로 배지가 안 붙는다. */}
-                {(p.film_modes || []).map((id) => (
-                  <span key={id} className="badge ai">{filmMode(id).label}</span>
-                ))}
-                <span className="badge ai">{label}</span>
-                {selecting && (
-                  <span className="card-pick" aria-hidden="true">{selected?.has(p.id) ? "✓" : ""}</span>
                 )}
               </span>
             </Link>

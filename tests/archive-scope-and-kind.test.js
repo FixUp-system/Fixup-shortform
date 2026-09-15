@@ -41,17 +41,22 @@ describe("보관함 — 보던 탭이 주소에 남는다", () => {
   });
 });
 
-describe("보관함 카드 — 어느 모드로 만들었는지 말한다", () => {
-  const src = strip(readFileSync("components/ProjectCards.jsx", "utf8"));
+// ★★★ 2026-09-15 사장님 결정 — **종류는 카드 배지가 아니라 보관함 위 필터가 말한다.**
+//   카드마다 붙은 배지가 날짜·상태와 섞여 복잡했다. 지키려던 것(세 모드가 모두 이름을 갖고,
+//   단계별 = ad·film 이 아닌 전부)은 필터 표로 옮겨 그대로 잰다.
+describe("보관함 — 어느 모드로 만들었는지 필터로 가른다", () => {
+  const cards = strip(readFileSync("components/ProjectCards.jsx", "utf8"));
+  const page = strip(readFileSync("app/archive/page.js", "utf8"));
 
-  it("★★★ 세 모드가 모두 자기 이름을 단다", () => {
-    expect(src).toMatch(/원클릭/);
-    expect(src).toMatch(/한 번에/);
-    expect(src, "단계별 배지가 없다 — 배지 없는 카드가 무엇인지 알 수 없다").toMatch(/단계별/);
+  // ★ 「한 번에」 칸은 같은 날 사장님 지시로 뺐다("한번에는 제거해줘") — 그 영상은 [전체]에서 보인다.
+  it("★★★ 필터 칸은 전체 · 원클릭 · 단계별이다", async () => {
+    const { ARCHIVE_KINDS } = await import("../lib/archive/spec.js");
+    expect(ARCHIVE_KINDS.map((k) => k.label)).toEqual(["전체", "원클릭", "단계별"]);
+    expect(page, "화면이 필터 표를 안 그린다").toMatch(/ARCHIVE_KINDS\.map/);
   });
 
-  it("★★ 단계별은 **ad·film 이 아닐 때** 붙는다 — 상세 화면과 같은 갈래다", () => {
-    expect(src).toMatch(/!isAd && !isFilm && <span className="badge ai">단계별<\/span>/);
+  it("★★ 카드에는 종류 배지가 없다 — 필터와 두 벌이면 한쪽이 낡는다", () => {
+    expect(cards).not.toMatch(/className="badge ai"/);
   });
 
   it("★ 상세 화면도 같은 이름을 쓴다 — 자리마다 다르게 부르면 같은 것이 달라 보인다", () => {

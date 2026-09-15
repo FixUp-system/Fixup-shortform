@@ -44,10 +44,10 @@ describe("보관함 제목 — 두 자리를 다 푼다", () => {
   //   구별이 안 됐다. 그래서 이 시험은 「두 줄」이 아니라 **그 자리가 비었는가**를 재는 것으로
   //   바뀐다. 서버가 100자로 자르는 것은 그대로다 — 그 값은 지우기 다이얼로그와
   //   그림의 대체 텍스트(alt)가 아직 쓴다.
-  //   ★ 날짜는 그 뒤 썸네일 왼쪽 아래로 옮겼다(.thumb-tag.when).
-  it("★ 카드에는 제목 규칙이 아예 없다 — 대신 날짜가 선다", () => {
+  //   ★ 날짜는 그 뒤 보관함의 **날짜 묶음 제목**으로 올라갔다(.archive-day-title).
+  it("★ 카드에는 제목 규칙이 아예 없다 — 대신 날짜 묶음이 선다", () => {
     expect(css.indexOf(".project-meta .title"), "옛 제목 규칙이 남아 있다").toBe(-1);
-    expect(css.indexOf(".thumb-tag.when"), "날짜 규칙이 없다").toBeGreaterThan(-1);
+    expect(css.indexOf(".archive-day-title"), "날짜 묶음 규칙이 없다").toBeGreaterThan(-1);
   });
 });
 

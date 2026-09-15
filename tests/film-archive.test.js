@@ -66,14 +66,16 @@ describe("보관함 목록이 film 을 안다", () => {
   });
 });
 
-describe("카드가 방식을 그린다", () => {
+// ★★★ 2026-09-15 사장님 결정 — **카드는 방식 배지를 더는 안 그린다.** 카드를 썸네일만 남기고
+//   종류는 보관함 위 필터가 가른다(tests/archive-kind-filter.test.js).
+//   ⚠️ 방식(장면 순서·참고 그림)은 **이제 목록 어디에도 안 보인다** — 상세 화면도 방식을 말하지 않는다.
+//     알고 받아들인 손실이다(사장님이 고른 안). 필요해지면 상세에 한 줄 더하는 것이 자리다.
+//   목록이 film_modes 를 싣는 계약(위 describe)은 그대로 둔다 — 완성본 판정(video_url)이 그 자리를 쓴다.
+describe("카드는 방식 배지를 안 그린다", () => {
   const cards = strip(readFileSync("components/ProjectCards.jsx", "utf8"));
 
-  it("★ 방식 이름을 표에서 가져온다 — 손으로 적으면 방식이 늘 때 빠진다", () => {
-    expect(cards).toMatch(/FILM_MODES/);
-  });
-
-  it("★ film_modes 를 읽어 배지를 그린다", () => {
-    expect(cards).toMatch(/film_modes/);
+  it("★ 방식 배지가 남지 않았다", () => {
+    expect(cards).not.toMatch(/film_modes/);
+    expect(cards).not.toMatch(/filmMode\(/);
   });
 });

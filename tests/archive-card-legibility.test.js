@@ -81,17 +81,19 @@ describe("썸네일 위 뱃지는 사진 위에서 보인다", () => {
 //   (사장님 결정), 날짜는 `white-space: nowrap` 이라 **두 줄이 될 수 없다.**
 //   그래서 이제는 가운데 맞추기가 맞다 — 배지(안 여백 포함 약 22px)가 글자 줄(19px)보다
 //   크기 때문에, flex-start 로 두면 날짜만 위로 붕 뜨게 보인다.
-// ★★★ 같은 날 뒤이어 — **날짜가 이 줄을 떠났다**(썸네일 왼쪽 아래, tests/archive-card-date.test.js).
-//   이 줄에는 배지만 남는다. 날짜가 접히지 않는 계약은 그쪽 시험이 잰다.
-describe("카드 아래 뱃지 줄", () => {
-  const meta = () => rule(".project-meta");
-
-  it("★ 규칙이 실제로 있다", () => {
-    expect(meta()).toContain("display: flex");
+// ★★★ 같은 날 뒤이어 — **그 줄 자체를 걷었다**(사장님 결정). 날짜는 보관함의 묶음 제목,
+//   종류는 위 필터, 상태는 안 끝난 카드의 썸네일 태그가 말한다(lib/archive/spec.js).
+//   겹칠 글자 줄이 없으니, 지키던 것은 **썸네일 위 태그끼리 안 부딪힌다**로 옮긴다.
+describe("카드 아래 글자 줄은 없다 — 썸네일 태그끼리 안 부딪힌다", () => {
+  it("★★ 옛 줄의 규칙이 남지 않았다 — 안 쓰는 CSS 는 살아 있는 줄로 읽힌다", () => {
+    expect(rule(".project-meta"), ".project-meta 규칙이 남아 있다").toBe("");
   });
 
-  it("★ 뱃지는 제 크기를 지킨다 — 눌리면 글자가 두 줄로 찌그러진다(기존 계약)", () => {
-    expect(rule(".project-meta .badge")).toMatch(/flex:\s*none/);
+  it("★★★ 상태 태그는 휴지통 자리를 비워 두고 한 줄에서 말줄임한다", () => {
+    const tag = rule(".thumb-tag");
+    expect(tag).toMatch(/max-width:\s*calc\(100% - \d+px\)/);
+    expect(tag).toMatch(/white-space:\s*nowrap/);
+    expect(tag).toMatch(/text-overflow:\s*ellipsis/);
   });
 });
 
@@ -136,12 +138,8 @@ describe("상태 뱃지는 칸이 눌려도 안 찌그러진다", () => {
 //
 // ★ 그래서 **둘 다** 필요하다. 줄바꿈만 열면 칸이 여전히 안 줄고, min-width 만 0 으로
 //   두면 줄이 안 접혀 글자가 잘린다.
+// ★ 2026-09-15 — 카드 아래 줄은 걷었다(위 describe). 격자 칸이 줄어들 수 있어야 한다는 계약은 남는다.
 describe("보관함 카드 — 가로로 안 넘친다", () => {
-  it("★★★ 카드 아래 줄이 접힌다", () => {
-    expect(rule(".project-meta"), "줄바꿈이 없어 배지·[지우기] 가 옆으로 밀린다")
-      .toMatch(/flex-wrap:\s*wrap/);
-  });
-
   it("★★★ 격자 칸이 내용보다 좁아질 수 있다 — grid 항목의 기본값이 auto 다", () => {
     expect(rule(".project-card"), "min-width: 0 이 없어 열이 벌어진다")
       .toMatch(/min-width:\s*0/);

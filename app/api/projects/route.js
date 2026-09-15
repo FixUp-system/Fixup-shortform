@@ -1,4 +1,5 @@
 import { createProject, listProjects, listAllProjects, PROJECT_PAGE, projectCursor } from "../../../lib/projects";
+import { archiveKindOf } from "../../../lib/archive/spec.js";
 import { isSubtitleLang, DEFAULT_SPEECH_LANG } from "../../../lib/subtitle-langs.js";
 import { isAspect, DEFAULT_ASPECT_ID } from "../../../lib/aspects";
 import { TARGET_CHOICES } from "../../../lib/script";
@@ -29,7 +30,13 @@ export const GET = withUser(async (req, _ctx, user) => {
   const scope = url.searchParams.get("scope");
   // ★ 손님이라는 사실을 **화면에 말해 준다** — 화면이 "로그인하면 내 영상이 보여요"를 그린다.
   if (!user) return Response.json({ projects: [], guest: true, has_more: false });
-  const page = { before: projectCursor(url.searchParams.get("before")), limit: PROJECT_PAGE + 1 };
+  // kind — 보관함 종류 필터(원클릭·단계별). **DB 가 거른다** — 받은 쪽 안에서 거르면
+  //   「더 보기」 쪽마다 몇 편만 남는다. 모르는 값은 전체다(lib/archive/spec.js).
+  const page = {
+    before: projectCursor(url.searchParams.get("before")),
+    limit: PROJECT_PAGE + 1,
+    kind: archiveKindOf(url.searchParams.get("kind")),
+  };
   const rows = scope === "all" && user.role === "admin"
     ? await listAllProjects(user.id, page)
     : await listProjects(user.id, page);
