@@ -274,21 +274,9 @@ function ArchiveDetailPageBody() {
 
           <div className="sub-editor">
             <div className="brief">
-              {/* ★★★ 2026-09-01 사장님 지시 — **한눈에 들어오게.** 그전에는 사양 다섯이
-                  줄 다섯을 차지해, 정작 궁금한 "어떻게 만들었나"가 세로로 흩어져 있었다.
-                  한 줄 칩으로 모으면 훑는 눈이 한 번에 지나간다.
-                  ★ 없는 값은 칩째 안 그린다 — 이 화면의 규칙 그대로다(Row 와 같은 뜻).
-                  ★ 화풍은 **라벨**로 그린다(lib/archive/spec.js) — 그전에는 `s.style` 을
-                    그대로 그려 `vlog` 라는 영어 id 가 새어 나왔다. 옆 값들은 전부
-                    사람 말이었으므로 거기만 깨져 보였다. */}
-              <div className="spec-chips">
-                {modelLabel && <span className="spec-chip"><b>모델</b>{modelLabel}</span>}
-                {seconds ? <span className="spec-chip"><b>길이</b>{seconds}초</span> : null}
-                {resolution && <span className="spec-chip"><b>화질</b>{resolution}</span>}
-                {s.aspect_ratio && <span className="spec-chip"><b>비율</b>{s.aspect_ratio}</span>}
-                {styleLabel && <span className="spec-chip"><b>화풍</b>{styleLabel}</span>}
-              </div>
-
+              {/* ★★★ 2026-09-15 사장님 지시 — **붙인 사진이 맨 위**, 만들 때 쓴 값은 그 아래.
+                  이 화면은 "어떻게 만들어졌나"를 보는 자리인데, 눈이 가장 먼저 붙는 것이
+                  그림이다 — 칩부터 읽히면 무엇으로 만든 영상인지가 한 박자 늦는다. */}
               {/* ★★★ **붙인 레퍼런스를 그림으로 보여 준다**(사장님 지시: "사용자가 첨부한
                   레퍼런스는 어떤건지"). 그전에는 "3장"이라고만 적혀 있어서, 무엇을 붙였는지
                   알려면 제작 화면까지 들어가야 했다.
@@ -304,6 +292,21 @@ function ArchiveDetailPageBody() {
                   ))}
                 </div>
               )}
+
+              {/* ★★★ 2026-09-01 사장님 지시 — **한눈에 들어오게.** 그전에는 사양 다섯이
+                  줄 다섯을 차지해, 정작 궁금한 "어떻게 만들었나"가 세로로 흩어져 있었다.
+                  한 줄 칩으로 모으면 훑는 눈이 한 번에 지나간다.
+                  ★ 없는 값은 칩째 안 그린다 — 이 화면의 규칙 그대로다(Row 와 같은 뜻).
+                  ★ 화풍은 **라벨**로 그린다(lib/archive/spec.js) — 그전에는 `s.style` 을
+                    그대로 그려 `vlog` 라는 영어 id 가 새어 나왔다. 옆 값들은 전부
+                    사람 말이었으므로 거기만 깨져 보였다. */}
+              <div className="spec-chips">
+                {modelLabel && <span className="spec-chip"><b>모델</b>{modelLabel}</span>}
+                {seconds ? <span className="spec-chip"><b>길이</b>{seconds}초</span> : null}
+                {resolution && <span className="spec-chip"><b>화질</b>{resolution}</span>}
+                {s.aspect_ratio && <span className="spec-chip"><b>비율</b>{s.aspect_ratio}</span>}
+                {styleLabel && <span className="spec-chip"><b>화풍</b>{styleLabel}</span>}
+              </div>
 
               <Row label="내가 적은 내용">
                 {doc.material?.text ? <UserInput text={doc.material.text} /> : null}

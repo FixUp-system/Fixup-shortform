@@ -1741,6 +1741,12 @@ label.up.add:hover { border-color: var(--ink-soft); color: var(--ink); }
 
 /* ── 브리핑 카드 */
 .brief { background: var(--deep); border: 1px solid var(--line); border-radius: var(--r-card); padding: 16px 18px; }
+/* ★★★ 2026-09-15 사장님 지시 — 보관함 상세에서 **두 칸의 길이를 맞춘다.** 왼쪽 「만든 정보」가
+   제 내용만큼만 서고 오른쪽 영상은 그보다 훨씬 길어, 둘이 다른 물건처럼 보였다.
+   ★ 늘이는 것은 **왼쪽 상자**다 — 영상은 비율이 정하는 크기라 건드리면 안 된다.
+   ★ 보관함 상세에서만(.panel--library) — ⑥완성의 무대는 자막 조절판이라 사정이 다르다. */
+.panel--library .sub-editor { display: flex; flex-direction: column; align-self: stretch; }
+.panel--library .brief { flex: 1; }
 .brief-row { display: grid; grid-template-columns: 86px 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
 .brief-row:last-child { border-bottom: 0; }
 .brief-row > b { color: var(--ink-soft); font-weight: 400; font-size: 14px; padding-top: 2px; }
