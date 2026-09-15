@@ -245,7 +245,10 @@ export default function ReelNewPage() {
             설정」 레일이 서 있다. 격자도 **같은 것**(.rw-grid)을 써서 레일의 x 좌표가 한
             픽셀도 안 움직인다 — 시작하는 순간 그 레일이 그대로 「잠김」을 말하는 레일이 된다.
           ★ 줄 자체는 **옮기기만** 했다 — 각 줄에 붙은 사정(주석)이 많아 다시 쓰는 것이 더 위험하다. */}
-      <div className="rw-grid rw-grid--even">
+      {/* ★★★ 2026-09-15 — 바닥 맞추기는 **접혔을 때만**이다(사장님 지적: "더 보기 했을 때
+          입력 폼이 너무 길어져"). 펼치면 레일이 길어지는데, 맞춰 두면 적는 칸이 그대로
+          따라가 화면 아래까지 늘어진다. 펼친 뒤에는 레일만 길어지고 폼은 제 높이를 지킨다. */}
+      <div className={`rw-grid${more || allStyles ? "" : " rw-grid--even"}`}>
         <aside className="rp-panel">
           <div className="rp-head">이 영상의 설정</div>
           <div className="rp-body">

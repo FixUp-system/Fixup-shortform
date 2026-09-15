@@ -69,7 +69,12 @@ describe("①입력 — 설정은 왼쪽 레일에", () => {
   //     (reel-workbench-layout 의 「왼쪽 설정 패널은 작업대 길이를 따라 늘어나지 않는다」).
   //     그래서 **이 화면에서만** 여는 표식을 따로 둔다.
   it("★★★ 두 칸의 **바닥이 맞는다** — 이 화면에서만", () => {
-    expect(page, "높이를 맞추는 표식이 없다").toMatch(/rw-grid[^"`]*rw-grid--even/);
+    expect(page, "높이를 맞추는 표식이 없다").toContain("rw-grid--even");
+    // ★★★ 2026-09-15 사장님 지적 — 「더 보기 했을 때 입력 폼이 너무 길어져」.
+    //   펼치면 레일이 길어지는데 바닥을 맞춰 두면 **적는 칸이 그걸 그대로 따라간다.**
+    //   그래서 **접혔을 때만** 맞춘다. 펼친 뒤에는 레일만 길어지고 폼은 제 높이를 지킨다.
+    expect(page, "펼쳐도 폼이 레일을 따라간다 — 너무 길어진다")
+      .toMatch(/(more|allStyles)[\s\S]{0,60}?rw-grid--even/);
     const m = /\.rw-grid--even\s*\{([^}]*)\}/.exec(css);
     expect(m, "그 표식의 규칙이 없다").toBeTruthy();
     expect(m[1], "바닥을 안 맞춘다").toMatch(/align-items:\s*stretch/);
