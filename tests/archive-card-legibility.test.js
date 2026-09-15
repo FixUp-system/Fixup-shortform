@@ -76,19 +76,23 @@ describe("썸네일 위 뱃지는 사진 위에서 보인다", () => {
 //
 // 원인: 제목이 line-clamp: 2 로 **두 줄까지 자라는데** .project-meta 가 align-items:
 // center 라, 제목이 두 줄이 되면 그 줄이 세로로 커져 옆 뱃지와 시각적으로 부딪힌다.
-describe("카드 아래 제목과 뱃지가 안 겹친다", () => {
+//
+// ★★★ 2026-09-15 — **그 전제가 사라졌다.** 제목 줄을 걷고 만든 날짜를 두었고
+//   (사장님 결정), 날짜는 `white-space: nowrap` 이라 **두 줄이 될 수 없다.**
+//   그래서 이제는 가운데 맞추기가 맞다 — 배지(안 여백 포함 약 22px)가 글자 줄(19px)보다
+//   크기 때문에, flex-start 로 두면 날짜만 위로 붕 뜨게 보인다.
+//   ★ 지키려던 것(글과 배지가 안 부딪힌다)은 그대로다 — 재는 방법을 바꿨다:
+//     정렬 방향이 아니라 **그 줄이 두 줄이 될 수 있는가**를 막는다.
+describe("카드 아래 날짜와 뱃지가 안 겹친다", () => {
   const meta = () => rule(".project-meta");
 
   it("★ 규칙이 실제로 있다", () => {
     expect(meta()).toContain("display: flex");
   });
 
-  it("★ 가운데 정렬이 아니다 — 제목이 두 줄이 되면 뱃지와 부딪힌다", () => {
-    expect(meta()).not.toMatch(/align-items:\s*center/);
-  });
-
-  it("★ 위쪽에 맞춘다 — 제목이 몇 줄이든 뱃지는 첫 줄 옆에 선다", () => {
-    expect(meta()).toMatch(/align-items:\s*flex-start/);
+  it("★★★ 날짜가 두 줄이 될 수 없다 — 겹침을 막는 진짜 근거는 이것이다", () => {
+    expect(rule(".project-meta .when"), "날짜가 접힐 수 있다 — 접히면 배지와 부딪힌다")
+      .toMatch(/white-space:\s*nowrap/);
   });
 
   it("★ 뱃지는 제 크기를 지킨다 — 눌리면 글자가 두 줄로 찌그러진다(기존 계약)", () => {

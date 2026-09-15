@@ -37,12 +37,16 @@ describe("보관함 제목 — 두 자리를 다 푼다", () => {
     expect(store).toMatch(/material_text \|\| ""\)\.slice\(0, (8|9|1[0-2])\d\)/);
   });
 
-  it("★ 카드가 한 줄로 안 자른다 — 두 줄까지 보여준다", () => {
-    const at = css.indexOf(".project-meta .title");
-    expect(at).toBeGreaterThan(-1);
-    const rule = css.slice(at, css.indexOf("}", at));
-    expect(rule, "아직 nowrap 이라 한 줄에서 잘린다").not.toMatch(/white-space:\s*nowrap/);
-    expect(rule, "줄 수 제한(-webkit-line-clamp)이 없다").toMatch(/line-clamp:\s*2/);
+  // ★★★ 2026-09-15 — **이 결정은 뒤집혔다.** 카드에서 제목 줄을 통짜로 걷고
+  //   만든 날짜를 둔다(사장님 결정, tests/archive-card-date.test.js).
+  //   두 줄로 늘리는 것으로는 문제가 안 풀렸다 — 「제목」이 사장님이 적은 원문
+  //   앞 100자라, 비슷한 편끼리는 **앞머리 자체가 같아서** 한 줄이든 두 줄이든
+  //   구별이 안 됐다. 그래서 이 시험은 「두 줄」이 아니라 **그 자리가 비었는가**를 재는 것으로
+  //   바뀐다. 서버가 100자로 자르는 것은 그대로다 — 그 값은 지우기 다이얼로그와
+  //   그림의 대체 텍스트(alt)가 아직 쓴다.
+  it("★ 카드에는 제목 규칙이 아예 없다 — 그 자리는 날짜가 썼다", () => {
+    expect(css.indexOf(".project-meta .title"), "옛 제목 규칙이 남아 있다").toBe(-1);
+    expect(css.indexOf(".project-meta .when"), "날짜 규칙이 없다").toBeGreaterThan(-1);
   });
 });
 

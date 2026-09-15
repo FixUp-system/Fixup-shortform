@@ -7,6 +7,8 @@ import { thumbUrl } from "../lib/thumb-url.js";
 import Link from "next/link";
 import { useDialog } from "./DialogProvider";
 import { FILM_MODES, filmMode } from "../lib/film/mode";
+// 만든 날짜를 사람 말로 — 화면이 직접 조립하면 자리마다 모양이 갈린다.
+import { madeOnLabel } from "../lib/archive/spec";
 
 // 홈과 보관함이 같은 카드를 쓴다. 마크업을 두 벌로 두면 한쪽만 고쳐지는 날이 온다.
 
@@ -189,7 +191,13 @@ export default function ProjectCards({ projects, limit, onDeleted, selecting, se
                 {p.video_url && <span className="thumb-tag">영상</span>}
               </span>
               <span className="project-meta">
-                <span className="title">{p.title || "제목 없음"}</span>
+                {/* ★★★ 2026-09-15 사장님 결정 — 여기 있던 「제목」은 제목이 아니었다.
+                    `material_text.slice(0, 100)`, 즉 사장님이 적은 원문 앞머리라
+                    비슷한 편끼리는 똑같이 잘려 **구별에 도움이 안 됐다.**
+                    ★ 그렇다고 줄을 비우지는 않는다 — 썸네일이 아직 없는 카드가 많아
+                      비우면 카드를 가를 단서가 배지 둘뿐이 된다.
+                    ★ 말을 만드는 일은 lib/archive/spec.js 가 한다(화면은 그리기만). */}
+                <span className="when">{madeOnLabel(p.created_ts)}</span>
                 {/* ★★★ 2026-09-03 사장님 지시 — **어느 모드로 만든 것인지 카드가 말한다.**
                     그전에는 광고(원클릭)와 film(한 번에)에만 배지가 붙고 **단계별은 아무
                     표시가 없어서**, 배지 없는 카드가 "단계별"인지 "옛 문서라 종류를 모르는
