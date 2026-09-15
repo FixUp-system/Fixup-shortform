@@ -6,6 +6,7 @@ import { useState } from "react";
 import { thumbUrl } from "../lib/thumb-url.js";
 import Link from "next/link";
 import { useDialog } from "./DialogProvider";
+import Icon from "./Icon";
 import { FILM_MODES, filmMode } from "../lib/film/mode";
 // 만든 날짜를 사람 말로 — 화면이 직접 조립하면 자리마다 모양이 갈린다.
 import { madeOnLabel } from "../lib/archive/spec";
@@ -189,6 +190,31 @@ export default function ProjectCards({ projects, limit, onDeleted, selecting, se
               <span className="project-thumb">
                 <Thumb video={p.video_url} image={p.image_url} alt={p.title || "만든 영상"} />
                 {p.video_url && <span className="thumb-tag">영상</span>}
+                {/* ★ 남이 만든 카드에는 쓰기 버튼을 아예 안 그린다(mine === false) —
+                    눌러도 404 인 버튼을 그리면 "왜 안 되지"만 남는다. 목록에 mine 이 없는
+                    옛 호출부(홈)는 지금 그대로다.
+                    ★★ **운영자는 예외다**(2026-09-03 사장님 지시: "관리자는 전체 영상을
+                    삭제할 수 있는 권한"). 서버도 같이 열렸으므로(lib/projects.js 의
+                    deleteProject) 화면만 열어 404 를 만드는 상황이 아니다.
+                    ⚠️ 이 값은 **화면이 정하지 않는다** — 부르는 쪽이 /api/me 의 isAdmin 을
+                    보고 넘긴다. 여기서 역할을 직접 읽으면 판정이 두 벌이 된다.
+                    고르는 동안에는 낱개 지우기를 감춘다 — 두 가지 지우는 길이 한 화면에
+                    있으면 어느 것이 지금 도는 길인지 흐려진다
+                    ★★★ 2026-09-15 사장님 결정 — **썸네일 오른쪽 위 휴지통**이다. 날짜 · 배지 줄에
+                    두니 모든 카드에서 날짜 밑으로 밀렸다(tests/archive-card-delete-spot.test.js).
+                    이름은 aria-label 이 말한다(아이콘은 aria-hidden). */}
+                {onDeleted && !selecting && (canDeleteAny || p.mine !== false) && (
+                  <button
+                    className="card-del"
+                    aria-label="이 영상 지우기"
+                    title="이 영상 지우기"
+                    disabled={busyId === p.id}
+                    onClick={(e) => remove(e, p)}
+                  >
+                    <Icon name="trash" size={14} />
+                    {busyId === p.id && "지우는 중…"}
+                  </button>
+                )}
               </span>
               <span className="project-meta">
                 {/* ★★★ 2026-09-15 사장님 결정 — 여기 있던 「제목」은 제목이 아니었다.
@@ -218,26 +244,6 @@ export default function ProjectCards({ projects, limit, onDeleted, selecting, se
                 <span className="badge ai">{label}</span>
                 {selecting && (
                   <span className="card-pick" aria-hidden="true">{selected?.has(p.id) ? "✓" : ""}</span>
-                )}
-                {/* ★ 남이 만든 카드에는 쓰기 버튼을 아예 안 그린다(mine === false) —
-                    눌러도 404 인 버튼을 그리면 "왜 안 되지"만 남는다. 목록에 mine 이 없는
-                    옛 호출부(홈)는 지금 그대로다.
-                    ★★ **운영자는 예외다**(2026-09-03 사장님 지시: "관리자는 전체 영상을
-                    삭제할 수 있는 권한"). 서버도 같이 열렸으므로(lib/projects.js 의
-                    deleteProject) 화면만 열어 404 를 만드는 상황이 아니다.
-                    ⚠️ 이 값은 **화면이 정하지 않는다** — 부르는 쪽이 /api/me 의 isAdmin 을
-                    보고 넘긴다. 여기서 역할을 직접 읽으면 판정이 두 벌이 된다.
-                    고르는 동안에는 낱개 지우기를 감춘다 — 두 가지 지우는 길이 한 화면에
-                    있으면 어느 것이 지금 도는 길인지 흐려진다 */}
-                {onDeleted && !selecting && (canDeleteAny || p.mine !== false) && (
-                  <button
-                    className="card-del"
-                    aria-label="이 영상 지우기"
-                    disabled={busyId === p.id}
-                    onClick={(e) => remove(e, p)}
-                  >
-                    {busyId === p.id ? "지우는 중…" : "지우기"}
-                  </button>
                 )}
               </span>
             </Link>
