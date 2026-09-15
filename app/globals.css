@@ -581,7 +581,9 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
    ([지우기]는 09-15 에 썸네일 모서리로 나갔다 — 지금도 「한 번에」 카드는 배지만으로 넘친다.) */
 /* 한 줄이다 — 날짜 · 배지들(2026-09-15 사장님 지시). 가운데 맞추기는 그 줄의 글자와
    배지의 높이가 달라서 필요하다(flex-start 면 배지가 글자보다 위로 뜨다). */
-.project-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* ★ 가로도 가운데다(2026-09-15 사장님 지시) — 썸네일 밑에서 줄이 왼쪽에 붙으면 카드 오른쪽이
+   비어 보인다. 배지가 넘쳐 두 줄이 되는 카드(「한 번에」)도 줄마다 가운데로 선다. */
+.project-meta { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
 /* 카드의 지우기 — 되돌릴 수 없는 동작이라 눈에 먼저 띄면 안 된다. 평소에는 흐리게 두고
    카드에 마우스를 올렸을 때만 또렷해진다. 손가락으로 쓰는 화면에는 늘 보인다
    (hover 가 없는 기기에서 숨기면 지울 길이 아예 없어진다).
@@ -651,12 +653,15 @@ a.side-step:hover { background: var(--surface2); color: var(--ink); }
      ★ 한때 날짜가 줄을 혼자 쓰게(flex-basis 100%) 떼었지만, 사장님 지시로 **한 줄
        (날짜 · 배지)** 로 되돌렸다. 좁은 카드에서는 배지가 flex-wrap 으로 다음 줄로 간다.
      ★ nowrap 을 함께 둔다 — 좁은 카드에서는 날짜가 단위를 끊고 접힐 수 있다
-       (그것이 바로 사장님이 본 「8월 28 / 일」이다). */
+       (그것이 바로 사장님이 본 「8월 28 / 일」이다).
+     ★★ 글자는 **배지와 같다**(12px · 600 · 자간 0.02em — `.badge` 의 값, 2026-09-15 사장님 지시).
+       14px 로 두니 한 줄 안에서 날짜만 크게 튀었다. 배지와 달리 바탕·안 여백은 없다. */
   flex: none;
   white-space: nowrap;
   font-weight: 600;
-  font-size: 14px;
-  line-height: 1.35;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  line-height: 1.6;
 }
 /* 날짜와 배지 사이의 구분점 — 둘은 같은 줄에 서지만 성격이 다르다(언제 · 무엇).
    ★ 글자가 아니라 **장식**이라 CSS 에 둔다 — 마크업에 넣으면 화면을 읽어 주는

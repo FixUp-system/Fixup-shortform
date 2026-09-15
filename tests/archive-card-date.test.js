@@ -67,6 +67,25 @@ describe("보관함 카드 CSS — 자리를 옮긴다", () => {
     expect(css.indexOf(".project-meta .when"), ".project-meta .when 규칙이 없다").toBeGreaterThan(-1);
   });
 
+  // ★★ 2026-09-15 사장님 지시 — 날짜 글자는 배지(라벨)와 같고, 줄은 가로 가운데다.
+  it("★★ 날짜 글자가 배지와 같다 — 크기·굵기·자간", () => {
+    const pick = (sel) => {
+      const at = css.indexOf(`\n${sel} {`);
+      return css.slice(at, css.indexOf("\n}", at));
+    };
+    const when = pick(".project-meta .when");
+    const badge = pick(".badge");
+    for (const prop of ["font-size", "font-weight", "letter-spacing"]) {
+      const v = (s) => s.match(new RegExp(`${prop}:\\s*([^;]+);`))?.[1];
+      expect(v(when), `${prop} 가 배지와 다르다`).toBe(v(badge));
+    }
+  });
+
+  it("★★ 날짜 · 배지 줄은 가로 가운데로 선다", () => {
+    const at = css.indexOf("\n.project-meta {");
+    expect(css.slice(at, css.indexOf("}", at))).toMatch(/justify-content:\s*center/);
+  });
+
   it("★★ 옛 제목 규칙은 걷는다 — 아무도 안 쓰는 CSS 가 남으면 다음 사람이 살아 있는 줄 안다", () => {
     expect(css.indexOf(".project-meta .title"), "옛 제목 규칙이 남아 있다").toBe(-1);
   });
