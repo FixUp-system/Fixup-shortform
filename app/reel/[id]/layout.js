@@ -18,7 +18,7 @@ import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useReelProject } from "../../../components/ReelProjectContext";
 import SettingsPanel from "../../../components/reel/SettingsPanel";
-import StepStack from "../../../components/reel/StepStack";
+import { ReelStepStrip } from "../../../components/reel/StepStack";
 import {
   REEL_STEPS, reelStepHref, isReelStepReachable, currentReelStepKey, reelStepFromPathname,
 } from "../../../lib/reel/steps";
@@ -74,12 +74,17 @@ function Inner({ children }) {
   //   같은 말을 두 번 하는 자리가 돼 걷어냈다. 사이드바에는 이 흐름으로 **되돌아오는
   //   링크 한 줄**만 남는다. 광고·film·옛 단계별은 작업대가 없어 그대로 사이드바가 그린다.
   return (
-    <div className="rw-grid">
-      <SettingsPanel />
-      <div className="rw-work">
-        <StepStack>{children}</StepStack>
+    <>
+      {/* ★★★ 2026-09-15 사장님 지시 — 띠는 격자 **밖·위**다. 격자 안(본문 칸)에 있으면
+          설정 패널만 띠보다 위에서 시작해 두 카드의 상단이 안 맞는다. 위로 올리면
+          설정 패널과 본문이 둘 다 격자 첫 줄이 되어 **저절로** 맞는다 — 여백을 수로
+          밀어 넣지 않는다(띠가 두 줄로 접히는 화면에서 그 수가 바로 틀어진다). */}
+      <ReelStepStrip />
+      <div className="rw-grid">
+        <SettingsPanel />
+        <div className="rw-work">{children}</div>
       </div>
-    </div>
+    </>
   );
 }
 

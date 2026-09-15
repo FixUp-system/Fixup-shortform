@@ -189,12 +189,24 @@ describe("단계별 작업 화면 배치", () => {
     expect(code, "불러오는 중 갈래가 사라졌다").toMatch(/불러오는 중/);
   });
 
-  it("★★ 설정 패널과 작업대를 함께 그린다", () => {
+  it("★★ 설정 패널과 본문을 함께 그린다", () => {
     expect(code).toMatch(/<SettingsPanel\s*\/>/);
-    expect(code).toMatch(/<StepStack>[\s\S]*\{children\}[\s\S]*<\/StepStack>/);
-    // 부품을 실제로 끌어왔나 — 이름만 쓰면 화면이 그 자리에서 죽는다.
     expect(code, "설정 패널을 import 하지 않았다").toMatch(/import\s+SettingsPanel\s+from/);
-    expect(code, "작업대를 import 하지 않았다").toMatch(/import\s+StepStack\s+from/);
+    expect(code, "걸음 띠를 import 하지 않았다").toMatch(/import\s*\{[^}]*ReelStepStrip[^}]*\}/);
+  });
+
+  // ★★★ 2026-09-15 사장님 지시 — 설정 카드의 **상단**이 시나리오 카드의 상단과 맞아야 한다.
+  //   그전에는 띠가 본문 칸(.rw-work) 안에 있어서 설정 패널만 띠보다 위에서 시작했다.
+  //   ★ 여백을 수로 밀어 넣지 않는다 — 띠가 두 줄로 접히는 화면에서 그 수가 바로 틀어진다.
+  //     띠를 **격자 위로** 올리면 설정 패널과 본문이 **둘 다 격자 첫 줄**이 되어 저절로 맞는다.
+  //   ★★ 격자의 한 줄로 떼어 내는 방법은 **쓸 수 없다**: 띠는 sticky 라 자기보다 큰 상자가
+  //     있어야 움직인다. 제 높이만 한 줄에 갇히면 붙는 성질이 그 자리에서 죽는다.
+  it("★★★ 띠는 격자 **밖·위**에 선다 — 그래야 설정과 본문의 상단이 맞는다", () => {
+    const iStrip = code.indexOf("<ReelStepStrip");
+    const iGrid = code.indexOf('className="rw-grid"');
+    expect(iStrip, "띠를 안 그린다").toBeGreaterThan(-1);
+    expect(iGrid, "격자를 안 그린다").toBeGreaterThan(-1);
+    expect(iStrip, "띠가 격자 안에 있다 — 설정 패널만 위로 삐져나온다").toBeLessThan(iGrid);
   });
 
   it("★★ children 을 꽂는 자리는 하나다 — 두 곳이면 단계 페이지가 두 번 그려진다", () => {
@@ -204,6 +216,8 @@ describe("단계별 작업 화면 배치", () => {
     expect(at, "격자를 안 그린다").toBeGreaterThan(-1);
     const jsx = code.slice(at, code.indexOf(");", at));
     expect([...jsx.matchAll(/\{\s*children\s*\}/g)].length, "children 을 여러 자리에 꽂는다").toBe(1);
+    // 띠는 이제 격자 밖이므로, 격자 안에 남는 것은 **설정 패널과 본문 둘**이다.
+    expect(jsx, "격자 안에 띠가 남아 있다").not.toContain("ReelStepStrip");
   });
 });
 

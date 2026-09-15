@@ -79,20 +79,19 @@ describe("걸음 띠 — 가로 한 줄", () => {
     expect(stripZ, "띠가 벨트를 덮는다").toBeLessThan(beltZ);
   });
 
-  it("★★★ 지금 단계 내용은 띠 **밖**에 온다 — 줄 안에 꽂으면 다시 밀려난다", () => {
-    const jsx = code.slice(code.lastIndexOf("return ("));
-    const iStrip = jsx.indexOf("rs-strip");
-    expect(iStrip, "띠를 안 그린다").toBeGreaterThan(-1);
-    // 띠를 닫은 **뒤에** children 이 온다. 띠 안에 있으면 단계 하나가 다시 여섯 줄
-    // 사이에 끼어 들어가 옛 구조가 된다.
-    const iClose = jsx.indexOf("</div>", iStrip);
-    expect(iClose, "띠를 안 닫는다").toBeGreaterThan(-1);
-    const iChildren = jsx.indexOf("{children}");
-    expect(iChildren, "children 을 안 그린다").toBeGreaterThan(-1);
-    expect(iChildren, "children 이 띠 안에 있다 — 단계 내용이 줄 사이에 낀다")
-      .toBeGreaterThan(iClose);
-    // 꽂는 자리가 둘이면 단계 페이지가 두 번 그려진다(폴링도 두 벌이 된다).
-    expect([...jsx.matchAll(/\{\s*children\s*\}/g)].length, "children 을 여러 자리에 꽂는다").toBe(1);
+  // ★★★ 2026-09-15 — 이 자리에는 "children 이 띠를 **닫은 뒤**에 온다"를 재는 판이
+  //   있었다. 그때는 이 부품이 띠와 본문을 함께 그렸기 때문이다. 지금은 띠가 격자
+  //   **밖·위**로 나가면서 이 부품이 `children` 을 **아예 안 받는다** — 섞일 자리가
+  //   구조적으로 사라졌다. 그래서 순서가 아니라 **그 사실 자체**를 못 박는다.
+  //   (어디에 서는가는 tests/reel-workbench-layout.test.js 가 잰다.)
+  it("★★★ 띠는 본문을 품지 않는다 — 품는 순간 단계 내용이 줄 사이에 낀다", () => {
+    const at = code.indexOf("export function ReelStepStrip");
+    expect(at, "띠 출구가 없다").toBeGreaterThan(-1);
+    const sig = code.slice(at, code.indexOf(")", at) + 1);
+    expect(sig, "띠가 children 을 받는다 — 본문이 띠 안으로 들어올 수 있다").not.toContain("children");
+    const body = code.slice(at, code.indexOf("\n}", at));
+    expect(body, "띠가 본문을 그린다").not.toMatch(/\{\s*children\s*\}/);
+    expect(body, "띠 겉틀을 안 그린다").toContain("rs-strip");
   });
 
   // ★★★ 2026-09-14 낮에 이 자리에서 캐스케이드로 데었다 — `.is-open { opacity: 1 }` 로

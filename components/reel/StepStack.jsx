@@ -96,20 +96,27 @@ export function ReelStepPreview() {
   );
 }
 
-export default function StepStack({ children }) {
+// 걸음 띠 — **격자 밖·위**에 선다(2026-09-15 사장님 지시).
+//
+// ★★★ 그전에는 이 부품이 `children` 까지 받아 본문 칸(.rw-work) 안에서 띠+본문을 함께
+//   그렸다. 그러면 설정 패널만 띠보다 **위에서** 시작해 두 카드의 상단이 안 맞는다.
+//   이제 띠는 격자 위에 서고, 설정 패널과 본문이 **둘 다 격자 첫 줄**이 되어 저절로 맞는다.
+// ★★ 격자의 **한 줄**로 떼어 내는 방법은 쓸 수 없다 — 띠는 sticky 라 자기보다 큰 상자가
+//   있어야 움직인다. 제 높이만 한 줄에 갇히면 붙는 성질이 그 자리에서 죽는다.
+//   격자 밖에 두면 상자가 본문 전체라 그대로 붙는다.
+export function ReelStepStrip() {
   const pathname = usePathname();
   const { project } = useReelProject();
   // 아직 못 읽었으면 틀을 그리지 않는다 — 빈 줄 여섯이 먼저 서면 사장님은 자기
   // 영상이 처음으로 되돌아간 줄 안다.
-  if (!project) return children;
+  if (!project) return null;
 
   // 주소가 먼저다 — 사장님이 실제로 보고 있는 화면이 그것이다. 주소로 못 알아본
   // 자리에서만 문서가 말하는 지금 단계로 떨어진다.
   const here = reelStepFromPathname(pathname)?.key || currentReelStepKey(project);
 
   return (
-    <>
-      <div className="rs-strip">
+    <div className="rs-strip">
         {REEL_STEPS.map((step) => {
           const now = step.key === here;
           const reachable = isReelStepReachable(step.key, project);
@@ -141,8 +148,6 @@ export default function StepStack({ children }) {
             <span className={cls} key={step.key}>{head}</span>
           );
         })}
-      </div>
-      {children}
-    </>
+    </div>
   );
 }
