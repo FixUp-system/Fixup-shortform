@@ -56,7 +56,7 @@ import { STYLE_PRESETS } from "../../../lib/styles";
 // (resolutionsForModel). isResolutionFor 는 라우트와 같은 판정이라 여기서는 안 쓴다(화면은
 // 목록에서 고르므로 애초에 모르는 값이 안 생긴다 — 검증은 서버 몫).
 import {
-  resolutionsForModel, secondsForModel, reelModelsForTier,
+  resolutionsForModel, secondsForModel, pickedSeconds, reelModelsForTier,
   DEFAULT_I2V_MODEL, DEFAULT_RESOLUTION, defaultResolutionForModel, blocksFacesInRefs,
 } from "../../../lib/clip-limits";
 // 등급은 서버가 판정해 /api/me 로 내려준다 — 화면이 profile 을 직접 읽지 않는다.
@@ -140,6 +140,10 @@ export default function ReelNewPage() {
   const [err, setErr] = useState("");
   const fileRef = useRef(null);
   const locked = !!busy || uploading;
+  // 시작에 실을 길이 — 선택지가 하나면 안 골라도 그 값이다(pickedSeconds).
+  // ★★★ 2026-09-15 회귀 — 고를 게 하나뿐인 길이 줄을 숨긴 뒤에도 잠금이 날 target 을 봐서, 기본 모델(15초 하나)에서
+  //   [시작하기]가 **영원히 안 눌렸다**(누를 칸이 없었다). 잠금과 보내는 값이 이 한 값을 같이 본다.
+  const seconds = pickedSeconds(model, target);
 
   // ★★ 모델을 바꾸면 **그 모델이 안 받는 값을 들고 있을 수 있다** — 광고 화면의
   //   onModelChange 와 같은 처방이다(app/ads/new/page.js). 예: 2.0 에서 1080p 를 골라
@@ -205,7 +209,7 @@ export default function ReelNewPage() {
       body: JSON.stringify({
         material: { text, photos },
         settings: {
-          aspect_ratio: aspect, target_seconds: target, resolution, i2v_model: model,
+          aspect_ratio: aspect, target_seconds: seconds, resolution, i2v_model: model,
           concept, mood, style, narration_lang: lang,
         },
       }),
@@ -431,7 +435,7 @@ export default function ReelNewPage() {
             ))}
             <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={onFiles} />
             <span className="spacer" />
-            <button className="cta" disabled={locked || !text.trim() || !target} onClick={create}>
+            <button className="cta" disabled={locked || !text.trim() || !seconds} onClick={create}>
               {busy === "create" ? "만드는 중…" : uploading ? "사진 올리는 중…" : "시작하기 →"}
             </button>
           </div>
