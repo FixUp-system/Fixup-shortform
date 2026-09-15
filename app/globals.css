@@ -1157,8 +1157,23 @@ a.side-item { text-decoration: none; }
      세로 흐름으로 두고 순서만 뒤집는다(order). 마크업 순서는 그대로라 스크린리더도
      "펼치기"를 글 다음에 만난다.
    ★ 액센트를 안 쓴다 — 앱층에서 가장 강한 색은 사이드바 스테퍼의 몫이다(판이 잡는다). */
+/* ★★★ 2026-09-15 — 적은 글은 이 자리에서 펼치지 않고 **입력 화면으로 간다**(사장님 결정).
+   미리보기는 그대로 두고, 아래 한 줄이 가는 길이다. */
+.input-more { display: flex; flex-direction: column; gap: 8px; }
+/* ★ 브라우저 기본 링크 모양(보라 + 밑줄)이 나오면 이 화면에서 혼자 날것으로 보인다 —
+   우리 글자색으로 두고 손을 올렸을 때만 밑줄을 긋는다. */
+.input-more .fold-more {
+  align-self: flex-start;
+  color: var(--ink-soft);
+  text-decoration: none;
+  font-size: 12px;
+}
+.input-more .fold-more:hover { color: var(--ink); text-decoration: underline; }
 .input-fold { display: flex; flex-direction: column; }
 /* 잘린 앞부분 — **여는 줄 안**에 산다(닫힌 <details> 는 본문을 안 그린다). */
+/* ★ 자르기는 **두 자리 모두**에 건다 — 옛 규칙이 `.input-fold` 안에만 걸려 있어, 접힘을
+   링크로 바꾸자 미리보기가 전문으로 쏟아졌다(2026-09-15 실측). */
+.input-more .input-preview,
 .input-fold .input-preview {
   display: -webkit-box;
   -webkit-box-orient: vertical;

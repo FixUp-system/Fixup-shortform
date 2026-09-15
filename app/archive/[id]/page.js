@@ -108,20 +108,22 @@ function Row({ label, children }) {
 //   없는 분량을 있는 것처럼 말한다.
 const INPUT_FOLD_AT = 200;
 
-function UserInput({ text }) {
+// ★★★ 2026-09-15 사장님 결정 — 더 보려면 **입력 화면으로 간다.** 그전에는 이 자리에서
+//   접었다 폈다(`<details>`). 보관함은 **보는 곳**이고 고치는 곳은 제작 화면이라, 글을 더
+//   보려면 그쪽으로 가는 것이 흐름에 맞다 — 거기서는 보는 데서 그치지 않고 **고칠 수도** 있다.
+// ★★ 라벨이 함께 바뀌었다 — 「전체 보기」는 "이 자리에서 더 보여 줘"로 읽힌다. 페이지를
+//   옮기는데 그 말을 두면 거짓말이 된다. 가는 곳을 이름에 적는다.
+// ★ 손님 걱정은 없다 — 보관함을 회원 전용으로 돌리기로 했다(사장님, 2026-09-15).
+//   그 전까지는 손님이 눌렀을 때 로그인 화면으로 간다.
+function UserInput({ text, href }) {
   if (text.length <= INPUT_FOLD_AT) return <span className="script-src">{text}</span>;
   return (
-    <details className="input-fold">
-      {/* ★★ 미리보기가 **여는 줄 안**에 있다. `<details>` 는 닫히면 본문을 아예 안 그리므로
-          (실측: 미리보기가 통째로 사라졌다) 잘린 앞부분은 summary 가 들고 있어야 한다.
-          펼치면 그 미리보기는 감추고 아래 전문이 대신 선다 — 같은 글이 두 번 보이지 않게. */}
-      <summary>
-        <span className="script-src input-preview">{text}</span>
-        <span className="fold-more">전체 보기 — {text.length.toLocaleString()}자</span>
-        <span className="fold-less">접기</span>
-      </summary>
-      <p className="script-src">{text}</p>
-    </details>
+    <div className="input-more">
+      <span className="script-src input-preview">{text}</span>
+      <Link className="fold-more" href={href}>
+        입력 화면에서 보기 — {text.length.toLocaleString()}자 →
+      </Link>
+    </div>
   );
 }
 
@@ -242,6 +244,9 @@ function ArchiveDetailPageBody() {
     return reelStepHref(step, id);
   };
   const workHref = isAd ? `/ads/${id}` : isFilm ? filmHref() : isReel ? reelHref() : `/create/${id}/briefing`;
+  // ★ 적은 글을 보는 자리는 **①입력**이다 — [이어서 작업하기](workHref)가 가는 "지금 단계"와
+  //   다르다. 종류마다 그 화면이 따로 있어 한 줄로 적으면 딴 데로 간다.
+  const inputHref = isAd ? `/ads/${id}` : isFilm ? filmHref() : isReel ? `/reel/${id}/briefing` : `/create/${id}/briefing`;
   // 모델은 **전체 이름**으로 적는다 — 여기는 모델 묶음 밖이라 "2.0" 만 적으면 무엇의
   // 2.0 인지 알 수 없다. 이름은 표에서 온다(화면이 짓지 않는다).
   //
@@ -309,7 +314,7 @@ function ArchiveDetailPageBody() {
               </div>
 
               <Row label="내가 적은 내용">
-                {doc.material?.text ? <UserInput text={doc.material.text} /> : null}
+                {doc.material?.text ? <UserInput text={doc.material.text} href={inputHref} /> : null}
               </Row>
             </div>
 
