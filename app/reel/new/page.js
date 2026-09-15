@@ -70,6 +70,13 @@ import { MAX_MATERIAL_TEXT } from "../../../lib/material";
 // film(app/film/new/page.js)과 같은 규칙이다.
 const AD_STYLES = STYLE_PRESETS.filter((s) => Object.keys(AD_STYLE_LINES).includes(s.id));
 
+// 레일에서 겉에 세우는 화풍 수. 나머지는 눌러서 편다.
+// ★★ **셋**인 이유는 실측이다 — 340px 레일의 안쪽은 312px 이고, 실사·브이로그·일러스트
+//   (약 192px) + 간격 + 「+6」 칩까지 넣으면 **한 줄**에 들어간다. 넷으로 두면 애니메이션이
+//   더해져 332px 가 되어 **두 줄**이 된다(처음에 넷으로 두고 "한 줄"이라 적었다가 화면에서
+//   틀린 것을 봤다). 레일 폭이 바뀌면 이 수도 다시 재야 한다.
+const STYLE_HEAD = 3;
+
 export default function ReelNewPage() {
   const router = useRouter();
   const { setProject } = useReelProject();
@@ -91,6 +98,10 @@ export default function ReelNewPage() {
   const [text, setText] = useState("");
   // 레일에서 자주 안 바꾸는 줄 다섯을 접는다(2026-09-15).
   const [more, setMore] = useState(false);
+  // ★★★ 2026-09-15 — 화풍 아홉이 레일에서 **세 줄**을 먹었다(레일의 34%). 겉에는 **넷만**
+  //   두고 나머지는 눌러서 편다. 사장님이 "폭을 늘리는 건 ①과 ②~⑥ 이 달라 안 맞는다"고
+  //   짚어, 폭이 아니라 **내용**을 줄이는 쪽으로 갔다(레일 420px 은 되돌렸다).
+  const [allStyles, setAllStyles] = useState(false);
   const [photos, setPhotos] = useState([]); // {id, filename, url}
   const [concept, setConcept] = useState(DEFAULT_REEL_CONCEPT);
   const [mood, setMood] = useState(DEFAULT_AD_OPTIONS.mood);
@@ -260,6 +271,9 @@ export default function ReelNewPage() {
               </div>
             </div>
 
+            {/* ★ 고를 게 하나뿐이면 **줄을 안 그린다**(2026-09-15) — 누를 수 없는 칩 하나가
+                줄을 차지한다. 모델을 바꿔 선택지가 늘면 다시 나타난다. */}
+            {secondsForModel(model).length > 1 && (
             <div className="tray-row">
               <span className="tray-label">길이</span>
               <div className="tray-col">
@@ -274,17 +288,30 @@ export default function ReelNewPage() {
                 </div>
               </div>
             </div>
+            )}
 
             <div className="tray-row">
               <span className="tray-label">화풍</span>
               <div className="tray-col">
                 <div className="chips">
-                  {AD_STYLES.map((s) => (
+                  {/* ★★★ 겉에는 **앞의 넷**만. 다만 **고른 것은 뒤쪽이어도 늘 보인다** —
+                      숨으면 무엇을 골랐는지 화면에서 사라진다(가장 잘 나는 실수다). */}
+                  {(allStyles
+                    ? AD_STYLES
+                    : AD_STYLES.filter((s, i) => i < STYLE_HEAD || s.id === style)
+                  ).map((s) => (
                     <button key={s.id} className={`chip${style === s.id ? " on" : ""}`}
                       disabled={locked} onClick={() => setStyle(s.id)}>
                       {s.label}
                     </button>
                   ))}
+                  {/* ★ 남은 수를 적는다 — "더 있다"만 말하면 몇 개인지 몰라 누를지 정하기 어렵다. */}
+                  {!allStyles && AD_STYLES.length > STYLE_HEAD && (
+                    <button type="button" className="chip rp-more-inline"
+                      onClick={() => setAllStyles(true)}>
+                      +{AD_STYLES.filter((s, i) => i >= STYLE_HEAD && s.id !== style).length}
+                    </button>
+                  )}
                 </div>
                 <div className="tray-note">{AD_STYLES.find((s) => s.id === style)?.desc}</div>
               </div>
