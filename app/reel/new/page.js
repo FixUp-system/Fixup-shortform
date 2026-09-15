@@ -250,17 +250,17 @@ export default function ReelNewPage() {
             <div className="tray-row">
               <span className="tray-label">사이즈</span>
               <div className="tray-col">
-                <div className="chips">
+                {/* ★★★ 2026-09-15 — 사이즈도 드롭다운이다(사장님 지적: "사이즈만 칩이니까
+                    이것도 좀 이상한 것 같아"). 한 줄만 다른 모양이면 그 줄이 튄다.
+                    ★ 이름만이 아니라 **비율까지** 적는 것은 그대로다 — 광고 화면과 같은 모양이고
+                      (2026-08-25 사장님 지적: "라벨 부분이 안맞아") "세로"만으로는 9:16 인지
+                      4:5 인지 알 수 없다. */}
+                <Select value={aspect} disabled={locked} aria-label="사이즈"
+                  onChange={(e) => setAspect(e.target.value)}>
                   {ASPECTS.map((a) => (
-                    <button key={a.id} className={`chip${aspect === a.id ? " on" : ""}`}
-                      disabled={locked} onClick={() => setAspect(a.id)}>
-                      {/* ★ 이름만이 아니라 **비율까지** 적는다 — 광고 화면과 같은 모양이다
-                          (2026-08-25 사장님 지적: "라벨 부분이 안맞아"). "세로"만으로는
-                          9:16 인지 4:5 인지 알 수 없다. */}
-                      {a.label} · {a.id}
-                    </button>
+                    <option key={a.id} value={a.id}>{a.label} · {a.id}</option>
                   ))}
-                </div>
+                </Select>
                 {/* ★ 문구도 광고 화면과 맞춘다(2026-08-25 사장님 지시 — "광고 영상에
                     맞춰서"). 두 흐름이 같은 것을 고르는데 말투가 다르면 사장님이
                     화면마다 다른 사용법을 익혀야 한다. */}
@@ -274,15 +274,13 @@ export default function ReelNewPage() {
             <div className="tray-row">
               <span className="tray-label">길이</span>
               <div className="tray-col">
-                <div className="chips">
+                {/* ★ 크레딧 표기는 없다(2026-08-25 사장님 지시 — "일단 제거"). */}
+                <Select value={target ?? ""} disabled={locked} aria-label="길이"
+                  onChange={(e) => setTarget(Number(e.target.value))}>
                   {secondsForModel(model).map((s) => (
-                    <button key={s} className={`chip${target === s ? " on" : ""}`}
-                      disabled={locked} onClick={() => setTarget(s)}>
-                      {/* ★ 크레딧 표기를 뗐다(2026-08-25 사장님 지시 — "일단 제거"). */}
-                      {s}초
-                    </button>
+                    <option key={s} value={s}>{s}초</option>
                   ))}
-                </div>
+                </Select>
               </div>
             </div>
             )}

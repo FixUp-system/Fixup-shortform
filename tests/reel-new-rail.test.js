@@ -51,10 +51,19 @@ describe("①입력 — 설정은 왼쪽 레일에", () => {
     }
   });
 
-  it("★★ 사이즈만 칩으로 남는다 — 셋뿐이고 **모양으로 고르는** 값이다", () => {
+  // ★★★ 2026-09-15 사장님 지적 — 「사이즈만 칩이니까 이것도 좀 이상한 것 같아」.
+  //   한 줄만 다른 모양이면 그 줄이 튄다. **전부 드롭다운**으로 통일했다.
+  //   ★ 비율 글자는 지킨다 — 「세로」만으로는 9:16 인지 4:5 인지 알 수 없다
+  //     (2026-08-25 사장님 지적: "라벨 부분이 안맞아").
+  it("★★★ 레일에 **칩이 남지 않는다** — 한 줄만 다른 모양이면 그 줄이 튄다", () => {
+    const rail = page.slice(page.indexOf("rp-panel"), page.indexOf("rw-work"));
+    expect(rail, "레일에 칩 줄이 남아 있다").not.toContain("chips");
+    expect(page, "사이즈 줄이 없다").toContain("ASPECTS.");
+  });
+
+  it("★★ 사이즈는 **비율 글자를 지킨다** — 「세로」만으로는 9:16 인지 모른다", () => {
     const at = page.indexOf("ASPECTS.");
-    expect(at, "사이즈 줄이 없다").toBeGreaterThan(-1);
-    expect(page.slice(Math.max(0, at - 240), at + 240), "사이즈까지 드롭다운이 됐다").toContain("chips");
+    expect(page.slice(at, at + 260), "비율을 안 적는다").toMatch(/a\.label[\s\S]{0,40}?a\.id/);
   });
 
   it("★★ 레일 안에서는 라벨이 **왼쪽**에 선다 — 줄 높이가 반이 된다", () => {
