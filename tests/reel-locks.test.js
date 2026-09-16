@@ -28,7 +28,7 @@ describe("lockedAxes — 축마다 잠기는 때가 다르다", () => {
     const l = lockedAxes(p({ scenario: { text: "A 15-second commercial." } }));
     for (const k of ["aspect_ratio", "target_seconds", "i2v_model", "resolution"]) {
       expect(l[k].locked, `${k} 가 열려 있다`).toBe(true);
-      expect(l[k].reason).toBe("시나리오를 확정해서 잠겼어요");
+      expect(l[k].reason).toBe("시나리오를 확정해서 수정이 불가능해요");
     }
     // ★ 화풍만 아직 열려 있다 — 그림을 한 장도 안 그렸다(이 갈림이 아래 판의 요지다).
     expect(l.style.locked).toBe(false);
@@ -41,7 +41,7 @@ describe("lockedAxes — 축마다 잠기는 때가 다르다", () => {
       cuts: [cut({ image: { url: "/api/uploads/a.jpg" } }), cut({ idx: 1 })],
     }));
     expect(l.style.locked).toBe(true);
-    expect(l.style.reason).toBe("첫 그림을 그려서 잠겼어요");
+    expect(l.style.reason).toBe("첫 그림을 그려서 수정이 불가능해요");
   });
 
   it("★★ 클립을 구워도 잠금이 더 늘지 않는다 — 네 축은 시나리오에서 이미 잠겼다", () => {
@@ -52,9 +52,9 @@ describe("lockedAxes — 축마다 잠기는 때가 다르다", () => {
       cuts: [cut({ image: { url: "a" }, video: { url: "v" } })],
     }));
     expect(l.i2v_model.locked).toBe(true);
-    expect(l.i2v_model.reason).toBe("시나리오를 확정해서 잠겼어요");
+    expect(l.i2v_model.reason).toBe("시나리오를 확정해서 수정이 불가능해요");
     expect(l.resolution.locked).toBe(true);
-    expect(l.resolution.reason).toBe("시나리오를 확정해서 잠겼어요");
+    expect(l.resolution.reason).toBe("시나리오를 확정해서 수정이 불가능해요");
   });
 
   it("문서가 없거나 이상해도 던지지 않는다 — 화면이 죽으면 안 된다", () => {
