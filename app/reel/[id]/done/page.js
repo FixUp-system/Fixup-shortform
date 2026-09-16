@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useReelProject } from "../layout";
-import { reelOf, reelErrorFor, isReelRendering, speechMismatch } from "../../../../lib/reel/doc";
+import { reelOf, reelErrorFor, isReelRendering, speechMismatch, pronWarning } from "../../../../lib/reel/doc";
 import { startPolling } from "../../../../lib/poll";
 import { REEL_STEPS, reelStepHref } from "../../../../lib/reel/steps";
 import ReelBack from "../../../../components/ReelBack";
@@ -139,6 +139,10 @@ export default function ReelDonePage() {
   const rendering = isReelRendering(reel);
   const cuts = project?.cuts || [];
   const mismatch = speechMismatch(project);
+  const pron = pronWarning(project);
+  // ★ 한쪽이 비어 있는 덩어리(뻐고 듣거나 없는 말을 들은 자리)는 보여 줘도 읽힌지 않는다 —
+  //   "무엇이 무엇으로" 가 둘 다 있는 것만 골라 **최대 셋**만 내보인다.
+  const pronSpans = (pron?.spans || []).filter((sp) => sp?.said && sp?.heard).slice(0, 3);
   const hasClips = cuts.some((c) => c?.video?.url);
 
   // 진입·새로고침 복원 — 합성 중이면 폴링을 잇는다.
@@ -246,6 +250,24 @@ export default function ReelDonePage() {
       {mismatch && cuts[0]?.video?.whole === true && cuts[0]?.video?.url && (
         <p className="pgsub warn">
           ⚠️ 영상 속 말과 자막이 다를 수 있어요 — 들린 말: “{mismatch.heard}”
+        </p>
+      )}
+
+      {/* ★★ 2026-09-16 — **발음 정확도는 조용한 안내다.** 빨간 경고(.warn)로 안 띄운다 —
+          받아쓰기가 잘못 들었을 수도 있어 **우리가 틀렸다고 단정할 수 없다**(표본 2편뿐이다).
+          근거 없는 경고는 무시하게 되는 것이 이 저장소가 이미 겪은 일이다.
+          ★ 그래서 **어느 낟말이 어떻게 들렸는지**를 함께 보여 준다 — 사장님이 귀로
+            확인할 수 있어야 안내가 쓸모가 있다. 판정은 lib/reel/doc.js 의 pronWarning 하나다.
+          ★ 새 CSS 를 안 만든다 — 위 안내문들과 같은 .pgsub 을 그대로 입는다(.warn 없이). */}
+      {pron && cuts[0]?.video?.whole === true && cuts[0]?.video?.url && (
+        <p className="pgsub">
+          말소리를 들어 보니 몇 군데가 다르게 들려요
+          {pronSpans.length > 0 && (
+            <> — {pronSpans.map((sp, i) => (
+              <span key={`${sp.at}-${i}`}>{i > 0 && ", "}“{sp.said}” → “{sp.heard}”</span>
+            ))}</>
+          )}
+          . 받아쓰기가 잘못 들었을 수도 있어요.
         </p>
       )}
 

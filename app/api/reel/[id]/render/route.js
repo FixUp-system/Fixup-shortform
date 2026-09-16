@@ -10,6 +10,7 @@ import { speechLangOf } from "../../../../../lib/subtitle-langs.js";
 // 자막 시각 — 모델이 **언제** 말했는지를 재서 붙인다(2026-08-25 실측).
 import { probeSpeech } from "../../../../../lib/speech-probe.js";
 import { alignSpeech, needsSpeechProbe, speechUnits } from "../../../../../lib/speech-timing.js";
+import { speechAccuracy } from "../../../../../lib/speech-accuracy.js";
 import { narrationUnits } from "../../../../../lib/reel/narration.js";
 import { extractAudioDataUri } from "../../../../../lib/speech-audio.js";
 
@@ -105,7 +106,18 @@ export const POST = withUser(async (req, { params }, user) => {
       //   `narrationUnits` 는 전부 `ok:false`인 `speech`를 이미 올바르게 다룬다(전부 `{}`
       //   → 비례 폴백). 낱말을 하나도 못 받았을 때(측정 자체 실패)만 저장하지 않는다.
       if (heardRaw.words.length) {
-        const speech = { at: Date.now(), source: "scribe-v2", units: measured.units, heard: measured.heard };
+        // ★★ 2026-09-16 — **발음 정확도도 같이 남긴다**(`speech.pron`). 지금까지 보낸 문장과 들은
+        //   문장을 비교하는 코드는 **글자 수 비율뿐**이었다 — "무엇을 잘못 읽었나"를 짚는 자리가
+        //   없어서, 사장님이 지적한 발음 문제를 편마다 귀로 들어 찾아야 했다.
+        // ★ **상시 기록이다** — 경고를 띄우려고만 재는 것이 아니라, 편이 쌓여야 임계를 실측
+        //   분포에서 뽑을 수 있다(lib/reel/doc.js 의 PRON_WARN_RATIO 는 지금 잠정값이다).
+        // ★ 돈이 더 나가지 않는다 — 이미 받아 둔 받아쓰기를 다시 읽을 뿐이다.
+        // ★ **자막 글자는 안 건든다** — 들은 글자를 자막으로 태우지 않는다는 규율이
+        //   lib/speech-timing.js 상단에 있다. 이것은 **기록과 표시**일 뿐이다.
+        // ★ 보낸 문장이 비어 있으면 넣지 않는다 — 재는 자가 없는 것과 "100%"는 다르다.
+        const said = project?.cuts?.[0]?.video?.said || "";
+        const pron = said.trim() ? speechAccuracy(said, measured.heard?.text || "") : null;
+        const speech = { at: Date.now(), source: "scribe-v2", units: measured.units, heard: measured.heard, ...(pron ? { pron } : {}) };
         await updateProject(id, user.id, (p) => putReel(p, { speech })).catch(() => {});
         timedUnits = narrationUnits({ ...project, reel: { ...reelOf(project), speech } }, seconds) || units;
       }
