@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useReelProject } from "../layout";
 import { isPromptsReady } from "../../../../lib/reel/doc";
-import { planReelBake, reelSheetUrl, reelWholePrompt, canBakeReel } from "../../../../lib/reel/oneshot";
+import { planReelBake, reelSheetUrl, reelWholePrompt, reelWholePromptKo, canBakeReel } from "../../../../lib/reel/oneshot";
 // 영어 원문 + 한국어를 한 덩어리로 — 세 화면이 같은 모양을 쓴다.
 import PromptWithKo from "../../../../components/PromptWithKo";
 import { REEL_STEPS, reelStepHref } from "../../../../lib/reel/steps";
@@ -158,7 +158,11 @@ export default function ReelPromptsPage() {
               <span className="spinner" aria-hidden="true" /> 영상 프롬프트를 다시 쓰고 있어요
             </p>
           ) : (
-            <PromptWithKo text={whole} ko={project?.reel?.prompt_ko} />
+            /* ★ 2026-09-16 — 번역은 **본문(whole)과 같은 짝**을 써야 한다. 고친
+                프롬프트가 있으면 reel.prompt_ko, 없으면(기본 경로) scenario.text_ko —
+                reelWholePrompt 가 whole 을 고르는 것과 같은 판정이다(reelWholePromptKo,
+                lib/reel/oneshot.js). 짝을 안 맞추면 본문과 번역이 다른 글이 된다. */
+            <PromptWithKo text={whole} ko={reelWholePromptKo(project)} />
           )}
             </div>
             {sheetUrl && (
