@@ -25,6 +25,8 @@ import { boardKey } from "../../../../lib/reel/board-key";
 // ★ 칸에 실리는 지문 한 줄 — **지문을 만드는 쪽과 같은 함수**다(lib/reel/panels.js).
 //   화면에서 다시 조립하면 실제로 나간 글과 갈린다.
 import { panelSay } from "../../../../lib/reel/panels";
+// ★ 2026-09-16 — 지문의 **한국어 번역**만 보여 준다(아래 savedPromptKo 참고).
+import PromptWithKo from "../../../../components/PromptWithKo";
 import { aspectFor } from "../../../../lib/aspects";
 import { regenPrice, priceLabel, videoPrice } from "../../../../lib/pricing";
 import { modelIdForProject, resolutionForProject } from "../../../../lib/clip-limits";
@@ -138,6 +140,12 @@ export default function ReelImagesPage() {
   // ★ 한국어 번역은 **판 단위로 하나**다(2026-09-03) — 컷마다 같은 글을 저장하지 않는다.
   //   옛 문서에는 없다(사장님 결정: 앞으로 만드는 것에만) → 그때는 화면이 그 줄을 안 그린다.
   //   ★ 미리보기(아직 안 그린 상태)에는 번역이 없다 — 저장된 지문이 있을 때만 짝이 맞는다.
+  // ★ 2026-09-16 — 2026-09-14(67c151b) 가 "손님에게 불필요한 정보(영어 원문) 제거"로
+  //   이 줄과 함께 아래의 영어 원문 UI 를 걷었는데, 한국어 번역까지 같이 사라졌다
+  //   (지금까지 이 화면에 지문이 아예 안 보였다). PromptWithKo 는 이미 한국어만
+  //   보여 주도록 고쳐져 있다(2026-09-14) — 그 계약 그대로 되살린다. 영어 원문을
+  //   따로 보여 주는 UI 는 되살리지 않는다.
+  const savedPromptKo = savedPrompt ? (reel?.image_prompt_ko || "") : "";
   // 사장님 요청이 실린 지문인가 — 라우트가 note 를 받아 그릴 때 남긴다.
   // 보드 주소가 바뀌면(컷을 고쳤다) 다시 "오는 중"으로 되돌린다.
   useEffect(() => { setBoardReady(false); }, [boardHref]);
@@ -387,9 +395,13 @@ export default function ReelImagesPage() {
           받는 자리라 뜻이 다르다. 자리도 그래서 다르다 — 지문 절의 머리에 선다.
           ★ 받는 것은 같은 보드 한 장이다(컷 그림을 모아 그린다) — "스토리보드 포함".
           ★ 자리: **컷 카드 아래 · 라인 위**(사장님 지시 3차). 라인은 지문 절이 갖는다. */}
-      {/* ★★ 2026-09-14 — [전체 내려받기]와 기본으로 펼쳐진 **이미지 생성 지문 전체**(영어)를 걷었다
+      {/* ★★ 2026-09-14 — [전체 내려받기]와 기본으로 펼쳐진 영어 원문·번역 병기 절을 걷었다
           (사장님 지시: 사용자에게 불필요한 정보 제거). 받는 자리는 보드 옆 [보드 내려받기] 하나다 —
-          두 버튼이 같은 한 장을 받았다. 지문은 문서에 그대로 남는다(굽기·수정 요청은 그대로 돈다). */}
+          두 버튼이 같은 한 장을 받았다. 영어 원문은 되살리지 않는다.
+          ★ 2026-09-16 — 다만 **한국어 번역**은 되살린다. 위 걷어낸 절이 지문을 보여 주는
+          유일한 자리였다 — 걷으며 영어와 한국어가 함께 사라져 이 화면에 지문이 아예 안
+          보였다(위 savedPromptKo 참고). 지문이 없으면(아직 안 그렸다) 아무것도 안 그린다. */}
+      {savedPrompt && <PromptWithKo text={savedPrompt} ko={savedPromptKo} />}
 
       {/* ★★ 이미지 수정 요청 — **전체 한 장 단위**다(2026-08-25 사장님 결정).
           스토리보드가 한 장이라 그 단위가 맞다 — 칸 하나만 다시 만들면 그것만 컷별로
