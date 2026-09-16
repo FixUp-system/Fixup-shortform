@@ -211,4 +211,17 @@ describe("speechUnits — 재 놓고 못 믿으면 버린다", () => {
     expect(out.units.every((u) => u.ok === false)).toBe(true);
     expect(out.heard).toEqual({ chars: 0, text: "" });
   });
+
+  // ★ 뒤 문장의 낱말 타임스탬프를 앞 문장보다 이르게 둔 것만 다르다 — 길이(1.0초씩,
+  //   범위 안 15초), 낱말 길이(둘 다 0.5초/4글자, 임계 2.18초 미만), 들은 비율(14/14=1)은
+  //   전부 정상이라 다른 세 판정에는 걸리지 않는다. 오직 시작 순서 역전만 이 케이스를 잡는다.
+  it("문장 순서가 뒤바뀌면(시작이 앞 문장 끝보다 이르면) 뒤 문장을 버린다", () => {
+    const words = [
+      { timestamp: [5.0, 5.5], text: "가나다라" }, { timestamp: [5.5, 6.0], text: "마바사." },
+      { timestamp: [1.0, 1.5], text: "아자차카" }, { timestamp: [1.5, 2.0], text: "타파하." },
+    ];
+    const out = speechUnits(S, words, { seconds: 15 });
+    expect(out.units[0]).toEqual({ start: 5.0, seconds: 1.0, ok: true });
+    expect(out.units[1]).toEqual({ start: null, seconds: null, ok: false });
+  });
 });
