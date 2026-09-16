@@ -96,7 +96,15 @@ export const POST = withUser(async (req, { params }, user) => {
       const audio = await extractAudioDataUri(clipUrl, { projectId: id });
       const heardRaw = await probeSpeech(audio, { projectId: id, seconds, lang: speechLangOf(project) });
       const measured = speechUnits(units.map((u) => u.sentence), heardRaw.words, { seconds });
-      if (measured.units.some((u) => u.ok)) {
+      // ★★★ 2026-09-16 리뷰 C1 — **낱말을 하나라도 받았으면 항상 저장한다.** 예전에는
+      //   `measured.units.some(ok)`(자막에 얹을 문장이 하나라도 있어야) 저장했는데, 그러면
+      //   전부 못 믿는(예: 들은 양이 범위 밖) 편은 저장 자체가 통째로 건너뛰어졌다 — ①
+      //   speechMismatch 의 "short" 갈래가 도달 불가능해지고(가장 크게 어긋난 편이 조용히
+      //   지나간다), ② `ok:false`(재 봤는데 못 믿는다)와 `speech` 없음(아직 안 쟀다)의
+      //   구분이 깨지고, ③ 완성할 때마다 다시 재서 돈이 반복해 나간다(설계 §4.3·§4.7).
+      //   `narrationUnits` 는 전부 `ok:false`인 `speech`를 이미 올바르게 다룬다(전부 `{}`
+      //   → 비례 폴백). 낱말을 하나도 못 받았을 때(측정 자체 실패)만 저장하지 않는다.
+      if (heardRaw.words.length) {
         const speech = { at: Date.now(), source: "scribe-v2", units: measured.units, heard: measured.heard };
         await updateProject(id, user.id, (p) => putReel(p, { speech })).catch(() => {});
         timedUnits = narrationUnits({ ...project, reel: { ...reelOf(project), speech } }, seconds) || units;

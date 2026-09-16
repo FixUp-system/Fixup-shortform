@@ -109,6 +109,23 @@ describe("Scribe v2 로 잰다", () => {
   });
 });
 
+// ── 2026-09-16 리뷰 Critical 1 — 전부 버려진 측정도 저장된다 ──────────────────
+//
+// `if (measured.units.some((u) => u.ok))`는 문장 하나라도 살아남아야 저장한다.
+// speechUnits 는 들은 양 비율이 범위 밖이면 **전 문장을 ok:false 로 버리는데**, 그때
+// 저장이 통째로 건너뛰어져 ① speechMismatch 의 "short" 갈래가 도달 불가능해지고
+// (가장 크게 어긋난 편이 조용히 지나간다), ② ok:false(재 봤는데 못 믿는다)와
+// speech 없음(아직 안 쟀다)의 구분이 깨지고, ③ 완성할 때마다 다시 재서 돈이 반복해
+// 나간다(설계 §4.3·§4.7). 낱말을 하나라도 받았으면(측정 자체는 성공) 항상 저장해야
+// 한다 — narrationUnits 는 전부 ok:false 인 speech 를 이미 올바르게 다룬다(비례 폴백).
+describe("C1 — 전부 버려진 측정도 저장된다", () => {
+  it("저장 조건이 '문장 하나라도 ok' 가 아니라 '낱말을 하나라도 받았는가'다", () => {
+    expect(route, "여전히 ok 한 문장이 있어야 저장한다 — 전부 버려진 측정을 통째로 잃는다")
+      .not.toMatch(/measured\.units\.some\(\(u\)\s*=>\s*u\.ok\)/);
+    expect(route, "낱말을 받았는지로 저장을 가르지 않는다").toMatch(/heardRaw\.words\.length/);
+  });
+});
+
 // ── 2026-09-16 리뷰 Critical 1 — 옛 컷별 갈래도 새 계약을 따라야 한다 ──────────
 //
 // `else if (needsSpeechProbe …)` 갈래는 probeSpeech 계약이 바뀐 뒤에도 예전처럼
