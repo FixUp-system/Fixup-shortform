@@ -9,6 +9,12 @@ import { useDialog } from "./DialogProvider";
 import Icon from "./Icon";
 // 상태 태그의 말 — 화면이 직접 조립하면 자리마다 모양이 갈린다.
 import { cardStatusTag } from "../lib/archive/spec";
+// ★ 2026-09-16 사장님 지시 — 카드에도 **모델**을 보여 준다("기본으로 만들었는지 프로로
+//   만들었는지 알 수 없다"). 라벨의 출처는 이 두 표 하나씩뿐이다 — 화면에 id→라벨 표를
+//   새로 짓지 않는다. 둘 다 **추측하지 않는다**(값이 없으면 null, 옛 문서를 LEGACY 로
+//   떨어뜨리지 않는다).
+import { i2vModelLabelOf } from "../lib/clip-limits.js";
+import { adModelLabelOf } from "../lib/ad/models.js";
 
 // 홈과 보관함이 같은 카드를 쓴다. 마크업을 두 벌로 두면 한쪽만 고쳐지는 날이 온다.
 
@@ -181,6 +187,13 @@ export default function ProjectCards({ projects, limit, onDeleted, selecting, se
               : (STATUS_LABEL[p.status] || "진행 중");
         // 썸네일 위 상태 태그 — 안 끝난 카드만 말한다(끝났으면 null). 말은 lib/archive/spec.js 가 만든다.
         const status = cardStatusTag(p, label);
+        // ★ 2026-09-16 — 모델 배지. film·legacy(kind 가 reel·ad 가 아님)는 이 축이 없으니
+        //   그린다면 있지도 않은 값을 지어내는 것이다 — null 로 두어 아무것도 안 그린다.
+        const modelLabel = p.kind === "reel"
+          ? i2vModelLabelOf(p.i2v_model)
+          : p.kind === "ad"
+            ? adModelLabelOf(p.ad_model)
+            : null;
         return (
           <li key={p.id}>
             <Link
@@ -199,6 +212,12 @@ export default function ProjectCards({ projects, limit, onDeleted, selecting, se
                     ★ 원문 앞 100자였던 「제목」은 여전히 안 그린다 — 비슷한 편끼리 앞머리가 같아
                       구별에 도움이 안 됐다(그 값은 지우기 다이얼로그와 alt 가 쓴다). */}
                 {status && <span className="thumb-tag">{status}</span>}
+                {/* ★ 2026-09-16 — 모델 배지. 왼쪽 위(상태 태그)·오른쪽 위(지우기/체크)와
+                    겹치지 않게 **아래쪽**에 둔다. 새 CSS 규칙을 짓지 않고 .thumb-tag 모양을
+                    그대로 재사용하되, top 을 비우고 bottom 으로만 옮긴다. */}
+                {modelLabel && (
+                  <span className="thumb-tag model-badge">{modelLabel}</span>
+                )}
                 {selecting && (
                   <span className="card-pick" aria-hidden="true">{selected?.has(p.id) ? "✓" : ""}</span>
                 )}

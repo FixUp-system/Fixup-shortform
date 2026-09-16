@@ -14,8 +14,8 @@
 import { Suspense, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { adModel } from "../../../lib/ad/models";
-import { modelIdForProject, resolutionForProject } from "../../../lib/clip-limits";
+import { adModelLabelOf } from "../../../lib/ad/models";
+import { resolutionForProject, i2vModelLabelOf } from "../../../lib/clip-limits";
 import { archiveVideoUrl } from "../../../lib/archive/video";
 // 영상 비율 — 화면이 직접 적지 않는다. 값의 출처는 프로젝트 하나다(lib/aspects.js).
 import { aspectFor } from "../../../lib/aspects";
@@ -251,18 +251,21 @@ function ArchiveDetailPageBody() {
   // ★ 적은 글을 보는 자리는 **①입력**이다 — [이어서 작업하기](workHref)가 가는 "지금 단계"와
   //   다르다. 종류마다 그 화면이 따로 있어 한 줄로 적으면 딴 데로 간다.
   const inputHref = isAd ? `/ads/${id}` : isFilm ? filmHref() : isReel ? `/reel/${id}/briefing` : `/create/${id}/briefing`;
-  // 모델은 **전체 이름**으로 적는다 — 여기는 모델 묶음 밖이라 "2.0" 만 적으면 무엇의
-  // 2.0 인지 알 수 없다. 이름은 표에서 온다(화면이 짓지 않는다).
-  //
   // ★ film 은 이 표들(광고표·단계별 I2V 표) 중 어디에도 없다. 억지로 태우면 화면이 **그 문서에
   //   없는 모델·화질을 지어낸다** — 없는 값은 줄째 안 그리는 것이 이 화면의 규칙이다(Row).
-  const modelId = isAd ? s.model : isFilm ? null : modelIdForProject(doc);
+  //
+  // ★★ 2026-09-16 — **다시 뒤집혔다.** 2026-09-14 에는 "단계별은 모델 칩이 없다"였는데,
+  //   모델을 비교하는 중이라 「기본」·「프로」 어느 쪽으로 만들었는지가 다시 필요해졌다
+  //   (사장님 지시: 카드와 상세 둘 다). 둘 다 **표의 label 접근자**를 쓰고 **추측하지
+  //   않는다** — 값이 없거나 모르는 모델이면 null 이다(LEGACY_*_MODEL 로 떨어뜨리지
+  //   않는다. lib/clip-limits.js 의 i2vModelLabelOf, lib/ad/models.js 의 adModelLabelOf 참고).
   const modelLabel = isFilm
     ? null
     : isAd
-      ? adModel(s.model)?.label
-      // ★ 2026-09-14 — 업체 모델명(Kling v3·MiniMax H3)은 안 적는다(사장님 지시). 원클릭만 기본/프로로 적는다.
-      : null;
+      ? adModelLabelOf(s.model)
+      : isReel
+        ? i2vModelLabelOf(s.i2v_model)
+        : null;
   const resolution = isAd ? s.resolution : isFilm ? null : resolutionForProject(doc);
   const seconds = isAd ? s.seconds : isFilm ? s.seconds ?? null : s.target_seconds;
   // ★ 화풍은 표(lib/styles.js)의 라벨로 옮긴다 — 그전에는 id 가 그대로 떴다(`vlog`).

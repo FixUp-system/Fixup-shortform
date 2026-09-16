@@ -87,16 +87,18 @@ describe("보관함 상세 — 말과 표시를 다듬는다", () => {
   // (옛 판 "'시나리오' 가 아니라 '프롬프트' 다" 는 2026-09-14 접힘 칸 제거로 뜻을 잃어 걷어냈다 —
   //  칸이 없다는 것은 위 "프롬프트 접힘 칸이 없다" 묶음이 잰다.)
 
-  // ★★ 2026-09-14 — **뒤집힌 판이다.** 그전에는 모델을 'Seedance 2.0' 같은 전체 이름으로 적게
-  //   못 박았다. 사장님 지시로 업체 모델명은 안 적는다 — 원클릭(광고)만 표의 label(기본/프로)을
-  //   적고, 단계별·reel 은 모델 칩 자체가 없다.
-  it("★ 모델 칩은 광고만, 표의 label 로 — 업체 이름(name·I2V_MODELS 라벨)을 안 적는다", () => {
+  // ★★ 2026-09-16 — **다시 뒤집힌 판이다.** 2026-09-14 에는 "단계별·reel 은 모델 칩 자체가
+  //   없다"로 못 박았는데, 모델을 비교하는 중이라 그 정보가 다시 필요해졌다(사장님 지시:
+  //   보관함에서 「기본」으로 만들었는지 「프로」로 만들었는지 알 수 없다 → 카드와 상세 둘
+  //   다에 표시한다). 광고는 그대로 표의 label(기본/프로)이고, 단계별(reel)도 같은 결로
+  //   표(I2V_MODELS)의 label 을 그대로 쓴다 — 업체 전체 이름(name)은 여전히 안 적는다.
+  it("★ 모델 칩은 광고·단계별 둘 다 표의 label 로 — 업체 전체 이름(name)은 안 적는다", () => {
     const at = code.indexOf("const modelLabel");
     expect(at, "modelLabel 을 못 찾았다").toBeGreaterThan(-1);
     const expr = code.slice(at, code.indexOf(";", at));
-    expect(expr).toMatch(/adModel\(s\.model\)\?\.label/);
+    expect(expr).toMatch(/adModelLabelOf\(s\.model\)/);
     expect(expr, "광고에 업체 전체 이름(name)을 쓴다").not.toMatch(/\.name\b/);
-    expect(expr, "단계별이 영상 모델 라벨(Kling v3 등)을 적는다").not.toContain("I2V_MODELS");
+    expect(expr, "단계별이 I2V_MODELS 표의 라벨 접근자를 쓴다").toMatch(/i2vModelLabelOf\(s\.i2v_model\)/);
     expect(adModels, "광고 표의 label 이 기본/프로가 아니다").toMatch(/label:\s*"기본"/);
     expect(adModels).toMatch(/label:\s*"프로"/);
   });
