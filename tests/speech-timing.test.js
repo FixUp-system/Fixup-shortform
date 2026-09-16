@@ -58,12 +58,12 @@ describe("alignSpeech — 말하는 컷에 시각을 붙인다", () => {
     expect(out[4].sentence).toBe("그 맛, 그대로.");        // 쉼표도 그대로
   });
 
-  // ★ 못 들은 말이 있으면 그 컷은 그냥 둔다 — 옛 방식(컷 경계)으로 흐른다.
-  it("조각이 모자라면 남는 컷은 그대로다", () => {
+  // ★ 들은 말이 원고보다 한참 적으면 **어느 문장을 못 들었는지 알 수 없다** — 앞에서부터
+  //   붙이면 뒤가 통째로 틀린다. 전부 건드리지 않고 바닥(컷 경계·글자 비례)으로 흐른다.
+  //   (2026-09-15 이전에는 앞 둘에 붙였다 — 순서 짝짓기 시절의 계약이었다.)
+  it("들은 말이 원고보다 한참 적으면 아무 컷도 건드리지 않는다", () => {
     const out = alignSpeech(cuts, chunks.slice(0, 2));
-    expect(out[0].spoken_start).toBeCloseTo(0.03, 2);
-    expect(out[2].spoken_start).toBeCloseTo(6.47, 2);
-    expect(out[4].spoken_start).toBeUndefined();
+    expect(out.every((c) => c.spoken_start === undefined)).toBe(true);
   });
 
   // ★ 모르는 값에 던지지 않는다 — 이 저장소 규율.
@@ -71,5 +71,92 @@ describe("alignSpeech — 말하는 컷에 시각을 붙인다", () => {
     expect(alignSpeech(cuts, [])).toEqual(cuts);
     expect(alignSpeech(cuts, null)).toEqual(cuts);
     expect(alignSpeech(null, chunks)).toEqual([]);
+  });
+});
+
+// ★★★ 2026-09-15 사장님 신고 — *"V라인 리프팅 디바이스 영상이 자막이 하나도 안 맞아."*
+//
+//   whisper 는 **문장이 아니라 말이 쉬는 곳**(쉼표)에서 조각을 끊는다. 순서로 짝지으면
+//   문장 1 에 조각 1("…쿠션,")이, 문장 2 에 조각 2("위로 … 밴드.")가 붙어 **뒤가 전부 밀린다.**
+//   운영 문서에 남은 값이 그 흔적이다(조각 끝 = 다음 조각 시작, 글자 대비 불가능하게 짧음):
+//     3856b99d  [{start:1.16, seconds:2}, {start:3.16, seconds:4.32}]              — 2문장
+//     115387f3  [{start:0.03, seconds:3.02}, {start:3.05, seconds:2.28}, {start:5.33, seconds:3.84}] — 3문장
+//   아래 조각의 앞부분은 그 저장값 그대로이고, 저장되지 않은 뒷부분 조각은 같은 리듬으로 채웠다.
+//   ★ 글자는 여전히 안 쓴다 — 조각 글자의 **개수**만 써서 조각을 문장에 묶는다.
+describe("alignSpeech — 쉼표에서 끊긴 조각을 문장으로 묶는다", () => {
+  it("2문장·4조각(3856b99d): 문장마다 자기 조각들의 처음~끝이다", () => {
+    const units = [
+      { sentence: "턱선을 감싸는 부드러운 쿠션, 위로 탄탄하게 당겨 주는 밴드." },
+      { sentence: "하루 십 분, 집에서 완성하는 V라인 케어." },
+    ];
+    const parts = [
+      { timestamp: [1.16, 3.16], text: " 턱선을 감싸는 부드러운 쿠션," },
+      { timestamp: [3.16, 7.48], text: " 위로 탄탄하게 당겨주는 밴드." },
+      { timestamp: [8.1, 9.2], text: " 하루 십분," },
+      { timestamp: [9.2, 12.4], text: " 집에서 완성하는 브이라인 케어." },
+    ];
+    const out = alignSpeech(units, parts);
+    expect(out[0].spoken_start).toBeCloseTo(1.16, 2);
+    expect(out[0].spoken_seconds).toBeCloseTo(6.32, 2);   // 1.16 → 7.48
+    expect(out[1].spoken_start).toBeCloseTo(8.1, 2);
+    expect(out[1].spoken_seconds).toBeCloseTo(4.3, 2);    // 8.10 → 12.40
+    expect(out[1].sentence).toBe("하루 십 분, 집에서 완성하는 V라인 케어.");
+  });
+
+  it("3문장·4조각(115387f3): 가운데 문장이 쉼표 조각 둘을 가진다", () => {
+    const units = [
+      { sentence: "턱선을 감싸는 새로운 V라인 케어." },
+      { sentence: "탄탄한 밴드가 당겨 올리고, 부드러운 쿠션이 편안하게 받쳐줍니다." },
+      { sentence: "매일 3분, 갸름한 라인의 시작." },
+    ];
+    const parts = [
+      { timestamp: [0.03, 3.05], text: " 턱선을 감싸는 새로운 브이라인 케어." },
+      { timestamp: [3.05, 5.33], text: " 탄탄한 밴드가 당겨 올리고," },
+      { timestamp: [5.33, 9.17], text: " 부드러운 쿠션이 편안하게 받쳐줍니다." },
+      { timestamp: [9.6, 12.9], text: " 매일 3분, 갸름한 라인의 시작." },
+    ];
+    const out = alignSpeech(units, parts);
+    expect(out[0].spoken_start).toBeCloseTo(0.03, 2);
+    expect(out[0].spoken_seconds).toBeCloseTo(3.02, 2);
+    expect(out[1].spoken_start).toBeCloseTo(3.05, 2);
+    expect(out[1].spoken_seconds).toBeCloseTo(6.12, 2);   // 3.05 → 9.17
+    expect(out[2].spoken_start).toBeCloseTo(9.6, 2);
+    expect(out[2].spoken_seconds).toBeCloseTo(3.3, 2);
+  });
+
+  it("조각 하나가 두 문장을 품으면 그 조각 안에서 글자 비례로 나눈다", () => {
+    const units = [{ sentence: "가나다라." }, { sentence: "마바사아." }];
+    const parts = [{ timestamp: [1, 5], text: "가나다라 마바사아" }];
+    const out = alignSpeech(units, parts);
+    expect(out[0].spoken_start).toBeCloseTo(1, 2);
+    expect(out[0].spoken_seconds).toBeCloseTo(2, 2);
+    expect(out[1].spoken_start).toBeCloseTo(3, 2);
+    expect(out[1].spoken_seconds).toBeCloseTo(2, 2);
+  });
+
+  // ★ 조각에 글자가 없으면 묶을 자가 없다 — 개수가 같을 때만 예전처럼 순서로 붙인다.
+  it("조각 글자가 없고 개수가 다르면 건드리지 않는다", () => {
+    const units = [{ sentence: "하나, 둘." }, { sentence: "셋." }];
+    const parts = [{ timestamp: [0, 1] }, { timestamp: [1, 2] }, { timestamp: [2, 3] }];
+    const out = alignSpeech(units, parts);
+    expect(out.every((u) => u.spoken_start === undefined)).toBe(true);
+  });
+
+  it("조각 글자가 없어도 개수가 같으면 순서로 붙인다", () => {
+    const units = [{ sentence: "하나." }, { sentence: "둘." }];
+    const parts = [{ timestamp: [0.5, 1] }, { timestamp: [1.5, 2] }];
+    const out = alignSpeech(units, parts);
+    expect(out[1].spoken_start).toBeCloseTo(1.5, 2);
+  });
+
+  // ★ 배경음악 가사처럼 원고에 없는 말을 잔뜩 들었으면 길이 비율이 무너진다 — 믿지 않는다.
+  it("들은 글자가 원고보다 한참 많으면 건드리지 않는다", () => {
+    const units = [{ sentence: "짧은 말." }, { sentence: "끝." }];
+    const parts = [
+      { timestamp: [0, 2], text: "짧은 말 그리고 원고에 전혀 없는 아주 긴 노랫말이 이어진다" },
+      { timestamp: [2, 3], text: "끝" },
+    ];
+    const out = alignSpeech(units, parts);
+    expect(out.every((u) => u.spoken_start === undefined)).toBe(true);
   });
 });
