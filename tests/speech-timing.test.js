@@ -186,7 +186,8 @@ describe("speechUnits — 재 놓고 못 믿으면 버린다", () => {
     ];
     const out = speechUnits(S, words, { seconds: 15 });
     expect(out.units[0].ok).toBe(true);
-    expect(out.units[1]).toEqual({ start: null, seconds: null, ok: false });
+    // ★ I4 — 이상치는 "재기가 흔들렸다"이지 "말하지 않았다"가 아니다. reason 으로 가른다.
+    expect(out.units[1]).toEqual({ start: null, seconds: null, ok: false, reason: "outlier" });
   });
 
   it("영상 길이를 넘으면 버린다", () => {
@@ -196,6 +197,7 @@ describe("speechUnits — 재 놓고 못 믿으면 버린다", () => {
     ];
     const out = speechUnits(S, words, { seconds: 15 });
     expect(out.units[1].ok).toBe(false);
+    expect(out.units[1].reason).toBe("range");
   });
 
   it("들은 양이 원고의 0.75 배 미만이면 전부 버린다", () => {
@@ -203,12 +205,16 @@ describe("speechUnits — 재 놓고 못 믿으면 버린다", () => {
     const out = speechUnits(S, words, { seconds: 15 });
     expect(out.units.every((u) => u.ok === false)).toBe(true);
     expect(out.heard.chars).toBe(2);
+    // ★ I4 — "딴 말을 들었다"이지 "낱말이 하나도 안 묶였다"가 아니다. missing-sentence
+    //   경고는 speechMismatch 의 "short" 갈래가 따로 맡는다.
+    expect(out.units.every((u) => u.reason === "heard-ratio")).toBe(true);
   });
 
   it("낱말이 없으면 전부 버리고 들은 양은 0 이다", () => {
     const out = speechUnits(S, [], { seconds: 15 });
     expect(out.units).toHaveLength(2);
     expect(out.units.every((u) => u.ok === false)).toBe(true);
+    expect(out.units.every((u) => u.reason === "empty")).toBe(true);
     expect(out.heard).toEqual({ chars: 0, text: "" });
   });
 
@@ -222,6 +228,6 @@ describe("speechUnits — 재 놓고 못 믿으면 버린다", () => {
     ];
     const out = speechUnits(S, words, { seconds: 15 });
     expect(out.units[0]).toEqual({ start: 5.0, seconds: 1.0, ok: true });
-    expect(out.units[1]).toEqual({ start: null, seconds: null, ok: false });
+    expect(out.units[1]).toEqual({ start: null, seconds: null, ok: false, reason: "order" });
   });
 });

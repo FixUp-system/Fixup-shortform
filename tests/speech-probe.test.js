@@ -12,8 +12,31 @@ import { probeSpeech } from "../lib/speech-probe.js";
 //   currentActor() 가 **던진다**(lib/actor.js). 다른 원장 테스트들(tts·imagegen)도
 //   전부 이 헬퍼로 감싼다 — 여기만 빠뜨리면 이 테스트만 조용히 빈 결과로 떨어진다.
 import { runWithActor } from "../lib/actor.js";
+import { listRecords } from "../lib/costs.js";
 
 describe("probeSpeech", () => {
+  // ★★ 2026-09-16 리뷰 M3 — 200 응답인데 낱말이 0개(예: 무음 구간)면 **유료 호출인데
+  //   원장에 안 남았다.** 실패(!res.ok)·호출 자체를 안 한 경우(가짜 모드·오디오 없음)만
+  //   안 남아야 한다 — 성공 응답이면 낱말 수와 무관하게 남는다.
+  it("성공 응답인데 낱말이 0개여도 원장에 남는다", async () => {
+    const before = (await listRecords()).length;
+    await runWithActor("t-user", () => probeSpeech("data:audio/mp4;base64,AA", {
+      fetchImpl: async () => ({ ok: true, json: async () => ({ words: [] }) }),
+      projectId: "p1", seconds: 15,
+    }));
+    const after = await listRecords();
+    expect(after.length).toBe(before + 1);
+  });
+
+  it("실패 응답(!res.ok)이면 원장에 안 남는다", async () => {
+    const before = (await listRecords()).length;
+    await runWithActor("t-user", () => probeSpeech("data:audio/mp4;base64,AA", {
+      fetchImpl: async () => ({ ok: false, status: 500, text: async () => "boom" }),
+      projectId: "p1", seconds: 15,
+    }));
+    expect((await listRecords()).length).toBe(before);
+  });
+
   it("가짜 모드에서는 부르지 않는다 — 값이 0 이라 잴 것이 없다", async () => {
     const prev = process.env.SHOTFORM_FAKE;
     process.env.SHOTFORM_FAKE = "fal";
