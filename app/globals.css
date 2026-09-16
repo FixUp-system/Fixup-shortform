@@ -3693,6 +3693,55 @@ a.rs-step:not(.is-now):hover { background: var(--surface2); }
   align-self: center;
   justify-self: center;
 }
+/* ★★★ 2026-09-16 저녁 사장님 지시 — ⑤영상에서는 **판을 영상 높이에 맞추고, 오른쪽 끝을
+   왼쪽처럼 컴포넌트 선에 붙인다.**
+   그전(같은 날 낮)에는 영상만 판에 맞췄는데, 판은 **가로로 넓은 격자**(예 4×2 = 1.125)라
+   같은 칸 폭에서 높이가 560 에 못 미쳤다 — 그래서 영상이 더 크고 아랫변이 다시 어긋났다.
+   ★ 그래서 기준을 뒤집는다: **높이를 하나 정해 두고**(`--rv-media-h`) 둘 다 그 키로 세운다.
+     폭은 각자의 비율이 정한다 — 판은 넓고(≈630) 영상은 좁다(≈315).
+   ★ 칸을 `1fr auto` 로 둔다 — 영상 칸이 **제 폭만큼만** 차지하고 오른쪽 끝에 붙어서,
+     9:16 영상 양옆에 남던 빈 자리가 사라진다(사장님: "오른쪽 여백을 왼쪽처럼 맞춰 달라").
+     판은 왼쪽 끝에 붙는다(`flex-start`) — 가운데 정렬로 두면 왼쪽에 같은 빈 자리가 생긴다.
+   ★ `max-height` 를 `none` 으로 되돌리는 이유: 위 두 규칙의 560 상한이 남아 있으면
+     `--rv-media-h` 를 키워도 그 값에서 잘린다(키를 정하는 자리가 둘이 된다). */
+.rv-split--video.is-two {
+  --rv-media-h: min(560px, 68vh);
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+/* ★ 좁은 화면에서는 **키를 낮춘다.** 560 을 고집하면 판이 제 칸보다 넓어져(가로 격자일수록)
+   상자 안에서 위아래로 빈 자리가 생긴다 — 아랫변이 다시 어긋나 보인다.
+   460 인 이유는 실측이다: 뷰포트 1,241(두 칸이 유지되는 최저값)에서 작업대 821 · 영상 259 ·
+   판 칸 542 인데, 4×2 판(1.125)이 460 키로 서려면 517 이 필요하다 — 딱 들어간다.
+   ⚠️ 판 비율이 그보다 가로로 길면(예 3×1 = 1.69) 여전히 못 채운다. 그때는 판이 작아질 뿐
+   상자와 영상의 위아래 선은 맞는다. */
+@media (max-width: 1440px) {
+  .rv-split--video.is-two { --rv-media-h: min(460px, 68vh); }
+}
+/* ★ 바탕 `.sheet-view` 는 `width: fit-content` + 좌우 `auto` 여백으로 **가운데** 선다 —
+   그대로 두면 왼쪽에 81px 이 남는다(실측). 여기서만 왼쪽 여백을 0 으로 돌린다. */
+.rv-split--video > .sheet-view { justify-content: flex-start; margin-left: 0; margin-right: auto; }
+/* ★★ `object-fit: contain` 이 **왜 필요한가** — 실측으로 밟은 자리다.
+   높이를 못 박은 그림에 `max-width: 100%` 가 걸리면(칸이 좁을 때) 브라우저는 폭만 깎고
+   높이는 그대로 둔다 — 그림이 **찌그러진다**(작업대 820px 에서 판 1.125 가 0.77 로).
+   `contain` 이면 상자는 칸에 맞되 그림은 제 비율로 들어앉는다. 좁은 폭에서는 위아래에
+   빈 자리가 생기지만 **찌그러지지는 않는다** — 넓은 화면(작업대 ≥1,000)에서는 그림이
+   상자를 꽉 채우므로 이 손해가 없다. */
+.rv-split--video > .sheet-view img {
+  height: var(--rv-media-h);
+  width: auto;
+  max-height: none;
+  max-width: 100%;
+  object-fit: contain;
+}
+.rv-split--video > .vid-result {
+  height: var(--rv-media-h);
+  width: auto;
+  max-height: none;
+  max-width: 100%;
+  margin: 0;
+  justify-self: end;
+}
 /* 좁은 화면에서는 위아래로 쌓는다 — 두 칸을 그대로 두면 둘 다 못 읽는 폭이 된다.
    경계는 작업 화면이 한 칸으로 접히는 값(1240)과 같다: 그 아래에서는 설정 패널도
    본문 위로 쌓이므로, 여기서만 두 칸을 고집하면 화면이 통째로 좁아진다. */

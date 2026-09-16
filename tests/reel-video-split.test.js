@@ -57,4 +57,52 @@ describe("⑤영상 — 시킨 것 ↔ 나온 것", () => {
     expect(rule, "상한이 판(560px)과 다르다").toMatch(/max-height:\s*560px/);
     expect(rule, "가로로 넘칠 수 있다").toMatch(/max-width:\s*100%/);
   });
+
+  // ★★★ 2026-09-16 저녁 사장님 지시 — 낮의 규칙만으로는 **판이 영상보다 작았다**.
+  //   판은 가로로 넓은 격자(4×2 ≈ 1.125)라 같은 칸 폭에서 560 에 못 미친다.
+  //   그래서 키를 하나 정해 두고(`--rv-media-h`) 둘 다 그 키로 세우고,
+  //   영상 칸은 제 폭만큼만 차지해 **오른쪽 끝**에 붙는다.
+  it("★★★ ⑤만의 규칙을 쓴다 — ②·④의 글 카드 짝은 건드리지 않는다", () => {
+    expect(page, "⑤ 전용 표식이 없다 — 규칙이 ②시나리오까지 간다").toContain("rv-split--video");
+  });
+
+  it("★★★ 판과 영상이 **같은 키**로 선다", () => {
+    const css = readFileSync("app/globals.css", "utf8");
+    const at = css.indexOf(".rv-split--video.is-two");
+    expect(at, "⑤ 전용 격자 규칙이 없다").toBeGreaterThan(-1);
+    const grid = css.slice(at, css.indexOf("}", at));
+    expect(grid, "키를 정하는 자리가 없다").toMatch(/--rv-media-h:/);
+    expect(grid, "영상 칸이 제 폭만큼만 차지하지 않는다 — 양옆에 빈 자리가 남는다")
+      .toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto/);
+
+    for (const sel of [".rv-split--video > .sheet-view img", ".rv-split--video > .vid-result"]) {
+      const i = css.indexOf(sel);
+      expect(i, `${sel} 규칙이 없다`).toBeGreaterThan(-1);
+      const rule = css.slice(i, css.indexOf("}", i));
+      expect(rule, `${sel} 가 공통 키를 안 쓴다`).toMatch(/height:\s*var\(--rv-media-h\)/);
+      expect(rule, `${sel} 에 옛 560 상한이 남아 키가 둘이다`).toMatch(/max-height:\s*none/);
+      expect(rule, `${sel} 가 칸을 넘칠 수 있다`).toMatch(/max-width:\s*100%/);
+    }
+  });
+
+  // ★ 실측으로 밟은 자리 둘 — 둘 다 없으면 좁은 화면에서 티가 난다.
+  it("★★ 좁은 화면에서는 키를 낮추고, 판은 찌그러지지 않는다", () => {
+    const css = readFileSync("app/globals.css", "utf8");
+    expect(css, "좁은 화면에서 키를 안 낮춘다 — 판이 제 칸을 못 채워 위아래가 빈다")
+      .toMatch(/@media \(max-width: 1440px\) \{\s*\.rv-split--video\.is-two \{ --rv-media-h:/);
+    const i = css.indexOf(".rv-split--video > .sheet-view img");
+    expect(css.slice(i, css.indexOf("}", i)), "높이를 못 박은 그림에 object-fit 이 없다 — 좁은 칸에서 찌그러진다")
+      .toMatch(/object-fit:\s*contain/);
+  });
+
+  it("★★ 판은 왼쪽 끝, 영상은 오른쪽 끝에 붙는다", () => {
+    const css = readFileSync("app/globals.css", "utf8");
+    const s = css.indexOf(".rv-split--video > .sheet-view {");
+    expect(s, "판을 왼쪽에 붙이는 규칙이 없다").toBeGreaterThan(-1);
+    expect(css.slice(s, css.indexOf("}", s)), "판이 가운데 서서 왼쪽에 빈 자리가 남는다")
+      .toMatch(/justify-content:\s*flex-start/);
+    const v = css.indexOf(".rv-split--video > .vid-result");
+    expect(css.slice(v, css.indexOf("}", v)), "영상이 오른쪽 끝에 안 붙는다")
+      .toMatch(/justify-self:\s*end/);
+  });
 });
