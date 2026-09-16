@@ -160,3 +160,55 @@ describe("alignSpeech — 쉼표에서 끊긴 조각을 문장으로 묶는다",
     expect(out.every((u) => u.spoken_start === undefined)).toBe(true);
   });
 });
+
+import { speechUnits } from "../lib/speech-timing.js";
+
+// 임계값 근거(2026-09-16 실측): 정상 최장 낱말은 글자수 대비 2.3배("올리고" 1.28초/3글자),
+// 쉼을 머금은 낱말은 7.6배(whisper "하루" 2.78초/2글자). 그 사이인 3배를 잡았다.
+describe("speechUnits — 재 놓고 못 믿으면 버린다", () => {
+  const S = ["가나다라 마바사.", "아자차카 타파하."];
+
+  it("정상이면 문장마다 시작~끝이 붙는다", () => {
+    const words = [
+      { timestamp: [1.0, 1.5], text: "가나다라" }, { timestamp: [1.5, 2.0], text: "마바사." },
+      { timestamp: [5.0, 5.5], text: "아자차카" }, { timestamp: [5.5, 6.0], text: "타파하." },
+    ];
+    const out = speechUnits(S, words, { seconds: 15 });
+    expect(out.units[0]).toEqual({ start: 1.0, seconds: 1.0, ok: true });
+    expect(out.units[1]).toEqual({ start: 5.0, seconds: 1.0, ok: true });
+    expect(out.heard.chars).toBe(14);
+  });
+
+  it("첫 낱말이 글자수 대비 3배를 넘게 길면 그 문장을 버린다", () => {
+    const words = [
+      { timestamp: [1.0, 1.5], text: "가나다라" }, { timestamp: [1.5, 2.0], text: "마바사." },
+      { timestamp: [2.0, 5.6], text: "아자차카" }, { timestamp: [5.6, 6.0], text: "타파하." },
+    ];
+    const out = speechUnits(S, words, { seconds: 15 });
+    expect(out.units[0].ok).toBe(true);
+    expect(out.units[1]).toEqual({ start: null, seconds: null, ok: false });
+  });
+
+  it("영상 길이를 넘으면 버린다", () => {
+    const words = [
+      { timestamp: [1.0, 1.5], text: "가나다라" }, { timestamp: [1.5, 2.0], text: "마바사." },
+      { timestamp: [14.0, 16.5], text: "아자차카" }, { timestamp: [16.5, 17.0], text: "타파하." },
+    ];
+    const out = speechUnits(S, words, { seconds: 15 });
+    expect(out.units[1].ok).toBe(false);
+  });
+
+  it("들은 양이 원고의 0.75 배 미만이면 전부 버린다", () => {
+    const words = [{ timestamp: [1.0, 1.5], text: "가나" }];
+    const out = speechUnits(S, words, { seconds: 15 });
+    expect(out.units.every((u) => u.ok === false)).toBe(true);
+    expect(out.heard.chars).toBe(2);
+  });
+
+  it("낱말이 없으면 전부 버리고 들은 양은 0 이다", () => {
+    const out = speechUnits(S, [], { seconds: 15 });
+    expect(out.units).toHaveLength(2);
+    expect(out.units.every((u) => u.ok === false)).toBe(true);
+    expect(out.heard).toEqual({ chars: 0, text: "" });
+  });
+});
