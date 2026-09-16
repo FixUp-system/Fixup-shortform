@@ -8,7 +8,7 @@ import { withUser } from "../../../lib/auth/require-user.js";
 import { getStore } from "../../../lib/store/index.js";
 import { balanceFor } from "../../../lib/charges.js";
 import { fakeFal } from "../../../lib/fake.js";
-import { creditsEnabled, creditsEnabledFor } from "../../../lib/charges.js";
+import { creditsEnabled, creditsEnabledFor, isInternalAccount } from "../../../lib/charges.js";
 import { tierOf } from "../../../lib/tiers.js";
 import { displayNameOf, NAME_MAX } from "../../../lib/display-name.js";
 
@@ -31,9 +31,13 @@ export const GET = withUser(async (_req, _ctx, user) => {
     // ★ gated 는 "잔액 부족"이 아니라 "크레딧 게이트가 켜져 있음"이다(/api/credits 와 같은 규칙).
     // 실모드면 잔액과 무관하게 늘 true 이고, 잔액 판정은 화면이 gated && balance < 가격 으로 한다.
     // ★ 2026-09-14 — 계정마다 가른다(내부 계정 면제). /api/credits 와 같은 판정이다.
-    gated: !fakeFal() && await creditsEnabledFor(user.id),
+    // ★★ 2026-09-16 — 위에서 이미 읽은 `profile` 을 넘긴다. creditsEnabledFor 가 같은
+    //   프로필을 또 조회하던 것이 이 라우트의 두 번째 DB 왕복이었다(실측 23~68ms).
+    gated: !fakeFal() && await creditsEnabledFor(user.id, profile),
     // 내부 계정인가 — 원장 값 그대로(전역 스위치와 무관). 상단바가 "내부 계정" 표시에 쓴다.
-    internal: creditsEnabled() && profile.internal === true,
+    // ★ 판정 규칙(profile.internal === true)은 isInternalAccount 하나뿐이다 — creditsEnabledFor
+    //   도 같은 함수를 쓴다(lib/charges.js). 두 곳에 따로 적으면 언젠가 한쪽만 바뀐다.
+    internal: creditsEnabled() && isInternalAccount(profile),
     // ★ 원문 role 을 그대로 흘리지 않는다 — 화면이 쓸 판정 하나만 준다.
     // 사이드바가 이걸 보고 운영자 전용 링크(비용 기록)를 그릴지 정한다.
     isAdmin: user.role === "admin",
