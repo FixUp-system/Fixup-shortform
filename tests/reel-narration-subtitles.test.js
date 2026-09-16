@@ -47,6 +47,27 @@ describe("자막 단위 — narrationUnits", () => {
   });
 });
 
+// ── 2026-09-16 — 새 자리(reel.speech)가 옛 자리(narration_timing)를 이긴다 ──────
+describe("Scribe v2 새 자리를 읽는다", () => {
+  it("새 자리(reel.speech)의 믿을 수 있는 문장만 시각을 얹는다", () => {
+    const p = {
+      cuts: [{ video: { url: "u", whole: true, said: "가나다.\n라마바." } }],
+      reel: { speech: { units: [{ start: 1.5, seconds: 2, ok: true }, { start: null, seconds: null, ok: false }] } },
+    };
+    const units = narrationUnits(p, 15);
+    expect(units[0].spoken_start).toBe(1.5);
+    expect(units[1].spoken_start).toBeUndefined();
+  });
+
+  it("reel.speech 가 없으면 옛 narration_timing 을 읽는다", () => {
+    const p = {
+      cuts: [{ video: { url: "u", whole: true, said: "가나다.\n라마바." } }],
+      reel: { narration_timing: [{ start: 0.5, seconds: 1 }] },
+    };
+    expect(narrationUnits(p, 15)[0].spoken_start).toBe(0.5);
+  });
+});
+
 describe("합성이 그 단위를 쓴다 — subtitleCutsOf", () => {
   const cuts = [
     { idx: 0, seconds: 5, sentence: "", video: { url: "https://x/v.mp4", seconds: 15 } },

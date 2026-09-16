@@ -107,12 +107,15 @@ describe("② 합성 전에 **한 벌도** 잰다", () => {
     expect(route, "아직 한 벌이면 재기를 건너뛴다").not.toMatch(/!units\s*&&\s*needsSpeechProbe/);
   });
 
+  // ★★★ 2026-09-16 — 저장 자리가 `reel.narration_timing`(whisper 조각)에서
+  //   `reel.speech`(Scribe v2 낱말 단위 판정, lib/speech-timing.js 의 speechUnits)로
+  //   옮겼다. 자세한 계약은 tests/reel-render-speech.test.js 의 "Scribe v2 로 잰다".
   it("★★ 잰 것을 **한 벌 단위로** 문서에 남긴다 — 다시 합성할 때 또 재면 값이 두 번 나간다", () => {
-    expect(route).toMatch(/narration_timing/);
+    expect(route).toMatch(/speech/);
   });
 
   it("★ 이미 잰 것이 있으면 다시 안 잰다", () => {
-    expect(route).toMatch(/narration_timing/);
+    expect(route).toMatch(/reelOf\(project\)\.speech/);
     expect(route).toMatch(/alignSpeech/);
   });
 });

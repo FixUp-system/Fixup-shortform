@@ -1,7 +1,7 @@
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { runInBackground } from "../../../../../lib/background.js";
 import { getProject, updateProject } from "../../../../../lib/projects.js";
-import { putReel } from "../../../../../lib/reel/doc.js";
+import { putReel, reelOf } from "../../../../../lib/reel/doc.js";
 // ★ 진행 표식 — 사이드바가 ⑤영상과 ⑥완성을 가르는 유일한 근거다(둘 다 status 가
 //   "rendering" 이다). lib/reel/steps.js 의 runningReelStepKey 가 이 값을 읽는다.
 import { reelProgress } from "../../../../../lib/reel/pipeline.js";
@@ -9,8 +9,9 @@ import { composeVideo } from "../../../../../lib/compose.js";
 import { speechLangOf } from "../../../../../lib/subtitle-langs.js";
 // 자막 시각 — 모델이 **언제** 말했는지를 재서 붙인다(2026-08-25 실측).
 import { probeSpeech } from "../../../../../lib/speech-probe.js";
-import { alignSpeech, needsSpeechProbe } from "../../../../../lib/speech-timing.js";
+import { alignSpeech, needsSpeechProbe, speechUnits } from "../../../../../lib/speech-timing.js";
 import { narrationUnits } from "../../../../../lib/reel/narration.js";
+import { extractAudioDataUri } from "../../../../../lib/speech-audio.js";
 
 // 완성 — 컷마다 만든 클립을 이어 붙이고 자막을 태운다. lib/compose.js 의 composeVideo
 // 하나가 그 둘을 다 한다(합성이 곧 자막 굽기다) — 새 장치를 만들지 않는다.
@@ -82,20 +83,22 @@ export const POST = withUser(async (req, { params }, user) => {
   // ★ 못 재도 그대로 간다 — 자막 하나 때문에 이미 값을 다 치른 한 편을 잃을 수 없다.
   //   그때는 글자 수 비례라는 **바닥**으로 흐른다(예전 그대로다).
   // ★ 컷 line 은 지우지 않는다 — 한 벌이 빠졌을 때 옛 길(컷 자막)로 떨어지는 안전망이다.
+  // ★★ 2026-09-16 — 자막 시각을 **Scribe v2 낱말 단위**로 재는 새 자리(`reel.speech`)로
+  //   바꾼다. whisper(segment)는 쉼을 다음 조각의 시작에 붙여 자막이 최대 2.75초 일찍
+  //   떴다(설계 문서 §2) — Scribe v2 는 낱말마다 시각을 줘 쉼이 안 섞인다.
+  //   설계: docs/superpowers/specs/2026-09-16-reel-subtitle-timing-design.md
+  // ★ 자막이 꺼져 있으면 재지 않는다 — 쓰지 않을 값에 돈을 내지 않는다.
+  // ★ 이미 잰 편은 다시 안 잰다. 소리가 바뀌면 lib/reel/pipeline.js 가 지운다.
   if (units) {
-    if (units.length > 1 && !units.some((u) => Number(u.spoken_start) > 0)) {
+    if (units.length > 1 && !reelOf(project).speech && project.settings?.subtitle?.off !== true) {
       const clipUrl = cuts.find((c) => c?.video?.url)?.video?.url;
-      const chunks = await probeSpeech(clipUrl, { projectId: id, seconds });
-      if (chunks.length) {
-        timedUnits = alignSpeech(units, chunks);
-        // ★ 문장과 **같은 순서**로 담는다 — 개수가 어긋나면 남는 자리는 null 이고,
-        //   narrationUnits 가 그 자리를 건드리지 않아 바닥으로 흐른다.
-        await updateProject(id, user.id, (p) => putReel(p, {
-          narration_timing: timedUnits.map((u) => ({
-            start: Number.isFinite(u.spoken_start) ? u.spoken_start : null,
-            seconds: Number.isFinite(u.spoken_seconds) ? u.spoken_seconds : null,
-          })),
-        })).catch(() => {});
+      const audio = await extractAudioDataUri(clipUrl, { projectId: id });
+      const heardRaw = await probeSpeech(audio, { projectId: id, seconds, lang: speechLangOf(project) });
+      const measured = speechUnits(units.map((u) => u.sentence), heardRaw.words, { seconds });
+      if (measured.units.some((u) => u.ok)) {
+        const speech = { at: Date.now(), source: "scribe-v2", units: measured.units, heard: measured.heard };
+        await updateProject(id, user.id, (p) => putReel(p, { speech })).catch(() => {});
+        timedUnits = narrationUnits({ ...project, reel: { ...reelOf(project), speech } }, seconds) || units;
       }
     }
   } else if (needsSpeechProbe(cuts) && !cuts.some((c) => Number(c?.spoken_start) > 0)) {

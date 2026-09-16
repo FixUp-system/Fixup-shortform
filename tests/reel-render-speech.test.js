@@ -64,9 +64,12 @@ describe("한 벌도 시각을 잰다", () => {
     expect(units, "한 벌 계산이 재기 판정보다 뒤에 있다").toBeLessThan(probe);
   });
 
+  // ★★★ 2026-09-16 — whisper(alignSpeech·narration_timing)에서 Scribe v2 낱말 단위
+  //   판정(speechUnits)과 새 저장 자리(reel.speech)로 옮겼다. 아래 새 describe 가
+  //   그 계약을 잰다 — 이 자리는 "한 벌이면 재고 문서에 남긴다"만 남긴다.
   it("★★ 한 벌이면 **한 벌 단위로** 재고, 그 값을 문서에 남긴다", () => {
-    expect(clean, "한 벌을 정렬하지 않는다").toMatch(/alignSpeech\(units,/);
-    expect(clean, "잰 값을 남기는 자리가 없다").toMatch(/narration_timing/);
+    expect(clean, "낱말 단위 판정을 안 쓴다").toMatch(/speechUnits\(/);
+    expect(clean, "잰 값을 남기는 자리가 없다").toMatch(/speech/);
   });
 
   it("★★ 옛 문서·컷별 갈래는 **예전 그대로** 컷에 박는다 — 회귀 0", () => {
@@ -76,5 +79,29 @@ describe("한 벌도 시각을 잰다", () => {
 
   it("★ 문장이 하나면 안 잰다 — 시작이 곧 영상 시작이라 어긋날 자리가 없다", () => {
     expect(clean).toMatch(/units\.length\s*>\s*1/);
+  });
+});
+
+// ── 2026-09-16 — Scribe v2 로 바꾼다 ─────────────────────────────────────────
+//
+// whisper(segment)는 쉼을 다음 조각의 시작에 붙여 자막이 최대 2.75초 일찍 떴다
+// (설계 문서 §2). Scribe v2 는 낱말마다 시각을 준다 — 영상에서 소리를 뽑고
+// (lib/speech-audio.js) 낱말 단위로 잰(lib/speech-probe.js) 뒤 문장 경계에
+// 판정을 얹어(lib/speech-timing.js 의 speechUnits) 새 자리(reel.speech)에 남긴다.
+describe("Scribe v2 로 잰다", () => {
+  it("소리를 뽑은 뒤에 잰다", () => {
+    const a = route.indexOf("extractAudioDataUri(");
+    const b = route.indexOf("probeSpeech(");
+    expect(a).toBeGreaterThan(-1);
+    expect(b).toBeGreaterThan(a);
+  });
+
+  it("판정을 거쳐 새 자리에 저장한다", () => {
+    expect(route).toMatch(/speechUnits\(/);
+    expect(route).toMatch(/source:\s*"scribe-v2"/);
+  });
+
+  it("이미 잰 편은 다시 재지 않는다", () => {
+    expect(route).toMatch(/!reelOf\(project\)\.speech/);
   });
 });
