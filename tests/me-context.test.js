@@ -75,6 +75,9 @@ describe("내 정보 공유본", () => {
     expect(bare, "AppShell 의 bare 갈래를 못 찾았다 — 갈래 모양이 바뀌었으면 이 검사부터 고쳐라").not.toBeNull();
     expect(bare[0]).not.toMatch(/MeProvider/);
     // bare 가 아닌 갈래에만 있다.
-    expect(shell).toMatch(/<MeProvider>/);
+    // ★ 2026-09-16 — `initial` prop 이 붙었다(레이아웃이 헤더에서 읽은 guest·isAdmin 힌트를
+    //   내려보낸다, lib/auth/initial-me.js). 열린 태그만 잰다 — 프롭 유무는 이 판의 관심사가
+    //   아니다(그 값은 tests/initial-me.test.js·sidebar-account-ui.test.js 가 문다).
+    expect(shell).toMatch(/<MeProvider[\s>]/);
   });
 });

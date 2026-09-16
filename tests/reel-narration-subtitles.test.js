@@ -47,6 +47,75 @@ describe("자막 단위 — narrationUnits", () => {
   });
 });
 
+// ── 2026-09-16 — 새 자리(reel.speech)가 옛 자리(narration_timing)를 이긴다 ──────
+describe("Scribe v2 새 자리를 읽는다", () => {
+  it("새 자리(reel.speech)의 믿을 수 있는 문장은 잰 시각 그대로, 못 믿는 문장은 그 뒤 구간에 놓인다", () => {
+    const p = {
+      cuts: [{ video: { url: "u", whole: true, said: "가나다.\n라마바." } }],
+      reel: { speech: { units: [{ start: 1.5, seconds: 2, ok: true }, { start: null, seconds: null, ok: false }] } },
+    };
+    const units = narrationUnits(p, 15);
+    expect(units[0].spoken_start).toBe(1.5);
+    // ★ I1 — 뒤에 ok 문장이 없으므로 앞 ok 문장의 끝(3.5)에서 영상 끝(15)까지가 경계다.
+    //   0(안 잰 것으로 취급)이 아니라 이 값이어야 앞 문장과 안 겹친다.
+    expect(units[1].spoken_start).toBe(3.5);
+    expect(units[1].spoken_seconds).toBeCloseTo(11.5, 5);
+  });
+
+  it("reel.speech 가 없으면 옛 narration_timing 을 읽는다", () => {
+    const p = {
+      cuts: [{ video: { url: "u", whole: true, said: "가나다.\n라마바." } }],
+      reel: { narration_timing: [{ start: 0.5, seconds: 1 }] },
+    };
+    expect(narrationUnits(p, 15)[0].spoken_start).toBe(0.5);
+  });
+});
+
+// ── task-7 — 못 잰 문장의 비례 바닥이 영상 길이가 아니라 "말한 구간"이다 ──────
+//   측정이 있으면 말이 끝난 뒤로 자막이 늘어지면 안 된다(2026-08-25 실측: 15초 영상에
+//   18·24초 자막). 측정이 아예 없으면 예전처럼 영상 길이를 쓴다 — 회귀 0.
+describe("폴백 기준 — 말한 구간", () => {
+  it("측정이 있으면 못 믿는 문장은 말한 구간 안에서 비례로 흐른다", () => {
+    const p = {
+      cuts: [{ video: { url: "u", whole: true, said: "가나다.\n라마바.\n사아자." } }],
+      reel: { speech: { units: [
+        { start: 1.0, seconds: 2.0, ok: true },
+        { start: null, seconds: null, ok: false },
+        { start: 7.0, seconds: 2.0, ok: true },
+      ] } },
+    };
+    const units = narrationUnits(p, 15);
+    // 못 믿는 둘째 문장이 말한 구간(1.0~9.0) 기준으로 흐른다 — 영상 끝(15초)까지 안 늘어진다
+    expect(units[1].seconds).toBeLessThan(8);
+  });
+
+  // ★★ I1 — 위 테스트는 seconds 만 보고 start 를 한 번도 안 봐서, "0 기준이라 앞 문장과
+  //   겹친다"는 결함을 통과시켰다(리뷰 지적). start 를 단정해서 그 결함을 잡는다.
+  it("★ 못 믿는 문장이 앞 ok 문장의 끝 ~ 뒤 ok 문장의 시작 사이에 놓인다 — 겹치지 않는다", () => {
+    const p = {
+      cuts: [{ video: { url: "u", whole: true, said: "가나다.\n라마바.\n사아자." } }],
+      reel: { speech: { units: [
+        { start: 1.0, seconds: 2.0, ok: true },
+        { start: null, seconds: null, ok: false },
+        { start: 7.0, seconds: 2.0, ok: true },
+      ] } },
+    };
+    const units = narrationUnits(p, 15);
+    const firstEnd = units[0].spoken_start + units[0].spoken_seconds;
+    const thirdStart = units[2].spoken_start;
+    expect(units[1].spoken_start).toBeCloseTo(firstEnd, 5);
+    expect(units[1].spoken_start + units[1].spoken_seconds).toBeCloseTo(thirdStart, 5);
+    // 겹치지 않는다: 둘째 문장의 시작이 첫째 문장의 끝보다 이르지 않다
+    expect(units[1].spoken_start).toBeGreaterThanOrEqual(firstEnd - 1e-6);
+  });
+
+  it("측정이 아예 없으면 예전처럼 영상 길이로 나눈다", () => {
+    const p = { cuts: [{ video: { url: "u", whole: true, said: "가나다.\n라마바." } }], reel: {} };
+    const units = narrationUnits(p, 10);
+    expect(units[0].seconds + units[1].seconds).toBeCloseTo(10, 3);
+  });
+});
+
 describe("합성이 그 단위를 쓴다 — subtitleCutsOf", () => {
   const cuts = [
     { idx: 0, seconds: 5, sentence: "", video: { url: "https://x/v.mp4", seconds: 15 } },

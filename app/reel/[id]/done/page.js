@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useReelProject } from "../layout";
-import { reelOf, reelErrorFor, isReelRendering } from "../../../../lib/reel/doc";
+import { reelOf, reelErrorFor, isReelRendering, speechMismatch } from "../../../../lib/reel/doc";
 import { startPolling } from "../../../../lib/poll";
 import { REEL_STEPS, reelStepHref } from "../../../../lib/reel/steps";
 import ReelBack from "../../../../components/ReelBack";
@@ -138,6 +138,7 @@ export default function ReelDonePage() {
   const reel = reelOf(project);
   const rendering = isReelRendering(reel);
   const cuts = project?.cuts || [];
+  const mismatch = speechMismatch(project);
   const hasClips = cuts.some((c) => c?.video?.url);
 
   // 진입·새로고침 복원 — 합성 중이면 폴링을 잇는다.
@@ -230,6 +231,16 @@ export default function ReelDonePage() {
           ★ 새 CSS 를 안 만든다 — ②시나리오의 수정 요청 칸과 같은 옷을 입는다.
           ★ **돈이 안 나가는 버튼**이라 자기 자리에 둘 수 있다. 값이 나가는 버튼은 아래
             실행줄의 [다시 만들기] 하나다(이 저장소의 규율). */}
+      {/* ★ 2026-09-16 — 모델이 실제로 한 말을 재서 원고와 크게 다르면 여기서 알린다
+          (render 라우트가 재 놓은 project.reel.speech 를 speechMismatch 가 판정한다).
+          ★ 근거 없는 경고는 무시된다 — 들린 말을 함께 보여 준다. LLM 에게 다시 묻지
+            않는다(이 저장소는 LLM 검수가 조용히 통과만 시킨 전례가 있다). */}
+      {mismatch && cuts[0]?.video?.whole === true && cuts[0]?.video?.url && (
+        <p className="pgsub warn">
+          ⚠️ 영상 속 말과 자막이 다를 수 있어요 — 들린 말: “{mismatch.heard}”
+        </p>
+      )}
+
       {cuts[0]?.video?.whole === true && cuts[0]?.video?.url && (
         <div className="note-form">
           <p className="pgsub">자막 글자 — 이 영상이 말하는 문장이에요. 비우면 시나리오의 내레이션을 따라요.</p>

@@ -20,13 +20,21 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 
 const Ctx = createContext(null);
 
-export function MeProvider({ children }) {
+// ★ 2026-09-16 — `initial` 은 app/layout.js(서버 컴포넌트)가 middleware 의 검증된 요청
+//   헤더에서 뽑아 내려보낸 힌트다(lib/auth/initial-me.js 의 `{ guest, isAdmin }`).
+//   여기서는 그중 `guest` 만 받아 첫 렌더의 값으로 쓴다 — GET /api/me 가 돌아오기 전에도
+//   "로그인했는가"는 이미 서버가 아는 값이라 기다릴 이유가 없다(사이드바 [내 계정] 지연 신고).
+//   ★ `isAdmin` 은 여기서 안 받는다 — `me` 를 부분 값으로 채우면 그 truthy 함을 "프로필을
+//   다 읽었다"로 여기는 다른 소비자(상단바 잔액·마이페이지 이름칸)가 깨진다. isAdmin 힌트는
+//   AppShell 이 Sidebar 에 곧장 건넨다(components/Sidebar.jsx 의 initialAdmin prop).
+//   ★ ready 는 그대로 false 로 시작한다 — 초기값이 있다고 "다 읽었다"가 되지 않는다.
+export function MeProvider({ children, initial }) {
   const [me, setMe] = useState(null);
   const [failed, setFailed] = useState(false);
   // ★★ 손님(로그인 안 함)인가 — **실패와 다른 축이다**(2026-08-27). 401 은 "못 읽었다"가
   //   아니라 "아직 로그인 안 했다"이고, 상단바가 그 자리에 [로그인]을 그려야 한다.
   //   failed 하나로 뭉치면 일시적인 오류에도 로그인 버튼이 뜬다.
-  const [guest, setGuest] = useState(false);
+  const [guest, setGuest] = useState(() => Boolean(initial?.guest));
   // ★★★ **읽기가 끝났는가**(2026-08-31). `me` 가 null 인 것은 두 가지 뜻이다 —
   //   "아직 읽는 중"과 "읽어 봤더니 없다". 소비자들이 그 둘을 구분 못 해서 새로고침 직후
   //   **잘못된 한 프레임**이 그려졌다: 크레딧이 반짝 보이고(`me?.gated !== false` 가

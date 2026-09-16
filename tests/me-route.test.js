@@ -4,7 +4,14 @@ import { memoryStore, resetMemoryStore } from "../lib/store/memory.js";
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
 
 // creditsEnabled 도 함께 준다 — 라우트가 gated 를 그것으로 판정한다(2026-08-14).
-vi.mock("../lib/charges.js", () => ({ balanceFor: async () => 85.18, creditsEnabled: () => true, creditsEnabledFor: async () => true }));
+// ★ 2026-09-16 — isInternalAccount 도 준다. 라우트가 이제 (중복 조회를 없애려고) 이미
+//   읽은 profile 을 그 함수로 직접 판정한다(lib/charges.js).
+vi.mock("../lib/charges.js", () => ({
+  balanceFor: async () => 85.18,
+  creditsEnabled: () => true,
+  creditsEnabledFor: async () => true,
+  isInternalAccount: (profile) => profile?.internal === true,
+}));
 
 const { GET, PATCH } = await import("../app/api/me/route.js");
 

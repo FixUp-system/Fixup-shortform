@@ -1,5 +1,7 @@
 import "./globals.css";
 import localFont from "next/font/local";
+import { headers } from "next/headers";
+import { meInitialFromHeaders } from "../lib/auth/initial-me.js";
 import { ProjectProvider } from "../components/ProjectContext";
 import { AdProjectProvider } from "../components/AdProjectContext";
 import { FilmProjectProvider } from "../components/FilmProjectContext";
@@ -29,7 +31,14 @@ export const metadata = {
   description: "대화만 하면 숏폼 영상이 만들어져요",
 };
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
+  // ★ 2026-09-16 — 사이드바 [내 계정]·[운영] 이 GET /api/me 왕복(미들웨어 Auth 왕복 + 라우트
+  //   DB 조회, 실측 평균 131ms)이 끝나야 나타난다는 신고가 있었다. middleware.js 는 이미
+  //   신원을 검증해 요청 헤더에 넣어 두므로, 여기서 그 값을 읽어 AppShell 에 내려보낸다
+  //   (app/home/page.js 가 이미 같은 방식으로 헤더를 읽는다).
+  // ★ 새 판정이 아니다 — meInitialFromHeaders 는 헤더를 그대로 옮길 뿐이고, 진짜 역할
+  //   게이트는 여전히 middleware 하나다.
+  const meInitial = meInitialFromHeaders(await headers());
   return (
     // ★ 2026-09-08 — 벌이 하나(밝은 벌)로 합쳐지면서 테마를 먼저 칠하던 <head> 인라인
     //   스크립트를 걷어냈다. 고를 것이 없으니 첫 칠 전에 정할 것도 없다.
@@ -61,7 +70,7 @@ export default function RootLayout({ children }) {
                   있으면 사이드바보다 아래라 단계 목록을 사이드바에서 그릴 수 없다. */}
               <ReelProjectProvider>
                 <DialogProvider>
-                  <AppShell>{children}</AppShell>
+                  <AppShell initialMe={meInitial}>{children}</AppShell>
                 </DialogProvider>
               </ReelProjectProvider>
             </FilmProjectProvider>

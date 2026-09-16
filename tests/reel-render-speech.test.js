@@ -4,6 +4,9 @@
 // ★ 못 재도 합성은 그대로 간다 — 자막 하나 때문에 이미 값을 치른 한 편을 잃지 않는다.
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
+import { probeSpeech } from "../lib/speech-probe.js";
+import { alignSpeech } from "../lib/speech-timing.js";
+import { runWithActor } from "../lib/actor.js";
 
 const route = readFileSync("app/api/reel/[id]/render/route.js", "utf8");
 const clean = route.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
@@ -64,9 +67,12 @@ describe("한 벌도 시각을 잰다", () => {
     expect(units, "한 벌 계산이 재기 판정보다 뒤에 있다").toBeLessThan(probe);
   });
 
+  // ★★★ 2026-09-16 — whisper(alignSpeech·narration_timing)에서 Scribe v2 낱말 단위
+  //   판정(speechUnits)과 새 저장 자리(reel.speech)로 옮겼다. 아래 새 describe 가
+  //   그 계약을 잰다 — 이 자리는 "한 벌이면 재고 문서에 남긴다"만 남긴다.
   it("★★ 한 벌이면 **한 벌 단위로** 재고, 그 값을 문서에 남긴다", () => {
-    expect(clean, "한 벌을 정렬하지 않는다").toMatch(/alignSpeech\(units,/);
-    expect(clean, "잰 값을 남기는 자리가 없다").toMatch(/narration_timing/);
+    expect(clean, "낱말 단위 판정을 안 쓴다").toMatch(/speechUnits\(/);
+    expect(clean, "잰 값을 남기는 자리가 없다").toMatch(/speech/);
   });
 
   it("★★ 옛 문서·컷별 갈래는 **예전 그대로** 컷에 박는다 — 회귀 0", () => {
@@ -76,5 +82,88 @@ describe("한 벌도 시각을 잰다", () => {
 
   it("★ 문장이 하나면 안 잰다 — 시작이 곧 영상 시작이라 어긋날 자리가 없다", () => {
     expect(clean).toMatch(/units\.length\s*>\s*1/);
+  });
+});
+
+// ── 2026-09-16 — Scribe v2 로 바꾼다 ─────────────────────────────────────────
+//
+// whisper(segment)는 쉼을 다음 조각의 시작에 붙여 자막이 최대 2.75초 일찍 떴다
+// (설계 문서 §2). Scribe v2 는 낱말마다 시각을 준다 — 영상에서 소리를 뽑고
+// (lib/speech-audio.js) 낱말 단위로 잰(lib/speech-probe.js) 뒤 문장 경계에
+// 판정을 얹어(lib/speech-timing.js 의 speechUnits) 새 자리(reel.speech)에 남긴다.
+describe("Scribe v2 로 잰다", () => {
+  it("소리를 뽑은 뒤에 잰다", () => {
+    const a = route.indexOf("extractAudioDataUri(");
+    const b = route.indexOf("probeSpeech(");
+    expect(a).toBeGreaterThan(-1);
+    expect(b).toBeGreaterThan(a);
+  });
+
+  it("판정을 거쳐 새 자리에 저장한다", () => {
+    expect(route).toMatch(/speechUnits\(/);
+    expect(route).toMatch(/source:\s*"scribe-v2"/);
+  });
+
+  it("이미 잰 편은 다시 재지 않는다", () => {
+    expect(route).toMatch(/!reelOf\(project\)\.speech/);
+  });
+});
+
+// ── 2026-09-16 리뷰 Critical 1 — 전부 버려진 측정도 저장된다 ──────────────────
+//
+// `if (measured.units.some((u) => u.ok))`는 문장 하나라도 살아남아야 저장한다.
+// speechUnits 는 들은 양 비율이 범위 밖이면 **전 문장을 ok:false 로 버리는데**, 그때
+// 저장이 통째로 건너뛰어져 ① speechMismatch 의 "short" 갈래가 도달 불가능해지고
+// (가장 크게 어긋난 편이 조용히 지나간다), ② ok:false(재 봤는데 못 믿는다)와
+// speech 없음(아직 안 쟀다)의 구분이 깨지고, ③ 완성할 때마다 다시 재서 돈이 반복해
+// 나간다(설계 §4.3·§4.7). 낱말을 하나라도 받았으면(측정 자체는 성공) 항상 저장해야
+// 한다 — narrationUnits 는 전부 ok:false 인 speech 를 이미 올바르게 다룬다(비례 폴백).
+describe("C1 — 전부 버려진 측정도 저장된다", () => {
+  it("저장 조건이 '문장 하나라도 ok' 가 아니라 '낱말을 하나라도 받았는가'다", () => {
+    expect(route, "여전히 ok 한 문장이 있어야 저장한다 — 전부 버려진 측정을 통째로 잃는다")
+      .not.toMatch(/measured\.units\.some\(\(u\)\s*=>\s*u\.ok\)/);
+    expect(route, "낱말을 받았는지로 저장을 가르지 않는다").toMatch(/heardRaw\.words\.length/);
+  });
+});
+
+// ── 2026-09-16 리뷰 Critical 1 — 옛 컷별 갈래도 새 계약을 따라야 한다 ──────────
+//
+// `else if (needsSpeechProbe …)` 갈래는 probeSpeech 계약이 바뀐 뒤에도 예전처럼
+// 영상 URL 을 넘기고 반환을 배열로 읽고 있었다. 새 계약은 오디오 data URI 를 받고
+// `{ words, text }` 를 준다 — 소스 문자열 검사로는 이 어긋남이 안 잡힌다(둘 다
+// "probeSpeech"·"alignSpeech" 라는 이름만 쓰기 때문이다). 그래서 여기서는 **동작**을
+// 잰다: probeSpeech 가 실제로 주는 words 모양을 그대로 alignSpeech 에 넣었을 때
+// 컷에 시각이 붙는지를 확인한다 — 이 둘이 안 맞으면 이 테스트가 조용히 통과하는 대신
+// spoken_start 가 안 붙어야 한다(맞물리지 않는다는 뜻이므로).
+describe("옛 컷별 갈래 — probeSpeech 반환이 alignSpeech 입력과 맞물린다", () => {
+  it("probeSpeech 의 words 를 그대로 alignSpeech 에 넣으면 컷에 시각이 붙는다", async () => {
+    const cuts = [
+      { sentence: "가나다", video: { url: "https://x/a.mp4" } },
+      { sentence: "라마바" },
+    ];
+    const body = {
+      words: [
+        { text: "가나다", start: 0.1, end: 0.9, type: "word" },
+        { text: " ", start: 0.9, end: 1.0, type: "spacing" },
+        { text: "라마바", start: 1.0, end: 1.8, type: "word" },
+      ],
+    };
+    const heardRaw = await runWithActor("t-user", () => probeSpeech("data:audio/mp4;base64,AA", {
+      fetchImpl: async () => ({ ok: true, json: async () => body }),
+      projectId: "p1", seconds: 2,
+    }));
+    expect(heardRaw.words.length).toBeGreaterThan(0);
+
+    const timed = alignSpeech(cuts, heardRaw.words);
+    expect(timed[0].spoken_start).toBeCloseTo(0.1, 2);
+    expect(timed[1].spoken_start).toBeCloseTo(1.0, 2);
+  });
+
+  it("route 가 옛 갈래에서도 extractAudioDataUri 를 거쳐 오디오를 넘긴다", () => {
+    // else-if 본문(옛 컷별 갈래) 안에서 extractAudioDataUri 를 부른다 — 그렇지 않으면
+    // 영상 URL 을 그대로 probeSpeech 에 넘겨 값이 안 나간다(fal 이 data URI 만 받는다).
+    const body = route.slice(route.indexOf("else if (needsSpeechProbe"), route.indexOf("runInBackground("));
+    expect(body).toContain("extractAudioDataUri(");
+    expect(body).toMatch(/heardRaw\.words/);
   });
 });

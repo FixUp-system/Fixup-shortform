@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildCues, toAss, cutSeconds, subtitleStyle, lineWidthUnits, textUnits, MAX_SUBTITLE_LINES, splitSubtitleText, breakTwoLines } from "../lib/subtitles";
+import { buildCues, toAss, cutSeconds, subtitleStyle, lineWidthUnits, textUnits, MAX_SUBTITLE_LINES, splitSubtitleText, breakTwoLines, SUBTITLE_LEAD_SECONDS } from "../lib/subtitles";
 import {
   SUBTITLE_FONTS, DEFAULT_SUBTITLE, normalizeSubtitle, outlineFor, clampPos, SIZE_MIN, SIZE_MAX,
   posFromLegacyPosition, SUBTITLE_LINE_HEIGHT,
@@ -191,10 +191,11 @@ describe("buildCues", () => {
     ];
     const cues = buildCues(cuts);
     expect(cues).toHaveLength(4);
-    expect(cues[0].start).toBe(1.06);
-    expect(cues[1].start).toBe(4.24);
-    expect(cues[2].start).toBe(6.18);   // 누적이면 8 이다
-    expect(cues[3].start).toBe(9.32);   // 누적이면 12 다
+    // ★ 2026-09-16 갱신: 자막이 SUBTITLE_LEAD_SECONDS(0.15초) 만큼 당겨 뜬다(task-5).
+    expect(cues[0].start).toBe(1.06 - SUBTITLE_LEAD_SECONDS);
+    expect(cues[1].start).toBe(4.24 - SUBTITLE_LEAD_SECONDS);
+    expect(cues[2].start).toBeCloseTo(6.18 - SUBTITLE_LEAD_SECONDS, 3);   // 누적이면 8 이다
+    expect(cues[3].start).toBe(9.32 - SUBTITLE_LEAD_SECONDS);   // 누적이면 12 다
   });
 
   // ★ 길이는 여전히 spoken_seconds 가 쥔다 — 시작만 갈아끼우는 것이지 두 값이 하나가 아니다.
@@ -202,8 +203,9 @@ describe("buildCues", () => {
     const cues = buildCues([
       { idx: 0, sentence: "한 문장.", seconds: 10, spoken_start: 2.5, spoken_seconds: 1.5 },
     ]);
-    expect(cues[0].start).toBe(2.5);
-    expect(cues[0].end).toBe(4);        // 2.5 + 1.5 — 컷 끝(10)이 아니다
+    // ★ 2026-09-16 갱신: 리드인만큼 시작·끝이 함께 당겨진다(task-5).
+    expect(cues[0].start).toBe(2.5 - SUBTITLE_LEAD_SECONDS);
+    expect(cues[0].end).toBe(2.5 - SUBTITLE_LEAD_SECONDS + 1.5);   // 컷 끝(10)이 아니다
   });
 
   // ★ 한 컷이 자막 여러 조각으로 쪼개져도(긴 문장) 첫 조각이 실측 시각에서 시작해야 한다.
@@ -214,8 +216,25 @@ describe("buildCues", () => {
       { width: 720, height: 1280 }
     );
     expect(cues.length).toBeGreaterThan(1);
-    expect(cues[0].start).toBe(3);
-    expect(cues[cues.length - 1].end).toBe(9);   // 3 + 6 — 말 끝에 못 박힌다
+    // ★ 2026-09-16 갱신: 리드인만큼 당겨 뜬다(task-5).
+    expect(cues[0].start).toBe(3 - SUBTITLE_LEAD_SECONDS);
+    expect(cues[cues.length - 1].end).toBe(3 - SUBTITLE_LEAD_SECONDS + 6);   // 말 끝에 못 박힌다
+  });
+
+  // 2026-09-16: task-5-brief.md 의 실패 테스트 그대로.
+  it("잰 시작에서 리드인만큼 당겨 뜬다", () => {
+    const cues = buildCues([{ sentence: "가나다.", seconds: 3, spoken_start: 2.0, spoken_seconds: 1.0 }]);
+    expect(cues[0].start).toBeCloseTo(2.0 - SUBTITLE_LEAD_SECONDS, 3);
+  });
+
+  it("0 보다 앞으로는 못 간다", () => {
+    const cues = buildCues([{ sentence: "가나다.", seconds: 3, spoken_start: 0.05, spoken_seconds: 1.0 }]);
+    expect(cues[0].start).toBe(0);
+  });
+
+  it("못 잰 문장(비례)은 당기지 않는다 — 기준이 다른 값이다", () => {
+    const cues = buildCues([{ sentence: "가나다.", seconds: 3 }]);
+    expect(cues[0].start).toBe(0);
   });
 
   // spoken_seconds 가 없는 옛 문서는 지금처럼 화면 시간을 쓴다 — 회귀 0
