@@ -68,6 +68,31 @@ describe("Scribe v2 새 자리를 읽는다", () => {
   });
 });
 
+// ── task-7 — 못 잰 문장의 비례 바닥이 영상 길이가 아니라 "말한 구간"이다 ──────
+//   측정이 있으면 말이 끝난 뒤로 자막이 늘어지면 안 된다(2026-08-25 실측: 15초 영상에
+//   18·24초 자막). 측정이 아예 없으면 예전처럼 영상 길이를 쓴다 — 회귀 0.
+describe("폴백 기준 — 말한 구간", () => {
+  it("측정이 있으면 못 믿는 문장은 말한 구간 안에서 비례로 흐른다", () => {
+    const p = {
+      cuts: [{ video: { url: "u", whole: true, said: "가나다.\n라마바.\n사아자." } }],
+      reel: { speech: { units: [
+        { start: 1.0, seconds: 2.0, ok: true },
+        { start: null, seconds: null, ok: false },
+        { start: 7.0, seconds: 2.0, ok: true },
+      ] } },
+    };
+    const units = narrationUnits(p, 15);
+    // 못 믿는 둘째 문장이 말한 구간(1.0~9.0) 기준으로 흐른다 — 영상 끝(15초)까지 안 늘어진다
+    expect(units[1].seconds).toBeLessThan(8);
+  });
+
+  it("측정이 아예 없으면 예전처럼 영상 길이로 나눈다", () => {
+    const p = { cuts: [{ video: { url: "u", whole: true, said: "가나다.\n라마바." } }], reel: {} };
+    const units = narrationUnits(p, 10);
+    expect(units[0].seconds + units[1].seconds).toBeCloseTo(10, 3);
+  });
+});
+
 describe("합성이 그 단위를 쓴다 — subtitleCutsOf", () => {
   const cuts = [
     { idx: 0, seconds: 5, sentence: "", video: { url: "https://x/v.mp4", seconds: 15 } },
