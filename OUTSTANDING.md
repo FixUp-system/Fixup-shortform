@@ -1,3 +1,61 @@
+# 이어서 할 일 — `merge/subtitle-on-reel` (2026-09-16 · 자막 시각 재설계 배포)
+
+> 🗂️ **09-16 — 단계별 자막 시각 재설계 · 사이드바 지연 · 배포 사고**
+> (열 폴더: `C:\Users\fixup\shotform-saas\.claude\worktrees\merge-subtitle`)
+>
+> · ✅ **09-16 14:41 프로덕션 배포** — `dpl_5JdGJABUMkrvb9n1BScTpnEyaPjQ`
+>   (슬러그 `…-hgacj21mf-fix-up1` · Ready · 별칭 연결됨 · 코드 **`e8ddc2c`**).
+> · **브랜치 `merge/subtitle-on-reel`** = `feat/reel-cut-r2v`(09-15 프로덕션) + `fix/subtitle-chunk-grouping`(09-16 작업).
+>   병합 **충돌 0** · 미커밋 **0** · `fixup` 푸시 완료 · `main` 보다 **38 앞**(main 은 09-15 판 그대로다).
+> · 테스트 **6,567 그린**(10 skipped) · `npx next build` 성공 후 `.next` 삭제.
+>
+> ### 🔴 09-16 배포 사고 — 한 번 되돌렸다 (다음 세션이 반드시 읽을 것)
+> 첫 배포(`…-5jmnxlnkg`)를 **`main` 기준 브랜치**로 올려 **09-15 작업이 통째로 사라졌다**
+> (보관함 UI·카드·`/reel/new`·클립 모델 표 등 **64개 파일**). 사장님이 "보관함 UI가 이전과 똑같다"로 발견했다.
+> · 조치: `npx vercel rollback …-jiudf702l… --scope fix-up1`(2초) → `feat/reel-cut-r2v` 위에 병합 → 재배포.
+> · 뿌리: **프로덕션이 `main` 이 아니라 브랜치 워크트리에서 나간다.** 어느 코드가 라이브인지 아는 방법이
+>   배포 폴더(`C:\Users\fixup\shotform-deploy-*`) 비교뿐이다.
+> · ⚠️ **배포 전 반드시**: 직전 배포 폴더와 `diff -rq` 로 **무엇이 빠지는지** 먼저 본다.
+> · ⚠️ `npx vercel` 은 **`--scope fix-up1` 을 빼면 `Not authorized`** 로 죽는다(이번에 처음 겪었다).
+> · ⚠️ 새로 만든 워크트리가 **CRLF 로 펼쳐져** 테스트 1개가 거짓 실패했다(커밋된 내용은 LF).
+>   처방: 그 워크트리에서 `git config core.autocrlf false` 후 `git rm --cached -r . && git reset --hard`.
+>
+> ### 이번에 들어간 것 — 단계별(reel) 자막 시각
+> 설계 `docs/superpowers/specs/2026-09-16-reel-subtitle-timing-design.md` ·
+> 계획 `docs/superpowers/plans/2026-09-16-reel-subtitle-timing.md`
+> · **측정기 교체**: fal `whisper`(조각) → **`elevenlabs/speech-to-text/scribe-v2`(낱말)**.
+>   whisper 는 **쉼을 다음 말의 시작에 붙인다** — 낱말 단위로 바꿔도 같다("하루"가 2.78초로 기록됐다).
+>   Scribe 는 낱말 사이 쉼을 빈 구간으로 남겨 문장 시작이 맞는다. 값도 더 싸다($0.009 → $0.002/편).
+> · **소리만 뽑아 보낸다**(`lib/speech-audio.js`) — Scribe 는 mp4 를 422 로 거절한다. 로컬 ffmpeg, 0원, 실측 0.46MB.
+> · **묶기·판정은 코드가 한다**(`lib/speech-timing.js`): 낱말을 글자 수로 문장에 묶고,
+>   순서·범위·낱말 길이 이상치(3배)·들은 양(0.75~1.5배) 넷으로 판정해 **못 믿는 문장만** `ok:false` 로 떨군다.
+> · **리드인 0.15초**는 `lib/subtitles.js` 의 `buildCues` 에서만 건다 — **저장값은 원값**이다.
+> · **무효화**: 굽기 접수·수거·attach·가짜 모드·자막 글자 수정에서 `speech`·`narration_timing` 을 함께 버린다.
+> · **경고**: 모델이 문장을 통째로 안 말했으면(`reason:"empty"`) 완성 화면이 알린다. LLM 에게 안 묻는다.
+> · **실측(운영 영상 2편 재합성)**: 자막 시작 오차 **-0.06 · -0.05 · +0.14 · -0.04초** — 목표 ±0.3초 안.
+>   (09-15 에는 최대 **2.8초** 일렀다.) 실제 말 시작은 ffmpeg 음성대역(300~3400Hz)으로 쟀다.
+>
+> ### 함께 들어간 것 — 사이드바 지연
+> · [내 계정]·[운영] 이 `GET /api/me` 를 기다렸다 나타나던 것을, **미들웨어가 주입한 신원 헤더를
+>   루트 레이아웃(서버)에서 읽어** 첫 페인트부터 그린다(`lib/auth/initial-me.js`).
+> · `/api/me` 가 같은 프로필을 **두 번 읽던 것**을 없앴다(실측 23~68ms 절감).
+>   내부 계정 판정은 `isInternalAccount` 하나로 모았다.
+>
+> ### 🧷 알고 안 고치고 넘기는 것
+> · **`main` 병합 안 했다.** 라이브 코드는 `merge/subtitle-on-reel` 이다. `main` 은 09-15 판.
+> · **배포 추적 구멍**(위 사고의 뿌리) — 라이브가 어느 커밋인지 저장소만 봐서는 모른다.
+> · 최종 리뷰의 Minor 4건: 자막 **끝**도 0.15초 당겨진다 / 임계 0.75 가 `speech-timing`·`reel/doc` 두 곳 /
+>   완성 때 클립을 **두 번 내려받는다**(측정+합성) / 가짜 모드 무효화에 전용 테스트가 없다.
+> · 원클릭·film 자막은 **여전히 계획 초 방식**이다(±1~2초 흔들림). 이번 범위 밖으로 뒀다.
+> · 자막 **번역**(`subtitle_lang`)은 한 벌 내레이션에 번역 자리가 없어 **조용히 원문**이 나간다.
+>
+> ### 검증한 것 / 안 한 것
+> · ✅ 실측: 운영 영상 2편 재합성 후 오차 ±0.3초 · 테스트 6,567 · 빌드 · 배포 Ready
+> · ❌ **라이브에서 새로 만든 영상으로는 아직 확인 안 했다** — 특히 **Vercel 함수 안에서 ffmpeg 오디오 추출이
+>   되는지**가 미검증이다(실패해도 자막은 비례 폴백으로 흐르고 완성본은 나온다).
+>   원가 장부에 `fal-ai/elevenlabs/speech-to-text` 행이 남는지로 실제 측정 여부를 알 수 있다.
+> · ❌ 사이드바·보관함 라이브 눈 확인은 사장님 몫으로 남겼다.
+
 # 이어서 할 일 — `main` (2026-09-15 · 단계별 화면 B안)
 
 > 🗂️ **09-15 오후 — 보관함 정리 · 「더 보기」 · 좁히기** (열 폴더: `C:\Users\fixup\shotform-saas\.claude\worktrees\step-gate`)
