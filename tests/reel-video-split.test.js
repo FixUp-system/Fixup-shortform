@@ -44,4 +44,17 @@ describe("⑤영상 — 시킨 것 ↔ 나온 것", () => {
     const b = page.indexOf("cuts.length > 0");
     expect(page.slice(b), "컷별 갈래의 칸까지 걷어냈다").toContain("up photo-mark");
   });
+  // ★★★ 2026-09-16 사장님 지시 — 영상을 **판 높이에 맞춘다**(이전에는 230px 고정이라
+  //   판만 크고 영상은 작아 아랫변이 크게 어긋났다). 재는 것은 **높이**다 — 폭을 잡으면
+  //   9:16 영상이 칸을 넘는다. 상한은 판과 같은 560px 이어야 둘이 같은 자를 쓴다.
+  it("★★★ 영상은 판 높이를 따른다 — 폭이 아니라 높이를 맞춘다", () => {
+    const css = readFileSync("app/globals.css", "utf8");
+    const at = css.indexOf(".rv-split > .vid-result");
+    expect(at, ".rv-split 안 재생기 규칙이 없다").toBeGreaterThan(-1);
+    const rule = css.slice(at, css.indexOf("}", at));
+    expect(rule, "높이를 칸에 안 맞춘다").toMatch(/height:\s*100%/);
+    expect(rule, "폭을 고정했다 — 비율이 정해야 한다").toMatch(/width:\s*auto/);
+    expect(rule, "상한이 판(560px)과 다르다").toMatch(/max-height:\s*560px/);
+    expect(rule, "가로로 넘칠 수 있다").toMatch(/max-width:\s*100%/);
+  });
 });
