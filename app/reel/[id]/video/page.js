@@ -273,10 +273,10 @@ export default function ReelVideoPage() {
           일도 중복이 아니라 **대조**다("내가 그린 대로 나왔나"). 전제가 바뀌어 되살린다.
           ★ 되돌리려면 tests/reel-video-split.test.js 를 지우고 `!cuts[0]?.video?.url &&` 를
             되살리면 된다. */}
+      {/* ★ `rv-split--video` — ⑤만의 규칙이다(판과 영상이 같은 키로 서고, 영상 칸은 제
+          폭만큼만 차지해 오른쪽 끝에 붙는다). ②시나리오·④프롬프트의 `.rv-split` 은
+          글 카드와 짝을 이루는 자리라 같은 규칙을 쓰면 글이 눌린다. */}
       {oneShot ? (
-        {/* ★ `rv-split--video` — ⑤만의 규칙이다(판과 영상이 같은 키로 서고, 영상 칸은 제
-            폭만큼만 차지해 오른쪽 끝에 붙는다). ②시나리오·④프롬프트의 `.rv-split` 은
-            글 카드와 짝을 이루는 자리라 같은 규칙을 쓰면 글이 눌린다. */}
         <div className={`rv-split rv-split--video${playing?.video?.url && sheetUrl ? " is-two" : ""}`}>
         {sheetUrl && (
           /* ★★★ 2026-09-14 밤 — 여기는 `.up`(86×86 · cover)이었다. 스토리보드 한 장이
