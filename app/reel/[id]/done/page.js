@@ -222,6 +222,14 @@ export default function ReelDonePage() {
              [다시 만들기] 하나다. 둘을 두면 어느 것이 반영하는 버튼인지 알 수 없다
              (단계별 완성 화면이 2026-08-13 에 같은 이유로 버튼을 하나로 합쳤다). */
           onDragging={(v) => { dragRef.current = v; }}
+          /* ★ 2026-09-16 — [자막 반영하기](저장만, 합성 안 함). 통짜로 구운 편에만
+             둔다 — 컷별 갈래는 컷마다 sentence 가 자막이라 축이 다르다(아래 note-form
+             과 같은 조건, lib/reel/narration.js 의 putSaid 가 같은 판정을 한다).
+             ★ 조건을 안 채우면 onSaveText 를 안 넘긴다 — SubtitleEditor 는 그 prop 이
+             없으면 버튼 자체를 안 그린다(옵션 계약). */
+          onSaveText={cuts[0]?.video?.whole === true && cuts[0]?.video?.url ? saveSaid : null}
+          saveTextLabel={busy === "said" ? "저장하는 중…" : "자막 반영하기"}
+          saveTextDisabled={said.trim() === savedSaid.trim() || rendering || !!busy}
         />
       )}
 
@@ -254,17 +262,12 @@ export default function ReelDonePage() {
             placeholder="영상이 말하는 문장을 그대로 적어 주세요"
           />
           <div className="note-act">
+            {/* ★ 2026-09-16 — 버튼은 자막 조절판(SubtitleEditor 의 수정 패널) 안
+                [자막 반영하기]로 옮겼다(사장님 지시). 여기 남는 것은 안내문뿐이다 —
+                값이 안 바뀌었으면 조용하다. */}
             {said.trim() !== savedSaid.trim() && busy !== "said" && (
               <p className="pgsub note-hint">저장한 뒤 다시 만들어야 영상에 들어가요.</p>
             )}
-            <button
-              type="button"
-              className="tag"
-              disabled={said.trim() === savedSaid.trim() || rendering || !!busy}
-              onClick={saveSaid}
-            >
-              {busy === "said" ? "저장하는 중…" : "자막 글자 저장"}
-            </button>
           </div>
         </div>
       )}

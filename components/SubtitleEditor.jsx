@@ -93,6 +93,16 @@ export default function SubtitleEditor({
   onApply = null,
   applyLabel = "",
   applyDisabled = false,
+  // ★ 2026-09-16 — [자막 반영하기]. **저장만** 한다(합성하지 않는다) — reel 완성 화면의
+  //   자막 글자 textarea 옆에 있던 버튼을 조절판 안으로 옮겼다(사장님 지시). 저장할
+  //   대상(자막 글자)과 저장 동작은 부르는 화면의 것이라 여기서 만들지 않는다 — 그냥
+  //   버튼 하나를 이 패널의 격자 마지막 줄에 놓아 줄 뿐이다.
+  //   ★ 안 주면(onSaveText 없으면) 이 줄 자체를 안 그린다 — done 화면 말고 다른 곳
+  //     (예: create/[id]/done)이 이 prop 없이 SubtitleEditor 를 쓰므로, 안 주는 것이
+  //     "버튼 없음"이 되어야 그 화면들이 안 깨진다.
+  onSaveText = null,
+  saveTextLabel = "",
+  saveTextDisabled = false,
   // 드래그 중이라고 알린다 — 부르는 화면이 서버 값으로 덮어쓰는 것을 그동안 멈춘다.
   onDragging = null,
   // 흐름마다 다른 것들. topSlot 은 조절판 맨 위(단계별의 언어 줄),
@@ -356,6 +366,20 @@ export default function SubtitleEditor({
                 </button>
               )}
             </div>
+            {/* ★ 자막 글자 저장 — 패널의 **맨 아래 줄**이다(사장님 지시). 새 클래스를
+                만들지 않는다: 위 실행 줄과 같은 `.sub-row--actions`·`.mini`를 쓴다. */}
+            {onSaveText && (
+              <div className="sub-row sub-row--actions">
+                <button
+                  type="button"
+                  className="mini"
+                  disabled={saveTextDisabled}
+                  onClick={onSaveText}
+                >
+                  {saveTextLabel}
+                </button>
+              </div>
+            )}
           </div>
           {children}
         </div>
