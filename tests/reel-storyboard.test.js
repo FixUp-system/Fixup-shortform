@@ -12,7 +12,7 @@
 //   4) 저장(saveStoryboardCells) — **우리 바이트**가 어디로 가고 어떤 URL 이 되는가
 //   5) 굽기로 넘어가는 길(toFalImageUrl) — 비공개 URL 은 fal 이 못 읽는다 → data URI
 import { describe, it, expect } from "vitest";
-import { reelCutChoicesFor } from "../lib/reel/scenario-rules.js";
+import { reelCutChoicesFor, reelGridFor } from "../lib/reel/scenario-rules.js";
 import sharp from "sharp";
 import {
   planReelImages, storyboardGridFor, storyboardImageSize, buildStoryboardPrompt,
@@ -395,5 +395,32 @@ describe("③그림 라우트", () => {
   it("잘라서 저장하고 그 주소를 컷에 꽂는다", () => {
     expect(lib).toContain("cropStoryboardCells(");
     expect(lib).toContain("saveStoryboardCells(");
+  });
+});
+
+// ★★★ 2026-09-16 사장님 지시 — **판은 720p 칸으로 그린다. 상한을 넘을 때만 줄인다.**
+//   그전에는 굽기 화질이 곧 칸 크기라, 480p 로 만든 편은 완성본만 거친 것이 아니라
+//   **참조 그림까지** 거칠어졌다(6컷 판 2160×3840 → 1440×2562, 칸 넓이 약 45%).
+//   값은 안 는다 — GPT Image 2 는 크기가 아니라 quality(high) 로 매긴다.
+describe("storyboardImageSize — 480p 도 판은 720p 칸으로", () => {
+  it("480p 6컷이 720p 6컷과 같은 판이다", () => {
+    const g = storyboardGridFor(6, { resolution: "480p" });
+    expect(storyboardImageSize(g, "9:16", "480p")).toEqual(storyboardImageSize(g, "9:16", "720p"));
+  });
+
+  it("상한을 넘으면 줄이되, 칸이 굽기 해상도 밑으로는 안 간다", () => {
+    for (const n of reelCutChoicesFor("480p")) {
+      const g = reelGridFor(n, { resolution: "480p", aspect: "9:16" });
+      const { width, height } = storyboardImageSize(g, "9:16", "480p");
+      const cell = Math.max(Math.round(width / g.cols), Math.round(height / g.rows));
+      expect(Math.max(width, height), `${n}컷이 상한을 넘는다`).toBeLessThanOrEqual(3840);
+      expect(cell, `${n}컷의 칸이 480p 굽기(854)보다 작다`).toBeGreaterThanOrEqual(854 - 8);
+    }
+  });
+
+  it("1080p 는 그대로 제 칸(1920)을 쓴다 — 720p 로 낮추지 않는다", () => {
+    const g = storyboardGridFor(4, { resolution: "1080p" });
+    const { width, height } = storyboardImageSize(g, "9:16", "1080p");
+    expect(Math.max(Math.round(width / g.cols), Math.round(height / g.rows))).toBeGreaterThanOrEqual(1912);
   });
 });
