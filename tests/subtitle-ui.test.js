@@ -370,7 +370,11 @@ describe("⑥완성 — 조절판이 카드 안에 들어오고 영상과 키를
 
   it("★ 조절판+간격+영상이 카드 안폭(720)을 안 넘는다", () => {
     // 조절판 총폭 = 라벨 52 + 간격 14 + 컨트롤 열(--ctl-w) + 안쪽 여백 36
-    const at = css.indexOf(".sub-editor {");
+    // ★ 2026-09-16 — --ctl-w 는 이제 .sub-editor 가 아니라 .done-stage 에서 정의된다
+    //   (좁은 칸에서 컨트롤이 함께 줄어들게 고치며, 그리드 열도 같은 값을 봐야 했다 —
+    //   app/globals.css 의 .done-stage 주석 참고). 값의 자리가 바뀐 것이지 값 자체나
+    //   보장(카드 안폭을 안 넘는다)은 그대로다.
+    const at = css.indexOf(".done-stage {");
     expect(at).toBeGreaterThan(-1);
     const rule = css.slice(at, css.indexOf("}", at));
     const w = Number(/--ctl-w:\s*(\d+)px/.exec(rule)?.[1]);
