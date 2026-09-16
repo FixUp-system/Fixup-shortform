@@ -38,7 +38,12 @@
 >
 > ★ **이어서 하는 세션이 읽을 두 장**(2026-09-16 갱신):
 > · **상태와 남은 일** → 이 저장소의 `OUTSTANDING.md` — **여기부터 읽어라.**
->   ⚠️ **라이브 코드는 `ec6cd3a` 다**(09-16 저녁 2차 배포 `…-k672v5c6o-fix-up1`).
+>   ⚠️⚠️ **`vercel deploy --prod` 만으로는 사장님 주소가 안 바뀐다**(09-16 저녁에 밝혔다).
+>   어제의 `vercel rollback` 이 `fixup-shortform-service.vercel.app` 을 옛 판에 **고정**시켜서,
+>   그 뒤 두 번의 배포가 `Ready` 인 채 라이브가 아니었다. **배포 뒤에는 반드시**
+>   `npx vercel promote <배포URL> --scope fix-up1` 까지 하고, 라이브 CSS 를 받아 새 선택자가
+>   나오는지로 확인한다. `vercel inspect` 의 Aliases 는 **팀 SSO 로 막힌 주소**라 증거가 못 된다.
+>   ⚠️ **라이브 코드는 `595089f` 다**(09-16 저녁 3차 배포 `…-79l0wckfk-fix-up1` · promote 완료).
 >   **`main` 을 거기로 당겨 놓았으니 지금은 `main` = `merge/subtitle-on-reel` = 라이브다.**
 >   워크트리 `C:\Users\fixup\shotform-saas\.claude\worktrees\merge-subtitle` 에서 세션을 열면 그대로 이어진다.
 >   ⚠️ 그래도 **푸시는 배포가 아니다**(git 트리거 빌드는 0ms 에서 멎는다) — 배포는 CLI 로 따로 한다.
