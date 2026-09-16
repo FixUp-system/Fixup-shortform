@@ -48,6 +48,21 @@ describe("자막 글자 고치기 — putSaid", () => {
     expect(next.reel.status).toBe("done");
   });
 
+  // ★★★ 2026-09-16 리뷰 지적 — 새 자리(reel.speech, Scribe v2 낱말 단위 판정)도
+  //   문장이 바뀌면 딴 문장의 시각이다. 옛 자리만 걷으면 narrationUnits 가 계속
+  //   reel.speech 를 이겨 써서 글자를 고쳐도 시각이 안 바뀐다(설계 문서 §4.7).
+  it("★★★ 새 자리(reel.speech)도 함께 걷는다", () => {
+    const p = whole({
+      reel: {
+        status: "done",
+        speech: { at: 1, source: "scribe-v2", units: [{ start: 1, seconds: 2, ok: true }], heard: { chars: 1, text: "x" } },
+      },
+    });
+    const next = putSaid(p, "새 문장.");
+    expect(next.reel.speech).toBeUndefined();
+    expect(next.reel.status).toBe("done");
+  });
+
   it("★★ 영상과 각인은 **안 건드린다** — 글자를 고쳤다고 산 영상이 낡으면 안 된다", () => {
     const next = putSaid(whole(), "새 문장.");
     expect(next.cuts[0].video.url).toBe("u");

@@ -4,6 +4,9 @@
 // ★ 못 재도 합성은 그대로 간다 — 자막 하나 때문에 이미 값을 치른 한 편을 잃지 않는다.
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
+import { probeSpeech } from "../lib/speech-probe.js";
+import { alignSpeech } from "../lib/speech-timing.js";
+import { runWithActor } from "../lib/actor.js";
 
 const route = readFileSync("app/api/reel/[id]/render/route.js", "utf8");
 const clean = route.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
@@ -103,5 +106,47 @@ describe("Scribe v2 로 잰다", () => {
 
   it("이미 잰 편은 다시 재지 않는다", () => {
     expect(route).toMatch(/!reelOf\(project\)\.speech/);
+  });
+});
+
+// ── 2026-09-16 리뷰 Critical 1 — 옛 컷별 갈래도 새 계약을 따라야 한다 ──────────
+//
+// `else if (needsSpeechProbe …)` 갈래는 probeSpeech 계약이 바뀐 뒤에도 예전처럼
+// 영상 URL 을 넘기고 반환을 배열로 읽고 있었다. 새 계약은 오디오 data URI 를 받고
+// `{ words, text }` 를 준다 — 소스 문자열 검사로는 이 어긋남이 안 잡힌다(둘 다
+// "probeSpeech"·"alignSpeech" 라는 이름만 쓰기 때문이다). 그래서 여기서는 **동작**을
+// 잰다: probeSpeech 가 실제로 주는 words 모양을 그대로 alignSpeech 에 넣었을 때
+// 컷에 시각이 붙는지를 확인한다 — 이 둘이 안 맞으면 이 테스트가 조용히 통과하는 대신
+// spoken_start 가 안 붙어야 한다(맞물리지 않는다는 뜻이므로).
+describe("옛 컷별 갈래 — probeSpeech 반환이 alignSpeech 입력과 맞물린다", () => {
+  it("probeSpeech 의 words 를 그대로 alignSpeech 에 넣으면 컷에 시각이 붙는다", async () => {
+    const cuts = [
+      { sentence: "가나다", video: { url: "https://x/a.mp4" } },
+      { sentence: "라마바" },
+    ];
+    const body = {
+      words: [
+        { text: "가나다", start: 0.1, end: 0.9, type: "word" },
+        { text: " ", start: 0.9, end: 1.0, type: "spacing" },
+        { text: "라마바", start: 1.0, end: 1.8, type: "word" },
+      ],
+    };
+    const heardRaw = await runWithActor("t-user", () => probeSpeech("data:audio/mp4;base64,AA", {
+      fetchImpl: async () => ({ ok: true, json: async () => body }),
+      projectId: "p1", seconds: 2,
+    }));
+    expect(heardRaw.words.length).toBeGreaterThan(0);
+
+    const timed = alignSpeech(cuts, heardRaw.words);
+    expect(timed[0].spoken_start).toBeCloseTo(0.1, 2);
+    expect(timed[1].spoken_start).toBeCloseTo(1.0, 2);
+  });
+
+  it("route 가 옛 갈래에서도 extractAudioDataUri 를 거쳐 오디오를 넘긴다", () => {
+    // else-if 본문(옛 컷별 갈래) 안에서 extractAudioDataUri 를 부른다 — 그렇지 않으면
+    // 영상 URL 을 그대로 probeSpeech 에 넘겨 값이 안 나간다(fal 이 data URI 만 받는다).
+    const body = route.slice(route.indexOf("else if (needsSpeechProbe"), route.indexOf("runInBackground("));
+    expect(body).toContain("extractAudioDataUri(");
+    expect(body).toMatch(/heardRaw\.words/);
   });
 });

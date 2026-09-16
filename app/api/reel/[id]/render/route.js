@@ -90,7 +90,8 @@ export const POST = withUser(async (req, { params }, user) => {
   // ★ 자막이 꺼져 있으면 재지 않는다 — 쓰지 않을 값에 돈을 내지 않는다.
   // ★ 이미 잰 편은 다시 안 잰다. 소리가 바뀌면 lib/reel/pipeline.js 가 지운다.
   if (units) {
-    if (units.length > 1 && !reelOf(project).speech && project.settings?.subtitle?.off !== true) {
+    // 자막 끄기 설정이 생기면 여기서 측정을 건너뛴다(설계 §5) — 지금은 그런 설정이 없다.
+    if (units.length > 1 && !reelOf(project).speech) {
       const clipUrl = cuts.find((c) => c?.video?.url)?.video?.url;
       const audio = await extractAudioDataUri(clipUrl, { projectId: id });
       const heardRaw = await probeSpeech(audio, { projectId: id, seconds, lang: speechLangOf(project) });
@@ -103,10 +104,16 @@ export const POST = withUser(async (req, { params }, user) => {
     }
   } else if (needsSpeechProbe(cuts) && !cuts.some((c) => Number(c?.spoken_start) > 0)) {
     // 옛 문서·컷별 갈래 — **예전 그대로** 컷에 박는다(회귀 0).
+    // ★★ 2026-09-16 리뷰 지적 — probeSpeech 계약이 바뀌었다(영상 URL → 오디오 data URI,
+    //   배열 → {words, text}). 이 갈래만 옛 호출 모양으로 남아 있으면 words 를 조각
+    //   배열로 착각해 alignSpeech 가 조용히 통과만 하고 아무것도 못 붙인다.
     const clipUrl = cuts.find((c) => c?.video?.url)?.video?.url;
-    const chunks = await probeSpeech(clipUrl, { projectId: id, seconds });
-    if (chunks.length) {
-      timed = alignSpeech(cuts, chunks);
+    const audio = await extractAudioDataUri(clipUrl, { projectId: id });
+    const heardRaw = await probeSpeech(audio, { projectId: id, seconds, lang: speechLangOf(project) });
+    if (heardRaw.words.length) {
+      // ★ words 는 이미 alignSpeech 가 기대하는 { timestamp: [s, e], text } 모양이다
+      //   (whisper 조각과 같은 모양으로 맞춰 뒀다 — lib/speech-probe.js).
+      timed = alignSpeech(cuts, heardRaw.words);
       await updateProject(id, user.id, (p) => ({
         ...p,
         cuts: (p.cuts || []).map((c, i) => (timed[i] ? { ...c, spoken_start: timed[i].spoken_start, spoken_seconds: timed[i].spoken_seconds } : c)),
