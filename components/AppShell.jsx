@@ -26,7 +26,11 @@ import { isBarePath, isLandingPath } from "../lib/auth/paths.js";
 // ★ bare 갈래에는 두지 않는다: /login·/pending 에서 그 요청은 401(승인 대기자는 403)이다.
 import { MeProvider } from "./MeContext";
 
-export default function AppShell({ children }) {
+// ★ 2026-09-16 — initialMe 는 app/layout.js(서버 컴포넌트)가 middleware 의 검증된 헤더에서
+//   뽑아 내려보낸 값(lib/auth/initial-me.js)이다. `{ guest, isAdmin }` 로 `MeProvider`의
+//   guest 축을 첫 렌더부터 채우고, `Sidebar`에는 isAdmin 힌트를 곧장 건넨다 — 사이드바가
+//   GET /api/me 왕복을 기다리지 않고도 [내 계정]·[운영] 을 옳게 그리기 위해서다.
+export default function AppShell({ children, initialMe }) {
   const pathname = usePathname();
 
   if (isBarePath(pathname)) {
@@ -43,14 +47,14 @@ export default function AppShell({ children }) {
   // ★ work--flush 는 기둥(1160)과 여백을 걷는 수식자다. .work 만 쓰는 화면에는 안 샌다.
   if (isLandingPath(pathname)) {
     return (
-      <MeProvider>
+      <MeProvider initial={initialMe}>
         <main className="work work--flush">{children}</main>
       </MeProvider>
     );
   }
 
   return (
-    <MeProvider>
+    <MeProvider initial={initialMe}>
       <div className="belt">
         <span className="belt-side" />
         {/* ★ 2026-09-14 — BETA 문구를 걷었다(사장님 지시: 사용자에게 불필요한 정보 제거).
@@ -62,7 +66,7 @@ export default function AppShell({ children }) {
         </span>
       </div>
       <div className="shell">
-        <Sidebar />
+        <Sidebar initialAdmin={initialMe?.isAdmin} />
         <main className="work">{children}</main>
       </div>
     </MeProvider>

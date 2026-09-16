@@ -215,7 +215,10 @@ const SIDEBAR_FLOWS = Object.freeze({
   reel: true,    // 영상 만들기
 });
 
-export default function Sidebar() {
+// ★ 2026-09-16 — `initialAdmin` 은 app/layout.js 가 middleware 의 검증된 요청 헤더에서 뽑아
+//   (lib/auth/initial-me.js) AppShell 을 거쳐 내려보낸 힌트다. GET /api/me 가 돌아오기
+//   전에도 [운영] 섹션을 옳게 그리려고 받는다 — 아래 isAdmin 계산 참고.
+export default function Sidebar({ initialAdmin = false }) {
   const pathname = usePathname();
   const { project } = useProject();
   // ★★ 손님(로그인 안 함)인가 — 2026-08-27. 보관함은 손님도 보지만, **원가 표**는
@@ -234,8 +237,13 @@ export default function Sidebar() {
   //   **원가 표**는 우리 지출 구조라 회원의 것이다(아래 [실제 비용]). 만들기 링크는 남긴다:
   //   누르면 로그인 화면으로 가고 거기서 가입한다(그 길이 곧 가입 유도다).
   //   ★ useMe() 를 두 번 부르지 않는다 — 공유본 하나에서 둘을 꺼낸다.
-  const { me, guest } = useMe();
-  const isAdmin = !!me?.isAdmin;
+  const { me, guest, ready } = useMe();
+  // ★★ 2026-09-16 — GET /api/me 가 돌아오기 전에는 헤더 힌트(initialAdmin)를 쓴다.
+  //   middleware 가 이미 검증한 값이라 믿을 수 있고, 그 값이 없으면(손님·개발 우회 없음)
+  //   initialAdmin 도 false 라 그대로 fail-closed 다. 응답이 오면(ready) `me?.isAdmin`
+  //   하나만 본다 — 두 값이 갈리는 순간(드물지만 role 이 그새 바뀐 경우)도 서버가 마지막에
+  //   답한 값이 이긴다.
+  const isAdmin = !!me?.isAdmin || (initialAdmin && !ready);
   const inCreate = pathname.startsWith("/create");
   // 진행 중인 프로젝트가 있으면 그 프로젝트로, 없으면 새로 시작 화면으로.
   const makeVideoHref = makeHref(project);
@@ -351,8 +359,12 @@ export default function Sidebar() {
       </Link>
       {/* ★ [내 계정] 묶음(2026-09-14 사장님 지시: "내 정보로 이동할 수 있는 섹션, 위의 영상 만들기랑 분리해서").
           마이페이지로 가는 길이 상단바 드롭다운 안에만 있었다. 영상 메뉴와 섞이지 않게 머리말·구분선으로 가른다.
-          ★ 손님(비로그인)에게는 안 그린다 — 눌러도 로그인으로 튕기는 막다른 링크다. 읽기 전(me 없음)에도 안 그린다. */}
-      {me && !guest && (
+          ★ 손님(비로그인)에게는 안 그린다 — 눌러도 로그인으로 튕기는 막다른 링크다.
+          ★★ 2026-09-16 — 예전에는 `me && !guest`(GET /api/me 가 돌아와야 그렸다)였다.
+          로그인 여부는 이제 middleware 헤더에서 첫 렌더부터 안다(MeContext 의 guest 축,
+          lib/auth/initial-me.js) — 링크 하나일 뿐이고 진짜 경계는 middleware 다, 프로필을
+          다 읽을 때까지 기다릴 이유가 없다. */}
+      {!guest && (
         <>
           <div className="side-sec">내 계정</div>
           <Link
