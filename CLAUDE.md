@@ -38,11 +38,12 @@
 >
 > ★ **이어서 하는 세션이 읽을 두 장**(2026-09-16 갱신):
 > · **상태와 남은 일** → 이 저장소의 `OUTSTANDING.md` — **여기부터 읽어라.**
->   ⚠️ **라이브 코드는 `merge/subtitle-on-reel` 이다**(09-16 배포 `dpl_5JdGJABUMkrvb9n1BScTpnEyaPjQ`) —
->   워크트리 `C:\Users\fixup\shotform-saas\.claude\worktrees\merge-subtitle` 에서 세션을 열어라.
->   그 브랜치는 `feat/reel-cut-r2v`(09-15 프로덕션) + `fix/subtitle-chunk-grouping`(09-16 자막·사이드바)이다.
->   **`main` 은 09-15 판이라 오늘 것이 없다** — main 에서 배포하면 09-15·09-16 작업이 통째로 사라진다
->   (09-16 에 실제로 그렇게 배포했다가 되돌렸다 · `OUTSTANDING.md` 맨 위 참고).
+>   ⚠️ **라이브 코드는 `ec6cd3a` 다**(09-16 저녁 2차 배포 `…-k672v5c6o-fix-up1`).
+>   **`main` 을 거기로 당겨 놓았으니 지금은 `main` = `merge/subtitle-on-reel` = 라이브다.**
+>   워크트리 `C:\Users\fixup\shotform-saas\.claude\worktrees\merge-subtitle` 에서 세션을 열면 그대로 이어진다.
+>   ⚠️ 그래도 **푸시는 배포가 아니다**(git 트리거 빌드는 0ms 에서 멎는다) — 배포는 CLI 로 따로 한다.
+>   그리고 **다음 작업을 브랜치에서 배포하는 순간 `main` 과 라이브가 다시 갈린다**
+>   (09-16 에 옛 `main` 을 배포해 64파일을 날렸다가 되돌렸다 · `OUTSTANDING.md` 맨 위 참고).
 >   `feat/credit-unit`(크레딧 새 단위·보관함 닫기)은 **아직 어느 배포에도 안 들어갔다.**
 > · **왜 그렇게 했나(회차 서사)** → `C:\Users\fixup\obsidian_jaechan\sources\` 의
 >   `shotform-mcs-login-legal-and-poll-narrowing-2026-09-11.md`(가장 최신 · MCS 맞추기·법률 문서·폴링 좁히기·얼굴 격자)
