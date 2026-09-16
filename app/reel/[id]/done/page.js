@@ -273,7 +273,9 @@ export default function ReelDonePage() {
 
       {cuts[0]?.video?.whole === true && cuts[0]?.video?.url && (
         <div className="note-form">
-          <p className="pgsub">자막 글자 — 이 영상이 말하는 문장이에요. 비우면 시나리오의 내레이션을 따라요.</p>
+          {/* ★ 2026-09-16 밤 사장님 지시로 안내 문구를 지웠다("자막 글자 — 이 영상이 말하는
+              문장이에요…"). 적는 칸의 자리표시자가 같은 말을 이미 하고 있었다 — 같은 말을
+              두 번 하면 화면만 길어진다. */}
           <AutoTextarea
             className="field"
             rows={3}

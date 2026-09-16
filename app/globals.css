@@ -2066,10 +2066,13 @@ input.field::placeholder { color: var(--ink-soft); }
      빈 값으로 본다) 칸이 336px 대신 그 작은 값으로 굳어 버린다(실측: 285px). `--panel-w`로
      못 박으면 칸 크기가 안쪽 폭 계산과 무관해지고, 안쪽은 이 칸이 좁아질 때만 줄어든다. */
   grid-template-columns: minmax(0, var(--panel-w)) minmax(0, auto);
-  /* ★ 조절판을 영상 높이(640px)까지 늘려 봤다가 **되돌렸다**(2026-08-13 사용자 요청).
-     늘리면 네 줄(위치·글꼴·색·크기) 사이가 허옇게 벌어져, 빽빽한 조절판이 아니라
-     빈 상자로 보인다. 조절판은 제 내용만큼만 차지하고 윗변만 영상과 맞춘다. */
-  align-items: start;
+  /* ★★★ 2026-09-16 밤 사장님 지시 — **조절판을 영상 높이에 맞춘다**("수정 부분 사이즈를
+     영상 길이에 맞춰줘"). 2026-08-13 에 한 번 늘렸다가 되돌린 자리다 — 그때 되돌린 이유는
+     "네 줄 사이가 허옇게 벌어져 빈 상자로 보인다"였다.
+     ★ 그래서 **늘리는 것은 상자뿐**이다. 줄(위치·글꼴·색·크기·버튼)은 제 높이를 그대로
+       지키고, 남는 높이는 **위아래로 나눠** 가진다(.subpanel 의 justify-content: center).
+       줄 사이를 벌리는 `space-between` 이 08-13 에 되돌린 그 모양이다 — 쓰지 마라. */
+  align-items: stretch;
   justify-content: center;
   gap: 0 24px;
   margin-top: 14px;
@@ -2077,7 +2080,10 @@ input.field::placeholder { color: var(--ink-soft); }
 /* 제목은 1행 왼쪽 칸에만 — 오른쪽 칸(영상)은 1행을 비워 두고 2행부터 시작한다.
    그래서 회색 상자와 영상의 윗변이 같은 줄에서 만난다. */
 .done-stage .sub-eyebrow { grid-row: 1; grid-column: 1; margin: 0 0 10px; }
-.done-stage .sub-editor { grid-row: 2; grid-column: 1; margin: 0; }
+.done-stage .sub-editor { grid-row: 2; grid-column: 1; margin: 0; display: flex; flex-direction: column; }
+/* ★ 상자가 남는 높이를 가져가고(flex: 1), 안의 줄들은 **가운데에 모인다.**
+   늘어나는 것은 상자 하나뿐이라 줄 간격은 08-13 이전과 똑같다. */
+.done-stage .sub-editor > .subpanel { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; }
 /* ★ 영상을 **가로 560 · 세로 640 상자**에 가둔다(2026-08-13 사용자 승인).
    비율(--ar = 가로/세로)은 화면이 넘긴다 — 값의 출처는 프로젝트 하나여야 한다.
      9:16  → min(560, 640×0.5625=360)  = 360×640  (지금과 한 픽셀도 안 바뀐다)
@@ -3704,20 +3710,29 @@ a.rs-step:not(.is-now):hover { background: var(--surface2); }
      판은 왼쪽 끝에 붙는다(`flex-start`) — 가운데 정렬로 두면 왼쪽에 같은 빈 자리가 생긴다.
    ★ `max-height` 를 `none` 으로 되돌리는 이유: 위 두 규칙의 560 상한이 남아 있으면
      `--rv-media-h` 를 키워도 그 값에서 잘린다(키를 정하는 자리가 둘이 된다). */
+/* ★★★ 2026-09-16 밤 사장님 지시 — **둘 사이가 너무 멀다.** 양 끝에 붙여 놓으니 가운데가
+   180px 넘게 비었다. 벌어진 자리를 여백으로 메우는 대신 **둘을 키워서** 메운다.
+   키를 칸 폭에서 역산한다: 판(4×2 = 1.125)과 영상(9:16 = 0.5625)이 나란히 서면
+   가로가 `1.6875 × 키 + 간격` 이다. 그래서 `키 = (칸 폭 − 간격) / 1.6875`.
+   ★ `cqw` 를 쓰는 이유: 이 값은 **뷰포트가 아니라 담는 칸**이 정한다(왼쪽 설정 레일이
+     340px 을 먹고, 기둥도 1,600 에서 멈춘다). 뷰포트로 재면 레일을 빼먹어 늘 어긋난다.
+     그래서 부모(.rv-page)를 컨테이너로 세우고 여기서 그 폭을 읽는다.
+   ★ 상한 68vh 는 그대로다 — 세로로 화면을 넘으면 "한눈에 본다"가 깨진다.
+   ⚠️ 1.6875 는 **가장 흔한 판(4×2)** 기준이다. 판이 그보다 세로로 길면(2×2 = 0.5625)
+     가운데가 조금 남고, 가로로 길면(3×1 = 1.69) 판이 상자를 다 못 채운다. 어느 쪽이든
+     넘치지는 않는다 — `max-width: 100%` 와 `object-fit: contain` 이 받는다. */
 .rv-split--video.is-two {
-  --rv-media-h: min(560px, 68vh);
-  grid-template-columns: minmax(0, 1fr) auto;
+  --rv-media-h: min(68vh, calc((100cqw - var(--sp-5)) / 1.6875));
+  /* ★ 칸을 둘 다 `auto` 로 두고 **가운데로 모은다.** 흔한 판(4×2)에서는 위 식이 칸 폭을
+     정확히 채우므로 가운데 정렬이 곧 양 끝 정렬이다(실측 1920 에서 738+24+370 = 1,132 = 칸 폭).
+     세로로 긴 판(2×2)은 둘 다 9:16 이라 **어떻게 해도 가로가 남는다** — 그때 남는 자리를
+     가운데 한 곳에 몰아 두면 골짜기처럼 보인다. 좌우로 나눠 두는 편이 낫다. */
+  grid-template-columns: auto auto;
+  justify-content: center;
   align-items: center;
 }
-/* ★ 좁은 화면에서는 **키를 낮춘다.** 560 을 고집하면 판이 제 칸보다 넓어져(가로 격자일수록)
-   상자 안에서 위아래로 빈 자리가 생긴다 — 아랫변이 다시 어긋나 보인다.
-   460 인 이유는 실측이다: 뷰포트 1,241(두 칸이 유지되는 최저값)에서 작업대 821 · 영상 259 ·
-   판 칸 542 인데, 4×2 판(1.125)이 460 키로 서려면 517 이 필요하다 — 딱 들어간다.
-   ⚠️ 판 비율이 그보다 가로로 길면(예 3×1 = 1.69) 여전히 못 채운다. 그때는 판이 작아질 뿐
-   상자와 영상의 위아래 선은 맞는다. */
-@media (max-width: 1440px) {
-  .rv-split--video.is-two { --rv-media-h: min(460px, 68vh); }
-}
+/* 컨테이너를 세우는 자리 — 값을 읽는 쪽(.rv-split--video)에서는 제 폭을 못 읽는다(자기 참조). */
+.rv-page:has(.rv-split--video) { container-type: inline-size; }
 /* ★ 바탕 `.sheet-view` 는 `width: fit-content` + 좌우 `auto` 여백으로 **가운데** 선다 —
    그대로 두면 왼쪽에 81px 이 남는다(실측). 여기서만 왼쪽 여백을 0 으로 돌린다. */
 .rv-split--video > .sheet-view { justify-content: flex-start; margin-left: 0; margin-right: auto; }

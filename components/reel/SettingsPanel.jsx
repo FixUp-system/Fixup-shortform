@@ -13,14 +13,23 @@
 //   않는다** — 부르지 않더라도 import 가 있으면 다음 사람이 그 줄을 되살리기 쉽다.
 //   판: tests/reel-settings-panel-ui.test.js · tests/reel-ui.test.js 의 「값을 말하지 않는다」.
 //
-// ★★★ 이번 패널이 그리는 축은 **셋**이다(비율·길이·화풍). 모델·화질은 범위 밖이라
-//   여기서 안 그린다 — 잠금 표(lockedAxes)에는 다섯이 다 있지만, 그린 축만 사유를 말한다.
+// ★★★ 2026-09-16 밤 사장님 지시 — **고른 것이 여기 다 보여야 한다.**
+//   그전에는 셋(비율·길이·화풍)만 그렸는데, 만들기 화면에서 고르는 것은 **여덟**이다
+//   (비율·길이·화질·모델·화풍·컨셉·분위기·나레이션 언어). 나머지를 안 그리니 "내가 뭘로
+//   시켰더라"를 화면에서 확인할 길이 없었다.
+//   ★ 고칠 수 있는 축은 **다섯**이다 — 설정 라우트가 받는 것이 그 다섯이고(aspect_ratio·
+//     target_seconds·style·i2v_model·resolution), 잠금 표(lockedAxes)도 그 다섯이다.
+//   ★ 나머지 셋(컨셉·분위기·나레이션 언어)은 **보여 주기만** 한다 — 라우트가 안 받는다.
+//     고를 수 있게 두면 눌러도 아무 일이 없거나 400 이라 거짓말이 된다.
 import { useState } from "react";
 import { useReelProject } from "../ReelProjectContext";
+import { useMe } from "../MeContext";
 import { lockedAxes } from "../../lib/reel/locks.js";
 import { ASPECTS } from "../../lib/aspects.js";
 import { STYLE_PRESETS } from "../../lib/styles.js";
-import { secondsForModel } from "../../lib/clip-limits.js";
+import { secondsForModel, reelModelsForTier, resolutionsForModel, i2vModelLabelOf } from "../../lib/clip-limits.js";
+import { REEL_CONCEPTS } from "../../lib/reel/concepts.js";
+import { AD_MOODS, AD_LANGS } from "../../lib/ad/options.js";
 
 // ★★★ 표에 없는 저장값도 보여 준다 — 잠긴 축에서 값이 사라지면 무엇으로 만들었는지가
 //   화면에서 지워진다(옛 문서에 실재).
@@ -41,8 +50,19 @@ export function withSavedValue(items, value, fmt) {
   return [...items, { id: value, text: fmt(value), off: true }];
 }
 
+// 표에서 라벨을 찾되, 모르는 값이면 저장값 자체를 보여 준다 — 값을 지어내지도, 지우지도 않는다.
+function labelIn(table, id) {
+  if (id === undefined || id === null || id === "") return "";
+  return table.find((x) => x.id === id)?.label || String(id);
+}
+
 export default function SettingsPanel() {
   const { project, reload } = useReelProject();
+  // ★★ 모델 칩 목록은 **등급이 가른다**(만들기 화면과 같은 방식 — reelModelsForTier).
+  //   등급을 모르는 동안(ready === false)에는 목록을 비운다 — 모르는 등급을 기본 등급으로
+  //   떨어뜨리면 프로 사장님에게 기본 모델 하나만 보인다(app/reel/new/page.js 에서 실제로
+  //   밟았던 자리다). 그 동안에도 **저장된 모델**은 withSavedValue 가 칩으로 세운다.
+  const { me, ready } = useMe();
   const [busy, setBusy] = useState(false);
   // 서버가 거절한 이유를 담는다. 라우트는 409(잠김)·400(값)·403(등급)으로 답하는데,
   // 삼키면 사장님은 **칩이 안 바뀌는 이유**를 영영 모른다.
@@ -70,7 +90,27 @@ export default function SettingsPanel() {
       axis: "style", label: "화풍", value: s.style,
       items: withSavedValue(STYLE_PRESETS.map((p) => ({ id: p.id, text: p.label })), s.style, (v) => String(v)),
     },
+    {
+      axis: "i2v_model", label: "모델", value: s.i2v_model,
+      items: withSavedValue(
+        (ready ? reelModelsForTier(me?.tier, { admin: me?.isAdmin === true }) : []).map((m) => ({ id: m.id, text: m.label })),
+        s.i2v_model, (v) => i2vModelLabelOf(v) || String(v),
+      ),
+    },
+    {
+      // ★ 화질 칸은 **저장된 모델**이 정한다 — 길이 칸과 같은 이유다(화면과 서버가 같은 표를 본다).
+      axis: "resolution", label: "화질", value: s.resolution,
+      items: withSavedValue(resolutionsForModel(s.i2v_model).map((r) => ({ id: r, text: r })), s.resolution, (v) => String(v)),
+    },
   ];
+
+  // ★ 라우트가 안 받는 축들 — **보여 주기만** 한다. 값이 없으면 줄 자체를 안 그린다
+  //   (없는 값을 "기본값"으로 지어내 보여 주면, 고른 적 없는 것을 고른 것처럼 읽힌다).
+  const shown = [
+    { label: "컨셉", text: labelIn(REEL_CONCEPTS, s.concept) },
+    { label: "분위기", text: labelIn(AD_MOODS, s.mood) },
+    { label: "나레이션", text: labelIn(AD_LANGS, s.narration_lang) },
+  ].filter((x) => x.text);
 
   // ★★ 잠긴 이유는 **한 번만** 말한다. 비율·길이·모델·화질은 전부 같은 문구
   //   ("시나리오를 확정해서 잠겼어요")를 쓰므로, 축마다 그 줄을 그리면 같은 말이 줄줄이 선다.
@@ -133,6 +173,16 @@ export default function SettingsPanel() {
       <div className="rp-head">이 영상의 설정</div>
       <div className="rp-body">
         {fields.map(field)}
+        {/* ★ 못 고치는 값도 **같은 모양**으로 선다 — 다른 모양을 주면 새 CSS 가 필요하고,
+            그러면 같은 줄을 그리는 자리가 둘이 된다. 칩은 늘 비활성이다(고를 수 없다). */}
+        {shown.map((x) => (
+          <div key={x.label} className="rp-field">
+            <div className="rp-lab">{x.label}</div>
+            <div className="rp-chips">
+              <button type="button" className="rp-chip on" disabled>{x.text}</button>
+            </div>
+          </div>
+        ))}
         {reasons.length > 0 && (
           <p className="rp-why">{reasons.join(" · ")}</p>
         )}

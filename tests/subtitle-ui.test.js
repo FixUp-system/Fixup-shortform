@@ -384,16 +384,19 @@ describe("⑥완성 — 조절판이 카드 안에 들어오고 영상과 키를
     expect(editorWidth + 24 + 360, `조절판이 ${editorWidth}px 라 카드를 넘는다`).toBeLessThanOrEqual(720);
   });
 
-  it("★ 세로는 영상에 안 맞춘다 — 조절판은 제 내용만큼만 차지한다", () => {
-    // 한때 영상 높이(640px)까지 늘렸다가 되돌렸다(2026-08-13 사용자 요청): 늘리면 네 줄
-    // 사이가 허옇게 벌어져 빽빽한 조절판이 아니라 빈 상자로 보인다.
+  it("★★★ 세로를 **영상에 맞춘다** — 2026-09-16 사장님 지시로 08-13 판단을 뒤집었다", () => {
+    // 08-13 에는 영상 높이(640px)까지 늘렸다가 되돌렸다: 늘리면 네 줄 사이가 허옇게 벌어져
+    // 빽빽한 조절판이 아니라 빈 상자로 보였다. 09-16 에 사장님이 다시 맞춰 달라고 했고,
+    // 그때와 다른 점은 **늘어나는 것이 상자뿐**이라는 것이다 — 줄은 제 높이를 지키고
+    // 남는 높이를 위아래로 나눠 가진다(실측: 조절판 336×646 · 영상 360×646 · 줄 62px 유지).
     const at = css.indexOf(".done-stage {");
     const rule = css.slice(at, css.indexOf("}", at));
-    expect(rule, "무대가 세로로 늘리고 있다(stretch)").not.toMatch(/align-items:\s*stretch/);
-    // 격자에서는 start 가 flex-start 자리다
-    expect(rule).toMatch(/align-items:\s*(flex-)?start/);
-    // 상자에 높이를 물리면 같은 일이 다시 벌어진다
-    expect(css, "subpanel 에 height:100% 가 남아 있다").not.toMatch(/\.done-stage \.subpanel \{[^}]*height:\s*100%/);
+    expect(rule, "칸이 제 내용만큼만 선다 — 영상과 아랫변이 어긋난다").toMatch(/align-items:\s*stretch/);
+    // ★ 되돌린 그 모양은 여전히 금지다 — 줄 사이를 벌리면 빈 상자가 된다.
+    const i = css.indexOf(".done-stage .sub-editor > .subpanel");
+    expect(i, "상자가 남는 높이를 가져가는 규칙이 없다").toBeGreaterThan(-1);
+    expect(css.slice(i, css.indexOf("}", i)), "줄 사이를 벌린다(08-13 에 되돌린 모양)")
+      .not.toMatch(/justify-content:\s*space-between/);
   });
 });
 

@@ -72,8 +72,13 @@ describe("⑤영상 — 시킨 것 ↔ 나온 것", () => {
     expect(at, "⑤ 전용 격자 규칙이 없다").toBeGreaterThan(-1);
     const grid = css.slice(at, css.indexOf("}", at));
     expect(grid, "키를 정하는 자리가 없다").toMatch(/--rv-media-h:/);
-    expect(grid, "영상 칸이 제 폭만큼만 차지하지 않는다 — 양옆에 빈 자리가 남는다")
-      .toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto/);
+    expect(grid, "키를 칸 폭에서 역산하지 않는다 — 둘 사이가 벌어진다")
+      .toMatch(/--rv-media-h:\s*min\(68vh,\s*calc\(\(100cqw - var\(--sp-5\)\) \/ 1\.6875\)\)/);
+    expect(grid, "칸을 제 폭만큼만 쓰고 가운데로 모으지 않는다")
+      .toMatch(/grid-template-columns:\s*auto auto/);
+    expect(grid, "남는 자리가 한쪽에 몰린다").toMatch(/justify-content:\s*center/);
+    expect(css, "컨테이너를 세우는 자리가 없다 — cqw 가 제 폭을 못 읽는다")
+      .toMatch(/\.rv-page:has\(\.rv-split--video\) \{ container-type: inline-size; \}/);
 
     for (const sel of [".rv-split--video > .sheet-view img", ".rv-split--video > .vid-result"]) {
       const i = css.indexOf(sel);
@@ -85,24 +90,19 @@ describe("⑤영상 — 시킨 것 ↔ 나온 것", () => {
     }
   });
 
-  // ★ 실측으로 밟은 자리 둘 — 둘 다 없으면 좁은 화면에서 티가 난다.
-  it("★★ 좁은 화면에서는 키를 낮추고, 판은 찌그러지지 않는다", () => {
+  // ★ 실측으로 밟은 자리 — 높이를 못 박은 그림에 max-width 가 걸리면 폭만 깎여 찌그러진다.
+  it("★★ 좁은 칸에서도 판이 찌그러지지 않는다", () => {
     const css = readFileSync("app/globals.css", "utf8");
-    expect(css, "좁은 화면에서 키를 안 낮춘다 — 판이 제 칸을 못 채워 위아래가 빈다")
-      .toMatch(/@media \(max-width: 1440px\) \{\s*\.rv-split--video\.is-two \{ --rv-media-h:/);
     const i = css.indexOf(".rv-split--video > .sheet-view img");
     expect(css.slice(i, css.indexOf("}", i)), "높이를 못 박은 그림에 object-fit 이 없다 — 좁은 칸에서 찌그러진다")
       .toMatch(/object-fit:\s*contain/);
   });
 
-  it("★★ 판은 왼쪽 끝, 영상은 오른쪽 끝에 붙는다", () => {
+  it("★★ 판은 제 상자 왼쪽에 붙는다 — 상자 안에서 또 가운데로 가면 둘 사이가 벌어진다", () => {
     const css = readFileSync("app/globals.css", "utf8");
     const s = css.indexOf(".rv-split--video > .sheet-view {");
     expect(s, "판을 왼쪽에 붙이는 규칙이 없다").toBeGreaterThan(-1);
     expect(css.slice(s, css.indexOf("}", s)), "판이 가운데 서서 왼쪽에 빈 자리가 남는다")
       .toMatch(/justify-content:\s*flex-start/);
-    const v = css.indexOf(".rv-split--video > .vid-result");
-    expect(css.slice(v, css.indexOf("}", v)), "영상이 오른쪽 끝에 안 붙는다")
-      .toMatch(/justify-self:\s*end/);
   });
 });

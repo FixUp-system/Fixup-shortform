@@ -159,3 +159,42 @@ describe("표 밖 저장값 (Ruling 11)", () => {
     }
   });
 });
+
+// ★★★ 2026-09-16 밤 사장님 지시 — "사이드바에서도 사용자가 선택한 것들을 볼 수 있게 해 달라.
+//   지금 입력에서와는 다르게 비율·길이·화풍밖에 없다."
+//   만들기 화면이 받는 것은 여덟이다(비율·길이·화질·모델·화풍·컨셉·분위기·나레이션 언어).
+//   그중 설정 라우트가 **받는 다섯**만 고칠 수 있고, 나머지 셋은 보여 주기만 한다.
+describe("이 영상의 설정 — 고른 것이 다 보인다", () => {
+  const code = readFileSync("components/reel/SettingsPanel.jsx", "utf8");
+
+  it("★★★ 고칠 수 있는 축 **다섯**을 다 그린다", () => {
+    for (const axis of ["aspect_ratio", "target_seconds", "style", "i2v_model", "resolution"]) {
+      expect(code, `${axis} 축이 없다`).toContain(`axis: "${axis}"`);
+    }
+  });
+
+  it("★★★ 모델·화질도 **표에서** 온다 — 화면에 이름·숫자를 적지 않는다", () => {
+    expect(code, "모델 목록을 손으로 적었다").toMatch(/withSavedValue\(\s*\n?\s*\(ready \? reelModelsForTier/);
+    expect(code, "화질 목록이 저장된 모델을 안 본다").toMatch(/withSavedValue\(resolutionsForModel\(s\.i2v_model\)/);
+  });
+
+  it("★★ 모델 칩은 **등급이 가른다** — 등급을 모르는 동안에는 목록을 비운다", () => {
+    expect(code, "등급을 안 읽는다 — 프로 사장님에게 기본 모델만 보인다").toContain("useMe");
+    expect(code, "등급을 모르는 동안 기본 등급으로 떨어진다").toMatch(/ready \? reelModelsForTier\(me\?\.tier/);
+  });
+
+  it("★★★ 라우트가 안 받는 셋(컨셉·분위기·나레이션)은 **못 누른다**", () => {
+    const at = code.indexOf("const shown = [");
+    expect(at, "보여 주기만 하는 줄이 없다").toBeGreaterThan(-1);
+    const 줄 = code.slice(at, code.indexOf("];", at));
+    for (const label of ["컨셉", "분위기", "나레이션"]) {
+      expect(줄, `${label} 이 없다`).toContain(label);
+    }
+    expect(code, "못 고치는 값을 누를 수 있게 뒀다 — 눌러도 아무 일이 없거나 400 이다")
+      .toMatch(/className="rp-chip on" disabled/);
+  });
+
+  it("★★ 값이 없으면 그 줄은 **안 그린다** — 고른 적 없는 것을 고른 것처럼 보이면 안 된다", () => {
+    expect(code, "빈 값을 걸러내지 않는다").toMatch(/\]\.filter\(\(x\) => x\.text\)/);
+  });
+});
