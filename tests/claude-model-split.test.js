@@ -10,9 +10,9 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resetMemoryStore } from "../lib/store/memory.js";
 import { runWithActor } from "../lib/actor.js";
-import { listRecords } from "../lib/costs.js";
+import { listRecords, estimateLlmCost } from "../lib/costs.js";
 import { callJson, CLAUDE_MODEL } from "../lib/ad/llm.js";
-import { TEXT_MODEL } from "../lib/reel/llm.js";
+import { TEXT_MODEL, TRANSLATE_MODEL } from "../lib/reel/llm.js";
 import { MODEL as OPUS } from "../lib/llm.js";
 
 const U = "00000000-0000-4000-8000-0000000000c1";
@@ -72,10 +72,22 @@ describe("Claude 모델 나누기", () => {
     expect(Number(opus.est_cost_usd)).toBeCloseTo(Number(fable.est_cost_usd) / 2, 6);
   });
 
-  it("★★ 번역·영상 프롬프트 세 자리는 Opus 5 를 넘긴다", () => {
-    for (const f of ["lib/reel/translate.js", "lib/reel/whole-prompt.js", "lib/reel/clip-prompt.js"]) {
+  it("★★ 영상 프롬프트 두 자리는 Opus 5 를 넘긴다", () => {
+    for (const f of ["lib/reel/whole-prompt.js", "lib/reel/clip-prompt.js"]) {
       expect(readFileSync(f, "utf8"), `${f} 가 Opus 를 안 넘긴다 — Fable 로 불린다`).toContain("model: TEXT_MODEL");
     }
+  });
+
+  // ★★★ 2026-09-17 저녁 사장님 결정 — **번역은 Sonnet 5.** 옮기기만 하는 일이라 판단·창작이 거의 없다.
+  it("★★★ 번역 두 자리(지문·자막)는 Sonnet 5 를 넘긴다", () => {
+    expect(readFileSync("lib/reel/translate.js", "utf8"), "지문 번역이 Sonnet 을 안 넘긴다").toContain("model: TRANSLATE_MODEL");
+    expect(readFileSync("app/api/projects/[id]/subtitle-lang/route.js", "utf8"), "자막 번역이 Sonnet 을 안 넘긴다").toContain("model: SONNET_MODEL");
+    expect(TRANSLATE_MODEL).toBe("claude-sonnet-5");
+  });
+
+  it("★★★ Sonnet 5 원가는 단가표에서 온다 — 없으면 gpt-4o 단가로 떨어진다", () => {
+    expect(estimateLlmCost("claude-sonnet-5", { input_tokens: 1_000_000, output_tokens: 1_000_000 })).toBeCloseTo(12, 6);
+    expect(estimateLlmCost("claude-opus-5", { input_tokens: 1_000_000, output_tokens: 1_000_000 })).toBeCloseTo(30, 6);
   });
 
   // ★ 2026-09-17 저녁 — 시나리오도 **수정일 때만** Opus 5 로 간다(tests/scenario-revise.test.js 가 동작을 잰다).

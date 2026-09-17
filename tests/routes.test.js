@@ -55,7 +55,7 @@ vi.mock("../lib/pipeline.js", async (importOriginal) => ({
 }));
 
 const llmMock = vi.hoisted(() => ({ callJson: vi.fn() }));
-vi.mock("../lib/llm.js", () => ({ callJson: (...a) => llmMock.callJson(...a) }));
+vi.mock("../lib/llm.js", () => ({ callJson: (...a) => llmMock.callJson(...a), SONNET_MODEL: "claude-sonnet-5" }));
 
 const { POST: cutsPOST } = await import("../app/api/projects/[id]/cuts/route.js");
 const { POST: imagesPOST } = await import("../app/api/projects/[id]/images/route.js");

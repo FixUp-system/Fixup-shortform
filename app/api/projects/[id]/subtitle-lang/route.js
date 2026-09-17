@@ -1,5 +1,5 @@
 import { getProject, updateProject, isStepDoc } from "../../../../../lib/projects";
-import { callJson } from "../../../../../lib/llm";
+import { callJson, SONNET_MODEL } from "../../../../../lib/llm";
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { BudgetExceeded } from "../../../../../lib/costs.js";
 import { isSubtitleLang, speechLangOf } from "../../../../../lib/subtitle-langs.js";
@@ -40,7 +40,8 @@ export const POST = withUser(async (req, { params }, user) => {
     const msg = buildTranslateMessages(staleCuts.map(({ cut }) => cut), lang);
     let raw;
     try {
-      raw = await callJson({ system: msg.system, messages: msg.messages, stage: "자막 번역", projectId: id });
+      // 옮기기만 하는 일이라 Sonnet 5 다(lib/llm.js 의 SONNET_MODEL).
+      raw = await callJson({ system: msg.system, messages: msg.messages, stage: "자막 번역", projectId: id, model: SONNET_MODEL });
     } catch (e) {
       // 예산 오류는 삼키지 않는다 — withUser 까지 올라가야 402/503 이 된다.
       if (e instanceof BudgetExceeded) throw e;
