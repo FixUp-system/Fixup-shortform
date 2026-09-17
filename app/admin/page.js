@@ -407,7 +407,7 @@ export default function AdminPage() {
 
       {users !== null && (
         <>
-          <div className="panel cost-filters">
+          <div className="panel cost-filters cost-filters--spread">
             <label>
               <small>시작일</small>
               <input className="field" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -450,10 +450,12 @@ export default function AdminPage() {
             )}
             {/* ★ 추가 버튼은 좁히기 줄 **맨 끝**이다 — 제목 옆에 두면 표와 멀어지고, 이 줄은 이미
                 표를 다루는 자리다.
-                ★★ 2026-09-17 사장님 지시 — **오른쪽 끝에 붙인다**(.cost-filters-end). 그전에는 상태 칩 뒤에
-                  바로 서서 오른쪽에만 큰 빈 자리가 남았다. 이제 좌우 여백이 카드 안쪽 여백으로 같다.
-                ★ [조건 지우기]보다 **뒤**에 둔다 — 앞에 두면 그 버튼이 나타날 때 추가 버튼 오른쪽에 끼어든다. */}
-            <button type="button" className="mini confirm-btn cost-filters-end" onClick={openAdd} disabled={busy === "add"}>
+                ★★ 2026-09-17 사장님 지시(2차) — 오른쪽 끝에 붙였더니 **상태 칩과 사이가 너무 벌어졌다.**
+                  남는 가로를 **세 몫으로 똑같이** 나눈다: 시작일 앞 · 상태와 이 버튼 사이 · 이 버튼 뒤
+                  (.cost-filters--spread 의 앞뒤 빈 칸 + 아래 가운데 빈 칸).
+                ★ [조건 지우기]보다 **뒤**에 둔다 — 앞에 두면 그 버튼이 나타날 때 추가 버튼 뒤에 끼어든다. */}
+            <span className="cost-filters-gap" aria-hidden="true" />
+            <button type="button" className="mini confirm-btn" onClick={openAdd} disabled={busy === "add"}>
               + 사용자 추가
             </button>
           </div>
