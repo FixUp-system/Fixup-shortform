@@ -19,6 +19,8 @@ const STATUS_LABEL = {
   pending: "대기 중",
   approved: "승인됨",
   blocked: "차단됨",
+  // ★ 2026-09-17 — 기록 보존형 삭제. 계정·크레딧 내역·영상은 남고 로그인만 막힌다.
+  deleted: "삭제됨",
 };
 
 // 그 사람의 시계로 본 날짜 — 마이페이지와 같은 규칙이다(toISOString 은 UTC 라
@@ -68,6 +70,98 @@ export default function AdminPage() {
   const [grantAmount, setGrantAmount] = useState(String(DEFAULT_GRANT));
   const [grantReason, setGrantReason] = useState("체험");
   const panelUser = panelId ? (users || []).find((u) => u.id === panelId) || null : null;
+
+  // ★★ 2026-09-17 사장님 지시 — **계정을 여기서 바로 만든다.** 그전에는 상대가 가입 화면에서
+  //   가입하고 운영자가 승인하는 길뿐이었다. 만든 계정은 곧바로 승인 상태다(서버가 정한다).
+  // ★ 모달은 계정 모달과 같은 장치(<dialog> + .dlg 계열)다 — 새 모양을 만들지 않는다.
+  // ★ 닫을 때 값을 비운다 — 앞에 적던 비밀번호가 다음에 여는 사람 화면에 남으면 안 된다.
+  const [adding, setAdding] = useState(false);
+  const [newUser, setNewUser] = useState({ name: "", email: "", password: "" });
+  const [addErr, setAddErr] = useState("");
+  const [notice, setNotice] = useState("");
+  const addRef = useRef(null);
+  useEffect(() => {
+    const el = addRef.current;
+    if (!el) return;
+    if (adding && !el.open) el.showModal();
+    if (!adding && el.open) el.close();
+  }, [adding]);
+  function openAdd() {
+    setNewUser({ name: "", email: "", password: "" });
+    setAddErr("");
+    setNotice("");
+    setAdding(true);
+  }
+  function closeAdd() {
+    setAdding(false);
+    setNewUser({ name: "", email: "", password: "" });
+    setAddErr("");
+  }
+  async function addUser() {
+    setBusy("add");
+    setAddErr("");
+    try {
+      const r = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newUser),
+      });
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        // 서버가 준 문구 그대로 — 이미 가입된 이메일·약한 비밀번호를 화면이 추측하지 않는다.
+        setAddErr(body.error || "계정을 만들지 못했어요");
+        return;
+      }
+      const made = newUser.email;
+      closeAdd();
+      // 비밀번호는 화면에 다시 띄우지 않는다 — 운영자가 적은 값이고, 남기면 어깨너머로 샌다.
+      setNotice(`${made} 계정을 만들었어요 — 비밀번호는 상대에게 따로 알려 주세요.`);
+      await load();
+    } catch {
+      setAddErr("연결에 문제가 있어요 — 잠시 후 다시 시도해 주세요");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  // ★★ 2026-09-17 사장님 지시 — **계정 삭제.** 기록 보존형이다(사장님 결정): 로그인만 영구히
+  //   막고, 계정·크레딧 내역·영상은 남는다. 그래서 되돌릴 수 있다(복구).
+  //   ★ 자기 계정·운영자 계정은 버튼을 안 그린다 — 서버도 같은 것을 막는다(가림막이 아니라 잠금).
+  async function removeUser(u) {
+    const ok = await confirm({
+      title: `${displayNameOf(u)} 계정을 삭제할까요?`,
+      body: `${u.email}\n이 계정으로는 더 이상 로그인할 수 없어요. 크레딧 내역과 만든 영상은 그대로 남고, 목록의 「삭제됨」에서 복구할 수 있어요.`,
+      confirmLabel: "삭제",
+    });
+    if (!ok) return;
+    setBusy(u.id);
+    setErr("");
+    try {
+      const r = await fetch(`/api/admin/users/${u.id}`, { method: "DELETE" });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "삭제하지 못했어요");
+      closePanel();
+      setNotice(`${u.email} 계정을 삭제했어요.`);
+      await load();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy("");
+    }
+  }
+  async function restoreUser(u) {
+    setBusy(u.id);
+    setErr("");
+    try {
+      const r = await fetch(`/api/admin/users/${u.id}/restore`, { method: "POST" });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "복구하지 못했어요");
+      setNotice(`${u.email} 계정을 복구했어요.`);
+      await load();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy("");
+    }
+  }
   // ★ showModal() 로 연다 — `open` 속성만 두면 **모달이 아니라 인라인**으로 뜬다(배경도
   //   Esc 도 포커스 가둠도 없다). DialogProvider 와 같은 방식이다.
   const panelRef = useRef(null);
@@ -281,7 +375,9 @@ export default function AdminPage() {
   const q = query.trim().toLowerCase();
   const found = (users || []).filter(
     (u) =>
-      (!statusFilter || u.status === statusFilter) &&
+      // ★ "전체"에는 삭제된 계정이 안 섞인다 — 지운 사람이 목록에 계속 서 있으면 지운 것 같지 않다.
+      //   보려면 「삭제됨」을 고른다(복구도 거기서 한다).
+      (statusFilter ? u.status === statusFilter : u.status !== "deleted") &&
       inDayRange(u.created_at, from, to) &&
       (!q ||
         displayNameOf(u).toLowerCase().includes(q) ||
@@ -290,11 +386,14 @@ export default function AdminPage() {
   );
   // 요약 타일의 수 — 좁히기와 무관한 **전체** 기준이다(승인 대기가 몇 명 쌓였는지를 먼저 본다).
   const countOf = (s) => (users || []).filter((u) => u.status === s).length;
+  // 살아 있는 계정 수 — 타일·아래 수가 같은 값을 본다.
+  const activeCount = (users || []).filter((u) => u.status !== "deleted").length;
   const STATUS_PICKS = [
     ["", "전체"],
     ["pending", "승인 대기"],
     ["approved", "승인됨"],
     ["blocked", "차단됨"],
+    ["deleted", "삭제됨"],
   ];
 
   // ★ 구성은 비용 기록(/costs)과 같다(2026-09-14 사장님 지시) — 카드 안의 좁히기 줄 · 요약 타일 · 표.
@@ -344,6 +443,11 @@ export default function AdminPage() {
                 ))}
               </span>
             </label>
+            {/* ★ 추가 버튼은 좁히기 줄 **맨 끝**이다 — 제목 옆에 두면 표와 멀어지고, 이 줄은 이미
+                표를 다루는 자리다. */}
+            <button type="button" className="mini confirm-btn" onClick={openAdd} disabled={busy === "add"}>
+              + 사용자 추가
+            </button>
             {(query || statusFilter || from || to) && (
               <button type="button" className="mini" onClick={() => { setQuery(""); setStatusFilter(""); setFrom(""); setTo(""); }}>
                 조건 지우기
@@ -354,7 +458,7 @@ export default function AdminPage() {
           <div className="cost-summary">
             <div className="cost-tile">
               <small>전체</small>
-              <b>{users.length}명</b>
+              <b>{activeCount}명</b>
             </div>
             <div className="cost-tile">
               <small>승인 대기</small>
@@ -373,6 +477,7 @@ export default function AdminPage() {
       )}
 
       {err && <p className="pgsub warn">{err}</p>}
+      {notice && !err && <p className="pgsub">{notice}</p>}
 
       {users === null ? (
         <p className="pgsub">불러오는 중…</p>
@@ -540,14 +645,26 @@ export default function AdminPage() {
               <button className="mini" disabled={busy === panelUser.id} onClick={() => resetPassword(panelUser.id)}>
                 비밀번호 재설정
               </button>
-              {panelUser.status !== "approved" && (
+              {/* ★ 삭제된 계정은 승인·차단을 안 그린다 — 서버가 409 로 막는다(로그인 금지가 남아
+                  "승인했는데 못 들어온다"가 된다). 살리는 문은 복구 하나다. */}
+              {panelUser.status === "deleted" && (
+                <button className="mini" disabled={busy === panelUser.id} onClick={() => restoreUser(panelUser)}>
+                  복구
+                </button>
+              )}
+              {panelUser.status !== "approved" && panelUser.status !== "deleted" && (
                 <button className="mini" disabled={busy === panelUser.id} onClick={() => setStatus(panelUser.id, "approved")}>
                   승인
                 </button>
               )}
-              {panelUser.status !== "blocked" && (
+              {panelUser.status !== "blocked" && panelUser.status !== "deleted" && (
                 <button className="mini" disabled={busy === panelUser.id} onClick={() => setStatus(panelUser.id, "blocked")}>
                   차단
+                </button>
+              )}
+              {panelUser.status !== "deleted" && panelUser.self !== true && panelUser.role !== "admin" && (
+                <button className="mini" disabled={busy === panelUser.id} onClick={() => removeUser(panelUser)}>
+                  계정 삭제
                 </button>
               )}
             </div>
@@ -597,13 +714,72 @@ export default function AdminPage() {
           </div>
         </dialog>
       )}
+      {adding && (
+        <dialog
+          ref={addRef}
+          className="dlg"
+          aria-label="사용자 추가"
+          onCancel={(e) => { e.preventDefault(); closeAdd(); }}
+          onClick={(e) => { if (e.target === addRef.current) closeAdd(); }}
+        >
+          <form
+            className="dlg-box"
+            onSubmit={(e) => { e.preventDefault(); addUser(); }}
+          >
+            <h2 className="dlg-title">사용자 추가</h2>
+            <p className="dlg-body">
+              만든 계정은 바로 승인돼요. 비밀번호는 상대에게 따로 알려 주세요 ({PASSWORD_MIN}자 이상).
+            </p>
+            <input
+              className="dlg-input"
+              type="text"
+              placeholder="이름"
+              aria-label="이름"
+              value={newUser.name}
+              onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+              disabled={busy === "add"}
+              autoFocus
+            />
+            <input
+              className="dlg-input"
+              type="email"
+              placeholder="이메일"
+              aria-label="이메일"
+              value={newUser.email}
+              onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+              disabled={busy === "add"}
+            />
+            <input
+              className="dlg-input"
+              type="password"
+              autoComplete="new-password"
+              placeholder="비밀번호"
+              aria-label="비밀번호"
+              value={newUser.password}
+              onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+              disabled={busy === "add"}
+            />
+            {addErr && <p className="pgsub warn">{addErr}</p>}
+            <div className="dlg-actions">
+              <button type="button" className="mini" onClick={closeAdd} disabled={busy === "add"}>취소</button>
+              <button
+                type="submit"
+                className="mini confirm-btn dlg-go"
+                disabled={busy === "add" || !newUser.name.trim() || !newUser.email.trim() || !newUser.password}
+              >
+                {busy === "add" ? "만드는 중…" : "만들기"}
+              </button>
+            </div>
+          </form>
+        </dialog>
+      )}
       {/* ★ 수는 표 감싸개(.cost-table-wrap) **밖**이다. 그 안은 가로 스크롤 상자라
           (overflow-x: auto) 오른쪽 끝에 붙인 글자가 잘려 보인다(2026-08-13 실측). */}
       {users !== null && found.length > 0 && (
         <p className="pgsub admin-count">
-          {found.length === users.length
-            ? `전체 ${users.length}명`
-            : `찾은 ${found.length}명 (전체 ${users.length}명)`}
+          {found.length === activeCount && !statusFilter
+            ? `전체 ${activeCount}명`
+            : `찾은 ${found.length}명 (전체 ${activeCount}명)`}
         </p>
       )}
     </>

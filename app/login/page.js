@@ -68,7 +68,11 @@ export default function LoginPage() {
       //   Suspense 경계를 요구해 빌드가 깨진다. 이 자리는 눌렀을 때만 도는 코드다.
       const back = safeNext(new URLSearchParams(window.location.search).get("next"));
       // refresh 를 함께 부르는 이유: 서버 컴포넌트가 새 세션으로 다시 그려져야 한다.
-      router.replace(back || "/");
+      // ★★ 2026-09-17 사장님 지적 — 로그인하면 **만들기 화면이 잠깐 떴다가** 랜딩으로 넘어갔다.
+      //   `/` 는 app/page.js 가 `/home` 으로 되돌리기만 하는 자리인데, 그 한 번의 경유 동안
+      //   주소가 `/` 라서 AppShell 이 랜딩(LANDING_PATHS = /home)이 아니라 **사이드바 달린 앱
+      //   껍데기**를 그렸다 — 그 모습이 "만들기 화면"으로 보였다. 목적지로 **곧바로** 간다.
+      router.replace(back || "/home");
       router.refresh();
     } catch {
       setError("연결에 문제가 있어요 — 잠시 후 다시 시도해 주세요");

@@ -154,7 +154,8 @@ export async function middleware(req) {
   // API 는 그 403 이 이미 답이므로 화면(!isApi)만 홈으로 되돌린다 — 승인 게이트와 같은 방식.
   if (isAdminPath(pathname) && role !== "admin" && !isApi) {
     const to = req.nextUrl.clone();
-    to.pathname = "/";
+    // ★ `/` 가 아니라 `/home` 이다 — `/` 를 경유하면 그 사이 앱 껍데기가 한 번 번쩍인다(로그인과 같은 이유).
+    to.pathname = "/home";
     return copyCookies(cookieRes, NextResponse.redirect(to));
   }
   return res;

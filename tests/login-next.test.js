@@ -69,7 +69,9 @@ describe("배선 — 세 자리가 같은 함수를 쓴다", () => {
     expect(login, "safeNext 를 안 쓴다").toMatch(/safeNext\(/);
     expect(login, "next 를 안 읽는다").toMatch(/get\("next"\)/);
     expect(login, "여전히 무조건 첫 화면으로 간다").not.toMatch(/router\.replace\("\/"\)/);
-    expect(login, "돌아갈 자리가 없을 때의 기본값이 없다").toMatch(/router\.replace\([\w]+\s*\|\|\s*"\/"\)/);
+    // ★ 2026-09-17 — 기본값이 `/` 에서 `/home` 으로 바뀌었다. `/` 를 경유하면 그 사이 앱 껍데기
+    //   (사이드바)가 한 번 번쩍여 "만들기 화면이 잠깐 뜬다"로 보였다(사장님 지적).
+    expect(login, "돌아갈 자리가 없을 때의 기본값이 없다").toMatch(/router\.replace\([\w]+\s*\|\|\s*"\/home"\)/);
   });
 
   it("★★ 랜딩의 손님 버튼이 **돌아올 자리를 실어서** 보낸다", () => {

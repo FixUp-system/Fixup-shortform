@@ -1,28 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { getStore } from "../../../../../lib/store/index.js";
-import { SIGNUP_GRANT, SIGNUP_GRANT_REASON } from "../../../../../lib/pricing.js";
+import { grantSignupCreditsOnce } from "../../../../../lib/admin/signup-grant.js";
 import { isTier, TIERS } from "../../../../../lib/tiers.js";
 import { blocksSelfRoleChange } from "../../../../../lib/admin/self-guard.js";
 
-// 가입 기본 지급 — **처음 승인될 때 한 번**만 들어간다.
-//
-// 왜 가입 시점이 아니라 여기인가: 승인 전에는 어차피 아무것도 못 쓰므로 사장님 입장에서는
-// "가입하니 크레딧이 있다"와 똑같이 보이고, 공개 주소로 무작위 가입이 들어와도 장부에
-// 지급 행이 안 쌓인다. 그리고 지급이 **사람이 누른 결과**로 남는다(granted_by).
-//
-// ★ credit_grants 에는 멱등키가 없다. approved→pending→approved 토글 한 번에 500 이
-// 또 들어가므로, 지급 전에 같은 사유의 행이 이미 있는지 본다. 사유 문구가 곧 그 열쇠다.
-async function grantSignupCreditsOnce(store, userId, grantedBy) {
-  const grants = await store.listGrants(userId);
-  if (grants.some((g) => g.reason === SIGNUP_GRANT_REASON)) return;
-  await store.insertGrant({
-    user_id: userId,
-    amount_credits: SIGNUP_GRANT,
-    reason: SIGNUP_GRANT_REASON,
-    granted_by: grantedBy,
-  });
-}
+// 가입 기본 지급은 lib/admin/signup-grant.js 한 벌이다(계정 추가 POST 도 같은 것을 부른다).
 
 const ALLOWED_STATUS = new Set(["approved", "blocked", "pending"]);
 const ALLOWED_ROLE = new Set(["user", "admin"]);
@@ -78,6 +61,12 @@ export const PATCH = withUser(async (req, { params }, user) => {
   if (!current) {
     return Response.json({ error: "사용자를 찾을 수 없어요" }, { status: 404 });
   }
+  // ★★ 삭제된 계정은 여기서 못 건드린다(2026-09-17). 삭제는 로그인 금지(ban)까지 걸어 두는데,
+  //   이 문으로 승인만 바꾸면 **원장은 승인·게이트도 승인인데 로그인은 막힌** 계정이 생긴다 —
+  //   운영자는 살렸다고 믿고 사용자는 영영 못 들어온다. 살리는 문은 복구 하나다.
+  if (current.status === "deleted") {
+    return Response.json({ error: "삭제된 계정이에요 — 먼저 복구해 주세요" }, { status: 409 });
+  }
 
   const nextStatus = status ?? current.status;
   const nextRole = role ?? current.role;
@@ -126,5 +115,61 @@ export const PATCH = withUser(async (req, { params }, user) => {
   // admin.signOut(jwt) 은 첫 인자가 user id 가 아니라 access token 이라 uuid 를 넘기면
   // 401 을 반환한다 — 그런데 던지지 않고 {data:null, error} 로 돌려주기 때문에 예전
   // 코드의 .catch()는 절대 안 걸렸고 실패조차 로그에 안 남았다. 애초에 불필요한 호출이었다.)
+  return Response.json({ ok: true });
+}, { adminOnly: true });
+
+// ★★★ DELETE /api/admin/users/[id] — **기록 보존형 삭제**(2026-09-17 사장님 결정).
+//
+// 계정을 Supabase 에서 진짜로 지우면 두 가지가 조용히 벌어진다(db/schema.sql 실측):
+//   · credit_grants·credit_charges 가 `on delete cascade` 라 **충전·사용 내역이 함께 사라진다**
+//     — 정산 기록이 날아간다.
+//   · projects.owner_id 에는 FK 가 없어 영상은 **주인 없이 남는다**.
+// 그래서 지우지 않고 **문을 닫는다**:
+//   ① 로그인 금지(ban) — 새 로그인·토큰 갱신이 막힌다
+//   ② 게이트(app_metadata.status)와 원장(profiles.status)을 `deleted` 로 — 목록에서 숨는다
+//   계정·크레딧 내역·영상은 **그대로 남고**, 복구(POST …/restore)로 되돌릴 수 있다.
+//
+// ★ 막는 것 둘:
+//   · 자기 계정 — 지우는 순간 이 화면에서 쫓겨나고 되돌릴 사람이 없을 수 있다
+//   · 운영자 계정 — 먼저 역할을 사용자로 내린 뒤 지운다(운영자를 실수로 지우는 한 번을 더 거른다)
+// ★ 쓰는 순서는 PATCH 와 같다 — **게이트 먼저**, 성공했을 때만 원장.
+// 약 100년 — Supabase 의 ban_duration 은 "영구"를 따로 주지 않는다.
+const BAN_FOREVER = "876000h";
+
+export const DELETE = withUser(async (_req, { params }, user) => {
+  const { id } = await params;
+  if (blocksSelfRoleChange(user.id, id)) {
+    return Response.json({ error: "자기 계정은 삭제할 수 없어요" }, { status: 400 });
+  }
+  const store = getStore();
+  const current = (await store.findProfiles([id])).get(id);
+  if (!current) {
+    return Response.json({ error: "사용자를 찾을 수 없어요" }, { status: 404 });
+  }
+  if (current.role === "admin") {
+    return Response.json(
+      { error: "운영자 계정은 삭제할 수 없어요 — 먼저 역할을 사용자로 바꿔 주세요" }, { status: 400 }
+    );
+  }
+  // 이미 지운 계정 — 같은 결과를 또 만들 뿐이라 성공으로 답한다(두 번 누른 것).
+  if (current.status === "deleted") return Response.json({ ok: true });
+
+  const admin = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { persistSession: false } }
+  );
+  const { error } = await admin.auth.admin.updateUserById(id, {
+    ban_duration: BAN_FOREVER,
+    app_metadata: { status: "deleted", role: current.role },
+  });
+  if (error) {
+    console.error("계정 삭제(로그인 금지) 실패:", error.message);
+    return Response.json({ error: "계정을 삭제하지 못했어요" }, { status: 502 });
+  }
+  await store.updateProfile(id, { status: "deleted", approved_at: null });
+
+  // 감사 — 누가 누구를 언제 지웠는지.
+  console.log(`[계정 삭제] ${user.id} → ${id}`);
   return Response.json({ ok: true });
 }, { adminOnly: true });
