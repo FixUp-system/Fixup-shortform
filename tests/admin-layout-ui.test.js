@@ -9,7 +9,8 @@ describe("사용자 관리(/admin) — 비용 기록과 같은 구성", () => {
   const src = strip(readFileSync("app/admin/page.js", "utf8"));
 
   it("찾기 줄이 카드 안에 있고, 작은 라벨 위 · 칸 아래다", () => {
-    expect(src).toMatch(/className="panel cost-filters"/);
+    // ★ 2026-09-17 — 수식자(cost-filters--spread)가 붙을 수 있다. 재는 것은 "비용 기록과 같은 카드"다.
+    expect(src).toMatch(/className="panel cost-filters( [\w-]+)*"/);
     expect(src).toMatch(/<small>찾기<\/small>/);
     expect(src).not.toMatch(/admin-tools/);
   });
