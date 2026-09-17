@@ -443,16 +443,19 @@ export default function AdminPage() {
                 ))}
               </span>
             </label>
-            {/* ★ 추가 버튼은 좁히기 줄 **맨 끝**이다 — 제목 옆에 두면 표와 멀어지고, 이 줄은 이미
-                표를 다루는 자리다. */}
-            <button type="button" className="mini confirm-btn" onClick={openAdd} disabled={busy === "add"}>
-              + 사용자 추가
-            </button>
             {(query || statusFilter || from || to) && (
               <button type="button" className="mini" onClick={() => { setQuery(""); setStatusFilter(""); setFrom(""); setTo(""); }}>
                 조건 지우기
               </button>
             )}
+            {/* ★ 추가 버튼은 좁히기 줄 **맨 끝**이다 — 제목 옆에 두면 표와 멀어지고, 이 줄은 이미
+                표를 다루는 자리다.
+                ★★ 2026-09-17 사장님 지시 — **오른쪽 끝에 붙인다**(.cost-filters-end). 그전에는 상태 칩 뒤에
+                  바로 서서 오른쪽에만 큰 빈 자리가 남았다. 이제 좌우 여백이 카드 안쪽 여백으로 같다.
+                ★ [조건 지우기]보다 **뒤**에 둔다 — 앞에 두면 그 버튼이 나타날 때 추가 버튼 오른쪽에 끼어든다. */}
+            <button type="button" className="mini confirm-btn cost-filters-end" onClick={openAdd} disabled={busy === "add"}>
+              + 사용자 추가
+            </button>
           </div>
 
           <div className="cost-summary">

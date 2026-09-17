@@ -958,6 +958,9 @@ a.side-item { text-decoration: none; }
   margin-bottom: 16px;
 }
 .cost-filters label { display: block; }
+/* 줄의 **오른쪽 끝**에 붙는 버튼(사용자 관리의 [+ 사용자 추가]) — 남는 가로를 왼쪽에 몰아 받아서
+   오른쪽 여백이 카드 안쪽 여백과 같아진다(왼쪽 끝과 같은 간격). 줄이 접히면 새 줄의 오른쪽 끝에 선다. */
+.cost-filters .cost-filters-end { margin-left: auto; }
 .cost-filters small { color: var(--ink-soft); font-size: 12px; display: block; margin-bottom: 6px; }
 /* 날짜·검색 칸 — 옆의 종류 세그먼트(.seg)와 같은 키·같은 테두리다.
    ★★ 2026-09-14 — `var(--ctl-h)` 였는데 그 토큰은 **자막 조절판(.sub-editor) 안에서만** 정의된다.
