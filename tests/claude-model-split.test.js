@@ -78,9 +78,15 @@ describe("Claude 모델 나누기", () => {
     }
   });
 
-  it("★★ 시나리오 세 자리는 모델을 넘기지 않는다 — Fable 5 그대로다", () => {
-    for (const f of ["lib/ad/scenario.js", "lib/reel/scenario.js", "lib/film/scenario.js"]) {
-      expect(readFileSync(f, "utf8"), `${f} 가 모델을 바꿨다`).not.toMatch(/model:\s*(TEXT_MODEL|OPUS|"claude-opus)/);
+  // ★ 2026-09-17 저녁 — 시나리오도 **수정일 때만** Opus 5 로 간다(tests/scenario-revise.test.js 가 동작을 잰다).
+  //   여기서는 "새로 쓰기에는 모델을 안 넘긴다"만 본다 — 넘기는 자리는 revising 갈래 하나여야 한다.
+  it("★★ 시나리오는 **수정 갈래에서만** 모델을 넘긴다 — 새로 쓰기는 Fable 5 그대로다", () => {
+    for (const f of ["lib/ad/scenario.js", "lib/reel/scenario.js"]) {
+      const src = readFileSync(f, "utf8");
+      const passes = [...src.matchAll(/model:\s*(TEXT_MODEL|OPUS_MODEL)/g)];
+      expect(passes.length, `${f} 가 모델을 넘기는 자리가 하나가 아니다`).toBe(1);
+      expect(src, `${f} 가 수정 갈래 밖에서 모델을 넘긴다`).toMatch(/\.\.\.\(revising \? \{ model: (TEXT_MODEL|OPUS_MODEL) \} : \{\}\)/);
     }
+    expect(readFileSync("lib/film/scenario.js", "utf8"), "film 이 모델을 바꿨다").not.toMatch(/model:\s*(TEXT_MODEL|OPUS|"claude-opus)/);
   });
 });
