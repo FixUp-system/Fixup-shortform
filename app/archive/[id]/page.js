@@ -142,6 +142,18 @@ function ArchiveDetailPageBody() {
   const [err, setErr] = useState("");
   // 완성본 파일의 실제 크기 — 불러온 뒤에 안다(아래 previewRatio). ★ 훅이라 아래 조기 return 들보다 앞에 둔다.
   const [media, setMedia] = useState({ src: null, width: 0, height: 0 });
+  // ★★ 2026-09-18 사장님 요청 — **이전 판**(다시 만들기 전 완성본). 목록의 진실은 저장소 한 곳이라
+  //   문서가 아니라 라우트에 묻는다(app/api/projects/[id]/renders).
+  //   ★ 실패는 조용히 넘긴다 — 판이 없거나 못 읽어도 이 화면의 본래 일(완성본 보기)은 그대로다.
+  const [versions, setVersions] = useState([]);
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/projects/${id}/renders`)
+      .then((r) => (r.ok ? r.json() : { versions: [] }))
+      .then((d) => { if (alive) setVersions(d.versions || []); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [id]);
 
   useEffect(() => {
     let alive = true;
@@ -378,6 +390,27 @@ function ArchiveDetailPageBody() {
           </div>
         </div>
 
+        {/* ★★ 이전 판 — 다시 만들기 전 완성본이다(2026-09-18 사장님 요청: "이전 영상도 보고 저장할 수
+            있었으면 좋겠다"). 완성본 이름은 프로젝트마다 하나라 다시 구우면 덮어써졌는데, 이제 굽기
+            직전에 판으로 남긴다(lib/compose.js 의 archiveCurrentRender).
+            ★ 판이 없으면 줄 자체를 안 그린다 — 대부분의 편은 한 번만 굽는다.
+            ★ 새 CSS 를 안 만든다 — 이 화면이 이미 쓰는 .mini·.pgsub 을 그대로 입는다. */}
+        {versions.length > 0 && (
+          <div className="arch-versions">
+            <p className="pgsub">이전 판 {versions.length}개 — 다시 만들기 전 영상이에요.</p>
+            <ul className="arch-version-list">
+              {versions.map((v) => (
+                <li key={v.url}>
+                  <span className="mono">{whenLabel(v.ts)}</span>
+                  {/* 보기는 새 탭이다 — 이 화면의 완성본 재생기를 갈아 끼우면 "지금 판"이 무엇인지 흐려진다. */}
+                  <a className="mini" href={v.url} target="_blank" rel="noreferrer">보기</a>
+                  <a className="mini" href={`${v.url}?dl=1`} download>내려받기</a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <div className="step-actions">
           <Link href={backTo} className="mini">보관함으로</Link>
           <div className="fwd">
@@ -403,6 +436,15 @@ function ArchiveDetailPageBody() {
 }
 
 // ★ useSearchParams 는 Suspense 경계 안에서만 쓸 수 있다(Next App Router).
+// 판이 만들어진 시각 — **사장님 시계**로 적는다(toISOString 은 UTC 라 오전에 만든 것이 하루 전으로 보인다).
+// ★ 하이드레이션이 어긋나지 않게 자리 수를 직접 맞춘다 — toLocaleString 은 서버·브라우저 로케일이
+//   갈릴 수 있다(lib/pricing.js 가 같은 이유로 정규식을 쓴다).
+function whenLabel(ts) {
+  const d = new Date(Number(ts) || 0);
+  const p2 = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+}
+
 export default function ArchiveDetailPage() {
   return (
     <Suspense fallback={null}>

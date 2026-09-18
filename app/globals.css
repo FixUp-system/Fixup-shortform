@@ -3879,3 +3879,10 @@ main.work:has(.rw-grid) { max-width: 1600px; }
 /* ── 작업 화면 배치 끝 ──────────────────────────────────────────────────
    ★ 이 표식도 **판의 경계**다 — tests/reel-workbench-layout.test.js 가 여기까지만
      잘라서 hex·액센트를 잰다. 새 규칙은 이 표식 **위**에 넣어라. */
+
+/* ── 보관함 상세의 **이전 판** 목록 (2026-09-18 사장님 요청) ─────────────────
+   다시 만들기 전 완성본이다. 줄마다 만든 시각과 [보기]·[내려받기] 뿐이라 장치를 새로
+   만들지 않는다 — 글자는 .pgsub·.mono, 버튼은 .mini 그대로다. 여기서 정하는 것은 **자리**뿐이다. */
+.arch-versions { margin-top: var(--sp-4); }
+.arch-version-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+.arch-version-list li { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }

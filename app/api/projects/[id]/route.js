@@ -9,6 +9,7 @@ import { isAspect } from "../../../../lib/aspects";
 import { isSpeed } from "../../../../lib/speeds";
 import { MOTION_AXES } from "../../../../lib/motion.js";
 import { ownedPhotoKeys } from "../../../../lib/refs-io.js";
+import { parseVersionName } from "../../../../lib/render-versions.js";
 import { withUser } from "../../../../lib/auth/require-user.js";
 import { getStore } from "../../../../lib/store/index.js";
 import { alreadyChargedVideo } from "../../../../lib/charges.js";
@@ -436,7 +437,13 @@ export const DELETE = withUser(async (_req, { params }, user) => {
     const base = filmVideoBase(id, m.id);
     return [`${base}.mp4`, `${base}-raw.mp4`];
   });
-  for (const key of [`${id}.mp4`, `${id}-raw.mp4`, ...filmKeys]) {
+  // ★ 2026-09-18 — **이전 판도 함께 지운다**(`<id>-v<시각>.mp4`). 안 지우면 지운 프로젝트의
+  //   영상이 저장소에 영영 남는다(문서가 없어져 목록에도 안 잡힌다). 목록은 저장소에 묻는다 —
+  //   판의 진실이 거기 하나라서다(app/api/projects/[id]/renders 와 같은 판단).
+  const versionKeys = (await getStore().listObjects("renders", `${id}-v`).catch(() => []))
+    .map((o) => o.name)
+    .filter((name) => parseVersionName(name)?.projectId === id);
+  for (const key of [`${id}.mp4`, `${id}-raw.mp4`, ...filmKeys, ...versionKeys]) {
     await getStore().deleteObject("renders", key).catch((e) => {
       console.error("완성본 삭제 실패:", key, e?.message);
     });

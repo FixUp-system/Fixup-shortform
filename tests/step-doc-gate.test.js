@@ -284,6 +284,10 @@ describe("★ 단계별 라우트는 전부 공용 판정을 쓴다", () => {
     "app/api/projects/route.js → GET", // 목록 — 문서 하나를 안 읽는다
     "app/api/projects/route.js → POST", // 새로 만들기 — 아직 문서가 없다
     "app/api/projects/[id]/route.js → DELETE", // 보관함 지우기(위 주석)
+    // ★ 이전 판 목록도 **일부러** 뺀다(2026-09-18). 보관함 상세는 종류를 가리지 않고 한 화면인데
+    //   (단계별·원클릭·film 이 모두 이 화면으로 열린다), 여기에 판정을 걸면 원클릭·film 의 판이
+    //   영영 안 보인다. 지우기와 같은 판단이다 — 소유자 검사는 getProject 가 그대로 한다.
+    "app/api/projects/[id]/renders/route.js → GET",
   ]);
 
   it("라우트 파일을 실제로 훑었다 — 목록이 비면 이 테스트는 아무것도 안 지킨다", () => {

@@ -20,9 +20,13 @@ const SIGNED_URL_SECONDS = 60 * 30;
 // **m[1](프로젝트 id)** 하나로 한다 — 광고 이름(`<id>.mp4`·`<id>-raw.mp4`)은 그대로 통과한다.
 // ★ 방식 목록은 lib/film/mode.js 의 표에서 읽는다. 여기에 손으로 "order|refs" 를 적으면
 //   표와 갈리고, 그러면 새 방식의 영상이 저장은 되는데 열리지 않는다.
+// ★ `-v<시각>` 갈래도 받는다(2026-09-18 사장님 요청) — 다시 구울 때 덮어쓰기 직전의 완성본을
+//   판으로 남긴다(lib/compose.js 의 archiveCurrentRender · 이름 규칙은 lib/render-versions.js).
+//   이 갈래가 없으면 판이 저장은 되는데 **열 수도 내려받을 수도 없다.**
+//   소유자 검사는 여전히 **m[1](프로젝트 id)** 하나다 — 판도 같은 문을 지난다.
 const MODES = FILM_MODES.map((m) => m.id).join("|");
 const RENDER_MP4 = new RegExp(
-  `^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(-(?:${MODES}))?(-raw)?\\.mp4$`
+  `^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(-(?:${MODES}))?(-raw|-v\\d+)?\\.mp4$`
 );
 
 export const GET = withUser(async (req, { params }, user) => {
