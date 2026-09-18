@@ -28,10 +28,15 @@ const MODES = FILM_MODES.map((m) => m.id).join("|");
 const RENDER_MP4 = new RegExp(
   `^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(-(?:${MODES}))?(-raw|-v\\d+)?\\.mp4$`
 );
+// ★ **표지 한 장**(`<id>-thumb.jpg`)도 같은 문으로 나간다(2026-09-18 사장님 요청).
+//   보관함 카드가 그림이 없을 때 이 주소를 지어 본다(lib/render-thumb.js) — 문이 안 열리면
+//   원클릭 카드는 계속 빈 칸이다. 소유자 검사는 그대로 **프로젝트 id** 하나로 한다.
+const RENDER_THUMB = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-thumb\.jpg$/;
 
 export const GET = withUser(async (req, { params }, user) => {
   const { name } = await params;
-  const m = RENDER_MP4.exec(name);
+  // 표지는 묶음이 하나뿐이라(방식·원본 갈래가 없다) 모양을 맞춰 아래 판정을 그대로 쓴다.
+  const m = RENDER_MP4.exec(name) || RENDER_THUMB.exec(name);
   if (!m) return new Response("잘못된 파일명", { status: 400 });
 
   // ★ 소유자가 아니어도 재생된다(보관함 전체 공유) — 내부 팀이라 서로의 결과물을 본다.

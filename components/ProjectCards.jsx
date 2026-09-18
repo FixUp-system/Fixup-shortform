@@ -4,6 +4,7 @@ import { useState } from "react";
 // ★ 순수 모듈이라 화면이 읽어도 된다 — 실제로 줄이는 lib/thumbs.js(sharp)는 서버 전용이다.
 //   여기서 그쪽을 import 하면 클라이언트 번들에 sharp 가 실려 빌드가 깨진다.
 import { thumbUrl } from "../lib/thumb-url.js";
+import { renderThumbUrl } from "../lib/render-thumb.js";
 import Link from "next/link";
 import { useDialog } from "./DialogProvider";
 import Icon from "./Icon";
@@ -61,7 +62,7 @@ const FILM_STATUS_LABEL = {
 // ★ 그림이 없는 카드가 실측 **25/46** 이다(광고·필름은 cuts[0].image 가 없다).
 //   빈 칸으로 두면 고장으로 보이므로 그 자리는 말로 채운다 — 아래 참고.
 //   근본 해결은 **굽는 김에 표지 그림을 함께 만드는 것**이다(별도 작업).
-function Thumb({ video, image, alt }) {
+function Thumb({ video, image, alt, id }) {
   // ★ 그림이 **안 올 수 있다**(2026-09-07 실측). 새 프로젝트로 이사한 뒤 파일이 아직
   //   옛 프로젝트에 있어 업로드 사진이 전부 404 였다. 그대로 두면 브라우저가
   //   ⚠️ 이 주석에 별표를 슬래시 뒤에 쓰지 마라 — 화면 계약을 재는 판의 주석 제거기가
@@ -70,6 +71,8 @@ function Thumb({ video, image, alt }) {
   //   **깨진 아이콘**을 그린다 — 전에는 <video> 라 검은 칸이어서 덜 흉했다.
   //   못 받으면 말로 바꿔 준다. 고장을 더 흉하게 보이게 하는 것은 우리 책임이다.
   const [broken, setBroken] = useState(false);
+  // 표지(완성본 첫 화면)를 못 받았는가 — 옛 편에는 그 파일이 없다.
+  const [thumbBroken, setThumbBroken] = useState(false);
 
   // 그림이 있으면 그림 하나가 전부다. loading="lazy" 라 화면 밖 카드는 받지도 않는다.
   //
@@ -86,8 +89,22 @@ function Thumb({ video, image, alt }) {
       />
     );
   }
-  // ★ 영상은 있는데 표지 그림이 없는 자리 — 실측 46편 중 **25편**이 여기로 온다.
-  //   빈 칸으로 두면 고장 난 것처럼 보이므로, 없는 것과 안 보이는 것을 갈라 말해 준다.
+  // ★★ 2026-09-18 — 영상은 있는데 그림이 없는 자리(원클릭·film 전부가 여기였다). 이제 굽는 김에
+  //   **완성본의 첫 화면**을 한 장 남기므로(lib/render-thumb.js) 그 주소를 지어 본다.
+  //   ★ 문서에 주소를 안 적는다 — 진실은 저장소 하나다. 파일이 없으면 <img> 가 실패하고,
+  //     그때 아래 글자로 떨어진다(옛 편은 그대로 글자가 보인다).
+  if (video && id && !thumbBroken) {
+    return (
+      <img
+        className="thumb-media"
+        src={renderThumbUrl(id)}
+        alt={alt}
+        loading="lazy"
+        onError={() => setThumbBroken(true)}
+      />
+    );
+  }
+  // ★ 표지도 없는 옛 편 — 빈 칸으로 두면 고장 난 것처럼 보이므로 말로 채운다.
   if (video) return <span className="thumb-empty">영상이 있어요 — 눌러서 보기</span>;
   // ★ 문구를 가른다 — "아직 안 만들었다"와 "만들었는데 못 받았다"는 다른 상태다.
   //   사장님이 그 둘을 구분해야 무엇을 할지 안다(만들기 vs 파일 복구).
@@ -202,7 +219,7 @@ export default function ProjectCards({ projects, limit, onDeleted, selecting, se
               onClick={selecting ? (e) => { e.preventDefault(); onToggleSelect?.(p.id); } : undefined}
             >
               <span className="project-thumb">
-                <Thumb video={p.video_url} image={p.image_url} alt={p.title || "만든 영상"} />
+                <Thumb video={p.video_url} image={p.image_url} id={p.id} alt={p.title || "만든 영상"} />
                 {/* ★★★ 2026-09-15 사장님 결정 — **카드는 썸네일만 남긴다.** 붙어 있던 넷을 성격대로 흩었다
                     (lib/archive/spec.js 의 머리 주석):
                     · 「영상」 태그 — "완성"과 같은 말이라 걷었다
