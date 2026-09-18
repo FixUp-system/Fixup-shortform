@@ -49,7 +49,11 @@
 >   ⚠️ 그래도 **푸시는 배포가 아니다**(git 트리거 빌드는 0ms 에서 멎는다) — 배포는 CLI 로 따로 한다.
 >   그리고 **다음 작업을 브랜치에서 배포하는 순간 `main` 과 라이브가 다시 갈린다**
 >   (09-16 에 옛 `main` 을 배포해 64파일을 날렸다가 되돌렸다 · `OUTSTANDING.md` 맨 위 참고).
->   `feat/credit-unit`(크레딧 새 단위·보관함 닫기)은 **아직 어느 배포에도 안 들어갔다.**
+>   ⚠️ **정정(09-18)**: 이 자리에 *"`feat/credit-unit`(크레딧 새 단위·보관함 닫기)은 아직 어느 배포에도
+>   안 들어갔다"* 고 적혀 있었는데 **사실이 아니다.** 그 갈래는 `781bf25`(09-15 00:46, `feat/credit-codes`
+>   를 `main` 으로)로 들어왔고, 팁 `11878a2` 는 라이브 `b4c7bef` 의 **조상이다**
+>   (`git merge-base --is-ancestor feat/credit-unit b4c7bef` → 참). 09-14 뒤로 그 갈래의 코드 커밋은 0이고
+>   문서 커밋만 남아 있다. **즉 크레딧 새 단위는 이미 라이브다.**
 > · **왜 그렇게 했나(회차 서사)** → `C:\Users\fixup\obsidian_jaechan\sources\` 의
 >   `shotform-mcs-login-legal-and-poll-narrowing-2026-09-11.md`(가장 최신 · MCS 맞추기·법률 문서·폴링 좁히기·얼굴 격자)
 >   ← `shotform-webhook-collect-and-function-storage-2026-09-10.md`(수거·웹훅·함수 저장량)

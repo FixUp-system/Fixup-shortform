@@ -1,5 +1,27 @@
 # 이어서 할 일 — `main` = `merge/subtitle-on-reel` (2026-09-16 · 자막 시각 재설계 + UI 여덟 건)
 
+> 📍 **2026-09-18 세션 시작 실측** (세어서 적었다 · 코드 변경 0 · 아래 셋은 문서와 실제가 어긋났던 자리다)
+> · 브랜치 `merge/subtitle-on-reel` = `main` · HEAD **`e939de4`**(09-17 12:00) · 미커밋 **0**
+> · 푸시: **`fixup` 은 최신**(배포와 관련된 원격) · `origin` 은 **14커밋 뒤**(`08beabb`, 배포와 무관)
+> · 테스트 **6,657 그린** · 10 skipped · 파일 416/418 · `npx vitest run` 종료코드 **0**
+>   (문서에 적혀 있던 6,585 는 09-16 값이었다)
+> · 🔴 **`main` 에 안 나간 코드 커밋 셋이 있다** — 라이브는 여전히 `b4c7bef`(09-17 2차 배포)인데
+>   그 뒤로 `7861687`·`5e9f540`·`e939de4`(운영자 화면 **좁히기 줄** 정렬 셋)이 쌓였다.
+>   `b4c7bef..main` = 4커밋이고 그 중 `docs:` 아닌 줄이 **3**이다 → **배포하면 나갈 것이 있다.**
+> · ✅ 정정: `feat/credit-unit`(크레딧 새 단위)은 **이미 라이브다** — `781bf25`(09-15)로 들어와
+>   팁 `11878a2` 가 `b4c7bef` 의 조상이다. `CLAUDE.md` 의 "어느 배포에도 안 들어갔다"를 같이 고쳤다.
+> · 🪤 **밟은 함정 — 문서 한 줄 고쳤는데 커밋이 1,111줄이었다.** `step-gate` 워크트리에서 `CLAUDE.md` 를
+>   고치자 **파일 전체가 CRLF 로 다시 쓰였다**(그 폴더의 `README.md` 도 CRLF다 · 커밋본은 LF).
+>   `git status` 는 깨끗했고 `grep -c $'\r'` 도 **0을 돌려줘 못 잡았다** — 잡은 것은
+>   `git diff --stat`(1111줄) 과 `tail -c 4 … | xxd`(끝이 `0d0a`)다.
+>   처방: `tr -d '\r' < 파일 > 파일` 후 `--amend`. **문서 커밋도 `--stat` 을 보고 나서 끝낸다.**
+> · ⚠️ **이 문단을 담은 커밋 자체가 `main` ref 보다 앞선다** — `merge/subtitle-on-reel` 만 움직였고
+>   `main` 은 아직 `e939de4` 다(브랜치 ref 이동은 승인이 필요해 못 했다).
+>   맞추려면 `git branch -f main merge/subtitle-on-reel` (fast-forward · 문서 커밋 하나뿐).
+> · ⚠️ 워크트리 `step-gate`(`feat/reel-cut-r2v`)는 **다 병합됐고 46커밋 뒤다** — 거기 `CLAUDE.md` 가
+>   "credit-unit 이 최신"이라고 잘못 가리키고 있어 그 자리에 되돌림 안내를 박았다.
+>   이어서 할 세션은 `C:\Users\fixup\shotform-saas\.claude\worktrees\merge-subtitle` 에서 연다.
+
 > ✅ **09-17 오전(2차) 프로덕션 배포** — `…-qsdcir6wr-fix-up1`(코드 **`b4c7bef`**). 사장님 주소가 이 판을
 > 가리키는 것 확인 · `/login`·`/home`·`/legal/terms` 200 · `/admin` 손님 → 로그인으로 307 · `POST /api/admin/users` 비로그인 401.
 > 이번 판에 들어간 것:
