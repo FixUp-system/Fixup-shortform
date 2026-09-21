@@ -1,6 +1,15 @@
 # 🧭 지금 상태 — 2026-09-21 인계 (여기부터 읽어라)
 
-> **열 폴더**: `C:\Users\fixup\shotform-saas\.claude\worktrees\merge-subtitle`
+> **열 폴더(09-21 바뀜)**: 이제 **`C:\Users\fixup\shotform-saas` 가 `main` 이다**(7월 브랜치
+> `feature/synopsis-redefinition` 에서 옮겼다 — 남아 있던 7월 미커밋 수정은 폐기된 대본 흐름이라 버렸고, 패치는
+> 세션 scratchpad `july-uncommitted-2026-09-21.patch` 에 보관했다 · 옛 `.env.local` 은 `.env.local.bak-july-20260921`).
+> 워크트리 `.claude\worktrees\merge-subtitle` 도 그대로 있고 같은 커밋이다. 둘 중 어디서 열어도 된다. ⚠️ 두 가지가 바뀌었다:
+> · **워크트리에서 `git branch -f main HEAD` 가 이제 실패한다**(main 이 이 폴더에 체크아웃돼 있다).
+>   워크트리에서 main 을 당기려면 `git -C C:/Users/fixup/shotform-saas merge --ff-only merge/subtitle-on-reel`.
+> · **이 폴더에서 `npx vitest run` 을 그냥 돌리면 `.claude/worktrees/**` 의 다른 워크트리 테스트까지 주워 담아 수백 개가 빨개진다.**
+>   이 폴더 테스트만: `npx vitest run --dir ./tests`(09-21 실측 6,679 그린). 워크트리 안에서는 그냥 돌려도 된다.
+>
+> **워크트리 경로(예전 열 폴더)**: `C:\Users\fixup\shotform-saas\.claude\worktrees\merge-subtitle`
 > · 브랜치 `merge/subtitle-on-reel` · HEAD **`63e0590`**(09-18) · 미커밋 **0** · `fixup` 미푸시 **0**
 > · **`main` = HEAD**(`fixup/main` 과 0/0). ⚠️ `origin/main`(거울)은 **19 커밋 뒤**(`08beabb`, 09-16) —
 >   자격 증명 입력이 필요해 09-16 뒤로 안 밀었다. 배포와는 무관하다(Vercel 은 `fixup` 만 본다).
