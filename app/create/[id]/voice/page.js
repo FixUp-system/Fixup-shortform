@@ -14,7 +14,7 @@ import BackButton from "../../../../components/BackButton";
 import { VOICES } from "../../../../lib/voices";
 import { isAudioStale, isReachable } from "../../../../lib/steps";
 // 상한과 정가는 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다).
-import { MAX_REGEN_PER_CUT, priceLabel, regenPrice, videoPrice, formatCredits } from "../../../../lib/pricing";
+import { MAX_REGEN_PER_CUT, priceLabel, regenPrice, videoPrice, formatCredits, regenCountText } from "../../../../lib/pricing";
 import { modelIdForProject, projectSpeaks, resolutionForProject } from "../../../../lib/clip-limits";
 // 폴링과 판정은 화면이 다시 적지 않는다 — 복붙본이 조금씩 갈려 ④이미지가 images_error 를
 // 영영 못 보던 버그가 났다(2026-08-14). 한 벌에서 온다.
@@ -307,7 +307,7 @@ export default function VoiceStepPage() {
                         ★ 아래 값에 모델을 안 넘긴다 — 목소리 재생성 값은 영상 모델과 무관하다
                         (REGEN_PRICE.voice 는 표가 아니라 숫자 하나다). 클립만 모델을 탄다 */}
                     <span className="badge ai">
-                      다시 읽음 {c.voice_regen_count || 0}/{MAX_REGEN_PER_CUT}
+                      다시 읽음 {regenCountText(c.voice_regen_count)}
                     </span>
                     <button
                       className="mini"

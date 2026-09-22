@@ -93,14 +93,16 @@ describe("낡은 클립을 다시 만들면 값을 받는다", () => {
     expect(await getStore().sumCharges(A) - before).toBe(REGEN_PRICE.clip["seedance-2.0"]["480p"]);
   });
 
-  it("상한을 넘기지 못한다 — 컷별과 같은 3회다", async () => {
+  // ★★ 2026-09-22 — 상한이 없어졌다(유료 재생성 무제한). 3회를 넘긴 컷도 값을 받고 돈다.
+  it("3회를 넘긴 낡은 클립도 값을 받고 다시 만든다", async () => {
     await grant(5000);
-    const p = await projectWithStaleClip(MAX_REGEN_PER_CUT);
+    const p = await projectWithStaleClip(3);
     await chargeVideo({ userId: A, projectId: p.id, seconds: 30, model: "kling-v3" });
+    const before = await getStore().sumCharges(A);
 
     const res = await POST(req(), ctx(p.id));
-    expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/3회/);
+    expect(res.status).not.toBe(400);
+    expect(await getStore().sumCharges(A) - before).toBe(REGEN_PRICE.clip["kling-v3"]["720p"]);
   });
 
   it("크레딧이 모자라면 만들지 않는다", async () => {

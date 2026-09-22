@@ -441,13 +441,12 @@ describe("분할 → 이미지 (이어 부르면 갈라지기 전과 같다)", (
     });
   });
 
-  it("regenCut은 3회 제한", async () => {
+  // ★★ 2026-09-22 — 유료 재생성 무제한(lib/pricing.js 의 MAX_REGEN_PER_CUT). 넷째도 돈다.
+  it("regenCut 은 3회를 넘겨도 돈다 — 회차 값은 라우트가 받는다", async () => {
     const p = await makeProject();
     await runBoth(p.id,deps());
-    await pipeline.regenCut(p.id, OWNER, 0, deps());
-    await pipeline.regenCut(p.id, OWNER, 0, deps());
-    await pipeline.regenCut(p.id, OWNER, 0, deps());
-    await expect(pipeline.regenCut(p.id, OWNER, 0, deps())).rejects.toThrow(/3회/);
+    for (let i = 0; i < 4; i++) await pipeline.regenCut(p.id, OWNER, 0, deps());
+    expect((await projects.getProject(p.id, OWNER)).cuts[0].regen_count).toBe(4);
   });
 
   // ★★ 2026-08-18 사장님 지시로 뜻이 바뀌었다. 옛 계약은 "지시를 컷에 저장하고 **꼬리에
@@ -1565,16 +1564,16 @@ describe("재생성 상한 판정이 낙관적 락 재시도를 견딘다", () =
     expect((await projects.getProject(p.id, OWNER)).cuts[0].regen_count).toBe(1);
   });
 
-  it("진짜로 상한에 닿았으면 CAS 에 져도 여전히 던진다", async () => {
+  // ★★ 2026-09-22 — 상한이 없어졌다. CAS 에 져도 회차가 한 번만 오르는지만 본다.
+  it("3회를 넘긴 컷도 CAS 에 지고 나서 회차가 한 번만 오른다", async () => {
     const p = await projectWithCut({ voice_regen_count: 3 });
     const spy = loseFirstCas();
     try {
-      await expect(
-        pipeline.regenVoice(p.id, OWNER, 0, { speak: async () => ({ url: "x", seconds: 1 }) })
-      ).rejects.toThrow(/3회/);
+      await pipeline.regenVoice(p.id, OWNER, 0, { speak: async () => ({ url: "x", seconds: 1 }) });
     } finally {
       spy.mockRestore();
     }
+    expect((await projects.getProject(p.id, OWNER)).cuts[0].voice_regen_count).toBe(4);
   });
 });
 

@@ -195,7 +195,7 @@ export default function ReelImagesPage() {
       {drawingNow
         ? "그리는 중…"
         : hasImages
-          ? `다시 만들기 · ${showCredits && regenTotal > 0 ? priceLabel(regenTotal) : "무료"} (${triesLeft}회 남음)`
+          ? `다시 만들기 · ${showCredits && regenTotal > 0 ? priceLabel(regenTotal) : "무료"}${Number.isFinite(triesLeft) ? ` (${triesLeft}회 남음)` : ""}`
           : firstCharge && showCredits && listPrice > 0
             ? `그림 만들기 · ${priceLabel(listPrice)}`
             : "그림 만들기"}

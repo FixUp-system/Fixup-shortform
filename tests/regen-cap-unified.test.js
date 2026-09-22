@@ -50,13 +50,16 @@ const charges = async (kind) => (await getStore().listCharges(U)).filter((c) => 
 const strip = (t) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 const src = (p) => strip(readFileSync(p, "utf8"));
 
-describe("상한이 하나다 — 3회", () => {
-  it("★★★ 컷·시나리오·스토리보드 상한이 같은 수(3)다", () => {
-    expect(MAX_REGEN_PER_CUT).toBe(3);
-    expect(MAX_SCENARIO_REWRITES).toBe(MAX_REGEN_PER_CUT);
+// ★★★ 2026-09-22 뒤집힘 — **유료 재생성은 무제한**(사장님: "재생성하면 크레딧을 또 받으면 된다").
+//   3회에 걸려 "다시 만들기"가 진행되지 않았다. 값을 받는 자리는 횟수로 막지 않고,
+//   **값을 안 받는** 시나리오 다시 쓰기만 3회로 남긴다(tests/regen-unlimited.test.js).
+describe("상한 — 유료는 무제한, 시나리오는 3회", () => {
+  it("★★★ 유료 재생성은 무제한이고 시나리오 다시 쓰기는 3회다", () => {
+    expect(MAX_REGEN_PER_CUT).toBe(Infinity);
+    expect(MAX_REEL_IMAGE_TRIES).toBe(Infinity);
+    expect(MAX_SCENARIO_REWRITES).toBe(3);
     // tries 는 첫 생성부터 센다 — 그래서 상한은 "1 + 다시 쓰기 3회"다.
     expect(MAX_SCENARIO_TRIES).toBe(1 + MAX_SCENARIO_REWRITES);
-    expect(MAX_REEL_IMAGE_TRIES).toBe(1 + MAX_REGEN_PER_CUT);
   });
 
   it("★★ 스토리보드 한 장의 재생성 단가가 있다 — 원가($0.401)를 밑돌지 않는다", () => {
@@ -138,12 +141,13 @@ describe("reel 컷 다시 굽기", () => {
     expect(doc.cuts[0].clip_regen_count).toBe(2);
   });
 
-  it("★★★ 3회를 다 썼으면 돈이 있어도 400 — 청구 앞에서 막는다", async () => {
-    const id = await makeReel({ cuts: [CUT(0, true)], regenCount: MAX_REGEN_PER_CUT });
+  it("★★★ 3회를 넘겨도 막지 않는다 — 대신 값을 받는다(2026-09-22)", async () => {
+    const id = await makeReel({ cuts: [CUT(0, true)], regenCount: 5 });
     const res = await CLIPS(req(), ctx(id));
-    expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/3회/);
-    expect(await charges("regen_clip")).toHaveLength(0);
+    expect(res.status, JSON.stringify(await res.clone().json())).toBe(200);
+    expect(await charges("regen_clip")).toHaveLength(1);
+    const doc = await runWithActor(U, () => getProject(id, U));
+    expect(doc.cuts[0].clip_regen_count).toBe(6);
   });
 
   it("★★ 잔액이 모자라면 402 — 회차도 안 오른다", async () => {
@@ -188,18 +192,19 @@ describe("광고 다시 굽기 상한", () => {
     await grant(10_000);
   });
 
-  it("★★★ 다시 굽기 3회를 채웠으면 400", async () => {
-    const id = await makeAd(MAX_REGEN_PER_CUT);
-    const res = await AD_RENDER(post(), ctx(id));
-    expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/3회/);
-  });
-
-  it("★★ 2회까지 썼으면 시작되고 회차가 3이 된다", async () => {
-    const id = await makeAd(MAX_REGEN_PER_CUT - 1);
+  it("★★★ 다시 굽기 3회를 채웠어도 시작된다 — 정가를 매번 받으므로 막지 않는다(2026-09-22)", async () => {
+    const id = await makeAd(3);
     const res = await AD_RENDER(post(), ctx(id));
     expect(res.status, JSON.stringify(await res.clone().json())).toBe(202);
     const doc = await runWithActor(U, () => getProject(id, U));
-    expect(doc.ad_bake_count).toBe(MAX_REGEN_PER_CUT);
+    expect(doc.ad_bake_count).toBe(4);
+  });
+
+  it("★★ 회차는 계속 센다", async () => {
+    const id = await makeAd(9);
+    const res = await AD_RENDER(post(), ctx(id));
+    expect(res.status).toBe(202);
+    const doc = await runWithActor(U, () => getProject(id, U));
+    expect(doc.ad_bake_count).toBe(10);
   });
 });

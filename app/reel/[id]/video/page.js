@@ -347,7 +347,9 @@ export default function ReelVideoPage() {
                   {/* ★ 2026-09-14 — "다시 만듦 1/3" 대신 남은 횟수로 말한다(③이미지와 같은 말투). */}
                   {(c.clip_regen_count || 0) >= MAX_REGEN_PER_CUT
                     ? "다시 만들기 끝"
-                    : `다시 만들기 ${MAX_REGEN_PER_CUT - (c.clip_regen_count || 0)}회 남음`}
+                    : Number.isFinite(MAX_REGEN_PER_CUT)
+                      ? `다시 만들기 ${MAX_REGEN_PER_CUT - (c.clip_regen_count || 0)}회 남음`
+                      : `다시 만듦 ${c.clip_regen_count || 0}회`}
                 </span>
               )}
             </div>

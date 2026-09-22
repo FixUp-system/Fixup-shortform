@@ -19,7 +19,7 @@ import { buildClipPrompt, promptBodyOf } from "../../../../lib/cuts";
 // 비율은 lib 한 곳에서 온다 — 화면이 표를 또 만들면 언젠가 갈린다(④이미지가 그랬다)
 import { aspectFor } from "../../../../lib/aspects";
 // 상한과 값은 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다).
-import { MAX_REGEN_PER_CUT, priceLabel, regenPrice } from "../../../../lib/pricing";
+import { MAX_REGEN_PER_CUT, priceLabel, regenPrice, regenCountText } from "../../../../lib/pricing";
 // 폴링 루프·진행 판정·오류 필드 표는 전부 lib 한 벌이다. 화면마다 복붙해 두었더니
 // 조금씩 다르게 틀렸다(④이미지가 images_error 를 영영 못 보던 버그가 그것이다).
 import { startPolling } from "../../../../lib/poll";
@@ -330,7 +330,7 @@ export default function VideoStepPage() {
                   {(c.video || c.video_error) && (
                     <>
                       <span className="badge ai">
-                        다시 만듦 {c.clip_regen_count || 0}/{MAX_REGEN_PER_CUT}
+                        다시 만듦 {regenCountText(c.clip_regen_count)}
                       </span>
                     </>
                   )}

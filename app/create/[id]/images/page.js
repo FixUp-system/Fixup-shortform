@@ -16,7 +16,7 @@ import { isImageStale, isReachable } from "../../../../lib/steps";
 //   이 사슬에는 `fs` 가 없다(tests/prompt-editing-ui.test.js 가 그 그물을 친다).
 import { buildImagePrompt, promptBodyOf } from "../../../../lib/cuts";
 // 상한과 값은 가격표 한 곳에서 온다(import 0 개의 순수 모듈이라 화면에서 안전하다).
-import { MAX_REGEN_PER_CUT, priceLabel, regenPrice, videoPrice, formatCredits } from "../../../../lib/pricing";
+import { MAX_REGEN_PER_CUT, priceLabel, regenPrice, videoPrice, formatCredits, regenCountText } from "../../../../lib/pricing";
 import { modelIdForProject, resolutionForProject } from "../../../../lib/clip-limits";
 // 폴링 한 벌·판정 한 벌·오류 필드 표 한 벌. 화면은 그리기만 한다 —
 // 같은 판정을 화면마다 손으로 적었을 때 조용히 갈렸고, 그 어긋남이 이 화면이
@@ -713,8 +713,8 @@ function PreviewPane({ cut, project, url, photoName, usage, aspect, stalled, onR
           </div>
           <span className="regen-note mono">
             {atLimit
-              ? `더는 다시 만들 수 없어요 (${MAX_REGEN_PER_CUT}/${MAX_REGEN_PER_CUT})`
-              : `다시 만듦 ${cut.regen_count}/${MAX_REGEN_PER_CUT}`}
+              ? `더는 다시 만들 수 없어요 (${regenCountText(cut.regen_count)})`
+              : `다시 만듦 ${regenCountText(cut.regen_count)}`}
           </span>
 
           {/* 접어 둔다 — 주경로는 위 "고치고 싶은 점" 칸이다. 이 자리는 직접 지시를 쓰는

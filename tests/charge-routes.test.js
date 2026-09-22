@@ -316,14 +316,13 @@ describe("재생성 청구 — 컷당 첫 회는 공짜", () => {
       expect(pipelineMock.regen).not.toHaveBeenCalled();
     });
 
-    // 상한이 청구 뒤에 있으면 4회째가 **값을 받고 나서** 400 이 된다 — 내고 아무것도 못 받는다.
-    it(`${name} 재생성 — 상한(3회)에 닿으면 청구 없이 400 이다`, async () => {
-      const { p, base } = await paidCuts(5000, { [field]: MAX_REGEN_PER_CUT });
+    // ★★ 2026-09-22 — 상한이 없어졌다(유료 재생성 무제한). 3회를 넘겨도 **값을 받고** 돈다.
+    it(`${name} 재생성 — 3회를 넘겨도 막지 않고 회차 값을 받는다`, async () => {
+      const { p, base } = await paidCuts(5000, { [field]: 3 });
       const res = await route(post(), idxCtx(p.id, 0));
-      expect(res.status).toBe(400);
-      expect((await res.json()).error).toMatch(/3회까지/);
-      expect(await balanceFor(A)).toBe(base);
-      expect(pipelineMock.regen).not.toHaveBeenCalled();
+      expect(res.status).toBe(200);
+      expect(await balanceFor(A)).toBe(base - price);
+      expect(pipelineMock.regen).toHaveBeenCalled();
     });
 
     // 카운터는 시도 **전**에 오른다 — 되돌리지 않으면 재시도가 다음 회차 값을 또 낸다.
@@ -359,20 +358,17 @@ describe("재생성 청구 — 컷당 첫 회는 공짜", () => {
       expect(await balanceFor(A)).toBe(5000 - VIDEO_PRICE["kling-v3"]["720p"][30]);   // 첫 회는 여전히 공짜다
     });
 
-    // ★ 게이트를 블록 맨 앞에 두면 이 조합에서만 옛 결함이 되살아난다 —
-    // 정가를 받고 나서 상한으로 400. 드문 것과 없는 것은 다르다.
-    it(`${name} 재생성 — 환불된 프로젝트라도 상한에 닿았으면 청구 없이 400 이다`, async () => {
+    // ★★ 2026-09-22 — 상한이 없어져 "환불 + 상한" 조합의 400 은 사라졌다. 대신 환불된
+    //   프로젝트가 회차를 많이 썼어도 **정가와 회차 값을 둘 다** 받는지 본다(순지불 0 통로 방지).
+    it(`${name} 재생성 — 환불된 프로젝트가 회차를 많이 썼으면 정가와 회차 값을 둘 다 받는다`, async () => {
       await grant(5000);
-      const p = await withCuts(30, { [field]: MAX_REGEN_PER_CUT, image: { url: "i0" } });
+      const p = await withCuts(30, { [field]: 3, image: { url: "i0" } });
       await chargeVideo({ userId: A, projectId: p.id, seconds: 30 });
       await refundVideo({ userId: A, projectId: p.id });
       expect(await balanceFor(A)).toBe(5000);
 
-      const res = await route(post(), idxCtx(p.id, 0));
-      expect(res.status).toBe(400);
-      expect((await res.json()).error).toMatch(/3회까지/);
-      expect(await balanceFor(A)).toBe(5000);      // 정가도 회차 값도 안 나갔다
-      expect(pipelineMock.regen).not.toHaveBeenCalled();
+      expect((await route(post(), idxCtx(p.id, 0))).status).toBe(200);
+      expect(await balanceFor(A)).toBe(5000 - VIDEO_PRICE["kling-v3"]["720p"][30] - price);
     });
 
     it(`${name} 재생성 — 환불된 프로젝트인데 잔액이 없으면 402 다`, async () => {

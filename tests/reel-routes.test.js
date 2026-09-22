@@ -277,19 +277,14 @@ describe("N3 — 시나리오 재작성이 그림 회차를 리셋한다(재검�
 });
 
 describe("B2 — 그림 재작성이 총량 방어선을 우회하지 않는다(실행 가능한 단정)", () => {
-  it("판별 상한(imageTries)이 리셋돼도 수명 상한(imageTriesTotal)이 남아 있으면 막는다", () => {
-    // N3 처방대로 시나리오를 여러 번 재작성해 imageTries 는 매번 0으로 돌아온다고 해도,
-    // imageTriesTotal 은 절대 안 돌아온다 — 그 값이 수명 상한에 닿으면 판별 상한과
-    // 무관하게 못 그린다. 이게 "20판 재작성으로 $115" 를 막는 유일한 값이다.
-    const reel = { imageTries: 0, imageTriesTotal: MAX_REEL_IMAGE_TRIES_LIFETIME };
-    expect(imageTriesLeft(reel)).toBeGreaterThan(0); // 판별 상한은 방금 리셋돼 남아 있다
-    expect(imageTriesLeftLifetime(reel)).toBe(0); // 그래도 수명 상한이 막는다
-  });
-
-  it("정상 사용(재작성 없음)은 판별 상한이 그대로 막는다 — 수명 상한이 먼저 걸리지 않는다", () => {
-    const reel = { imageTries: MAX_REEL_IMAGE_TRIES, imageTriesTotal: 3 };
-    expect(imageTriesLeft(reel)).toBe(0);
+  // ★★★ 2026-09-22 — 두 상한 다 **무제한**이 됐다(다시 그리기는 첫 회 뒤로 값을 받는다).
+  //   "20판 재작성으로 $115" 는 무료 다시 그리기가 판마다 리셋되던 구멍이었는데, 이제
+  //   판마다 공짜는 첫 1회뿐이고 판(시나리오 다시 쓰기)은 3회로 묶여 있다.
+  it("많이 그린 판도 막지 않는다 — 판별·수명 둘 다", () => {
+    const reel = { imageTries: 40, imageTriesTotal: 400 };
+    expect(imageTriesLeft(reel)).toBeGreaterThan(0);
     expect(imageTriesLeftLifetime(reel)).toBeGreaterThan(0);
+    expect(MAX_REEL_IMAGE_TRIES).toBe(Infinity);
   });
 
   it("수명 상한은 판별 상한의 배수다 — 최악 비용이 옛 상한의 몇 배 안쪽으로 묶인다", () => {
