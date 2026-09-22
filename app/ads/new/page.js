@@ -38,7 +38,7 @@ import { useMe } from "../../../components/MeContext";
 // 등급이 고를 수 있는 모델 — 표와 판정은 lib/tiers.js 한 벌이다.
 import { modelsForTier } from "../../../lib/tiers";
 import { MAX_MATERIAL_TEXT } from "../../../lib/material";
-import { PHOTO_ROLES, visiblePhotoRoles, isPersonPhoto } from "../../../lib/photos";
+import { PHOTO_ROLES, visiblePhotoRoles, isPersonPhoto, PERSON_PHOTO_NOTE } from "../../../lib/photos";
 
 // 화풍 라벨은 styles.js 에 있지만, 고를 수 있는 것은 AD_STYLE_LINES 에 영상용 문구가 있는
 // id 뿐이어야 한다 — 둘이 어긋나면 화면에는 있는데 서버(normalizeAdOptions)가 400 을 낸다.
@@ -93,6 +93,8 @@ export default function AdNewPage() {
   //   (단계별 app/reel/new 와 같은 규율: 잠긴 버튼을 남기지 않고 숨긴다).
   //   ⚠️ 일단 **화면 숨김만**이다("일단 숨김처리" — 같은 날 지시). 서버 잠금은 아직 없다 —
   //   옛 문서나 API 직접 호출로는 여전히 인물 사진이 실려 나갈 수 있다.
+  //   ★★ 2026-09-03 뒤로는 **막는 모델이 없어** 프로에서도 ＋인물 이 보인다. 대신 프로는
+  //     서버가 인물 사진 얼굴에 격자를 씌워 보낸다(2026-09-22, lib/ad/pipeline.js 의 readRefs).
   const noFaces = blocksFacesForEndpoint(adEndpoint(model, "r2v"));
   const photoRoles = visiblePhotoRoles(noFaces);
   // 이미 올려 둔 인물 사진은 지우지 않는다 — 기본으로 되돌리면 그대로 살아나야 한다.
@@ -228,6 +230,9 @@ export default function AdNewPage() {
               {busy ? "만드는 중…" : uploading ? "사진 올리는 중…" : "시나리오 만들기 →"}
             </button>
           </div>
+          {/* ★ 2026-09-22 사장님 지시 — 올린 얼굴이 그대로 옮겨지지 않는다(프로는 격자를 씌워
+              보낸다, lib/ad/pipeline.js 의 readRefs). 문장은 lib/photos.js 하나다. */}
+          {photoRoles.some((r) => r.id === "person") && <p className="composer-note">{PERSON_PHOTO_NOTE}</p>}
         </div>
 
         {err && <p className="pgsub warn">{err}</p>}

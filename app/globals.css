@@ -2227,6 +2227,8 @@ textarea.field::selection, input.field::selection { background: var(--sel); colo
   padding-top: 12px;
 }
 .composer-bar .spacer { margin-left: auto; }
+/* ＋인물 아래 고지(2026-09-22) — 조작줄 바로 밑에 작게. 경고가 아니라 안내라 옅은 색이다 */
+.composer-note { margin: -4px 0 0; font-size: 12px; line-height: 1.5; color: var(--ink-soft); }
 .composer-bar .cta { margin-top: 0; height: var(--ctl-md); padding: 0 16px; font-size: 14px; }
 
 /* 조작 알약 — 지금 값을 라벨에 이고 있다. 눌러야 알 수 있는 자리를 만들지 않는다 */

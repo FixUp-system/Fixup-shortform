@@ -70,7 +70,7 @@ import { useMe } from "../../../components/MeContext";
 //     서버가 settings.resolution 을 읽어 한다. 문구만 뺀 것이지 값이 바뀐 것이 아니다.
 // 사진 상한 — 서버(app/api/reel/route.js)와 **같은 파일**에서 읽는다. 손으로 두 벌 적으면
 // 화면은 통과시키는데 서버가 400 을 내고, 사장님은 다 올린 뒤에야 거절당한다.
-import { MAX_PHOTOS, PHOTO_ROLES, visiblePhotoRoles, isPersonPhoto } from "../../../lib/photos";
+import { MAX_PHOTOS, PHOTO_ROLES, visiblePhotoRoles, isPersonPhoto, PERSON_PHOTO_NOTE } from "../../../lib/photos";
 import { MAX_MATERIAL_TEXT } from "../../../lib/material";
 
 // 화풍은 영상용 문구가 있는 것만 고를 수 있다 — 광고 화면(app/ads/new/page.js)·
@@ -441,6 +441,9 @@ export default function ReelNewPage() {
               {busy === "create" ? "만드는 중…" : uploading ? "사진 올리는 중…" : "시작하기 →"}
             </button>
           </div>
+          {/* ★ 2026-09-22 사장님 지시 — 올린 얼굴은 그림 모델이 판에 **새로 그린다**. 문장은
+              lib/photos.js 하나다(원클릭과 같은 말). */}
+          {photoRoles.some((r) => r.id === "person") && <p className="composer-note">{PERSON_PHOTO_NOTE}</p>}
           </div>
         </div>
       </div>
