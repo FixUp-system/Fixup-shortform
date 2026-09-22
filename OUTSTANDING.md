@@ -14,7 +14,10 @@
 > · **`main` = HEAD**(`fixup/main` 과 0/0). ⚠️ `origin/main`(거울)은 **19 커밋 뒤**(`08beabb`, 09-16) —
 >   자격 증명 입력이 필요해 09-16 뒤로 안 밀었다. 배포와는 무관하다(Vercel 은 `fixup` 만 본다).
 > · 테스트 **6,679 그린**(10 skipped) — 09-21 에 다시 돌려 확인.
-> · **라이브 = `ef2a417`**(09-18 2차 배포 `…-axx4vr9kl-fix-up1`). HEAD 와의 차이는 **문서 커밋 하나뿐**이다.
+> · **라이브 = `0e6d8c1`**(09-22 배포 `…-ptguhstun-fix-up1` · 사장님 주소 확인 · 라이브 CSS 에 `.composer-note`).
+>   원클릭 프로가 인물 사진 얼굴에 격자를 씌워 보낸다(336a7e28 초상 422 대응) + ＋인물 아래 "비슷한 인물" 고지.
+>   ⚠️ **2.5 실제 굽기로 통과하는지는 아직 안 쟀다.** 배포 폴더 `C:\Users\fixup\shotform-deploy-0922`.
+>   ⚠️ 워크트리 `merge/subtitle-on-reel` 은 이제 `main` 보다 뒤다 — 거기서 이어가려면 먼저 main 을 당겨라.
 > · 배포 절차(바뀐 것): `git archive` → `.vercel` 복사 → 직전 배포 폴더와 `diff -rq` →
 >   `npx vercel deploy --prod --yes --scope fix-up1` → **`npx vercel inspect https://fixup-shortform-service.vercel.app`
 >   로 사장님 주소가 새 판인지 확인**(09-16 롤백 고정 사고 뒤로 매번 본다).

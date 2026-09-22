@@ -43,8 +43,8 @@
 >   그 뒤 두 번의 배포가 `Ready` 인 채 라이브가 아니었다. **배포 뒤에는 반드시**
 >   `npx vercel promote <배포URL> --scope fix-up1` 까지 하고, 라이브 CSS 를 받아 새 선택자가
 >   나오는지로 확인한다. `vercel inspect` 의 Aliases 는 **팀 SSO 로 막힌 주소**라 증거가 못 된다.
->   ⚠️ **라이브 코드는 `ef2a417` 다**(09-18 2차 배포 `…-axx4vr9kl-fix-up1` · 사장님 주소 확인).
->   **`main` 을 거기로 당겨 놓았으니 지금은 `main` = `merge/subtitle-on-reel` = 라이브다.**
+>   ⚠️ **라이브 코드는 `0e6d8c1` 다**(09-22 배포 `…-ptguhstun-fix-up1` · 사장님 주소 확인).
+>   **09-21 부터 이 폴더가 `main` 이고 `main` = 라이브다.** 워크트리 `merge/subtitle-on-reel` 은 그보다 뒤다.
 >   워크트리 `C:\Users\fixup\shotform-saas\.claude\worktrees\merge-subtitle` 에서 세션을 열면 그대로 이어진다.
 >   ⚠️ 그래도 **푸시는 배포가 아니다**(git 트리거 빌드는 0ms 에서 멎는다) — 배포는 CLI 로 따로 한다.
 >   그리고 **다음 작업을 브랜치에서 배포하는 순간 `main` 과 라이브가 다시 갈린다**
