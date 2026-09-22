@@ -17,7 +17,7 @@ import { TARGET_CHOICES } from "../../../../lib/script";
 import { SUBTITLE_POSITIONS, normalizeSubtitle } from "../../../../lib/subtitles.js";
 import { isSubtitleLang } from "../../../../lib/subtitle-langs.js";
 // 컷별 덮어쓰기 상한. 숫자를 여기서 새로 만들지 않는다 — **원장이 프롬프트를 자르는 자리**를
-// 그대로 쓴다(lib/costs.js 의 LEDGER_PROMPT_MAX 주석에 왜 2000 인지가 있다).
+// 그대로 쓴다(lib/costs.js 의 LEDGER_PROMPT_MAX 주석에 왜 그 값인지가 있다).
 import { LEDGER_PROMPT_MAX } from "../../../../lib/costs.js";
 // 완성본 파일 이름 규칙 — **한 곳에서** 온다. film 은 방식이 이름에 들어가 한 프로젝트에
 // 파일이 넷이다(lib/film/mode.js). 순수 모듈이라 굽기 장치(ffmpeg·fal)가 딸려 오지 않는다.
@@ -230,7 +230,7 @@ export const PATCH = withUser(async (req, { params }, user) => {
   // ★ 값은 **원장이 프롬프트를 자르는 자리**(LEDGER_PROMPT_MAX)를 그대로 쓴다. 그 위로 쓰면
   //   원장에 안 남아 "무엇을 보냈는가"를 확인할 채널이 막힌다 — 그 주석이 계측기라고 부르는
   //   값이다. 본문이 프롬프트 맨 앞이라(promptBodyOf 의 불변) 상한을 본문에 걸면 원장 앞
-  //   2000자 안에 사장님이 쓴 글이 통째로 들어온다.
+  //   상한(4000자, 09-22 에 2000 에서 올렸다) 안에 사장님이 쓴 글이 통째로 들어온다.
   // ★ 자르지 않고 **400 으로 되돌린다** — 자르면 사장님이 쓴 글의 뒷부분이 조용히 사라진
   //   프롬프트로 값을 치른다(공통 지시와 같은 규칙이다).
   // ★ 저장 **전에** 막는다 — 뒤(updateProject 안)에서 던지면 같은 요청의 다른 값이 절반만
