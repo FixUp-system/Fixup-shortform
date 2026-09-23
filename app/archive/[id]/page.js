@@ -314,7 +314,8 @@ function ArchiveDetailPageBody() {
   };
 
   return (
-    <>
+    // ★ arch-page — 기둥을 단계별과 같게 넓히는 표식이다(app/globals.css 의 기둥 절).
+    <div className="arch-page">
       <h1 className="pgtitle">
         {isAd ? "원클릭 영상" : isFilm ? "한 번에 굽는 영상" : isReel ? "단계별 영상" : "영상 만들기 (단계별)"}
       </h1>
@@ -431,7 +432,7 @@ function ArchiveDetailPageBody() {
           </div>
         </div>
       </section>
-    </>
+    </div>
   );
 }
 

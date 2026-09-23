@@ -58,16 +58,19 @@ describe("보관함 상세 — 프롬프트 접힘 칸이 없다", () => {
   });
 });
 
+// ★★ 2026-09-23 뒤집힘 — 폭을 정하는 자리가 **기둥 하나**가 됐다(사장님 지시: 보관함을
+//   단계별과 같은 폭으로). 그전에는 `.panel--library` 가 자기 상한(1160)을 들고 있었고,
+//   그 값이 앱 공통 기둥과 같아 "카드가 정하는지 기둥이 정하는지"가 흐렸다.
+//   지금은 카드가 기둥을 꽉 채우고(width:100%), 폭은 main.work:has(.arch-page) 가 정한다
+//   (tests/archive-column-width.test.js).
 describe("보관함 상세 — 테두리를 넓힌다", () => {
-  it("★ 전용 폭을 쓴다 — panel--stage(960)를 늘리면 ⑥완성 무대까지 넓어진다", () => {
+  it("★ 전용 폭 클래스를 쓴다 — panel--stage(960)를 늘리면 ⑥완성 무대까지 넓어진다", () => {
     expect(src, "상세 전용 폭 클래스가 없다").toMatch(/panel--library/);
     const at = css.indexOf(".panel--library");
     expect(at, ".panel--library 규칙이 없다").toBeGreaterThan(-1);
     const rule = css.slice(at, css.indexOf("}", at));
-    const width = Number(/max-width:\s*(\d+)px/.exec(rule)?.[1]);
-    expect(width, "예전(960)보다 넓지 않다").toBeGreaterThan(960);
-    // 본문 기둥(1160)을 넘지 않는다 — 넘으면 가로 스크롤이 생긴다
-    expect(width).toBeLessThanOrEqual(1160);
+    expect(rule, "카드가 기둥을 꽉 채우지 않는다").toMatch(/width:\s*100%/);
+    expect(rule, "카드가 폭을 또 정하면 기둥과 갈린다").not.toMatch(/max-width/);
   });
 });
 

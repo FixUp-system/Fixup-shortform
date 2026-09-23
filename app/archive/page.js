@@ -255,7 +255,9 @@ function ArchiveBody() {
   }
 
   return (
-    <>
+    // ★ arch-page — 기둥을 단계별과 같게 넓히는 표식이다(app/globals.css 의 기둥 절).
+    //   이 클래스에는 생김새가 없다: 껍데기(main.work)가 `:has()` 로 집기만 한다.
+    <div className="arch-page">
       <div className="home-header">
         <h1 className="pgtitle">보관함</h1>
         {selecting ? (
@@ -422,7 +424,7 @@ function ArchiveBody() {
           </button>
         </div>
       )}
-    </>
+    </div>
   );
 }
 
