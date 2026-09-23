@@ -79,13 +79,15 @@ describe("무엇이라고 말해 주나 — attachedRoleLine", () => {
 describe("지시문 — 사진이 붙으면 그 줄이 실린다", () => {
   const grid = { rows: 1, cols: 3 };
 
-  it("★★★ 사진이 있으면 종류를 말한다", () => {
+  // ★★ 2026-09-22 — 종류만 말하던 문장이 **번호까지** 붙는 문장으로 바뀌었다
+  //   (tests/oneshot-photo-labels.test.js). 판이 1번, 사진이 2번부터다.
+  it("★★★ 사진이 있으면 번호와 종류를 말한다", () => {
     const p = buildOneShotPrompt(grid, 3, "body", { photos: [P({ role: "logo" })] });
-    expect(p).toMatch(/One of the attached images/);
+    expect(p).toMatch(/Attached image 2 is the brand logo/);
   });
 
   it("★★ 사진이 없으면 그 줄이 **통째로 없다** — 옛 문서는 글자 그대로 예전이다", () => {
-    expect(buildOneShotPrompt(grid, 3, "body", {})).not.toMatch(/One of the attached images/);
+    expect(buildOneShotPrompt(grid, 3, "body", {})).not.toMatch(/Attached image 2/);
   });
 
   // ★★★ 2026-09-04 사장님 지시 — **무엇이 정본인지 못 박는다.**
