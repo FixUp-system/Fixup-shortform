@@ -87,8 +87,8 @@ export default async function HomePage() {
         <div className="land-hero-haze" aria-hidden="true" />
         <div className="land-hero-copy">
           <p className="land-slate"><b>SHORTFORM</b><span /> 숏폼 영상 스튜디오</p>
-          <h1 className="display">간단한 입력이면<br />영상 한 편이 됩니다</h1>
-          <p className="land-lede">시나리오 · 화면 · 자막 · 목소리까지 한 번에. 원하는 규격으로 뽑아드립니다.</p>
+          <h1 className="display">몇 줄만 적으면<br />영상 한 편이 나옵니다</h1>
+          <p className="land-lede">장면도 자막도 목소리도 함께 나옵니다. 15초부터 60초까지, 올릴 곳에 맞는 크기로.</p>
         </div>
       </div>
 
@@ -105,12 +105,12 @@ export default async function HomePage() {
           가장 먼저 말한다(컷을 이어붙이면 원고와 글자 그대로 같다). */}
       <section className="land-tell">
         <div className="land-wrap land-say">
-          <p className="land-slate land-say-slate"><b>SC 01</b><span /> 무엇이 되는가</p>
-          <p className="land-statement">적어 주신 글이<br /><b>장면과 자막</b>이 됩니다.</p>
+          <p className="land-slate land-say-slate"><b>01</b><span /> 글이 영상이 되는 방식</p>
+          <p className="land-statement">적으신 글이 그대로<br /><b>장면과 자막</b>이 됩니다.</p>
           <div className="land-quote">
             <p className="land-qsrc">
-              가게 이야기를 적으면 그 글에서 장면을 뽑고, 자막은 <b>글자 그대로</b> 영상에 태웁니다.
-              위 갤러리의 자막은 전부 그렇게 들어간 것입니다.
+              가게 이야기를 적으면 그 글에서 장면이 나옵니다. 자막은 다시 쓰지 않습니다 —
+              <b>적으신 문장 그대로</b> 화면에 올라갑니다. 위 영상의 자막이 전부 그렇게 들어간 것입니다.
             </p>
             <p className="land-qout">
               예 — “어느 오후, 시간이 멈췄습니다.” · “빛이 먼저 들어와, 자리를 잡습니다.”
@@ -124,7 +124,7 @@ export default async function HomePage() {
         <div className="land-wrap">
           <div className="land-tellhead">
             <div>
-              <p className="land-slate"><b>SC 02</b><span /> 만드는 방법</p>
+              <p className="land-slate"><b>02</b><span /> 만드는 방법</p>
               <h2 className="land-h2">맡기거나, 보면서 고치거나</h2>
               <p className="land-lede">둘 다 같은 자료로 시작합니다. 중간을 손보고 싶은지 아닌지만 고르시면 됩니다.</p>
             </div>
@@ -134,22 +134,22 @@ export default async function HomePage() {
           </div>
           <div className="land-ways">
             <div className="land-way">
-              <h3 className="land-way-h">원클릭 영상</h3>
-              <p className="land-way-who">지금 올릴 한 편이 급할 때</p>
+              <h3 className="land-way-h">원클릭 — 맡기고 받기</h3>
+              <p className="land-way-who">오늘 올릴 한 편이 급할 때</p>
               <ul className="land-way-list">
-                <li>자료를 적고 버튼 한 번</li>
-                <li>시나리오 · 그림 · 영상 · 자막까지 알아서</li>
-                <li>다 되면 보관함에 저장</li>
+                <li>적고 버튼 한 번이면 끝</li>
+                <li>시나리오 · 그림 · 영상 · 자막이 이어서 나옵니다</li>
+                <li>다 되면 내 목록에 쌓입니다</li>
               </ul>
               <p className="land-way-foot">누르는 횟수 1번</p>
             </div>
             <div className="land-way">
-              <h3 className="land-way-h">단계별 영상</h3>
+              <h3 className="land-way-h">단계별 — 보면서 고치기</h3>
               <p className="land-way-who">문구와 장면을 내 손으로 잡고 싶을 때</p>
               <ul className="land-way-list">
                 <li>시나리오를 읽고 고친 뒤 다음으로</li>
                 <li>마음에 안 드는 장면만 다시 그리기</li>
-                <li>컷마다 첫 1회는 무료로 다시 만들기</li>
+                <li>장면마다 첫 번째 다시 만들기는 무료</li>
               </ul>
               <p className="land-way-foot">멈추는 자리 6곳</p>
             </div>
@@ -164,17 +164,17 @@ export default async function HomePage() {
         <div className="land-wrap">
           <div className="land-tellhead">
             <div>
-              <p className="land-slate"><b>SC 03</b><span /> 단계별로 만들면</p>
+              <p className="land-slate"><b>03</b><span /> 단계별로 만들면</p>
               <h2 className="land-h2">여섯 자리에서 멈춰 볼 수 있어요</h2>
-              <p className="land-lede">앞 단계를 고치면 뒤 단계가 낡았다고 알려 줍니다. 필요한 것만 다시 만들면 됩니다.</p>
+              <p className="land-lede">앞을 고치면 뒤가 바뀌어야 한다고 알려 줍니다. 바뀐 것만 다시 만들면 됩니다.</p>
             </div>
           </div>
           <ol className="land-six">
             <li><b>01</b><strong>입력</strong><span>가게 이야기와 사진</span></li>
             <li><b>02</b><strong>시나리오</strong><span>장면 · 대사 · 초</span></li>
-            <li><b>03</b><strong>이미지</strong><span>장면마다 한 장</span></li>
-            <li><b>04</b><strong>영상 프롬프트</strong><span>어떻게 움직일지</span></li>
-            <li><b>05</b><strong>영상</strong><span>컷을 굽습니다</span></li>
+            <li><b>03</b><strong>그림</strong><span>장면마다 한 장</span></li>
+            <li><b>04</b><strong>움직임</strong><span>무엇이 어떻게 움직일지</span></li>
+            <li><b>05</b><strong>영상</strong><span>장면이 움직입니다</span></li>
             <li><b>06</b><strong>완성</strong><span>자막 얹어 한 편으로</span></li>
           </ol>
         </div>
@@ -182,9 +182,9 @@ export default async function HomePage() {
 
       {/* 만든 영상 — 굽힌 표지에서 그린다(components/HomeMade.jsx). */}
       <div className="land-wrap land-made-head">
-        <p className="land-slate"><b>SC 04</b><span /> 만든 영상</p>
-        <h2 className="land-h2">shortform 으로 만들었습니다</h2>
-        <p className="land-lede">전부 실제로 이 서비스에서 나온 영상입니다.</p>
+        <p className="land-slate"><b>04</b><span /> 만든 영상</p>
+        <h2 className="land-h2">여기 있는 건 전부 이걸로 만들었습니다</h2>
+        <p className="land-lede">카페 · 미용실 · 건강식품 · 제품 광고 — 업종은 달라도 만든 방법은 같습니다.</p>
       </div>
       <HomeMade />
 
@@ -195,7 +195,7 @@ export default async function HomePage() {
         <div className="land-wrap">
           <div className="land-tellhead">
             <div>
-              <p className="land-slate"><b>SC 05</b><span /> 크레딧</p>
+              <p className="land-slate"><b>05</b><span /> 크레딧</p>
               <h2 className="land-h2">쓴 만큼만,<br />한 가지 단위로</h2>
               <p className="land-lede">영상도 다시 만들기도 전부 크레딧 하나로 셉니다. 월 구독이 아니라 필요할 때 채우는 방식입니다.</p>
             </div>
@@ -234,7 +234,7 @@ export default async function HomePage() {
       <section className="land-final">
         <div className="land-wrap">
           <h2 className="land-h2">오늘 올릴 한 편,<br />지금 만들어 보세요</h2>
-          <p className="land-lede">몇 줄만 적으면 됩니다. 나머지는 같이 만들어 갑니다.</p>
+          <p className="land-lede">준비할 자료는 없습니다. 가게 이야기 몇 줄이면 시작할 수 있어요.</p>
           <Link className="cta land-cta-big" href={signedIn ? "/ads/new" : "/login?next=/ads/new"}>
             {signedIn ? "만들러 가기" : "시작하기"}
           </Link>

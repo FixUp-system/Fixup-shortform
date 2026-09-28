@@ -3093,6 +3093,10 @@ a.um-credit:hover { color: var(--ink); background: var(--surface2); }
        탁하게 죽어서다. */
   background: var(--stage-dark);
   color: var(--stage-ink);
+  /* ★ 한국어 줄바꿈 — 기본값은 **낱말 가운데를 자른다**(CJK 는 어디서든 끊긴다).
+     실측으로 "15 / 초부터", "중간을 손 / 보고 싶은지"가 나왔다. keep-all 이 어절 단위로 끊는다.
+     ⚠️ 긴 영문 URL 이 들어오면 반대로 안 끊겨 넘칠 수 있다 — 랜딩에는 그런 글이 없어서 여기 건다. */
+  word-break: keep-all;
   /* ★ [맨 위로] 버튼을 화면 끝까지 빼내므로 가로로 삐져나갈 수 있다. `clip` 은
      `hidden` 과 달리 **스크롤 컨테이너를 만들지 않아** sticky 가 그대로 산다. */
   overflow-x: clip;
