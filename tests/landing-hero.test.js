@@ -8,6 +8,7 @@
 //   ⚠️ 되살리려거든 **뒤집힌 줄 알고** 되살려라 — 값은 git 이력에 있다.
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
+import { REEL_STEPS } from "../lib/reel/steps.js";
 
 const css = readFileSync("app/globals.css", "utf8");
 const page = readFileSync("app/home/page.js", "utf8");
@@ -103,9 +104,30 @@ describe("랜딩 — 첫 화면은 흩뿌린 콜라주다 (2026-09-28 전면 교
   });
 
   it("★★ 아래 절이 여섯이다 — 자막 · 두 갈래 · 여섯 자리 · 만든 영상 · 크레딧 · 마무리", () => {
-    for (const mark of ["land-say", "land-ways", "land-six", "HomeMade", "land-packs", "land-final"]) {
+    // ★ 2026-09-28 — 「여섯 자리」가 글자 목록(land-six)에서 **목업 작업 화면**(land-app)으로 바뀌었다.
+    for (const mark of ["land-say", "land-ways", "land-app", "HomeMade", "land-packs", "land-final"]) {
       expect(pageCode, `${mark} 절이 없다`).toContain(mark);
     }
+    expect(css, "옛 글자 목록 규칙이 남았다").not.toContain(".home .land-six");
+  });
+
+  it("★★★ 목업 작업 화면의 **탭 이름을 손으로 적지 않았다** — 앱과 두 벌이 되면 갈린다", () => {
+    // 실제로 갈려 있었다: 랜딩이 「그림 · 움직임」이라 적고 앱은 「이미지 생성 · 영상 프롬프트」였다.
+    expect(pageCode, "REEL_STEPS 를 안 읽는다").toMatch(/REEL_STEPS/);
+    expect(pageCode, "탭을 손으로 적었다").not.toContain("영상 프롬프트</strong>");
+    // 자리(CSS)와 표(REEL_STEPS)의 **개수가 같아야** 한다. 단계가 늘면 여기서 걸린다.
+    for (const key of REEL_STEPS.map((s) => s.key)) {
+      expect(css, `${key} 탭을 켜는 규칙이 없다`).toContain(`#ls-${key}:checked`);
+      expect(pageCode, `${key} 화면 칸이 없다`).toContain(`lp-${key}`);
+    }
+    const rules = [...css.matchAll(/#ls-([a-z]+):checked ~ \.land-app-screens/g)].map((m) => m[1]);
+    expect(rules.sort(), "CSS 의 화면 수가 REEL_STEPS 와 다르다")
+      .toEqual(REEL_STEPS.map((s) => s.key).sort());
+  });
+
+  it("★★ 탭 전환에 **자바스크립트를 안 쓴다** — 랜딩의 클라이언트 부품은 콜라주 하나뿐이다", () => {
+    expect(pageCode, "화면이 클라이언트가 됐다").not.toMatch(/"use client"/);
+    expect(pageCode, "라디오로 전환하지 않는다").toMatch(/type="radio"/);
   });
 
   it("★★ 껍데기의 닻이 **실제로 있는 자리**를 가리킨다 — 죽은 앵커는 아무 일도 안 한다", () => {

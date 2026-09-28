@@ -3435,12 +3435,104 @@ a.um-credit:hover { color: var(--ink); background: var(--surface2); }
 .home .land-way-list li::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--lime); margin-top: 8px; flex: none; }
 .home .land-way-foot { margin: auto 0 0; padding-top: 16px; border-top: 1px solid var(--stage-edge); font-size: 12px; color: var(--stage-chrome); }
 
-.home .land-six { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); border-top: 1px solid var(--stage-edge); }
-.home .land-six li { display: flex; flex-direction: column; gap: 8px; padding: 20px 16px 22px 0; border-right: 1px solid var(--stage-edge); }
-.home .land-six li:last-child { border-right: 0; }
-.home .land-six b { font-size: 12px; font-weight: 700; color: var(--lime); }
-.home .land-six strong { font-size: 16px; font-weight: 600; }
-.home .land-six span { font-size: 12px; color: var(--stage-chrome); }
+/* ── 03 절의 목업 작업 화면 (2026-09-28) ───────────────────────────────────
+   "여섯 자리에서 멈춘다"를 **말로 세지 않고 보여 준다.** 탭 이름은 화면이 REEL_STEPS 에서
+   읽어 그리므로 여기 CSS 는 **자리만** 잡는다(이름을 CSS 에 적지 마라 — 두 벌이 된다).
+   ★ 전환은 라디오 + :checked 다. 자바스크립트가 없다 —
+     라디오가 .land-app 의 **직계 자식**이고 탭 줄·화면이 그 **뒤 형제**라야 ~ 가 닿는다.
+     순서를 바꾸면 조용히 안 먹는다. */
+.home .land-app {
+  border: 1px solid var(--stage-edge); border-radius: var(--r-card);
+  background: var(--stage-raise); overflow: hidden;
+}
+/* 라디오는 보이지 않지만 **초점은 받는다**(키보드로 탭을 넘길 수 있어야 한다).
+   display:none 으로 지우면 초점이 사라진다. */
+.home .land-app-pick {
+  position: absolute; width: 1px; height: 1px; margin: -1px;
+  padding: 0; border: 0; overflow: hidden; clip-path: inset(50%);
+}
+.home .land-app-tabs {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 12px; border-bottom: 1px solid var(--stage-edge);
+}
+.home .land-app-tab {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 13px; border-radius: var(--r-pill); cursor: pointer;
+  font-size: 12px; color: var(--stage-chrome); background: var(--stage-raise);
+  transition: color .18s ease, background .18s ease;
+}
+.home .land-app-tab b { font-weight: 700; }
+.home .land-app-tab:hover { color: var(--stage-ink); }
+.home .land-app-pick:focus-visible + .land-app-tabs { outline: 2px solid var(--lime); outline-offset: 2px; }
+
+/* 화면 — 한 번에 하나만 보인다. 기본은 전부 숨기고 :checked 가 하나를 켠다. */
+/* ★ min-height 가 있어야 탭을 옮길 때 **높이가 안 튄다** — 칸마다 내용 길이가 달라
+   없으면 누를 때마다 아래 절이 위아래로 흔들린다(실측). */
+.home .land-app-screen {
+  display: none; grid-template-columns: 200px minmax(0, 1fr); gap: 1px;
+  background: var(--stage-edge); min-height: 312px;
+}
+.home .land-app-screen .land-app-rail,
+.home .land-app-screen .land-app-main { background: var(--stage-dark); padding: 18px; }
+.home .land-app-main--wide { grid-column: 1 / -1; }
+.home .land-app-rail--out { display: flex; flex-direction: column; gap: 12px; align-items: center; }
+
+.home .land-app-lbl { margin: 0 0 12px; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--stage-chrome); }
+.home .land-app-row { display: flex; justify-content: space-between; gap: 10px; margin: 0 0 9px; font-size: 12px; color: var(--stage-chrome); }
+.home .land-app-row b { font-weight: 600; color: var(--stage-ink); }
+.home .land-app-text { margin: 0 0 14px; font-size: 14px; line-height: 1.7; color: var(--stage-ink); }
+.home .land-app-line {
+  display: flex; align-items: center; gap: 10px; margin: 0 0 8px;
+  padding: 9px 12px; border-radius: var(--r-ctl); background: var(--stage-raise);
+  font-size: 14px; color: var(--stage-ink);
+}
+.home .land-app-line b { font-size: 12px; font-weight: 700; color: var(--lime); }
+.home .land-app-line span { margin-left: auto; font-size: 12px; color: var(--stage-chrome); }
+.home .land-app-line--on { box-shadow: inset 0 0 0 1px var(--lime); }
+.home .land-app-ask {
+  display: flex; align-items: center; gap: 10px; margin: 14px 0 0;
+  padding: 10px 12px; border-radius: var(--r-ctl); border: 1px solid var(--stage-edge);
+}
+.home .land-app-ask span { font-size: 14px; color: var(--stage-chrome); }
+.home .land-app-ask em {
+  margin-left: auto; font-style: normal; white-space: nowrap;
+  padding: 6px 12px; border-radius: var(--r-pill);
+  font-size: 12px; color: var(--lime-ink); background: var(--lime);
+}
+.home .land-app-note { margin: 14px 0 0; font-size: 12px; line-height: 1.7; color: var(--stage-chrome); }
+.home .land-app-note b { color: var(--lime); font-weight: 600; }
+.home .land-app-go { margin: 16px 0 0; font-size: 12px; color: var(--lime); }
+.home .land-app-thumbs { display: flex; gap: 8px; }
+.home .land-app-thumbs i { width: 46px; height: 46px; border-radius: var(--r-ctl); background: var(--stage-raise); }
+/* ⚠️ 9:16 칸을 폭으로 늘리면 **판이 괴물처럼 커진다**(4열 × 1250px 폭 → 한 칸이 516px 높이).
+   스토리보드는 손톱만 하면 되니 칸의 폭을 못 박는다. */
+.home .land-app-board { display: grid; grid-template-columns: repeat(4, 84px); gap: 8px; }
+.home .land-app-board img {
+  width: 100%; aspect-ratio: 9 / 16; object-fit: cover; object-position: 50% 38%;
+  border-radius: var(--r-ctl); background: var(--stage-raise); display: block;
+}
+.home .land-app-vid {
+  width: 84px; aspect-ratio: 9 / 16; object-fit: cover; display: block;
+  border-radius: var(--r-ctl); background: var(--stage-raise);
+}
+
+.home #ls-material:checked ~ .land-app-tabs [for="ls-material"] { color: var(--lime-ink); background: var(--lime); }
+.home #ls-scenario:checked ~ .land-app-tabs [for="ls-scenario"] { color: var(--lime-ink); background: var(--lime); }
+.home #ls-images:checked ~ .land-app-tabs [for="ls-images"] { color: var(--lime-ink); background: var(--lime); }
+.home #ls-prompts:checked ~ .land-app-tabs [for="ls-prompts"] { color: var(--lime-ink); background: var(--lime); }
+.home #ls-video:checked ~ .land-app-tabs [for="ls-video"] { color: var(--lime-ink); background: var(--lime); }
+.home #ls-done:checked ~ .land-app-tabs [for="ls-done"] { color: var(--lime-ink); background: var(--lime); }
+.home #ls-material:checked ~ .land-app-screens #lp-material { display: grid; }
+.home #ls-scenario:checked ~ .land-app-screens #lp-scenario { display: grid; }
+.home #ls-images:checked ~ .land-app-screens #lp-images { display: grid; }
+.home #ls-prompts:checked ~ .land-app-screens #lp-prompts { display: grid; }
+.home #ls-video:checked ~ .land-app-screens #lp-video { display: grid; }
+.home #ls-done:checked ~ .land-app-screens #lp-done { display: grid; }
+
+@media (max-width: 760px) {
+  .home .land-app-screen { grid-template-columns: minmax(0, 1fr); }
+  .home .land-app-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 
 .home .land-packs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-3); }
 .home .land-pack {
@@ -3459,12 +3551,9 @@ a.um-credit:hover { color: var(--ink); background: var(--surface2); }
 @media (max-width: 900px) {
   .home .land-say { grid-template-columns: minmax(0, 1fr); }
   .home .land-ways { grid-template-columns: minmax(0, 1fr); }
-  .home .land-six { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .home .land-six li { border-right: 0; }
   .home .land-packs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 560px) {
-  .home .land-six { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .home .land-packs { grid-template-columns: minmax(0, 1fr); }
 }
 

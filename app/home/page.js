@@ -37,6 +37,7 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { USER_HEADER } from "../../lib/auth/headers.js";
+import { REEL_STEPS } from "../../lib/reel/steps.js";
 import HomeCollage from "../../components/HomeCollage.jsx";
 import HomeMade from "../../components/HomeMade.jsx";
 import UserMenu from "../../components/UserMenu.jsx";
@@ -157,26 +158,142 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* SC 03 — 단계별로 멈추는 여섯 자리. 표는 lib/steps.js 의 STEPS 와 **같은 순서**다.
-          ⚠️ 그 표가 바뀌면 여기도 바꿔라(랜딩은 그 파일을 읽지 않는다 — 화면이 서버 전용
-            모듈을 끌어오면 빌드가 깨진 사고가 이 저장소에 세 번 있었다). */}
+      {/* 03 — 단계별로 멈추는 여섯 자리. **말로 세지 않고 화면을 보여 준다**
+          (2026-09-28 사장님 지시: "실제 우리 화면을 넣어주면 어때 … 예시로 한개 넣어둬서
+          사용자가 아 이런식으로 사용할 수 있는가를 알 수 있게").
+
+          ★★ **탭 이름은 `REEL_STEPS` 에서 읽는다.** 손으로 적으면 앱과 랜딩이 두 벌이 되어
+            갈린다 — 실제로 갈려 있었다(랜딩이 「그림 · 움직임」이라 적고 앱은 「이미지 생성 ·
+            영상 프롬프트」였다). 단계가 늘거나 이름이 바뀌면 이 절이 **저절로** 따라간다.
+          ★★ 화면은 **스크린샷이 아니라 목업**이다(사장님 결정). 스크린샷은 앱이 바뀌면
+            조용히 낡고, 실제 프로젝트 내용이 찍히고, 무겁다. 목업은 이 랜딩의 토큰으로
+            그려서 색이 바뀌어도 같이 따라온다.
+            ⚠️ 대신 **진짜와 어긋날 수 있다.** 그래서 안에 쓰는 말은 지어내지 않고
+              실제 화면에서 그대로 가져왔다(소재·조건 / 내레이션·이대로 고치기 /
+              다시 만들기·무료 / 영상 프롬프트 / 굽는 중 / 자막 반영하기).
+              화면을 크게 고치면 여기도 같이 본다.
+          ★ 탭 전환은 **자바스크립트를 안 쓴다** — 라디오와 `:checked` 로 한다.
+            랜딩에 클라이언트 부품을 또 늘리지 않으려는 것이다(콜라주 하나로 충분하다).
+          ★ 칸 안의 글·버튼은 **그림이다**(누르는 물건이 아니다). 진짜 입력은 [시작하기] 뒤에 있다. */}
       <section className="land-tell">
         <div className="land-wrap">
           <div className="land-tellhead">
             <div>
               <p className="land-slate"><b>03</b><span /> 단계별로 만들면</p>
               <h2 className="land-h2">여섯 자리에서 멈춰 볼 수 있어요</h2>
-              <p className="land-lede">앞을 고치면 뒤가 바뀌어야 한다고 알려 줍니다. 바뀐 것만 다시 만들면 됩니다.</p>
+              <p className="land-lede">위 탭을 눌러 보세요. 앞을 고치면 뒤가 바뀌어야 한다고 알려 주고, 바뀐 것만 다시 만들면 됩니다.</p>
             </div>
           </div>
-          <ol className="land-six">
-            <li><b>01</b><strong>입력</strong><span>가게 이야기와 사진</span></li>
-            <li><b>02</b><strong>시나리오</strong><span>장면 · 대사 · 초</span></li>
-            <li><b>03</b><strong>그림</strong><span>장면마다 한 장</span></li>
-            <li><b>04</b><strong>움직임</strong><span>무엇이 어떻게 움직일지</span></li>
-            <li><b>05</b><strong>영상</strong><span>장면이 움직입니다</span></li>
-            <li><b>06</b><strong>완성</strong><span>자막 얹어 한 편으로</span></li>
-          </ol>
+
+          <div className="land-app">
+            {REEL_STEPS.map((s, i) => (
+              <input
+                key={s.key}
+                className="land-app-pick"
+                type="radio"
+                name="land-step"
+                id={`ls-${s.key}`}
+                defaultChecked={i === 1}
+              />
+            ))}
+
+            <div className="land-app-tabs" role="tablist" aria-label="단계별 화면 미리보기">
+              {REEL_STEPS.map((s) => (
+                <label key={s.key} className="land-app-tab" htmlFor={`ls-${s.key}`}>
+                  <b>{s.no}</b>
+                  {s.label}
+                </label>
+              ))}
+            </div>
+
+            <div className="land-app-screens">
+              {/* 1 입력 — 왼쪽에 조건, 오른쪽에 소재 */}
+              <div className="land-app-screen" id="lp-material">
+                <div className="land-app-rail">
+                  <p className="land-app-lbl">조건</p>
+                  <p className="land-app-row"><span>길이</span><b>15초</b></p>
+                  <p className="land-app-row"><span>사이즈</span><b>세로 9:16</b></p>
+                  <p className="land-app-row"><span>화풍</span><b>실사</b></p>
+                  <p className="land-app-row"><span>언어</span><b>한국어</b></p>
+                </div>
+                <div className="land-app-main">
+                  <p className="land-app-lbl">소재</p>
+                  <p className="land-app-text">매일 아침 직접 내리는 핸드드립. 창가 자리에서 오후 햇빛이 길게 들어옵니다.</p>
+                  <div className="land-app-thumbs"><i /><i /><i /></div>
+                  <p className="land-app-go">시나리오로 →</p>
+                </div>
+              </div>
+
+              {/* 2 시나리오 — 사람이 멈추는 유일한 자리 */}
+              <div className="land-app-screen" id="lp-scenario">
+                <div className="land-app-main land-app-main--wide">
+                  <p className="land-app-lbl">내레이션</p>
+                  <p className="land-app-line"><b>01</b> 어느 오후, 시간이 멈췄습니다.<span>4초</span></p>
+                  <p className="land-app-line"><b>02</b> 빛이 먼저 들어와, 자리를 잡습니다.<span>5초</span></p>
+                  <p className="land-app-line"><b>03</b> 한 잔이 천천히 내려옵니다.<span>6초</span></p>
+                  <div className="land-app-ask">
+                    <span>두 번째 문장을 더 짧게</span>
+                    <em>이대로 고치기</em>
+                  </div>
+                  <p className="land-app-go">이미지 생성 →</p>
+                </div>
+              </div>
+
+              {/* 3 이미지 생성 — 스토리보드 */}
+              <div className="land-app-screen" id="lp-images">
+                <div className="land-app-main land-app-main--wide">
+                  <p className="land-app-lbl">스토리보드</p>
+                  <div className="land-app-board">
+                    {["v06", "v07", "v02", "v08"].map((f) => (
+                      <img key={f} src={`/reel/${f}.jpg`} alt="" loading="lazy" />
+                    ))}
+                  </div>
+                  <p className="land-app-note">마음에 안 드는 장면만 <b>다시 만들기</b> — 장면마다 첫 번째는 <b>무료</b></p>
+                  <p className="land-app-go">영상 프롬프트로 →</p>
+                </div>
+              </div>
+
+              {/* 4 영상 프롬프트 — 굽기 전, 여기서 고치면 0원 */}
+              <div className="land-app-screen" id="lp-prompts">
+                <div className="land-app-main land-app-main--wide">
+                  <p className="land-app-lbl">영상 프롬프트 · 장면 2</p>
+                  <p className="land-app-text">창가로 들어온 빛이 테이블을 천천히 가로지른다. 카메라는 거의 움직이지 않는다.</p>
+                  <div className="land-app-ask">
+                    <span>빛이 조금 더 천천히</span>
+                    <em>이대로 고치기</em>
+                  </div>
+                  <p className="land-app-note">여기서 고치면 <b>0원</b>입니다. 영상을 만든 뒤에 고치면 그 장면을 다시 사야 해요.</p>
+                  <p className="land-app-go">영상 만들기 →</p>
+                </div>
+              </div>
+
+              {/* 5 영상 — 장면마다 따로 만들어진다 */}
+              <div className="land-app-screen" id="lp-video">
+                <div className="land-app-main land-app-main--wide">
+                  <p className="land-app-lbl">영상</p>
+                  <p className="land-app-line"><b>01</b> 만들었어요<span>4초</span></p>
+                  <p className="land-app-line"><b>02</b> 만들었어요<span>5초</span></p>
+                  <p className="land-app-line land-app-line--on"><b>03</b> 만드는 중…<span>6초</span></p>
+                  <p className="land-app-note">한 장면이 잘못 나오면 <b>그 장면만</b> 다시 만듭니다.</p>
+                  <p className="land-app-go">완성으로 →</p>
+                </div>
+              </div>
+
+              {/* 6 완성 — 자막을 마지막으로 손본다 */}
+              <div className="land-app-screen" id="lp-done">
+                <div className="land-app-main">
+                  <p className="land-app-lbl">자막</p>
+                  <p className="land-app-text">영상이 말하는 문장을 그대로 적어 주세요.</p>
+                  <p className="land-app-line"><b>02</b> 빛이 먼저 들어와, 자리를 잡습니다.</p>
+                  <p className="land-app-note"><b>자막 반영하기</b> 를 눌러야 영상에 들어가요.</p>
+                </div>
+                <div className="land-app-rail land-app-rail--out">
+                  <img className="land-app-vid" src="/reel/v06.jpg" alt="" loading="lazy" />
+                  <p className="land-app-go">내려받기 · 보관함으로 →</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
