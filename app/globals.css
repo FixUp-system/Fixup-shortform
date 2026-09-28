@@ -3253,6 +3253,90 @@ a.um-credit:hover { color: var(--ink); background: var(--surface2); }
   margin: 0; font-size: 16px; line-height: 1.8; color: var(--ink-soft);
   max-width: 50ch; text-wrap: balance;
 }
+/* ── 첫 화면: 흩뿌린 콜라주 (2026-09-28) ─────────────────────────────────────
+   자리·크기는 레퍼런스(spragadheeshraj.com)를 **실측**해서 옮긴 것이다:
+     1440×900 에서 아홉 칸 · 크기와 가로세로비가 제각각 · 화면 가장자리 밖으로 잘려 나간다.
+     390×844 에서는 y·x 는 거의 그대로이고 **작은 칸의 폭만 두 배 넘게** 커졌다
+     (10.9%→24.9%, 11.9%→28.7%) — 폭을 그냥 비율로 줄이면 폰에서 실오라기처럼 가늘어진다.
+   ★★ 자리를 **CSS 가 들고 있는 이유**: 화면에서 인라인 스타일로 주면 아홉 자리가 인라인이 되어
+      인라인 스타일 상한(tests/design-system.test.js · 저장소 전체 10곳)을 혼자 다 먹는다.
+      ⚠️ 그 판은 **소스를 문자열로** 센다 — 여기에 그 문법을 그대로 적기만 해도 한 곳으로 세어진다
+      (실제로 이 주석에 적었다가 판이 빨개졌다).
+   ★ 어두운 면은 이제 **둘**이다(여기와 .land-two) — tests/landing-hero.test.js 가 그 둘을 못 박는다.
+   ★ 껍데기(.stage-nav)는 sticky 라 자리를 차지한다 — 이 절은 그 **아래**에서 시작하므로
+     밝은 띠와 어두운 첫 화면이 겹치지 않는다(따로 손댈 것이 없다). */
+.home .land-hero {
+  position: relative; height: 80svh; min-height: 560px; overflow: hidden;
+  background: var(--stage-dark);
+  display: grid; place-items: center;
+}
+.home .land-hero-field { position: absolute; inset: 0; }
+.home .land-plate {
+  position: absolute; left: var(--x); top: var(--y); width: var(--w); height: var(--h);
+  overflow: hidden;
+  transition: transform 620ms cubic-bezier(.16, .8, .24, 1);
+}
+.home .land-plate img {
+  display: block; width: 100%; height: 100%;
+  object-fit: cover; object-position: var(--pos, 50% 38%);
+}
+/* 올린 칸은 **맨 앞으로 나온다.** z-index 가 없으면 겹친 자리에서 DOM 순서대로만 쌓여
+   뒤에 그린 이웃이 위를 덮는다(목업에서 실제로 그랬다). 2 면 글자(3)보다는 아래다. */
+.home .land-plate:hover { transform: scale(1.035); z-index: 2; }
+
+/* 글자 뒤 그늘 — 표지가 밝은 편이 섞여 있어 그냥 얹으면 제목이 안 읽힌다.
+   그라디언트를 쓰지 않는다(판이 허락한 자리 목록에 없다) — 판 전체에 고르게 깐다. */
+.home .land-hero-haze { position: absolute; inset: 0; background: var(--stage-dark); opacity: .52; }
+
+.home .land-hero-copy {
+  position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center;
+  text-align: center; color: var(--stage-ink);
+  padding-inline: var(--stage-gap);
+}
+.home .land-hero-copy .display { margin-bottom: 14px; }
+.home .land-hero-copy .land-slate { color: var(--stage-chrome); }
+.home .land-hero-copy .land-slate span { background: var(--stage-glass); }
+.home .land-hero-copy .land-lede { color: var(--stage-chrome); }
+
+/* 아홉 칸 — 순서는 lib/landing.js 의 HERO_IDS 와 **같은 번호**다. --drift 는 스크롤 시차
+   배율(실측 1.24~2.07)을 "100svh 굴리는 동안 더 움직이는 거리(svh)"로 바꾼 값이다. */
+.home .land-plate:nth-child(1) { --x: -1vw;    --y: -5%; --w: 21.7vw; --h: 42%; --drift: 29; }
+.home .land-plate:nth-child(2) { --x: 36.6vw;  --y: -3%; --w: 16.8vw; --h: 38%; --drift: 58; }
+.home .land-plate:nth-child(3) { --x: 79.2vw;  --y: -2%; --w: 20.8vw; --h: 35%; --drift: 34; }
+.home .land-plate:nth-child(4) { --x: 3vw;     --y: 44%; --w: 10.9vw; --h: 24%; --drift: 92; }
+.home .land-plate:nth-child(5) { --x: 31.7vw;  --y: 56%; --w: 12.8vw; --h: 22%; --drift: 74; }
+.home .land-plate:nth-child(6) { --x: 79.2vw;  --y: 38%; --w: 11.9vw; --h: 20%; --drift: 86; }
+.home .land-plate:nth-child(7) { --x: -14.9vw; --y: 65%; --w: 39.6vw; --h: 40%; --drift: 39; --pos: 50% 62%; }
+.home .land-plate:nth-child(8) { --x: 42.6vw;  --y: 60%; --w: 15.8vw; --h: 50%; --drift: 49; }
+.home .land-plate:nth-child(9) { --x: 74.2vw;  --y: 52%; --w: 25.7vw; --h: 50%; --drift: 24; }
+
+/* 스크롤 시차 — **JS 없이** 한다. 랜딩은 서버 컴포넌트 한 벌이고(09-10 에 첫 방문 7.5→1.6초),
+   여기 한 자리 때문에 클라이언트 부품을 붙이지 않는다. 못 하는 브라우저에서는 그냥 안 움직인다. */
+@keyframes land-drift { to { translate: 0 calc(var(--drift) * -1svh); } }
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .home .land-plate {
+      animation: land-drift linear both;
+      animation-timeline: scroll();
+      animation-range: 0 100svh;
+    }
+  }
+}
+
+/* 좁은 화면 — 자리는 그대로 두고 **작은 칸만 키운다**(위 실측). */
+@media (max-width: 760px) {
+  .home .land-hero { height: 74svh; min-height: 480px; }
+  .home .land-plate:nth-child(1) { --x: -1vw;  --y: -5%; --w: 21vw; --h: 37%; }
+  .home .land-plate:nth-child(2) { --x: 24vw;  --y: 0;   --w: 34vw; --h: 20%; }
+  .home .land-plate:nth-child(3) { --x: 78vw;  --y: -2%; --w: 21vw; --h: 35%; }
+  .home .land-plate:nth-child(4) { --x: 3vw;   --y: 44%; --w: 25vw; --h: 24%; }
+  .home .land-plate:nth-child(5) { --x: 26vw;  --y: 58%; --w: 20vw; --h: 20%; }
+  .home .land-plate:nth-child(6) { --x: 65vw;  --y: 38%; --w: 29vw; --h: 20%; }
+  .home .land-plate:nth-child(7) { --x: -14vw; --y: 66%; --w: 38vw; --h: 30%; }
+  .home .land-plate:nth-child(8) { --x: 48vw;  --y: 62%; --w: 26vw; --h: 38%; }
+  .home .land-plate:nth-child(9) { --x: 76vw;  --y: 56%; --w: 30vw; --h: 34%; }
+}
+
 .home .land-h2 {
   margin: 0 0 16px; font-size: 30px; line-height: 1.24;
   letter-spacing: -0.015em; font-weight: 700; text-wrap: balance;

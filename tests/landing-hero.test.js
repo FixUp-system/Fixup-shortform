@@ -50,12 +50,39 @@ describe("랜딩 — 화면을 채우던 덮개는 걷었다 (2026-09-14)", () =
     }
   });
 
-  it("★★★ 랜딩이 **밝은 벌**이다 — 어두운 것은 두 갈래 절 하나뿐", () => {
+  it("★★★ 랜딩은 **밝은 벌**이고 어두운 면은 **딱 둘**이다 — 첫 화면과 두 갈래 절", () => {
     // 09-09 밤에 화면 전체를 검게 칠한 것은 덮개 때문이었고, 덮개가 사라지며 이유도 사라졌다.
+    // ★★ 2026-09-28 — 어두운 면이 **하나에서 둘로** 늘었다. 사장님이 고른 첫 화면 시안
+    //   (레퍼런스 spragadheeshraj.com 을 옮긴 흩뿌린 콜라주)이 검정 바탕이라서다.
+    //   늘린 것이지 **푼 것이 아니다** — 목록을 여기 못 박아 두는 이유는 그대로다:
+    //   "어두워도 되는 자리"가 열려 있으면 랜딩이 조금씩 도로 검어진다(09-09 밤이 그랬다).
+    //   ⚠️ 셋째를 더하고 싶으면 그 자리가 왜 필요한지 여기 적고 늘려라. 그냥 늘리지 마라.
+    //   ★ `.land-hero-haze`(글자 뒤 그늘)도 같은 토큰을 쓰지만 **면이 아니라 덧칠**이다 —
+    //     그래서 목록에 든다(같은 절 안이라 새로 어두워지는 자리가 아니다).
     expect(rule(".home"), "랜딩 뿌리가 바탕색을 안 쓴다").toMatch(/background:\s*var\(--bg\)/);
     const dark = [...css.matchAll(/(\.home [^{]*)\{[^}]*background:\s*var\(--stage-dark\)/g)]
       .map((m) => m[1].trim());
-    expect(dark, "어두운 면이 두 갈래 절 말고 또 있다(또는 하나도 없다)").toEqual([".home .land-two"]);
+    expect(dark, "어두운 면의 목록이 달라졌다").toEqual([
+      ".home .land-hero",
+      ".home .land-hero-haze",
+      ".home .land-two",
+    ]);
+  });
+
+  it("★★ 첫 화면 콜라주에 **영상 태그가 없다** — 2026-09-07 사고의 그 자리다", () => {
+    // 이 단정은 tests/home-sections-ui.test.js·showcase-static.test.js 와 겹친다. 일부러다 —
+    // 콜라주를 새로 넣으면서 "여기는 첫 화면이니까 한 편쯤"이 가장 나오기 쉬운 자리가 됐다.
+    expect(pageCode, "첫 화면에 영상 태그가 들어왔다").not.toMatch(/<video/);
+  });
+
+  it("★★ 콜라주의 아홉 칸이 **자리를 다 가지고 있다** — 빠지면 그 칸이 왼쪽 위에 겹쳐 선다", () => {
+    // 자리는 CSS 가 nth-child 로 들고 있고 편은 lib/landing.js 의 HERO_IDS 가 들고 있다.
+    // 둘의 **개수가 어긋나면** 자리 없는 칸이 left:auto 로 떨어져 한 구석에 포개진다.
+    for (let i = 1; i <= 9; i += 1) {
+      expect(css, `${i} 번 칸의 자리가 없다`).toContain(`.home .land-plate:nth-child(${i})`);
+    }
+    expect(css, "열째 칸 자리가 생겼다 — HERO_IDS 와 맞는지 보라")
+      .not.toContain(".home .land-plate:nth-child(10)");
   });
 });
 

@@ -38,7 +38,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { USER_HEADER } from "../../lib/auth/headers.js";
 import { SHOWCASE } from "../../lib/showcase.js";
-import { DIAGRAM_ID } from "../../lib/landing.js";
+import { DIAGRAM_ID, HERO_IDS } from "../../lib/landing.js";
 import HomeMade from "../../components/HomeMade.jsx";
 import UserMenu from "../../components/UserMenu.jsx";
 
@@ -47,6 +47,11 @@ import UserMenu from "../../components/UserMenu.jsx";
 //   나오면 도해가 거짓말을 한다(09-14 사장님 지적). 고르는 자리는 lib/landing.js 한 곳이고,
 //   벽은 같은 편을 빼고 그린다(components/HomeMade.jsx).
 const OUT = SHOWCASE.find((t) => t.id === DIAGRAM_ID) || SHOWCASE[0] || null;
+
+// 첫 화면의 콜라주 — 짝지은 아홉 편을 **적어 둔 순서대로** 세운다(순서 = CSS 의 칸 번호).
+// ★ 목록에서 사라진 id 는 조용히 빠진다 — 칸 하나가 비는 편이 화면이 죽는 것보다 낫다.
+//   그래서 아래 화면은 개수를 세지 않고 있는 것만 그린다.
+const HERO = HERO_IDS.map((id) => SHOWCASE.find((t) => t.id === id)).filter(Boolean);
 
 export default async function HomePage() {
   const signedIn = Boolean((await headers()).get(USER_HEADER));
@@ -79,13 +84,32 @@ export default async function HomePage() {
         </div>
       </div>
 
-      <div className="land-wrap">
-        {/* 머리글 — 09-14 에 돌아왔다(위 ①). 한 줄이 제품을 말하고, 아래 도해가 그것을 보인다. */}
-        <div className="land-head">
+      {/* 첫 화면 — **흩뿌린 콜라주 위에 머리글을 얹는다** (2026-09-28, 사장님이 고른 시안).
+          ★ 머리글은 09-14 의 그것을 **자리만 옮긴 것**이다(문구 그대로). 위 ① 은 그대로 유효하다 —
+            "무엇을 해 주는 곳인지 먼저 말해야 한다"가 첫 화면 한가운데에 선다.
+          ★★ **영상 태그는 여기에도 없다.** 칸은 전부 굽힌 표지(webp)다 — 2026-09-07 사고의 그 자리이고,
+            판 둘이 이 파일과 components/HomeMade.jsx 를 함께 잰다. 움직임은 CSS 스크롤 시차뿐이라
+            클라이언트 JS 도 안 붙는다(이 파일은 계속 서버 컴포넌트다).
+          ★ 칸은 **장식**이다(aria-hidden · alt 빈 문자열) — 읽히는 목록은 아래 벽 하나다.
+            누르는 곳도 아니다: 남의 영상 상세는 운영자만 열 수 있어 손님에게는 막다른 길이다
+            (components/HomeMade.jsx 가 같은 이유로 09-14 에 링크를 걷었다). */}
+      <div className="land-hero">
+        <div className="land-hero-field" aria-hidden="true">
+          {HERO.map((t) => (
+            <span key={t.file} className="land-plate">
+              <img src={`/showcase/${t.file}`} alt="" width={t.w} height={t.h} />
+            </span>
+          ))}
+        </div>
+        <div className="land-hero-haze" aria-hidden="true" />
+        <div className="land-hero-copy">
           <p className="land-slate"><b>SHORTFORM</b><span /> 숏폼 영상 스튜디오</p>
           <h1 className="display">간단한 입력이면<br />영상 한 편이 됩니다</h1>
           <p className="land-lede">시나리오 · 화면 · 자막 · 목소리까지 한 번에. 원하는 규격으로 뽑아드립니다.</p>
         </div>
+      </div>
+
+      <div className="land-wrap">
 
         {/* 걸음 띠 — **순서가 정보다.** 01·02·03 이 진짜 순서라서 번호를 단다
             (장식으로 번호를 다는 자리가 아니다). 가운데 걸음이 아래 도해의 주제와 같다. */}
