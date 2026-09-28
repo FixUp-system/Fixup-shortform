@@ -215,11 +215,15 @@ export default async function HomePage() {
                   <p className="land-app-row"><span>사이즈</span><b>세로 9:16</b></p>
                   <p className="land-app-row"><span>화풍</span><b>실사</b></p>
                   <p className="land-app-row"><span>언어</span><b>한국어</b></p>
+                  <p className="land-app-row"><span>컨셉</span><b>가게 소개</b></p>
+                  <p className="land-app-row"><span>분위기</span><b>차분하게</b></p>
                 </div>
                 <div className="land-app-main">
                   <p className="land-app-lbl">소재</p>
-                  <p className="land-app-text">매일 아침 직접 내리는 핸드드립. 창가 자리에서 오후 햇빛이 길게 들어옵니다.</p>
-                  <div className="land-app-thumbs"><i /><i /><i /></div>
+                  <p className="land-app-text">매일 아침 직접 내리는 핸드드립. 창가 자리에서 오후 햇빛이 길게 들어옵니다.
+                  주말에는 원두를 바꿔 내리고, 남은 자리는 두 곳뿐입니다.</p>
+                  <div className="land-app-thumbs"><i /><i /><i /><i /></div>
+                  <p className="land-app-note">사진은 없어도 됩니다 — 글만 있어도 장면을 만듭니다.</p>
                   <p className="land-app-go">시나리오로 →</p>
                 </div>
               </div>
@@ -231,6 +235,7 @@ export default async function HomePage() {
                   <p className="land-app-line"><b>01</b> 어느 오후, 시간이 멈췄습니다.<span>4초</span></p>
                   <p className="land-app-line"><b>02</b> 빛이 먼저 들어와, 자리를 잡습니다.<span>5초</span></p>
                   <p className="land-app-line"><b>03</b> 한 잔이 천천히 내려옵니다.<span>6초</span></p>
+                  <p className="land-app-line"><b>04</b> 오늘도 같은 자리에서 기다립니다.<span>5초</span></p>
                   <div className="land-app-ask">
                     <span>두 번째 문장을 더 짧게</span>
                     <em>이대로 고치기</em>
@@ -262,6 +267,8 @@ export default async function HomePage() {
                     <span>빛이 조금 더 천천히</span>
                     <em>이대로 고치기</em>
                   </div>
+                  <p className="land-app-lbl land-app-lbl--gap">영상 프롬프트 · 장면 3</p>
+                  <p className="land-app-text">잔 위로 김이 천천히 올라온다. 배경은 흐리게 두고 잔에 초점을 맞춘다.</p>
                   <p className="land-app-note">여기서 고치면 <b>0원</b>입니다. 영상을 만든 뒤에 고치면 그 장면을 다시 사야 해요.</p>
                   <p className="land-app-go">영상 만들기 →</p>
                 </div>
@@ -274,6 +281,8 @@ export default async function HomePage() {
                   <p className="land-app-line"><b>01</b> 만들었어요<span>4초</span></p>
                   <p className="land-app-line"><b>02</b> 만들었어요<span>5초</span></p>
                   <p className="land-app-line land-app-line--on"><b>03</b> 만드는 중…<span>6초</span></p>
+                  <p className="land-app-line"><b>04</b> 기다리는 중<span>5초</span></p>
+                  <p className="land-app-note">창을 닫아도 됩니다 — 다 되면 보관함에 들어가 있어요.</p>
                   <p className="land-app-note">한 장면이 잘못 나오면 <b>그 장면만</b> 다시 만듭니다.</p>
                   <p className="land-app-go">완성으로 →</p>
                 </div>
@@ -284,7 +293,9 @@ export default async function HomePage() {
                 <div className="land-app-main">
                   <p className="land-app-lbl">자막</p>
                   <p className="land-app-text">영상이 말하는 문장을 그대로 적어 주세요.</p>
+                  <p className="land-app-line"><b>01</b> 어느 오후, 시간이 멈췄습니다.</p>
                   <p className="land-app-line"><b>02</b> 빛이 먼저 들어와, 자리를 잡습니다.</p>
+                  <p className="land-app-line"><b>03</b> 한 잔이 천천히 내려옵니다.</p>
                   <p className="land-app-note"><b>자막 반영하기</b> 를 눌러야 영상에 들어가요.</p>
                 </div>
                 <div className="land-app-rail land-app-rail--out">
