@@ -50,23 +50,26 @@ describe("랜딩 — 화면을 채우던 덮개는 걷었다 (2026-09-14)", () =
     }
   });
 
-  it("★★★ 랜딩은 **밝은 벌**이고 어두운 면은 **첫 화면 하나뿐**이다(그 그늘까지 둘)", () => {
-    // 09-09 밤에 화면 전체를 검게 칠한 것은 덮개 때문이었고, 덮개가 사라지며 이유도 사라졌다.
-    // ★★ 2026-09-28 — 어두운 면이 **하나에서 둘로** 늘었다. 사장님이 고른 첫 화면 시안
-    //   (레퍼런스 spragadheeshraj.com 을 옮긴 흩뿌린 콜라주)이 검정 바탕이라서다.
-    //   ★ 09-28 전면 교체로 옛 두 갈래 절(.land-two)이 사라져, 어두운 자리는 첫 화면 하나다.
-    //   늘린 것이지 **푼 것이 아니다** — 목록을 여기 못 박아 두는 이유는 그대로다:
-    //   "어두워도 되는 자리"가 열려 있으면 랜딩이 조금씩 도로 검어진다(09-09 밤이 그랬다).
-    //   ⚠️ 셋째를 더하고 싶으면 그 자리가 왜 필요한지 여기 적고 늘려라. 그냥 늘리지 마라.
-    //   ★ `.land-hero-haze`(글자 뒤 그늘)도 같은 토큰을 쓰지만 **면이 아니라 덧칠**이다 —
-    //     그래서 목록에 든다(같은 절 안이라 새로 어두워지는 자리가 아니다).
-    expect(rule(".home"), "랜딩 뿌리가 바탕색을 안 쓴다").toMatch(/background:\s*var\(--bg\)/);
-    const dark = [...css.matchAll(/(\.home [^{]*)\{[^}]*background:\s*var\(--stage-dark\)/g)]
-      .map((m) => m[1].trim());
-    expect(dark, "어두운 면의 목록이 달라졌다").toEqual([
-      ".home .land-hero",
-      ".home .land-hero-haze",
-    ]);
+  it("★★★ 랜딩은 **어두운 벌**이다 — 색은 :root 의 무대 토큰과 --lime 만 쓴다", () => {
+    // 이력이 오간 자리라 적어 둔다: 09-09 밤 어두움 → 09-14 밝음(제품 도해를 놓으면서) →
+    // **09-28 어두움**(목업 전면 교체 · 사장님 "컬러도 반영해줘").
+    // 지금 어두운 이유는 **첫 화면이 검정 무대의 콜라주**라서다 — 그 아래만 밝으면
+    // 한 페이지에 두 벌이 얹힌 것처럼 읽힌다. 다시 밝게 되돌리려거든 첫 화면부터 바꿔라.
+    // ★ 이 판이 여전히 세는 것은 "밝다/어둡다"가 아니라 **색 벌을 새로 만들지 않았는가**다.
+    //   09-09 에 랜딩 전용 토큰을 만들었다가 소비자 0 이 되어 지운 적이 있다.
+    expect(rule(".home"), "랜딩 뿌리가 무대 색을 안 쓴다").toMatch(/background:\s*var\(--stage-dark\)/);
+    expect(rule(".home"), "랜딩 글자색이 무대 색이 아니다").toMatch(/color:\s*var\(--stage-ink\)/);
+    // 랜딩 전용으로 더한 색은 **--lime 하나뿐**이어야 한다(그리고 :root 안에 있어야 한다).
+    const rootAt = css.indexOf(":root {");
+    expect(rootAt, ":root 블록을 못 찾았다").toBeGreaterThan(-1);
+    const root = css.slice(rootAt, css.indexOf("\n}", rootAt));
+    expect(root, "--lime 이 :root 에 없다").toMatch(/--lime:\s*#/);
+    expect(root, "--lime-ink 가 :root 에 없다").toMatch(/--lime-ink:\s*#/);
+    // 앱층은 여전히 --accent 가 강조색이다. 라임이 랜딩 밖으로 새면 여기서 걸린다.
+    const stray = [...css.matchAll(/([^{}]*)\{[^}]*var\(--lime/g)]
+      .map((m) => m[1].trim().split("*/").pop().trim())
+      .filter((s) => s && !s.startsWith(":root") && !s.includes(".home"));
+    expect(stray, "라임을 랜딩 밖에서 쓴다 — 앱의 강조색은 --accent 다").toEqual([]);
   });
 
   it("★★ 첫 화면의 **영상은 부품 안에만** 있다 — 화면 파일로 새어 나오지 않는다", () => {

@@ -100,6 +100,10 @@
   --stage-panel: #0D0D0F;
   --stage-edge: rgba(255, 255, 255, .08);
   --stage-glass: rgba(255, 255, 255, .22);
+  /* 랜딩 강조색 — 2026-09-28. 목업의 라임이다. **앱층에는 쓰지 않는다**(앱의 강조는 --accent).
+     랜딩은 검정 무대라 분홍 액센트가 탁하게 죽는다 — 어두운 바탕에서 읽히는 색이 따로 필요했다. */
+  --lime: #DDFA42;
+  --lime-ink: #0A0A0A;
   /* 랜딩의 기둥과 여백 — 프로토타입이 쓰던 값 그대로다(`max-width:1400px` + 이 여백).
      ★ 고정 24px 로 두면 넓은 모니터에서 벽이 화면 끝에 붙어 답답하고, 좁은 화면에서는
        도리어 넓다. 실측 2560px 화면에서 그 차이가 그대로 보였다. */
@@ -3076,13 +3080,15 @@ a.um-credit:hover { color: var(--ink); background: var(--surface2); }
      깔아(opacity) 판을 낮춘다. 흐림띠는 그라디언트이고, 불투명 띠는 껍데기를 막대로
      만든다. 둘 다 프로토타입에 없던 것이다. */
 .home {
-  /* ★★★ 2026-09-14 — 랜딩이 **밝은 벌로 돌아왔다.** 09-09 밤에 화면 전체를 검게 칠했던
-     것은 "덮개(사진 한 장)가 첫 화면"이라는 틀 때문이었는데, 09-14 에 그 틀을 제품 도해로
-     바꾸면서 이유가 사라졌다. 어두운 면은 이제 첫 화면(.land-hero)과 그 그늘뿐이다.
-     ★ 그 절의 색은 `:root` 의 무대 토큰을 그대로 쓴다 — 랜딩만을 위한 색 벌을 또 만들지
-       않는다(09-09 에 그렇게 만든 토큰 하나는 소비자가 0 이 되어 이 회차에 지웠다). */
-  background: var(--bg);
-  color: var(--ink);
+  /* ★★★ 2026-09-28 — 랜딩이 **다시 어두운 벌이다**(사장님: "컬러도 반영해줘").
+     이력이 오간 자리라 적어 둔다: 09-09 밤 어두움 → 09-14 밝음(도해를 놓으면서) →
+     09-28 어두움(목업 전면 교체). 지금 이유는 **첫 화면이 검정 무대의 콜라주**라서다 —
+     그 아래만 밝으면 한 페이지에 두 벌이 얹힌 것처럼 읽힌다.
+     ★ 색은 `:root` 의 **무대 토큰**을 그대로 쓴다 — 랜딩만을 위한 색 벌을 또 만들지 않는다.
+       새로 더한 것은 강조색 `--lime` 하나뿐이고, 그건 어두운 바탕에서 분홍 액센트가
+       탁하게 죽어서다. */
+  background: var(--stage-dark);
+  color: var(--stage-ink);
   /* ★ [맨 위로] 버튼을 화면 끝까지 빼내므로 가로로 삐져나갈 수 있다. `clip` 은
      `hidden` 과 달리 **스크롤 컨테이너를 만들지 않아** sticky 가 그대로 산다. */
   overflow-x: clip;
@@ -3110,8 +3116,8 @@ a.um-credit:hover { color: var(--ink); background: var(--surface2); }
   justify-content: space-between;
   gap: var(--sp-4);
   padding: var(--sp-3) max(var(--stage-gap), calc(50% - var(--stage-col) / 2));
-  background: var(--bg);
-  box-shadow: inset 0 -1px 0 var(--line);
+  background: var(--stage-dark);
+  box-shadow: inset 0 -1px 0 var(--stage-edge);
 }
 .home .stage-brand {
   display: inline-flex; align-items: center;
@@ -3119,8 +3125,8 @@ a.um-credit:hover { color: var(--ink); background: var(--surface2); }
   color: var(--ink); text-decoration: none;
 }
 .home .stage-nav-right { display: flex; align-items: center; gap: var(--sp-4); }
-.home .land-navlink { font-size: 14px; color: var(--ink-soft); text-decoration: none; }
-.home .land-navlink:hover { color: var(--ink); }
+.home .land-navlink { font-size: 14px; color: var(--stage-chrome); text-decoration: none; }
+.home .land-navlink:hover { color: var(--lime); }
 
 /* ★★★ 두 버튼을 **한 급으로** 맞춘다 (2026-09-10 사장님: "로그인 만들러가기 버튼 사이즈가
    비율이 너무 안맞아"). 안 맞을 수밖에 없었다 — 둘은 원래 **다른 자리의 버튼**이다:
@@ -3183,7 +3189,7 @@ a.um-credit:hover { color: var(--ink); background: var(--surface2); }
    ★ 누름을 막지 않는다(pointer-events) — 아래 타일과 [더 보러가기]가 그대로 눌린다. */
 .home .stage-cut::after {
   content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 240px;
-  background: linear-gradient(to top, var(--bg) 34%, transparent);
+  background: linear-gradient(to top, var(--stage-dark) 34%, transparent);
   pointer-events: none;
 }
 .home .stage-more {
@@ -3244,7 +3250,7 @@ a.um-credit:hover { color: var(--ink); background: var(--surface2); }
   font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
   color: var(--ink-soft);
 }
-.home .land-slate b { color: var(--accent); font-weight: 600; }
+.home .land-slate b { color: var(--lime); font-weight: 600; }
 .home .land-slate span { width: 26px; height: 1px; background: var(--line); }
 .home .land-lede {
   margin: 0; font-size: 16px; line-height: 1.8; color: var(--ink-soft);
@@ -3391,7 +3397,7 @@ a.um-credit:hover { color: var(--ink); background: var(--surface2); }
    옛 랜딩의 걸음 띠·도해·규격 띠·두 갈래 절은 걷었고, 목업의 절 구성을 옮겼다:
    ① 적은 글이 장면과 자막이 된다 ② 두 갈래 ③ 여섯 자리 ④ 만든 영상 벽 ⑤ 크레딧 ⑥ 마무리.
    ★ 값은 이 저장소의 토큰만 쓴다(:root 밖 hex 금지 · 글자 크기 다섯 · 반경 토큰 셋). */
-.home .land-tell { padding-block: clamp(56px, 8vw, 104px); border-top: 1px solid var(--line); }
+.home .land-tell { padding-block: clamp(56px, 8vw, 104px); border-top: 1px solid var(--stage-edge); }
 .home .land-tellhead {
   display: flex; align-items: flex-end; justify-content: space-between;
   gap: var(--sp-4); flex-wrap: wrap; margin-bottom: clamp(28px, 4vw, 44px);
@@ -3402,45 +3408,45 @@ a.um-credit:hover { color: var(--ink); background: var(--surface2); }
 .home .land-say-slate { grid-column: 1 / -1; margin-bottom: 0; }
 .home .land-say { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(24px, 4vw, 60px); align-items: center; }
 .home .land-statement { margin: 0; font-size: 30px; line-height: 1.24; letter-spacing: -0.015em; font-weight: 700; text-wrap: balance; }
-.home .land-statement b { color: var(--accent); font-weight: 700; }
-.home .land-quote { border-left: 1px solid var(--line); padding-left: 24px; display: flex; flex-direction: column; gap: 14px; }
-.home .land-qsrc { margin: 0; font-size: 16px; line-height: 1.8; color: var(--ink-soft); }
-.home .land-qsrc b { color: var(--ink); font-weight: 600; }
-.home .land-qout { margin: 0; font-size: 14px; color: var(--ink-soft); }
+.home .land-statement b { color: var(--lime); font-weight: 700; }
+.home .land-quote { border-left: 1px solid var(--stage-edge); padding-left: 24px; display: flex; flex-direction: column; gap: 14px; }
+.home .land-qsrc { margin: 0; font-size: 16px; line-height: 1.8; color: var(--stage-chrome); }
+.home .land-qsrc b { color: var(--stage-ink); font-weight: 600; }
+.home .land-qout { margin: 0; font-size: 14px; color: var(--stage-chrome); }
 
 .home .land-ways { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
 .home .land-way {
   display: flex; flex-direction: column; gap: 12px;
   padding: clamp(20px, 3vw, 34px); border-radius: var(--r-card);
-  background: var(--surface); box-shadow: var(--ring), var(--lift);
+  background: var(--stage-panel); box-shadow: inset 0 0 0 1px var(--stage-edge);
 }
 .home .land-way-h { margin: 0; font-size: 18px; font-weight: 700; }
-.home .land-way-who { margin: 0; font-size: 14px; color: var(--ink-soft); }
-.home .land-way-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; font-size: 14px; color: var(--ink-soft); }
+.home .land-way-who { margin: 0; font-size: 14px; color: var(--stage-chrome); }
+.home .land-way-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; font-size: 14px; color: var(--stage-chrome); }
 .home .land-way-list li { display: flex; gap: 10px; }
-.home .land-way-list li::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); margin-top: 8px; flex: none; }
-.home .land-way-foot { margin: auto 0 0; padding-top: 16px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-soft); }
+.home .land-way-list li::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--lime); margin-top: 8px; flex: none; }
+.home .land-way-foot { margin: auto 0 0; padding-top: 16px; border-top: 1px solid var(--stage-edge); font-size: 12px; color: var(--stage-chrome); }
 
-.home .land-six { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); border-top: 1px solid var(--line); }
-.home .land-six li { display: flex; flex-direction: column; gap: 8px; padding: 20px 16px 22px 0; border-right: 1px solid var(--line); }
+.home .land-six { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); border-top: 1px solid var(--stage-edge); }
+.home .land-six li { display: flex; flex-direction: column; gap: 8px; padding: 20px 16px 22px 0; border-right: 1px solid var(--stage-edge); }
 .home .land-six li:last-child { border-right: 0; }
-.home .land-six b { font-size: 12px; font-weight: 700; color: var(--accent); }
+.home .land-six b { font-size: 12px; font-weight: 700; color: var(--lime); }
 .home .land-six strong { font-size: 16px; font-weight: 600; }
-.home .land-six span { font-size: 12px; color: var(--ink-soft); }
+.home .land-six span { font-size: 12px; color: var(--stage-chrome); }
 
 .home .land-packs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-3); }
 .home .land-pack {
   display: flex; flex-direction: column; gap: 10px;
   padding: clamp(18px, 2.4vw, 28px); border-radius: var(--r-card);
-  background: var(--surface); box-shadow: var(--ring), var(--lift);
+  background: var(--stage-panel); box-shadow: inset 0 0 0 1px var(--stage-edge);
 }
-.home .land-pack--pick { box-shadow: var(--ring-accent, var(--ring)), var(--lift); }
-.home .land-pack-n { font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+.home .land-pack--pick { box-shadow: inset 0 0 0 1px var(--lime); }
+.home .land-pack-n { font-size: 12px; font-weight: 600; color: var(--stage-chrome); }
 .home .land-pack-c { font-size: 30px; font-weight: 700; letter-spacing: -0.015em; font-variant-numeric: tabular-nums; }
-.home .land-pack-c i { font-style: normal; font-size: 14px; font-weight: 400; color: var(--ink-soft); }
-.home .land-pack-p { align-self: flex-start; padding: 4px 10px; border-radius: var(--r-pill); border: 1px dashed var(--line); font-size: 12px; color: var(--ink-soft); }
-.home .land-pack-g { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-soft); }
-.home .land-note { margin: 20px 0 0; font-size: 12px; color: var(--ink-soft); }
+.home .land-pack-c i { font-style: normal; font-size: 14px; font-weight: 400; color: var(--stage-chrome); }
+.home .land-pack-p { align-self: flex-start; padding: 4px 10px; border-radius: var(--r-pill); border: 1px dashed var(--stage-edge); font-size: 12px; color: var(--stage-chrome); }
+.home .land-pack-g { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--stage-edge); font-size: 12px; color: var(--stage-chrome); }
+.home .land-note { margin: 20px 0 0; font-size: 12px; color: var(--stage-chrome); }
 
 @media (max-width: 900px) {
   .home .land-say { grid-template-columns: minmax(0, 1fr); }
@@ -3877,3 +3883,22 @@ main.work:has(.rw-grid), main.work:has(.arch-page) { max-width: 1600px; }
 .arch-versions { margin-top: var(--sp-4); }
 .arch-version-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
 .arch-version-list li { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* ── 랜딩의 색 (2026-09-28) ────────────────────────────────────────────────
+   어두운 바탕에서 앱의 분홍 액센트(--accent)는 탁하게 죽는다. 랜딩에서만 --lime 을 쓴다.
+   ★ `.cta` 자체는 앱 전체가 쓰는 부품이라 건드리지 않는다 — **랜딩 안에서만** 덮어쓴다. */
+.home .land-slate { color: var(--stage-chrome); }
+.home .land-slate span { background: var(--stage-glass); }
+.home .land-lede { color: var(--stage-chrome); }
+.home .land-h2 { color: var(--stage-ink); }
+.home .cta { background: var(--lime); color: var(--lime-ink); }
+.home .cta:hover { background: var(--stage-ink); }
+.home .stage-brand { color: var(--stage-ink); }
+.home .stage-tile { background: var(--stage-panel); }
+/* ★ 신원 영역(components/UserMenu.jsx)은 **앱 껍데기용**이라 밝은 벌로 칠해져 있다.
+   랜딩이 어두워지면서 크레딧 숫자가 검정 글씨로 검정 띠 위에 얹혀 **사실상 안 보였다**
+   (실측: rgb(20,20,19) on rgb(16,16,16)). 부품을 고치면 앱 전체가 따라 바뀌므로
+   **랜딩 안에서만** 덮어쓴다. 메뉴가 열렸을 때의 판(.um-menu)은 흰 카드 그대로 둔다 —
+   그건 띄워 놓는 면이라 어두운 띠 위에서도 읽힌다. */
+.home .stage-nav .um-btn { color: var(--stage-ink); }
+.home .stage-nav .um-credit { color: var(--stage-ink); background: var(--stage-glass); }
