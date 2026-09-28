@@ -50,10 +50,11 @@ describe("랜딩 — 화면을 채우던 덮개는 걷었다 (2026-09-14)", () =
     }
   });
 
-  it("★★★ 랜딩은 **밝은 벌**이고 어두운 면은 **딱 둘**이다 — 첫 화면과 두 갈래 절", () => {
+  it("★★★ 랜딩은 **밝은 벌**이고 어두운 면은 **첫 화면 하나뿐**이다(그 그늘까지 둘)", () => {
     // 09-09 밤에 화면 전체를 검게 칠한 것은 덮개 때문이었고, 덮개가 사라지며 이유도 사라졌다.
     // ★★ 2026-09-28 — 어두운 면이 **하나에서 둘로** 늘었다. 사장님이 고른 첫 화면 시안
     //   (레퍼런스 spragadheeshraj.com 을 옮긴 흩뿌린 콜라주)이 검정 바탕이라서다.
+    //   ★ 09-28 전면 교체로 옛 두 갈래 절(.land-two)이 사라져, 어두운 자리는 첫 화면 하나다.
     //   늘린 것이지 **푼 것이 아니다** — 목록을 여기 못 박아 두는 이유는 그대로다:
     //   "어두워도 되는 자리"가 열려 있으면 랜딩이 조금씩 도로 검어진다(09-09 밤이 그랬다).
     //   ⚠️ 셋째를 더하고 싶으면 그 자리가 왜 필요한지 여기 적고 늘려라. 그냥 늘리지 마라.
@@ -65,83 +66,48 @@ describe("랜딩 — 화면을 채우던 덮개는 걷었다 (2026-09-14)", () =
     expect(dark, "어두운 면의 목록이 달라졌다").toEqual([
       ".home .land-hero",
       ".home .land-hero-haze",
-      ".home .land-two",
     ]);
   });
 
-  it("★★ 첫 화면 콜라주에 **영상 태그가 없다** — 2026-09-07 사고의 그 자리다", () => {
-    // 이 단정은 tests/home-sections-ui.test.js·showcase-static.test.js 와 겹친다. 일부러다 —
-    // 콜라주를 새로 넣으면서 "여기는 첫 화면이니까 한 편쯤"이 가장 나오기 쉬운 자리가 됐다.
-    expect(pageCode, "첫 화면에 영상 태그가 들어왔다").not.toMatch(/<video/);
-  });
-
-  it("★★ 콜라주의 아홉 칸이 **자리를 다 가지고 있다** — 빠지면 그 칸이 왼쪽 위에 겹쳐 선다", () => {
-    // 자리는 CSS 가 nth-child 로 들고 있고 편은 lib/landing.js 의 HERO_IDS 가 들고 있다.
-    // 둘의 **개수가 어긋나면** 자리 없는 칸이 left:auto 로 떨어져 한 구석에 포개진다.
-    for (let i = 1; i <= 9; i += 1) {
-      expect(css, `${i} 번 칸의 자리가 없다`).toContain(`.home .land-plate:nth-child(${i})`);
-    }
-    expect(css, "열째 칸 자리가 생겼다 — HERO_IDS 와 맞는지 보라")
-      .not.toContain(".home .land-plate:nth-child(10)");
+  it("★★ 첫 화면의 **영상은 부품 안에만** 있다 — 화면 파일로 새어 나오지 않는다", () => {
+    // 영상 태그는 2026-09-28 에 열렸지만 자리가 **하나**여야 한다(components/HomeCollage.jsx).
+    // 화면 파일에 직접 적히기 시작하면 "여기도 한 편쯤"이 다시 퍼진다 — 방어선이 한 파일에 모여
+    // 있어야 tests/home-collage.test.js 가 그것을 통째로 잰다.
+    expect(pageCode, "화면 파일에 영상 태그가 들어왔다").not.toMatch(/<video/);
+    expect(pageCode, "콜라주 부품을 안 쓴다").toMatch(/<HomeCollage\s*\/>/);
   });
 });
 
-describe("랜딩 — 첫 화면이 제품을 말한다 (2026-09-14 뒤집힘)", () => {
-  it("★★★ 머리글이 **있다** — 09-09 에 걷었던 것이 돌아왔다", () => {
-    // 그때는 "결과물이 유일한 주인공"이라 큰 글자를 걷었다. 시안 검토에서 사장님이
-    // "무엇을 해 주는 곳인지 먼저"로 돌아섰다 — 없어진 것을 지키던 판을 뒤집는다.
-    expect(pageCode, "전시층 제목이 없다").toMatch(/className="display"/);
-    expect(pageCode, "리드 문장이 없다").toMatch(/className="land-lede"/);
-  });
-
-  it("★★ 걸음 띠가 **순서를 말한다** — 01 · 02 · 03", () => {
-    // 번호는 장식이 아니라 정보다(실제 순서). 09-10 에 지운 절과는 **다른 절**이다 —
-    // 그때 지운 것은 소재·시나리오·영상 생성이고 이름도 `.stage-step*` 이었다.
-    for (const n of ["STEP 01", "STEP 02", "STEP 03"]) {
-      expect(pageCode, `${n} 이 없다`).toContain(n);
+describe("랜딩 — 첫 화면은 흩뿌린 콜라주다 (2026-09-28 전면 교체)", () => {
+  // ★★★ 이 describe 는 09-14 의 **제품 도해**를 재던 자리다. 사장님이 09-28 에 랜딩을
+  //   통째로 갈았다("전체 페이지를 갈아 끼울거야") — 걸음 띠 · 도해 · 규격 띠 · 두 갈래 절이
+  //   전부 걷혔다. 되살릴 값은 git 이력에 있다. **뒤집힌 줄 알고** 되살려라.
+  it("★★★ 옛 절을 그리는 코드가 **없다** — 남으면 죽은 규칙이 다음 사람을 속인다", () => {
+    for (const w of ["land-diagram", "land-panel", "land-steps", "land-fits", "land-two"]) {
+      expect(pageCode, `${w} 가 화면에 남았다`).not.toContain(w);
+      expect(css, `${w} 규칙이 CSS 에 남았다`).not.toContain(".home ." + w);
     }
-    expect(css, "걸음 띠의 자리를 안 잡았다").toContain(".home .land-steps ");
-    expect(css, "옛 이름이 되살아났다").not.toContain(".home .stage-steps ");
   });
 
-  it("★★★ 도해가 **세 칸**이다 — 적는 자리 · 두 갈래 · 모이는 결과", () => {
-    for (const c of ["land-panel", "land-fork", "land-out"]) {
-      expect(pageCode, `${c} 가 없다`).toContain(c);
+  it("★★ 머리글은 **콜라주 한가운데**에 선다 — 문구는 09-14 의 그것 그대로다", () => {
+    expect(pageCode, "첫 화면 절이 없다").toMatch(/className="land-hero"/);
+    expect(pageCode, "머리글이 콜라주 위에 없다").toMatch(/className="land-hero-copy"/);
+    expect(pageCode, "제품을 말하는 한 줄이 없다").toContain("영상 한 편이 됩니다");
+  });
+
+  it("★★ 아래 절이 여섯이다 — 자막 · 두 갈래 · 여섯 자리 · 만든 영상 · 크레딧 · 마무리", () => {
+    for (const mark of ["land-say", "land-ways", "land-six", "HomeMade", "land-packs", "land-final"]) {
+      expect(pageCode, `${mark} 절이 없다`).toContain(mark);
     }
-    expect(rule(".home .land-diagram"), "세 칸으로 안 눕는다")
-      .toMatch(/grid-template-columns:\s*[^;]*minmax/);
   });
 
-  it("★★ 도해는 **그림이다** — 진짜 입력칸을 두지 않는다", () => {
-    // 여기서 누르게 만들면 랜딩이 앱 흉내를 내다 만다. 진짜 입력은 [시작하기] 뒤에 있다.
-    expect(pageCode, "입력 요소가 랜딩에 있다").not.toMatch(/<(input|textarea|select|button)\b/);
-  });
-});
-
-describe("랜딩 — 두 갈래 절 (2026-09-14 사장님 지시)", () => {
-  it("★★★ 두 카드가 **같은 크기**다 — 한쪽만 길면 그쪽이 정답처럼 읽힌다", () => {
-    expect(rule(".home .land-paths"), "늘여서 맞추지 않는다")
-      .toMatch(/align-items:\s*stretch/);
-    // 늘인 카드에서 마지막 줄까지 같은 높이에 서게 하는 짝이다(없으면 카드만 커진다).
-    expect(rule(".home .land-pwhen"), "마지막 줄이 바닥에 안 붙는다")
-      .toMatch(/margin:\s*auto\s+0\s+0/);
-  });
-
-  it("★★★ 뱃지가 **알약**이다 — 글자만으로는 제목에 묻혔다", () => {
-    const tag = rule(".home .land-ptag");
-    expect(tag, ".home .land-ptag 규칙이 없다").toBeTruthy();
-    expect(tag, "바탕이 없다 — 다시 글자로 돌아갔다").toMatch(/background:\s*var\(--/);
-    expect(tag, "알약 모서리가 아니다").toMatch(/border-radius:\s*var\(--r-pill\)/);
-    // 두 길의 **무게는 같다**(색만 다르다) — 한쪽만 강조하면 다른 길이 없는 것처럼 읽힌다.
-    expect(rule(".home .land-path--deep .land-ptag"), "단계별 뱃지가 원클릭과 다른 급이다")
-      .toMatch(/background:\s*var\(--accent\)/);
-  });
-
-  it("★★★ 지키지 못할 약속을 하지 않는다 — 원클릭도 시나리오에서 한 번 멈춘다", () => {
-    // app/ads/[id]/page.js 의 실제 흐름: 입력 → 시나리오 확인 → [영상 만들기] → 완성.
-    // 돈 나가는 버튼 앞이라 그 한 번은 있어야 하는 자리다. 그래서 문구를 사실로 맞춘다.
-    expect(pageCode, "안 멈춘다고 약속한다").not.toMatch(/중간에 멈추는 곳이 없습니다/);
-    expect(pageCode, "손쉬움으로 말하지 않는다").toMatch(/손쉽게/);
+  it("★★ 껍데기의 닻이 **실제로 있는 자리**를 가리킨다 — 죽은 앵커는 아무 일도 안 한다", () => {
+    for (const href of ["#made", "#two"]) {
+      expect(pageCode, `${href} 로 가는 길이 없다`).toContain(`href="${href}"`);
+    }
+    expect(pageCode, '#two 가 가리키는 자리가 없다').toMatch(/id="two"/);
+    // #made 는 벽 부품이 단다(components/HomeMade.jsx 의 stage-band).
+    expect(jsxCode, '#made 가 가리키는 자리가 없다').toMatch(/id="made"/);
   });
 });
 

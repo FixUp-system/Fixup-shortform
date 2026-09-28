@@ -2983,8 +2983,6 @@ a.um-credit:hover { color: var(--ink); background: var(--surface2); }
 .panel-dl { flex: none; }
 
 
-
-
 /* ── 줄 위의 선을 끄는 갈래는 **지웠다**(2026-08-25). ⑤영상의 [영상 만들기]가 그 갈래를
    쓰던 유일한 자리였는데, 사장님이 "라인 위에 있으니 라인 아래로"라고 해서 그 버튼이
    맨 아래 실행줄(.step-actions) 안으로 들어갔다 — 쓰는 곳이 0 이 된 규칙은 남기지 않는다.
@@ -3080,7 +3078,7 @@ a.um-credit:hover { color: var(--ink); background: var(--surface2); }
 .home {
   /* ★★★ 2026-09-14 — 랜딩이 **밝은 벌로 돌아왔다.** 09-09 밤에 화면 전체를 검게 칠했던
      것은 "덮개(사진 한 장)가 첫 화면"이라는 틀 때문이었는데, 09-14 에 그 틀을 제품 도해로
-     바꾸면서 이유가 사라졌다. 어두운 면은 이제 두 갈래 절(.land-two) 하나뿐이다.
+     바꾸면서 이유가 사라졌다. 어두운 면은 이제 첫 화면(.land-hero)과 그 그늘뿐이다.
      ★ 그 절의 색은 `:root` 의 무대 토큰을 그대로 쓴다 — 랜딩만을 위한 색 벌을 또 만들지
        않는다(09-09 에 그렇게 만든 토큰 하나는 소비자가 0 이 되어 이 회차에 지웠다). */
   background: var(--bg);
@@ -3145,7 +3143,6 @@ a.um-credit:hover { color: var(--ink); background: var(--surface2); }
    .stage-down 과 그 움직임). 화면을 가득 채우던 히어로가 제품 도해로 바뀌어 쓰는 자리가
    0 이 됐다 — 쓰는 자리가 없는 규칙은 다음 사람에게 거짓말을 한다. 값은 git 이력에 있다.
    그 앞 09-10 에는 같은 이유로 덮개의 재생 링크·표시를 지웠다. */
-
 
 
 /* 벽 — **비율을 안 정한다.** 타일 높이는 그림이 정한다. 숏폼은 9:16 이 많고 메인에 걸 것은
@@ -3254,17 +3251,15 @@ a.um-credit:hover { color: var(--ink); background: var(--surface2); }
   max-width: 50ch; text-wrap: balance;
 }
 /* ── 첫 화면: 흩뿌린 콜라주 (2026-09-28) ─────────────────────────────────────
-   자리·크기는 레퍼런스(spragadheeshraj.com)를 **실측**해서 옮긴 것이다:
-     1440×900 에서 아홉 칸 · 크기와 가로세로비가 제각각 · 화면 가장자리 밖으로 잘려 나간다.
-     390×844 에서는 y·x 는 거의 그대로이고 **작은 칸의 폭만 두 배 넘게** 커졌다
-     (10.9%→24.9%, 11.9%→28.7%) — 폭을 그냥 비율로 줄이면 폰에서 실오라기처럼 가늘어진다.
-   ★★ 자리를 **CSS 가 들고 있는 이유**: 화면에서 인라인 스타일로 주면 아홉 자리가 인라인이 되어
-      인라인 스타일 상한(tests/design-system.test.js · 저장소 전체 10곳)을 혼자 다 먹는다.
-      ⚠️ 그 판은 **소스를 문자열로** 센다 — 여기에 그 문법을 그대로 적기만 해도 한 곳으로 세어진다
-      (실제로 이 주석에 적었다가 판이 빨개졌다).
-   ★ 어두운 면은 이제 **둘**이다(여기와 .land-two) — tests/landing-hero.test.js 가 그 둘을 못 박는다.
-   ★ 껍데기(.stage-nav)는 sticky 라 자리를 차지한다 — 이 절은 그 **아래**에서 시작하므로
-     밝은 띠와 어두운 첫 화면이 겹치지 않는다(따로 손댈 것이 없다). */
+   자리·크기·자르는 자리는 **레퍼런스(spragadheeshraj.com)를 실측**해서 옮긴 값이고,
+   그 표는 lib/home-collage.js 에 있다 — 여기 좌표는 그 표와 **같은 번호**(.p1~.p11)다.
+   ⚠️ 한쪽만 고치면 갈린다. 칸을 더하거나 빼면 **양쪽을 같이** 고쳐라.
+   ★★ 자리를 화면에서 인라인으로 주지 않는 이유: 열한 칸이면 인라인 스타일 상한
+      (tests/design-system.test.js · 저장소 전체 10곳)을 혼자 다 먹는다.
+      그 판은 소스를 문자열로 세므로 **주석에 그 문법을 그대로 적기만 해도** 한 곳으로 세어진다.
+   ★ 어두운 면은 이 절과 그 그늘 **둘뿐**이다 — tests/landing-hero.test.js 가 못 박는다.
+   ★ 껍데기(.stage-nav)는 sticky 라 자리를 차지한다 — 이 절은 그 아래에서 시작하므로
+     밝은 띠와 어두운 첫 화면이 겹치지 않는다. */
 .home .land-hero {
   position: relative; height: 80svh; min-height: 560px; overflow: hidden;
   background: var(--stage-dark);
@@ -3273,134 +3268,91 @@ a.um-credit:hover { color: var(--ink); background: var(--surface2); }
 .home .land-hero-field { position: absolute; inset: 0; }
 .home .land-plate {
   position: absolute; left: var(--x); top: var(--y); width: var(--w); height: var(--h);
-  overflow: hidden;
+  will-change: transform;
+}
+/* 커지는 연출은 **안쪽**이 맡는다 — 바깥(.land-plate)의 transform 은 시차가 매 프레임 쓴다.
+   한 자리에 둘을 같이 쓰면 스크롤할 때마다 hover 가 지워진다. */
+.home .land-plate-in {
+  display: block; position: relative; width: 100%; height: 100%; overflow: hidden;
   transition: transform 620ms cubic-bezier(.16, .8, .24, 1);
 }
-.home .land-plate img {
-  display: block; width: 100%; height: 100%;
+.home .land-poster,
+.home .land-clip {
+  position: absolute; inset: 0; display: block; width: 100%; height: 100%;
   object-fit: cover; object-position: var(--pos, 50% 38%);
 }
+/* 표지가 먼저 깔리고, 영상이 준비되면 그 위로 떠오른다(자리는 그대로라 안 튄다). */
+.home .land-clip { opacity: 0; transition: opacity 520ms ease; }
+.home .land-plate.on .land-clip { opacity: 1; }
 /* 올린 칸은 **맨 앞으로 나온다.** z-index 가 없으면 겹친 자리에서 DOM 순서대로만 쌓여
    뒤에 그린 이웃이 위를 덮는다(목업에서 실제로 그랬다). 2 면 글자(3)보다는 아래다. */
-.home .land-plate:hover { transform: scale(1.035); z-index: 2; }
+.home .land-plate:hover,
+.home .land-plate:focus-within { z-index: 2; }
+.home .land-plate:hover .land-plate-in,
+.home .land-plate:focus-within .land-plate-in { transform: scale(1.035); }
+.home .land-hero-field.hot .land-plate:not(:hover) .land-plate-in { opacity: .45; }
+.home .land-cap {
+  position: absolute; left: 10px; bottom: 10px; z-index: 2;
+  padding: 4px 8px; border-radius: var(--r-pill);
+  background: var(--stage-panel); color: var(--stage-chrome);
+  font-size: 12px; opacity: 0; transition: opacity 320ms ease; pointer-events: none;
+}
+.home .land-plate:hover .land-cap,
+.home .land-plate:focus-within .land-cap { opacity: 1; }
 
 /* 글자 뒤 그늘 — 표지가 밝은 편이 섞여 있어 그냥 얹으면 제목이 안 읽힌다.
    그라디언트를 쓰지 않는다(판이 허락한 자리 목록에 없다) — 판 전체에 고르게 깐다. */
-.home .land-hero-haze { position: absolute; inset: 0; background: var(--stage-dark); opacity: .52; }
+/* ⚠️ pointer-events 를 빼먹으면 이 그늘이 판 전체를 덮어 **호버가 통째로 죽는다**
+   (영상도 안 돌고 라벨도 안 뜬다). 화면상으로는 멀쩡해 보여서 늦게 발견된다 — 실측으로 잡았다. */
+.home .land-hero-haze {
+  position: absolute; inset: 0; pointer-events: none;
+  background: var(--stage-dark); opacity: .52;
+}
 
 .home .land-hero-copy {
   position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center;
   text-align: center; color: var(--stage-ink);
-  padding-inline: var(--stage-gap);
+  padding-inline: var(--stage-gap); pointer-events: none;
 }
 .home .land-hero-copy .display { margin-bottom: 14px; }
 .home .land-hero-copy .land-slate { color: var(--stage-chrome); }
 .home .land-hero-copy .land-slate span { background: var(--stage-glass); }
 .home .land-hero-copy .land-lede { color: var(--stage-chrome); }
 
-/* 아홉 칸 — 순서는 lib/landing.js 의 HERO_IDS 와 **같은 번호**다. --drift 는 스크롤 시차
-   배율(실측 1.24~2.07)을 "100svh 굴리는 동안 더 움직이는 거리(svh)"로 바꾼 값이다. */
-.home .land-plate:nth-child(1) { --x: -1vw;    --y: -5%; --w: 21.7vw; --h: 42%; --drift: 29; }
-.home .land-plate:nth-child(2) { --x: 36.6vw;  --y: -3%; --w: 16.8vw; --h: 38%; --drift: 58; }
-.home .land-plate:nth-child(3) { --x: 79.2vw;  --y: -2%; --w: 20.8vw; --h: 35%; --drift: 34; }
-.home .land-plate:nth-child(4) { --x: 3vw;     --y: 44%; --w: 10.9vw; --h: 24%; --drift: 92; }
-.home .land-plate:nth-child(5) { --x: 31.7vw;  --y: 56%; --w: 12.8vw; --h: 22%; --drift: 74; }
-.home .land-plate:nth-child(6) { --x: 79.2vw;  --y: 38%; --w: 11.9vw; --h: 20%; --drift: 86; }
-.home .land-plate:nth-child(7) { --x: -14.9vw; --y: 65%; --w: 39.6vw; --h: 40%; --drift: 39; --pos: 50% 62%; }
-.home .land-plate:nth-child(8) { --x: 42.6vw;  --y: 60%; --w: 15.8vw; --h: 50%; --drift: 49; }
-.home .land-plate:nth-child(9) { --x: 74.2vw;  --y: 52%; --w: 25.7vw; --h: 50%; --drift: 24; }
+/* 열한 칸 — 번호는 lib/home-collage.js 의 순서와 같다. */
+.home .p1  { --x: -1vw;    --y: -5%; --w: 21.7vw; --h: 42%; --pos: 50% 38%; }
+.home .p2  { --x: 36.6vw;  --y: -3%; --w: 16.8vw; --h: 38%; --pos: 50% 34%; }
+.home .p3  { --x: 79.2vw;  --y: -2%; --w: 20.8vw; --h: 35%; --pos: 50% 36%; }
+.home .p4  { --x: 22vw;    --y: 6%;  --w: 9.5vw;  --h: 18%; --pos: 50% 44%; }
+.home .p5  { --x: 64vw;    --y: 4%;  --w: 11vw;   --h: 21%; --pos: 50% 42%; }
+.home .p6  { --x: 3vw;     --y: 44%; --w: 10.9vw; --h: 24%; --pos: 50% 40%; }
+.home .p7  { --x: 31.7vw;  --y: 56%; --w: 12.8vw; --h: 22%; --pos: 50% 40%; }
+.home .p8  { --x: 79.2vw;  --y: 38%; --w: 11.9vw; --h: 20%; --pos: 50% 44%; }
+.home .p9  { --x: -14.9vw; --y: 65%; --w: 39.6vw; --h: 40%; --pos: 50% 62%; }
+.home .p10 { --x: 42.6vw;  --y: 60%; --w: 15.8vw; --h: 50%; --pos: 50% 46%; }
+.home .p11 { --x: 74.2vw;  --y: 52%; --w: 25.7vw; --h: 50%; --pos: 50% 52%; }
 
-/* 스크롤 시차 — **JS 없이** 한다. 랜딩은 서버 컴포넌트 한 벌이고(09-10 에 첫 방문 7.5→1.6초),
-   여기 한 자리 때문에 클라이언트 부품을 붙이지 않는다. 못 하는 브라우저에서는 그냥 안 움직인다. */
-@keyframes land-drift { to { translate: 0 calc(var(--drift) * -1svh); } }
-@supports (animation-timeline: scroll()) {
-  @media (prefers-reduced-motion: no-preference) {
-    .home .land-plate {
-      animation: land-drift linear both;
-      animation-timeline: scroll();
-      animation-range: 0 100svh;
-    }
-  }
-}
-
-/* 좁은 화면 — 자리는 그대로 두고 **작은 칸만 키운다**(위 실측). */
+/* 좁은 화면 — 자리는 그대로 두고 **작은 칸만 키운다**(레퍼런스 390×844 실측). */
 @media (max-width: 760px) {
   .home .land-hero { height: 74svh; min-height: 480px; }
-  .home .land-plate:nth-child(1) { --x: -1vw;  --y: -5%; --w: 21vw; --h: 37%; }
-  .home .land-plate:nth-child(2) { --x: 24vw;  --y: 0;   --w: 34vw; --h: 20%; }
-  .home .land-plate:nth-child(3) { --x: 78vw;  --y: -2%; --w: 21vw; --h: 35%; }
-  .home .land-plate:nth-child(4) { --x: 3vw;   --y: 44%; --w: 25vw; --h: 24%; }
-  .home .land-plate:nth-child(5) { --x: 26vw;  --y: 58%; --w: 20vw; --h: 20%; }
-  .home .land-plate:nth-child(6) { --x: 65vw;  --y: 38%; --w: 29vw; --h: 20%; }
-  .home .land-plate:nth-child(7) { --x: -14vw; --y: 66%; --w: 38vw; --h: 30%; }
-  .home .land-plate:nth-child(8) { --x: 48vw;  --y: 62%; --w: 26vw; --h: 38%; }
-  .home .land-plate:nth-child(9) { --x: 76vw;  --y: 56%; --w: 30vw; --h: 34%; }
+  .home .p1  { --x: -1vw;  --y: -5%; --w: 21vw; --h: 37%; }
+  .home .p2  { --x: 24vw;  --y: 0;   --w: 34vw; --h: 20%; }
+  .home .p3  { --x: 78vw;  --y: -2%; --w: 21vw; --h: 35%; }
+  .home .p4  { --x: 58vw;  --y: 2%;  --w: 19vw; --h: 16%; }
+  .home .p5  { --x: 33vw;  --y: 33%; --w: 20vw; --h: 17%; }
+  .home .p6  { --x: 3vw;   --y: 44%; --w: 25vw; --h: 24%; }
+  .home .p7  { --x: 26vw;  --y: 58%; --w: 20vw; --h: 20%; }
+  .home .p8  { --x: 65vw;  --y: 38%; --w: 29vw; --h: 20%; }
+  .home .p9  { --x: -14vw; --y: 66%; --w: 38vw; --h: 30%; }
+  .home .p10 { --x: 48vw;  --y: 62%; --w: 26vw; --h: 38%; }
+  .home .p11 { --x: 76vw;  --y: 56%; --w: 30vw; --h: 34%; }
 }
 
 .home .land-h2 {
   margin: 0 0 16px; font-size: 30px; line-height: 1.24;
   letter-spacing: -0.015em; font-weight: 700; text-wrap: balance;
 }
-
-/* 걸음 띠 — **번호가 정보다.** 01·02·03 이 실제 순서라서 단다(장식이 아니다). */
-.home .land-steps {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
-  margin-top: clamp(28px, 4vw, 44px); align-items: stretch;
-}
-.home .land-step {
-  position: relative; display: flex; gap: 14px; align-items: center;
-  padding: 16px 18px; border-radius: var(--r-card);
-  background: var(--surface); box-shadow: var(--ring), var(--lift);
-}
-.home .land-step::after {
-  content: "›"; position: absolute; right: -12px; top: 50%; transform: translateY(-50%);
-  font-size: 18px; color: var(--ink-soft); line-height: 1;
-}
-.home .land-step:last-child::after { content: none; }
-.home .land-ic {
-  width: 42px; height: 42px; flex: none; border-radius: var(--r-ctl);
-  display: grid; place-items: center;
-  background: var(--accent-soft); color: var(--accent);
-}
-.home .land-step-tx em {
-  display: block; font-style: normal; font-size: 12px; letter-spacing: .1em;
-  text-transform: uppercase; color: var(--ink-soft);
-}
-/* ★ 줄 끝에 낱말 하나만 떨어지지 않게 — "고치며"가 혼자 내려가던 자리다. */
-.home .land-step-tx strong {
-  display: block; font-size: 16px; font-weight: 600; line-height: 1.45; text-wrap: balance;
-}
-
-/* 도해 — 세 칸: 적는 자리 · 두 갈래 · 모이는 결과 */
-/* ★ 세 칸의 **높이를 맞춘다**(09-14 사장님 지시). 가운데만 짧아 가운데 정렬로 떠 있으면
-   도해가 한 덩어리로 안 읽힌다 — 늘여서 맞추고, 가운데의 두 갈래는 각자 절반을 나눠 갖되
-   글은 칸 안에서 세로 가운데에 둔다(빈 자리가 위아래로 갈리지 않게).
-   ★ 오른쪽 결과는 비율(9:16)로 높이를 정하고 있었는데, 늘이면 높이가 먼저 정해지므로
-     비율은 물러나고 그림이 잘려 맞춰진다(object-fit: cover). */
-.home .land-diagram {
-  display: grid; grid-template-columns: 284px minmax(0, 1fr) 272px;
-  gap: clamp(14px, 2.4vw, 30px); align-items: stretch;
-  margin-top: clamp(32px, 5vw, 56px);
-}
-.home .land-panel {
-  background: var(--surface); border-radius: var(--r-card); padding: 20px 18px;
-  box-shadow: var(--ring), var(--lift);
-  display: flex; flex-direction: column; gap: 16px;
-}
-.home .land-field-set { display: flex; flex-direction: column; gap: 7px; }
-.home .land-label { font-size: 12px; color: var(--ink-soft); font-weight: 600; }
-.home .land-field {
-  background: var(--surface); border-radius: var(--r-ctl); padding: 10px 12px;
-  font-size: 14px; line-height: 1.6; color: var(--ink);
-  box-shadow: var(--ring), var(--lift);
-}
 .home .land-field--ta { position: relative; min-height: 88px; padding-bottom: 26px; }
-.home .land-count { position: absolute; right: 10px; bottom: 7px; font-size: 12px; color: var(--ink-soft); }
-.home .land-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.home .land-chip {
-  font-size: 12px; padding: 5px 11px; border-radius: var(--r-pill);
-  background: var(--surface); color: var(--ink-soft); box-shadow: var(--ring);
-}
 .home .land-chip--on { background: var(--accent); color: var(--btn-ink); font-weight: 600; box-shadow: none; }
 
 /* 두 갈래 — 입력에서 뻗어 나가는 선이 구조를 말한다 */
@@ -3426,145 +3378,92 @@ a.um-credit:hover { color: var(--ink); background: var(--surface2); }
 .home .land-bhead strong { font-size: 14px; font-weight: 600; line-height: 1.4; }
 .home .land-branch p { margin: 0; font-size: 12px; color: var(--ink-soft); line-height: 1.6; }
 .home .land-trail { display: flex; align-items: stretch; gap: 7px; flex-wrap: wrap; }
-.home .land-node {
-  flex: 1; min-width: 76px; border-radius: var(--r-ctl); background: var(--surface2);
-  padding: 8px 9px; display: flex; flex-direction: column; gap: 4px; box-shadow: var(--ring);
-}
-.home .land-node em { font-style: normal; font-size: 12px; color: var(--ink); line-height: 1.35; }
-.home .land-node b {
-  align-self: flex-start; font-size: 12px; font-weight: 600; letter-spacing: .04em;
-  color: var(--accent); background: var(--accent-soft); padding: 2px 5px; border-radius: var(--r-ctl);
-}
 .home .land-node--plain b { color: var(--ink-soft); background: transparent; padding: 0; }
 .home .land-node--fin { background: var(--accent-soft); box-shadow: 0 0 0 1px var(--accent); }
 .home .land-node--fin em { color: var(--accent); font-weight: 600; }
-.home .land-arw { align-self: center; flex: none; font-size: 12px; color: var(--ink-soft); }
-
-/* 모이는 결과 — 표지 한 장 위에 자막과 재생 표시가 얹힌 **그림**이다(누르는 것이 아니다).
-   ★ 비율은 여기서 정한다(벽은 반대다 — 그림이 정한다). 세로 한 칸으로 고정해야 도해의
-     오른쪽 칸이 흔들리지 않는다. */
-.home .land-out {
-  position: relative; width: 100%; max-width: 340px; margin-inline: auto;
-  aspect-ratio: 9 / 16; border-radius: var(--r-card); overflow: hidden;
-  background: var(--stage-panel); box-shadow: var(--elevate);
-}
-.home .land-out img { width: 100%; height: 100%; max-width: 100%; object-fit: cover; display: block; }
-/* ★ 자막은 **아래**에 선다(09-14 사장님 지시). 가운데 두면 사람 얼굴을 덮는다 —
-   우리가 실제로 태우는 자리도 화면 아래다. 재생 표시 줄 위에 얹는다. */
-.home .land-burn {
-  position: absolute; left: 0; right: 0; bottom: 52px; margin: 0; padding-inline: 18px;
-  text-align: center; font-weight: 600; color: var(--on-media);
-  font-size: 18px; line-height: 1.3;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, .6);
-}
-/* ★ 시안은 여기에 흐림띠(그라디언트)를 깔았다 — 이 저장소에서는 못 쓴다. 불투명 면으로
-   바꾸되 아래 끝에만 얹어 그림을 덜 가린다. */
-.home .land-scrub {
-  position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 12px;
-  display: flex; align-items: center; gap: 10px; background: rgba(0, 0, 0, .48);
-}
-.home .land-pb {
-  width: 0; height: 0; flex: none;
-  border-left: 10px solid var(--on-media);
-  border-top: 7px solid transparent; border-bottom: 7px solid transparent;
-}
-.home .land-track { position: relative; flex: 1; height: 3px; border-radius: var(--r-pill); background: var(--stage-glass); }
-.home .land-track i { position: absolute; inset: 0 56% 0 0; border-radius: var(--r-pill); background: var(--on-media); }
-.home .land-time { font-size: 12px; letter-spacing: .04em; color: var(--on-media); }
-
-/* 규격 — **고르는** 것이지 셋이 한 번에 나오는 것이 아니다 */
-.home .land-fits {
-  margin-top: clamp(30px, 4vw, 46px);
-  display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center;
-}
-.home .land-fits-t { margin: 0; font-size: 14px; color: var(--ink-soft); }
-.home .land-fitrow { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
-.home .land-fit {
-  display: flex; align-items: center; gap: 9px;
-  background: var(--surface); border-radius: var(--r-ctl); padding: 9px 16px;
-  font-size: 14px; box-shadow: var(--ring), var(--lift);
-}
-.home .land-fit b { font-size: 12px; font-weight: 600; color: var(--accent); }
-
-/* ★★ 어두운 면은 **이 절 하나뿐이다.** 할 말이 가장 많은 자리라 바탕을 갈아 시선을 끊는다. */
-.home .land-two {
-  margin-top: clamp(56px, 8vw, 104px);
-  padding-block: clamp(56px, 8vw, 104px);
-  background: var(--stage-dark); color: var(--stage-ink);
-}
-.home .land-two .land-slate { color: var(--stage-chrome); }
-.home .land-two .land-slate span { background: var(--stage-glass); }
-.home .land-two .land-h2 { color: var(--stage-ink); }
-.home .land-two .land-lede { color: var(--stage-chrome); }
-
-/* ★ 두 카드는 **같은 크기**다(09-14 사장님 지시). 늘여서 맞추고 마지막 줄을 바닥에 붙인다 —
-   한쪽만 길면 그쪽이 정답처럼 읽힌다. */
-.home .land-paths {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
-  margin-top: 38px; align-items: stretch;
-}
-.home .land-path {
-  display: flex; flex-direction: column; gap: 12px;
-  padding: 24px 24px 26px; border-radius: var(--r-card);
-  background: rgba(255, 255, 255, .05);
-  box-shadow: inset 0 0 0 1px var(--stage-glass);
-}
 .home .land-path--deep { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
-/* ★ 뱃지는 **알약**이다(09-14 사장님: "뱃지가 잘 안 보인다"). 글자만으로는 제목에 묻혔다.
-   둘의 색은 다르되 **무게는 같다** — 한쪽만 강조하면 다른 길이 없는 것처럼 읽힌다. */
-.home .land-ptag {
-  align-self: flex-start; padding: 5px 12px; border-radius: var(--r-pill);
-  font-size: 12px; font-weight: 600; letter-spacing: .1em; line-height: 1;
-  background: var(--stage-ink); color: var(--stage-dark);
-}
-.home .land-path--deep .land-ptag { background: var(--accent); color: var(--btn-ink); }
-.home .land-path-h { margin: 0; font-size: 18px; font-weight: 600; color: var(--stage-ink); }
-.home .land-plist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
-.home .land-plist li { display: flex; gap: 9px; font-size: 14px; line-height: 1.65; color: var(--stage-chrome); }
-.home .land-plist li::before {
-  content: ""; flex: none; width: 5px; height: 5px; margin-top: 9px;
-  border-radius: 50%; background: var(--stage-glass);
-}
-.home .land-path--deep .land-plist li::before { background: var(--accent); }
-.home .land-plist li b { color: var(--stage-ink); font-weight: 600; }
-.home .land-pwhen {
-  margin: auto 0 0; padding-top: 15px; border-top: 1px solid var(--stage-glass);
-  font-size: 14px; color: var(--stage-chrome);
-}
-.home .land-pwhen b { color: var(--stage-ink); font-weight: 600; }
-.home .land-editbox {
-  margin-top: 6px; padding: 15px; border-radius: var(--r-ctl);
-  display: flex; flex-direction: column; gap: 11px;
-  background: rgba(0, 0, 0, .45); box-shadow: inset 0 0 0 1px var(--stage-glass);
-}
-.home .land-editlbl { font-size: 12px; letter-spacing: .12em; color: var(--stage-chrome); }
-.home .land-typed { margin: 0; font-size: 16px; line-height: 1.6; color: var(--stage-ink); }
-.home .land-send {
-  align-self: flex-end; padding: 7px 15px; border-radius: var(--r-pill);
-  font-size: 14px; background: var(--accent); color: var(--btn-ink);
-}
 
 /* 만든 영상 머리 · 마무리 */
 /* ★ [맨 위로] 가 이 묶음 안에서 sticky 로 뜬다 — 두 갈래 절부터 페이지 끝까지 따라온다. */
 .home .land-below { position: relative; }
 .home .land-made-head { padding-top: clamp(56px, 8vw, 104px); }
+/* ── 아래 절들 (2026-09-28 전면 교체) ──────────────────────────────────────
+   옛 랜딩의 걸음 띠·도해·규격 띠·두 갈래 절은 걷었고, 목업의 절 구성을 옮겼다:
+   ① 적은 글이 장면과 자막이 된다 ② 두 갈래 ③ 여섯 자리 ④ 만든 영상 벽 ⑤ 크레딧 ⑥ 마무리.
+   ★ 값은 이 저장소의 토큰만 쓴다(:root 밖 hex 금지 · 글자 크기 다섯 · 반경 토큰 셋). */
+.home .land-tell { padding-block: clamp(56px, 8vw, 104px); border-top: 1px solid var(--line); }
+.home .land-tellhead {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: var(--sp-4); flex-wrap: wrap; margin-bottom: clamp(28px, 4vw, 44px);
+}
+.home .land-tellhead .land-lede { margin-top: 14px; }
+
+/* 첫 절의 번호는 왼쪽 칸 **위**에 선다 — grid 두 칸을 통째로 가로지른다. */
+.home .land-say-slate { grid-column: 1 / -1; margin-bottom: 0; }
+.home .land-say { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(24px, 4vw, 60px); align-items: center; }
+.home .land-statement { margin: 0; font-size: 30px; line-height: 1.24; letter-spacing: -0.015em; font-weight: 700; text-wrap: balance; }
+.home .land-statement b { color: var(--accent); font-weight: 700; }
+.home .land-quote { border-left: 1px solid var(--line); padding-left: 24px; display: flex; flex-direction: column; gap: 14px; }
+.home .land-qsrc { margin: 0; font-size: 16px; line-height: 1.8; color: var(--ink-soft); }
+.home .land-qsrc b { color: var(--ink); font-weight: 600; }
+.home .land-qout { margin: 0; font-size: 14px; color: var(--ink-soft); }
+
+.home .land-ways { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
+.home .land-way {
+  display: flex; flex-direction: column; gap: 12px;
+  padding: clamp(20px, 3vw, 34px); border-radius: var(--r-card);
+  background: var(--surface); box-shadow: var(--ring), var(--lift);
+}
+.home .land-way-h { margin: 0; font-size: 18px; font-weight: 700; }
+.home .land-way-who { margin: 0; font-size: 14px; color: var(--ink-soft); }
+.home .land-way-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; font-size: 14px; color: var(--ink-soft); }
+.home .land-way-list li { display: flex; gap: 10px; }
+.home .land-way-list li::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); margin-top: 8px; flex: none; }
+.home .land-way-foot { margin: auto 0 0; padding-top: 16px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-soft); }
+
+.home .land-six { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); border-top: 1px solid var(--line); }
+.home .land-six li { display: flex; flex-direction: column; gap: 8px; padding: 20px 16px 22px 0; border-right: 1px solid var(--line); }
+.home .land-six li:last-child { border-right: 0; }
+.home .land-six b { font-size: 12px; font-weight: 700; color: var(--accent); }
+.home .land-six strong { font-size: 16px; font-weight: 600; }
+.home .land-six span { font-size: 12px; color: var(--ink-soft); }
+
+.home .land-packs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-3); }
+.home .land-pack {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: clamp(18px, 2.4vw, 28px); border-radius: var(--r-card);
+  background: var(--surface); box-shadow: var(--ring), var(--lift);
+}
+.home .land-pack--pick { box-shadow: var(--ring-accent, var(--ring)), var(--lift); }
+.home .land-pack-n { font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+.home .land-pack-c { font-size: 30px; font-weight: 700; letter-spacing: -0.015em; font-variant-numeric: tabular-nums; }
+.home .land-pack-c i { font-style: normal; font-size: 14px; font-weight: 400; color: var(--ink-soft); }
+.home .land-pack-p { align-self: flex-start; padding: 4px 10px; border-radius: var(--r-pill); border: 1px dashed var(--line); font-size: 12px; color: var(--ink-soft); }
+.home .land-pack-g { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-soft); }
+.home .land-note { margin: 20px 0 0; font-size: 12px; color: var(--ink-soft); }
+
+@media (max-width: 900px) {
+  .home .land-say { grid-template-columns: minmax(0, 1fr); }
+  .home .land-ways { grid-template-columns: minmax(0, 1fr); }
+  .home .land-six { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .home .land-six li { border-right: 0; }
+  .home .land-packs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .home .land-six { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .home .land-packs { grid-template-columns: minmax(0, 1fr); }
+}
+
 .home .land-final { padding-block: clamp(56px, 8vw, 104px); text-align: center; }
 .home .land-final .land-wrap { display: flex; flex-direction: column; align-items: center; }
 .home .land-cta-big { height: auto; padding: 14px 30px; border-radius: var(--r-pill); font-size: 16px; margin-top: 24px; }
 
 @media (max-width: 1040px) {
-  .home .land-diagram { grid-template-columns: 1fr; gap: 28px; }
-  .home .land-panel { width: 100%; max-width: 460px; margin-inline: auto; }
   .home .land-fork { width: 100%; max-width: 620px; margin-inline: auto; padding-left: 0; }
   .home .land-fork::before, .home .land-branch::before { display: none; }
-  .home .land-out { max-width: 300px; }
-  .home .land-paths { grid-template-columns: 1fr; }
 }
 @media (max-width: 700px) {
-  .home .land-steps { grid-template-columns: 1fr; gap: 12px; }
-  .home .land-step::after { content: "⌄"; right: 50%; top: auto; bottom: -14px; transform: translateX(50%); }
   .home .land-trail { flex-direction: column; align-items: stretch; }
-  .home .land-arw { align-self: center; transform: rotate(90deg); }
   .home .land-navlink { display: none; }
 }
 

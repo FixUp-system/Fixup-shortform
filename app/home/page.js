@@ -37,21 +37,9 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { USER_HEADER } from "../../lib/auth/headers.js";
-import { SHOWCASE } from "../../lib/showcase.js";
-import { DIAGRAM_ID, HERO_IDS } from "../../lib/landing.js";
+import HomeCollage from "../../components/HomeCollage.jsx";
 import HomeMade from "../../components/HomeMade.jsx";
 import UserMenu from "../../components/UserMenu.jsx";
-
-// 도해 오른쪽의 "두 길이 모이는 결과".
-// ★★ **왼쪽에 적은 이야기로 나온 편**이어야 한다 — 주스 세 가지를 적어 놓고 딴 그림이
-//   나오면 도해가 거짓말을 한다(09-14 사장님 지적). 고르는 자리는 lib/landing.js 한 곳이고,
-//   벽은 같은 편을 빼고 그린다(components/HomeMade.jsx).
-const OUT = SHOWCASE.find((t) => t.id === DIAGRAM_ID) || SHOWCASE[0] || null;
-
-// 첫 화면의 콜라주 — 짝지은 아홉 편을 **적어 둔 순서대로** 세운다(순서 = CSS 의 칸 번호).
-// ★ 목록에서 사라진 id 는 조용히 빠진다 — 칸 하나가 비는 편이 화면이 죽는 것보다 낫다.
-//   그래서 아래 화면은 개수를 세지 않고 있는 것만 그린다.
-const HERO = HERO_IDS.map((id) => SHOWCASE.find((t) => t.id === id)).filter(Boolean);
 
 export default async function HomePage() {
   const signedIn = Boolean((await headers()).get(USER_HEADER));
@@ -87,20 +75,15 @@ export default async function HomePage() {
       {/* 첫 화면 — **흩뿌린 콜라주 위에 머리글을 얹는다** (2026-09-28, 사장님이 고른 시안).
           ★ 머리글은 09-14 의 그것을 **자리만 옮긴 것**이다(문구 그대로). 위 ① 은 그대로 유효하다 —
             "무엇을 해 주는 곳인지 먼저 말해야 한다"가 첫 화면 한가운데에 선다.
-          ★★ **영상 태그는 여기에도 없다.** 칸은 전부 굽힌 표지(webp)다 — 2026-09-07 사고의 그 자리이고,
-            판 둘이 이 파일과 components/HomeMade.jsx 를 함께 잰다. 움직임은 CSS 스크롤 시차뿐이라
-            클라이언트 JS 도 안 붙는다(이 파일은 계속 서버 컴포넌트다).
+          🔴 **여기에만 영상 태그가 있다.** 2026-09-07 사고 뒤로 랜딩에서는 그 태그가 금지였는데
+            09-28 에 사장님이 그 자리를 열었다 — 무엇이 그때와 다른지(정적 파일 · 표지 우선 ·
+            줄인 클립)는 components/HomeCollage.jsx 머리말에 적어 두었다. **거기부터 읽어라.**
+            아래 벽(components/HomeMade.jsx)은 **여전히 금지**이고 판이 그대로 지킨다.
           ★ 칸은 **장식**이다(aria-hidden · alt 빈 문자열) — 읽히는 목록은 아래 벽 하나다.
             누르는 곳도 아니다: 남의 영상 상세는 운영자만 열 수 있어 손님에게는 막다른 길이다
             (components/HomeMade.jsx 가 같은 이유로 09-14 에 링크를 걷었다). */}
       <div className="land-hero">
-        <div className="land-hero-field" aria-hidden="true">
-          {HERO.map((t) => (
-            <span key={t.file} className="land-plate">
-              <img src={`/showcase/${t.file}`} alt="" width={t.w} height={t.h} />
-            </span>
-          ))}
-        </div>
+        <HomeCollage />
         <div className="land-hero-haze" aria-hidden="true" />
         <div className="land-hero-copy">
           <p className="land-slate"><b>SHORTFORM</b><span /> 숏폼 영상 스튜디오</p>
@@ -109,217 +92,148 @@ export default async function HomePage() {
         </div>
       </div>
 
-      <div className="land-wrap">
-
-        {/* 걸음 띠 — **순서가 정보다.** 01·02·03 이 진짜 순서라서 번호를 단다
-            (장식으로 번호를 다는 자리가 아니다). 가운데 걸음이 아래 도해의 주제와 같다. */}
-        <div className="land-steps">
-          <div className="land-step">
-            <span className="land-ic" aria-hidden="true">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
-            </span>
-            <span className="land-step-tx">
-              <em>STEP 01</em>
-              <strong>만들고 싶은 것을 몇 줄 적습니다</strong>
-            </span>
-          </div>
-          <div className="land-step">
-            <span className="land-ic" aria-hidden="true">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m5 3 1.2 3.3L9.5 7.5 6.2 8.7 5 12 3.8 8.7.5 7.5l3.3-1.2Z" /><path d="m16 9 1.8 4.7L22.5 15l-4.7 1.8L16 21.5l-1.8-4.7L9.5 15l4.7-1.3Z" /></svg>
-            </span>
-            <span className="land-step-tx">
-              <em>STEP 02</em>
-              <strong>원클릭으로 한 번에,<br />또는 단계별로 보고 고치며</strong>
-            </span>
-          </div>
-          <div className="land-step">
-            <span className="land-ic" aria-hidden="true">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4" /><path d="m7 9 5-5 5 5" /><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" /></svg>
-            </span>
-            <span className="land-step-tx">
-              <em>STEP 03</em>
-              <strong>고른 규격으로, 자막과 소리까지 붙어 나옵니다</strong>
-            </span>
-          </div>
-        </div>
-
-        {/* 도해 — **입력 → 두 갈래 → 같은 결과.** 시안에서 사장님이 고른 구조가 이것이다
-            (*"레퍼런스처럼 시나리오 입력 후 두가지 갈래로 퍼지는걸로"*). */}
-        <div className="land-diagram">
-          {/* 왼쪽 — 적는 자리. 그림이라 진짜 입력칸을 쓰지 않는다(위 머리말 참고). */}
-          <div className="land-panel">
-            <div className="land-field-set">
-              <span className="land-label">무엇을 만들까요</span>
-              <div className="land-field">여름 신제품 3종 소개 영상</div>
-            </div>
-            <div className="land-field-set">
-              <span className="land-label">이야기 · 자료</span>
-              <div className="land-field land-field--ta">
-                직접 짜서 만든 생과일 주스 세 가지를 소개합니다. 수박·자몽·키위, 여름 한정. 시원한 느낌으로 짧게.
-                <span className="land-count">72 / 2000</span>
-              </div>
-            </div>
-            <div className="land-field-set">
-              <span className="land-label">화풍</span>
-              <div className="land-chips">
-                <span className="land-chip land-chip--on">실사</span>
-                <span className="land-chip">브이로그</span>
-                <span className="land-chip">일러스트</span>
-                <span className="land-chip">제품컷</span>
-              </div>
-            </div>
-            <div className="land-field-set">
-              <span className="land-label">사이즈</span>
-              <div className="land-chips">
-                <span className="land-chip land-chip--on">세로 · 9:16</span>
-                <span className="land-chip">정사각 · 1:1</span>
-                <span className="land-chip">가로 · 16:9</span>
-              </div>
-            </div>
-            <div className="land-field-set">
-              <span className="land-label">길이</span>
-              <div className="land-chips">
-                <span className="land-chip land-chip--on">15초</span>
-              </div>
-              {/* ★★ 칩 아래 설명 두 줄은 **걷었다**(2026-09-14 사장님 지시 — 칩이 이미 말한다).
-                  ⚠️ 그래도 **사실은 이것이다**: 길이 칩이 하나뿐인 것은 고른 모델의 한 번
-                  상한에서 뽑히기 때문이고, 규격은 셋 중 **고르는** 것이지 한 번에 셋이
-                  나오는 것이 아니다. 이 설명을 되살릴 때도, 다른 문구를 새로 적을 때도
-                  그 사실을 넘어서는 약속을 쓰지 마라(시안 검토에서 한 번 틀리게 적었다). */}
-            </div>
-          </div>
-
-          {/* 가운데 — 두 갈래로 퍼진다. 이것이 이 제품의 차별점이라고 사장님이 꼽았다:
-              *"중간을 보고 고칠 수 있다"*. 다만 그것만 내밀면 약해서 **두 길을 나란히** 보인다. */}
-          <div className="land-fork">
-            <div className="land-branch">
-              <div className="land-bhead">
-                <span className="land-btag">원클릭</span>
-                <strong>적어주시면 끝까지 알아서</strong>
-              </div>
-              <p>중간에 멈추지 않고 완성까지 한 번에. 빨리 한 편 필요할 때.</p>
-              <div className="land-trail">
-                <span className="land-node land-node--plain"><em>이야기 적기</em><b>한 번만</b></span>
-                <span className="land-arw" aria-hidden="true">┈▸</span>
-                <span className="land-node land-node--fin"><em>완성 영상</em><b>멈춤 없이</b></span>
-              </div>
-            </div>
-
-            <div className="land-branch land-branch--pick">
-              <div className="land-bhead">
-                <span className="land-btag">단계별</span>
-                <strong>보면서 고치며 만들기</strong>
-              </div>
-              <p>시나리오와 화면을 먼저 보여드립니다. 원하는 것과 다르면 그 자리에서 고칩니다.</p>
-              <div className="land-trail">
-                <span className="land-node"><em>시나리오</em><b>고칠 수 있어요</b></span>
-                <span className="land-arw" aria-hidden="true">┈▸</span>
-                <span className="land-node"><em>화면</em><b>고칠 수 있어요</b></span>
-                <span className="land-arw" aria-hidden="true">┈▸</span>
-                <span className="land-node land-node--fin"><em>완성 영상</em><b>확인 뒤에</b></span>
-              </div>
-            </div>
-          </div>
-
-          {/* 오른쪽 — 두 길이 모이는 결과. 시안은 여기에 스토리보드 판도 걸었는데, 그 판은
-              굽힌 표지(public/showcase)에 없어서 **이 회차에서는 안 건다.**
-              걸려면 scripts/showcase-refresh.mjs 가 판도 함께 굽게 해야 한다. */}
-          {OUT && (
-            <div className="land-out">
-              <img
-                src={`/showcase/${OUT.file}`}
-                alt="shortform 으로 만든 숏폼 영상"
-                width={OUT.w}
-                height={OUT.h}
-                fetchPriority="high"
-              />
-              {/* 자막은 우리가 ffmpeg 로 태워 넣는 것이라 그림 위에 그대로 얹는다.
-                  ★ 색을 입히지 않는다 — 지금 제공하지 않는 기능을 랜딩이 약속하면 안 된다
-                    (09-14 사장님 지시로 시안에서 색 자막을 걷었다). */}
-              {/* ★ 자막은 **아래**에 깐다(09-14 사장님 지시). 가운데 있으면 사람 얼굴이나
-                  물건을 덮는다 — 실제 우리가 태우는 자리도 화면 아래다. */}
-              <p className="land-burn">매일 아침 직접 짭니다<br />여름 한정 3종</p>
-              <div className="land-scrub" aria-hidden="true">
-                <span className="land-pb" />
-                <span className="land-track"><i /></span>
-                <span className="land-time">00:07 / 00:15</span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* 규격 — 비율을 **고르는** 것이지 셋이 한 번에 나오는 것이 아니다(시안 정정 셋 중 하나). */}
-        <div className="land-fits">
-          <p className="land-fits-t">급하면 원클릭, 제대로 만들려면 단계별 — 두 가지 다 있습니다</p>
-          <div className="land-fitrow">
-            <span className="land-fit"><b>9:16</b> 인스타 릴스 · 유튜브 쇼츠 · 틱톡</span>
-            <span className="land-fit"><b>16:9</b> 유튜브 · 홈페이지 · 화면 광고</span>
-            <span className="land-fit"><b>1:1</b> 인스타 피드 · 네이버 배너</span>
-          </div>
-        </div>
-      </div>
-
-      {/* ★★ 2026-09-14 — 아래 절들을 한 겹으로 묶는다. [맨 위로] 버튼이 **이 묶음 안에서**
-          sticky 로 떠 있어야 두 갈래 절부터 마무리까지 따라온다 — 벽 안에 두었더니 벽을
-          지나는 순간 같이 사라져 페이지 맨 아래에서는 보이지 않았다(사장님 지적).
-          ★ 히어로·도해는 이 묶음 **밖**이다 — 맨 위에서 "맨 위로"는 할 말이 없다. */}
+      {/* ★★ 아래 절들은 2026-09-28 에 **통째로 갈렸다**(사장님: "전체 페이지를 갈아 끼울거야").
+          걷어낸 것: 걸음 띠(STEP 01~03) · **제품 도해**(09-14 에 사장님이 시안 둘 중 고른 그것) ·
+          규격 띠(land-fits) · 어두운 두 갈래 절(land-two) · 옛 마무리(land-final).
+          ⚠️ 특히 **도해는 09-14 의 결정 그 자체였다** — 되살릴 값은 git 이력에 있고,
+            이 파일 머리말 ①~③ 이 왜 그것을 놓았는지 말한다. 되살리려거든 **뒤집힌 줄 알고** 해라.
+          남긴 것: 만든 영상 벽(아래)과 보관함 문. 벽은 목업에 없지만 2026-08-27 사장님 지시
+            ("기본으로 보관함 바로 확인")가 여기 말고는 걸릴 데가 없어서 남겼다. */}
       <div className="land-below">
-      {/* ★★ 어두운 면은 **여기 하나뿐이다.** 랜딩에서 가장 할 말이 많은 절이라 바탕을 갈아
-          시선을 끊는다 — 색으로 소리치는 자리를 하나로 몰아 둔 것이다. */}
-      <section className="land-two" id="two">
+
+      {/* SC 01 — 적은 글이 그대로 장면과 자막이 된다. 이 서비스의 유일한 구조적 보장이라
+          가장 먼저 말한다(컷을 이어붙이면 원고와 글자 그대로 같다). */}
+      <section className="land-tell">
+        <div className="land-wrap land-say">
+          <p className="land-slate land-say-slate"><b>SC 01</b><span /> 무엇이 되는가</p>
+          <p className="land-statement">적어 주신 글이<br /><b>장면과 자막</b>이 됩니다.</p>
+          <div className="land-quote">
+            <p className="land-qsrc">
+              가게 이야기를 적으면 그 글에서 장면을 뽑고, 자막은 <b>글자 그대로</b> 영상에 태웁니다.
+              위 갤러리의 자막은 전부 그렇게 들어간 것입니다.
+            </p>
+            <p className="land-qout">
+              예 — “어느 오후, 시간이 멈췄습니다.” · “빛이 먼저 들어와, 자리를 잡습니다.”
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* SC 02 — 두 갈래. 둘 다 같은 자료로 시작하고, 중간을 손보고 싶은지만 고른다. */}
+      <section className="land-tell" id="two">
         <div className="land-wrap">
-          <p className="land-slate"><b>SC 02</b><span /> 원클릭 · 단계별</p>
-          <h2 className="land-h2">급할 땐 한 번에,<br />다듬을 땐 단계별로</h2>
-          <p className="land-lede">
-            오늘 당장 올릴 게 필요한 날이 있고, 원하는 그림이 또렷해 손봐가며 만들고 싶은 날이 있습니다.
-            그래서 길을 둘로 열어두었습니다.
-          </p>
-
-          {/* ★ 두 카드는 **같은 크기**다(09-14 사장님 지시). 내용 길이가 달라도 늘여서 맞추고
-              마지막 "이럴 때" 줄을 바닥에 붙인다 — 한쪽만 길면 그쪽이 정답처럼 읽힌다. */}
-          <div className="land-paths">
-            <div className="land-path">
-              <span className="land-ptag">원클릭</span>
-              <h3 className="land-path-h">적어두면 끝까지 알아서</h3>
-              <ul className="land-plist">
-                <li><b>손쉽게 한 번에 만듭니다.</b> 시나리오만 한 번 보고 나머지는 맡기면 돼요.</li>
-                <li>시나리오 · 화면 · 자막 · 소리까지 한 번에 붙습니다.</li>
-                <li>기다렸다가 완성된 영상만 받아보면 됩니다.</li>
-              </ul>
-              <p className="land-pwhen"><b>이럴 때</b> — 소재는 정해졌고, 빨리 한 편만 있으면 될 때</p>
+          <div className="land-tellhead">
+            <div>
+              <p className="land-slate"><b>SC 02</b><span /> 만드는 방법</p>
+              <h2 className="land-h2">맡기거나, 보면서 고치거나</h2>
+              <p className="land-lede">둘 다 같은 자료로 시작합니다. 중간을 손보고 싶은지 아닌지만 고르시면 됩니다.</p>
             </div>
-
-            <div className="land-path land-path--deep">
-              <span className="land-ptag">단계별</span>
-              <h3 className="land-path-h">보면서 고치며 만들기</h3>
-              <ul className="land-plist">
-                <li><b>시나리오와 화면을 먼저 보여드립니다.</b> 영상을 만들기 전이에요.</li>
-                <li>원하는 것과 다르면 <b>그 자리에서 고칩니다.</b> 처음부터 다시 돌릴 필요가 없어요.</li>
-                <li>마음에 들 때 마지막으로 영상을 만듭니다.</li>
+            <Link className="cta" href={signedIn ? "/ads/new" : "/login?next=/ads/new"}>
+              {signedIn ? "만들러 가기" : "시작하기"}
+            </Link>
+          </div>
+          <div className="land-ways">
+            <div className="land-way">
+              <h3 className="land-way-h">원클릭 영상</h3>
+              <p className="land-way-who">지금 올릴 한 편이 급할 때</p>
+              <ul className="land-way-list">
+                <li>자료를 적고 버튼 한 번</li>
+                <li>시나리오 · 그림 · 영상 · 자막까지 알아서</li>
+                <li>다 되면 보관함에 저장</li>
               </ul>
-              <div className="land-editbox">
-                <span className="land-editlbl">고치고 싶은 것을 적어주세요</span>
-                <p className="land-typed">두 번째 장면을 더 밝게, 마지막에 로고도 넣어줘</p>
-                <span className="land-send">이대로 고치기</span>
-              </div>
-              <p className="land-pwhen"><b>이럴 때</b> — 머릿속에 그림이 있고, 그대로 나와야 할 때</p>
+              <p className="land-way-foot">누르는 횟수 1번</p>
+            </div>
+            <div className="land-way">
+              <h3 className="land-way-h">단계별 영상</h3>
+              <p className="land-way-who">문구와 장면을 내 손으로 잡고 싶을 때</p>
+              <ul className="land-way-list">
+                <li>시나리오를 읽고 고친 뒤 다음으로</li>
+                <li>마음에 안 드는 장면만 다시 그리기</li>
+                <li>컷마다 첫 1회는 무료로 다시 만들기</li>
+              </ul>
+              <p className="land-way-foot">멈추는 자리 6곳</p>
             </div>
           </div>
         </div>
       </section>
 
+      {/* SC 03 — 단계별로 멈추는 여섯 자리. 표는 lib/steps.js 의 STEPS 와 **같은 순서**다.
+          ⚠️ 그 표가 바뀌면 여기도 바꿔라(랜딩은 그 파일을 읽지 않는다 — 화면이 서버 전용
+            모듈을 끌어오면 빌드가 깨진 사고가 이 저장소에 세 번 있었다). */}
+      <section className="land-tell">
+        <div className="land-wrap">
+          <div className="land-tellhead">
+            <div>
+              <p className="land-slate"><b>SC 03</b><span /> 단계별로 만들면</p>
+              <h2 className="land-h2">여섯 자리에서 멈춰 볼 수 있어요</h2>
+              <p className="land-lede">앞 단계를 고치면 뒤 단계가 낡았다고 알려 줍니다. 필요한 것만 다시 만들면 됩니다.</p>
+            </div>
+          </div>
+          <ol className="land-six">
+            <li><b>01</b><strong>입력</strong><span>가게 이야기와 사진</span></li>
+            <li><b>02</b><strong>시나리오</strong><span>장면 · 대사 · 초</span></li>
+            <li><b>03</b><strong>이미지</strong><span>장면마다 한 장</span></li>
+            <li><b>04</b><strong>영상 프롬프트</strong><span>어떻게 움직일지</span></li>
+            <li><b>05</b><strong>영상</strong><span>컷을 굽습니다</span></li>
+            <li><b>06</b><strong>완성</strong><span>자막 얹어 한 편으로</span></li>
+          </ol>
+        </div>
+      </section>
+
       {/* 만든 영상 — 굽힌 표지에서 그린다(components/HomeMade.jsx). */}
       <div className="land-wrap land-made-head">
-        <p className="land-slate"><b>SC 03</b><span /> 만든 영상</p>
+        <p className="land-slate"><b>SC 04</b><span /> 만든 영상</p>
         <h2 className="land-h2">shortform 으로 만들었습니다</h2>
         <p className="land-lede">전부 실제로 이 서비스에서 나온 영상입니다.</p>
       </div>
       <HomeMade />
 
+      {/* SC 05 — 크레딧. ⚠️⚠️ **금액이 비어 있다**(“가격 미정”). 목업 그대로 옮긴 것이고,
+          팩 크기는 정해진 값이지만 **판매가는 결제를 붙일 때 정한다**(OUTSTANDING.md 크레딧 절).
+          손님에게 열기 전에 채우거나, 못 채우면 이 절을 내려라 — 빈 가격표는 안 파는 것보다 나쁘다. */}
+      <section className="land-tell">
+        <div className="land-wrap">
+          <div className="land-tellhead">
+            <div>
+              <p className="land-slate"><b>SC 05</b><span /> 크레딧</p>
+              <h2 className="land-h2">쓴 만큼만,<br />한 가지 단위로</h2>
+              <p className="land-lede">영상도 다시 만들기도 전부 크레딧 하나로 셉니다. 월 구독이 아니라 필요할 때 채우는 방식입니다.</p>
+            </div>
+          </div>
+          <div className="land-packs">
+            <div className="land-pack">
+              <span className="land-pack-n">스타터</span>
+              <span className="land-pack-c">1,000<i> 크레딧</i></span>
+              <span className="land-pack-p">가격 미정</span>
+              <span className="land-pack-g">15초 한 편씩 가볍게 시험해 보는 크기</span>
+            </div>
+            <div className="land-pack land-pack--pick">
+              <span className="land-pack-n">베이직 · 추천</span>
+              <span className="land-pack-c">3,000<i> 크레딧</i></span>
+              <span className="land-pack-p">가격 미정</span>
+              <span className="land-pack-g">한 달에 몇 편씩 꾸준히 올리는 가게</span>
+            </div>
+            <div className="land-pack">
+              <span className="land-pack-n">프로</span>
+              <span className="land-pack-c">5,000<i> 크레딧</i></span>
+              <span className="land-pack-p">가격 미정</span>
+              <span className="land-pack-g">채널을 본격적으로 돌리는 경우</span>
+            </div>
+            <div className="land-pack">
+              <span className="land-pack-n">비즈니스</span>
+              <span className="land-pack-c">10,000<i> 크레딧</i></span>
+              <span className="land-pack-p">가격 미정</span>
+              <span className="land-pack-g">여러 매장 · 여러 제품을 한꺼번에</span>
+            </div>
+          </div>
+          <p className="land-note">※ 팩 크기는 정해진 값이고, 금액은 결제를 붙일 때 채웁니다. 위 갤러리의 영상은 실제로 만든 것입니다.</p>
+        </div>
+      </section>
+
       {/* 마무리 — 이 화면에서 가장 큰 문. 위의 [시작하기]와 **같은 곳**으로 간다. */}
       <section className="land-final">
         <div className="land-wrap">
-          <h2 className="land-h2">머릿속에 있는 장면을<br />다음 영상으로</h2>
+          <h2 className="land-h2">오늘 올릴 한 편,<br />지금 만들어 보세요</h2>
           <p className="land-lede">몇 줄만 적으면 됩니다. 나머지는 같이 만들어 갑니다.</p>
           <Link className="cta land-cta-big" href={signedIn ? "/ads/new" : "/login?next=/ads/new"}>
             {signedIn ? "만들러 가기" : "시작하기"}

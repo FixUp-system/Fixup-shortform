@@ -4,7 +4,6 @@
 //   열리면서 첫 화면의 주인공이 "사진 한 장"에서 "무엇을 만들어 주는가"로 바뀌었다
 //   (app/home/page.js 머리말 ③). 그래서 이 부품은 이제 **벽 하나만** 그린다 —
 //   껍데기(브랜드·신원·주 버튼)도 화면이 직접 그리므로 `nav` prop 도 없어졌다.
-//   ★ 도해의 결과 자리에 걸린 한 편은 여기서 뺀다 — 고르는 자리는 lib/landing.js 다.
 //   ★ 2026-09-14 — [맨 위로] 버튼도 **화면 쪽으로 옮겼다.** 벽 안에 있으면 벽을 지나는
 //     순간 같이 사라져서, 페이지 맨 아래(마무리 절)에서는 보이지 않았다(사장님 지적).
 //
@@ -34,10 +33,11 @@
 //     미리 잡는다 — 표지가 하나씩 뜰 때 아래가 밀리지 않는다.
 import Link from "next/link";
 import { SHOWCASE } from "../lib/showcase.js";
-import { DIAGRAM_ID } from "../lib/landing.js";
 
-// 도해에 건 한 편은 빼고 나머지가 벽이 된다 — 같은 그림이 한 화면에 두 번 나오지 않게.
-const WALL = SHOWCASE.filter((t) => t.id !== DIAGRAM_ID);
+// ★ 2026-09-28 — **굽힌 표지 전부**가 벽이다. 예전에는 도해에 건 한 편을 뺐는데
+//   (같은 그림이 한 화면에 두 번 나오지 않게) 그 도해가 사라졌다 — 뺄 이유도 함께 사라졌고,
+//   빼는 코드를 남겨 두면 "어딘가 또 걸려 있다"는 거짓말이 된다.
+const WALL = SHOWCASE;
 
 export default function HomeMade() {
   if (WALL.length === 0) return null;
