@@ -3452,13 +3452,13 @@ a.um-credit:hover { color: var(--ink); background: var(--surface2); }
   padding: 0; border: 0; overflow: hidden; clip-path: inset(50%);
 }
 .home .land-app-tabs {
-  display: flex; flex-wrap: wrap; gap: 6px;
-  padding: 12px; border-bottom: 1px solid var(--stage-edge);
+  display: flex; flex-wrap: wrap; gap: 8px;
+  padding: 16px; border-bottom: 1px solid var(--stage-edge);
 }
 .home .land-app-tab {
   display: inline-flex; align-items: center; gap: 7px;
-  padding: 7px 13px; border-radius: var(--r-pill); cursor: pointer;
-  font-size: 12px; color: var(--stage-chrome); background: var(--stage-raise);
+  padding: 11px 18px; border-radius: var(--r-pill); cursor: pointer;
+  font-size: 14px; color: var(--stage-chrome); background: var(--stage-raise);
   transition: color .18s ease, background .18s ease;
 }
 .home .land-app-tab b { font-weight: 700; }
@@ -3469,58 +3469,58 @@ a.um-credit:hover { color: var(--ink); background: var(--surface2); }
 /* ★ min-height 가 있어야 탭을 옮길 때 **높이가 안 튄다** — 칸마다 내용 길이가 달라
    없으면 누를 때마다 아래 절이 위아래로 흔들린다(실측). */
 .home .land-app-screen {
-  display: none; grid-template-columns: 200px minmax(0, 1fr); gap: 1px;
-  background: var(--stage-edge); min-height: 476px;  /* = 가장 큰 칸(이미지 생성)의 실측 높이 */
+  display: none; grid-template-columns: 260px minmax(0, 1fr); gap: 1px;
+  background: var(--stage-edge); min-height: 604px;  /* = 가장 큰 칸(이미지 생성)의 실측 높이 */
 }
 .home .land-app-screen .land-app-rail,
-.home .land-app-screen .land-app-main { background: var(--stage-dark); padding: 18px; }
+.home .land-app-screen .land-app-main { background: var(--stage-dark); padding: 28px; }
 .home .land-app-main--wide { grid-column: 1 / -1; }
 .home .land-app-rail--out { display: flex; flex-direction: column; gap: 12px; align-items: center; justify-content: center; }
 /* 완성 칸만 **영상이 주인공**이라 오른쪽을 넓게 준다(다른 칸은 200px 설정 레일이다). */
-.home #lp-done { grid-template-columns: minmax(0, 1fr) 240px; }
+.home #lp-done { grid-template-columns: minmax(0, 1fr) 320px; }
 
 .home .land-app-lbl--gap { margin-top: 18px; }
-.home .land-app-lbl { margin: 0 0 12px; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--stage-chrome); }
-.home .land-app-row { display: flex; justify-content: space-between; gap: 10px; margin: 0 0 9px; font-size: 12px; color: var(--stage-chrome); }
+.home .land-app-lbl { margin: 0 0 16px; font-size: 14px; letter-spacing: .1em; text-transform: uppercase; color: var(--stage-chrome); }
+.home .land-app-row { display: flex; justify-content: space-between; gap: 10px; margin: 0 0 13px; font-size: 14px; color: var(--stage-chrome); }
 .home .land-app-row b { font-weight: 600; color: var(--stage-ink); }
-.home .land-app-text { margin: 0 0 14px; font-size: 14px; line-height: 1.7; color: var(--stage-ink); }
+.home .land-app-text { margin: 0 0 18px; font-size: 18px; line-height: 1.7; color: var(--stage-ink); }
 .home .land-app-line {
-  display: flex; align-items: center; gap: 10px; margin: 0 0 8px;
-  padding: 9px 12px; border-radius: var(--r-ctl); background: var(--stage-raise);
-  font-size: 14px; color: var(--stage-ink);
+  display: flex; align-items: center; gap: 14px; margin: 0 0 10px;
+  padding: 15px 18px; border-radius: var(--r-ctl); background: var(--stage-raise);
+  font-size: 16px; color: var(--stage-ink);
 }
-.home .land-app-line b { font-size: 12px; font-weight: 700; color: var(--lime); }
-.home .land-app-line span { margin-left: auto; font-size: 12px; color: var(--stage-chrome); }
+.home .land-app-line b { font-size: 14px; font-weight: 700; color: var(--lime); }
+.home .land-app-line span { margin-left: auto; font-size: 14px; color: var(--stage-chrome); }
 .home .land-app-line--on { box-shadow: inset 0 0 0 1px var(--lime); }
 .home .land-app-ask {
-  display: flex; align-items: center; gap: 10px; margin: 14px 0 0;
-  padding: 10px 12px; border-radius: var(--r-ctl); border: 1px solid var(--stage-edge);
+  display: flex; align-items: center; gap: 12px; margin: 18px 0 0;
+  padding: 14px 18px; border-radius: var(--r-ctl); border: 1px solid var(--stage-edge);
 }
-.home .land-app-ask span { font-size: 14px; color: var(--stage-chrome); }
+.home .land-app-ask span { font-size: 16px; color: var(--stage-chrome); }
 .home .land-app-ask em {
   margin-left: auto; font-style: normal; white-space: nowrap;
-  padding: 6px 12px; border-radius: var(--r-pill);
-  font-size: 12px; color: var(--lime-ink); background: var(--lime);
+  padding: 9px 16px; border-radius: var(--r-pill);
+  font-size: 14px; color: var(--lime-ink); background: var(--lime);
 }
-.home .land-app-note { margin: 14px 0 0; font-size: 12px; line-height: 1.7; color: var(--stage-chrome); }
+.home .land-app-note { margin: 18px 0 0; font-size: 14px; line-height: 1.7; color: var(--stage-chrome); }
 .home .land-app-note b { color: var(--lime); font-weight: 600; }
-.home .land-app-go { margin: 16px 0 0; font-size: 12px; color: var(--lime); }
+.home .land-app-go { margin: 22px 0 0; font-size: 16px; color: var(--lime); }
 .home .land-app-thumbs { display: flex; gap: 8px; }
-.home .land-app-thumbs i { width: 68px; height: 68px; border-radius: var(--r-ctl); background: var(--stage-raise); }
+.home .land-app-thumbs i { width: 92px; height: 92px; border-radius: var(--r-ctl); background: var(--stage-raise); }
 /* 스토리보드 — 여기가 **결과물이 보이는 자리**다(2026-09-28 사장님: "영역이 너무 작아서
    결과물이 잘 안 보여"). 84px 이었을 때는 손톱만 해서 무엇이 나왔는지 안 보였다.
    ⚠️ 그렇다고 폭을 1fr 로 풀면 안 된다 — 9:16 이라 1,100px 폭에서 한 칸이 516px 높이가 되어
      판이 괴물처럼 커진다(실측). **최대 폭을 묶고** 그 안에서 고르게 나눈다. */
 .home .land-app-board {
   display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;
-  max-width: 800px;
+  max-width: 980px;
 }
 .home .land-app-board img {
   width: 100%; aspect-ratio: 9 / 16; object-fit: cover; object-position: 50% 38%;
   border-radius: var(--r-ctl); background: var(--stage-raise); display: block;
 }
 .home .land-app-vid {
-  width: 100%; max-width: 188px; aspect-ratio: 9 / 16; object-fit: cover; display: block;
+  width: 100%; max-width: 260px; aspect-ratio: 9 / 16; object-fit: cover; display: block;
   border-radius: var(--r-ctl); background: var(--stage-raise);
 }
 
