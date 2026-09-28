@@ -102,6 +102,10 @@
   --stage-glass: rgba(255, 255, 255, .22);
   /* 랜딩 강조색 — 2026-09-28. 목업의 라임이다. **앱층에는 쓰지 않는다**(앱의 강조는 --accent).
      랜딩은 검정 무대라 분홍 액센트가 탁하게 죽는다 — 어두운 바탕에서 읽히는 색이 따로 필요했다. */
+  /* 어두운 면 **위로 한 단 올라온** 카드. 밝은 벌의 --surface 에 해당하는 자리다.
+     ★ --stage-panel(#0D0D0F)을 쓰면 안 된다 — 그건 바탕(#101010)보다 **더 어두워서**
+       카드가 앞으로 나오는 대신 파묻힌다(2026-09-28 크레딧 절에서 실제로 그랬다). */
+  --stage-raise: rgba(255, 255, 255, .055);
   --lime: #DDFA42;
   --lime-ink: #0A0A0A;
   /* 랜딩의 기둥과 여백 — 프로토타입이 쓰던 값 그대로다(`max-width:1400px` + 이 여백).
@@ -3418,7 +3422,7 @@ a.um-credit:hover { color: var(--ink); background: var(--surface2); }
 .home .land-way {
   display: flex; flex-direction: column; gap: 12px;
   padding: clamp(20px, 3vw, 34px); border-radius: var(--r-card);
-  background: var(--stage-panel); box-shadow: inset 0 0 0 1px var(--stage-edge);
+  background: var(--stage-raise); box-shadow: inset 0 0 0 1px var(--stage-edge);
 }
 .home .land-way-h { margin: 0; font-size: 18px; font-weight: 700; }
 .home .land-way-who { margin: 0; font-size: 14px; color: var(--stage-chrome); }
@@ -3438,13 +3442,13 @@ a.um-credit:hover { color: var(--ink); background: var(--surface2); }
 .home .land-pack {
   display: flex; flex-direction: column; gap: 10px;
   padding: clamp(18px, 2.4vw, 28px); border-radius: var(--r-card);
-  background: var(--stage-panel); box-shadow: inset 0 0 0 1px var(--stage-edge);
+  background: var(--stage-raise); box-shadow: inset 0 0 0 1px var(--stage-edge);
 }
 .home .land-pack--pick { box-shadow: inset 0 0 0 1px var(--lime); }
 .home .land-pack-n { font-size: 12px; font-weight: 600; color: var(--stage-chrome); }
 .home .land-pack-c { font-size: 30px; font-weight: 700; letter-spacing: -0.015em; font-variant-numeric: tabular-nums; }
 .home .land-pack-c i { font-style: normal; font-size: 14px; font-weight: 400; color: var(--stage-chrome); }
-.home .land-pack-p { align-self: flex-start; padding: 4px 10px; border-radius: var(--r-pill); border: 1px dashed var(--stage-edge); font-size: 12px; color: var(--stage-chrome); }
+.home .land-pack-p { align-self: flex-start; padding: 4px 10px; border-radius: var(--r-pill); border: 1px dashed var(--stage-glass); font-size: 12px; color: var(--stage-ink); }
 .home .land-pack-g { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--stage-edge); font-size: 12px; color: var(--stage-chrome); }
 .home .land-note { margin: 20px 0 0; font-size: 12px; color: var(--stage-chrome); }
 
@@ -3901,4 +3905,7 @@ main.work:has(.rw-grid), main.work:has(.arch-page) { max-width: 1600px; }
    **랜딩 안에서만** 덮어쓴다. 메뉴가 열렸을 때의 판(.um-menu)은 흰 카드 그대로 둔다 —
    그건 띄워 놓는 면이라 어두운 띠 위에서도 읽힌다. */
 .home .stage-nav .um-btn { color: var(--stage-ink); }
-.home .stage-nav .um-credit { color: var(--stage-ink); background: var(--stage-glass); }
+.home .stage-nav .um-credit { color: var(--stage-chrome); background: var(--stage-raise); }
+/* ★ 숫자는 칩 안의 <b> 이고 **자기 색(--ink)을 따로 들고 있다** — 겉만 칠하면 숫자만
+   검정으로 남아 사라진다(실측: 940 이 rgb(20,20,19) 로 안 보였다). 강조색을 준다. */
+.home .stage-nav .um-credit b { color: var(--lime); }
