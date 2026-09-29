@@ -67,6 +67,19 @@ describe("시나리오 규칙 — 세 흐름이 같은 한 줄을 쓴다", () =>
     expect(IP_SCENARIO_RULE).toMatch(/색|머리/);
   });
 
+  // ★★★ 2026-09-29 사장님 지적 — **알아볼 수 있어야 한다.** "바꿔라"에만 무게가 실리면
+  //   모델이 과하게 멀어져 무슨 이야기인지 알 수 없게 된다. 사람이 알아보는 근거(줄거리의
+  //   상징)와 검사가 거르는 근거(인물 겉모습 조합)는 **다른 것**이라 둘 다 챙길 수 있다.
+  it("★★★ 이야기의 상징은 살리라고 말한다 — 빨간 사과·마법 거울까지 바꾸면 안 된다", () => {
+    expect(IP_SCENARIO_RULE).toMatch(/상징/);
+    expect(IP_SCENARIO_RULE).toMatch(/살린다|그대로 둔다|지킨다/);
+  });
+
+  it("★★ 바꾸는 대상이 **의상 색 조합과 머리 모양**으로 좁혀져 있다", () => {
+    expect(IP_SCENARIO_RULE).toMatch(/의상|옷/);
+    expect(IP_SCENARIO_RULE).toMatch(/머리 모양/);
+  });
+
   for (const f of ["lib/reel/scenario.js", "lib/ad/scenario.js", "lib/film/scenario.js"]) {
     it(`★★ ${f} 가 그 한 줄을 싣는다 — 손으로 다시 적으면 세 벌이 갈린다`, () => {
       expect(readFileSync(f, "utf8"), f).toMatch(/IP_SCENARIO_RULE/);
