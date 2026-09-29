@@ -39,6 +39,7 @@ import { useMe } from "../../../components/MeContext";
 import { modelsForTier } from "../../../lib/tiers";
 import { MAX_MATERIAL_TEXT } from "../../../lib/material";
 import { PHOTO_ROLES, visiblePhotoRoles, isPersonPhoto, PERSON_PHOTO_NOTE } from "../../../lib/photos";
+import { shrinkForUpload } from "../../../lib/upload-shrink";
 
 // 화풍 라벨은 styles.js 에 있지만, 고를 수 있는 것은 AD_STYLE_LINES 에 영상용 문구가 있는
 // id 뿐이어야 한다 — 둘이 어긋나면 화면에는 있는데 서버(normalizeAdOptions)가 400 을 낸다.
@@ -114,7 +115,9 @@ export default function AdNewPage() {
     try {
       for (const file of files.slice(0, Math.max(room, 0))) {
         const fd = new FormData();
-        fd.append("file", file);
+        // ★★ 2026-09-29 — **올리기 전에 줄인다.** 플랫폼이 요청 본문을 4.5MB 에서 막아
+        //   휴대폰 사진(4~8MB)이 **말없이 실패**했다(lib/upload-shrink.js 머리말).
+        fd.append("file", await shrinkForUpload(file));
         const res = await fetch("/api/uploads", { method: "POST", body: fd });
         const data = await res.json();
         // ★ 올린 사진에 **누른 버튼의 종류**를 붙인다 — 이 값이 프롬프트의 라벨이 된다.

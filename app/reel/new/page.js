@@ -72,6 +72,7 @@ import { useMe } from "../../../components/MeContext";
 // 화면은 통과시키는데 서버가 400 을 내고, 사장님은 다 올린 뒤에야 거절당한다.
 import { MAX_PHOTOS, PHOTO_ROLES, visiblePhotoRoles, isPersonPhoto, PERSON_PHOTO_NOTE } from "../../../lib/photos";
 import { MAX_MATERIAL_TEXT } from "../../../lib/material";
+import { shrinkForUpload } from "../../../lib/upload-shrink";
 
 // 화풍은 영상용 문구가 있는 것만 고를 수 있다 — 광고 화면(app/ads/new/page.js)·
 // film(app/film/new/page.js)과 같은 규칙이다.
@@ -188,7 +189,9 @@ export default function ReelNewPage() {
     try {
       for (const file of files.slice(0, Math.max(room, 0))) {
         const fd = new FormData();
-        fd.append("file", file);
+        // ★★ 2026-09-29 — **올리기 전에 줄인다.** 플랫폼이 요청 본문을 4.5MB 에서 막아
+        //   휴대폰 사진(4~8MB)이 **말없이 실패**했다(lib/upload-shrink.js 머리말).
+        fd.append("file", await shrinkForUpload(file));
         const res = await fetch("/api/uploads", { method: "POST", body: fd });
         const data = await res.json().catch(() => ({}));
         // ★ 올린 사진에 **누른 버튼의 종류**를 붙인다 — 이 값이 프롬프트의 라벨이 된다.

@@ -23,6 +23,7 @@ import { SUBTITLE_LANGS, DEFAULT_SPEECH_LANG } from "../../lib/subtitle-langs";
 import { videoPrice, formatCredits } from "../../lib/pricing";
 import StylePicker from "../../components/StylePicker";
 import { MAX_MATERIAL_TEXT } from "../../lib/material";
+import { shrinkForUpload } from "../../lib/upload-shrink";
 
 export default function CreatePage() {
   const router = useRouter();
@@ -71,7 +72,9 @@ export default function CreatePage() {
   async function onFiles(e) {
     for (const file of e.target.files) {
       const fd = new FormData();
-      fd.append("file", file);
+      // ★★ 2026-09-29 — **올리기 전에 줄인다.** 플랫폼이 요청 본문을 4.5MB 에서 막아
+        //   휴대폰 사진(4~8MB)이 **말없이 실패**했다(lib/upload-shrink.js 머리말).
+        fd.append("file", await shrinkForUpload(file));
       const res = await fetch("/api/uploads", { method: "POST", body: fd });
       const data = await res.json();
       if (res.ok) setPhotos((p) => [...p, data]);
