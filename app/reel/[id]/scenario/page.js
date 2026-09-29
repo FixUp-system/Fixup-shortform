@@ -16,6 +16,7 @@ import { useParams } from "next/navigation";
 import { useReelProject } from "../layout";
 import { REEL_STEPS, reelStepHref } from "../../../../lib/reel/steps";
 import { scenarioLock } from "../../../../lib/reel/doc";
+import { findKnownIp, ipWarning } from "../../../../lib/known-ip";
 import { reelSheetUrl } from "../../../../lib/reel/oneshot";
 // 영어 원문 + 한국어를 한 덩어리로(2026-09-03) — 원문은 안 건드린다.
 import PromptWithKo from "../../../../components/PromptWithKo";
@@ -101,6 +102,10 @@ export default function ReelScenarioPage() {
   //   ③ **두 번 안 부른다** — 개발 모드는 effect 를 두 번 돌린다. ref 로 막는다.
   // ★ 실패하면 그대로 이 화면에 남는다 — 오류와 [다시 쓰기]가 아래에 있다.
   //   그래서 버튼을 지우지 않는다(자동은 첫 방문 한 번이고 버튼이 그 폴백이다).
+  // ★ 잘 알려진 캐릭터·작품 — 시나리오와 사장님이 적은 자료를 **둘 다** 본다. 시나리오가
+  //   이름을 지웠어도 자료에 남아 있으면 그림이 그쪽을 따라갈 수 있다.
+  const ipNames = findKnownIp(`${scenario?.text || ""}\n${project?.material?.text || ""}`);
+
   const autoRef = useRef(false);
   useEffect(() => {
     if (autoRef.current) return;
@@ -186,6 +191,10 @@ export default function ReelScenarioPage() {
           <p className="script-src">{narration.text}</p>
         </div>
       )}
+      {/* ★★★ 2026-09-28 — **잘 알려진 캐릭터·작품을 미리 알려 준다**(백설공주 편 6ce304aa 가
+          출력 저작권으로 거절됐다). **막지 않는다**(사장님 결정) — 콜라보 제품처럼 그 이름이
+          꼭 필요한 경우가 있다. 판정은 lib/known-ip.js 한 벌이다(화면이 손으로 안 적는다). */}
+      {ipNames.length > 0 && <p className="pgsub warn">{ipWarning(ipNames)}</p>}
       {lock && <p className="pgsub">{lock.message}</p>}
         </div>
         {sheetUrl && (
