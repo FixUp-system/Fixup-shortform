@@ -11,7 +11,9 @@ import { modelIdForProject, resolutionForProject } from "../../../../../lib/clip
 import { fakeFal } from "../../../../../lib/fake.js";
 import {
   reelOf, putReel, isImagesLocked, imageTriesLeft, imageTriesLeftLifetime, isReelRendering,
+  REEL_IMAGE_DEADLINE_MS,
 } from "../../../../../lib/reel/doc.js";
+import { withDeadline } from "../../../../../lib/deadline.js";
 import {
   planReelImages, drawStoryboardSheet, mergeImages,
 } from "../../../../../lib/reel/storyboard.js";
@@ -184,10 +186,19 @@ export const POST = withUser(async (req, { params }, user) => {
     // ★ 몸통은 lib/reel/storyboard.js 의 drawStoryboardSheet 하나다(2026-08-31 에 옮겼다) —
     //   초상 거절 자동 재시도가 같은 길로 판을 다시 그린다. 두 벌이면 한쪽만 고쳐진다.
     try {
-      const drawn = await drawStoryboardSheet({
-        project, cuts, grid: plan.grid, note,
-        projectId: id, ownerId: user.id, aspect: aspect_ratio, resolution,
-      });
+      // ★★★ 2026-09-29 — **우리 시계로 먼저 끝낸다.** 함수 상한(maxDuration 300초)에 닿으면
+      //   플랫폼이 함수를 통째로 끝내고 이 `catch` 도 사라진다 — 문서에는 `imagesDrawing:true`
+      //   만 남아 화면이 영원히 로딩이었다(실측: 판 수정이 10분 넘게 멈춰 있었다).
+      //   ★ 호출 자체는 못 멈춘다(그림 모델은 계속 만든다) — 다만 우리가 먼저 끝내고
+      //     사유를 적은 뒤 잠금을 풀 수 있다(아래 merge 가 imagesDrawing:false 로 내린다).
+      const drawn = await withDeadline(
+        drawStoryboardSheet({
+          project, cuts, grid: plan.grid, note,
+          projectId: id, ownerId: user.id, aspect: aspect_ratio, resolution,
+        }),
+        REEL_IMAGE_DEADLINE_MS,
+        "그림이 오래 걸려서 못 끝냈어요 — 고칠 내용을 짧게 줄여 다시 시도해 주세요",
+      );
       for (const [idx, image] of drawn) made.set(idx, image);
     } catch (e) {
       failure = e;
