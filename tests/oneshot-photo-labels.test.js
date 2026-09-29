@@ -44,13 +44,13 @@ describe("라벨 — 어느 첨부가 무엇인가", () => {
   it("★★★ 사진마다 번호와 종류를 붙인다", () => {
     const line = attachedRoleLines([P("logo", 0), P("product", 1)], 2);
     expect(line).toMatch(/Attached image 2 is the brand logo/);
-    expect(line).toMatch(/Attached image 3 is the product/);
+    expect(line).toMatch(/Attached image 3 is the subject/);
   });
 
   it("★★★ 같은 종류가 둘이면 **둘 다** 번호를 받는다 — 묶어 말하면 짝을 못 짓는다", () => {
     const line = attachedRoleLines([P("product", 0), P("product", 1)], 2);
-    expect(line).toMatch(/Attached image 2 is the product/);
-    expect(line).toMatch(/Attached image 3 is the product/);
+    expect(line).toMatch(/Attached image 2 is the subject/);
+    expect(line).toMatch(/Attached image 3 is the subject/);
   });
 
   it("★★ 종류를 모르는 사진도 번호는 받는다 — 번호가 실제 첨부 자리와 어긋나면 안 된다", () => {
@@ -71,7 +71,7 @@ describe("통짜 지문 — 판이 1번이라고 말한다", () => {
     const p = prompt([P("logo", 0), P("product", 1)]);
     expect(p).toMatch(/Attached image 1 is (the )?storyboard/i);
     expect(p).toMatch(/Attached image 2 is the brand logo/);
-    expect(p).toMatch(/Attached image 3 is the product/);
+    expect(p).toMatch(/Attached image 3 is the subject/);
   });
 
   it("★★ 사진이 없으면 번호 문장이 통째로 없다", () => {

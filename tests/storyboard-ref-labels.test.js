@@ -28,12 +28,12 @@ describe("판 지문 — 첨부 라벨", () => {
   it("★★★ 사진마다 번호와 종류를 말한다 — 순서는 실리는 순서 그대로다", () => {
     const out = prompt([{ photo_id: LOGO, key: "logo.png" }, { photo_id: PROD, key: "prod.png" }]);
     expect(out).toMatch(/Attached reference image 1 is the brand logo/);
-    expect(out).toMatch(/Attached reference image 2 is the product/);
+    expect(out).toMatch(/Attached reference image 2 is the subject/);
   });
 
   it("★★ 아바타(사진이 아닌 참조)는 사람이라고 말한다 — 번호가 밀리면 안 된다", () => {
     const out = prompt([{ photo_id: PROD, key: "prod.png" }, { kind: "person", source: "avatar", key: "a1.png" }]);
-    expect(out).toMatch(/Attached reference image 1 is the product/);
+    expect(out).toMatch(/Attached reference image 1 is the subject/);
     expect(out).toMatch(/Attached reference image 2 is the person/);
   });
 

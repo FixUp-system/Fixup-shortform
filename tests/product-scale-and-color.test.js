@@ -83,7 +83,7 @@ describe("사진 판정 — 색과 크기를 읽는다", () => {
         fetchImpl: async () => ({ ok: false, status: 500, text: async () => "" }),
       })
     );
-    expect(got).toEqual({ person: false, what: "", who: null, lettering: "", scale: "" });
+    expect(got).toEqual({ person: false, any_face: false, what: "", who: null, lettering: "", scale: "" });
   });
 });
 

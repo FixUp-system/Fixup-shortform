@@ -144,7 +144,7 @@ describe("describePhoto — 올린 사진에 무엇이 담겼나", () => {
       photoBytes: null, projectId: "p1", apiKey: "k",
       fetchImpl: reply({ person: true, what: "작업복 남성", who: "50대 남성" }),
     }));
-    expect(got).toEqual({ person: true, what: "작업복 남성", who: "50대 남성", lettering: "", scale: "" });
+    expect(got).toEqual({ person: true, any_face: true, what: "작업복 남성", who: "50대 남성", lettering: "", scale: "" });
   });
 
   it("사물·공간 사진이면 person=false, who=null", async () => {
@@ -152,7 +152,7 @@ describe("describePhoto — 올린 사진에 무엇이 담겼나", () => {
       photoBytes: null, projectId: "p1", apiKey: "k",
       fetchImpl: reply({ person: false, what: "가게 내부", who: "몰라" }),
     }));
-    expect(got).toEqual({ person: false, what: "가게 내부", who: null, lettering: "", scale: "" });
+    expect(got).toEqual({ person: false, any_face: false, what: "가게 내부", who: null, lettering: "", scale: "" });
   });
 
   it("응답이 깨져도 던지지 않는다 — 사물로 취급해 흐름을 막지 않는다", async () => {
@@ -160,7 +160,7 @@ describe("describePhoto — 올린 사진에 무엇이 담겼나", () => {
       photoBytes: null, projectId: "p1", apiKey: "k",
       fetchImpl: async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: "{{{" } }] }) }),
     }));
-    expect(got).toEqual({ person: false, what: "", who: null, lettering: "", scale: "" });
+    expect(got).toEqual({ person: false, any_face: false, what: "", who: null, lettering: "", scale: "" });
   });
 
   it("호출이 실패해도 던지지 않는다", async () => {
@@ -168,7 +168,7 @@ describe("describePhoto — 올린 사진에 무엇이 담겼나", () => {
       photoBytes: null, projectId: "p1", apiKey: "k",
       fetchImpl: async () => ({ ok: false, status: 500, text: async () => "" }),
     }));
-    expect(got).toEqual({ person: false, what: "", who: null, lettering: "", scale: "" });
+    expect(got).toEqual({ person: false, any_face: false, what: "", who: null, lettering: "", scale: "" });
   });
 
   it("actor 컨텍스트 없이 부르면 던진다 — fail-open 이 이것까지 삼키면 안 된다", async () => {
@@ -205,7 +205,7 @@ describe("describePhoto — 올린 사진에 무엇이 담겼나", () => {
       fetchImpl: reply({ person: true, what: "작업복 남성", who: "50대 남성" }, () => { called = true; }),
     }));
     expect(called).toBe(true);
-    expect(got).toEqual({ person: true, what: "작업복 남성", who: "50대 남성", lettering: "", scale: "" });
+    expect(got).toEqual({ person: true, any_face: true, what: "작업복 남성", who: "50대 남성", lettering: "", scale: "" });
     delete process.env.SHOTFORM_FAKE_IMAGES;
   });
 
@@ -272,5 +272,62 @@ describe("describePhoto 가 한도를 본다", () => {
       }))
     ).rejects.toThrow(BudgetExceeded);
     expect(called, "한도를 넘었는데 OpenAI 로 나갔다").toBe(false);
+  });
+});
+
+// ── 배경 얼굴까지 본다 (2026-09-29) ───────────────────────────────────────────
+//
+// ★★★ 왜 더했나. `person` 은 **"주인공이 사람인가"** 에 답하는 값이라 지문이 못 박아 둔
+//   대로 *"멀리 지나가는 행인이나 뒷모습만 있으면 false"* 다. 주인공을 가리는 목적에는
+//   맞지만, **fal 은 배경 얼굴에도 거절을 낸다** — lib/reel/face-grid.js 가 이미 밟은
+//   함정이다("옛 지문의 clearly visible 은 배경의 작은 얼굴을 건너뛰었는데, 거절을 부른
+//   것이 바로 그 얼굴이었다").
+// ★ 그래서 **호출을 새로 만들지 않고** 지금 도는 판정에 칸 하나를 더한다 — 이 판정은
+//   사진마다 이미 정확히 한 번 돌고 캐시된다(readPhotoVision 의 `if (ph.vision) continue`).
+//   값이 사실상 0원인 이유가 그것이다.
+describe("describePhoto — 거절될 얼굴이 있는가(any_face)", () => {
+  const reply = (obj) => async () => ({
+    ok: true,
+    json: async () => ({ model: "gpt-4o", usage: { prompt_tokens: 10, completion_tokens: 5 },
+      choices: [{ message: { content: JSON.stringify(obj) } }] }),
+  });
+
+  it("★★ 주인공은 사람이 아닌데 배경에 얼굴이 있으면 any_face 만 true 다", async () => {
+    const got = await runWithActor("t-user", () => describePhoto({
+      photoBytes: null, projectId: "p1", apiKey: "k",
+      fetchImpl: reply({ person: false, what: "카페 테이블 위 갈색 병", any_face: true }),
+    }));
+    expect(got.person).toBe(false);
+    expect(got.any_face).toBe(true);
+  });
+
+  it("얼굴이 하나도 없으면 false 다", async () => {
+    const got = await runWithActor("t-user", () => describePhoto({
+      photoBytes: null, projectId: "p1", apiKey: "k",
+      fetchImpl: reply({ person: false, what: "회색 강아지", any_face: false }),
+    }));
+    expect(got.any_face).toBe(false);
+  });
+
+  it("★ 주인공이 사람이면 모델이 any_face 를 빠뜨려도 true 다 — 사람이 있는데 얼굴이 없을 수 없다", async () => {
+    const got = await runWithActor("t-user", () => describePhoto({
+      photoBytes: null, projectId: "p1", apiKey: "k",
+      fetchImpl: reply({ person: true, what: "작업복 남성", who: "50대 남성" }),
+    }));
+    expect(got.any_face).toBe(true);
+  });
+
+  it("★★ 지문이 배경·작은 얼굴을 **이름으로** 부른다 — clearly visible 로 물으면 그것을 놓친다", async () => {
+    let sent = "";
+    await runWithActor("t-user", () => describePhoto({
+      photoBytes: null, projectId: "p1", apiKey: "k",
+      fetchImpl: async (_u, opt) => {
+        sent = JSON.parse(opt.body).messages[0].content[0].text;
+        return { ok: true, json: async () => ({ choices: [{ message: { content: "{}" } }] }) };
+      },
+    }));
+    expect(sent).toMatch(/any_face/);
+    expect(sent).toMatch(/배경/);
+    expect(sent).toMatch(/작|흐릿/);
   });
 });

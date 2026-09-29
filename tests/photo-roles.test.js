@@ -66,7 +66,7 @@ describe("원클릭 — 장마다 한 줄", () => {
     const p = adPrompt([photo("a", "logo"), photo("b", "product")]);
     // 이름은 모델 표(adRefLabel)가 만든다 — H3 는 "Image 1" 이다.
     expect(p).toMatch(/Image 1[\s\S]{0,80}로고/);
-    expect(p).toMatch(/Image 2[\s\S]{0,80}제품/);
+    expect(p).toMatch(/Image 2[\s\S]{0,80}피사체/);
   });
 
   it("★★ 불변 지시가 실린다", () => {
@@ -156,4 +156,39 @@ describe("화면 — 버튼이 셋이다", () => {
       expect(src, "올린 사진에 종류를 안 붙인다").toMatch(/role/);
     });
   }
+});
+
+// ── 제품 → 피사체 (2026-09-29) ───────────────────────────────────────────────
+//
+// ★★★ 왜 넓혔나. 강아지 편 `1c979787` 에서 사장님이 강아지 사진을 **＋인물**로 올렸다 —
+//   로고도 제품도 아니니 담을 칸이 그것밖에 없었다. 그런데 `person` 은 설명만 하는 칸이
+//   아니라 **초상 정책 스위치**라(lib/photos.js 의 hasFaceRisk), 네 장이 전부 영상 모델에
+//   안 갔다. 즉 **칸이 없어서** 잘못된 칸을 고르게 만든 것이 사고의 입구였다.
+// ★ 그래서 **칸을 늘리지 않는다.** 동물 칸을 더하면 음식·건물·자동차가 따라온다 —
+//   `product` 의 뜻을 "이 영상의 피사체"로 넓혀 그 전부를 담는다.
+// ★★ **id 는 `product` 그대로다.** 이 값은 Supabase 의 projects.doc 에 저장돼 있다 —
+//   바꾸면 이미 올라간 사진들의 종류가 통째로 사라진다(photoRole 이 null 을 돌려준다).
+//   바뀌는 것은 화면 이름과 두 지시문뿐이다.
+describe("제품 칸이 피사체로 넓어졌다", () => {
+  it("★★ id 는 그대로다 — 저장된 문서가 이 값을 들고 있다", () => {
+    expect(PHOTO_ROLE_IDS).toEqual(["logo", "product", "person"]);
+  });
+
+  it("화면 이름이 피사체다", () => {
+    expect(photoRole("product").label).toBe("피사체");
+  });
+
+  it("★ 지시문이 물건만 가리키지 않는다 — 강아지를 '제품'이라 부르면 틀린 지시다", () => {
+    const r = photoRole("product");
+    expect(r.en, "영어 지시가 아직 product 로 시작한다").toMatch(/is the subject/);
+    // 동물이 들어올 수 있음을 지시문이 실제로 말한다(모델이 읽는 것은 이 글뿐이다).
+    expect(r.en).toMatch(/creature|animal/i);
+    expect(r.ko).toMatch(/피사체/);
+  });
+
+  it("넓혀도 불변 지시는 그대로다 — 이 칸의 목적이다", () => {
+    const r = photoRole("product");
+    expect(r.ko).toMatch(/절대|그대로|바꾸지/);
+    expect(r.en).toMatch(/never|exactly|unchanged/i);
+  });
 });

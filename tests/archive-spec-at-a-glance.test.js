@@ -51,7 +51,7 @@ describe("레퍼런스 — 무엇을 붙였는지 보인다", () => {
   it("★★★ 장수가 아니라 **그림과 종류**다 — '3장'으로는 무엇을 붙였는지 모른다", () => {
     expect(archiveRefs(doc)).toEqual([
       { id: "p1", url: "/api/uploads/a.png", label: "로고" },
-      { id: "p2", url: "/api/uploads/b.png", label: "제품" },
+      { id: "p2", url: "/api/uploads/b.png", label: "피사체" },
       { id: "p3", url: "/api/uploads/c.png", label: "인물" },
       { id: "p4", url: "/api/uploads/d.png", label: "사진" },
     ]);

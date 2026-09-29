@@ -12,7 +12,7 @@ import { useReelProject } from "../layout";
 import { reelOf, reelErrorFor, isReelRendering } from "../../../../lib/reel/doc";
 // ★★ 2026-08-25 — 굽기 갈래가 둘이다(통짜 · 컷별). 판정은 lib 의 순수 함수 하나다 —
 //   canBakeReel 은 컷별 갈래에서 예전 canBakeReelClips 를 글자 그대로 부른다.
-import { planReelBake, canBakeReel, isReelOneShotStale, reelSheetUrl, reelWholePrompt, reelBakeCounts } from "../../../../lib/reel/oneshot";
+import { planReelBake, canBakeReel, isReelOneShotStale, reelSheetUrl, reelWholePrompt, reelBakeCounts, oneShotDroppedPhotos } from "../../../../lib/reel/oneshot";
 // ★★ "안 눌렀다 / 되고 있다 / 멈춘 것 같다 / 실패했다 / 끝났다" — 판정은 lib 한 벌이
 //   한다(단계별 흐름의 화면 다섯이 이미 이것을 본다). 화면이 스스로 재면 그 사본이
 //   조용히 갈린다.
@@ -120,6 +120,8 @@ export default function ReelVideoPage() {
   const doneCount = cuts.filter((c) => c?.video?.url).length;
   // ★ 갈래는 **문서**로 판정한다 — 상태 라우트(live)는 settings·scenario 를 안 싣는다.
   const oneShot = planReelBake(project).mode === "oneshot";
+  // ★ 판과 함께 못 보낸 사진 — 서버가 쓰는 판정 그대로다(lib/reel/oneshot.js).
+  const dropped = oneShotDroppedPhotos(project);
   const sheetUrl = reelSheetUrl(project?.cuts || []);
   const oneShotStale = oneShot && isReelOneShotStale(project);
 
@@ -221,6 +223,19 @@ export default function ReelVideoPage() {
           ★ 컷별 갈래의 "컷 N개 중 M개"는 남긴다 — 그것은 안쪽 사정이 아니라 진척이다. */}
       {!oneShot && <p className="pgsub">컷 {cuts.length}개 중 {doneCount}개를 만들었어요</p>}
       {err && <p className="pgsub warn">{err}</p>}
+      {/* ★★★ 2026-09-29 — **빠진 사진을 말한다.** 얼굴이 든 사진은 판과 함께 안 보낸다
+          (초상 정책 방어, 2026-09-04). 맞는 규칙인데 **조용했다** — 편 `1c979787` 은
+          올린 네 장이 전부 빠졌는데 화면이 아무 말도 안 했고, 그래서 "영상 속 강아지가
+          판과 다르다"가 왜 나는지 알 길이 없었다(영상 모델이 실물을 한 번도 못 봤다).
+          ★ 여기서는 **살릴 수 없다** — 보내면 굽기가 통째로 거절된다. 말해 주는 것이 전부다.
+          ★ 판정은 서버와 **같은 한 벌**을 부른다(oneShotDroppedPhotos) — 손으로 다시
+            적으면 갈리고, 갈리면 화면이 거짓말을 한다. */}
+      {oneShot && dropped.length > 0 && (
+        <p className="pgsub warn">
+          ⚠ 사진 {dropped.length}장은 영상에 참조로 보내지 않았어요 — 사람 얼굴이 담겨 있어
+          함께 보내면 만들기가 거절돼요. 그 사진의 생김새는 스토리보드 그림으로만 전해져요.
+        </p>
+      )}
       {/* ★ 실패는 **사장님 말로** 옮겨서 보인다(lib/failure.js 의 classifyFailure —
           generationState 가 부른다). 못 알아본 문구는 원문 그대로 나온다.
           ★ 어느 단계의 실패인지는 reelErrorFor 가 이미 가른다 — ⑥완성의 합성 실패가
