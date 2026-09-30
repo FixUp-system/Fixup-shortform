@@ -153,6 +153,13 @@ describe("★ 요구하지 말 것 — 손만 크게 잡는 클로즈업", () =>
     const { system } = buildLongformScenarioMessages(project, { segmentCount: 2 });
     expect(system).toMatch(/손만 크게 잡는/);
   });
+
+  it("★ 작은 물건을 손가락으로 집거나 놓는 동작도 요구하지 않는다 — 동작 대신 결과를 보여 준다", () => {
+    // 같은 편 구간 3·4: "상반신이 보이게"로 고쳐도 H3 가 손 쪽으로 당겨 잡았고, 반지 놓는 손이 어색했다(사장님).
+    const { system } = buildLongformScenarioMessages(project, { segmentCount: 2 });
+    expect(system).toMatch(/작은 물건을 손가락으로 집거나 놓는/);
+    expect(system).toMatch(/결과/);
+  });
 });
 
 describe("구간별 의상 참조 고르기", () => {
