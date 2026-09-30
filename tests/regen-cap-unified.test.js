@@ -11,7 +11,7 @@
 // ★ 단가는 원가에서 나와 이미 REGEN_PRICE 에 있다 — 이 파일이 새로 정하는 값은 없다.
 //   빠져 있던 것은 (1) reel 이 chargeRegen 을 **안 부르던 것**, (2) 시나리오·그림 상한이
 //   3이 아니던 것, (3) 광고에 상한이 없던 것, (4) 스토리보드 한 장의 단가(sheet).
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resetMemoryStore, memoryStore } from "../lib/store/memory.js";
 import { getStore } from "../lib/store/index.js";
@@ -20,9 +20,9 @@ import { runWithActor } from "../lib/actor.js";
 import { chargeVideo } from "../lib/charges.js";
 import {
   REGEN_PRICE, FREE_REGEN_PER_CUT, MAX_REGEN_PER_CUT, MAX_SCENARIO_TRIES, MAX_SCENARIO_REWRITES,
-  regenPrice, videoPrice,
+  regenPrice, videoPrice, UNPAID_REGEN_CAP,
 } from "../lib/pricing.js";
-import { MAX_REEL_IMAGE_TRIES } from "../lib/reel/doc.js";
+import { MAX_REEL_IMAGE_TRIES, imageTriesLeft } from "../lib/reel/doc.js";
 import { modelIdForProject, resolutionForProject } from "../lib/clip-limits.js";
 import { USER_HEADER, STATUS_HEADER, ROLE_HEADER } from "../lib/auth/headers.js";
 
@@ -68,9 +68,10 @@ describe("상한 — 유료는 무제한, 시나리오는 3회", () => {
     expect(regenPrice("sheet", FREE_REGEN_PER_CUT)).toBe(REGEN_PRICE.sheet);
   });
 
-  it("★ 광고·reel 라우트가 같은 상수를 본다 — 숫자를 손으로 적지 않는다", () => {
+  it("★ 광고·reel 라우트가 같은 판정을 본다 — 숫자를 손으로 적지 않는다", () => {
+    // 2026-09-30 — 상수 대신 regenCapNow()(크레딧 꺼진 동안만 3회)를 본다.
     for (const p of ["app/api/reel/[id]/clips/route.js", "app/api/ads/[id]/render/route.js"]) {
-      expect(src(p), `${p} 가 MAX_REGEN_PER_CUT 을 안 본다`).toMatch(/MAX_REGEN_PER_CUT/);
+      expect(src(p), `${p} 가 regenCapNow 를 안 본다`).toMatch(/regenCapNow\(\)/);
     }
     expect(src("app/api/reel/[id]/clips/route.js")).toMatch(/chargeRegen\(/);
     expect(src("app/api/reel/[id]/images/route.js")).toMatch(/chargeRegen\(/);
@@ -206,5 +207,72 @@ describe("광고 다시 굽기 상한", () => {
     expect(res.status).toBe(202);
     const doc = await runWithActor(U, () => getProject(id, U));
     expect(doc.ad_bake_count).toBe(10);
+  });
+});
+
+// ★★★ 2026-09-30 — **크레딧이 꺼진 동안만 3회**(사장님 결정). 09-22 의 "무제한"은 회차마다
+//   값을 받는다는 전제였는데, 크레딧이 꺼지면(SHOTFORM_NO_CREDITS=1) 그 값이 0 이라 버튼을
+//   누를 때마다 fal 원가만 나갔다. 켜져 있으면 그대로 무제한이다(위 판들).
+// ★ 가짜 모드는 원가가 0 이라 막지 않는다 — 막을 것이 없다.
+describe("크레딧이 꺼진 동안 — 재생성은 3회까지", () => {
+  const AD_H = { [USER_HEADER]: U, [STATUS_HEADER]: "approved", [ROLE_HEADER]: "user" };
+  const postAd = () => new Request("http://x", { method: "POST", headers: AD_H });
+
+  beforeEach(async () => {
+    resetMemoryStore();
+    delete process.env.SHOTFORM_FAKE;
+    process.env.SHOTFORM_NO_CREDITS = "1";
+    await memoryStore.insertProfile({ id: U, email: "c@x.kr", status: "approved", role: "user", tier: "pro" });
+  });
+  afterEach(() => { delete process.env.SHOTFORM_NO_CREDITS; delete process.env.SHOTFORM_FAKE; });
+
+  it("★★★ 상한 판정 — 꺼지면 3, 켜지면 무제한, 가짜 모드면 무제한", async () => {
+    const { regenCapNow } = await import("../lib/charges.js");
+    expect(UNPAID_REGEN_CAP).toBe(3);
+    expect(regenCapNow()).toBe(UNPAID_REGEN_CAP);
+    delete process.env.SHOTFORM_NO_CREDITS;
+    expect(regenCapNow()).toBe(MAX_REGEN_PER_CUT);
+    process.env.SHOTFORM_NO_CREDITS = "1";
+    process.env.SHOTFORM_FAKE = "fal";
+    expect(regenCapNow()).toBe(MAX_REGEN_PER_CUT);
+  });
+
+  it("★★★ reel 컷 다시 굽기 — 3회를 다 썼으면 400 이고 회차도 안 오른다", async () => {
+    const id = await makeReel({ cuts: [CUT(0, true)], regenCount: 3 });
+    const res = await CLIPS(req(), ctx(id));
+    expect(res.status, JSON.stringify(await res.clone().json())).toBe(400);
+    const doc = await runWithActor(U, () => getProject(id, U));
+    expect(doc.cuts[0].clip_regen_count).toBe(3);
+  });
+
+  it("★★ reel 컷 다시 굽기 — 2회까지 썼으면 아직 굽는다", async () => {
+    const id = await makeReel({ cuts: [CUT(0, true)], regenCount: 2 });
+    const res = await CLIPS(req(), ctx(id));
+    expect(res.status, JSON.stringify(await res.clone().json())).toBe(200);
+  });
+
+  it("★★★ 광고 다시 굽기 — 3회를 다 썼으면 400", async () => {
+    const p = await runWithActor(U, () =>
+      createProject({
+        ownerId: U, kind: "ad", material: { text: "앰플 광고", photos: [] },
+        settings: { seconds: 15, model: "minimax-h3", resolution: "2K", aspect_ratio: "9:16" },
+      })
+    );
+    await runWithActor(U, () => updateProject(p.id, U, (d) => ({
+      ...d,
+      scenario: { text: "P", shots: [{ beat: "가" }], endpoint: "t2v", tries: 1 },
+      status: "done",
+      videos: [{ url: "https://fal/ad.mp4", seconds: 15, ts: 1 }],
+      ad_bake_count: 3,
+    })));
+    const res = await AD_RENDER(postAd(), ctx(p.id));
+    expect(res.status, JSON.stringify(await res.clone().json())).toBe(400);
+  });
+
+  it("★★★ 스토리보드 다시 그리기 — 첫 그리기 + 3회를 넘기면 남은 횟수가 0 이다", () => {
+    expect(imageTriesLeft({ imageTries: 1 + UNPAID_REGEN_CAP }, 1 + UNPAID_REGEN_CAP)).toBe(0);
+    expect(imageTriesLeft({ imageTries: UNPAID_REGEN_CAP }, 1 + UNPAID_REGEN_CAP)).toBe(1);
+    // 그림 라우트가 크레딧 판정으로 상한을 고른다 — 손으로 적은 숫자가 아니다
+    expect(src("app/api/reel/[id]/images/route.js")).toMatch(/imageTriesLeft\(reel,\s*[^)]+\)/);
   });
 });

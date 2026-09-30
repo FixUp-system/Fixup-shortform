@@ -4,8 +4,8 @@ import { runReelClips, runReelOneShot } from "../../../../../lib/reel/pipeline.j
 import { planReelBake, canBakeReel } from "../../../../../lib/reel/oneshot.js";
 import { putReel, reelOf } from "../../../../../lib/reel/doc.js";
 import { getProject, updateProject } from "../../../../../lib/projects.js";
-import { requireVideoCharge, NoCredits, assertCanAfford, chargeRegen } from "../../../../../lib/charges.js";
-import { regenPrice, MAX_REGEN_PER_CUT } from "../../../../../lib/pricing.js";
+import { requireVideoCharge, NoCredits, assertCanAfford, chargeRegen, regenCapNow } from "../../../../../lib/charges.js";
+import { regenPrice } from "../../../../../lib/pricing.js";
 import { isReelClipStale } from "../../../../../lib/reel/steps.js";
 import { modelIdForProject, resolutionForProject } from "../../../../../lib/clip-limits.js";
 import { fakeFal } from "../../../../../lib/fake.js";
@@ -104,11 +104,13 @@ export const POST = withUser(async (req, { params }, user) => {
     if (rebaking.length) {
       const model = modelIdForProject(project);
       const resolution = resolutionForProject(project);
-      const over = rebaking.filter((c) => (Number(c.clip_regen_count) || 0) >= MAX_REGEN_PER_CUT);
+      // ★ 상한은 지금 크레딧 상태가 정한다(lib/charges.js 의 regenCapNow — 꺼진 동안만 3회).
+      const cap = regenCapNow();
+      const over = rebaking.filter((c) => (Number(c.clip_regen_count) || 0) >= cap);
       if (over.length) {
         const which = over.map((c) => c.idx + 1).join("·");
         return Response.json(
-          { error: `${which}번 컷은 다시 만들기를 다 썼어요 — 영상 다시 만들기는 컷당 ${MAX_REGEN_PER_CUT}회까지예요` },
+          { error: `${which}번 컷은 다시 만들기를 다 썼어요 — 영상 다시 만들기는 컷당 ${cap}회까지예요` },
           { status: 400 }
         );
       }

@@ -2,9 +2,9 @@ import { regenVoice } from "../../../../../../../lib/pipeline";
 import { getProject, isStepDoc } from "../../../../../../../lib/projects";
 import { withUser } from "../../../../../../../lib/auth/require-user.js";
 import {
-  assertCanAfford, chargeRegen, refundRegen, requireVideoCharge, NoCredits,
+  assertCanAfford, chargeRegen, refundRegen, requireVideoCharge, NoCredits, regenCapNow,
 } from "../../../../../../../lib/charges.js";
-import { regenPrice, MAX_REGEN_PER_CUT } from "../../../../../../../lib/pricing.js";
+import { regenPrice } from "../../../../../../../lib/pricing.js";
 import { BudgetExceeded } from "../../../../../../../lib/costs.js";
 import { fakeFal } from "../../../../../../../lib/fake";
 import { RegenBusy } from "../../../../../../../lib/regen-busy.js";
@@ -62,8 +62,10 @@ export const POST = withUser(async (req, { params }, user) => {
     // 뒤에 두면 4회째에 값을 받고 나서 regenVoice 가 같은 상한으로 던져 400 이 된다 —
     // 내고 아무것도 못 받는 응답이다. 정가 게이트를 이 앞에 두었을 때도 같은 결함이
     // 환불된 프로젝트에서만 되살아났다. 드문 것과 없는 것은 다르다.
-    if (prior >= MAX_REGEN_PER_CUT) {
-      return Response.json({ error: "목소리 다시 만들기는 컷당 3회까지예요" }, { status: 400 });
+    // ★ 상한은 지금 크레딧 상태가 정한다(lib/charges.js 의 regenCapNow — 꺼진 동안만 3회).
+    const cap = regenCapNow();
+    if (prior >= cap) {
+      return Response.json({ error: `목소리 다시 만들기는 컷당 ${cap}회까지예요` }, { status: 400 });
     }
 
     // ★ 재생성도 유료 입구다 — /clips 와 **같은 문**을 쓴다.

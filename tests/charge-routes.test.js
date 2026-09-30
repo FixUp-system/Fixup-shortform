@@ -356,6 +356,22 @@ describe("재생성 청구 — 컷당 첫 회는 공짜", () => {
       expect(await balanceFor(A)).toBe(base - price);
     });
 
+    // ★★ 2026-09-30 — 크레딧이 꺼진 동안만 3회(사장님 결정). 꺼지면 회차 값이 0 이라
+    //   버튼마다 fal 원가만 나간다. 켜져 있으면 위 판대로 무제한이다.
+    it(`${name} 재생성 — 크레딧이 꺼졌으면 3회를 다 쓴 뒤 400 이고 생성을 안 부른다`, async () => {
+      const { p } = await paidCuts(5000, { [field]: 3 });
+      process.env.SHOTFORM_NO_CREDITS = "1";
+      try {
+        expect((await route(post(), idxCtx(p.id, 0))).status).toBe(400);
+        expect(pipelineMock.regen).not.toHaveBeenCalled();
+        pipelineMock.regen.mockClear();
+        await projects.updateProject(p.id, A, (proj) => ({ ...proj, cuts: proj.cuts.map((c) => ({ ...c, [field]: 2 })) }));
+        expect((await route(post(), idxCtx(p.id, 0))).status).toBe(200);
+      } finally {
+        delete process.env.SHOTFORM_NO_CREDITS;
+      }
+    });
+
     it(`${name} 재생성 — 라우트가 읽은 회차를 생성에 넘긴다(그 회차를 가져갈 때 대조한다)`, async () => {
       const { p } = await paidCuts(5000, { [field]: 2 });
       await route(post(), idxCtx(p.id, 0));

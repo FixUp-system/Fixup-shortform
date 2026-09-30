@@ -5,7 +5,7 @@ import { getProject, updateProject } from "../../../../../lib/projects.js";
 import { generateImage, imageResolutionFor } from "../../../../../lib/imagegen.js";
 import { buildImagePrompt } from "../../../../../lib/cuts.js";
 import { loadCutRefs } from "../../../../../lib/cut-refs.js";
-import { requireVideoCharge, NoCredits, assertCanAfford, chargeRegen } from "../../../../../lib/charges.js";
+import { requireVideoCharge, NoCredits, assertCanAfford, chargeRegen, regenCapNow } from "../../../../../lib/charges.js";
 import { regenPrice } from "../../../../../lib/pricing.js";
 import { modelIdForProject, resolutionForProject } from "../../../../../lib/clip-limits.js";
 import { fakeFal } from "../../../../../lib/fake.js";
@@ -91,7 +91,10 @@ export const POST = withUser(async (req, { params }, user) => {
   if (isImagesLocked(reel)) {
     return Response.json({ error: "이미 그리는 중이에요" }, { status: 409 });
   }
-  if (imageTriesLeft(reel) <= 0) {
+  // ★ 2026-09-30 — 크레딧이 꺼진 동안은 첫 그리기 + 3회(lib/charges.js 의 regenCapNow).
+  //   imageTries 는 첫 그리기부터 세므로 상한이 1 + cap 이다. 켜져 있으면 예전 그대로 무제한.
+  const drawCap = regenCapNow();
+  if (imageTriesLeft(reel, Number.isFinite(drawCap) ? 1 + drawCap : undefined) <= 0) {
     return Response.json({ error: "그림을 너무 많이 다시 그렸어요" }, { status: 400 });
   }
   // ★★ 2026-08-21 재검토 B2 — 시나리오판마다 리셋되는 imageTriesLeft 만으로는 재작성을

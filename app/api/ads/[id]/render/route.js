@@ -1,7 +1,7 @@
 import { withUser } from "../../../../../lib/auth/require-user.js";
 import { startAdRender } from "../../../../../lib/ad/pipeline.js";
-import { assertCanAfford, NoCredits, alreadyChargedAd } from "../../../../../lib/charges.js";
-import { adVideoPrice, MAX_REGEN_PER_CUT } from "../../../../../lib/pricing.js";
+import { assertCanAfford, NoCredits, alreadyChargedAd, regenCapNow } from "../../../../../lib/charges.js";
+import { adVideoPrice } from "../../../../../lib/pricing.js";
 import { updateProject } from "../../../../../lib/projects.js";
 import { hasRenderedAdVideo } from "../../../../../lib/ad/attempt.js";
 import { loadAd } from "../route.js";
@@ -52,10 +52,12 @@ export const POST = withUser(async (_req, { params }, user) => {
   //   회차는 프로젝트 문서(ad_bake_count)가 센다 — 첫 굽기는 재생성이 아니라 안 센다.
   //   videos 는 매번 **갈아끼워지므로**(lib/ad/pipeline.js 의 `videos: [{…}]`) 그 길이로는
   //   못 센다. 상수는 컷·시나리오·그림과 **같은 것**을 본다(MAX_REGEN_PER_CUT).
+  // ★ 2026-09-30 — 상한은 지금 크레딧 상태가 정한다(lib/charges.js 의 regenCapNow — 꺼진 동안만 3회).
   const rebake = hasRenderedAdVideo(project);
-  if (rebake && (Number(project.ad_bake_count) || 0) >= MAX_REGEN_PER_CUT) {
+  const cap = regenCapNow();
+  if (rebake && (Number(project.ad_bake_count) || 0) >= cap) {
     return Response.json(
-      { error: `다시 만들기를 다 썼어요 — 영상 다시 만들기는 ${MAX_REGEN_PER_CUT}회까지예요` },
+      { error: `다시 만들기를 다 썼어요 — 영상 다시 만들기는 ${cap}회까지예요` },
       { status: 400 }
     );
   }

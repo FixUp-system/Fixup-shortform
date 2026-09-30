@@ -4,8 +4,8 @@ import { runVideoPipeline, withProgress } from "../../../../../lib/pipeline";
 import { isClipStale } from "../../../../../lib/steps";
 import { isGenerationLive } from "../../../../../lib/progress.js";
 import { withUser } from "../../../../../lib/auth/require-user.js";
-import { requireVideoCharge, assertCanAfford, chargeRegen, NoCredits } from "../../../../../lib/charges.js";
-import { regenPrice, MAX_REGEN_PER_CUT } from "../../../../../lib/pricing.js";
+import { requireVideoCharge, assertCanAfford, chargeRegen, NoCredits, regenCapNow } from "../../../../../lib/charges.js";
+import { regenPrice } from "../../../../../lib/pricing.js";
 import { fakeFal } from "../../../../../lib/fake";
 import { modelIdForProject, projectSpeaks, resolutionForProject } from "../../../../../lib/clip-limits.js";
 
@@ -123,11 +123,13 @@ export const POST = withUser(async (req, { params }, user) => {
 
     // 상한 판정이 **청구보다 앞**이다 — 컷별 라우트와 같은 이유다(내고 아무것도 못 받는
     // 응답을 만들지 않는다).
-    const over = stale.filter((c) => (Number(c.clip_regen_count) || 0) >= MAX_REGEN_PER_CUT);
+    // ★ 상한은 지금 크레딧 상태가 정한다(lib/charges.js 의 regenCapNow — 꺼진 동안만 3회).
+    const cap = regenCapNow();
+    const over = stale.filter((c) => (Number(c.clip_regen_count) || 0) >= cap);
     if (over.length) {
       const which = over.map((c) => c.idx + 1).join("·");
       return Response.json(
-        { error: `${which}번 컷은 다시 만들기를 다 썼어요 — 영상 다시 만들기는 컷당 ${MAX_REGEN_PER_CUT}회까지예요` },
+        { error: `${which}번 컷은 다시 만들기를 다 썼어요 — 영상 다시 만들기는 컷당 ${cap}회까지예요` },
         { status: 400 }
       );
     }
