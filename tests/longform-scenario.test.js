@@ -126,6 +126,13 @@ describe("최종 리뷰에서 잡힌 것", () => {
     expect(rules).toMatch(/인물마다 자기 목소리/);
   });
 
+  it("★★ 소품을 드는 샷은 누가 어느 손으로 드는지 적게 한다 — 안 적으면 우산이 공중에 뜬다", () => {
+    // 실제 구간 1(romance-busstop) 끝 4초: 샷 설명이 "우산 하나 아래 어깨를 나란히"뿐이라 두 사람이
+    // 팔짱을 꼈고 우산은 아무도 안 든 채 떠 있었다. 금지("띄우지 마라")가 아니라 원하는 상태를 적게 한다.
+    const { system } = buildLongformScenarioMessages(project, { segmentCount: 2 });
+    expect(system).toMatch(/누가 어느 손으로/);
+  });
+
   it("★★★ 저장된 시나리오를 다시 잰다 — 확인 ① 뒤 run.json 편집이 규칙을 우회하지 못한다", () => {
     const scenario = validateLongformScenario(fakeLongformResponse(), 0).scenario;
     const state = { scenario, photos: [], settings: { resolution: "768P", aspect_ratio: "9:16" } };

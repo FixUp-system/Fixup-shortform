@@ -120,7 +120,8 @@ async function runPlan() {
     const anchor = seg === 2 ? { keys: segmentCharacters(state.scenario, 1) } : null;
     const last = seg === 2 ? {} : null;
     const { refs, dropped, extraUsd } = segmentRefs({ sheet: {}, photos, anchor, last });
-    const prompt = buildSegmentPrompt({ scenario: state.scenario, seg, bible: state.bible, refs });
+    const grid = storyboardGridFor(segmentShots(state.scenario, seg).length, { resolution: state.settings.resolution, aspect: state.settings.aspect_ratio });
+    const prompt = buildSegmentPrompt({ scenario: state.scenario, seg, bible: state.bible, refs, grid });
     writeFileSync(path.join(runDir, `seg${seg}.prompt.txt`), prompt);
     const seconds = segmentSeconds(state.scenario, seg);
     console.log(`\n구간 ${seg} — ${seconds}초 · 참조 ${refs.length}장(${refs.map((r) => r.kind).join(", ")}) · 추가 참조값 $${extraUsd.toFixed(2)}`);
@@ -172,11 +173,12 @@ async function runSegment(seg) {
     // 판 — 단계별과 같은 지문·같은 크기 규칙을 쓴다. 칸을 잘라 버킷에 올리는 일은 안 한다
     //   (drawStoryboardSheet 의 뒤 절반) — H3 에는 판 한 장의 주소만 있으면 된다.
     // ★★ 산 판은 **바로 적어 두고**, 다시 돌리면 그것을 쓴다(접수 전에 죽어도 판값이 두 번 안 나간다).
+    // ★ 격자는 판을 재사용할 때도 필요하다 — 지문 머리말이 격자 배치(행·열)를 말한다.
+    const cuts = buildReelCuts({ ...scn, shots: segmentShots(scn, seg) });
+    const grid = storyboardGridFor(cuts.length, { resolution: state.settings.resolution, aspect: state.settings.aspect_ratio });
     if (s.sheet) {
       console.log(`구간 ${seg} — 이미 그린 판을 다시 쓴다(${s.sheet})`);
     } else {
-      const cuts = buildReelCuts({ ...scn, shots: segmentShots(scn, seg) });
-      const grid = storyboardGridFor(cuts.length, { resolution: state.settings.resolution, aspect: state.settings.aspect_ratio });
       const boardRefs = photos.filter((p) => !hasFaceRisk(p)).map((p) => ({ bytes: p.bytes, key: p.key, photo_id: p.id, kind: "thing" }));
       const sheet = await generateImage({
         prompt: buildStoryboardPrompt(project, cuts, grid, "", boardRefs),
@@ -191,7 +193,7 @@ async function runSegment(seg) {
     }
 
     const { refs, dropped, extraUsd } = segmentRefs({ sheet: { url: s.sheet }, photos, anchor, last });
-    const prompt = buildSegmentPrompt({ scenario: scn, seg, bible, refs });
+    const prompt = buildSegmentPrompt({ scenario: scn, seg, bible, refs, grid });
     writeFileSync(path.join(runDir, `seg${seg}.prompt.txt`), prompt);
     printDropped(dropped);
     const seconds = segmentSeconds(scn, seg);

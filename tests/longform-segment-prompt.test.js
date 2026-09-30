@@ -16,6 +16,27 @@ describe("구간 가르기", () => {
   });
 });
 
+describe("★★★ 판 머리말 — 단계별이 실측으로 검증한 문장을 **맨 앞에** 그대로 쓴다", () => {
+  // 실제 구간 1(romance-busstop, 2026-09-30)의 0~4초가 **2×2 판을 그대로 움직인 분할 화면**이었다.
+  // 판 설명을 지문 중간에 한 줄만 넣고, 격자 배치·읽는 순서를 안 알렸다. 단계별(lib/reel/oneshot.js)
+  // 주석: "이 문장이 없으면 모델이 격자를 그대로 움직일 위험이 크다".
+  const grid = { rows: 1, cols: 3 };
+  const withSheet = buildSegmentPrompt({ scenario: scn, seg: 2, bible, refs, grid });
+
+  it("지문이 판 머리말로 **시작한다** — 격자 배치와 읽는 순서를 알린다", () => {
+    expect(withSheet.startsWith("The attached reference image is a 3-panel storyboard laid out as a 1-row by 3-column grid")).toBe(true);
+  });
+
+  it("분할 화면 금지 문장이 든다", () => {
+    expect(withSheet).toMatch(/Do NOT show the grid, panel borders, or any split screen/);
+  });
+
+  it("판이 없으면 머리말도 없다 — 없는 판을 설명하면 모델이 없는 것을 찾는다", () => {
+    const noSheet = buildSegmentPrompt({ scenario: scn, seg: 2, bible, refs: [{ kind: "anchor", keys: ["A"] }], grid });
+    expect(noSheet).not.toMatch(/storyboard laid out/);
+  });
+});
+
 describe("구간 지문", () => {
   const p = buildSegmentPrompt({ scenario: scn, seg: 2, bible, refs });
 
