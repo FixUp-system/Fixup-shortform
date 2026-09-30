@@ -3,7 +3,7 @@
 //
 //   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs plan <작업폴더> --input <입력.json> [--yes]
 //   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs seg1 <작업폴더> [--yes]
-//   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs seg2 <작업폴더> [--yes] [--anchor-at 7]
+//   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs seg2 <작업폴더> [--yes] [--anchor-at 7] [--voice-at "A=1.2-2.5+9.7-11;B=6.8-8.2"]
 //   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs join <작업폴더>
 //
 // ★★★ 유료 단계(plan·seg1·seg2)는 --yes 없이 안 돈다. 먼저 --yes 없이 돌려 어림값을 보고,
@@ -37,7 +37,8 @@ const { generateLongformScenario, checkStoredScenario } = await import("../../li
 const { buildBible, segmentCharacters } = await import("../../lib/longform/bible.js");
 const { buildSegmentPrompt, segmentShots, segmentSeconds } = await import("../../lib/longform/segment-prompt.js");
 const { segmentRefs } = await import("../../lib/longform/refs.js");
-const { frameAtArgs, lastFrameArgs, concatList, joinArgs, runFfmpeg } = await import("../../lib/longform/ffmpeg.js");
+const { frameAtArgs, lastFrameArgs, concatList, joinArgs, runFfmpeg, voiceClipArgs } = await import("../../lib/longform/ffmpeg.js");
+const { parseVoiceAt } = await import("../../lib/longform/voice-ref.js");
 const { h3Body, submitH3, waitH3 } = await import("../../lib/longform/h3.js");
 const { gate, checkBibleLock, stageCostUsd, stageIsFree, parseAnchorAt } = await import("../../lib/longform/run-state.js");
 
@@ -170,6 +171,23 @@ async function runSegment(seg) {
       s.anchorAt = pick.at;
     }
 
+    // 목소리 — 구간 2 만. 구간 1 에서 H3 가 낸 인물별 목소리를 잘라 reference_audio_urls 로 싣는다
+    //   (lib/longform/voice-ref.js 머리말). 판 구매 앞(0원 단계)에 둔다 — 오타로 죽어도 판값이 안 나간다.
+    let voices = [];
+    if (seg === 2) {
+      const vp = parseVoiceAt(opt("--voice-at"), { keys: (scn.characters || []).map((c) => c.key) });
+      if (!vp.ok) die(vp.reason);
+      for (const v of vp.voices) {
+        const vPath = path.join(runDir, `voice-${v.key}.mp3`);
+        rmSync(vPath, { force: true });
+        await runFfmpeg(voiceClipArgs({ input: path.join(runDir, "seg1.mp4"), ranges: v.ranges, out: vPath }));
+        if (!existsSync(vPath)) die(`${v.key} 목소리를 못 잘랐어요 — --voice-at 을 확인해요`);
+        voices.push({ key: v.key, bytes: readFileSync(vPath), seconds: v.seconds });
+        console.log(`   목소리 ${v.key} — ${v.seconds}초 (${vPath})`);
+      }
+      s.voiceAt = vp.voices.map(({ key, ranges }) => ({ key, ranges }));
+    }
+
     // 판 — 단계별과 같은 지문·같은 크기 규칙을 쓴다. 칸을 잘라 버킷에 올리는 일은 안 한다
     //   (drawStoryboardSheet 의 뒤 절반) — H3 에는 판 한 장의 주소만 있으면 된다.
     // ★★ 산 판은 **바로 적어 두고**, 다시 돌리면 그것을 쓴다(접수 전에 죽어도 판값이 두 번 안 나간다).
@@ -192,8 +210,8 @@ async function runSegment(seg) {
       save();
     }
 
-    const { refs, dropped, extraUsd } = segmentRefs({ sheet: { url: s.sheet }, photos, anchor, last });
-    const prompt = buildSegmentPrompt({ scenario: scn, seg, bible, refs, grid });
+    const { refs, audios, dropped, extraUsd } = segmentRefs({ sheet: { url: s.sheet }, photos, anchor, last, voices });
+    const prompt = buildSegmentPrompt({ scenario: scn, seg, bible, refs, audios, grid });
     writeFileSync(path.join(runDir, `seg${seg}.prompt.txt`), prompt);
     printDropped(dropped);
     const seconds = segmentSeconds(scn, seg);
@@ -202,9 +220,10 @@ async function runSegment(seg) {
       aspect: state.settings.aspect_ratio,
       resolution: state.settings.resolution,
       refs,
+      audios,
       seed: seedForProject({ settings: { i2v_model: "minimax-h3" } }, state.runId),
     });
-    Object.assign(s, { bible, prompt, seconds, dropped, extraUsd, refCount: refs.length });
+    Object.assign(s, { bible, prompt, seconds, dropped, extraUsd, refCount: refs.length, audioCount: audios.length });
 
     // ★★★ 접수증을 **기다리기 전에** 적는다 — 끊겨도 다시 돌리면 재접수 없이 이어 기다린다.
     s.job = fakeFal() ? { fake: true } : await submitH3(body);
