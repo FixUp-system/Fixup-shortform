@@ -92,7 +92,8 @@ describe("고정 블록 잠금", () => {
     const s = { segments: [{ bible: "B" }, {}] };
     const out = checkBibleLock(s, "B ");
     expect(out.ok).toBe(false);
-    expect(out.reason).toMatch(/구간 2 의 본문과 대사만/);
+    // 2026-09-30 — 장소·옷은 구간마다 바뀔 수 있게 풀었다(tests/longform-extend.test.js).
+    expect(out.reason).toMatch(/본문·대사·장소·옷만/);
   });
 });
 

@@ -4,7 +4,12 @@
 //   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs plan <작업폴더> --input <입력.json> [--yes]
 //   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs seg1 <작업폴더> [--yes]
 //   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs seg2 <작업폴더> [--yes] [--anchor-at 7] [--voice-at "A=1.2-2.5+9.7-11;B=6.8-8.2"] [--no-last] [--sheet-only]
+//   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs extend <작업폴더> --brief "방향" [--add 1] [--yes]
+//   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs seg3 <작업폴더> [seg2 와 같은 옵션] [--anchor-seg 1]
 //   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs join <작업폴더>
+//
+// ★★ 2026-09-30 구간 N개 — extend 가 구운 구간 뒤에 구간을 더하고(인물 잠금 · 장소·옷은 구간별),
+//   seg<n> 이 그 구간을 굽는다. 이름은 "2seg" 로 남았지만 구간 수는 run.json 이 정한다.
 //
 // ★★★ 유료 단계(plan·seg1·seg2)는 --yes 없이 안 돈다. 먼저 --yes 없이 돌려 어림값을 보고,
 //   사장님 승인을 받은 뒤 --yes 를 붙인다. seg1 과 seg2 는 **따로** 승인한다.
@@ -33,18 +38,18 @@ const { generateImage, imageResolutionFor } = await import("../../lib/imagegen.j
 const { resolutionForProject, seedForProject } = await import("../../lib/clip-limits.js");
 const { storyboardGridFor, storyboardImageSize, buildStoryboardPrompt } = await import("../../lib/reel/storyboard.js");
 const { buildReelCuts } = await import("../../app/api/reel/[id]/scenario/route.js");
-const { generateLongformScenario, checkStoredScenario } = await import("../../lib/longform/scenario.js");
-const { buildBible, segmentCharacters } = await import("../../lib/longform/bible.js");
+const { generateLongformScenario, checkStoredScenario, extendLongformScenario } = await import("../../lib/longform/scenario.js");
+const { buildBible, segmentCharacters, segmentBible, buildFixedBlock, segmentLook } = await import("../../lib/longform/bible.js");
 const { buildSegmentPrompt, segmentShots, segmentSeconds } = await import("../../lib/longform/segment-prompt.js");
 const { segmentRefs } = await import("../../lib/longform/refs.js");
 const { frameAtArgs, lastFrameArgs, concatList, joinArgs, runFfmpeg, voiceClipArgs } = await import("../../lib/longform/ffmpeg.js");
 const { parseVoiceAt } = await import("../../lib/longform/voice-ref.js");
 const { h3Body, submitH3, waitH3 } = await import("../../lib/longform/h3.js");
-const { gate, checkBibleLock, stageCostUsd, stageIsFree, parseAnchorAt } = await import("../../lib/longform/run-state.js");
+const { gate, checkBibleLock, stageCostUsd, stageIsFree, parseAnchorAt, segOf } = await import("../../lib/longform/run-state.js");
 
 const [stage, runDir, ...rest] = process.argv.slice(2);
 if (!stage || !runDir) {
-  console.error("사용법: longform-2seg.mjs <plan|seg1|seg2|join> <작업폴더> [--input 입력.json] [--yes] [--anchor-at 초]");
+  console.error("사용법: longform-2seg.mjs <plan|extend|seg<n>|join> <작업폴더> [--input 입력.json] [--brief 방향] [--yes] [--anchor-at 초]");
   process.exit(1);
 }
 const flag = (n) => rest.includes(n);
@@ -57,16 +62,20 @@ const state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, "utf8")
 const save = () => writeFileSync(statePath, JSON.stringify(state, null, 2));
 // ★★ 가짜 여부는 **그 단계가 부르는 것**으로 가른다(최종 리뷰: FAKE=fal 에서 H3 가 진짜로 나갔다).
 const free = stageIsFree(stage, { fal: fakeFal(), llm: fakeLlm() });
-const bakes = stage === "seg1" || stage === "seg2";
+const bakes = segOf(stage) > 0;
 if (bakes && !fakeFal() && !process.env.FAL_KEY) die("FAL_KEY 가 없어요(.env.local)");
 
 // 스크립트 안에서 쓰는 프로젝트 모양 — lib 들이 읽는 칸만 채운다. 저장하지 않는다.
-function projectOf() {
+// ★ seg 를 주면 그 구간의 장소·옷(segment_looks)으로 덮는다 — 판 지문(buildStoryboardPrompt)이
+//   scenario.environment·wardrobe 를 "전 칸 공통"으로 싣기 때문이다. 안 덮으면 몽타주 구간의
+//   판이 비 오는 정류장·카디건으로 그려진다.
+function projectOf(seg) {
+  const look = seg ? segmentLook(state.scenario, seg) : null;
   return {
     id: state.runId,
     settings: { ...state.settings, i2v_model: "minimax-h3" },
     material: { text: state.input?.text || "", photos: state.photos || [] },
-    scenario: state.scenario,
+    scenario: look ? { ...state.scenario, environment: look.environment, wardrobe: look.wardrobe } : state.scenario,
     cast: (state.scenario?.characters || []).map((c) => ({ id: c.key, who: c.who, look: c.look, voice: c.voice, cuts: [] })),
   };
 }
@@ -138,35 +147,41 @@ async function runPlan() {
 async function runSegment(seg) {
   const s = state.segments[seg - 1];
   const scn = state.scenario;
-  const bible = buildBible(scn, { style: state.settings.style });
-  if (seg === 2) {
-    const lock = checkBibleLock(state, bible);
+  // ★★ 2026-09-30 구간 N개 — 인물·목소리·화풍·색감은 잠그고(고정 블록), 장소·옷은 구간이 정한다.
+  const bible = segmentBible(scn, { style: state.settings.style, seg });
+  if (seg >= 2) {
+    const lock = checkBibleLock(state, buildFixedBlock(scn, { style: state.settings.style }));
     if (!lock.ok) die(lock.reason);
   }
 
   if (!s.job) {
-    const project = projectOf();
+    const project = projectOf(seg);
     const photos = photosWithBytes();
 
     // ★★ 최종 리뷰(2026-09-30) — **0원 단계를 판 구매($0.83) 앞에 둔다.** 예전에는 판을 먼저
     //   사고 닻을 뽑아서, --anchor-at 오타나 추출 실패로 죽으면 다시 돌릴 때 판을 또 샀다.
 
-    // 닻 — 구간 2 만. 기본은 구간 1 의 가운데. 확인 ① 에서 "출연자 전원이 보이는" 초를 골라 --anchor-at 으로 준다.
+    // 닻 — 구간 2 부터. 기본은 **바로 앞 구간**의 가운데. 출연자 전원이 보이는 초를 골라 --anchor-at 으로,
+    //   다른 구간에서 뽑으려면 --anchor-seg <n> 으로 준다(예: 구간 3 인데 얼굴이 잘 보이는 건 구간 1).
     let anchor = null;
     let last = null;
-    if (seg === 2) {
-      const pick = parseAnchorAt(opt("--anchor-at"), segmentSeconds(scn, 1));
+    if (seg >= 2) {
+      const from = Number(opt("--anchor-seg") || seg - 1);
+      if (!(Number.isInteger(from) && from >= 1 && from < seg)) die(`--anchor-seg 는 1~${seg - 1} 이어야 해요`);
+      const pick = parseAnchorAt(opt("--anchor-at"), segmentSeconds(scn, from));
       if (!pick.ok) die(pick.reason);
-      const prev = path.join(runDir, "seg1.mp4");
-      const aPath = path.join(runDir, "anchor.jpg");
-      const lPath = path.join(runDir, "last.jpg");
+      const prev = path.join(runDir, `seg${from}.mp4`);
+      const aPath = path.join(runDir, `anchor-seg${seg}.jpg`);
+      const lPath = path.join(runDir, `last-seg${seg}.jpg`);
       // 옛 프레임을 먼저 지운다 — 추출이 조용히 실패하면 지난번 닻을 읽게 된다.
       rmSync(aPath, { force: true });
       rmSync(lPath, { force: true });
       await runFfmpeg(frameAtArgs({ input: prev, at: pick.at, out: aPath }));
-      await runFfmpeg(lastFrameArgs({ input: prev, out: lPath }));
-      if (!existsSync(aPath) || !existsSync(lPath)) die("닻·마지막 프레임을 못 뽑았어요 — seg1.mp4 와 --anchor-at 을 확인해요");
-      anchor = { bytes: readFileSync(aPath), key: "anchor.jpg", keys: segmentCharacters(scn, 1) };
+      // 마지막 프레임은 늘 **바로 앞 구간**의 끝이다 — 이어지는 자리가 거기다.
+      await runFfmpeg(lastFrameArgs({ input: path.join(runDir, `seg${seg - 1}.mp4`), out: lPath }));
+      if (!existsSync(aPath) || !existsSync(lPath)) die(`닻·마지막 프레임을 못 뽑았어요 — seg${from}.mp4 와 --anchor-at 을 확인해요`);
+      anchor = { bytes: readFileSync(aPath), key: "anchor.jpg", keys: segmentCharacters(scn, from) };
+      s.anchorSeg = from;
       // --no-last: 직전 프레임을 싣지 않는다. 실제 구간 1(romance-busstop)의 끝 프레임이 **아무도 안 든
       //   우산**이었다 — "이어 가라"로 실으면 결함이 구간 2 로 넘어간다. 인물은 닻이 붙든다.
       last = flag("--no-last") ? null : { bytes: readFileSync(lPath), key: "last.jpg" };
@@ -174,10 +189,11 @@ async function runSegment(seg) {
       s.noLast = flag("--no-last");
     }
 
-    // 목소리 — 구간 2 만. 구간 1 에서 H3 가 낸 인물별 목소리를 잘라 reference_audio_urls 로 싣는다
-    //   (lib/longform/voice-ref.js 머리말). 판 구매 앞(0원 단계)에 둔다 — 오타로 죽어도 판값이 안 나간다.
+    // 목소리 — 구간 2 부터. **늘 구간 1** 에서 H3 가 낸 인물별 목소리를 잘라 reference_audio_urls 로
+    //   싣는다(lib/longform/voice-ref.js 머리말) — 목소리의 원본은 하나여야 구간이 늘어도 안 흔들린다.
+    //   판 구매 앞(0원 단계)에 둔다 — 오타로 죽어도 판값이 안 나간다.
     let voices = [];
-    if (seg === 2) {
+    if (seg >= 2) {
       const vp = parseVoiceAt(opt("--voice-at"), { keys: (scn.characters || []).map((c) => c.key) });
       if (!vp.ok) die(vp.reason);
       for (const v of vp.voices) {
@@ -263,24 +279,49 @@ async function runSegment(seg) {
   if (seg === 1) {
     console.log("\n⏸ 확인 ① — 구간 1 만 본다: ① 한국어로 말하나 ② 대사를 글자 그대로 말하나 ③ 한 장면에서 여러 인물이 대화하나.");
     console.log("   막히면 여기서 멈춘다. 통과하면 run.json 의 구간 2 샷만 손보고(선택), 출연자 전원이 보이는 초를 골라 seg2 --anchor-at <초>.");
+  } else if (seg < state.segments.length) {
+    console.log(`\n다음: seg${seg + 1} (먼저 --sheet-only 로 판을 본다)`);
   } else {
-    console.log("\n다음: join (0원)");
+    console.log("\n다음: join (0원) — 또는 extend 로 구간을 더한다");
   }
+}
+
+// 이어 쓰기 — 구운 구간은 그대로 두고 시나리오 뒤에 구간을 더한다(lib/longform/scenario.js 의
+//   extendLongformScenario). 끝나면 새 구간의 샷을 보여 준다 — 판을 사기 전에 사람이 읽는다.
+async function runExtend() {
+  const add = Number(opt("--add") || 1);
+  if (!(Number.isInteger(add) && add >= 1 && add <= 4)) die("--add 는 1~4 여야 해요");
+  const before = state.segments.length;
+  state.scenario = await extendLongformScenario({ state, brief: opt("--brief") || "", addSegments: add });
+  for (let n = before + 1; n <= before + add; n++) state.segments.push({ seg: n });
+  save();
+  for (let n = before + 1; n <= before + add; n++) {
+    console.log(`\n구간 ${n} — ${segmentSeconds(state.scenario, n)}초`);
+    const look = segmentLook(state.scenario, n);
+    console.log(`   장소: ${look.environment || "(앞과 같음)"}\n   옷: ${look.wardrobe || "(앞과 같음)"}`);
+    for (const s of segmentShots(state.scenario, n)) {
+      const said = s.line ? `  「${s.speaker_id}: ${s.line}」${(s.on_screen || []).includes(s.speaker_id) ? "" : " (화면 밖)"}` : "";
+      console.log(`   · ${s.seconds}초 ${s.shows}${said}`);
+    }
+  }
+  console.log(`\n⏸ 새 구간을 읽고, 괜찮으면 seg${before + 1} --sheet-only 로 판부터 본다.`);
 }
 
 async function runJoin() {
   const list = path.join(runDir, "concat.txt");
-  writeFileSync(list, concatList([path.resolve(runDir, "seg1.mp4"), path.resolve(runDir, "seg2.mp4")]));
-  const out = path.join(runDir, "longform-30s.mp4");
+  const files = state.segments.map((x) => path.resolve(runDir, `seg${x.seg}.mp4`));
+  writeFileSync(list, concatList(files));
+  const total = state.segments.reduce((t, x) => t + segmentSeconds(state.scenario, x.seg), 0);
+  const out = path.join(runDir, `longform-${total}s.mp4`);
   await runFfmpeg(joinArgs({ list, out }));
-  console.log(`이어 붙였다 — ${out}`);
-  console.log("\n⏸ 확인 ② — 30초를 보고 듣는다: 인물 유지 · 목소리 유지 · 이음새 · 이야기가 한 편인가.");
+  console.log(`이어 붙였다 — ${out} (구간 ${files.length}개)`);
+  console.log("\n⏸ 확인 — 보고 듣는다: 인물 유지 · 목소리 유지 · 이음새 · 이야기가 한 편인가.");
 }
 
 // ── 관문 ────────────────────────────────────────────────────────────────
-if (stage === "seg1" || stage === "seg2") {
-  const seg = stage === "seg1" ? 1 : 2;
-  if (state.scenario) {
+if (segOf(stage)) {
+  const seg = segOf(stage);
+  if (state.scenario && seg <= (state.segments || []).length) {
     // ★★★ 최종 리뷰(2026-09-30) — 확인 ① 뒤 run.json 편집을 **굽기 전에 다시 잰다.** 안 재면
     //   구간 2 를 27초로 고쳐도 통과하고 H3 가 조용히 15초로 잘랐다. 어림값도 틀렸다.
     const chk = checkStoredScenario(state);
@@ -290,13 +331,15 @@ if (stage === "seg1" || stage === "seg2") {
   }
 } else if (stage === "plan") {
   console.log(`어림 — plan: 약 $${stageCostUsd("plan").toFixed(2)} (시나리오 한 번 + 사진 판정 장당 ~$0.003)`);
+} else if (stage === "extend") {
+  console.log(`어림 — extend: 약 $${stageCostUsd("extend").toFixed(2)} 이하 (시나리오 이어 쓰기 한 번)`);
 }
 const g = gate(state, stage, { yes: flag("--yes") || free });
 if (!g.ok) die(g.reason);
 
 await runWithActor(process.env.SHOTFORM_MEASURE_USER || "admin", async () => {
   if (stage === "plan") await runPlan();
-  else if (stage === "seg1") await runSegment(1);
-  else if (stage === "seg2") await runSegment(2);
+  else if (stage === "extend") await runExtend();
+  else if (segOf(stage)) await runSegment(segOf(stage));
   else if (stage === "join") await runJoin();
 });
