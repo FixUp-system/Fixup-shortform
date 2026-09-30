@@ -9,7 +9,7 @@ const bible = buildBible(scn, { style: "photo" });
 const refs = [{ kind: "sheet" }, { kind: "photo", roleEn: "is the subject — keep it unchanged" }, { kind: "anchor", keys: ["A", "B"] }, { kind: "last" }];
 
 describe("구간 가르기", () => {
-  it("그 구간의 샷만", () => expect(segmentShots(scn, 2)).toHaveLength(2));
+  it("그 구간의 샷만", () => expect(segmentShots(scn, 2)).toHaveLength(3));
   it("초를 더한다", () => {
     expect(segmentSeconds(scn, 1)).toBe(14);
     expect(segmentSeconds(scn, 2)).toBe(15);

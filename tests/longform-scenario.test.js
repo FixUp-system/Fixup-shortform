@@ -52,7 +52,7 @@ describe("검증", () => {
 
   it("★★★ 구간이 15초를 넘으면 막고, 몇 초인지 말한다", () => {
     const raw = fakeLongformResponse();
-    raw.shots[0].seconds = 12; // 구간 1 = 12 + 7 = 19초
+    raw.shots[0].seconds = 10; // 구간 1 = 10 + 5 + 4 = 19초
     const out = validateLongformScenario(raw, 0, { segmentCount: 2 });
     expect(out.ok).toBe(false);
     expect(out.errors.join(" ")).toMatch(/구간 1 가 19초/);
@@ -60,8 +60,7 @@ describe("검증", () => {
 
   it("구간이 5초보다 짧아도 막는다", () => {
     const raw = fakeLongformResponse();
-    raw.shots[2].seconds = 1;
-    raw.shots[3].seconds = 1; // 구간 2 = 2초
+    for (const i of [3, 4, 5]) raw.shots[i].seconds = 1; // 구간 2 = 3초
     expect(validateLongformScenario(raw, 0).ok).toBe(false);
   });
 
@@ -86,7 +85,7 @@ describe("검증", () => {
 
   it("구간이 거꾸로 가면 막는다", () => {
     const raw = fakeLongformResponse();
-    raw.shots[3].segment = 1;
+    raw.shots[4].segment = 1; // 구간 2 의 첫 샷(3) 다음에 1 로 되돌아간다
     expect(validateLongformScenario(raw, 0).errors.join(" ")).toMatch(/거꾸로/);
   });
 
@@ -94,6 +93,16 @@ describe("검증", () => {
     const raw = fakeLongformResponse();
     for (const s of raw.shots) s.segment = 1;
     expect(validateLongformScenario(raw, 0).errors.join(" ")).toMatch(/구간 2 에 샷이 없다/);
+  });
+
+  it("★★★ 구간 샷이 판 한 장에 못 담기는 수면 막는다 — 판이 없으면 H3 가 구도를 못 받는다", () => {
+    // reelGridFor 는 3컷 미만이면 null 이다(REEL_MIN_CUTS). 2샷 구간은 스토리보드를 못 그린다.
+    const raw = fakeLongformResponse();
+    raw.shots = raw.shots.filter((s) => s.segment === 2).concat(); // 구간 2 만 남긴다
+    raw.shots.unshift({ ...raw.shots[0], segment: 1, seconds: 7 }, { ...raw.shots[0], segment: 1, seconds: 7 });
+    const out = validateLongformScenario(raw, 0);
+    expect(out.ok).toBe(false);
+    expect(out.errors.join(" ")).toMatch(/구간 1 의 샷 2개는 스토리보드 판 한 장에 못 담는다/);
   });
 
   it("인물 key 가 겹치면 막는다", () => {
