@@ -10,7 +10,7 @@ import {
   buildLongformScenarioMessages, validateLongformScenario, generateLongformScenario, fakeLongformResponse,
 } from "../lib/longform/scenario.js";
 import { buildSegmentPrompt, segmentCastRefs, shotAt } from "../lib/longform/segment-prompt.js";
-import { buildCastingPrompt, buildCostumePrompt } from "../lib/longform/casting.js";
+import { buildCastingPrompt, buildCostumePrompt, buildActedVoicePrompt, actedLineFor } from "../lib/longform/casting.js";
 
 const project = {
   id: "00000000-0000-4000-8000-000000000001",
@@ -173,6 +173,36 @@ describe("구간별 의상 참조 고르기", () => {
   it("옛 시나리오(옷 칸 없음)는 인물마다 기본 하나", () => {
     const old = validateLongformScenario(fakeLongformResponse(), 0).scenario;
     expect(segmentCastRefs(old, 1)).toEqual([{ key: "A", outfit: null }, { key: "B", outfit: null }]);
+  });
+});
+
+describe("★★★ 연기 목소리 — 사장님 선택(2026-09-30 목소리 비교 ③)", () => {
+  // 1분 완성본의 목소리가 "전체적으로 너무 어색"했다. 같은 대사 5초 셋을 비교했더니 ③(같은 얼굴·목소리
+  // 참조로 감정 대사를 한 번 더 찍어 그 소리를 참조로, 음색·나이만 따르게)이 가장 좋았다. 캐스팅 클립의
+  // "안녕하세요" 자기소개 톤이 억양·속도까지 옮겨 간 것이 원인으로 보인다.
+  const scn = validateLongformScenario(wedding(), 0).scenario;
+
+  it("연기 목소리 지문 — 얼굴(Image 1)·목소리(Audio 1)를 참조로, 이 인물의 대사를 감정을 실어 연기한다", () => {
+    const p = buildActedVoicePrompt(scn.characters[0], { line: "이번엔 내가 먼저야." });
+    expect(p).toMatch(/Image 1 shows this person and Audio 1 is their voice/);
+    expect(p).toMatch(/as an actor would/);
+    expect(p).toMatch(/Match only its timbre and age/);
+    expect(p).toMatch(/이번엔 내가 먼저야\./);
+    expect(p).toMatch(/plain light-grey wall/);
+  });
+
+  it("대사는 그 인물의 극 중 대사 중 가장 긴 것(감정이 실릴 여지가 크다) — 없으면 기본 문장", () => {
+    const longest = scn.shots.filter((s) => s.speaker_id === "A" && s.line).map((s) => s.line).sort((a, b) => b.length - a.length)[0];
+    expect(actedLineFor(scn, "A")).toBe(longest);
+    const none = structuredClone(scn);
+    for (const s of none.shots) if (s.speaker_id === "B") s.line = "";
+    expect(actedLineFor(none, "B")).toMatch(/\S/);
+  });
+
+  it("★★ 구간 지문의 목소리 줄 — 음색·나이만 따르고 감정·억양·속도는 장면을 따른다", () => {
+    const p = buildSegmentPrompt({ scenario: scn, seg: 1, bible: "", refs: [], audios: [{ key: "A" }] });
+    expect(p).toMatch(/Audio 1 is the voice of A\. Match only its timbre and age; the emotion, intonation and pace follow the scene\./);
+    expect(p).not.toMatch(/same timbre, pitch, age and pace/);
   });
 });
 

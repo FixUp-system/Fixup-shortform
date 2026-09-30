@@ -48,7 +48,7 @@ const { segmentRefs } = await import("../../lib/longform/refs.js");
 const { frameAtArgs, lastFrameArgs, concatList, joinArgs, runFfmpeg, voiceClipArgs, castFrameArgs } = await import("../../lib/longform/ffmpeg.js");
 const { parseVoiceAt } = await import("../../lib/longform/voice-ref.js");
 const { parseCastAt, sheetCastLines } = await import("../../lib/longform/cast.js");
-const { buildCastingPrompt, buildCostumePrompt, castingVoiceSeconds, CASTING_SECONDS } = await import("../../lib/longform/casting.js");
+const { buildCastingPrompt, buildCostumePrompt, buildActedVoicePrompt, actedLineFor, castingVoiceSeconds, CASTING_SECONDS } = await import("../../lib/longform/casting.js");
 const { H3_T2V } = await import("../../lib/longform/plan.js");
 const { h3Body, submitH3, waitH3 } = await import("../../lib/longform/h3.js");
 const { gate, checkBibleLock, stageCostUsd, stageIsFree, parseAnchorAt, segOf } = await import("../../lib/longform/run-state.js");
@@ -201,15 +201,46 @@ async function runCast() {
     }
     const at = Number(frameAt[c.key] ?? x.frameAt ?? 1);
     x.image = path.join(runDir, `cast-${c.key}.jpg`);
-    x.voice = path.join(runDir, `voice-${c.key}.mp3`);
+    x.voiceBase = path.join(runDir, `voice-${c.key}-base.mp3`);
     rmSync(x.image, { force: true });
-    rmSync(x.voice, { force: true });
+    rmSync(x.voiceBase, { force: true });
     await runFfmpeg(castFrameArgs({ input: video, at, crop: null, out: x.image }));
-    await runFfmpeg(voiceClipArgs({ input: video, ranges: [[0, voiceSeconds]], out: x.voice }));
-    if (!existsSync(x.image) || !existsSync(x.voice)) die(`캐스팅 ${c.key} 의 프레임·목소리를 못 뽑았어요`);
+    await runFfmpeg(voiceClipArgs({ input: video, ranges: [[0, voiceSeconds]], out: x.voiceBase }));
+    if (!existsSync(x.image) || !existsSync(x.voiceBase)) die(`캐스팅 ${c.key} 의 프레임·목소리를 못 뽑았어요`);
     Object.assign(x, { frameAt: at, voiceSeconds });
     save();
-    console.log(`캐스팅 ${c.key} — 영상 ${video} · 프레임 ${at}초 · 목소리 ${voiceSeconds}초`);
+    console.log(`캐스팅 ${c.key} — 영상 ${video} · 프레임 ${at}초 · 기본 목소리 ${voiceSeconds}초`);
+
+    // ★★★ 연기 목소리(사장님 선택 · 목소리 비교 ③) — 기본 얼굴·목소리를 참조로 극 중 대사를 감정을 실어
+    //   한 번 더 찍고, 그 소리를 모든 구간의 목소리 참조(voice-<key>.mp3)로 쓴다. 자기소개 톤이 억양·속도까지
+    //   옮겨 가 1분 완성본의 목소리가 어색했다.
+    const ax = (x.acted ||= {});
+    const aVideo = path.join(runDir, `casting-${c.key}-acted.mp4`);
+    if (flag("--redo")) { delete ax.job; delete ax.video; }
+    if (!ax.video) {
+      if (!ax.job) {
+        ax.line = actedLineFor(state.scenario, c.key);
+        ax.prompt = buildActedVoicePrompt(c, { line: ax.line });
+        const body = h3Body({
+          prompt: ax.prompt, seconds: CASTING_SECONDS, aspect: state.settings.aspect_ratio, resolution: state.settings.resolution,
+          refs: [{ bytes: readFileSync(x.image), key: "cast.jpg" }],
+          audios: [{ key: c.key, bytes: readFileSync(x.voiceBase) }],
+        });
+        ax.job = fakeFal() ? { fake: true } : await submitH3(body);
+        save();
+        console.log(`연기 목소리 ${c.key} 접수 — ${ax.job.requestId || "(가짜)"} · "${ax.line}"`);
+      }
+      if (ax.job.fake) copyFileSync(path.join("public", "samples", "reel-15s.mp4"), aVideo);
+      else await download(await waitH3(ax.job), aVideo);
+      ax.video = aVideo;
+      save();
+    }
+    x.voice = path.join(runDir, `voice-${c.key}.mp3`);
+    rmSync(x.voice, { force: true });
+    await runFfmpeg(voiceClipArgs({ input: ax.video, ranges: [[0, voiceSeconds]], out: x.voice }));
+    if (!existsSync(x.voice)) die(`연기 목소리 ${c.key} 를 못 뽑았어요`);
+    save();
+    console.log(`연기 목소리 ${c.key} — ${ax.video} · ${voiceSeconds}초`);
 
     // ★★ 의상 캐스팅(사장님 결정 · 방법 2) — 기본 캐스팅 얼굴을 Image 1 로 넣고 옷마다 5초. 첫 번째 옷은
     //   기본 캐스팅이 이미 입고 있다. 말은 안 시킨다(목소리는 기본 캐스팅의 것 하나).
@@ -491,8 +522,8 @@ if (segOf(stage)) {
 } else if (stage === "cast" && state.scenario) {
   const only = opt("--only") ? opt("--only").split(",").map((x) => x.trim()) : null;
   const chosen = (state.scenario.characters || []).filter((c) => !only || only.includes(c.key));
-  // 클립 수 = 인물마다 기본 1 + 옷이 더 있으면 옷마다 1(의상 캐스팅). 전부 5초라 값이 같다.
-  const clips = chosen.reduce((t, c) => t + Math.max(1, (c.outfits || []).length), 0);
+  // 클립 수 = 인물마다 기본 1 + 연기 목소리 1 + 옷이 더 있으면 옷마다 1(의상 캐스팅). 전부 5초라 값이 같다.
+  const clips = chosen.reduce((t, c) => t + Math.max(1, (c.outfits || []).length) + 1, 0);
   console.log(`어림 — cast: 약 $${stageCostUsd("cast", { resolution: state.settings.resolution, characters: clips }).toFixed(2)} (인물 ${chosen.length}명 · 클립 ${clips}개 × ${CASTING_SECONDS}초 · 이미 만든 것은 0원)`);
 }
 const g = gate(state, stage, { yes: flag("--yes") || free });
