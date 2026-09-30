@@ -4,12 +4,15 @@
 //   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs plan <작업폴더> --input <입력.json> [--yes]
 //   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs seg1 <작업폴더> [--yes]
 //   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs seg2 <작업폴더> [--yes] [--anchor-at 7] [--voice-at "A=1.2-2.5+9.7-11;B=6.8-8.2"] [--no-last] [--sheet-only]
+//   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs cast <작업폴더> [--only A] [--redo] [--frame-at "A=1.5"] [--yes]
 //   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs extend <작업폴더> --brief "방향" [--add 1] [--yes]
 //   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs seg3 <작업폴더> [seg2 와 같은 옵션] [--anchor-seg 1] [--cast-at "A=1@8.5;B=1@4.5:300,230,468,760"]
 //   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs join <작업폴더>
 //
 // ★★ 2026-09-30 구간 N개 — extend 가 구운 구간 뒤에 구간을 더하고(인물 잠금 · 장소·옷은 구간별),
 //   seg<n> 이 그 구간을 굽는다. 이름은 "2seg" 로 남았지만 구간 수는 run.json 이 정한다.
+// ★★★ 2026-09-30 실사 순서: plan → **cast**(인물별 H3 글만 5초 → 얼굴·목소리 참조) → seg1… → join.
+//   판(GPT Image)은 기본으로 끈다(--sheet 로만 켠다) — 그림 모델에서 출발한 참조가 AI 질감을 대물림했다.
 //
 // ★★★ 유료 단계(plan·seg1·seg2)는 --yes 없이 안 돈다. 먼저 --yes 없이 돌려 어림값을 보고,
 //   사장님 승인을 받은 뒤 --yes 를 붙인다. seg1 과 seg2 는 **따로** 승인한다.
@@ -45,6 +48,8 @@ const { segmentRefs } = await import("../../lib/longform/refs.js");
 const { frameAtArgs, lastFrameArgs, concatList, joinArgs, runFfmpeg, voiceClipArgs, castFrameArgs } = await import("../../lib/longform/ffmpeg.js");
 const { parseVoiceAt } = await import("../../lib/longform/voice-ref.js");
 const { parseCastAt, sheetCastLines } = await import("../../lib/longform/cast.js");
+const { buildCastingPrompt, castingVoiceSeconds, CASTING_SECONDS } = await import("../../lib/longform/casting.js");
+const { H3_T2V } = await import("../../lib/longform/plan.js");
 const { h3Body, submitH3, waitH3 } = await import("../../lib/longform/h3.js");
 const { gate, checkBibleLock, stageCostUsd, stageIsFree, parseAnchorAt, segOf } = await import("../../lib/longform/run-state.js");
 
@@ -63,7 +68,7 @@ const state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, "utf8")
 const save = () => writeFileSync(statePath, JSON.stringify(state, null, 2));
 // ★★ 가짜 여부는 **그 단계가 부르는 것**으로 가른다(최종 리뷰: FAKE=fal 에서 H3 가 진짜로 나갔다).
 const free = stageIsFree(stage, { fal: fakeFal(), llm: fakeLlm() });
-const bakes = segOf(stage) > 0;
+const bakes = segOf(stage) > 0 || stage === "cast";
 if (bakes && !fakeFal() && !process.env.FAL_KEY) die("FAL_KEY 가 없어요(.env.local)");
 
 // 스크립트 안에서 쓰는 프로젝트 모양 — lib 들이 읽는 칸만 채운다. 저장하지 않는다.
@@ -145,6 +150,58 @@ async function runPlan() {
   console.log(`\n⏸ 멈춤 0 — 두 지문을 읽고, 괜찮으면 seg1 을 돌려요(먼저 --yes 없이 → 어림값 확인 → 승인 → --yes).`);
 }
 
+// 캐스팅이 인물 전원 몫으로 끝났나 — 끝났으면 모든 구간이 그 얼굴·목소리를 쓴다(lib/longform/casting.js).
+function castingReady() {
+  const chars = state.scenario?.characters || [];
+  return chars.length > 0 && chars.every((c) => {
+    const x = state.casting?.[c.key];
+    return x?.image && x?.voice && existsSync(x.image) && existsSync(x.voice);
+  });
+}
+
+// 캐스팅 — 인물마다 H3 글만 5초 클립 → 얼굴 프레임(cast-<key>.jpg) · 목소리(voice-<key>.mp3).
+//   --only A,B 로 일부만 · --redo 로 이미 만든 인물도 다시 · --frame-at "A=1.5;B=4" 로 프레임만 다시 고른다(0원).
+async function runCast() {
+  const chars = state.scenario.characters || [];
+  const only = (opt("--only") || "").split(",").map((x) => x.trim()).filter(Boolean);
+  const targets = chars.filter((c) => !only.length || only.includes(c.key));
+  const frameAt = Object.fromEntries((opt("--frame-at") || "").split(";").filter(Boolean).map((p) => p.split("=").map((x) => x.trim())));
+  const voiceSeconds = castingVoiceSeconds(chars.length);
+  state.casting ||= {};
+  await Promise.all(targets.map(async (c) => {
+    const x = (state.casting[c.key] ||= {});
+    const video = path.join(runDir, `casting-${c.key}.mp4`);
+    if (flag("--redo")) { delete x.job; delete x.video; }
+    if (!x.video) {
+      if (!x.job) {
+        x.prompt = buildCastingPrompt(c);
+        const body = h3Body({ prompt: x.prompt, seconds: CASTING_SECONDS, aspect: state.settings.aspect_ratio, resolution: state.settings.resolution, textOnly: true });
+        // ★★★ 접수증을 기다리기 전에 적는다 — 끊겨도 다시 돌리면 이어 기다린다(구간과 같은 규약).
+        x.job = fakeFal() ? { fake: true } : await submitH3(body, { endpoint: H3_T2V });
+        save();
+        console.log(`캐스팅 ${c.key} 접수 — ${x.job.requestId || "(가짜)"}`);
+      }
+      if (x.job.fake) copyFileSync(path.join("public", "samples", "reel-15s.mp4"), video);
+      else await download(await waitH3(x.job), video);
+      x.video = video;
+      save();
+    }
+    const at = Number(frameAt[c.key] ?? x.frameAt ?? 1);
+    x.image = path.join(runDir, `cast-${c.key}.jpg`);
+    x.voice = path.join(runDir, `voice-${c.key}.mp3`);
+    rmSync(x.image, { force: true });
+    rmSync(x.voice, { force: true });
+    await runFfmpeg(castFrameArgs({ input: video, at, crop: null, out: x.image }));
+    await runFfmpeg(voiceClipArgs({ input: video, ranges: [[0, voiceSeconds]], out: x.voice }));
+    if (!existsSync(x.image) || !existsSync(x.voice)) die(`캐스팅 ${c.key} 의 프레임·목소리를 못 뽑았어요`);
+    Object.assign(x, { frameAt: at, voiceSeconds });
+    save();
+    console.log(`캐스팅 ${c.key} — 영상 ${video} · 프레임 ${at}초 · 목소리 ${voiceSeconds}초`);
+  }));
+  console.log("\n⏸ 캐스팅 클립을 보고 고른다 — 다시 뽑으려면 cast --only A --redo --yes, 프레임만 바꾸려면 cast --frame-at \"A=2\" --yes(0원).");
+  console.log("   괜찮으면 seg1 부터 굽는다 — 모든 구간이 이 얼굴·목소리를 참조로 쓴다(판은 기본으로 꺼져 있다).");
+}
+
 async function runSegment(seg) {
   const s = state.segments[seg - 1];
   const scn = state.scenario;
@@ -194,7 +251,14 @@ async function runSegment(seg) {
     //   싣는다(lib/longform/voice-ref.js 머리말) — 목소리의 원본은 하나여야 구간이 늘어도 안 흔들린다.
     //   판 구매 앞(0원 단계)에 둔다 — 오타로 죽어도 판값이 안 나간다.
     let voices = [];
-    if (seg >= 2) {
+    // ★★★ 캐스팅(cast 단계)이 있으면 그 목소리를 **구간 1 부터** 싣는다 — 목소리의 원본이 캐스팅 클립이다.
+    if (castingReady()) {
+      for (const c of scn.characters) {
+        const v = state.casting[c.key];
+        voices.push({ key: c.key, bytes: readFileSync(v.voice), seconds: v.voiceSeconds });
+      }
+      console.log(`   목소리 — 캐스팅 ${voices.map((v) => `${v.key} ${v.seconds}초`).join(" · ")}`);
+    } else if (seg >= 2) {
       const vp = parseVoiceAt(opt("--voice-at"), { keys: (scn.characters || []).map((c) => c.key) });
       if (!vp.ok) die(vp.reason);
       for (const v of vp.voices) {
@@ -211,7 +275,11 @@ async function runSegment(seg) {
     // 인물 참조 — 판과 H3 에 인물 얼굴 이미지를 싣는다(lib/longform/cast.js 머리말). --cast-at 으로 한 번
     //   정하면 run.json 에 남아 **이후 모든 구간이 같은 것을 쓴다.** 판 구매 앞(0원 단계)에 둔다.
     let cast = [];
-    {
+    if (castingReady()) {
+      // ★★★ 캐스팅(cast 단계)의 실사 프레임 — 그림 모델에서 출발한 참조는 AI 질감을 대물림한다(casting.js).
+      for (const c of scn.characters) cast.push({ key: c.key, bytes: readFileSync(state.casting[c.key].image) });
+      console.log(`   인물 — 캐스팅 ${cast.map((c) => c.key).join(" · ")}`);
+    } else {
       const given = opt("--cast-at");
       const cp = given ? parseCastAt(given, { keys: (scn.characters || []).map((c) => c.key), segments: state.segments.length }) : { ok: true, cast: state.castAt || [] };
       if (!cp.ok) die(cp.reason);
@@ -231,9 +299,15 @@ async function runSegment(seg) {
     //   (drawStoryboardSheet 의 뒤 절반) — H3 에는 판 한 장의 주소만 있으면 된다.
     // ★★ 산 판은 **바로 적어 두고**, 다시 돌리면 그것을 쓴다(접수 전에 죽어도 판값이 두 번 안 나간다).
     // ★ 격자는 판을 재사용할 때도 필요하다 — 지문 머리말이 격자 배치(행·열)를 말한다.
+    // ★★★ 2026-09-30 — 판은 **기본으로 끈다**(--sheet 로만 켠다). GPT Image 판이 AI 질감의 입구였다.
+    //   이미 산 판이 있는 구간(옛 회차)은 그대로 쓴다.
+    const useSheet = flag("--sheet") || Boolean(s.sheet);
+    if (flag("--sheet-only") && !useSheet) die("--sheet-only 는 --sheet 와 함께 써요(판은 기본으로 꺼져 있어요)");
     const cuts = buildReelCuts({ ...scn, shots: segmentShots(scn, seg) });
-    const grid = storyboardGridFor(cuts.length, { resolution: state.settings.resolution, aspect: state.settings.aspect_ratio });
-    if (s.sheet) {
+    const grid = useSheet ? storyboardGridFor(cuts.length, { resolution: state.settings.resolution, aspect: state.settings.aspect_ratio }) : null;
+    if (!useSheet) {
+      console.log(`구간 ${seg} — 판 없이 굽는다(구도는 지문의 샷 설명이 정한다)`);
+    } else if (s.sheet) {
       console.log(`구간 ${seg} — 이미 그린 판을 다시 쓴다(${s.sheet})`);
     } else {
       const boardRefs = photos.filter((p) => !hasFaceRisk(p)).map((p) => ({ bytes: p.bytes, key: p.key, photo_id: p.id, kind: "thing" }));
@@ -265,7 +339,7 @@ async function runSegment(seg) {
       return;
     }
 
-    const { refs, audios, dropped, extraUsd } = segmentRefs({ sheet: { url: s.sheet }, photos, cast, anchor, last, voices });
+    const { refs, audios, dropped, extraUsd } = segmentRefs({ sheet: useSheet ? { url: s.sheet } : null, photos, cast, anchor, last, voices });
     const prompt = buildSegmentPrompt({ scenario: scn, seg, bible, refs, audios, grid });
     writeFileSync(path.join(runDir, `seg${seg}.prompt.txt`), prompt);
     printDropped(dropped);
@@ -353,13 +427,17 @@ if (segOf(stage)) {
     //   구간 2 를 27초로 고쳐도 통과하고 H3 가 조용히 15초로 잘랐다. 어림값도 틀렸다.
     const chk = checkStoredScenario(state);
     if (!chk.ok) die(`run.json 의 시나리오가 규칙을 어겨요 — ${chk.errors.join(" · ")}`);
-    const est = stageCostUsd(stage, { resolution: state.settings.resolution, seconds: segmentSeconds(state.scenario, seg) });
-    console.log(`어림 — 구간 ${seg}: 약 $${est.toFixed(2)} (판 + H3 ${state.settings.resolution} · 참조 추가분은 굽기 직전에 다시 말한다)`);
+    const sheet = flag("--sheet") || Boolean(state.segments[seg - 1]?.sheet);
+    const est = stageCostUsd(stage, { resolution: state.settings.resolution, seconds: segmentSeconds(state.scenario, seg), sheet: sheet && !state.segments[seg - 1]?.sheet });
+    console.log(`어림 — 구간 ${seg}: 약 $${est.toFixed(2)} (${sheet ? "판 + " : "판 없이 · "}H3 ${state.settings.resolution} · 참조 추가분은 굽기 직전에 다시 말한다)`);
   }
 } else if (stage === "plan") {
   console.log(`어림 — plan: 약 $${stageCostUsd("plan").toFixed(2)} (시나리오 한 번 + 사진 판정 장당 ~$0.003)`);
 } else if (stage === "extend") {
   console.log(`어림 — extend: 약 $${stageCostUsd("extend").toFixed(2)} 이하 (시나리오 이어 쓰기 한 번)`);
+} else if (stage === "cast" && state.scenario) {
+  const n = opt("--only") ? opt("--only").split(",").length : (state.scenario.characters || []).length;
+  console.log(`어림 — cast: 약 $${stageCostUsd("cast", { resolution: state.settings.resolution, characters: n }).toFixed(2)} (인물 ${n}명 × ${CASTING_SECONDS}초 · 이미 만든 인물은 0원)`);
 }
 const g = gate(state, stage, { yes: flag("--yes") || free });
 if (!g.ok) die(g.reason);
@@ -367,6 +445,7 @@ if (!g.ok) die(g.reason);
 await runWithActor(process.env.SHOTFORM_MEASURE_USER || "admin", async () => {
   if (stage === "plan") await runPlan();
   else if (stage === "extend") await runExtend();
+  else if (stage === "cast") await runCast();
   else if (segOf(stage)) await runSegment(segOf(stage));
   else if (stage === "join") await runJoin();
 });
