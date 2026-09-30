@@ -35,8 +35,17 @@ describe("고정 블록", () => {
 
 describe("최종 리뷰에서 잡힌 것", () => {
   it("★★ 내레이터 목소리도 고정 블록에 싣는다 — 안 실으면 구간마다 내레이터가 따로 뽑힌다", () => {
-    const s = { ...scn, voice: "calm Korean woman in her 40s, low and warm" };
+    const s = structuredClone({ ...scn, voice: "calm Korean woman in her 40s, low and warm" });
+    s.shots[0].speaker_id = "narration";
     expect(buildBible(s, { style: "photo" })).toContain("Narrator voice: calm Korean woman in her 40s, low and warm.");
+  });
+
+  it("★★★ 내레이션 장면이 없으면 내레이터 줄을 안 넣는다 — 없던 내레이터를 모델이 끼워 넣는다", () => {
+    // 실제 plan(romance-busstop, 2026-09-30): 내레이션 샷 0개인데 voice 칸에 "hushed close-mic
+    // dialogue…"(대사 전체의 말투)가 적혔고, 그것이 "Narrator voice:" 로 고정 블록에 실렸다.
+    const s = { ...scn, voice: "hushed close-mic dialogue, natural and unhurried" };
+    expect(s.shots.some((x) => x.speaker_id === "narration")).toBe(false);
+    expect(buildBible(s, { style: "photo" })).not.toMatch(/Narrator voice/);
   });
 
   it("내레이터 목소리가 없으면 줄을 안 만든다", () => {
