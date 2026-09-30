@@ -187,6 +187,26 @@ describe("이어 쓰기", () => {
   });
 });
 
+describe("★★ LLM 제한 시간 — 구간이 늘면 시나리오가 길다", () => {
+  // 2026-09-30 첫 1분(구간 4개) plan 이 APIConnectionTimeoutError 로 죽었다. lib/llm.js 의 120초는
+  // "가장 큰 호출이 3,468 토큰"(08-12 실측) 근거인데 롱폼 시나리오는 그보다 훨씬 길다.
+  it("시나리오 생성은 구간 수만큼 기다린다", async () => {
+    const seen = [];
+    const call = async (a) => { seen.push(a.timeoutMs); return fakeLongformResponse(); };
+    const project = { id: "p", settings: { aspect_ratio: "9:16", style: "photo", mood: "premium", narration_lang: "ko", seconds: 30, target_seconds: 30 }, material: { text: "x", photos: [] } };
+    await (await import("../lib/longform/scenario.js")).generateLongformScenario({ project, segmentCount: 2, deps: { callJson: call } });
+    expect(seen[0]).toBeGreaterThan(120_000);
+    expect(seen[0]).toBeLessThanOrEqual(600_000);
+  });
+
+  it("이어 쓰기도 늘려 기다린다", async () => {
+    const seen = [];
+    const state = { scenario: base(), segments: [{ seg: 1 }, { seg: 2 }], photos: [], settings: {} };
+    await extendLongformScenario({ state, brief: "x", deps: { callJson: async (a) => { seen.push(a.timeoutMs); return fakeExtendResponse({ fromSegment: 3 }); } } });
+    expect(seen[0]).toBeGreaterThan(120_000);
+  });
+});
+
 describe("관문 — 구간 N개", () => {
   const three = { scenario: {}, segments: [{ seg: 1, video: "a" }, { seg: 2, video: "b" }, { seg: 3 }] };
 
