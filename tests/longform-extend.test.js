@@ -109,6 +109,17 @@ describe("지문 — 화면 밖 내레이션 · 옷이 바뀐 구간의 닻", ()
     expect(on).toMatch(/says, with natural lip sync/);
   });
 
+  it("★★ voiceover 면 화면에 있어도 내레이션이다 — 그 인물의 입은 움직이지 않는다", () => {
+    const vo = structuredClone(s);
+    const i = vo.shots.findIndex((x) => x.line === "우리 또 보자.");
+    Object.assign(vo.shots[i], { speaker_id: "A", voiceover: true, on_screen: ["A", "B"] });
+    const out = buildSegmentPrompt({ scenario: vo, seg: 3, bible, refs: [], audios: [{ key: "A" }] });
+    const l = out.split("\n").find((x) => x.includes("우리 또 보자"));
+    expect(l).toMatch(/A \(the voice in Audio 1\) speaks off-screen as a voice-over/);
+    expect(l).toMatch(/A's lips do not move/);
+    expect(l).not.toMatch(/lip sync/);
+  });
+
   it("★ 옷이 바뀐 구간에서는 닻의 옷을 따르라고 하지 않는다", () => {
     expect(p).toMatch(/keep every person's face, hair and build identical to it/);
     expect(p).not.toMatch(/build and clothing identical/);
@@ -125,7 +136,7 @@ describe("이어 쓰기", () => {
     expect(all).toMatch(/구간 3/);
     expect(all).toMatch(/늦어서 죄송해요/); // 앞 구간 대사
     expect(all).toMatch(/segment_looks/);
-    expect(all).toMatch(/화면 밖/);
+    expect(all).toMatch(/회상하듯 말하는 내레이션은 voiceover/);
   });
 
   it("★★★ 지시문이 답의 JSON 모양을 칸 이름까지 말한다 — callJson 은 schema 를 **안 쓴다**", () => {
@@ -136,6 +147,25 @@ describe("이어 쓰기", () => {
     for (const k of ["text", "segment_looks", "shots", "segment", "speaker_id", "on_screen", "shows", "line", "seconds", "camera", "lighting", "action", "sound"]) {
       expect(system).toContain(`"${k}"`);
     }
+  });
+
+  it("★★★ 앞 구간의 끝에서 이어 쓰게 한다 — 첫 실제 구간 3 이 전혀 안 이어졌다", () => {
+    // 2026-09-30: 구간 2 는 둘이 **함께** 버스에 오르며 끝났는데, 구간 3 은 "남자 혼자 버스에 앉아 옆자리가
+    // 비어 있다"로 시작했다(사장님: "시나리오가 전혀 안 이어지는데?"). 이어짐 규칙이 없었다.
+    const { system, messages } = buildExtendMessages({ scenario: state.scenario, fromSegment: 3, brief: "x" });
+    expect(system).toMatch(/앞 구간의 마지막 장면/);
+    expect(system).toMatch(/이유 없이 혼자 두지 마라/);
+    // 앞 구간의 끝 샷을 따로 짚어 준다 — 긴 목록 속에 묻히지 않게.
+    expect(messages[0].content).toMatch(/앞 구간의 마지막 샷/);
+    expect(messages[0].content).toContain(state.scenario.shots.at(-1).shows);
+  });
+
+  it("★★★ 회상 내레이션이 그 인물을 화면에서 빼게 만들지 않는다 — voiceover 로 가른다", () => {
+    // 같은 날: "내레이션은 on_screen 에 그 인물을 넣지 않는다"고 적었더니 LLM 이 여자를 몽타주에서 통째로 뺐다.
+    const { system } = buildExtendMessages({ scenario: state.scenario, fromSegment: 3, brief: "x" });
+    expect(system).not.toMatch(/on_screen 에는 그 인물을 넣지 않는다/);
+    expect(system).toMatch(/"voiceover"/);
+    expect(system).toMatch(/화면에 나와도 된다/);
   });
 
   it("스키마는 새 샷·장소옷·글만 받는다 — 인물 칸이 없다(인물은 잠겨 있다)", () => {

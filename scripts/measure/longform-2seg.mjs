@@ -300,8 +300,10 @@ async function runExtend() {
     const look = segmentLook(state.scenario, n);
     console.log(`   장소: ${look.environment || "(앞과 같음)"}\n   옷: ${look.wardrobe || "(앞과 같음)"}`);
     for (const s of segmentShots(state.scenario, n)) {
-      const said = s.line ? `  「${s.speaker_id}: ${s.line}」${(s.on_screen || []).includes(s.speaker_id) ? "" : " (화면 밖)"}` : "";
-      console.log(`   · ${s.seconds}초 ${s.shows}${said}`);
+      const vo = s.voiceover === true || !(s.on_screen || []).includes(s.speaker_id);
+      const said = s.line ? `  「${s.speaker_id}: ${s.line}」${vo ? " (내레이션)" : ""}` : "";
+      const who = (s.on_screen || []).join(",") || "사람 없음";
+      console.log(`   · ${s.seconds}초 [${who}] ${s.shows}${said}`);
     }
   }
   console.log(`\n⏸ 새 구간을 읽고, 괜찮으면 seg${before + 1} --sheet-only 로 판부터 본다.`);
