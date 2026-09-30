@@ -110,7 +110,8 @@ describe("지문 — 목소리", () => {
   });
 
   it("★ 대사 줄이 그 오디오를 가리킨다 — 글 묘사가 오디오와 싸우지 않게", () => {
-    const aLine = p.split("\n").find((l) => l.startsWith("A (") && l.includes("says"));
+    // 2026-09-30 부터 대사 줄 앞에 "Shot n — [연기 지시]" 가 붙는다(tests/longform-outfits.test.js).
+    const aLine = p.split("\n").find((l) => l.includes(" A (") && l.includes("says"));
     expect(aLine).toMatch(/A \(the voice in Audio 1\) says/);
   });
 

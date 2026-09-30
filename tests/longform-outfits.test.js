@@ -191,18 +191,63 @@ describe("★★★ 연기 목소리 — 사장님 선택(2026-09-30 목소리 �
     expect(p).toMatch(/plain light-grey wall/);
   });
 
-  it("대사는 그 인물의 극 중 대사 중 가장 긴 것(감정이 실릴 여지가 크다) — 없으면 기본 문장", () => {
-    const longest = scn.shots.filter((s) => s.speaker_id === "A" && s.line).map((s) => s.line).sort((a, b) => b.length - a.length)[0];
-    expect(actedLineFor(scn, "A")).toBe(longest);
-    const none = structuredClone(scn);
-    for (const s of none.shots) if (s.speaker_id === "B") s.line = "";
-    expect(actedLineFor(none, "B")).toMatch(/\S/);
+  it("★★ 연기 대사는 극 중 대사와 겹치지 않는다 — audition_line 을 쓰고, 없으면 기본 문장", () => {
+    // 2026-09-30 대본 형식 시험: C 의 연기 목소리가 극 중 대사("오늘만 지나면 끝나는 거지?")로 녹음돼, 장면에서
+    // 같은 문장을 말할 때 참조의 억양을 통째로 베꼈다(표정은 살았는데 톤이 연기 느낌이 아니었다 — 사장님).
+    const withLine = structuredClone(scn);
+    withLine.characters[0].audition_line = "나도 이렇게까지 하고 싶진 않았어.";
+    expect(actedLineFor(withLine, "A")).toBe("나도 이렇게까지 하고 싶진 않았어.");
+    const lines = new Set(scn.shots.map((s) => s.line).filter(Boolean));
+    expect(lines.has(actedLineFor(scn, "A"))).toBe(false);
+    expect(actedLineFor(scn, "A")).toMatch(/\S/);
   });
 
   it("★★ 구간 지문의 목소리 줄 — 음색·나이만 따르고 감정·억양·속도는 장면을 따른다", () => {
     const p = buildSegmentPrompt({ scenario: scn, seg: 1, bible: "", refs: [], audios: [{ key: "A" }] });
     expect(p).toMatch(/Audio 1 is the voice of A\. Match only its timbre and age; the emotion, intonation and pace follow the scene\./);
     expect(p).not.toMatch(/same timbre, pitch, age and pace/);
+  });
+});
+
+describe("★★★ 대사별 연기 지시(delivery) — 대본 형식 시험에서 감정이 살아났다(사장님: A 훨씬 나음)", () => {
+  const { system } = buildLongformScenarioMessages(project, { segmentCount: 2 });
+  const rules = system.slice(system.indexOf("★★ 롱폼 규칙"));
+
+  it("규칙·JSON 모양이 delivery 와 audition_line 을 요구한다", () => {
+    expect(rules).toContain('"delivery"');
+    expect(rules).toContain('"audition_line"');
+    expect(rules).toMatch(/극 중 대사와 겹치지 않게/);
+  });
+
+  it("검증 — audition_line 이 극 중 대사와 같으면 막는다", () => {
+    const raw = wedding();
+    raw.characters[1].audition_line = raw.shots.find((s) => s.speaker_id === "B" && s.line).line;
+    expect(validateLongformScenario(raw, 0).errors.join(" ")).toMatch(/B 의 audition_line/);
+  });
+
+  it("검증을 지나도 delivery·audition_line 이 살아남는다", () => {
+    const raw = wedding();
+    raw.shots[0].delivery = "quiet, a bitter edge";
+    raw.characters[0].audition_line = "이번엔 안 져.";
+    const out = validateLongformScenario(raw, 0).scenario;
+    expect(out.shots[0].delivery).toBe("quiet, a bitter edge");
+    expect(out.characters[0].audition_line).toBe("이번엔 안 져.");
+  });
+
+  it("★★ 대사 줄 — 샷 번호와 연기 지시가 대사 바로 앞에 붙는다", () => {
+    const raw = wedding();
+    raw.shots[1].delivery = "a hushed, urgent whisper";
+    const s = validateLongformScenario(raw, 0).scenario;
+    const p = buildSegmentPrompt({ scenario: s, seg: 1, bible: "", refs: [], audios: [] });
+    const l = p.split("\n").find((x) => x.includes(raw.shots[1].line));
+    expect(l).toMatch(/^Shot 2 — \[a hushed, urgent whisper\] B /);
+  });
+
+  it("연기 지시가 없으면 샷 번호만 붙는다", () => {
+    const s = validateLongformScenario(wedding(), 0).scenario;
+    const p = buildSegmentPrompt({ scenario: s, seg: 1, bible: "", refs: [], audios: [] });
+    const l = p.split("\n").find((x) => x.includes(s.shots[0].line));
+    expect(l).toMatch(/^Shot 1 — A /);
   });
 });
 
