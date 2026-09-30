@@ -143,3 +143,33 @@ describe("상한 — 오래 걸린다고 다 만들어진 영상을 버리지 �
     expect(await balanceFor(U), "포기했는데 환불을 안 했다").toBeGreaterThan(before);
   });
 });
+
+// ★★★ 2026-09-30 — 굽기 표식(bake_token). **접수 전에** rendering 과 같은 쓰기로 적고, 접수에
+//   같은 값을 넘긴다(웹훅 주소에 실린다). 웹훅의 접수증 되살리기가 이 값이 같을 때만 움직인다 —
+//   이전 굽기의 늦은 웹훅이 새 굽기에 옛 영상을 꽂지 못하게(lib/orphan-receipt.js).
+describe("굽기 표식", () => {
+  beforeEach(() => resetMemoryStore());
+
+  it("★★★ 접수 때 문서에 이미 새 표식이 있고, 접수에 같은 값이 넘어간다", async () => {
+    const p = await runWithActor(U, () =>
+      createProject({ settings: SETTINGS, material: { text: "앰플 광고", photos: [] }, ownerId: U, kind: "ad" })
+    );
+    const store = getStore();
+    const row = await store.selectProject(p.id, U);
+    await store.updateProjectRow(p.id, U, row.version, { ...row.doc, scenario, status: "scenario", bake_token: "old" });
+    await store.insertGrant({ user_id: U, amount_credits: 500, reason: "t" });
+    let atSubmit = null;
+    let passed = null;
+    await runWithActor(U, () => startAdRender(p.id, U, {
+      submitAdVideo: async (a) => {
+        passed = a.bakeToken;
+        atSubmit = (await getProject(p.id, U)).bake_token;
+        return { ...JOB };
+      },
+      storeVideo: async () => "x",
+    }));
+    expect(passed, "접수에 표식을 안 넘겼다").toBeTruthy();
+    expect(passed, "옛 굽기의 표식을 그대로 썼다").not.toBe("old");
+    expect(atSubmit, "접수 전에 문서에 적지 않았다").toBe(passed);
+  });
+});

@@ -141,6 +141,8 @@ describe("fal 웹훅 주소 — 접수할 때 실어 보낸다", () => {
   it("★★ 끝 슬래시가 겹치지 않는다", async () => {
     const { falWebhookUrl } = await import("../lib/fal-webhook.js");
     expect(falWebhookUrl("p1", { base: "https://x.app/" })).toBe("https://x.app/api/fal/webhook?p=p1");
+    // ★ 2026-09-30 — 굽기 표식(b)을 함께 싣는다. 이전 굽기의 늦은 웹훅을 가르는 값이다(lib/orphan-receipt.js).
+    expect(falWebhookUrl("p1", { base: "https://x.app", bake: "t1" })).toBe("https://x.app/api/fal/webhook?p=p1&b=t1");
   });
 });
 

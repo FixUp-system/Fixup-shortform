@@ -48,7 +48,9 @@ export async function POST(req) {
   //   위 머리말이 약속한 "fal 이 projectId 를 들고 찾아온다"가 실제로는 일하지 못하고 있었다.
   //   요청 번호는 **서명을 확인한 본문**에서만 읽는다. 결과는 여전히 fal 에 다시 물어 받는다.
   const requestId = requestIdOf(body);
-  const adopted = await adoptOrphanReceipt(projectId, requestId).catch((e) => ({ error: e?.message }));
+  // `b` — 접수 때 실어 보낸 굽기 표식. 이전 굽기의 늦은 웹훅을 가른다(lib/orphan-receipt.js 머리말).
+  const bake = new URL(req.url).searchParams.get("b");
+  const adopted = await adoptOrphanReceipt(projectId, { requestId, bake }).catch((e) => ({ error: e?.message }));
 
   // ★ 던지지 않는다 — 여기서 새면 fal 이 31번 다시 보낸다. 수거는 일시 오류면 접수증을
   //   지키므로(09-10 고침), 놓친 것은 다음 방문이나 크론이 이어받는다.

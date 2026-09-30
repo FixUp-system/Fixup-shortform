@@ -233,6 +233,21 @@ function fixture(over = {}) {
 }
 
 describe("runReelOneShot", () => {
+  // ★★★ 2026-09-30 — 굽기 표식. 접수 **전에** 문서에 새 값이 있고, 접수에 같은 값이 넘어간다
+  //   (웹훅 주소에 실린다 — lib/orphan-receipt.js 가 이전 굽기의 늦은 웹훅을 이것으로 가른다).
+  it("★★★ 접수 전에 새 굽기 표식을 적고 접수에 같은 값을 넘긴다", async () => {
+    const f = fixture({ reel: { bakeToken: "old" } });
+    let passed = null;
+    let atSubmit = null;
+    await runReelOneShot("pid", "uid", {
+      ...f,
+      submitClip: async (a) => { passed = a.bakeToken; atSubmit = f.doc.reel.bakeToken; return JOB; },
+    });
+    expect(passed, "접수에 표식을 안 넘겼다").toBeTruthy();
+    expect(passed, "옛 굽기의 표식을 그대로 썼다").not.toBe("old");
+    expect(atSubmit, "접수 전에 문서에 적지 않았다").toBe(passed);
+  });
+
   it("굽기가 **한 번**이다 — 원장·예산에도 한 번만 적힌다", async () => {
     const f = fixture();
     const seen = [];

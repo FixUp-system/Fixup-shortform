@@ -30,7 +30,7 @@ vi.mock("../lib/collect-sweep.js", () => ({
 }));
 // ★ 접수증 되살리기(2026-09-30) — 쓸기 **앞에** 서명된 요청 번호로 부른다.
 vi.mock("../lib/orphan-receipt.js", () => ({
-  adoptOrphanReceipt: async (id, requestId) => { swept.push(`adopt:${id}:${requestId}`); return {}; },
+  adoptOrphanReceipt: async (id, { requestId, bake }) => { swept.push(`adopt:${id}:${requestId}:${bake}`); return {}; },
 }));
 
 const post = async (url, ok) => {
@@ -42,7 +42,7 @@ const post = async (url, ok) => {
   }));
 };
 
-const URL_OK = "http://x/api/fal/webhook?p=11111111-1111-4111-8111-111111111111";
+const URL_OK = "http://x/api/fal/webhook?p=11111111-1111-4111-8111-111111111111&b=t9";
 
 describe("fal 웹훅 문 — 서명이 자물쇠다", () => {
   beforeEach(() => { swept.length = 0; });
@@ -58,7 +58,7 @@ describe("fal 웹훅 문 — 서명이 자물쇠다", () => {
     const res = await post(URL_OK, true);
     expect(res.status).toBe(200);
     expect(swept).toEqual([
-      "adopt:11111111-1111-4111-8111-111111111111:r1",
+      "adopt:11111111-1111-4111-8111-111111111111:r1:t9",
       "sweep:11111111-1111-4111-8111-111111111111",
     ]);
   });

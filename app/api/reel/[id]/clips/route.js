@@ -148,7 +148,9 @@ export const POST = withUser(async (req, { params }, user) => {
   //   위 잠금이 표식을 근거로 삼기 때문이다. 단계별 흐름의 생성 라우트 셋과 같은 처방이다.
   const at = Date.now();
   await updateProject(id, user.id, (p) =>
-    reelProgress(putReel(p, { status: "rendering", error: null }), "video", at)
+    // ★ 굽기 표식을 비운다(2026-09-30) — runReelOneShot 이 접수 전에 새 값을 적을 때까지, 이전
+    //   굽기의 늦은 웹훅이 되살리기(lib/orphan-receipt.js)에 걸리지 않게.
+    reelProgress(putReel(p, { status: "rendering", error: null, bakeToken: null }), "video", at)
   );
   // ★ **약속(promise)을 넘긴다 — 콜백이 아니다.** 콜백으로 넘기면 파이프라인이 요청 범위
   //   밖에서 시작하고, 비용 주체는 AsyncLocalStorage 에서 읽으므로 costActor() 가 던진다.
