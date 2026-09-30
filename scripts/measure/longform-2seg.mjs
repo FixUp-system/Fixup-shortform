@@ -5,7 +5,7 @@
 //   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs seg1 <작업폴더> [--yes]
 //   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs seg2 <작업폴더> [--yes] [--anchor-at 7] [--voice-at "A=1.2-2.5+9.7-11;B=6.8-8.2"] [--no-last] [--sheet-only]
 //   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs extend <작업폴더> --brief "방향" [--add 1] [--yes]
-//   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs seg3 <작업폴더> [seg2 와 같은 옵션] [--anchor-seg 1]
+//   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs seg3 <작업폴더> [seg2 와 같은 옵션] [--anchor-seg 1] [--cast-at "A=1@8.5;B=1@4.5:300,230,468,760"]
 //   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs join <작업폴더>
 //
 // ★★ 2026-09-30 구간 N개 — extend 가 구운 구간 뒤에 구간을 더하고(인물 잠금 · 장소·옷은 구간별),
@@ -42,8 +42,9 @@ const { generateLongformScenario, checkStoredScenario, extendLongformScenario } 
 const { buildBible, segmentCharacters, segmentBible, buildFixedBlock, segmentLook } = await import("../../lib/longform/bible.js");
 const { buildSegmentPrompt, segmentShots, segmentSeconds } = await import("../../lib/longform/segment-prompt.js");
 const { segmentRefs } = await import("../../lib/longform/refs.js");
-const { frameAtArgs, lastFrameArgs, concatList, joinArgs, runFfmpeg, voiceClipArgs } = await import("../../lib/longform/ffmpeg.js");
+const { frameAtArgs, lastFrameArgs, concatList, joinArgs, runFfmpeg, voiceClipArgs, castFrameArgs } = await import("../../lib/longform/ffmpeg.js");
 const { parseVoiceAt } = await import("../../lib/longform/voice-ref.js");
+const { parseCastAt, sheetCastLines } = await import("../../lib/longform/cast.js");
 const { h3Body, submitH3, waitH3 } = await import("../../lib/longform/h3.js");
 const { gate, checkBibleLock, stageCostUsd, stageIsFree, parseAnchorAt, segOf } = await import("../../lib/longform/run-state.js");
 
@@ -207,6 +208,25 @@ async function runSegment(seg) {
       s.voiceAt = vp.voices.map(({ key, ranges }) => ({ key, ranges }));
     }
 
+    // 인물 참조 — 판과 H3 에 인물 얼굴 이미지를 싣는다(lib/longform/cast.js 머리말). --cast-at 으로 한 번
+    //   정하면 run.json 에 남아 **이후 모든 구간이 같은 것을 쓴다.** 판 구매 앞(0원 단계)에 둔다.
+    let cast = [];
+    {
+      const given = opt("--cast-at");
+      const cp = given ? parseCastAt(given, { keys: (scn.characters || []).map((c) => c.key), segments: state.segments.length }) : { ok: true, cast: state.castAt || [] };
+      if (!cp.ok) die(cp.reason);
+      for (const c of cp.cast) {
+        if (c.seg >= seg) die(`인물 ${c.key} 의 참조는 이미 구운 앞 구간에서만 뽑아요(구간 ${c.seg} → 지금 구간 ${seg})`);
+        const cPath = path.join(runDir, `cast-${c.key}.jpg`);
+        rmSync(cPath, { force: true });
+        await runFfmpeg(castFrameArgs({ input: path.join(runDir, `seg${c.seg}.mp4`), at: c.at, crop: c.crop, out: cPath }));
+        if (!existsSync(cPath)) die(`인물 ${c.key} 이미지를 못 뽑았어요 — --cast-at 을 확인해요`);
+        cast.push({ key: c.key, bytes: readFileSync(cPath) });
+        console.log(`   인물 ${c.key} — 구간 ${c.seg} ${c.at}초${c.crop ? " (잘라냄)" : ""} (${cPath})`);
+      }
+      if (given) { state.castAt = cp.cast; save(); }
+    }
+
     // 판 — 단계별과 같은 지문·같은 크기 규칙을 쓴다. 칸을 잘라 버킷에 올리는 일은 안 한다
     //   (drawStoryboardSheet 의 뒤 절반) — H3 에는 판 한 장의 주소만 있으면 된다.
     // ★★ 산 판은 **바로 적어 두고**, 다시 돌리면 그것을 쓴다(접수 전에 죽어도 판값이 두 번 안 나간다).
@@ -217,12 +237,17 @@ async function runSegment(seg) {
       console.log(`구간 ${seg} — 이미 그린 판을 다시 쓴다(${s.sheet})`);
     } else {
       const boardRefs = photos.filter((p) => !hasFaceRisk(p)).map((p) => ({ bytes: p.bytes, key: p.key, photo_id: p.id, kind: "thing" }));
+      // 인물 참조는 사진 **뒤에** 싣고, 번호도 그 뒤부터 센다(판 지문의 "Attached reference image n" 규약).
+      const castRefs = cast.map((c) => ({ bytes: c.bytes, key: `cast-${c.key}.jpg`, kind: "person" }));
+      const castLines = sheetCastLines(cast, { startAt: boardRefs.length + 1 });
+      const sheetPrompt = [buildStoryboardPrompt(project, cuts, grid, "", boardRefs), castLines].filter(Boolean).join("\n\n");
+      writeFileSync(path.join(runDir, `seg${seg}-sheet.prompt.txt`), sheetPrompt);
       const sheet = await generateImage({
-        prompt: buildStoryboardPrompt(project, cuts, grid, "", boardRefs),
+        prompt: sheetPrompt,
         aspect_ratio: grid.canvas,
         projectId: state.runId,
         resolution: imageResolutionFor(project),
-        refs: boardRefs,
+        refs: [...boardRefs, ...castRefs],
         imageSize: storyboardImageSize(grid, state.settings.aspect_ratio, resolutionForProject(project)),
       });
       s.sheet = sheet.url;
@@ -240,7 +265,7 @@ async function runSegment(seg) {
       return;
     }
 
-    const { refs, audios, dropped, extraUsd } = segmentRefs({ sheet: { url: s.sheet }, photos, anchor, last, voices });
+    const { refs, audios, dropped, extraUsd } = segmentRefs({ sheet: { url: s.sheet }, photos, cast, anchor, last, voices });
     const prompt = buildSegmentPrompt({ scenario: scn, seg, bible, refs, audios, grid });
     writeFileSync(path.join(runDir, `seg${seg}.prompt.txt`), prompt);
     printDropped(dropped);
