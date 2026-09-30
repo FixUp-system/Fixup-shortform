@@ -31,11 +31,35 @@ describe("몸통", () => {
   });
 });
 
+describe("머리말은 한 자리(lib/fal-auth.js)에서 온다", () => {
+  it("★★★ 요청 몸통을 fal 에 보관하지 않게 한다 — 닻(실사 얼굴)과 올린 사진이 몸통에 든다", async () => {
+    const before = process.env.FAL_KEY;
+    process.env.FAL_KEY = "test-key";
+    const seen = [];
+    const fetchImpl = async (url, opt) => {
+      seen.push(opt?.headers || {});
+      return url.includes("queue.fal.run")
+        ? res(200, { request_id: "r", status_url: "S", response_url: "R" })
+        : res(200, { status: "IN_QUEUE" });
+    };
+    try {
+      await submitH3({ prompt: "p" }, { fetchImpl });
+      await collectH3({ statusUrl: "S", responseUrl: "R" }, { fetchImpl });
+    } finally {
+      process.env.FAL_KEY = before;
+    }
+    for (const h of seen) {
+      expect(h.Authorization).toBe("Key test-key");
+      expect(h["X-Fal-Store-IO"]).toBe("0");
+    }
+    expect(seen[0]["Content-Type"]).toBe("application/json");
+  });
+});
+
 describe("접수", () => {
   it("큐 주소로 보내고 접수증을 돌려준다", async () => {
     let called = "";
     const job = await submitH3({ prompt: "p" }, {
-      key: "k",
       fetchImpl: async (url) => { called = url; return res(200, { request_id: "r1", status_url: "S", response_url: "R" }); },
     });
     expect(called).toBe("https://queue.fal.run/minimax/h3/reference-to-video");
@@ -43,7 +67,7 @@ describe("접수", () => {
   });
 
   it("거절되면 상태 코드를 담아 던진다", async () => {
-    await expect(submitH3({}, { key: "k", fetchImpl: async () => res(422, { detail: "bad" }) }))
+    await expect(submitH3({}, { fetchImpl: async () => res(422, { detail: "bad" }) }))
       .rejects.toThrow(/H3 접수 실패 \(422\)/);
   });
 });
@@ -52,13 +76,12 @@ describe("수거", () => {
   const job = { statusUrl: "S", responseUrl: "R" };
 
   it("아직이면 done:false", async () => {
-    const out = await collectH3(job, { key: "k", fetchImpl: async () => res(200, { status: "IN_PROGRESS" }) });
+    const out = await collectH3(job, { fetchImpl: async () => res(200, { status: "IN_PROGRESS" }) });
     expect(out).toEqual({ done: false, status: "IN_PROGRESS" });
   });
 
   it("끝났으면 영상 주소를 준다", async () => {
     const out = await collectH3(job, {
-      key: "k",
       fetchImpl: async (url) => (url === "S" ? res(200, { status: "COMPLETED" }) : res(200, { video: { url: "https://v.mp4" } })),
     });
     expect(out).toEqual({ done: true, url: "https://v.mp4" });
@@ -69,7 +92,7 @@ describe("기다리기", () => {
   it("끝날 때까지 두드린다", async () => {
     let n = 0;
     const url = await waitH3({ statusUrl: "S", responseUrl: "R" }, {
-      key: "k", sleep: async () => {}, now: () => 0,
+      sleep: async () => {}, now: () => 0,
       fetchImpl: async (u) => {
         if (u === "S") return res(200, { status: ++n < 3 ? "IN_PROGRESS" : "COMPLETED" });
         return res(200, { video: { url: "https://v.mp4" } });
@@ -82,7 +105,7 @@ describe("기다리기", () => {
   it("★★ 시간을 넘기면 던지되, 접수증으로 이어 기다릴 수 있다고 말한다 — 재접수하면 값이 두 번 나간다", async () => {
     let t = 0;
     await expect(waitH3({ statusUrl: "S", responseUrl: "R" }, {
-      key: "k", sleep: async () => {}, now: () => (t += 60000), timeoutMs: 120000,
+      sleep: async () => {}, now: () => (t += 60000), timeoutMs: 120000,
       fetchImpl: async () => res(200, { status: "IN_QUEUE" }),
     })).rejects.toThrow(/다시 돌리면 이어서 기다려요/);
   });
