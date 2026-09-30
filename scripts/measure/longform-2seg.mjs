@@ -15,7 +15,7 @@
 //   "admin" 이고, admin 은 체험 한도($0.5)에 막힐 수 있다(CLAUDE.md 크레딧 절).
 // ⚠️ H3 영상은 원장(cost_records)에 안 남는다 — fal 을 직접 부른다(기존 측정 스크립트와 같다).
 //   시나리오·사진 판정·판 그림은 lib 을 거치므로 남는다. 대조할 때 이 차이를 안다.
-import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, rmSync } from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 
@@ -33,13 +33,13 @@ const { generateImage, imageResolutionFor } = await import("../../lib/imagegen.j
 const { resolutionForProject, seedForProject } = await import("../../lib/clip-limits.js");
 const { storyboardGridFor, storyboardImageSize, buildStoryboardPrompt } = await import("../../lib/reel/storyboard.js");
 const { buildReelCuts } = await import("../../app/api/reel/[id]/scenario/route.js");
-const { generateLongformScenario } = await import("../../lib/longform/scenario.js");
+const { generateLongformScenario, checkStoredScenario } = await import("../../lib/longform/scenario.js");
 const { buildBible, segmentCharacters } = await import("../../lib/longform/bible.js");
 const { buildSegmentPrompt, segmentShots, segmentSeconds } = await import("../../lib/longform/segment-prompt.js");
 const { segmentRefs } = await import("../../lib/longform/refs.js");
 const { frameAtArgs, lastFrameArgs, concatList, joinArgs, runFfmpeg } = await import("../../lib/longform/ffmpeg.js");
 const { h3Body, submitH3, waitH3 } = await import("../../lib/longform/h3.js");
-const { gate, checkBibleLock, stageCostUsd } = await import("../../lib/longform/run-state.js");
+const { gate, checkBibleLock, stageCostUsd, stageIsFree, parseAnchorAt } = await import("../../lib/longform/run-state.js");
 
 const [stage, runDir, ...rest] = process.argv.slice(2);
 if (!stage || !runDir) {
@@ -54,8 +54,10 @@ mkdirSync(runDir, { recursive: true });
 const statePath = path.join(runDir, "run.json");
 const state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, "utf8")) : {};
 const save = () => writeFileSync(statePath, JSON.stringify(state, null, 2));
-const free = fakeFal() && fakeLlm();
-if (!free && stage !== "join" && !process.env.FAL_KEY) die("FAL_KEY 가 없어요(.env.local)");
+// ★★ 가짜 여부는 **그 단계가 부르는 것**으로 가른다(최종 리뷰: FAKE=fal 에서 H3 가 진짜로 나갔다).
+const free = stageIsFree(stage, { fal: fakeFal(), llm: fakeLlm() });
+const bakes = stage === "seg1" || stage === "seg2";
+if (bakes && !fakeFal() && !process.env.FAL_KEY) die("FAL_KEY 가 없어요(.env.local)");
 
 // 스크립트 안에서 쓰는 프로젝트 모양 — lib 들이 읽는 칸만 채운다. 저장하지 않는다.
 function projectOf() {
@@ -144,34 +146,48 @@ async function runSegment(seg) {
     const project = projectOf();
     const photos = photosWithBytes();
 
-    // 판 — 단계별과 같은 지문·같은 크기 규칙을 쓴다. 칸을 잘라 버킷에 올리는 일은 안 한다
-    //   (drawStoryboardSheet 의 뒤 절반) — H3 에는 판 한 장의 주소만 있으면 된다.
-    const cuts = buildReelCuts({ ...scn, shots: segmentShots(scn, seg) });
-    const grid = storyboardGridFor(cuts.length, { resolution: state.settings.resolution, aspect: state.settings.aspect_ratio });
-    const boardRefs = photos.filter((p) => !hasFaceRisk(p)).map((p) => ({ bytes: p.bytes, key: p.key, photo_id: p.id, kind: "thing" }));
-    const sheet = await generateImage({
-      prompt: buildStoryboardPrompt(project, cuts, grid, "", boardRefs),
-      aspect_ratio: grid.canvas,
-      projectId: state.runId,
-      resolution: imageResolutionFor(project),
-      refs: boardRefs,
-      imageSize: storyboardImageSize(grid, state.settings.aspect_ratio, resolutionForProject(project)),
-    });
-    s.sheet = sheet.url;
+    // ★★ 최종 리뷰(2026-09-30) — **0원 단계를 판 구매($0.83) 앞에 둔다.** 예전에는 판을 먼저
+    //   사고 닻을 뽑아서, --anchor-at 오타나 추출 실패로 죽으면 다시 돌릴 때 판을 또 샀다.
 
     // 닻 — 구간 2 만. 기본은 구간 1 의 가운데. 확인 ① 에서 "출연자 전원이 보이는" 초를 골라 --anchor-at 으로 준다.
     let anchor = null;
     let last = null;
     if (seg === 2) {
+      const pick = parseAnchorAt(opt("--anchor-at"), segmentSeconds(scn, 1));
+      if (!pick.ok) die(pick.reason);
       const prev = path.join(runDir, "seg1.mp4");
-      const at = Number(opt("--anchor-at") ?? segmentSeconds(scn, 1) / 2);
       const aPath = path.join(runDir, "anchor.jpg");
       const lPath = path.join(runDir, "last.jpg");
-      await runFfmpeg(frameAtArgs({ input: prev, at, out: aPath }));
+      // 옛 프레임을 먼저 지운다 — 추출이 조용히 실패하면 지난번 닻을 읽게 된다.
+      rmSync(aPath, { force: true });
+      rmSync(lPath, { force: true });
+      await runFfmpeg(frameAtArgs({ input: prev, at: pick.at, out: aPath }));
       await runFfmpeg(lastFrameArgs({ input: prev, out: lPath }));
+      if (!existsSync(aPath) || !existsSync(lPath)) die("닻·마지막 프레임을 못 뽑았어요 — seg1.mp4 와 --anchor-at 을 확인해요");
       anchor = { bytes: readFileSync(aPath), key: "anchor.jpg", keys: segmentCharacters(scn, 1) };
       last = { bytes: readFileSync(lPath), key: "last.jpg" };
-      s.anchorAt = at;
+      s.anchorAt = pick.at;
+    }
+
+    // 판 — 단계별과 같은 지문·같은 크기 규칙을 쓴다. 칸을 잘라 버킷에 올리는 일은 안 한다
+    //   (drawStoryboardSheet 의 뒤 절반) — H3 에는 판 한 장의 주소만 있으면 된다.
+    // ★★ 산 판은 **바로 적어 두고**, 다시 돌리면 그것을 쓴다(접수 전에 죽어도 판값이 두 번 안 나간다).
+    if (s.sheet) {
+      console.log(`구간 ${seg} — 이미 그린 판을 다시 쓴다(${s.sheet})`);
+    } else {
+      const cuts = buildReelCuts({ ...scn, shots: segmentShots(scn, seg) });
+      const grid = storyboardGridFor(cuts.length, { resolution: state.settings.resolution, aspect: state.settings.aspect_ratio });
+      const boardRefs = photos.filter((p) => !hasFaceRisk(p)).map((p) => ({ bytes: p.bytes, key: p.key, photo_id: p.id, kind: "thing" }));
+      const sheet = await generateImage({
+        prompt: buildStoryboardPrompt(project, cuts, grid, "", boardRefs),
+        aspect_ratio: grid.canvas,
+        projectId: state.runId,
+        resolution: imageResolutionFor(project),
+        refs: boardRefs,
+        imageSize: storyboardImageSize(grid, state.settings.aspect_ratio, resolutionForProject(project)),
+      });
+      s.sheet = sheet.url;
+      save();
     }
 
     const { refs, dropped, extraUsd } = segmentRefs({ sheet: { url: s.sheet }, photos, anchor, last });
@@ -189,7 +205,7 @@ async function runSegment(seg) {
     Object.assign(s, { bible, prompt, seconds, dropped, extraUsd, refCount: refs.length });
 
     // ★★★ 접수증을 **기다리기 전에** 적는다 — 끊겨도 다시 돌리면 재접수 없이 이어 기다린다.
-    s.job = free ? { fake: true } : await submitH3(body);
+    s.job = fakeFal() ? { fake: true } : await submitH3(body);
     save();
     console.log(`구간 ${seg} 접수 — ${s.job.requestId || "(가짜)"} · ${seconds}초 · ${state.settings.resolution}`);
   } else {
@@ -230,6 +246,10 @@ async function runJoin() {
 if (stage === "seg1" || stage === "seg2") {
   const seg = stage === "seg1" ? 1 : 2;
   if (state.scenario) {
+    // ★★★ 최종 리뷰(2026-09-30) — 확인 ① 뒤 run.json 편집을 **굽기 전에 다시 잰다.** 안 재면
+    //   구간 2 를 27초로 고쳐도 통과하고 H3 가 조용히 15초로 잘랐다. 어림값도 틀렸다.
+    const chk = checkStoredScenario(state);
+    if (!chk.ok) die(`run.json 의 시나리오가 규칙을 어겨요 — ${chk.errors.join(" · ")}`);
     const est = stageCostUsd(stage, { resolution: state.settings.resolution, seconds: segmentSeconds(state.scenario, seg) });
     console.log(`어림 — 구간 ${seg}: 약 $${est.toFixed(2)} (판 + H3 ${state.settings.resolution} · 참조 추가분은 굽기 직전에 다시 말한다)`);
   }

@@ -59,6 +59,14 @@ describe("구간 지문", () => {
     expect(buildSegmentPrompt({ scenario: s, seg: 1, bible, refs: [] })).toContain("No people appear in this part.");
   });
 
+  it("★★ 내레이션 줄에도 내레이터 목소리 묘사를 붙인다 — 목소리의 유일한 글 채널이다", () => {
+    const s = structuredClone(scn);
+    s.voice = "calm, low narrator";
+    s.shots[0].speaker_id = "narration";
+    const q = buildSegmentPrompt({ scenario: s, seg: 1, bible, refs: [] });
+    expect(q).toContain('A narrator (calm, low narrator) says off-screen, in Korean: "오늘도 잘 구워졌네."');
+  });
+
   it("화면 밖 목소리는 입을 안 움직이게 말한다", () => {
     const s = structuredClone(scn);
     s.shots[0].speaker_id = "narration";

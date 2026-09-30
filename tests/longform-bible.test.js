@@ -33,6 +33,17 @@ describe("고정 블록", () => {
   });
 });
 
+describe("최종 리뷰에서 잡힌 것", () => {
+  it("★★ 내레이터 목소리도 고정 블록에 싣는다 — 안 실으면 구간마다 내레이터가 따로 뽑힌다", () => {
+    const s = { ...scn, voice: "calm Korean woman in her 40s, low and warm" };
+    expect(buildBible(s, { style: "photo" })).toContain("Narrator voice: calm Korean woman in her 40s, low and warm.");
+  });
+
+  it("내레이터 목소리가 없으면 줄을 안 만든다", () => {
+    expect(buildBible({ ...scn, voice: "" }, { style: "photo" })).not.toMatch(/Narrator voice/);
+  });
+});
+
 describe("구간 출연자", () => {
   it("보이거나 말하는 사람을 인물 목록 순서로 돌려준다", () => {
     expect(segmentCharacters(scn, 1)).toEqual(["A", "B"]);

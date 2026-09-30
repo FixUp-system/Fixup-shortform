@@ -5,6 +5,7 @@ import { REEL_SCENARIO_SCHEMA } from "../lib/reel/scenario.js";
 import {
   LONGFORM_SCENARIO_SCHEMA, segmentBounds, buildLongformScenarioMessages,
   validateLongformScenario, generateLongformScenario, fakeLongformResponse,
+  checkStoredScenario,
 } from "../lib/longform/scenario.js";
 
 const project = {
@@ -109,6 +110,34 @@ describe("검증", () => {
     const raw = fakeLongformResponse();
     raw.characters[1].key = "A";
     expect(validateLongformScenario(raw, 0).errors.join(" ")).toMatch(/겹쳐요/);
+  });
+});
+
+describe("최종 리뷰에서 잡힌 것", () => {
+  it("★★★ 단계별 지문의 '화자는 하나'·'통째로 만든다'를 명시적으로 덮어쓴다 — 안 그러면 다중 화자 시험이 기운다", () => {
+    const { system } = buildLongformScenarioMessages(project, { segmentCount: 2 });
+    // 단계별 지문이 실제로 그 문장들을 싣는다 — 덮어쓸 대상이 있다는 것을 먼저 확인한다.
+    expect(system).toMatch(/화자는 \*\*하나\*\*다/);
+    expect(system).toMatch(/한 번에 통째로/);
+    // 롱폼 규칙이 그 둘을 이 영상에 적용하지 않는다고 말한다.
+    const rules = system.slice(system.indexOf("★★ 롱폼 규칙"));
+    expect(rules).toMatch(/화자는 하나.*적용하지 않는다/);
+    expect(rules).toMatch(/통째로.*적용하지 않는다/);
+    expect(rules).toMatch(/인물마다 자기 목소리/);
+  });
+
+  it("★★★ 저장된 시나리오를 다시 잰다 — 확인 ① 뒤 run.json 편집이 규칙을 우회하지 못한다", () => {
+    const scenario = validateLongformScenario(fakeLongformResponse(), 0).scenario;
+    const state = { scenario, photos: [], settings: { resolution: "768P", aspect_ratio: "9:16" } };
+    expect(checkStoredScenario(state)).toEqual({ ok: true, scenario: expect.any(Object) });
+
+    const edited = structuredClone(state);
+    for (const s of edited.scenario.shots.filter((x) => x.segment === 2)) s.seconds = 9; // 구간 2 = 27초
+    edited.scenario.shots[3].speaker_id = "Z";
+    const out = checkStoredScenario(edited);
+    expect(out.ok).toBe(false);
+    expect(out.errors.join(" ")).toMatch(/구간 2 가 27초/);
+    expect(out.errors.join(" ")).toMatch(/"Z" 는 인물 목록에 없다/);
   });
 });
 

@@ -1,6 +1,9 @@
 // 단계 관문 — 돈이 나가는 자리를 코드가 지킨다(CLAUDE.md: 유료 생성은 승인 먼저).
 import { describe, it, expect } from "vitest";
-import { gate, checkBibleLock, stageCostUsd, h3SecondUsd, SCENARIO_USD, SHEET_USD } from "../lib/longform/run-state.js";
+import {
+  gate, checkBibleLock, stageCostUsd, h3SecondUsd, SCENARIO_USD, SHEET_USD,
+  stageIsFree, parseAnchorAt,
+} from "../lib/longform/run-state.js";
 
 const planned = { scenario: { shots: [] }, segments: [{ seg: 1 }, { seg: 2 }] };
 
@@ -41,6 +44,37 @@ describe("관문 — 돈", () => {
   it("잇기는 0원이라 --yes 가 필요 없다", () => {
     const s = { ...planned, segments: [{ seg: 1, video: "a" }, { seg: 2, video: "b" }] };
     expect(gate(s, "join", {})).toEqual({ ok: true });
+  });
+});
+
+describe("최종 리뷰에서 잡힌 것", () => {
+  it("★★★ 접수했거나 구운 구간이 있으면 plan 을 다시 못 돌린다 — 접수증이 지워져 값이 두 번 나간다", () => {
+    const withJob = { scenario: {}, segments: [{ seg: 1, job: { statusUrl: "S" } }, { seg: 2 }] };
+    const out = gate(withJob, "plan", { yes: true });
+    expect(out.ok).toBe(false);
+    expect(out.reason).toMatch(/새 작업 폴더/);
+    const withVideo = { scenario: {}, segments: [{ seg: 1, video: "a" }, { seg: 2 }] };
+    expect(gate(withVideo, "plan", { yes: true }).ok).toBe(false);
+  });
+
+  it("아직 아무것도 안 구웠으면 plan 을 다시 돌려도 된다", () => {
+    expect(gate(planned, "plan", { yes: true })).toEqual({ ok: true });
+  });
+
+  it("★★ 가짜 여부는 단계마다 그 단계가 부르는 것을 본다 — FAKE=fal 에서 H3 는 가짜여야 한다", () => {
+    // plan 은 LLM 을, seg 는 fal(판·H3)을 부른다. join 은 로컬이다.
+    expect(stageIsFree("plan", { fal: true, llm: false })).toBe(false);
+    expect(stageIsFree("seg1", { fal: true, llm: false })).toBe(true);
+    expect(stageIsFree("seg2", { fal: false, llm: true })).toBe(false);
+    expect(stageIsFree("join", { fal: false, llm: false })).toBe(true);
+  });
+
+  it("★★ 닻 초는 판을 사기 **전에** 거른다 — 숫자이고 0 이상 · 구간 길이 미만", () => {
+    expect(parseAnchorAt(undefined, 14)).toEqual({ ok: true, at: 7 });
+    expect(parseAnchorAt("5", 14)).toEqual({ ok: true, at: 5 });
+    expect(parseAnchorAt("abc", 14).ok).toBe(false);
+    expect(parseAnchorAt("-1", 14).ok).toBe(false);
+    expect(parseAnchorAt("14", 14).reason).toMatch(/0 이상 14초 미만/);
   });
 });
 
