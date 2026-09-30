@@ -14,7 +14,7 @@ npm run dev
 - `CLAUDE_API_KEY` — 대본·컷분할·화면설계·캐스팅·브리핑·대화 (Claude Opus 5)
 - `OPENAI_API_KEY` — 이미지 검수·사진 설명만 (gpt-4o vision)
 - `FAL_KEY` — 영상 생성 (fal.ai)
-- `FAL_IMAGE_ENDPOINT` — 컷 이미지 모델 (기본: fal-ai/nano-banana, $0.04/장)
+- `FAL_IMAGE_ENDPOINT` — 컷·스토리보드 이미지 모델 (코드 기본값: `openai/gpt-image-2`, `lib/imagegen.js`)
 - 영상 모델은 env 가 아니라 프로젝트가 정한다(⑤영상에서 고른다, `lib/clip-limits.js`의 `I2V_MODELS`)
 
 ## 구조
@@ -59,6 +59,54 @@ lib/costs.js                   비용 기록 저장소 (data/costs.json)
 app/api/costs/route.js         비용 조회
 docs/superpowers/specs/        설계 문서
 ```
+
+## 롱폼 (테스트용 · 사이드바 "테스트용 - 롱폼생성")
+
+15초 구간을 여러 개 만들어 이어 붙여 1~10분 영상을 만든다. 모델은 **MiniMax H3**(fal)이고, 인물이
+**직접 말한다**(TTS·립싱크 없음). 지금은 화면이 입력만 받고, 생성은 측정 스크립트로 돌린다.
+
+```
+plan(시나리오) → cast(실사 캐스팅) → seg1 → seg2 → … → join
+```
+
+```bash
+S="node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs"
+$S plan    data/longform/<폴더> --input 입력.json --segments 4 --yes   # 1분 = 구간 4개
+$S cast    data/longform/<폴더> --yes                                   # 인물·의상별 H3 5초 클립
+$S seg1    data/longform/<폴더> --yes                                   # 구간마다 따로 승인
+$S seg2    data/longform/<폴더> --anchor-at 5 --no-last --yes
+$S join    data/longform/<폴더>                                         # 0원
+$S extend  data/longform/<폴더> --brief "방향" --yes                    # 구운 구간 뒤에 구간 더하기
+```
+
+입력 파일 예: `{"text":"사용자가 칠 법한 한 줄","style":"photo","mood":"premium","aspect":"9:16","resolution":"768P","segments":4}`
+— 유료 단계는 `--yes` 없이 돌리면 어림값만 보여 주고 멈춘다. `SHOTFORM_FAKE=all` 이면 전 단계가 0원으로 관통한다.
+
+**구조의 핵심(2026-09-30 실측으로 정했다)**
+- **참조 사슬의 출발점은 H3 실사 캐스팅이다.** GPT Image 판에서 출발한 참조는 황금빛 역광·보케·화보
+  얼굴(AI 질감)을 모든 구간으로 대물림했다. 인물마다 H3 글만(text-to-video)으로 분위기 없는 전신 5초를
+  찍고, 그 프레임(얼굴)과 소리(목소리)를 구간 1부터 참조로 넣는다
+- **옷이 바뀌면 의상 캐스팅**: 기본 캐스팅 얼굴을 참조로 옷마다 5초를 더 찍고, 구간마다 그 구간에서
+  입는 옷의 참조만 싣는다(`characters[].outfits` · `shots[].outfits`)
+- **판(스토리보드)은 기본으로 끈다**(`--sheet` 로만 켠다) · 고정 블록에서 "예쁘게" 문구를 뺐다
+- **내레이션은 인물의 voiceover** 로만 쓴다 — 캐스팅이 없는 내레이터 목소리는 구간마다 달라진다
+- **요구하지 말 것**(`lib/longform/scenario.js` 의 `AVOID_RULES`): 옷감 상태 변화 · 한 우산 뒷모습 ·
+  소품 개수 미명시 · golden hour/역광/보케 · 손만 크게 잡는 클로즈업
+
+```
+lib/longform/plan.js           구간 산수 · 엔드포인트(H3_R2V · H3_T2V)
+lib/longform/scenario.js       시나리오 생성·검증·이어 쓰기 · 요구하지 말 것
+lib/longform/casting.js        캐스팅·의상 캐스팅 지문 · 목소리 길이
+lib/longform/bible.js          고정 블록(인물 잠금) · 구간별 장소·옷
+lib/longform/segment-prompt.js 구간 지문 · 구간별 의상 참조(segmentCastRefs)
+lib/longform/refs.js           H3 참조 목록(이미지 9 · 파일 12 · 목소리 합 15초)
+lib/longform/h3.js             H3 큐 호출(동기 호출은 300초에 끊기고 과금된다)
+lib/longform/run-state.js      단계 관문(--yes · 이어 받기 · 인물 잠금) · 어림값
+scripts/measure/longform-2seg.mjs   위 단계를 도는 스크립트
+scripts/measure/sheet-float-check.mjs 판 자동 검사 정확도 측정(VLM)
+```
+
+값(768P): 캐스팅 클립 5초 ≈ $0.30 · 15초 구간 ≈ $0.90 · 시나리오 ≈ $0.40 이하.
 
 ## 주의
 
