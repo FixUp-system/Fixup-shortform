@@ -108,13 +108,16 @@ async function runPlan() {
   if (!inputPath) die("plan 은 --input 입력.json 이 필요해요(scripts/measure/longform-2seg.example.json 참고)");
   state.runId ||= randomUUID();
   state.input = JSON.parse(readFileSync(inputPath, "utf8"));
+  // 구간 수 — --segments 가 먼저, 없으면 입력 파일의 segments, 없으면 2(30초 시험 때의 기본).
+  const segCount = Number(opt("--segments") || state.input.segments || 2);
+  if (!(Number.isInteger(segCount) && segCount >= 1 && segCount <= 40)) die("--segments 는 1~40 이어야 해요");
   state.settings = {
     aspect_ratio: state.input.aspect || "9:16",
     style: state.input.style || "photo",
     mood: state.input.mood || "premium",
     narration_lang: "ko",
-    seconds: 30,
-    target_seconds: 30,
+    seconds: segCount * 15,
+    target_seconds: segCount * 15,
     resolution: state.input.resolution || "768P",
   };
   state.photos = [];
@@ -125,29 +128,29 @@ async function runPlan() {
     const judged = vision.person || vision.what || vision.lettering;
     state.photos.push({ id: `p${i + 1}`, path: ph.path, key, role: ph.role, ...(judged ? { vision } : {}) });
   }
-  state.scenario = await generateLongformScenario({ project: projectOf(), segmentCount: 2 });
+  state.scenario = await generateLongformScenario({ project: projectOf(), segmentCount: segCount });
   state.bible = buildBible(state.scenario, { style: state.settings.style });
-  state.segments = [{ seg: 1 }, { seg: 2 }];
+  state.segments = Array.from({ length: segCount }, (_, i) => ({ seg: i + 1 }));
   save();
 
-  // ⏸ 멈춤 0 — 굽기 전에 두 구간의 지문 전문을 보여 준다(0원).
+  // ⏸ 멈춤 0 — 굽기 전에 구간마다 지문 전문을 보여 준다(0원). 판은 기본으로 꺼져 있다.
   const photos = photosWithBytes();
-  for (const seg of [1, 2]) {
-    const anchor = seg === 2 ? { keys: segmentCharacters(state.scenario, 1) } : null;
-    const last = seg === 2 ? {} : null;
-    const { refs, dropped, extraUsd } = segmentRefs({ sheet: {}, photos, anchor, last });
-    const grid = storyboardGridFor(segmentShots(state.scenario, seg).length, { resolution: state.settings.resolution, aspect: state.settings.aspect_ratio });
-    const prompt = buildSegmentPrompt({ scenario: state.scenario, seg, bible: state.bible, refs, grid });
+  for (const seg of state.segments.map((x) => x.seg)) {
+    const anchor = seg >= 2 ? { keys: segmentCharacters(state.scenario, seg - 1) } : null;
+    const { refs, dropped, extraUsd } = segmentRefs({ sheet: null, photos, anchor });
+    const grid = null;
+    const bible = segmentBible(state.scenario, { style: state.settings.style, seg });
+    const prompt = buildSegmentPrompt({ scenario: state.scenario, seg, bible, refs, grid });
     writeFileSync(path.join(runDir, `seg${seg}.prompt.txt`), prompt);
     const seconds = segmentSeconds(state.scenario, seg);
     console.log(`\n구간 ${seg} — ${seconds}초 · 참조 ${refs.length}장(${refs.map((r) => r.kind).join(", ")}) · 추가 참조값 $${extraUsd.toFixed(2)}`);
     console.log(`   출연: ${segmentCharacters(state.scenario, seg).join(", ") || "(없음)"}`);
     console.log(`   지문: ${path.join(runDir, `seg${seg}.prompt.txt`)}`);
     printDropped(dropped);
-    console.log(`   어림: $${stageCostUsd(`seg${seg}`, { resolution: state.settings.resolution, seconds, extraRefUsd: extraUsd }).toFixed(2)}`);
+    console.log(`   어림: $${stageCostUsd(`seg${seg}`, { resolution: state.settings.resolution, seconds, extraRefUsd: extraUsd, sheet: false }).toFixed(2)}`);
   }
-  console.log(`\n고정 블록:\n${state.bible}`);
-  console.log(`\n⏸ 멈춤 0 — 두 지문을 읽고, 괜찮으면 seg1 을 돌려요(먼저 --yes 없이 → 어림값 확인 → 승인 → --yes).`);
+  console.log(`\n고정 블록:\n${buildFixedBlock(state.scenario, { style: state.settings.style })}`);
+  console.log(`\n⏸ 멈춤 0 — 시나리오를 읽고, 괜찮으면 cast(캐스팅)부터 돌려요(먼저 --yes 없이 → 어림값 확인 → 승인 → --yes).`);
 }
 
 // 캐스팅이 인물 전원 몫으로 끝났나 — 끝났으면 모든 구간이 그 얼굴·목소리를 쓴다(lib/longform/casting.js).
