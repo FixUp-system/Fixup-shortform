@@ -3,7 +3,7 @@
 //
 //   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs plan <작업폴더> --input <입력.json> [--yes]
 //   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs seg1 <작업폴더> [--yes]
-//   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs seg2 <작업폴더> [--yes] [--anchor-at 7] [--voice-at "A=1.2-2.5+9.7-11;B=6.8-8.2"]
+//   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs seg2 <작업폴더> [--yes] [--anchor-at 7] [--voice-at "A=1.2-2.5+9.7-11;B=6.8-8.2"] [--no-last] [--sheet-only]
 //   node --import ./scripts/measure/ext-loader-reg.mjs scripts/measure/longform-2seg.mjs join <작업폴더>
 //
 // ★★★ 유료 단계(plan·seg1·seg2)는 --yes 없이 안 돈다. 먼저 --yes 없이 돌려 어림값을 보고,
@@ -167,8 +167,11 @@ async function runSegment(seg) {
       await runFfmpeg(lastFrameArgs({ input: prev, out: lPath }));
       if (!existsSync(aPath) || !existsSync(lPath)) die("닻·마지막 프레임을 못 뽑았어요 — seg1.mp4 와 --anchor-at 을 확인해요");
       anchor = { bytes: readFileSync(aPath), key: "anchor.jpg", keys: segmentCharacters(scn, 1) };
-      last = { bytes: readFileSync(lPath), key: "last.jpg" };
+      // --no-last: 직전 프레임을 싣지 않는다. 실제 구간 1(romance-busstop)의 끝 프레임이 **아무도 안 든
+      //   우산**이었다 — "이어 가라"로 실으면 결함이 구간 2 로 넘어간다. 인물은 닻이 붙든다.
+      last = flag("--no-last") ? null : { bytes: readFileSync(lPath), key: "last.jpg" };
       s.anchorAt = pick.at;
+      s.noLast = flag("--no-last");
     }
 
     // 목소리 — 구간 2 만. 구간 1 에서 H3 가 낸 인물별 목소리를 잘라 reference_audio_urls 로 싣는다
@@ -208,6 +211,17 @@ async function runSegment(seg) {
       });
       s.sheet = sheet.url;
       save();
+    }
+
+    // --sheet-only: 판까지만 사고 멈춘다 — 사장님이 판을 보고 나서 H3($0.90)를 산다.
+    //   실제 구간 1 의 떠 있는 우산은 **판에서 이미** 그렇게 그려져 있었다(영상은 판을 따랐을 뿐).
+    //   다시 돌리면 적어 둔 판을 쓰므로 판값이 두 번 안 나간다.
+    if (flag("--sheet-only")) {
+      const sheetPath = path.join(runDir, `seg${seg}-sheet.png`);
+      if (!fakeFal()) await download(s.sheet, sheetPath);
+      console.log(`\n⏸ 판만 그렸어요 — ${fakeFal() ? s.sheet : sheetPath}`);
+      console.log("   판을 보고 괜찮으면 --sheet-only 없이 같은 명령으로 다시 돌려요(판은 다시 안 산다).");
+      return;
     }
 
     const { refs, audios, dropped, extraUsd } = segmentRefs({ sheet: { url: s.sheet }, photos, anchor, last, voices });
