@@ -213,6 +213,11 @@ const SIDEBAR_FLOWS = Object.freeze({
   ad: true,      // 광고 영상
   film: false,   // 영상 만들기 (수정)
   reel: true,    // 영상 만들기
+  // ★★ 2026-09-29 사장님 지시 — 롱폼을 **따로** 진행할 자리. 이름도 사장님이 정했다
+  //   ("테스트용 - 롱폼생성"). 이름에 「테스트용」이 붙어 있는 것이 곧 계약이다 —
+  //   굽기가 아직 배선되지 않았고, 입력 화면까지만 있다.
+  //   ★ 접을 때는 위 머리말대로 이 한 글자를 false 로 돌린다(화면·테스트는 그대로 산다).
+  longform: true, // 테스트용 - 롱폼생성
 });
 
 // ★ 2026-09-16 — `initialAdmin` 은 app/layout.js 가 middleware 의 검증된 요청 헤더에서 뽑아
@@ -350,6 +355,23 @@ export default function Sidebar({ initialAdmin = false }) {
             <Link href="/reel/new" className="side-new">+ 새로 만들기</Link>
           )}
         </>
+      )}
+      {/* ★★ 롱폼 — **단계별과 섞지 않는다**(2026-09-29 사장님 지시: "거기서 따로 진행할게").
+          15초짜리 여러 편을 만들어 이어 붙이는 흐름이라 단계 구조 자체가 달라진다.
+          섞어 두면 한쪽을 고칠 때 다른 쪽이 깨진다.
+          ★ 「새로 만들기」 하위 링크를 안 단다 — 아직 프로젝트가 만들어지지 않으므로
+            들어갈 자리가 /longform/new 하나뿐이다. */}
+      {SIDEBAR_FLOWS.longform && (
+        <Link
+          href="/longform/new"
+          className={`side-item${pathname.startsWith("/longform") ? " on" : ""}`}
+        >
+          <span className="ic"><Icon name="home" /></span>
+          <span className="side-item-text">
+            테스트용 - 롱폼생성
+            <span className="side-item-sub">15초씩 이어 붙여요</span>
+          </span>
+        </Link>
       )}
       <Link
         href="/archive"

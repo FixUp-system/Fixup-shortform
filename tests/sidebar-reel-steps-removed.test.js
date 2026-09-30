@@ -47,7 +47,13 @@ describe("부제 한 줄이 실제로 두 줄로 선다", () => {
     const pairs = code.match(
       /side-item-text">[^<]*<span className="side-item-sub">[^<]*<\/span>\s*<\/span>/g
     ) || [];
-    expect(pairs.length, "부제가 쌓는 칸 **안**에 없다 — 한 줄에 나란히 선다").toBe(2);
+    // ★★ 2026-09-29 — **개수를 박지 않는다.** 원래 `toBe(2)` 였는데, 흐름이 하나 늘자
+    //   (테스트용 롱폼) 옳게 중첩했는데도 빨개졌다 — 재려던 것은 "몇 개인가"가 아니라
+    //   "**전부 안에 있는가**"다. 이제 부제를 하나 더 달아도 옳게 달면 그린이고,
+    //   하나라도 형제로 빼면 그 개수가 안 맞아 빨개진다(막으려던 그 모양 그대로다).
+    const subs = code.match(/side-item-sub/g) || [];
+    expect(subs.length, "부제가 하나도 없다 — 이 그물이 잴 것이 없어졌다").toBeGreaterThan(0);
+    expect(pairs.length, "부제가 쌓는 칸 **안**에 없다 — 한 줄에 나란히 선다").toBe(subs.length);
 
     const col = css.match(/\.side-item-text\s*\{[^}]*\}/);
     expect(col, ".side-item-text 규칙이 없다").not.toBeNull();
