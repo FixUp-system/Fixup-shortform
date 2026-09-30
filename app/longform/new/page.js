@@ -44,8 +44,12 @@ export default function LongformNewPage() {
   // ★ 구간 수는 **계산해서** 보여 준다. 손으로 적으면 굽는 쪽과 갈린다.
   const segments = segmentCountFor(seconds);
 
+  // ★★ 2026-09-30 사장님 지시 — "단계별 영상이랑 똑같은 사이즈로". 처음엔 카드(panel--wide)로
+  //   한 번 더 싸서 1440px 에서 격자가 832(단계별 1148), 입력 칸이 468×310(단계별 784×552)이었다.
+  //   그래서 뼈대를 app/reel/new/page.js 와 **같게** 둔다 — 카드 없이 조각으로 main 에 바로
+  //   서고, 오른쪽은 rw-work > composer > composer-bar 다. 크기는 그 클래스들이 정한다.
   return (
-    <section className="panel panel--wide">
+    <>
       <h1 className="pgtitle">테스트용 - 롱폼생성</h1>
       <p className="pgsub">
         15초짜리 여러 편을 만들어 이어 붙여요. 소재와 설정을 주시면 전체 시나리오부터 함께 만들어요.
@@ -121,31 +125,34 @@ export default function LongformNewPage() {
           </div>
         </aside>
 
-        <div>
-          <label className="lbl" htmlFor="lf-text">소재</label>
-          {/* ★ 칸도 기존 것을 쓴다 — 광고 첫 화면과 **같은 부품·같은 클래스**다
+        <div className="rw-work">
+          {/* ★ 칸도 기존 것을 쓴다 — 단계별 첫 화면과 **같은 부품·같은 클래스**다
               (components/AutoTextarea + .field.composer-text). 새 클래스를 지으면
               globals.css 에 이름이 없는 칸이 되고, tests/ad-draft-form-ui.test.js 의
               그물이 그것을 막는다(실제로 여기서 한 번 걸렸다). */}
           <div className="composer">
             <AutoTextarea
-              id="lf-text"
+              aria-label="소재"
               className="field composer-text"
               maxLength={MAX_MATERIAL_TEXT}
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="무엇에 대한 영상인가요? 이야기·정보·대본 무엇이든 적어 주세요."
             />
-          </div>
 
-          {/* ★★ 잠긴 이유를 말한다 — 눌리지 않는 버튼만 두면 "고장인가?"가 된다. */}
-          <p className="pgsub warn">
-            ⚠ 아직 만들기가 배선되지 않았어요 — 지금은 입력만 확인하는 시험용 화면이에요.
-            구간을 어디서 끊을지와 인물을 어떻게 붙들지를 정한 뒤에 열어요.
-          </p>
-          <button className="cta" disabled>시작하기</button>
+            <div className="composer-bar">
+              <span className="spacer" />
+              <button className="cta" disabled>시작하기 →</button>
+            </div>
+            {/* ★★ 잠긴 이유를 말한다 — 눌리지 않는 버튼만 두면 "고장인가?"가 된다.
+                단계별이 인물 고지를 두는 그 자리(composer-note)다. */}
+            <p className="composer-note">
+              ⚠ 아직 만들기가 배선되지 않았어요 — 지금은 입력만 확인하는 시험용 화면이에요.
+              구간을 어디서 끊을지와 인물을 어떻게 붙들지를 정한 뒤에 열어요.
+            </p>
+          </div>
         </div>
       </div>
-    </section>
+    </>
   );
 }

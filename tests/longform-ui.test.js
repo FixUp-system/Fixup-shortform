@@ -66,6 +66,23 @@ describe("입력 화면", () => {
   });
 });
 
+describe("★★ 단계별 첫 화면과 같은 크기다(2026-09-30 사장님 지시: \"단계별 영상이랑 똑같은 사이즈로\")", () => {
+  // 1440px 실측: 단계별은 격자 폭 1148 · 입력 칸 784×552, 롱폼은 카드(panel--wide)에 한 번 더
+  // 싸여 격자 832 · 입력 칸 468×310 이었다. 뼈대를 단계별(app/reel/new/page.js)과 같게 둔다.
+  it("카드로 한 번 더 싸지 않는다 — 단계별처럼 main 에 바로 선다", () => {
+    expect(newCode).not.toMatch(/panel--wide/);
+    expect(newCode).toMatch(/return \(\s*<>/);
+  });
+
+  it("오른쪽은 단계별과 같은 작업 칸(rw-work) 안의 입력 틀(composer)이다", () => {
+    expect(newCode).toMatch(/className="rw-work"[\s\S]*className="composer"[\s\S]*composer-text/);
+  });
+
+  it("버튼은 입력 틀 아래 띠(composer-bar)에 선다", () => {
+    expect(newCode).toMatch(/className="composer-bar"[\s\S]*className="cta"/);
+  });
+});
+
 describe("작업 화면 — 아직 자리표시다", () => {
   it("★ 굽기를 배선하지 않았다는 것을 화면이 말한다 — 빈 화면은 고장으로 읽힌다", () => {
     expect(stripComments(workPage)).toMatch(/아직|준비|설계/);
