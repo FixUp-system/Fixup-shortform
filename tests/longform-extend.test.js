@@ -128,6 +128,16 @@ describe("이어 쓰기", () => {
     expect(all).toMatch(/화면 밖/);
   });
 
+  it("★★★ 지시문이 답의 JSON 모양을 칸 이름까지 말한다 — callJson 은 schema 를 **안 쓴다**", () => {
+    // 첫 실제 extend(2026-09-30)가 "LLM 응답 해석 실패"로 죽었다. lib/llm.js 의 callJson 은 schema 인자를
+    // 받기만 하고 모델에 안 넘긴다 — 모양을 정하는 것은 지시문의 "JSON 으로만 답한다" 블록뿐이다.
+    const { system } = buildExtendMessages({ scenario: state.scenario, fromSegment: 3, brief: "x" });
+    expect(system).toMatch(/JSON 으로만 답한다/);
+    for (const k of ["text", "segment_looks", "shots", "segment", "speaker_id", "on_screen", "shows", "line", "seconds", "camera", "lighting", "action", "sound"]) {
+      expect(system).toContain(`"${k}"`);
+    }
+  });
+
   it("스키마는 새 샷·장소옷·글만 받는다 — 인물 칸이 없다(인물은 잠겨 있다)", () => {
     expect(Object.keys(LONGFORM_EXTEND_SCHEMA.properties).sort()).toEqual(["segment_looks", "shots", "text"]);
   });
