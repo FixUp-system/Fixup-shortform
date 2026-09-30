@@ -9,7 +9,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildLongformScenarioMessages, validateLongformScenario, generateLongformScenario, fakeLongformResponse,
 } from "../lib/longform/scenario.js";
-import { buildSegmentPrompt, segmentCastRefs } from "../lib/longform/segment-prompt.js";
+import { buildSegmentPrompt, segmentCastRefs, shotAt } from "../lib/longform/segment-prompt.js";
 import { buildCastingPrompt, buildCostumePrompt } from "../lib/longform/casting.js";
 
 const project = {
@@ -131,6 +131,27 @@ describe("구간 지문 — 엑스트라 · 샷별 옷 · 의상 참조", () => 
     const p = buildSegmentPrompt({ scenario: scn, seg: 2, bible: "", refs });
     expect(p).toMatch(/Image 1 shows A wearing outfit A2 \(charcoal wool trouser suit/);
     expect(p).toMatch(/in the shots where A wears A2/);
+  });
+});
+
+describe("★ 닻에 실제로 보이는 인물만 적는다", () => {
+  // 2026-09-30 revenge-wedding 구간 2: 닻(구간 1 의 5초 · A 혼자 휴대폰 클로즈업)을 "showing A, B, C" 로 실었다 —
+  //   구간 출연자 전원을 적었기 때문이다. 모델이 없는 B·C 를 찾을 수 있다.
+  const scn = validateLongformScenario(wedding(), 0).scenario;
+  it("그 초를 덮는 샷의 on_screen 이다", () => {
+    // 구간 1 = 5(A) + 5(A,B) + 4(A,B)
+    expect(shotAt(scn, 1, 2).on_screen).toEqual(["A"]);
+    expect(shotAt(scn, 1, 5.5).on_screen).toEqual(["A", "B"]);
+    expect(shotAt(scn, 1, 13.9).on_screen).toEqual(["A", "B"]);
+  });
+  it("구간 끝을 넘으면 마지막 샷", () => expect(shotAt(scn, 1, 99)).toBe(scn.shots[2]));
+});
+
+describe("★ 요구하지 말 것 — 손만 크게 잡는 클로즈업", () => {
+  // 같은 날 구간 2 마지막 컷("이불 위 반지 없는 손")에서 손가락이 뒤틀리며 움직였다.
+  it("시나리오·이어 쓰기 지시문에 든다", () => {
+    const { system } = buildLongformScenarioMessages(project, { segmentCount: 2 });
+    expect(system).toMatch(/손만 크게 잡는/);
   });
 });
 

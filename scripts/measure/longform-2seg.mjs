@@ -43,7 +43,7 @@ const { storyboardGridFor, storyboardImageSize, buildStoryboardPrompt } = await 
 const { buildReelCuts } = await import("../../app/api/reel/[id]/scenario/route.js");
 const { generateLongformScenario, checkStoredScenario, extendLongformScenario } = await import("../../lib/longform/scenario.js");
 const { buildBible, segmentCharacters, segmentBible, buildFixedBlock, segmentLook } = await import("../../lib/longform/bible.js");
-const { buildSegmentPrompt, segmentShots, segmentSeconds, segmentCastRefs } = await import("../../lib/longform/segment-prompt.js");
+const { buildSegmentPrompt, segmentShots, segmentSeconds, segmentCastRefs, shotAt } = await import("../../lib/longform/segment-prompt.js");
 const { segmentRefs } = await import("../../lib/longform/refs.js");
 const { frameAtArgs, lastFrameArgs, concatList, joinArgs, runFfmpeg, voiceClipArgs, castFrameArgs } = await import("../../lib/longform/ffmpeg.js");
 const { parseVoiceAt } = await import("../../lib/longform/voice-ref.js");
@@ -284,7 +284,8 @@ async function runSegment(seg) {
       // 마지막 프레임은 늘 **바로 앞 구간**의 끝이다 — 이어지는 자리가 거기다.
       await runFfmpeg(lastFrameArgs({ input: path.join(runDir, `seg${seg - 1}.mp4`), out: lPath }));
       if (!existsSync(aPath) || !existsSync(lPath)) die(`닻·마지막 프레임을 못 뽑았어요 — seg${from}.mp4 와 --anchor-at 을 확인해요`);
-      anchor = { bytes: readFileSync(aPath), key: "anchor.jpg", keys: segmentCharacters(scn, from) };
+      // ★ 닻에 **실제로 보이는 인물만** — 그 초를 덮는 샷의 on_screen(segment-prompt.js 의 shotAt).
+      anchor = { bytes: readFileSync(aPath), key: "anchor.jpg", keys: shotAt(scn, from, pick.at)?.on_screen || [] };
       s.anchorSeg = from;
       // --no-last: 직전 프레임을 싣지 않는다. 실제 구간 1(romance-busstop)의 끝 프레임이 **아무도 안 든
       //   우산**이었다 — "이어 가라"로 실으면 결함이 구간 2 로 넘어간다. 인물은 닻이 붙든다.
