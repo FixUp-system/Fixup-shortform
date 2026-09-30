@@ -1,0 +1,68 @@
+// 구간 지문 — 본문 → 고정 블록 → 출연 → 참조 → 대사(스펙 규칙 ④: 뒤에 올수록 강하게 받는다).
+import { describe, it, expect } from "vitest";
+import { buildSegmentPrompt, segmentShots, segmentSeconds } from "../lib/longform/segment-prompt.js";
+import { buildBible } from "../lib/longform/bible.js";
+import { fakeLongformResponse, validateLongformScenario } from "../lib/longform/scenario.js";
+
+const scn = validateLongformScenario(fakeLongformResponse(), 0).scenario;
+const bible = buildBible(scn, { style: "photo" });
+const refs = [{ kind: "sheet" }, { kind: "photo", roleEn: "is the subject — keep it unchanged" }, { kind: "anchor", keys: ["A", "B"] }, { kind: "last" }];
+
+describe("구간 가르기", () => {
+  it("그 구간의 샷만", () => expect(segmentShots(scn, 2)).toHaveLength(2));
+  it("초를 더한다", () => {
+    expect(segmentSeconds(scn, 1)).toBe(14);
+    expect(segmentSeconds(scn, 2)).toBe(15);
+  });
+});
+
+describe("구간 지문", () => {
+  const p = buildSegmentPrompt({ scenario: scn, seg: 2, bible, refs });
+
+  it("★★★ 순서가 본문 → 고정 블록 → 출연 → 참조 → 대사다", () => {
+    const at = (s) => p.indexOf(s);
+    expect(at("Shot 1")).toBeLessThan(at("Fixed setting"));
+    expect(at("Fixed setting")).toBeLessThan(at("In this part only"));
+    expect(at("In this part only")).toBeLessThan(at("Image 1"));
+    expect(at("Image 1")).toBeLessThan(at("says"));
+  });
+
+  it("★★ 고정 블록을 글자 그대로 싣는다", () => expect(p).toContain(bible));
+
+  it("그 구간 샷만 본문에 든다", () => {
+    expect(p).toContain("A hands B an apron");
+    expect(p).not.toContain("pulls a tray of bread");
+  });
+
+  it("★ 출연자 밖의 사람을 막는다", () => {
+    expect(p).toContain("In this part only A, B appear — no other people, including in the background.");
+  });
+
+  it("★★ H3 의 참조 이름(Image n)으로 역할을 말한다", () => {
+    expect(p).toMatch(/Image 1 is the storyboard for this part/);
+    expect(p).toMatch(/Image 2 is the subject/);
+    expect(p).toMatch(/Image 3 is a still from the previous part showing A, B/);
+    expect(p).toMatch(/Image 4 is the last frame of the previous part/);
+  });
+
+  it("★★★ 대사마다 그 인물의 목소리 묘사를 붙인다 — 목소리의 유일한 글 채널이다", () => {
+    expect(p).toContain('A (warm, low, unhurried) says, with natural lip sync, in Korean: "괜찮아, 반죽부터 하자."');
+  });
+
+  it("대사 없는 샷은 말하게 하지 않는다", () => {
+    expect(p.match(/ says/g)).toHaveLength(1);
+  });
+
+  it("사람이 없는 구간은 사람이 없다고 말한다", () => {
+    const s = structuredClone(scn);
+    for (const sh of s.shots) { sh.on_screen = []; sh.speaker_id = ""; sh.line = ""; }
+    expect(buildSegmentPrompt({ scenario: s, seg: 1, bible, refs: [] })).toContain("No people appear in this part.");
+  });
+
+  it("화면 밖 목소리는 입을 안 움직이게 말한다", () => {
+    const s = structuredClone(scn);
+    s.shots[0].speaker_id = "narration";
+    const q = buildSegmentPrompt({ scenario: s, seg: 1, bible, refs: [] });
+    expect(q).toContain('A narrator says off-screen, in Korean: "오늘도 잘 구워졌네."');
+  });
+});
