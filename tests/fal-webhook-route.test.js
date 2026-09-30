@@ -26,7 +26,11 @@ vi.mock("../lib/fal-webhook.js", () => ({
 }));
 vi.mock("../lib/collect-sweep.js", () => ({
   sweepBakingProjects: async () => ({ swept: 0 }),
-  sweepOneProject: async (id) => { swept.push(id); return { swept: 1, collected: 1 }; },
+  sweepOneProject: async (id) => { swept.push(`sweep:${id}`); return { swept: 1, collected: 1 }; },
+}));
+// ★ 접수증 되살리기(2026-09-30) — 쓸기 **앞에** 서명된 요청 번호로 부른다.
+vi.mock("../lib/orphan-receipt.js", () => ({
+  adoptOrphanReceipt: async (id, requestId) => { swept.push(`adopt:${id}:${requestId}`); return {}; },
 }));
 
 const post = async (url, ok) => {
@@ -49,10 +53,14 @@ describe("fal 웹훅 문 — 서명이 자물쇠다", () => {
     expect(swept, "서명도 없이 걷었다").toEqual([]);
   });
 
-  it("★★★ 서명이 맞으면 **그 편만** 걷는다", async () => {
+  it("★★★ 서명이 맞으면 **그 편만** — 접수증을 되살린 뒤 걷는다", async () => {
+    // 순서가 뜻이다: 되살린 접수증이 있어야 같은 회차의 쓸기가 그 편을 찾는다.
     const res = await post(URL_OK, true);
     expect(res.status).toBe(200);
-    expect(swept).toEqual(["11111111-1111-4111-8111-111111111111"]);
+    expect(swept).toEqual([
+      "adopt:11111111-1111-4111-8111-111111111111:r1",
+      "sweep:11111111-1111-4111-8111-111111111111",
+    ]);
   });
 
   it("★★★ 가리키는 편이 없어도 **2xx** 다 — 재시도를 부르지 않는다", async () => {

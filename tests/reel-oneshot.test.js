@@ -686,6 +686,22 @@ describe("attachReelVideo — 잃어버린 영상을 문서에 도로 붙인다"
     expect(f.doc.cuts[0].video, "굽는 중인데 덮었다").toBeUndefined();
   });
 
+  // ★★ 2026-09-30 — 웹훅의 접수증 되살리기(lib/orphan-receipt.js)가 이 문을 쓴다. 그 편은
+  //   **굽는 중인데 접수증이 없다**(접수 직후 함수가 죽었다) — 도는 굽기가 없으니 덮을 것도 없다.
+  it("★★ orphan 이면 굽는 중이어도 붙인다 — 단, 접수증이 없을 때만", async () => {
+    const f = fixture({ reel: { status: "rendering" } });
+    const out = await attachReelVideo("pid", "uid", { requestId: "req-lost" }, { ...f, fetchImpl: okFetch, orphan: true });
+    expect(out).toMatchObject({ attached: true });
+    expect(f.doc.cuts[0].video.url).toBe("https://fal/rescued.mp4");
+  });
+
+  it("★★ orphan 이어도 접수증이 살아 있으면 안 붙인다 — 그것은 정상 수거의 일이다", async () => {
+    const f = fixture({ reel: { status: "rendering", job: { requestId: "req-live" } } });
+    const out = await attachReelVideo("pid", "uid", { requestId: "req-other" }, { ...f, fetchImpl: okFetch, orphan: true });
+    expect(out).toMatchObject({ rendering: true });
+    expect(f.doc.cuts[0].video).toBeUndefined();
+  });
+
   it("★★ 나머지 컷의 옛 클립을 걷어낸다 — 안 걷으면 완성본이 한 편 + 옛 컷들이 된다", async () => {
     const f = fixture();
     f.doc.cuts[1].video = { url: "https://old/1.mp4", seconds: 5 };

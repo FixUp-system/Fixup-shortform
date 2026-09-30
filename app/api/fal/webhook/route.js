@@ -1,5 +1,6 @@
 import { verifyFalWebhook } from "../../../../lib/fal-webhook.js";
 import { sweepOneProject } from "../../../../lib/collect-sweep.js";
+import { adoptOrphanReceipt } from "../../../../lib/orphan-receipt.js";
 
 // ★★★ fal 이 **끝났다고 우리를 부르는 문** (2026-09-10 사장님: "크론 요청을 동적으로
 //   사용은 불가능한거야?").
@@ -42,9 +43,26 @@ export async function POST(req) {
   //   우리가 할 일이 없는 요청에 4xx/5xx 를 주면 그 재시도가 전부 헛걸음이 된다.
   if (!projectId) return Response.json({ ok: true, skipped: "가리키는 편이 없어요" });
 
+  // ★★★ 2026-09-30 — 쓸기 **앞에** 접수증을 되살린다(lib/orphan-receipt.js). 접수 직후 함수가
+  //   죽은 편은 문서에 요청 번호가 없어서, 쓸기(접수증이 있는 행만 고른다)가 그 편을 못 찾았다 —
+  //   위 머리말이 약속한 "fal 이 projectId 를 들고 찾아온다"가 실제로는 일하지 못하고 있었다.
+  //   요청 번호는 **서명을 확인한 본문**에서만 읽는다. 결과는 여전히 fal 에 다시 물어 받는다.
+  const requestId = requestIdOf(body);
+  const adopted = await adoptOrphanReceipt(projectId, requestId).catch((e) => ({ error: e?.message }));
+
   // ★ 던지지 않는다 — 여기서 새면 fal 이 31번 다시 보낸다. 수거는 일시 오류면 접수증을
   //   지키므로(09-10 고침), 놓친 것은 다음 방문이나 크론이 이어받는다.
   const out = await sweepOneProject(projectId).catch((e) => ({ error: e?.message }));
-  console.log("[fal 웹훅]", projectId, JSON.stringify(out));
+  console.log("[fal 웹훅]", projectId, JSON.stringify({ ...out, adopted: adopted?.adopted || null }));
   return Response.json({ ok: true, ...out });
+}
+
+// 본문에서 요청 번호만 읽는다 — 모양이 이상하면 없는 것으로 본다(되살리기를 안 할 뿐이다).
+function requestIdOf(body) {
+  try {
+    const id = JSON.parse(body)?.request_id;
+    return typeof id === "string" && id ? id : null;
+  } catch {
+    return null;
+  }
 }
