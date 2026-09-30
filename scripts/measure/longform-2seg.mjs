@@ -43,12 +43,12 @@ const { storyboardGridFor, storyboardImageSize, buildStoryboardPrompt } = await 
 const { buildReelCuts } = await import("../../app/api/reel/[id]/scenario/route.js");
 const { generateLongformScenario, checkStoredScenario, extendLongformScenario } = await import("../../lib/longform/scenario.js");
 const { buildBible, segmentCharacters, segmentBible, buildFixedBlock, segmentLook } = await import("../../lib/longform/bible.js");
-const { buildSegmentPrompt, segmentShots, segmentSeconds } = await import("../../lib/longform/segment-prompt.js");
+const { buildSegmentPrompt, segmentShots, segmentSeconds, segmentCastRefs } = await import("../../lib/longform/segment-prompt.js");
 const { segmentRefs } = await import("../../lib/longform/refs.js");
 const { frameAtArgs, lastFrameArgs, concatList, joinArgs, runFfmpeg, voiceClipArgs, castFrameArgs } = await import("../../lib/longform/ffmpeg.js");
 const { parseVoiceAt } = await import("../../lib/longform/voice-ref.js");
 const { parseCastAt, sheetCastLines } = await import("../../lib/longform/cast.js");
-const { buildCastingPrompt, castingVoiceSeconds, CASTING_SECONDS } = await import("../../lib/longform/casting.js");
+const { buildCastingPrompt, buildCostumePrompt, castingVoiceSeconds, CASTING_SECONDS } = await import("../../lib/longform/casting.js");
 const { H3_T2V } = await import("../../lib/longform/plan.js");
 const { h3Body, submitH3, waitH3 } = await import("../../lib/longform/h3.js");
 const { gate, checkBibleLock, stageCostUsd, stageIsFree, parseAnchorAt, segOf } = await import("../../lib/longform/run-state.js");
@@ -158,8 +158,18 @@ function castingReady() {
   const chars = state.scenario?.characters || [];
   return chars.length > 0 && chars.every((c) => {
     const x = state.casting?.[c.key];
-    return x?.image && x?.voice && existsSync(x.image) && existsSync(x.voice);
+    const base = x?.image && x?.voice && existsSync(x.image) && existsSync(x.voice);
+    // 의상 캐스팅 — 첫 번째 옷 밖의 옷마다 이미지가 있어야 한다.
+    const extra = (c.outfits || []).slice(1).every((o) => x?.costumes?.[o.id]?.image && existsSync(x.costumes[o.id].image));
+    return base && extra;
   });
+}
+
+// 그 인물·그 옷의 참조 이미지 — 첫 번째 옷(또는 옷 칸이 없으면)은 기본 캐스팅 프레임이다.
+function castImage(c, outfitId) {
+  const x = state.casting[c.key];
+  if (!outfitId || outfitId === c.outfits?.[0]?.id) return x.image;
+  return x.costumes[outfitId].image;
 }
 
 // 캐스팅 — 인물마다 H3 글만 5초 클립 → 얼굴 프레임(cast-<key>.jpg) · 목소리(voice-<key>.mp3).
@@ -200,6 +210,39 @@ async function runCast() {
     Object.assign(x, { frameAt: at, voiceSeconds });
     save();
     console.log(`캐스팅 ${c.key} — 영상 ${video} · 프레임 ${at}초 · 목소리 ${voiceSeconds}초`);
+
+    // ★★ 의상 캐스팅(사장님 결정 · 방법 2) — 기본 캐스팅 얼굴을 Image 1 로 넣고 옷마다 5초. 첫 번째 옷은
+    //   기본 캐스팅이 이미 입고 있다. 말은 안 시킨다(목소리는 기본 캐스팅의 것 하나).
+    x.costumes ||= {};
+    for (const o of (c.outfits || []).slice(1)) {
+      const y = (x.costumes[o.id] ||= {});
+      const cVideo = path.join(runDir, `casting-${o.id}.mp4`);
+      if (flag("--redo")) { delete y.job; delete y.video; }
+      if (!y.video) {
+        if (!y.job) {
+          y.prompt = buildCostumePrompt(c, o);
+          const body = h3Body({
+            prompt: y.prompt, seconds: CASTING_SECONDS, aspect: state.settings.aspect_ratio, resolution: state.settings.resolution,
+            refs: [{ bytes: readFileSync(x.image), key: "cast.jpg" }],
+          });
+          y.job = fakeFal() ? { fake: true } : await submitH3(body);
+          save();
+          console.log(`의상 ${o.id} 접수 — ${y.job.requestId || "(가짜)"}`);
+        }
+        if (y.job.fake) copyFileSync(path.join("public", "samples", "reel-15s.mp4"), cVideo);
+        else await download(await waitH3(y.job), cVideo);
+        y.video = cVideo;
+        save();
+      }
+      const cAt = Number(frameAt[o.id] ?? y.frameAt ?? 2);
+      y.image = path.join(runDir, `cast-${o.id}.jpg`);
+      rmSync(y.image, { force: true });
+      await runFfmpeg(castFrameArgs({ input: cVideo, at: cAt, crop: null, out: y.image }));
+      if (!existsSync(y.image)) die(`의상 ${o.id} 프레임을 못 뽑았어요`);
+      Object.assign(y, { frameAt: cAt, desc: o.desc });
+      save();
+      console.log(`의상 ${o.id} — 영상 ${cVideo} · 프레임 ${cAt}초 · ${o.desc}`);
+    }
   }));
   console.log("\n⏸ 캐스팅 클립을 보고 고른다 — 다시 뽑으려면 cast --only A --redo --yes, 프레임만 바꾸려면 cast --frame-at \"A=2\" --yes(0원).");
   console.log("   괜찮으면 seg1 부터 굽는다 — 모든 구간이 이 얼굴·목소리를 참조로 쓴다(판은 기본으로 꺼져 있다).");
@@ -280,8 +323,14 @@ async function runSegment(seg) {
     let cast = [];
     if (castingReady()) {
       // ★★★ 캐스팅(cast 단계)의 실사 프레임 — 그림 모델에서 출발한 참조는 AI 질감을 대물림한다(casting.js).
-      for (const c of scn.characters) cast.push({ key: c.key, bytes: readFileSync(state.casting[c.key].image) });
-      console.log(`   인물 — 캐스팅 ${cast.map((c) => c.key).join(" · ")}`);
+      //   ★★ 그 구간에서 입는 옷마다 하나(segmentCastRefs) — 회귀 구간처럼 한 구간 안에서 옷이 바뀌면 둘 다.
+      const byKey = new Map(scn.characters.map((c) => [c.key, c]));
+      for (const r of segmentCastRefs(scn, seg)) {
+        const c = byKey.get(r.key);
+        const desc = (c.outfits || []).find((o) => o.id === r.outfit)?.desc || "";
+        cast.push({ key: r.key, outfit: r.outfit, desc, bytes: readFileSync(castImage(c, r.outfit)) });
+      }
+      console.log(`   인물 — 캐스팅 ${cast.map((c) => c.outfit || c.key).join(" · ")}`);
     } else {
       const given = opt("--cast-at");
       const cp = given ? parseCastAt(given, { keys: (scn.characters || []).map((c) => c.key), segments: state.segments.length }) : { ok: true, cast: state.castAt || [] };
@@ -439,8 +488,11 @@ if (segOf(stage)) {
 } else if (stage === "extend") {
   console.log(`어림 — extend: 약 $${stageCostUsd("extend").toFixed(2)} 이하 (시나리오 이어 쓰기 한 번)`);
 } else if (stage === "cast" && state.scenario) {
-  const n = opt("--only") ? opt("--only").split(",").length : (state.scenario.characters || []).length;
-  console.log(`어림 — cast: 약 $${stageCostUsd("cast", { resolution: state.settings.resolution, characters: n }).toFixed(2)} (인물 ${n}명 × ${CASTING_SECONDS}초 · 이미 만든 인물은 0원)`);
+  const only = opt("--only") ? opt("--only").split(",").map((x) => x.trim()) : null;
+  const chosen = (state.scenario.characters || []).filter((c) => !only || only.includes(c.key));
+  // 클립 수 = 인물마다 기본 1 + 옷이 더 있으면 옷마다 1(의상 캐스팅). 전부 5초라 값이 같다.
+  const clips = chosen.reduce((t, c) => t + Math.max(1, (c.outfits || []).length), 0);
+  console.log(`어림 — cast: 약 $${stageCostUsd("cast", { resolution: state.settings.resolution, characters: clips }).toFixed(2)} (인물 ${chosen.length}명 · 클립 ${clips}개 × ${CASTING_SECONDS}초 · 이미 만든 것은 0원)`);
 }
 const g = gate(state, stage, { yes: flag("--yes") || free });
 if (!g.ok) die(g.reason);

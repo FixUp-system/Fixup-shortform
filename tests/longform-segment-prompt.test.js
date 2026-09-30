@@ -43,8 +43,8 @@ describe("구간 지문", () => {
   it("★★★ 순서가 본문 → 고정 블록 → 출연 → 참조 → 대사다", () => {
     const at = (s) => p.indexOf(s);
     expect(at("Shot 1")).toBeLessThan(at("Fixed setting"));
-    expect(at("Fixed setting")).toBeLessThan(at("In this part only"));
-    expect(at("In this part only")).toBeLessThan(at("Image 1"));
+    expect(at("Fixed setting")).toBeLessThan(at("The named characters in this part"));
+    expect(at("The named characters in this part")).toBeLessThan(at("Image 1"));
     expect(at("Image 1")).toBeLessThan(at("says"));
   });
 
@@ -55,8 +55,10 @@ describe("구간 지문", () => {
     expect(p).not.toContain("pulls a tray of bread");
   });
 
-  it("★ 출연자 밖의 사람을 막는다", () => {
-    expect(p).toContain("In this part only A, B appear — no other people, including in the background.");
+  it("★ 이름 있는 출연자를 짚고, 그 밖의 사람은 말 없는 배경 엑스트라로만 둔다", () => {
+    // 2026-09-30 — "배경에도 아무도 없다"가 결혼식장 하객과 싸워 바꿨다(tests/longform-outfits.test.js).
+    expect(p).toContain("The named characters in this part are A, B.");
+    expect(p).toMatch(/never speaking, never in focus/);
   });
 
   it("★★ H3 의 참조 이름(Image n)으로 역할을 말한다", () => {
@@ -77,7 +79,7 @@ describe("구간 지문", () => {
   it("사람이 없는 구간은 사람이 없다고 말한다", () => {
     const s = structuredClone(scn);
     for (const sh of s.shots) { sh.on_screen = []; sh.speaker_id = ""; sh.line = ""; }
-    expect(buildSegmentPrompt({ scenario: s, seg: 1, bible, refs: [] })).toContain("No people appear in this part.");
+    expect(buildSegmentPrompt({ scenario: s, seg: 1, bible, refs: [] })).toContain("No named characters appear in this part.");
   });
 
   it("★★ 내레이션 줄에도 내레이터 목소리 묘사를 붙인다 — 목소리의 유일한 글 채널이다", () => {
