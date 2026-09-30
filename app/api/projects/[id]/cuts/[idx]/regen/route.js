@@ -7,6 +7,7 @@ import {
 import { regenPrice, MAX_REGEN_PER_CUT } from "../../../../../../../lib/pricing.js";
 import { BudgetExceeded } from "../../../../../../../lib/costs.js";
 import { fakeFal } from "../../../../../../../lib/fake";
+import { RegenBusy } from "../../../../../../../lib/regen-busy.js";
 import { modelIdForProject, resolutionForProject } from "../../../../../../../lib/clip-limits.js";
 
 // ★★ 이 라우트는 **기다렸다가 답한다**(await regen…) — 생성 라우트 여섯과 다른 점이다.
@@ -43,10 +44,13 @@ export const POST = withUser(async (req, { params }, user) => {
   // 화면은 "크레딧 부족"과 "만들지 못했어요"를 구분할 수 없다.
   // 가짜 모드는 건너뛴다 — 0원이라 받을 것이 없다(assertBudget 과 같은 규칙).
   let charged = null;
+  // 이 요청이 읽은 회차 — 생성이 그 회차를 **가져갈 때** 대조한다(동시 요청 방어, lib/pipeline.js 의 regenTaken).
+  let expectedPrior;
   if (!fakeFal()) {
     const project = await getProject(id, user.id);
     const cut = (project?.cuts || []).find((c) => c.idx === Number(idx));
     const prior = Number(cut?.regen_count) || 0;
+    expectedPrior = prior;
 
     // ★ 상한 판정이 **어떤 청구보다도 앞**이다(아래 정가 게이트보다도 앞).
     // 뒤에 두면 4회째에 값을 받고 나서 regenCut 이 같은 상한으로 던져 400 이 된다 —
@@ -93,9 +97,13 @@ export const POST = withUser(async (req, { params }, user) => {
   }
 
   try {
-    const cut = await regenCut(id, user.id, Number(idx), undefined, instruction);
+    const cut = await regenCut(id, user.id, Number(idx), undefined, instruction, { expectedPrior });
     return Response.json({ cut });
   } catch (e) {
+    // ★★ 동시 요청에 진 쪽 — 실패가 아니다. 그 회차는 이긴 요청이 만들고 있고 값도 그쪽이
+    //   냈다. **환불하면 안 된다**: 장부의 회차 키가 같아서 이긴 쪽이 낸 값을 되돌린다
+    //   (2026-09-30 점검 — 더블클릭 하나로 유료 재생성이 순지불 0 이 됐다).
+    if (e instanceof RegenBusy) return Response.json({ error: e.message }, { status: 409 });
     // 못 준 것은 받지 않는다 — 자동 관통의 환불과 같은 정책.
     // 카운터는 시도 **전**에 오르므로, 되돌리지 않으면 재시도가 다음 회차 값을 또 낸다.
     if (charged !== null) {

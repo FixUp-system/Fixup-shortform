@@ -12,6 +12,7 @@ import * as projects from "../lib/projects.js";
 // 레거시(Kling) 표를 읽는다 — lib/pricing.js 의 폴백이 가리키는 그 표다.
 import { VIDEO_PRICE, REGEN_PRICE, MAX_REGEN_PER_CUT } from "../lib/pricing.js";
 import { balanceFor, chargeVideo, refundVideo } from "../lib/charges.js";
+import { RegenBusy } from "../lib/regen-busy.js";
 
 // 라우트가 fire-and-forget 으로 띄우는 것들은 전부 모킹한다 — 진짜로 돌면 fal 로 나간다.
 vi.mock("../lib/auto.js", () => ({ runAutoPipeline: vi.fn(async () => {}) }));
@@ -342,6 +343,24 @@ describe("재생성 청구 — 컷당 첫 회는 공짜", () => {
       expect(await balanceFor(A)).toBe(base);
       pipelineMock.regen.mockReset();
       pipelineMock.regen.mockImplementation(async () => ({ idx: 0 }));
+    });
+
+    // ★★ 2026-09-30 점검 — 동시 요청(더블클릭·두 탭). 회차 값은 장부 멱등키가 한 번만
+    //   받는데, 그 회차를 **가져가지 못한** 쪽이 실패로 끝나며 환불을 부르면 같은 키의
+    //   청구 — **이긴 쪽이 낸 값** — 을 되돌렸다. 컷은 유료로 새로 만들어지고 순지불은 0.
+    it(`${name} 재생성 — 동시 요청에 진 쪽은 409 이고 이긴 쪽의 청구를 되돌리지 않는다`, async () => {
+      const { p, base } = await paidCuts(5000, { [field]: 1 });
+      expect((await route(post(), idxCtx(p.id, 0))).status).toBe(200);   // 이긴 쪽 — 회차 1 값을 냈다
+      pipelineMock.regen.mockRejectedValueOnce(new RegenBusy());            // 진 쪽 — 같은 회차 1 을 들고 왔다
+      expect((await route(post(), idxCtx(p.id, 0))).status).toBe(409);
+      expect(await balanceFor(A)).toBe(base - price);
+    });
+
+    it(`${name} 재생성 — 라우트가 읽은 회차를 생성에 넘긴다(그 회차를 가져갈 때 대조한다)`, async () => {
+      const { p } = await paidCuts(5000, { [field]: 2 });
+      await route(post(), idxCtx(p.id, 0));
+      const args = pipelineMock.regen.mock.calls.at(-1);
+      expect(args.at(-1)).toEqual({ expectedPrior: 2 });
     });
 
     // ★ 최종 리뷰 ① — 회차 가격만 보면 여기가 순지불 0 통로였다.

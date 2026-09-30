@@ -1126,12 +1126,13 @@ describe("POST /api/projects — 화질", () => {
 // idx 자리는 비었다). tests/routes.test.js 가 이 라우트들을 한 번도 안 불러 828 그린
 // 뒤에도 안 잡혔다 — 여기서 최소 한 번씩 부른다.
 describe("POST regen 라우트 — id·ownerId·idx 가 밀리지 않는다", () => {
+  // 마지막 인자는 { expectedPrior } — 라우트가 읽은 회차다(동시 요청 방어, tests/regen-concurrency.test.js).
   it("컷 재생성 — id·ownerId·idx·instruction 순서로 넘긴다", async () => {
     const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
     await grant();
     const res = await cutRegenPOST(patchReq({ instruction: "더 밝게" }), idxCtx(p.id, 0));
     expect(res.status).toBe(200);
-    expect(pipelineMock.regen).toHaveBeenCalledWith(p.id, OWNER, 0, undefined, "더 밝게");
+    expect(pipelineMock.regen).toHaveBeenCalledWith(p.id, OWNER, 0, undefined, "더 밝게", expect.any(Object));
   });
 
   it("목소리 재생성 — id·ownerId·idx 순서로 넘긴다", async () => {
@@ -1139,7 +1140,7 @@ describe("POST regen 라우트 — id·ownerId·idx 가 밀리지 않는다", ()
     await grant();
     const res = await voiceRegenPOST(patchReq({}), idxCtx(p.id, 1));
     expect(res.status).toBe(200);
-    expect(pipelineMock.regen).toHaveBeenCalledWith(p.id, OWNER, 1);
+    expect(pipelineMock.regen).toHaveBeenCalledWith(p.id, OWNER, 1, undefined, expect.any(Object));
   });
 
   // 말하는 모델에서는 목소리가 클립과 한 몸이라 따로 다시 만들 수 없다.
@@ -1168,14 +1169,14 @@ describe("POST regen 라우트 — id·ownerId·idx 가 밀리지 않는다", ()
     await grant();
     const res = await clipRegenPOST(patchReq({ instruction: "더 천천히" }), idxCtx(p.id, 2));
     expect(res.status).toBe(200);
-    expect(pipelineMock.regen).toHaveBeenCalledWith(p.id, OWNER, 2, undefined, "더 천천히");
+    expect(pipelineMock.regen).toHaveBeenCalledWith(p.id, OWNER, 2, undefined, "더 천천히", expect.any(Object));
   });
 
   it("클립 재생성 — 지시가 없으면 안 싣는다", async () => {
     const p = await createProject({ ownerId: OWNER, settings: {}, material: { text: "자료", photos: [] } });
     await grant();
     await clipRegenPOST(patchReq({}), idxCtx(p.id, 2));
-    expect(pipelineMock.regen).toHaveBeenCalledWith(p.id, OWNER, 2, undefined, undefined);
+    expect(pipelineMock.regen).toHaveBeenCalledWith(p.id, OWNER, 2, undefined, undefined, expect.any(Object));
   });
 });
 
